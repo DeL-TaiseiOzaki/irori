@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="irori は、ノートを書き、Claude Code・Codex と知識を育てるデスクトップアプリ。Windows・Mac 向けの配布を準備しています。"
+    />
+    <meta name="theme-color" content="#f6f5ef" />
+    <title>irori — ノートから、次の仕事へ。</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">本文へ移動</a>
+    <header class="header wrap">
+      <a class="brand" href="#" aria-label="irori ホーム"
+        ><span class="mark" aria-hidden="true"></span>irori</a
+      >
+      <nav aria-label="メインナビゲーション">
+        <a href="#about">irori について</a
+        ><a href="#download" class="nav-download">ダウンロード <span aria-hidden="true">↘</span></a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero wrap">
+        <p class="eyebrow"><span class="dot"></span> A HOME FOR YOUR KNOWLEDGE</p>
+        <h1>ノートから、<br />次の<span class="warm">仕事</span>へ。</h1>
+        <p class="lead">
+          考えを書きとめる。その続きを、AI と進める。<br
+            class="desktop-break"
+          />あなたの知識を囲んで、一緒につくる場所。
+        </p>
+        <a class="button primary" href="#download"
+          >ダウンロードについて <span aria-hidden="true">↓</span></a
+        >
+        <p class="caption">Windows・Mac 向けに準備中 <span>／</span> 開発プレビュー</p>
+        <figure class="app-preview">
+          <div class="window-bar">
+            <div aria-hidden="true" class="window-dots"><i></i><i></i><i></i></div>
+            <span>irori · あなたの知識の作業場</span><span class="preview-tag">PREVIEW</span>
+          </div>
+          <img
+            src="./app-preview.png"
+            alt="irori の実際の開発画面。左にスペースとノート一覧、中央に日本語のノート、右に Codex を選択した AI パネル。"
+            width="1280"
+            height="913"
+            fetchpriority="high"
+          />
+          <figcaption>実際の開発画面です。表示内容は検証用のサンプルです。</figcaption>
+        </figure>
+      </section>
+      <section id="about" class="about wrap">
+        <div class="section-intro">
+          <p class="eyebrow">WRITE. THINK. MAKE.</p>
+          <h2>知識と実行を、<br />同じ場所で。</h2>
+          <p>ノートを書く時間と、何かをつくる時間。<br />その間を、irori がつなぎます。</p>
+        </div>
+        <div class="features">
+          <article>
+            <span class="feature-number">01 / WRITE</span>
+            <h3>いつものノートが、出発点。</h3>
+            <p>
+              見たまま書けるエディタと、Markdown のソース編集。手元の KB
+              フォルダを開いて、自分のファイルで作業できます。
+            </p>
+          </article>
+          <article>
+            <span class="feature-number">02 / WORK WITH AI</span>
+            <h3>相談から、実際の編集まで。</h3>
+            <p>
+              Claude Code・Codex
+              が、選んだ作業場所で実際に動きます。ノートの整理や編集、ツールの実行を、AI
+              パネルから依頼できます。
+            </p>
+          </article>
+          <article>
+            <span class="feature-number">03 / STAY IN CONTROL</span>
+            <h3>変更を、確かめながら進める。</h3>
+            <p>
+              エージェントの実行状況や確認依頼をパネルに表示。編集中のノートと外部の変更が競合したときは、両方を確認できます。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="download-section" id="download">
+        <div class="wrap">
+          <p class="eyebrow">BRING IRORI HOME</p>
+          <h2>あなたのパソコンに、irori を。</h2>
+          <p class="download-intro" id="release-status" role="status">
+            インストーラーの配布を準備しています。
+          </p>
+          <div id="downloads" class="downloads" aria-label="OS 別のダウンロード"></div>
+          <noscript
+            ><p>
+              現在、Windows・Mac 用インストーラーは配布準備中です。最新の配布情報の表示には
+              JavaScript を有効にしてください。
+            </p></noscript
+          >
+          <p class="release-note">
+            開発版ではノート編集と両エージェントの実行を Linux で確認済みです。<br />Windows・Mac
+            での動作確認と、インストーラーの準備を進めています。
+          </p>
+          <ol class="steps">
+            <li>
+              <span>1</span>
+              <div>
+                <strong>ダウンロード</strong>
+                <p>お使いのパソコン用を選ぶ</p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <strong>インストール</strong>
+                <p>ファイルを開いてアプリを追加</p>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <strong>自分の KB を開く</strong>
+                <p>ノートを開いて、作業を始める</p>
+              </div>
+            </li>
+          </ol>
+          <p class="caption">配布開始後のご利用の流れです。</p>
+        </div>
+      </section>
+      <section class="faq wrap">
+        <div>
+          <p class="eyebrow">GOOD TO KNOW</p>
+          <h2>はじめる前に。</h2>
+        </div>
+        <div class="questions">
+          <details>
+            <summary>ブラウザで使うアプリですか？</summary>
+            <p>
+              irori
+              はパソコンにインストールして使うデスクトップアプリです。このページは、アプリの紹介とダウンロードの入口です。
+            </p>
+          </details>
+          <details>
+            <summary>AI を使うには何が必要ですか？</summary>
+            <p>
+              現在の開発版では、Claude Code または Codex
+              のインストールと、それぞれのアカウントでのログインが必要です。配布版に向けて、初回設定をアプリから案内できるようにする予定です。
+            </p>
+          </details>
+          <details>
+            <summary>ノートはどこに保存されますか？</summary>
+            <p>
+              選んだ KB フォルダに、Markdown
+              ファイルとして保存されます。エージェントへの依頼では、処理に必要な内容が利用する AI
+              サービスに送信されることがあります。
+            </p>
+          </details>
+          <details>
+            <summary>すべての機能が使えますか？</summary>
+            <p>
+              現在は開発プレビューです。ノート編集とローカルエージェントの実行が最初の実装です。クラウド連携や成果物の履歴管理などは、今後の実装対象です。
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap footer">
+      <a class="brand" href="#"><span class="mark" aria-hidden="true"></span>irori</a>
+      <p>知識を囲んで、一緒につくる。</p>
+      <a href="#download">配布状況 <span aria-hidden="true">↗</span></a>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

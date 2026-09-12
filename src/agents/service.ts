@@ -1,0 +1,355 @@
+import { randomUUID } from 'node:crypto';
+import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { AgentEvent, AgentId, AgentInfo, Question, StartRun } from '../domain/types';
+import { agentEnv, killTree, launch, version } from './process';
+import { Rpc, type Message } from './rpc';
+import type { FileService } from '../host/files';
+type Reply = { allow: boolean; answers?: Record<string, string> };
+type Run = {
+  id: string;
+  cancelled: boolean;
+  abort: AbortController;
+  child?: ChildProcess;
+  rpc?: Rpc;
+  threadId?: string;
+  turnId?: string;
+  finish?: () => void;
+  closed: Promise<void>;
+  close: () => void;
+};
+export class AgentService {
+  private active?: Run;
+  private sessions = new Map<string, string>();
+  private requests = new Map<string, (reply: Reply) => void>();
+  constructor(
+    private files: FileService,
+    private emit: (event: AgentEvent) => void,
+  ) {}
+  get busy() {
+    return !!this.active;
+  }
+  async available(): Promise<AgentInfo[]> {
+    return Promise.all(
+      (['codex', 'claude'] as AgentId[]).map(async (id) => {
+        try {
+          const v = await version(id);
+          return {
+            id,
+            version: v,
+            available: true,
+            tested: v.includes(id === 'codex' ? '0.154.0' : '2.1.232'),
+            detail: '既存のCLI認証・設定を使用',
+          };
+        } catch (e) {
+          return { id, version: '', available: false, tested: false, detail: String(e) };
+        }
+      }),
+    );
+  }
+  start(input: StartRun): string {
+    if (this.active) throw Error('An agent is already running. Stop it before starting another.');
+    if (!input.prompt.trim() || input.prompt.length > 32000)
+      throw Error('Enter an instruction (up to 32,000 characters)');
+    this.files.get(input.scopeId);
+    let close!: () => void;
+    const closed = new Promise<void>((resolve) => {
+      close = resolve;
+    });
+    const run: Run = {
+      id: randomUUID(),
+      cancelled: false,
+      abort: new AbortController(),
+      closed,
+      close,
+    };
+    this.active = run;
+    // Let the IPC caller bind the returned run id before first events arrive.
+    setTimeout(() => void this.execute(run, input), 0);
+    return run.id;
+  }
+  private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
+    this.emit({ runId: run.id, type, text, ...extra });
+  }
+  private ask(run: Run, text: string, details: unknown, questions?: Question[]): Promise<Reply> {
+    if (run.cancelled) return Promise.resolve({ allow: false });
+    const requestId = randomUUID();
+    return new Promise((resolve) => {
+      this.requests.set(requestId, resolve);
+      this.event(run, questions ? 'question' : 'permission', text, {
+        requestId,
+        details: JSON.stringify(details, null, 2).slice(0, 24000),
+        questions,
+      });
+    });
+  }
+  respond(id: string, allow: boolean, answers?: Record<string, string>) {
+    const resolve = this.requests.get(id);
+    if (!resolve) throw Error('This request has already ended');
+    this.requests.delete(id);
+    resolve({ allow, answers });
+  }
+  async cancel() {
+    const run = this.active;
+    if (!run) return;
+    run.cancelled = true;
+    run.abort.abort();
+    for (const reply of this.requests.values()) reply({ allow: false });
+    this.requests.clear();
+    if (run.rpc && run.threadId && run.turnId)
+      run.rpc.send({
+        id: 0,
+        method: 'turn/interrupt',
+        params: { threadId: run.threadId, turnId: run.turnId },
+      });
+    if (run.child) await killTree(run.child);
+    run.finish?.();
+    await run.closed;
+  }
+  private async execute(run: Run, input: StartRun) {
+    const timer = setTimeout(() => {
+      this.event(run, 'error', '実行時間の上限（10分）に達しました。');
+      void this.cancel();
+    }, 600000);
+    let outcome: AgentEvent['outcome'] = 'completed';
+    try {
+      if (run.cancelled) return;
+      const space = this.files.get(input.scopeId);
+      let prompt = input.prompt;
+      if (input.notePath) {
+        await this.files.resolve(input.scopeId, input.notePath);
+        prompt = `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.\n\n${prompt}`;
+      }
+      const key = `${input.scopeId}:${input.agent}`;
+      if (input.newSession) this.sessions.delete(key);
+      this.event(
+        run,
+        'status',
+        `${input.agent === 'codex' ? 'Codex' : 'Claude Code'} を ${space.name} で実行中`,
+      );
+      if (input.agent === 'codex') await this.codex(run, space.root, prompt, key);
+      else await this.claude(run, space.root, prompt, key);
+    } catch (e) {
+      if (!run.cancelled) {
+        outcome = 'failed';
+        this.event(run, 'error', String(e));
+      }
+    } finally {
+      clearTimeout(timer);
+      for (const reply of this.requests.values()) reply({ allow: false });
+      this.requests.clear();
+      if (run.child) await killTree(run.child).catch(() => {});
+      run.rpc?.fail(Error('Run finished'));
+      if (run.cancelled) outcome = 'cancelled';
+      this.active = undefined;
+      this.event(
+        run,
+        'done',
+        outcome === 'completed'
+          ? '完了'
+          : outcome === 'cancelled'
+            ? '停止しました'
+            : '実行に失敗しました',
+        { outcome },
+      );
+      run.close();
+    }
+  }
+  private async codex(run: Run, cwd: string, prompt: string, key: string) {
+    const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd);
+    run.child = child;
+    let finished = false;
+    let failure: Error | undefined;
+    const completion = new Promise<void>((resolve) => {
+      run.finish = () => {
+        finished = true;
+        resolve();
+      };
+    });
+    let stderr = '';
+    child.stderr!.on('data', (b) => {
+      stderr = (stderr + b).slice(-6000);
+    });
+    child.on('close', (code) => {
+      if (!finished && !run.cancelled) failure = Error(`Codex exited (${code}): ${stderr}`);
+      run.finish?.();
+    });
+    const rpc = new Rpc(
+      child,
+      (m) => {
+        if (m.id !== undefined && m.method) {
+          void this.codexRequest(run, rpc, m).catch((e) => {
+            failure = e;
+            run.finish?.();
+          });
+          return;
+        }
+        const p = m.params ?? {};
+        if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
+        if (
+          m.method === 'item/started' &&
+          p.item?.type !== 'agentMessage' &&
+          p.item?.type !== 'userMessage'
+        )
+          this.event(run, 'tool', p.item?.type ?? 'tool', {
+            details: JSON.stringify(p.item).slice(0, 16000),
+          });
+        if (m.method === 'item/completed' && p.item?.type === 'fileChange')
+          this.event(run, 'tool', 'ファイルを変更しました', {
+            details: JSON.stringify(p.item).slice(0, 16000),
+          });
+        if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
+        if (m.method === 'turn/completed') {
+          if (p.turn?.status === 'failed')
+            failure = Error(p.turn.error?.message ?? 'Codex turn failed');
+          run.finish?.();
+        }
+      },
+      (error) => {
+        if (!finished && !run.cancelled) failure = error;
+        run.finish?.();
+      },
+    );
+    run.rpc = rpc;
+    await rpc.request('initialize', {
+      clientInfo: { name: 'irori', title: 'irori', version: '0.1.0' },
+      capabilities: { experimentalApi: true },
+    });
+    rpc.send({ method: 'initialized', params: {} });
+    const session = this.sessions.get(key);
+    const params = {
+      cwd,
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'user',
+      sandbox: 'workspace-write',
+    };
+    const thread = await rpc.request(
+      session ? 'thread/resume' : 'thread/start',
+      session ? { ...params, threadId: session } : params,
+    );
+    run.threadId = thread.thread.id;
+    this.sessions.set(key, thread.thread.id);
+    this.event(run, 'status', 'Codex: ワークスペース書き込み・必要時に許可を確認');
+    if (run.cancelled) return;
+    const turn = await rpc.request('turn/start', {
+      threadId: run.threadId,
+      input: [{ type: 'text', text: prompt, text_elements: [] }],
+    });
+    run.turnId = turn.turn.id;
+    await completion;
+    if (failure) throw failure;
+  }
+  private async codexRequest(run: Run, rpc: Rpc, m: Message) {
+    const p = m.params ?? {};
+    let result: unknown;
+    if (
+      m.method === 'item/commandExecution/requestApproval' ||
+      m.method === 'item/fileChange/requestApproval'
+    ) {
+      const reply = await this.ask(run, p.reason ?? '実行の許可', p);
+      result = { decision: reply.allow ? 'accept' : 'decline' };
+    } else if (m.method === 'item/tool/requestUserInput') {
+      const questions: Question[] = p.questions.map((q: any) => ({
+        id: q.id,
+        title: q.question,
+        options: q.options?.map((o: any) => o.label),
+      }));
+      const reply = await this.ask(run, 'エージェントからの質問', p, questions);
+      result = {
+        answers: Object.fromEntries(
+          questions.map((q) => [
+            q.id,
+            { answers: [reply.allow ? (reply.answers?.[q.id] ?? '') : 'User declined to answer.'] },
+          ]),
+        ),
+      };
+    } else if (m.method === 'item/permissions/requestApproval') {
+      const reply = await this.ask(run, p.reason ?? '追加アクセスの許可', p);
+      result = { permissions: reply.allow ? p.permissions : {}, scope: 'turn' };
+    } else {
+      // Unsupported forms/dynamic tools must never be implicitly approved.
+      this.event(run, 'error', `未対応の要求を拒否しました: ${m.method}`);
+      rpc.send({
+        id: m.id,
+        error: { code: -32601, message: 'This request is not supported by irori yet' },
+      });
+      return;
+    }
+    rpc.send({ id: m.id, result });
+  }
+  private async claude(run: Run, cwd: string, prompt: string, key: string) {
+    const { query } = await import('@anthropic-ai/claude-agent-sdk');
+    let stderr = '';
+    let sawResult = false;
+    let streamed = false;
+    const response = query({
+      prompt,
+      options: {
+        cwd,
+        pathToClaudeCodeExecutable: 'claude',
+        env: agentEnv(),
+        settingSources: ['user', 'project', 'local'],
+        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        permissionMode: 'default',
+        includePartialMessages: true,
+        resume: this.sessions.get(key),
+        abortController: run.abort,
+        spawnClaudeCodeProcess: (options) => {
+          const child = launch(options.command, options.args, options.cwd ?? cwd, options.env);
+          run.child = child;
+          child.stderr!.on('data', (b) => {
+            stderr = (stderr + b).slice(-6000);
+          });
+          return child as ChildProcessWithoutNullStreams;
+        },
+        canUseTool: async (tool, input) => {
+          if (tool === 'AskUserQuestion') {
+            const questions = (input.questions as any[]).map((q) => ({
+              id: q.question,
+              title: q.question,
+              options: q.options?.map((o: any) => o.label),
+            }));
+            const reply = await this.ask(run, 'Claude Code からの質問', input, questions);
+            return reply.allow
+              ? { behavior: 'allow', updatedInput: { ...input, answers: reply.answers } }
+              : { behavior: 'deny', message: 'User declined to answer' };
+          }
+          const reply = await this.ask(run, `${tool} の許可`, input);
+          return reply.allow
+            ? { behavior: 'allow', updatedInput: input }
+            : { behavior: 'deny', message: 'The user denied this operation.' };
+        },
+      },
+    });
+    try {
+      for await (const msg of response) {
+        if (run.cancelled) break;
+        if ('session_id' in msg && typeof msg.session_id === 'string')
+          this.sessions.set(key, msg.session_id);
+        if (msg.type === 'stream_event') {
+          const event = msg.event;
+          if (event.type === 'message_start') streamed = false;
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            streamed = true;
+            this.event(run, 'text', event.delta.text);
+          }
+        }
+        if (msg.type === 'assistant')
+          for (const block of msg.message.content) {
+            if (block.type === 'text' && !streamed) this.event(run, 'text', block.text);
+            if (block.type === 'tool_use')
+              this.event(run, 'tool', block.name, {
+                details: JSON.stringify(block.input).slice(0, 16000),
+              });
+          }
+        if (msg.type === 'result') {
+          sawResult = true;
+          if (msg.is_error)
+            throw Error('errors' in msg ? msg.errors.join('\n') : 'Claude Code reported an error');
+        }
+      }
+      if (!sawResult && !run.cancelled) throw Error(`Claude Code ended before a result: ${stderr}`);
+    } finally {
+      response.close();
+    }
+  }
+}

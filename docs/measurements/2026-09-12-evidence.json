@@ -1,0 +1,283 @@
+{
+  "recordedAt": "2026-09-12T09:20:59.139Z",
+  "environment": "Linux x86_64 / Xvfb; not native platform acceptance",
+  "reports": {
+    "real-agents": {
+      "results": [
+        {
+          "agent": "codex",
+          "outcome": "completed",
+          "modified": true,
+          "streamed": true,
+          "toolEvents": 3,
+          "permissions": 2,
+          "elapsedMs": 22624,
+          "errors": []
+        },
+        {
+          "agent": "claude",
+          "outcome": "completed",
+          "modified": true,
+          "streamed": true,
+          "toolEvents": 4,
+          "permissions": 2,
+          "elapsedMs": 15849,
+          "errors": []
+        }
+      ]
+    },
+    "ui-smoke": {
+      "startupMs": 454,
+      "realResults": [],
+      "errors": [],
+      "metrics": [
+        {
+          "type": "Browser",
+          "memory": {
+            "workingSetSize": 175500,
+            "peakWorkingSetSize": 179500
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 0.77,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "GPU",
+          "memory": {
+            "workingSetSize": 141200,
+            "peakWorkingSetSize": 159656
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 0.61,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "Utility",
+          "memory": {
+            "workingSetSize": 76188,
+            "peakWorkingSetSize": 76596
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 0.06,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "Tab",
+          "memory": {
+            "workingSetSize": 192692,
+            "peakWorkingSetSize": 192692
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 1.48,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        }
+      ],
+      "processTreePeak": {
+        "totalRssKiB": 706164,
+        "processes": [
+          {
+            "rssKiB": 172536,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 55672,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 56056,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 153020,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 76188,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 192692,
+            "name": "electron"
+          }
+        ]
+      },
+      "processTreeSamples": 5,
+      "checks": [
+        "folder registration",
+        "rich Markdown table",
+        "rich Japanese edit/save",
+        "no-op bytes",
+        "source save",
+        "edited BOM/CRLF/frontmatter preservation",
+        "clean external refresh",
+        "dirty conflict"
+      ],
+      "rootTestSandboxDisabled": true
+    },
+    "ui-smoke-real": {
+      "startupMs": 401,
+      "realResults": [
+        {
+          "agent": "codex",
+          "modified": true,
+          "editorReflected": true,
+          "dirtyAgentConflict": false
+        },
+        {
+          "agent": "claude",
+          "modified": true,
+          "editorReflected": true,
+          "dirtyAgentConflict": true
+        }
+      ],
+      "errors": [],
+      "metrics": [
+        {
+          "type": "Browser",
+          "memory": {
+            "workingSetSize": 186384,
+            "peakWorkingSetSize": 191212
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 1.58,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "GPU",
+          "memory": {
+            "workingSetSize": 137916,
+            "peakWorkingSetSize": 156372
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 0.82,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "Utility",
+          "memory": {
+            "workingSetSize": 76092,
+            "peakWorkingSetSize": 76416
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 0.06,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        },
+        {
+          "type": "Tab",
+          "memory": {
+            "workingSetSize": 179764,
+            "peakWorkingSetSize": 201496
+          },
+          "cpu": {
+            "cumulativeCPUUsage": 3.27,
+            "percentCPUUsage": 0,
+            "idleWakeupsPerSecond": 0
+          }
+        }
+      ],
+      "processTreePeak": {
+        "totalRssKiB": 1049792,
+        "processes": [
+          {
+            "rssKiB": 188096,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 55668,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 55768,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 137152,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 76092,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 180740,
+            "name": "electron"
+          },
+          {
+            "rssKiB": 356276,
+            "name": "claude"
+          }
+        ]
+      },
+      "processTreeSamples": 94,
+      "checks": [
+        "folder registration",
+        "rich Markdown table",
+        "rich Japanese edit/save",
+        "no-op bytes",
+        "source save",
+        "edited BOM/CRLF/frontmatter preservation",
+        "clean external refresh",
+        "dirty conflict"
+      ],
+      "rootTestSandboxDisabled": true
+    },
+    "lifecycle-agents": {
+      "results": [
+        {
+          "agent": "codex",
+          "phase": "deny",
+          "requests": 0,
+          "outcome": "completed",
+          "unchanged": true
+        },
+        {
+          "agent": "codex",
+          "phase": "question",
+          "requests": 0,
+          "outcome": "cancelled"
+        },
+        {
+          "agent": "codex",
+          "phase": "cancel",
+          "outcome": "cancelled",
+          "elapsedMs": 333,
+          "busy": false
+        },
+        {
+          "agent": "claude",
+          "phase": "deny",
+          "requests": 1,
+          "outcome": "completed",
+          "unchanged": true
+        },
+        {
+          "agent": "claude",
+          "phase": "question",
+          "requests": 1,
+          "outcome": "completed"
+        },
+        {
+          "agent": "claude",
+          "phase": "cancel",
+          "outcome": "cancelled",
+          "elapsedMs": 632,
+          "busy": false
+        }
+      ]
+    }
+  }
+}
