@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from '../host/serial-queue';
 import { CloudAccounts } from './accounts';
+import type { GoogleOAuth } from './oauth';
 import { Rclone, type RcloneAPI } from './rclone';
 import { cloudDeclaration, mountNameError, nameKey } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
@@ -42,8 +43,9 @@ export class CloudService {
     private files: FileService,
     openBrowser: (url: string) => Promise<void>,
     private rpc: RcloneAPI = new Rclone(files.dataDir),
+    oauth?: GoogleOAuth,
   ) {
-    this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser);
+    this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser, oauth);
   }
   get busy() {
     return this.queue.busy;

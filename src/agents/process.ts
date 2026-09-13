@@ -8,6 +8,8 @@ export function agentEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   delete env.IRORI_GOOGLE_CLIENT_ID;
   delete env.IRORI_GOOGLE_CLIENT_SECRET;
+  delete env.IRORI_BUILD_GOOGLE_CLIENT_ID;
+  delete env.IRORI_BUILD_GOOGLE_CLIENT_SECRET;
   const extra = [
     path.join(homedir(), '.local', 'bin'),
     path.join(homedir(), '.cargo', 'bin'),

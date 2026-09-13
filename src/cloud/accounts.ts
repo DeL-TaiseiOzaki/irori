@@ -5,6 +5,7 @@ import type { CloudAccount, CloudFolder } from '../domain/types';
 import { providerId } from '../domain/connections';
 import { readLocalJson, writeLocalJson } from '../host/local-json';
 import type { RcloneAPI } from './rclone';
+import type { GoogleOAuth } from './oauth';
 const accountSchema = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
@@ -23,7 +24,7 @@ export class CloudAccounts {
     private dataDir: string,
     readonly rpc: RcloneAPI,
     private openBrowser: (url: string) => Promise<void>,
-    private oauth = {
+    private oauth: GoogleOAuth = {
       clientId: process.env.IRORI_GOOGLE_CLIENT_ID,
       clientSecret: process.env.IRORI_GOOGLE_CLIENT_SECRET,
     },

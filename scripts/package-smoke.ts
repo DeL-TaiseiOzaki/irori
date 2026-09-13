@@ -14,7 +14,8 @@ const relocated = path.join(temporary, 'application');
 let application;
 try {
   // Copy the complete Forge output; launch with a different cwd and no Node module search path.
-  await cp(built, relocated, { recursive: true });
+  // macOS frameworks use relative links; rewriting them breaks Chromium's bundle lookup.
+  await cp(built, relocated, { recursive: true, verbatimSymlinks: true });
   const mac = process.platform === 'darwin';
   const resources = path.join(
     relocated,
@@ -30,6 +31,7 @@ try {
     'dist-host/main.cjs',
     'dist-host/preload.cjs',
     'assets/irori-icon.png',
+    'LICENSE',
     'docs/THIRD_PARTY_NOTICES.md',
   ])
     assert(entries.includes(entry), `Missing packaged file: ${entry}`);
@@ -67,7 +69,7 @@ try {
   const inventory = entries
     .filter((entry) => entry.startsWith('node_modules/') && entry.endsWith('/package.json'))
     .flatMap((entry) => {
-      const data = JSON.parse(extractFile(archive, entry).toString());
+      const data = JSON.parse(extractFile(archive, path.normalize(entry)).toString());
       return data.name && data.version
         ? [{ name: data.name, version: data.version, license: data.license ?? null }]
         : [];
@@ -81,6 +83,9 @@ try {
   delete env.NODE_OPTIONS;
   delete env.IRORI_GOOGLE_CLIENT_ID;
   delete env.IRORI_GOOGLE_CLIENT_SECRET;
+  // A packaged build must not use a development machine's OAuth environment.
+  env.IRORI_GOOGLE_CLIENT_ID = 'synthetic-development-client';
+  env.IRORI_GOOGLE_CLIENT_SECRET = 'synthetic-development-secret';
   application = await electron.launch({
     executablePath: path.join(
       relocated,
@@ -127,6 +132,10 @@ try {
   assert.equal(runtime.version, packaged.version);
   assert.equal(runtime.opencode, 'function');
   assert.equal(runtime.claude, 'function');
+  assert.equal(
+    (await page.evaluate(() => window.irori.cloudSetup())).oauthConfigured,
+    process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1',
+  );
   const root = path.join(temporary, '検証 KB');
   await mkdir(root);
   await writeFile(path.join(root, 'note.md'), '# Packaged note\n');

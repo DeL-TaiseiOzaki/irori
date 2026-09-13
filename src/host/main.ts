@@ -10,6 +10,8 @@ import { CloudService } from '../cloud/service';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import type { HostEvent, Space } from '../domain/types';
+import type { GoogleOAuth } from '../cloud/oauth';
+declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers: FSWatcher[] = [];
@@ -26,7 +28,12 @@ app
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }));
-    const cloud = new CloudService(files, (url) => shell.openExternal(url));
+    const cloud = new CloudService(
+      files,
+      (url) => shell.openExternal(url),
+      undefined,
+      app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
+    );
     files.cloud = cloud;
     const workspaces = new WorkspaceService(files);
     let fileMutations = 0;

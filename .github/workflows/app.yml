@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.21.0'
           cache: npm
@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.21.0'
           cache: npm
@@ -67,7 +67,7 @@ jobs:
       - if: runner.os != 'Linux'
         run: npm run test:package
       # Short-lived engineering artifacts, never GitHub Releases or website downloads.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: unsigned-irori-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.sha }}
           path: |
