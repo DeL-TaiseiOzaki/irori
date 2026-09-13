@@ -51,5 +51,5 @@ for (const platform of platforms) {
 }
 if (Object.values(release.downloads).some(Boolean)) {
   document.querySelector('#release-status')!.textContent =
-    `v${release.version} — お使いのパソコン用を選んでください。`;
+    `v${release.version} 開発プレビュー — 実機での動作確認用です。`;
 }

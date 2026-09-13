@@ -1,6 +1,6 @@
 name: Publish download website
 
-# Publishing is explicit until the first native installers have been verified.
+# Publishing remains explicit; a main push alone does not change public downloads.
 on:
   workflow_dispatch:
 

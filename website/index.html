@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="irori は、ノートを書き、Claude Code・Codex と知識を育てるデスクトップアプリ。Windows・Mac 向けの配布を準備しています。"
+      content="irori は、ノートを書き、CLI エージェントと知識を育てるデスクトップアプリ。Windows 64 ビット向けの検証版をダウンロードできます。"
     />
     <meta name="theme-color" content="#f6f5ef" />
     <title>irori — ノートから、次の仕事へ。</title>
@@ -35,7 +35,7 @@
         <a class="button primary" href="#download"
           >ダウンロードについて <span aria-hidden="true">↓</span></a
         >
-        <p class="caption">Windows・Mac 向けに準備中 <span>／</span> 開発プレビュー</p>
+        <p class="caption">Windows 64 ビット 検証版を公開中 <span>／</span> Mac は配布準備中</p>
         <figure class="app-preview">
           <div class="window-bar">
             <div aria-hidden="true" class="window-dots"><i></i><i></i><i></i></div>
@@ -76,10 +76,11 @@
             </p>
           </article>
           <article>
-            <span class="feature-number">03 / STAY IN CONTROL</span>
-            <h3>変更を、確かめながら進める。</h3>
+            <span class="feature-number">03 / SEE CONNECTIONS</span>
+            <h3>CSV から、知識のつながりへ。</h3>
             <p>
-              エージェントの実行状況や確認依頼をパネルに表示。編集中のノートと外部の変更が競合したときは、両方を確認できます。
+              CSV
+              を表やグラフで見渡し、階層やグループで絞り込んで、つながるノートへ。エージェントと一緒に育てる知識を、見やすく表示します。
             </p>
           </article>
         </div>
@@ -89,43 +90,49 @@
           <p class="eyebrow">BRING IRORI HOME</p>
           <h2>あなたのパソコンに、irori を。</h2>
           <p class="download-intro" id="release-status" role="status">
-            インストーラーの配布を準備しています。
+            Windows 向け開発プレビュー — 実機での動作確認用です。
           </p>
           <div id="downloads" class="downloads" aria-label="OS 別のダウンロード"></div>
           <noscript
             ><p>
-              現在、Windows・Mac 用インストーラーは配布準備中です。最新の配布情報の表示には
-              JavaScript を有効にしてください。
+              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1"
+                >GitHub の配布ページ</a
+              >から Windows 用インストーラーを取得できます。
             </p></noscript
           >
           <p class="release-note">
-            開発版ではノート編集と両エージェントの実行を Linux で確認済みです。<br />Windows・Mac
-            での動作確認と、インストーラーの準備を進めています。
+            署名なしの検証版です。Windows 11 実機でのインストール・日本語入力は確認待ちです。<br />
+            まずは新しいフォルダや KB のコピーでお試しください。
+            <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1"
+              >変更点・検証範囲・SHA-256</a
+            >
           </p>
           <ol class="steps">
             <li>
               <span>1</span>
               <div>
-                <strong>ダウンロード</strong>
-                <p>お使いのパソコン用を選ぶ</p>
+                <strong>Git を準備</strong>
+                <p>
+                  <a href="https://git-scm.com/downloads/win">Git for Windows</a> をインストール
+                </p>
               </div>
             </li>
             <li>
               <span>2</span>
               <div>
                 <strong>インストール</strong>
-                <p>ファイルを開いてアプリを追加</p>
+                <p>Windows 用 EXE を開いてアプリを追加</p>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <strong>自分の KB を開く</strong>
-                <p>ノートを開いて、作業を始める</p>
+                <strong>ワークスペースを作る</strong>
+                <p>検証用の KB フォルダを追加してノートを書く</p>
               </div>
             </li>
           </ol>
-          <p class="caption">配布開始後のご利用の流れです。</p>
+          <p class="caption">AMD Ryzen・Intel の x64 向けです。Windows ARM 用ではありません。</p>
         </div>
       </section>
       <section class="faq wrap">
@@ -144,8 +151,10 @@
           <details>
             <summary>AI を使うには何が必要ですか？</summary>
             <p>
-              現在の開発版では、Claude Code または Codex
-              のインストールと、それぞれのアカウントでのログインが必要です。配布版に向けて、初回設定をアプリから案内できるようにする予定です。
+              使いたい CLI（Claude
+              Code・Codex・OpenCode・Pi）を別途インストールし、対応するアカウントの設定が必要です。AI
+              の利用には各サービスの利用条件・料金が適用されます。ノートの編集は AI
+              を設定せずに試せます。
             </p>
           </details>
           <details>
@@ -159,7 +168,21 @@
           <details>
             <summary>すべての機能が使えますか？</summary>
             <p>
-              現在は開発プレビューです。ノート編集とローカルエージェントの実行が最初の実装です。クラウド連携や成果物の履歴管理などは、今後の実装対象です。
+              ノート編集、Git 操作、CSV
+              の表表示・ソース編集、設定済みオントロジーのグラフ表示を試せます。この配布物では
+              Google
+              アカウントの新規接続を利用できません。クラウドへの書き込み、成果物と参照ソースの履歴管理などは未完成です。Windows
+              実機での CLI 連携も確認待ちです。
+            </p>
+          </details>
+          <details>
+            <summary>インストールや動作で困ったら？</summary>
+            <p>
+              署名なしのため、Windows
+              が発行元を確認できない旨を表示する場合があります。起動できない場合や不具合は、<a
+                href="https://github.com/DeL-TaiseiOzaki/irori/issues"
+                >GitHub Issues</a
+              >へ、アプリのバージョンと表示されたメッセージをお知らせください。ノートの本文や認証情報は載せないでください。
             </p>
           </details>
         </div>
@@ -168,7 +191,9 @@
     <footer class="wrap footer">
       <a class="brand" href="#"><img class="mark" src="../assets/irori-icon.png" alt="" />irori</a>
       <p>知識を囲んで、一緒につくる。</p>
-      <a href="#download">配布状況 <span aria-hidden="true">↗</span></a>
+      <a href="https://github.com/DeL-TaiseiOzaki/irori"
+        >ソースコード・MIT License <span aria-hidden="true">↗</span></a
+      >
     </footer>
     <script type="module" src="./main.ts"></script>
   </body>
