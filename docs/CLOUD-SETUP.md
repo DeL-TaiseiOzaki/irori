@@ -2,11 +2,13 @@
 
 Date: 2026-09-13. The first onboarding and read-only connection implementation is available locally. Actual Google consent and successful native mounts remain acceptance gates; this is not a released cloud-sync feature.
 
+Configured preview follow-up: the owner has now registered both distributor secrets. Version `0.1.2` passes [native package CI 34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), including compiled-client browser handoff/read-only scope/cancellation with bundled rclone on Windows x64, Mac arm64 and Linux x64. No Google consent or native mount was completed by these tests. The owner declared broader permissions for future writes; the actual request remains `drive.readonly`. See [CHECKPOINT](CHECKPOINT.md) for publication/device status.
+
 Current ownership: new Drive attachments are [independent workspace connections](WORKSPACE-DRIVE.md). The header cloud action and Google Drive section manage the workspace; original KB contents controls continue to manage legacy declarations without moving user data. The KB-owned flow below is retained for compatibility. OAuth configuration is now embedded through explicit distributor build inputs as described below.
 
 ## Bundled connection runtime
 
-New packages bundle the official rclone 1.75.1 binary, its MIT notice and archive/executable hashes. Forge downloads the target platform archive using pinned upstream SHA-256 values and fflate for ZIP extraction. Packaged irori always selects that binary outside ASAR, rather than depending on PATH or a user override. Windows exposes a WinFsp installation link and recheck when the mount prerequisite is missing. See [distributor Google setup](DISTRIBUTOR-GOOGLE.md) for the external OAuth client and CI configuration still needed for account login.
+New packages bundle the official rclone 1.75.1 binary, its MIT notice and archive/executable hashes. Forge downloads the target platform archive using pinned upstream SHA-256 values and fflate for ZIP extraction. Packaged irori always selects that binary outside ASAR, rather than depending on PATH or a user override. Windows exposes a WinFsp installation link and recheck when the mount prerequisite is missing. See [distributor Google setup](DISTRIBUTOR-GOOGLE.md) for client/CI configuration and the remaining consent/device checks.
 
 ## Setup and ordinary flow
 
