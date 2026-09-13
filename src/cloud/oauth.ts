@@ -21,7 +21,7 @@ const desktopClient = z.object({
 export function distributionOAuth(env: NodeJS.ProcessEnv): GoogleOAuth | null {
   const clientId = env.IRORI_BUILD_GOOGLE_CLIENT_ID;
   const clientSecret = env.IRORI_BUILD_GOOGLE_CLIENT_SECRET;
-  if (clientId === undefined && clientSecret === undefined) return null;
+  if (!clientId && !clientSecret) return null;
   const result = desktopClient.safeParse({ clientId, clientSecret });
   if (!result.success)
     throw Error(

@@ -5,6 +5,10 @@ import { CloudAccounts } from '../src/cloud/accounts';
 
 test('distribution OAuth accepts complete desktop configuration and redacts invalid input', () => {
   assert.equal(distributionOAuth({}), null);
+  assert.equal(
+    distributionOAuth({ IRORI_BUILD_GOOGLE_CLIENT_ID: '', IRORI_BUILD_GOOGLE_CLIENT_SECRET: '' }),
+    null,
+  );
   // Ordinary development environment is never silently embedded into an installer.
   assert.equal(
     distributionOAuth({

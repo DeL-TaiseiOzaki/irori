@@ -34,6 +34,7 @@ try {
     'assets/irori-icon.png',
     'LICENSE',
     'docs/THIRD_PARTY_NOTICES.md',
+    'vendor/rclone/distribution.json',
   ])
     assert(entries.includes(entry), `Missing packaged file: ${entry}`);
   const roots = new Set([
@@ -44,6 +45,7 @@ try {
     'package.json',
     'docs',
     'LICENSE',
+    'vendor',
   ]);
   assert(
     entries.every((entry) => roots.has(entry.split('/')[0])),
@@ -123,10 +125,10 @@ try {
   await page.evaluate(() => {
     window.location.hash = 'packaged-smoke';
   });
-  assert.equal(
-    (await page.evaluate(() => window.irori.cloudSetup())).oauthConfigured,
-    process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1',
-  );
+  const cloudSetup = await page.evaluate(() => window.irori.cloudSetup());
+  assert.equal(cloudSetup.oauthConfigured, process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1');
+  assert.equal(cloudSetup.available, true, cloudSetup.detail);
+  assert.equal(cloudSetup.version, 'v1.75.1');
   const root = path.join(temporary, '検証 KB');
   await mkdir(root);
   await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
@@ -157,6 +159,22 @@ try {
     page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
   ).toHaveCount(4);
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'ターミナル', exact: true }).click();
+  const terminal = page.getByRole('region', { name: '配布検証 のターミナル' });
+  await expect(terminal.locator('.terminal-state')).toHaveText('実行中', { timeout: 15000 });
+  await terminal.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.insertText(
+    process.platform === 'win32'
+      ? "Set-Content -LiteralPath 'terminal 日本語.txt' -Value '配布端末から保存' -Encoding utf8"
+      : "printf '配布端末から保存\\n' > 'terminal 日本語.txt'",
+  );
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(path.join(root, 'terminal 日本語.txt'), 'utf8').catch(() => ''), {
+      timeout: 15000,
+    })
+    .toContain('配布端末から保存');
+  await terminal.getByRole('button', { name: 'ターミナルを終了して閉じる' }).click();
   const runtime = await application.evaluate(async ({ app }) => {
     const path = process.getBuiltinModule('node:path');
     const { createRequire } = process.getBuiltinModule('node:module');
@@ -214,6 +232,7 @@ try {
         platform: process.platform,
         arch: process.arch,
         runtime,
+        cloudSetup,
         inventory,
         artifacts,
       },

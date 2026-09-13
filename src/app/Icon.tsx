@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 
 const paths = {
+  terminal: 'm4 5 6 6-6 6m9 0h7',
   branch:
     'M6 3v12a4 4 0 0 0 4 4h4m4-13v2a4 4 0 0 1-4 4H6M8 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 1a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm-2 15a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
   history: 'M3 11a9 9 0 1 1 2 7M3 4v7h7m2-5v6l4 2',

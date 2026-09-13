@@ -4,6 +4,9 @@ This preview depends on installed npm packages; exact versions and integrity has
 
 | Reuse | License/notice location |
 |---|---|
+| xterm.js and FitAddon, node-pty, default-shell, which | MIT, each package LICENSE; node-pty ConPTY assets retain upstream notices |
+| rclone 1.75.1 | MIT, assets/rclone-LICENSE.txt; also shipped with the binary in vendor/rclone/LICENSE.txt |
+| fflate | MIT, development-only ZIP extraction; package LICENSE |
 | React / React DOM | MIT, each package's LICENSE |
 | Electron | MIT, node_modules/electron/LICENSE; binary distribution LICENSE and LICENSES.chromium.html |
 | Milkdown Crepe and Milkdown packages | MIT, package LICENSE files; ProseMirror/remark dependencies retain their own notices |

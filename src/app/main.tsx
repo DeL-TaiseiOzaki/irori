@@ -22,6 +22,7 @@ const CsvPreview = lazy(() =>
 const OntologyPanel = lazy(() =>
   import('./OntologyPanel').then((module) => ({ default: module.OntologyPanel })),
 );
+const TerminalPanel = lazy(() => import('./TerminalPanel'));
 import type { EditorHandle } from '../editor/Editor';
 import { sourceOnly } from '../editor/preservation';
 import './style.css';
@@ -200,6 +201,7 @@ function App() {
     [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
   const [ontologyOpen, setOntologyOpen] = useState(false);
+  const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
@@ -288,7 +290,7 @@ function App() {
       if (event.type === 'files') {
         setRevision((r) => r + 1);
         void reconcile();
-      } else {
+      } else if (event.type === 'agent') {
         const incoming = event.event;
         updateEvents((all) => {
           const last = all.at(-1);
@@ -334,6 +336,7 @@ function App() {
   }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest('.terminal-panel')) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         void save();
@@ -483,7 +486,7 @@ function App() {
       />
     );
   return (
-    <div className={`app ${panel ? 'panel-open' : ''}`}>
+    <div className={`app ${panel ? 'panel-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}>
       <a className="skip-to-editor" href="#editor-main">
         編集領域へ移動
       </a>
@@ -494,7 +497,7 @@ function App() {
         </div>
         <button
           className="workspace-switch"
-          disabled={dirty || running || connecting}
+          disabled={dirty || running || connecting || !!terminalSpace}
           onClick={() => {
             if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
               report('未保存のノートを保存してから移動してください。');
@@ -752,8 +755,20 @@ function App() {
             <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
           </div>
         )}
+        {terminalSpace && (
+          <Suspense fallback={<p className="hint">ターミナルを開いています…</p>}>
+            <TerminalPanel space={terminalSpace} onClose={() => setTerminalSpace(undefined)} />
+          </Suspense>
+        )}
         <footer>
           <span role="status">{status || (active ? `${active.name}で作業中` : '')}</span>
+          <button
+            disabled={!active && !terminalSpace}
+            aria-expanded={!!terminalSpace}
+            onClick={() => setTerminalSpace((value) => (value ? undefined : active))}
+          >
+            <Icon name="terminal" /> {terminalSpace ? 'ターミナルを終了' : 'ターミナル'}
+          </button>
           <button className="consult" onClick={() => setPanel((p) => !p)}>
             <Icon name="sparkles" /> {panel ? 'AIパネルを閉じる' : 'AIに相談'}
           </button>

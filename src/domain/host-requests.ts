@@ -9,9 +9,24 @@ const id = z.uuid(),
 const name = z.string().min(1).max(120),
   version = z.string().regex(/^[a-f0-9]{64}$/);
 const document = z.object({ scopeId: id, path, text, hash: version });
+const cols = z.number().int().min(2).max(500),
+  rows = z.number().int().min(1).max(300);
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
+  terminalShells: z.tuple([]),
+  openTerminal: z.tuple([id, path, cols, rows]),
+  writeTerminal: z.tuple([id, z.string().max(65536)]),
+  resizeTerminal: z.tuple([id, cols, rows]),
+  acknowledgeTerminal: z.tuple([
+    id,
+    z
+      .number()
+      .int()
+      .min(0)
+      .max(2 * 1024 * 1024),
+  ]),
+  closeTerminal: z.tuple([id]),
   gitStatus: z.tuple([id]),
   gitDiff: z.tuple([id, path, z.boolean()]),
   gitHistory: z.tuple([id, z.number().int().min(0).max(10000)]),
@@ -28,6 +43,7 @@ export const hostArguments = {
   saveWorkspace: z.tuple([name.trim().min(1), z.array(id).max(100), id.optional()]),
   removeWorkspace: z.tuple([id]),
   cloudSetup: z.tuple([]),
+  openCloudSetupHelp: z.tuple([]),
   workspaceCloud: z.tuple([id]),
   cloudEntries: z.tuple([id, path]),
   cloudRead: z.tuple([id, path]),

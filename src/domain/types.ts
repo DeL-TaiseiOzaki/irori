@@ -120,6 +120,7 @@ export interface CloudSetup {
   oauthConfigured: boolean;
   mountAvailable: boolean;
   detail: string;
+  prerequisite?: 'winfsp' | 'fuse';
 }
 export interface AddCloudAttachment {
   scopeId: string;
@@ -128,7 +129,22 @@ export interface AddCloudAttachment {
   contentsRoot: string;
   name: string;
 }
-export type HostEvent = { type: 'files'; scopeId: string } | { type: 'agent'; event: AgentEvent };
+export interface TerminalShell {
+  id: string;
+  name: string;
+}
+export interface TerminalSession {
+  id: string;
+  scopeId: string;
+  shell: TerminalShell;
+  cwd: string;
+}
+export type TerminalEvent =
+  { id: string; type: 'data'; data: string } | { id: string; type: 'exit'; code: number };
+export type HostEvent =
+  | { type: 'files'; scopeId: string }
+  | { type: 'agent'; event: AgentEvent }
+  | { type: 'terminal'; event: TerminalEvent };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -137,6 +153,17 @@ export interface StartRun {
   newSession?: boolean;
 }
 export interface HostAPI {
+  terminalShells(): Promise<TerminalShell[]>;
+  openTerminal(
+    scopeId: string,
+    shellId: string,
+    cols: number,
+    rows: number,
+  ): Promise<TerminalSession>;
+  writeTerminal(id: string, data: string): Promise<void>;
+  resizeTerminal(id: string, cols: number, rows: number): Promise<void>;
+  acknowledgeTerminal(id: string, length: number): Promise<void>;
+  closeTerminal(id: string): Promise<void>;
   gitStatus(scopeId: string): Promise<GitStatus>;
   gitDiff(scopeId: string, path: string, staged: boolean): Promise<GitDiff>;
   gitHistory(scopeId: string, offset: number): Promise<GitHistory>;
@@ -158,6 +185,7 @@ export interface HostAPI {
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
   removeWorkspace(id: string): Promise<void>;
   cloudSetup(): Promise<CloudSetup>;
+  openCloudSetupHelp(): Promise<void>;
   workspaceCloud(id: string): Promise<CloudRoot>;
   cloudEntries(id: string, path: string): Promise<Entry[]>;
   cloudRead(id: string, path: string): Promise<Document>;

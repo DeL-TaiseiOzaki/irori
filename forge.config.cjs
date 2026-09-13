@@ -1,7 +1,7 @@
 // Keep packaging with Forge; only compiled application files and runtime packages ship.
 module.exports = {
   packagerConfig: {
-    asar: true,
+    asar: { unpack: '{**/node_modules/node-pty/**/*,**/vendor/rclone/**/*}' },
     executableName: 'irori',
     appBundleId: 'io.github.deltaiseiozaki.irori',
     prune: true,
@@ -11,6 +11,13 @@ module.exports = {
       if (/^(dist|dist-host|assets|node_modules)(\/|$)/.test(relative))
         return relative.endsWith('.map');
       return !['package.json', 'LICENSE', 'docs', 'docs/THIRD_PARTY_NOTICES.md'].includes(relative);
+    },
+  },
+  plugins: [{ name: '@electron-forge/plugin-auto-unpack-natives', config: {} }],
+  hooks: {
+    packageAfterCopy: async (_config, buildPath, _electronVersion, platform, arch) => {
+      const { prepareRclone } = await import('./scripts/prepare-rclone.mjs');
+      await prepareRclone(platform, arch, require('node:path').join(buildPath, 'vendor', 'rclone'));
     },
   },
   makers: [

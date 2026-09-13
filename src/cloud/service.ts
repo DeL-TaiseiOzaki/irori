@@ -111,6 +111,7 @@ export class CloudService {
       const types = await this.rpc.call('mount/types');
       let mountAvailable = Array.isArray(types.mountTypes) && types.mountTypes.length > 0;
       let detail = 'クラウドフォルダは読み取り専用で接続します。';
+      let prerequisite: CloudSetup['prerequisite'];
       if (!mountAvailable)
         detail = 'このrcloneには利用できるマウント機能がありません。接続先の登録は可能です。';
       if (process.platform === 'linux') {
@@ -118,6 +119,7 @@ export class CloudService {
           await fs.access('/dev/fuse');
         } catch {
           mountAvailable = false;
+          prerequisite = 'fuse';
           detail =
             'この環境にはFUSEがありません。フォルダ選択・登録は可能ですが、マウントにはFUSEが必要です。';
         }
@@ -132,6 +134,7 @@ export class CloudService {
           );
         } catch {
           mountAvailable = false;
+          prerequisite = 'winfsp';
           detail = 'フォルダを接続するにはWinFspのインストールが必要です。';
         }
       } else if (process.platform === 'darwin') {
@@ -147,6 +150,7 @@ export class CloudService {
         oauthConfigured: this.accounts.configured,
         mountAvailable,
         detail,
+        prerequisite,
       };
     } catch (error) {
       return {

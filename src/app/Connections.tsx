@@ -88,6 +88,21 @@ export function Connections({
             ? 'Google Drive のフォルダを、このワークスペースに接続します。KB の追加・切り替えとは独立して使えます。'
             : 'この KB に保存されている既存の接続を管理します。新しい接続はワークスペースの Drive 欄から追加できます。'}
         </p>
+        {setup?.prerequisite && (
+          <div className="actions">
+            <button
+              onClick={() => void perform(() => host.openCloudSetupHelp())}
+              disabled={disabled}
+            >
+              {setup.prerequisite === 'winfsp'
+                ? 'WinFsp のダウンロードページを開く'
+                : 'マウント機能の導入手順を開く'}
+            </button>
+            <button onClick={() => setRevision((value) => value + 1)} disabled={disabled}>
+              導入後に再確認
+            </button>
+          </div>
+        )}
         <p className="setup-state" role="status">
           {setup
             ? `${setup.version ? `rclone ${setup.version} · ` : ''}${setup.detail}`
@@ -95,7 +110,8 @@ export function Connections({
         </p>
         {setup && !setup.oauthConfigured && (
           <p>
-            このビルドではGoogleログインの配布設定が未完了です。新しいアカウントの追加は利用できません。
+            この検証版では Google 接続の配布準備が未完了です。接続対応版への更新が必要です。Google
+            アカウント側の設定変更は不要です。
           </p>
         )}
         {issue && (

@@ -25,16 +25,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run setup:electron
+      - run: node scripts/prepare-rclone.mjs
       - name: Allow Chromium sandbox in the disposable runner
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: npm run build
       - run: npm test
+        env:
+          IRORI_TEST_RCLONE_PATH: ${{ github.workspace }}/.local/rclone/linux-x64/rclone
       - run: xvfb-run -a npm run test:ui
       - run: npm run build:website
       - run: xvfb-run -a npm run test:website
 
   package:
     needs: verify
+    env:
+      IRORI_EXPECT_PACKAGED_OAUTH: ${{ secrets.IRORI_GOOGLE_CLIENT_ID != '' && secrets.IRORI_GOOGLE_CLIENT_SECRET != '' && '1' || '0' }}
     strategy:
       fail-fast: false
       matrix:
@@ -62,6 +67,9 @@ jobs:
         name: Allow Chromium sandbox in the disposable runner
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: npm run make -- --arch=${{ matrix.arch }}
+        env:
+          IRORI_BUILD_GOOGLE_CLIENT_ID: ${{ secrets.IRORI_GOOGLE_CLIENT_ID }}
+          IRORI_BUILD_GOOGLE_CLIENT_SECRET: ${{ secrets.IRORI_GOOGLE_CLIENT_SECRET }}
       - if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:package
       - if: runner.os != 'Linux'

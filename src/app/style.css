@@ -1,3 +1,58 @@
+.terminal-panel {
+  height: clamp(220px, 34vh, 380px);
+  min-height: 180px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #202627;
+  color: #e0e5e1;
+  border-top: 1px solid #465550;
+}
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.terminal-toolbar strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.terminal-toolbar select,
+.terminal-toolbar button {
+  background: #303a3b;
+  color: #e0e5e1;
+  border: 1px solid #596564;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.terminal-state {
+  margin-right: auto;
+  color: #b4c2bb;
+}
+.terminal-screen {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 10px 6px;
+}
+.terminal-screen .xterm {
+  height: 100%;
+}
+.terminal-open .welcome {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0 auto;
+  width: 100%;
+  padding: 20px;
+}
+main > footer {
+  flex-shrink: 0;
+}
 :root {
   font-family:
     'Noto Sans JP',

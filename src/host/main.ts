@@ -12,6 +12,8 @@ import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
+import { TerminalService } from '../terminal/service';
+import { Rclone } from '../cloud/rclone';
 import type { HostEvent, Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
@@ -31,11 +33,22 @@ app
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }));
+    const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
     const cloud = new CloudService(
       new WorkspaceCloudStorage(files, workspaces),
       (url) => shell.openExternal(url),
-      undefined,
+      new Rclone(
+        files.dataDir,
+        app.isPackaged
+          ? path.join(
+              app.getAppPath() + '.unpacked',
+              'vendor',
+              'rclone',
+              process.platform === 'win32' ? 'rclone.exe' : 'rclone',
+            )
+          : undefined,
+      ),
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
     );
     files.cloud = cloud;
@@ -92,6 +105,9 @@ app
       },
     });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // A reloaded/crashed renderer cannot keep controlling its old sessions.
+    window.webContents.on('render-process-gone', () => void terminals.closeAll());
+    window.webContents.on('did-start-loading', () => void terminals.closeAll());
     window.webContents.on('will-navigate', (event) => event.preventDefault());
     window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
       callback(false),
@@ -123,6 +139,18 @@ app
       }
     }
     const handlers = {
+      openCloudSetupHelp: () =>
+        shell.openExternal(
+          process.platform === 'win32'
+            ? 'https://winfsp.dev/rel/'
+            : 'https://rclone.org/install/#installation-with-precompiled-binaries',
+        ),
+      terminalShells: () => terminals.available(),
+      openTerminal: (...args) => terminals.open(...args),
+      writeTerminal: (...args) => terminals.write(...args),
+      resizeTerminal: (...args) => terminals.resize(...args),
+      acknowledgeTerminal: (...args) => terminals.acknowledge(...args),
+      closeTerminal: (id) => terminals.close(id),
       gitStatus: (id) => git.status(id),
       gitDiff: (...args) => git.diff(...args),
       gitHistory: (...args) => git.history(...args),
@@ -252,15 +280,16 @@ app
             return;
           }
         }
-        if (agents.busy) {
+        if (agents.busy || terminals.busy) {
           const answer = await dialog.showMessageBox(window!, {
-            message: '実行中のエージェントを停止して閉じますか？',
+            message: '実行中のエージェント・ターミナルを停止して閉じますか？',
             buttons: ['戻る', '停止して閉じる'],
             cancelId: 0,
           });
           if (answer.response !== 1) return;
         }
         await agents.cancel();
+        await terminals.closeAll();
         await git.close();
         try {
           await cloud.close();
