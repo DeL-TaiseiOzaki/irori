@@ -378,6 +378,33 @@ export class GitService {
       return this.snapshot(s);
     });
   }
+  async stageMany(id: string, paths: string[], stage: boolean, version: string) {
+    return this.mutate(id, async (s) => {
+      const state = await this.checked(s, version);
+      if (!paths.length || paths.length > 4000 || state.operation === 'other') throw stale();
+      const selected = [...new Set(paths)];
+      for (const p of selected) {
+        this.validateName(p);
+        const change = state.changes.find((c) => c.path === p);
+        if (!change || change.conflict) throw stale();
+        if (stage) {
+          if (change.blocked) throw Error(change.blocked);
+          await this.safePath(s, p);
+        }
+      }
+      // One native index transaction, with NUL pathspecs for long/Japanese/option-like names.
+      await this.checked(s, version);
+      const command = stage
+        ? ['add', '-A']
+        : state.head
+          ? ['restore', '--staged', '--source=HEAD']
+          : ['rm', '--cached', '--force', '--ignore-unmatch'];
+      await this.git(s, [...command, '--pathspec-from-file=-', '--pathspec-file-nul'], {
+        input: selected.map(literal).join('\0') + '\0',
+      });
+      return this.snapshot(s);
+    });
+  }
   async commit(id: string, message: string, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version);

@@ -279,7 +279,13 @@ export class FileService {
         const mode = (await fs.stat(filename)).mode;
         const temp = path.join(path.dirname(filename), `.irori-save-${randomUUID()}.tmp`);
         try {
-          await fs.writeFile(temp, doc.text, { mode, flag: 'wx' });
+          const pending = await fs.open(temp, 'wx', mode);
+          try {
+            await pending.writeFile(doc.text);
+            await pending.sync();
+          } finally {
+            await pending.close();
+          }
           if (hash(await fs.readFile(filename)) !== doc.hash)
             throw Error('CONFLICT: File changed during save');
           await fs.rename(temp, filename);

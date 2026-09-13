@@ -1,10 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { realpath } from 'node:fs/promises';
+import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { FileService } from './files';
+import { ImageService } from './images';
+import { KnowledgeStore } from '../knowledge/store';
+import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
 import { CloudService } from '../cloud/service';
 import { WorkspaceCloudStorage } from '../cloud/storage';
@@ -32,7 +35,6 @@ app
     const emit = (event: HostEvent) => {
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
-    const agents = new AgentService(files, (event) => emit({ type: 'agent', event }));
     const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
     const cloud = new CloudService(
@@ -52,6 +54,19 @@ app
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
     );
     files.cloud = cloud;
+    const images = new ImageService(files, async (id, rel) => {
+      if (files.list().some((space) => space.scopeId === id)) return files.resolve(id, rel);
+      await cloud.workspaceRoot(id);
+      return cloud.resolve(id, rel);
+    });
+    const knowledge = new KnowledgeStore(files.dataDir, async (ref) => {
+      if (files.list().some((space) => space.scopeId === ref.scopeId))
+        return files.resolve(ref.scopeId, ref.path);
+      await cloud.workspaceRoot(ref.scopeId);
+      return cloud.resolve(ref.scopeId, ref.path);
+    });
+    const outbox = new CloudOutbox(files.dataDir, knowledge);
+    const agents = new AgentService(files, (event) => emit({ type: 'agent', event }), knowledge);
     let fileMutations = 0;
     const git = new GitService(files, () => !agents.busy && !cloud.busy && fileMutations === 0);
     async function changeFiles<T>(fn: () => Promise<T>) {
@@ -139,6 +154,36 @@ app
       }
     }
     const handlers = {
+      knowledgeHistory: (id) => {
+        files.get(id);
+        return knowledge.history(id);
+      },
+      restoreSource: async (source) => {
+        const bytes = await knowledge.bytes(source);
+        const choice = await dialog.showSaveDialog(window!, {
+          title: '保持版を別ファイルに復元',
+          defaultPath: path.basename(source.path),
+        });
+        if (choice.canceled || !choice.filePath) return;
+        const file = await openFileHandle(choice.filePath, 'wx', 0o600);
+        try {
+          await file.writeFile(bytes);
+          await file.sync();
+        } finally {
+          await file.close();
+        }
+      },
+      sourceText: (source) => knowledge.sourceText(source),
+      registerArtifact: (source, runId) => changeFiles(() => knowledge.artifact(source, runId)),
+      pendingCloudWrites: async (id) => {
+        await cloud.declarations(id);
+        return outbox.list(id);
+      },
+      prepareCloudWrite: async (id, mountId, source) => {
+        const target = (await cloud.declarations(id)).find((item) => item.mountId === mountId);
+        if (!target) throw Error('送信先の接続が見つかりません。');
+        return outbox.prepare({ ownerId: id, mountId, folderId: target.folderId }, source);
+      },
       openCloudSetupHelp: () =>
         shell.openExternal(
           process.platform === 'win32'
@@ -157,6 +202,7 @@ app
       gitCommitDiff: (...args) => git.commitDiff(...args),
       gitConflict: (...args) => git.conflict(...args),
       gitStage: (...args) => changed(args[0], () => git.stage(...args)),
+      gitStageMany: (...args) => changed(args[0], () => git.stageMany(...args)),
       gitCommit: (...args) => changed(args[0], () => git.commit(...args)),
       gitSync: (...args) => changed(args[0], () => git.sync(...args)),
       gitResolve: (...args) => changed(args[0], () => git.resolve(...args)),
@@ -217,14 +263,11 @@ app
       },
       entries: (...args) => files.entries(...args),
       read: (...args) => files.read(...args),
-      save: (doc) => {
-        if (agents.busy)
-          throw Error('エージェント実行中は保存できません。停止後に変更を確認してください。');
-        return changeFiles(() => files.save(doc));
-      },
+      saveImage: (...args) => changeFiles(() => images.save(...args)),
+      readImage: (...args) => images.read(...args),
+      save: (doc) => changeFiles(() => files.save(doc)),
       draft: (doc) => files.draft(doc),
       createNote: (...args) => {
-        if (agents.busy) throw Error('Stop the agent before creating a note');
         return changeFiles(() => files.createNote(...args));
       },
       openExternal: async (...args) => {

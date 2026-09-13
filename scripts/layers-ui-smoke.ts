@@ -95,20 +95,16 @@ try {
   const research = team.locator(`[data-scope-id="${spaces[2].scopeId}"]`);
   await engineering.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Engineering notes');
-  await page.getByRole('button', { name: 'ソース', exact: true }).click();
-  await page.locator('.cm-content').click();
+  await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nEngineering edit\n');
   await research.getByRole('button', { name: 'README', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('未保存');
-  await expect(engineering.locator('[aria-current="page"]')).toContainText('README');
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
+  await expect(research.locator('[aria-current="page"]')).toContainText('README');
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   expect(await readFile(path.join(spaces[1].root, 'README.md'), 'utf8')).toContain(
     'Engineering edit',
   );
   expect(await readFile(path.join(spaces[2].root, 'README.md'), 'utf8')).toBe('# Research notes\n');
-  await page.getByRole('alert').getByRole('button', { name: '閉じる' }).click();
   await research.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Research notes');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();

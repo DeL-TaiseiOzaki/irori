@@ -90,6 +90,9 @@ try {
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   if ((await readFile(path.join(kb, '日本語 note.md'), 'utf8')) !== input)
     throw Error('No-op changed Markdown bytes');
+  await page.locator('.ProseMirror').evaluate((element) => {
+    element.dataset.lifecycle = 'original';
+  });
   await page.locator('.ProseMirror p').first().click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
@@ -100,8 +103,9 @@ try {
     !(await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes('リッチ編集を保存します。')
   )
     throw Error('Rich edit was not saved');
-  await page.getByRole('button', { name: 'ソース', exact: true }).click();
-  const editor = page.locator('.cm-content');
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'original');
+  await expect(page.getByRole('button', { name: 'ソース', exact: true })).toHaveCount(0);
+  const editor = page.locator('.ProseMirror');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUIで編集しました。\n');
@@ -109,8 +113,7 @@ try {
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   await writeFile(path.join(kb, '日本語 note.md'), input + '\n外部の変更を反映しました。\n');
   await expect(page.locator('.document-editor')).toContainText('外部の変更を反映しました。');
-  await page.getByRole('button', { name: 'ソース', exact: true }).click();
-  await page.locator('.cm-content').click();
+  await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\n保持する下書き\n');
   await writeFile(path.join(kb, '日本語 note.md'), input + '\nエージェントの別の変更。\n');
@@ -121,15 +124,66 @@ try {
   await expect(page.locator('.versions')).toContainText('エージェントの別の変更。');
   await page.getByRole('button', { name: 'ディスク版を表示（下書きは保持）' }).click();
   await page.getByRole('button', { name: '互換', exact: true }).click();
-  await expect(page.locator('.cm-content')).toBeVisible();
-  await page.locator('.cm-content').click();
+  await expect(page.locator('.ProseMirror')).toBeVisible();
+  await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('互換編集');
   await page.getByRole('button', { name: '保存 •', exact: true }).click();
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
-  if ((await readFile(path.join(kb, '互換.md'), 'utf8')) !== opaque + '互換編集')
-    throw Error('Source edit lost BOM, CRLF or opaque Markdown');
+  const compatible = await readFile(path.join(kb, '互換.md'), 'utf8');
+  if (
+    !compatible.startsWith('\ufeff---\r\n# Keep this comment\r\nunknown: yes\r\n---') ||
+    !compatible.includes('![[埋め込み]]') ||
+    !compatible.includes('互換編集') ||
+    /(?<!\r)\n/.test(compatible)
+  )
+    throw Error('Document edit lost BOM, CRLF or opaque Markdown');
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6VEQAAAAASUVORK5CYII=';
+  await page.locator('.ProseMirror').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.locator('.ProseMirror').evaluate((element, bytes) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(
+      new File([Uint8Array.from(atob(bytes), (c) => c.charCodeAt(0))], '貼付.png', {
+        type: 'image/png',
+      }),
+    );
+    element.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }),
+    );
+  }, png);
+  await expect
+    .poll(() =>
+      page
+        .locator('.ProseMirror img')
+        .evaluateAll((images) =>
+          images.some((img) => (img as HTMLImageElement).naturalWidth === 1),
+        ),
+    )
+    .toBe(true);
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes('_assets/image-'),
+    )
+    .toBe(true);
+  const imageMarkdown = await readFile(path.join(kb, '日本語 note.md'), 'utf8');
+  expect(imageMarkdown).not.toMatch(/blob:|data:image/);
+  const imageRelative = imageMarkdown.match(/_assets\/image-[a-f0-9]+\.png/)![0];
+  expect(await readFile(path.join(kb, imageRelative))).toEqual(Buffer.from(png, 'base64'));
+  await page.getByRole('button', { name: '互換', exact: true }).click();
+  await page.getByRole('button', { name: '日本語 note', exact: true }).click();
+  await expect
+    .poll(() =>
+      page
+        .locator('.ProseMirror img')
+        .evaluateAll((images) =>
+          images.some((img) => (img as HTMLImageElement).naturalWidth === 1),
+        ),
+    )
+    .toBe(true);
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {
@@ -141,10 +195,9 @@ try {
         .fill(
           `Read the selected note and append exactly one paragraph: ${marker}. Use your native tools; shell reads and apply_patch are allowed. Only change this note. Preserve all existing Japanese text. Then report completion.`,
         );
-      await page.getByRole('button', { name: '保存して実行 ↗' }).click();
+      await page.getByRole('button', { name: '送信' }).click();
       if (agent === 'claude') {
-        await page.getByRole('button', { name: 'ソース', exact: true }).click();
-        await page.locator('.cm-content').click();
+        await page.locator('.ProseMirror').click();
         await page.keyboard.press('ControlOrMeta+End');
         await page.keyboard.insertText('\n実行中の下書き\n');
       }
@@ -161,7 +214,7 @@ try {
             .getByRole('button', { name: safe ? '今回のみ許可' : '拒否', exact: true })
             .click();
         }
-        if (await page.getByRole('button', { name: '保存して実行 ↗' }).isVisible()) {
+        if (await page.getByRole('button', { name: '送信' }).isVisible()) {
           completed = true;
           break;
         }
@@ -205,7 +258,8 @@ try {
       'rich Markdown table',
       'rich Japanese edit/save',
       'no-op bytes',
-      'source save',
+      'repeated document save without remount',
+      'local image paste, automatic save, relative bytes and reopen',
       'edited BOM/CRLF/frontmatter preservation',
       'clean external refresh',
       'dirty conflict',

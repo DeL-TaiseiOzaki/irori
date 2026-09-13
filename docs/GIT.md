@@ -1,5 +1,7 @@
 # Per-space Git collaboration
 
+Version 0.1.3 adds bulk stage/unstage and direct local commit from the displayed staged list/message. Opening Git flushes the note automatically. Single-file staging, partial index contents and separate push confirmation remain. See [the follow-up](EDITING-AND-RECORDS.md).
+
 Design direction, 2026-09-13: extend the existing writing workspace with a focused change-review sheet. Retain graphite `#25282c`, paper `#fafaf8`, ink `#22292e`, muted `#626b75`, rule `#dfe3e5` and ember `#c88435`. Use the existing Noto Sans JP/system typography; reserve monospace for patches and revisions. A left-aligned file/history list sits beside a broad review surface; the owning space and remote remain visible above both. Separate local commit controls from remote sharing. This makes repository ownership, already central to the five-pane explorer, the organizing principle rather than adding a generic dashboard.
 
 ```text

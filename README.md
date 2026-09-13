@@ -1,5 +1,7 @@
 # irori
 
+Source version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.
+
 Version 0.1.2 includes the distributor's Google client configuration so account connection can be tried through the system browser. Actual consent and native mounts still need device acceptance; see [Google setup and scope](docs/DISTRIBUTOR-GOOGLE.md). The [integrated native terminal](docs/TERMINAL.md), automatic shell discovery and bundled rclone remain included. [CHECKPOINT](docs/CHECKPOINT.md) records exact package/publication evidence.
 
 [Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.2-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
@@ -46,8 +48,8 @@ If the system Node is still 20, `npm ci` emits engine warnings even though subse
 
 1. Startup shows **ワークスペースを選択**. Select a saved workspace, or use **KBフォルダを開く** to register existing local checkouts/folders with a name and optional display category. The preview inspects the Git root, GitHub repository, branch and local changes.
 2. **登録して開く** explicitly creates `.irori/scope.json` for a new registration and adds `/contents/` to `.gitignore`. Existing Markdown is not moved. Select one or more registered spaces, name the workspace and press **選択したスペースを開く**. Each checkout keeps its own Git history and native agent configuration; irori does not initialize or publish a repository.
-3. Open a note in the explorer or choose **ノートを作成**. Edit directly, use Crepe's slash menu/table/block controls, or switch to **ソース**. Save with the button or Cmd/Ctrl+S.
-4. Open **AIに相談**, choose a harness, and enter an instruction. **保存して実行** saves the current note, starts the real CLI in that space, and supplies the selected note's path. Native requests/questions appear in the panel; **停止** cancels the process tree. The panel explains that standard Pi tools run without built-in approval prompts; its extension dialogs are supported. OpenCode keeps its native permission configuration.
+3. Open a note or choose **ノートを作成**. Markdown stays in document view with Crepe's slash/table/image controls. Paste images into `_assets/` beside the note. Notes auto-save; Cmd/Ctrl+S keeps the current selection and undo history.
+4. Open **AIに相談**, choose a harness, and enter an instruction. **送信** saves the current note and starts the real CLI in that space. Enter sends; Shift+Enter adds a newline. While working, **送信待ちに追加** queues the next message and the current note/source selection for automatic continuation after success. Native requests/questions appear in the panel; **停止** cancels the process tree. The panel explains that standard Pi tools run without built-in approval prompts; its extension dialogs are supported. OpenCode keeps its native permission configuration.
 5. A clean editor refreshes after agent/external changes. A dirty editor shows both versions. Recovery drafts remain device-local.
 6. The next run attempts to continue the previous native conversation, including after restarting irori. The panel shows whether a saved session exists. **会話の継続をリセット** detaches only this space/provider's session; notes and the CLI's own history remain. **新しい会話** resets before the next run. Previous conversation text is not restored to the panel yet. Native-provider restart acceptance remains outstanding.
 7. Saved workspace cards support editing and removal. Cloud connections support changing the chosen local folder name, removing disconnected attachments and removing unused accounts. Removing a workspace or attachment keeps KB notes and remote files. See the [implementation audit](docs/AUDIT-2026-09-13.md) for fixes, verification and remaining features.
@@ -57,7 +59,7 @@ CLI-native rules/settings/skills/MCP discovery remain the provider's responsibil
 
 ## GitHub and Git collaboration
 
-Open **変更と履歴** to review the active space's changes and commit history. Inspect a file, add its saved changes to **commit 対象**, and review the file list/message before committing locally. Existing staged changes remain visible; partial staging is preserved. **共有内容を確認** previews a separate push to that repository's remote branch.
+Open **変更と履歴** to review the active space's changes and commit history. Inspect saved changes, use **すべて追加** or per-file staging, and commit the displayed staged list/message with **コミット**. **すべて解除** removes staged selections without changing file bytes. Existing staged changes remain visible; partial staging is preserved. **共有内容を確認** previews a separate push to that repository's remote branch.
 
 **取得** updates remote observations. **受信** accepts clean fast-forwards; **履歴を統合** starts a native merge and opens conflicts for manual review, saving recovery copies before resolution. Finish a merge with a reviewed commit. No automatic stash, hard reset or force-push is used. The startup **GitHub から取得** flow clones into a new selected folder and continues normal space registration. Native Git credentials, hooks and signing settings apply.
 
@@ -67,7 +69,7 @@ The feature is exercised with real disposable Git repositories and local bare re
 
 Open a workspace and choose **クラウド接続**, or use **接続** in the **Google Drive** section. A workspace may be created before registering any KB; its Drive attachments remain independent of KB membership. The new flow registers named Google accounts through the system browser, browses My Drive/shared-drive folders and lets you choose the actual **contents内のフォルダ名** with a path preview. Multiple accounts and folders can be registered independently. Japanese and spaces are supported; collisions and occupied paths are rejected. The Drive folder ID and your chosen local name persist separately.
 
-The host manages a private rclone configuration and read-only mounts. Saved attachments reconnect when their workspace opens; individual failures leave local notes usable. Mounted text opens in read-only source mode. This preview does not upload edits, provide offline copies or recover pending cloud writes. Google consent and successful native mounts have **not** been accepted on real accounts/platforms yet.
+The host manages a private rclone configuration and read-only mounts. Saved attachments reconnect when their workspace opens; individual failures leave local notes usable. Mounted Markdown opens as a read-only document. **資料と成果物** can retain selected source versions and prepare recoverable local copies for future Drive delivery. Google uploads remain disabled; this is not general offline caching or completed D04 recovery. Google consent and successful native mounts have **not** been accepted on real accounts/platforms yet.
 
 Development prerequisites are an installed `rclone` executable (or host environment `IRORI_RCLONE_PATH`), a working native mount facility, and an irori-owned Google desktop OAuth application's `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET` in the host environment. The application explains missing prerequisites and disables account creation if OAuth configuration is absent. These are developer/distribution setup requirements; the intended shipped flow will not ask ordinary users to configure rclone or create Google Cloud projects. See [cloud setup](docs/CLOUD-SETUP.md) for the current boundary and verification.
 
@@ -92,23 +94,23 @@ Tests put detailed local evidence in ignored `test-results/` and mutate only dis
 ## Implementation boundary
 
 - React renderer → typed, validated `HostAPI` → Electron preload/main. No renderer Node access, raw IPC export, remote page navigation, or document script execution. The host alone controls a private authenticated loopback rclone service.
-- Milkdown Crepe rich editor + CodeMirror 6 source mode. Markdown is authoritative; unsupported detected constructs use source mode.
+- Milkdown Crepe document editor + CodeMirror 6 for other text/CSV source. Markdown is authoritative; detected unsupported blocks remain literal within the document.
 - Node `FileService`: canonical paths, scope ownership, portable UUID declarations, local bindings/drafts/backups, bounded lazy directory listing, watchers, version-aware writes.
 - Codex native app-server JSONL; Claude Agent SDK controls the installed unmodified `claude` binary. SDK import and processes are on demand. Session handles persist in device data, bound to scope UUID, provider and canonical checkout root. Resume errors retain the handle for retry or explicit reset; irori does not silently fall back to a new conversation. Conversation display history remains in memory.
-- One agent mutation run across this application instance; file saves are blocked during a run. This does not lock out other programs or other irori instances.
+- One native agent turn across this application instance; subsequent messages can queue. Concurrent editor saves retain version checks and recovery drafts. This does not lock out other programs or other irori instances.
 
 Device data lives in Electron's standard `userData` directory (override with `IRORI_DATA_DIR` for tests). Workspace selections, account metadata, rclone credentials and checkout-specific cloud bindings stay there. New workspace cloud declarations live under device-local `workspace-cloud/<workspaceId>/.irori/cloud-mounts.json`; original KB declarations remain in place. Both contain folder IDs and user-chosen relative names, with no account credentials or absolute paths. Disconnected attachments stay visible; cloud access requires verified folder identity and a live managed mount. Existing `contents` bytes are never moved or deleted by setup.
 
-Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, terminal, stable note/artifact identities and versioned provenance. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
+Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, portable identities and complete provenance. The new device-local source/run/artifact records are an incremental D06 implementation. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
 
 ## Download website
 
 The Japanese landing/download page is in `website/`. Run `npm run dev:website` to preview it in a browser, or `npm run build:website` to produce the static `dist-website/` output. This page is the distribution entrance; it does not run the desktop application in a browser.
 
-Windows and Mac installer buttons currently show **配布準備中** because no verified installers exist yet. The manual GitHub Pages workflow and release-asset configuration are documented in [distribution](docs/DISTRIBUTION.md). No website or installer has been published from this checkout.
+The Windows slot links the current unsigned testing preview; Mac downloads remain disabled. The manual GitHub Pages workflow and release-asset configuration are documented in [distribution](docs/DISTRIBUTION.md). Published installer identities and delivery evidence are recorded in CHECKPOINT.
 
 ## Resume from checkpoint
 
-[Checkpoint and restart guide](docs/CHECKPOINT.md) records the accepted distribution direction, implemented work, verification evidence and remaining implementation. This is a local development checkpoint, not a downloadable release.
+[Checkpoint and restart guide](docs/CHECKPOINT.md) records the accepted distribution direction, implemented work, verification evidence and remaining implementation. It distinguishes the published Windows testing preview from the still-open complete-release requirements.
 
 The implementation reuse audit is complete for the current feature set: shared host/queue/dialog/protocol code and matching service libraries are implemented. See [all decisions and validation](docs/REUSE-COMPLETION-2026-09-13.md).

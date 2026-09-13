@@ -386,6 +386,37 @@ function RepositoryPanel({
                   <h3>
                     {group.title}
                     <span>{group.entries.length}</span>
+                    <button
+                      className="git-stage-all"
+                      disabled={
+                        busy ||
+                        conflictDirty ||
+                        status.operation === 'other' ||
+                        !group.entries.some(
+                          (entry) => !entry.conflict && (group.staged || !entry.blocked),
+                        )
+                      }
+                      onClick={() =>
+                        void perform(
+                          () =>
+                            host.gitStageMany(
+                              space.scopeId,
+                              group.entries
+                                .filter(
+                                  (entry) => !entry.conflict && (group.staged || !entry.blocked),
+                                )
+                                .map((entry) => entry.path),
+                              !group.staged,
+                              status.version,
+                            ),
+                          group.staged
+                            ? '対象をすべて外しました。'
+                            : '保存済みの変更をまとめて追加しました。',
+                        )
+                      }
+                    >
+                      {group.staged ? 'すべて解除' : 'すべて追加'}
+                    </button>
                   </h3>
                   {!group.entries.length && (
                     <p className="muted">
@@ -467,7 +498,7 @@ function RepositoryPanel({
               <Icon name="branch" size={32} />
               <h2>共有する変更を選ぶ</h2>
               <p>
-                ファイルを開いて差分を確認し、commit 対象に追加します。
+                差分を確認し、まとめて、またはファイルごとに commit 対象へ追加できます。
                 <br />
                 commit はこの端末の履歴に保存されます。
               </p>
@@ -685,7 +716,12 @@ function RepositoryPanel({
           className="git-commit-form"
           onSubmit={(e) => {
             e.preventDefault();
-            setConfirmation('commit');
+            if (!canCommit || !message.trim()) return;
+            void perform(async () => {
+              const value = await host.gitCommit(space.scopeId, message, status.version);
+              setMessage('');
+              return value;
+            }, 'この端末の履歴に commit しました。');
           }}
         >
           <label>
@@ -702,7 +738,7 @@ function RepositoryPanel({
           </label>
           <span>{staged.length} 件を対象に選択</span>
           <button className="primary" disabled={busy || !canCommit || !message.trim()}>
-            commit 内容を確認
+            コミット
           </button>
         </form>
       )}

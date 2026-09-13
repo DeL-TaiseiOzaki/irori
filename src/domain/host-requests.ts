@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { agentIds } from './types';
 import type { HostRequests } from './host-bridge';
+import { sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
 
 const id = z.uuid(),
@@ -14,6 +15,12 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
+  knowledgeHistory: z.tuple([id]),
+  restoreSource: z.tuple([sourceVersion]),
+  sourceText: z.tuple([sourceVersion]),
+  registerArtifact: z.tuple([sourceRef, id]),
+  pendingCloudWrites: z.tuple([id]),
+  prepareCloudWrite: z.tuple([id, id, sourceRef]),
   terminalShells: z.tuple([]),
   openTerminal: z.tuple([id, path, cols, rows]),
   writeTerminal: z.tuple([id, z.string().max(65536)]),
@@ -32,6 +39,7 @@ export const hostArguments = {
   gitHistory: z.tuple([id, z.number().int().min(0).max(10000)]),
   gitCommitDiff: z.tuple([id, z.string().regex(/^[a-f0-9]{40,64}$/)]),
   gitStage: z.tuple([id, path, z.boolean(), version]),
+  gitStageMany: z.tuple([id, z.array(path).min(1).max(4000), z.boolean(), version]),
   gitCommit: z.tuple([id, z.string().min(1).max(10000), version]),
   gitSync: z.tuple([id, z.enum(['fetch', 'pull', 'merge', 'push']), version]),
   gitConflict: z.tuple([id, path]),
@@ -80,6 +88,12 @@ export const hostArguments = {
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
+  saveImage: z.tuple([
+    id,
+    path,
+    z.instanceof(Uint8Array).refine((value) => value.length <= 20 * 1024 * 1024),
+  ]),
+  readImage: z.tuple([id, path, path]),
   save: z.tuple([document]),
   draft: z.tuple([document]),
   createNote: z.tuple([id, z.string().max(120)]),
@@ -94,6 +108,7 @@ export const hostArguments = {
       prompt: z.string().min(1).max(32000),
       notePath: path.optional(),
       newSession: z.boolean().optional(),
+      sources: z.array(sourceRef).max(20).optional(),
     }),
   ]),
   cancel: z.tuple([]),

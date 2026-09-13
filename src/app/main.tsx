@@ -1,3 +1,5 @@
+import { KnowledgePanel } from './KnowledgePanel';
+import type { SourceRef } from '../domain/knowledge';
 import { Dialog } from './Dialog';
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -24,7 +26,6 @@ const OntologyPanel = lazy(() =>
 );
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
 import type { EditorHandle } from '../editor/Editor';
-import { sourceOnly } from '../editor/preservation';
 import './style.css';
 import { Startup, RegisterSpace } from './Startup';
 import { Connections } from './Connections';
@@ -200,6 +201,8 @@ function App() {
   const [cloudRoot, setCloudRoot] = useState<CloudRoot>(),
     [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [sources, setSources] = useState<SourceRef[]>([]);
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
@@ -219,6 +222,13 @@ function App() {
     [running, setRunning] = useState(false),
     [prompt, setPrompt] = useState(''),
     [fresh, setFresh] = useState(false);
+  const [sending, setSending] = useState(false);
+  const submitting = useRef(false);
+  const [queued, setQueued] = useState<
+    Array<{ id: number; prompt: string; notePath?: string; sources: SourceRef[] }>
+  >([]);
+  const queueId = useRef(0);
+  const [queuePaused, setQueuePaused] = useState(false);
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [newNote, setNewNote] = useState(false);
@@ -236,22 +246,23 @@ function App() {
     setEvents(histories.current.get(conversationKey.current) ?? []);
     setFresh(false);
   }, [active?.scopeId, agent]);
+  const conversation = useRef<HTMLDivElement>(null);
+  const followConversation = useRef(true);
+  useEffect(() => {
+    if (followConversation.current && conversation.current)
+      conversation.current.scrollTop = conversation.current.scrollHeight;
+  }, [events, panel]);
   const editor = useRef<EditorHandle>(null);
-  const current = useRef({ doc, buffer });
-  current.current = { doc, buffer };
+  const current = useRef({ doc, buffer, external });
+  current.current = { doc, buffer, external };
+  const saving = useRef<Promise<boolean> | undefined>(undefined);
   const dirty = !!doc && buffer !== doc.text;
   const report = (e: unknown) => setError(String(e));
   function load(next: Document) {
     setDoc(next);
     setBuffer(next.text);
     setExternal(undefined);
-    setMode(
-      /\.csv$/i.test(next.path)
-        ? 'table'
-        : !next.readOnly && /\.md$/i.test(next.path) && !sourceOnly(next.text)
-          ? 'rich'
-          : 'source',
-    );
+    setMode(/\.csv$/i.test(next.path) ? 'table' : /\.md$/i.test(next.path) ? 'rich' : 'source');
     setEditorKey((k) => k + 1);
     setStatus(next.readOnly ? 'クラウド資料・読み取り専用' : 'この端末に保存済み');
   }
@@ -261,6 +272,7 @@ function App() {
     setActive((a) => a ?? list[0]);
   }
   async function reconcile() {
+    if (saving.current) await saving.current;
     const now = current.current;
     if (!now.doc) return;
     try {
@@ -303,6 +315,7 @@ function App() {
         });
         if (incoming.type === 'done') {
           setRunning(false);
+          if (incoming.outcome !== 'completed') setQueuePaused(true);
           setRevision((r) => r + 1);
           void reconcile();
         }
@@ -324,16 +337,48 @@ function App() {
       delete window.iroriFlushDraft;
     };
   }, []);
-  async function save() {
-    if (!doc || doc.readOnly || gitOpen) return;
-    try {
-      const saved = await host.save({ ...doc, text: editor.current?.getText() ?? buffer });
-      load(saved);
-    } catch (e) {
-      report(e);
-      void reconcile();
+  async function save(): Promise<boolean> {
+    if (saving.current) {
+      if (!(await saving.current)) return false;
+      return save();
     }
+    const now = current.current;
+    if (!now.doc || now.doc.readOnly) return true;
+    if (now.external) return false;
+    const text = editor.current?.getText() ?? now.buffer;
+    if (text === now.doc.text) return true;
+    const operation = (async () => {
+      try {
+        const saved = await host.save({ ...now.doc!, text });
+        if (
+          current.current.doc?.scopeId === saved.scopeId &&
+          current.current.doc?.path === saved.path
+        ) {
+          const latest = editor.current?.getText() ?? current.current.buffer;
+          current.current = { ...current.current, doc: saved, buffer: latest };
+          setDoc(saved);
+          setBuffer(latest);
+          setStatus('この端末に保存済み');
+        }
+        return true;
+      } catch (e) {
+        report(e);
+        return false;
+      }
+    })();
+    saving.current = operation;
+    const success = await operation;
+    saving.current = undefined;
+    if (!success) void reconcile();
+    return success;
   }
+  useEffect(() => {
+    if (!dirty || doc?.readOnly || external || gitOpen) return;
+    const timer = setTimeout(() => {
+      void save();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [dirty, buffer, doc, external, gitOpen]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.terminal-panel')) return;
@@ -345,12 +390,9 @@ function App() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   });
-  function selectSpace(space: Space) {
-    if (dirty || (doc && (editor.current?.getText() ?? buffer) !== doc.text)) {
-      report('未保存のノートを保存してから移動してください。');
-      return false;
-    }
-    if (running || connecting) return false;
+  async function selectSpace(space: Space) {
+    if (!(await save())) return false;
+    if (running || queued.length || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
       setActive(space);
       setDoc(undefined);
@@ -366,11 +408,8 @@ function App() {
         setStatus(entry.blocked);
         return;
       }
-      if (dirty || (doc && (editor.current?.getText() ?? buffer) !== doc.text)) {
-        setError('未保存のノートを保存してから移動してください。');
-        return;
-      }
-      if (running && (space.scopeId !== active?.scopeId || entry.path !== doc?.path)) {
+      if (!(await save())) return;
+      if ((running || sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
         setError('実行を停止してからスペースを切り替えてください。');
         return;
       }
@@ -383,32 +422,77 @@ function App() {
       report(e);
     }
   }
+  async function sendTurn(
+    message: string,
+    notePath?: string,
+    newSession = false,
+    selectedSources = sources,
+  ) {
+    setError('');
+    followConversation.current = true;
+    setRunning(true);
+    if (newSession) updateEvents(() => []);
+    const runId = await host.start({
+      scopeId: active!.scopeId,
+      agent,
+      prompt: message,
+      notePath,
+      newSession,
+      sources: selectedSources,
+    });
+    updateEvents((all) => [...all, { runId, type: 'status', role: 'user', text: message }]);
+  }
   async function start() {
-    if (!active) return;
+    if (!active || submitting.current || !prompt.trim()) return;
+    submitting.current = true;
+    setSending(true);
+    const message = prompt;
     try {
-      if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-        await host.save({ ...doc!, text: editor.current?.getText() ?? buffer });
-        load(await host.read(doc!.scopeId, doc!.path));
-      }
-      setError('');
-      setRunning(true);
-      await host.start({
-        scopeId: active.scopeId,
-        agent,
-        prompt,
-        notePath: doc?.scopeId === active.scopeId ? doc.path : undefined,
-        newSession: fresh,
-      });
-      if (fresh) updateEvents(() => []);
-      updateEvents((all) => [...all, { runId: 'user', type: 'status', text: `あなた: ${prompt}` }]);
-      setPrompt('');
+      if (!(await save())) return;
+      const notePath = doc?.scopeId === active.scopeId ? doc.path : undefined;
+      if (running || queued.length) {
+        if (queued.length >= 20) throw Error('送信待ちは 20 件までです。');
+        setQueued((all) => [
+          ...all,
+          { id: ++queueId.current, prompt: message, notePath, sources: [...sources] },
+        ]);
+      } else await sendTurn(message, notePath, fresh);
+      setPrompt((value) => (value === message ? '' : value));
       setFresh(false);
     } catch (e) {
-      setRunning(false);
+      if (!running) setRunning(false);
       report(e);
+    } finally {
+      submitting.current = false;
+      setSending(false);
     }
   }
+  useEffect(() => {
+    if (running || sending || queuePaused || external || !queued.length || submitting.current)
+      return;
+    const next = queued[0];
+    submitting.current = true;
+    setSending(true);
+    void (async () => {
+      if (!(await save())) {
+        setQueuePaused(true);
+        return;
+      }
+      try {
+        await sendTurn(next.prompt, next.notePath, false, next.sources);
+        setQueued((all) => all.filter((item) => item.id !== next.id));
+      } catch (error) {
+        setRunning(false);
+        setQueuePaused(true);
+        report(error);
+      }
+    })().finally(() => {
+      submitting.current = false;
+      setSending(false);
+    });
+  }, [running, sending, queued, queuePaused, external]);
   async function openWorkspace(profile: WorkspaceProfile) {
+    setSources([]);
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
     setWorkspace(profile);
     setActive(available[0]);
@@ -460,15 +544,7 @@ function App() {
       setStatus(entry.blocked);
       return;
     }
-    if (
-      dirty ||
-      running ||
-      connecting ||
-      (doc && (editor.current?.getText() ?? buffer) !== doc.text)
-    ) {
-      report('未保存のノートを保存し、実行を停止してから資料を開いてください。');
-      return;
-    }
+    if (connecting || !(await save())) return;
     try {
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
         load(await host.cloudRead(root.scopeId, entry.path));
@@ -518,16 +594,20 @@ function App() {
           activeId={active?.scopeId}
           selected={doc}
           revision={revision}
-          locked={dirty || running || connecting}
+          locked={running || sending || queued.length > 0 || connecting}
           onSelect={(space) => {
-            selectSpace(space);
+            void selectSpace(space);
           }}
           onOpen={(space, entry) => void open(space, entry)}
           onConnect={(space) => {
-            if (selectSpace(space)) showConnections(space);
+            void selectSpace(space).then((selected) => {
+              if (selected) showConnections(space);
+            });
           }}
           onNote={(space) => {
-            if (selectSpace(space)) setNewNote(true);
+            void selectSpace(space).then((selected) => {
+              if (selected) setNewNote(true);
+            });
           }}
           onRefresh={() => setRevision((value) => value + 1)}
         />
@@ -578,13 +658,11 @@ function App() {
           <div className="actions">
             {active && (
               <button
-                disabled={running || dirty || connecting}
+                disabled={running || queued.length > 0 || connecting}
                 onClick={() => {
-                  if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-                    report('未保存のノートを保存してから Git の変更を確認してください。');
-                    return;
-                  }
-                  setGitOpen(true);
+                  void save().then((saved) => {
+                    if (saved) setGitOpen(true);
+                  });
                 }}
               >
                 <Icon name="branch" /> 変更と履歴
@@ -608,14 +686,21 @@ function App() {
             )}
             {connecting && <small>接続を準備中…</small>}
             {active && (
-              <button disabled={running || dirty} onClick={() => setNewNote(true)}>
+              <button
+                disabled={connecting}
+                onClick={() => {
+                  void save().then((saved) => {
+                    if (saved) setNewNote(true);
+                  });
+                }}
+              >
                 <Icon name="plus" /> ノートを作成
               </button>
             )}
             {doc && (
               <>
                 <button onClick={() => void reconcile()}>再読み込み</button>
-                <button disabled={running || !dirty || !!external} onClick={() => void save()}>
+                <button disabled={!dirty || !!external} onClick={() => void save()}>
                   保存{dirty ? ' •' : ''}
                 </button>
               </>
@@ -659,7 +744,34 @@ function App() {
         {doc ? (
           <>
             <div className="doc-toolbar">
-              <span>{dirty ? '未保存' : status}</span>
+              <span>{dirty ? '保存待ち' : status}</span>
+              <div className="actions">
+                <button
+                  disabled={
+                    sources.length >= 20 ||
+                    sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path)
+                  }
+                  onClick={() => {
+                    void save().then((saved) => {
+                      if (saved)
+                        setSources((all) => [...all, { scopeId: doc.scopeId, path: doc.path }]);
+                    });
+                  }}
+                >
+                  参照に追加
+                </button>
+                {active && (
+                  <button
+                    onClick={() => {
+                      void save().then((saved) => {
+                        if (saved) setKnowledgeOpen(true);
+                      });
+                    }}
+                  >
+                    資料と成果物
+                  </button>
+                )}
+              </div>
               <div className="actions">
                 {/\.csv$/i.test(doc.path) && (
                   <button
@@ -673,37 +785,27 @@ function App() {
                     表
                   </button>
                 )}
-                <button
-                  className={mode === 'rich' ? 'selected' : ''}
-                  disabled={doc.readOnly || !!sourceOnly(buffer) || !doc.path.endsWith('.md')}
-                  onClick={() => {
-                    setBuffer(editor.current?.getText() ?? buffer);
-                    setMode('rich');
-                    setEditorKey((k) => k + 1);
-                  }}
-                >
-                  ドキュメント
-                </button>
-                <button
-                  className={mode === 'source' ? 'selected' : ''}
-                  onClick={() => {
-                    setBuffer(editor.current?.getText() ?? buffer);
-                    setMode('source');
-                    setEditorKey((k) => k + 1);
-                  }}
-                >
-                  ソース
-                </button>
+                {!/\.md$/i.test(doc.path) && (
+                  <button
+                    className={mode === 'source' ? 'selected' : ''}
+                    onClick={() => {
+                      setBuffer(editor.current?.getText() ?? buffer);
+                      setMode('source');
+                      setEditorKey((k) => k + 1);
+                    }}
+                  >
+                    ソース
+                  </button>
+                )}
               </div>
             </div>
-            {sourceOnly(buffer) && <div className="hint">{sourceOnly(buffer)}</div>}
             {doc.draft && doc.draft.text !== doc.text && (
               <div className="hint">
                 復元できる下書きがあります。
                 <button
                   onClick={() => {
                     setBuffer(doc.draft!.text);
-                    setMode('source');
+                    setMode(/\.md$/i.test(doc.path) ? 'rich' : 'source');
                     setEditorKey((k) => k + 1);
                     if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
                   }}
@@ -724,6 +826,15 @@ function App() {
                     mode={mode}
                     readOnly={doc.readOnly}
                     onChange={setBuffer}
+                    onError={report}
+                    onUpload={async (file) =>
+                      host.saveImage(
+                        doc.scopeId,
+                        doc.path,
+                        new Uint8Array(await file.arrayBuffer()),
+                      )
+                    }
+                    resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
                   />
                 )}
               </Suspense>
@@ -800,7 +911,7 @@ function App() {
             <select
               aria-label="エージェント"
               value={agent}
-              disabled={running}
+              disabled={running || sending || queued.length > 0}
               onChange={(e) => setAgent(e.target.value as AgentId)}
             >
               {agentIds.map((id) => (
@@ -823,7 +934,25 @@ function App() {
               {active?.name ?? 'スペース未選択'}
               {doc ? ` / ${doc.path.split('/').at(-1)}` : ''}
             </div>
-            <small>保存したノートを参照し、このスペースでツールを実行します。</small>
+            {sources.length > 0 && (
+              <div className="selected-sources" aria-label="選択した参照資料">
+                {sources.map((source) => (
+                  <div key={`${source.scopeId}:${source.path}`}>
+                    <span>
+                      {spaces.find((space) => space.scopeId === source.scopeId)?.name ?? 'Drive'} /{' '}
+                      {source.path}
+                    </span>
+                    <button
+                      aria-label={`${source.path} を参照から外す`}
+                      onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <small>ノートは自動保存され、このスペースで会話が続きます。</small>
             <small>{infos.find((i) => i.id === agent)?.detail}</small>
             {active && (
               <SessionControls
@@ -840,7 +969,16 @@ function App() {
               />
             )}
           </div>
-          <div className="conversation" aria-live="polite">
+          <div
+            className="conversation"
+            aria-live="polite"
+            ref={conversation}
+            onScroll={() => {
+              const element = conversation.current!;
+              followConversation.current =
+                element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+            }}
+          >
             {events.length === 0 && (
               <div className="agent-empty">
                 <Icon name="sparkles" size={24} />
@@ -876,7 +1014,10 @@ function App() {
                   onError={report}
                 />
               ) : (
-                <div className={`message ${event.type}`} key={`${event.runId}-${i}`}>
+                <div
+                  className={`message ${event.role === 'user' ? 'user' : event.type}`}
+                  key={`${event.runId}-${i}`}
+                >
                   {event.type === 'tool' ? (
                     <details>
                       <summary>{event.text}</summary>
@@ -889,12 +1030,34 @@ function App() {
               ),
             )}
           </div>
+          {queued.length > 0 && (
+            <div className="message-queue" aria-label="送信待ち">
+              <strong>送信待ち {queued.length} 件</strong>
+              {queued.map((item) => (
+                <div key={item.id}>
+                  <span>{item.prompt}</span>
+                  <button
+                    disabled={sending}
+                    aria-label={`送信待ち ${item.id} を削除`}
+                    onClick={() => setQueued((all) => all.filter((entry) => entry.id !== item.id))}
+                  >
+                    取消
+                  </button>
+                </div>
+              ))}
+              {queuePaused && (
+                <button disabled={running || sending} onClick={() => setQueuePaused(false)}>
+                  送信を再開
+                </button>
+              )}
+            </div>
+          )}
           <div className="composer">
             <label className="new-session">
               <input
                 type="checkbox"
                 checked={fresh}
-                disabled={running}
+                disabled={running || sending || queued.length > 0}
                 onChange={(e) => setFresh(e.target.checked)}
               />
               新しい会話
@@ -903,30 +1066,55 @@ function App() {
               aria-label="エージェントへの指示"
               placeholder="このノートから、何を作りますか？"
               value={prompt}
-              disabled={running}
               onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (
+                  e.key === 'Enter' &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  e.keyCode !== 229
+                ) {
+                  e.preventDefault();
+                  void start();
+                }
+              }}
             />
             <div className="actions">
-              {running ? (
-                <button onClick={() => void host.cancel().catch(report)}>停止</button>
-              ) : (
+              {running && (
                 <button
-                  className="primary"
-                  disabled={
-                    !active ||
-                    connecting ||
-                    !prompt.trim() ||
-                    !!external ||
-                    infos.find((i) => i.id === agent)?.available !== true
-                  }
-                  onClick={() => void start()}
+                  onClick={() => {
+                    setQueuePaused(true);
+                    void host.cancel().catch(report);
+                  }}
                 >
-                  保存して実行 ↗
+                  停止
                 </button>
               )}
+              <button
+                className="primary"
+                disabled={
+                  !active ||
+                  sending ||
+                  connecting ||
+                  !prompt.trim() ||
+                  !!external ||
+                  infos.find((i) => i.id === agent)?.available !== true
+                }
+                onClick={() => void start()}
+              >
+                {running || queued.length ? '送信待ちに追加' : '送信'}
+              </button>
             </div>
           </div>
         </aside>
+      )}
+      {knowledgeOpen && active && (
+        <KnowledgePanel
+          space={active}
+          doc={doc}
+          cloudOwner={cloudRoot?.scopeId}
+          onClose={() => setKnowledgeOpen(false)}
+        />
       )}
       {ontologyOpen && active && (
         <Suspense fallback={<p className="hint">オントロジーを開いています…</p>}>

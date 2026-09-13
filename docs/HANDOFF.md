@@ -1,5 +1,7 @@
 # irori continuation handoff
 
+Continuation after `d1b828c`: source version `0.1.3` addresses image paste, continuous document editing, bulk Git staging and queued conversations. It adds device-local source/run/artifact records and durable cloud-send preparation with an rclone delivery-engine test; Google remains read-only. See [implementation and limits](EDITING-AND-RECORDS.md). No new device result or real model permission was supplied. Native preview publication is recorded separately below when verified.
+
 Checkpoint requested by the owner after delivery of Windows preview `0.1.2`, 2026-09-13. The owner's "OK" acknowledged delivery and requested this handoff; no successful Google login, mounted-folder access or new Windows device result was reported. This checkpoint changes documentation only. At its start, `main` was clean at `dc53e52`; the subsequent documentation commit contains this file.
 
 ## Start here

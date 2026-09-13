@@ -43,6 +43,7 @@ export interface Question {
 }
 export type AgentAnswers = Record<string, string | string[]>;
 export interface AgentEvent {
+  role?: 'user';
   runId: string;
   type: 'status' | 'text' | 'tool' | 'permission' | 'question' | 'error' | 'done';
   text: string;
@@ -151,8 +152,22 @@ export interface StartRun {
   prompt: string;
   notePath?: string;
   newSession?: boolean;
+  sources?: import('./knowledge').SourceRef[];
 }
 export interface HostAPI {
+  knowledgeHistory(scopeId: string): Promise<import('./knowledge').KnowledgeHistory>;
+  restoreSource(source: import('./knowledge').SourceVersion): Promise<void>;
+  sourceText(source: import('./knowledge').SourceVersion): Promise<string>;
+  registerArtifact(
+    source: import('./knowledge').SourceRef,
+    runId: string,
+  ): Promise<import('./knowledge').ArtifactRecord>;
+  pendingCloudWrites(ownerId: string): Promise<import('./knowledge').PendingWrite[]>;
+  prepareCloudWrite(
+    ownerId: string,
+    mountId: string,
+    source: import('./knowledge').SourceRef,
+  ): Promise<import('./knowledge').PendingWrite>;
   terminalShells(): Promise<TerminalShell[]>;
   openTerminal(
     scopeId: string,
@@ -169,6 +184,12 @@ export interface HostAPI {
   gitHistory(scopeId: string, offset: number): Promise<GitHistory>;
   gitCommitDiff(scopeId: string, oid: string): Promise<string>;
   gitStage(scopeId: string, path: string, staged: boolean, version: string): Promise<GitStatus>;
+  gitStageMany(
+    scopeId: string,
+    paths: string[],
+    staged: boolean,
+    version: string,
+  ): Promise<GitStatus>;
   gitCommit(scopeId: string, message: string, version: string): Promise<GitStatus>;
   gitSync(scopeId: string, action: GitSyncAction, version: string): Promise<GitStatus>;
   gitConflict(scopeId: string, path: string): Promise<GitConflict>;
@@ -209,6 +230,8 @@ export interface HostAPI {
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
+  saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
+  readImage(scopeId: string, note: string, url: string): Promise<string>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
   createNote(scopeId: string, name: string): Promise<Document>;

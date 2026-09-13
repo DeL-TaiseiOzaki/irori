@@ -90,23 +90,24 @@ try {
     .locator('.layer-pane.my-kb')
     .getByRole('button', { name: 'README', exact: true })
     .click();
-  await page.getByRole('button', { name: 'ソース', exact: true }).click();
-  await page.locator('.cm-content').click();
+  await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  await expect(page.getByRole('button', { name: '変更と履歴', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
   await page.getByRole('button', { name: '変更と履歴', exact: true }).click();
   const panel = page.getByRole('dialog', { name: 'Git の変更と履歴' });
   await expect(panel).toBeVisible();
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('+UI saved 日本語');
-  await panel.getByRole('button', { name: 'commit 対象に追加', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('commit 対象に追加しました');
+  await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
+  await panel.getByRole('button', { name: '更新', exact: true }).click();
+  await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
+  await expect(panel.getByRole('status')).toContainText('まとめて追加');
+  await panel.getByRole('button', { name: 'すべて解除', exact: true }).click();
+  await expect(panel.getByRole('status')).toContainText('すべて外しました');
+  await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
+  await expect(panel.getByRole('status')).toContainText('まとめて追加');
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('UI note update');
-  await panel.getByRole('button', { name: 'commit 内容を確認' }).click();
-  await expect(panel.getByRole('region', { name: 'Git 操作の確認' })).toContainText('README.md');
-  await panel.getByRole('button', { name: 'この内容を commit', exact: true }).click();
+  await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('この端末の履歴に commit');
   expect(git(root, 'show', 'HEAD:README.md')).toContain('UI saved 日本語');
   expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
@@ -172,8 +173,7 @@ try {
   await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 0 件');
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Merge reviewed versions');
-  await panel.getByRole('button', { name: 'commit 内容を確認' }).click();
-  await panel.getByRole('button', { name: 'この内容を commit', exact: true }).click();
+  await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.locator('.git-warning')).toHaveCount(0);
   expect(git(root, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 800));
@@ -209,8 +209,8 @@ try {
     JSON.stringify(
       {
         checks: [
-          'dirty editor blocks Git review',
-          'real staging and local commit through reviewed UI',
+          'Git review flushes the current editor',
+          'bulk stage/unstage and direct local commit through reviewed file list',
           'per-space history isolation',
           'explicit single-branch push to disposable bare remote',
           'fetch and divergent receive refusal',

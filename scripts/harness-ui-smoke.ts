@@ -17,6 +17,7 @@ const root = path.join(base, 'KB');
 await mkdir(root);
 const space = await files.register(root, 'ハーネス検証', 'personal');
 await writeFile(path.join(root, 'note.md'), '# Harness fixture\n');
+await writeFile(path.join(root, 'second.md'), '# Other note\n');
 const bin = path.join(base, 'bin');
 await mkdir(bin);
 for (const id of ['pi', 'opencode'])
@@ -52,7 +53,30 @@ try {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
     await page.getByLabel('エージェントへの指示').fill('dialog');
-    await page.getByRole('button', { name: '保存して実行 ↗', exact: true }).click();
+    await page.getByRole('button', { name: '送信', exact: true }).click();
+    if (agent === 'pi') {
+      await page.getByRole('button', { name: 'note', exact: true }).click();
+      await page.locator('.ProseMirror').click();
+      await page.keyboard.press('ControlOrMeta+End');
+      await page.keyboard.press('Enter');
+      await page.keyboard.insertText('会話中も編集を続けます');
+      await page.getByLabel('エージェントへの指示').fill('next queued message');
+      await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
+      await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
+        'next queued message',
+      );
+      expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain(
+        '会話中も編集を続けます',
+      );
+      const observations = await page.evaluate(
+        (id) => window.irori.knowledgeHistory(id),
+        space.scopeId,
+      );
+      // The first turn started before a note was selected; the queued turn captures its own note.
+      expect(observations.runs.length).toBeGreaterThanOrEqual(1);
+      await page.getByRole('button', { name: 'second', exact: true }).click();
+      await expect(page.locator('.ProseMirror')).toContainText('Other note');
+    }
     await page.locator('.request').getByRole('button', { name: '拒否', exact: true }).click();
     if (agent === 'opencode') {
       await page.getByRole('button', { name: 'Choice', exact: true }).click();
@@ -63,6 +87,29 @@ try {
     } else await page.getByLabel('Fixture answer', { exact: true }).fill('Choice');
     await page.getByRole('button', { name: '回答する', exact: true }).click();
     await expect(page.locator('.message.done').last()).toContainText('完了');
+    if (agent === 'pi') {
+      await expect(page.locator('.message.done')).toHaveCount(2);
+      const observations = await page.evaluate(
+        (id) => window.irori.knowledgeHistory(id),
+        space.scopeId,
+      );
+      expect(
+        observations.runs.some((run) => run.sources.some((source) => source.path === 'note.md')),
+      ).toBe(true);
+      await expect(page.getByLabel('送信待ち', { exact: true })).toHaveCount(0);
+      await page.getByLabel('エージェントへの指示').fill('hold');
+      await page.getByRole('button', { name: '送信', exact: true }).click();
+      await expect(page.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+      await page.getByLabel('エージェントへの指示').fill('after cancellation');
+      await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
+      await page.getByRole('button', { name: '停止', exact: true }).click();
+      await expect(page.getByRole('button', { name: '送信を再開', exact: true })).toBeEnabled();
+      await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
+        'after cancellation',
+      );
+      await page.getByRole('button', { name: '送信を再開', exact: true }).click();
+      await expect(page.locator('.message.done')).toHaveCount(4);
+    }
     await expect(
       page.getByText('次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。', {
         exact: true,

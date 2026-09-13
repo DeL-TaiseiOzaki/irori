@@ -32,6 +32,8 @@ try {
     'dist-host/main.cjs',
     'dist-host/preload.cjs',
     'assets/irori-icon.png',
+    'assets/irori-icon.ico',
+    'assets/irori-icon.icns',
     'LICENSE',
     'docs/THIRD_PARTY_NOTICES.md',
     'vendor/rclone/distribution.json',
@@ -227,6 +229,46 @@ try {
   await page.reload();
   await page.getByRole('checkbox', { name: /配布検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
+  await page.getByRole('button', { name: 'note', exact: true }).click();
+  await expect(page.locator('.ProseMirror')).toContainText('Packaged edit 日本語');
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6VEQAAAAASUVORK5CYII=';
+  const reference = await page.evaluate(async (png) => {
+    const space = (await window.irori.spaces())[0];
+    const url = await window.irori.saveImage(
+      space.scopeId,
+      'note.md',
+      Uint8Array.from(atob(png), (c) => c.charCodeAt(0)),
+    );
+    const note = await window.irori.read(space.scopeId, 'note.md');
+    await window.irori.save({ ...note, text: note.text + `\n![Image](${url})\n` });
+    return url;
+  }, png);
+  assert.equal(await readFile(path.join(root, reference), 'base64'), png);
+  await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+  await expect
+    .poll(() =>
+      page
+        .locator('.ProseMirror img')
+        .evaluateAll((images) =>
+          images.some((image) => (image as HTMLImageElement).naturalWidth === 1),
+        ),
+    )
+    .toBe(true);
+  await page.locator('.ProseMirror').evaluate((element) => {
+    element.dataset.lifecycle = 'packaged';
+  });
+  await page.locator('.ProseMirror').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('Continuous packaged edit');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(root, 'note.md'), 'utf8')).includes('Continuous packaged edit'),
+    )
+    .toBe(true);
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
   await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
   await expect(
     page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
@@ -300,7 +342,7 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned relocated Forge package; SDK imports, CSV graph, Japanese note/terminal file save and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Unsigned relocated Forge package; SDK imports, retained editor, local image paste/read, CSV graph, Japanese note/terminal file save and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,

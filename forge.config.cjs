@@ -3,6 +3,7 @@ module.exports = {
   packagerConfig: {
     asar: { unpack: '{**/node_modules/node-pty/**/*,**/vendor/rclone/**/*}' },
     executableName: 'irori',
+    icon: require('node:path').resolve('assets/irori-icon'),
     appBundleId: 'io.github.deltaiseiozaki.irori',
     prune: true,
     ignore: (filename) => {
@@ -26,7 +27,11 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: { name: 'irori', authors: 'DeL-TaiseiOzaki' },
+      config: {
+        name: 'irori',
+        authors: 'DeL-TaiseiOzaki',
+        setupIcon: require('node:path').resolve('assets/irori-icon.ico'),
+      },
     },
     { name: '@electron-forge/maker-dmg', config: { format: 'ULFO' } },
     { name: '@electron-forge/maker-zip', platforms: ['linux', 'darwin'] },

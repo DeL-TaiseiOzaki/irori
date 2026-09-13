@@ -412,3 +412,26 @@ test('linked worktrees keep their own index and operation markers', async (t) =>
   assert.equal(await readFile(path.join(linked, 'other.md'), 'utf8'), 'Linked change 日本語\n');
   assert.equal((await original.status(originalSpace.scopeId)).changes.length, 0);
 });
+
+test('Bulk staging uses exact path lists, preserves unselected partial staging, and unstages without changing bytes', async (t) => {
+  const { service, space, root } = await fixture(t);
+  const id = space.scopeId;
+  await writeFile(path.join(root, 'other.md'), 'staged');
+  await stage(service, id, 'other.md');
+  await writeFile(path.join(root, 'other.md'), 'unstaged');
+  const names = ['--日本語.md', 'image.png', '日本語 note.md'];
+  for (const name of names)
+    await writeFile(
+      path.join(root, name),
+      name === 'image.png' ? Buffer.from([0, 1, 2]) : 'changed',
+    );
+  const before = await service.status(id);
+  const added = await service.stageMany(id, names, true, before.version);
+  assert.equal(git(root, 'show', ':other.md'), 'staged');
+  assert.equal(added.changes.filter((c) => c.index !== ' ').length, 4);
+  await assert.rejects(service.stageMany(id, names, false, before.version), /確認後/);
+  const unstaged = await service.stageMany(id, names, false, added.version);
+  assert.equal(unstaged.changes.find((c) => c.path === 'other.md')?.index, 'M');
+  assert.deepEqual(await readFile(path.join(root, 'image.png')), Buffer.from([0, 1, 2]));
+  await assert.rejects(service.stageMany(id, ['contents/private.md'], true, unstaged.version));
+});

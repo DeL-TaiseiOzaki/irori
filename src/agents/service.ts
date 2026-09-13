@@ -1,3 +1,5 @@
+import { KnowledgeStore } from '../knowledge/store';
+import type { RunRecord } from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
@@ -37,6 +39,9 @@ export class AgentService {
   constructor(
     private files: FileService,
     private emit: (event: AgentEvent) => void,
+    private knowledge = new KnowledgeStore(files.dataDir, (ref) =>
+      files.resolve(ref.scopeId, ref.path),
+    ),
   ) {
     this.sessions = new SessionStore(files.dataDir);
   }
@@ -152,6 +157,7 @@ export class AgentService {
     }, 600000);
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
+    let record: RunRecord | undefined;
     try {
       if (run.cancelled) return;
       const space = this.files.get(input.scopeId);
@@ -159,6 +165,23 @@ export class AgentService {
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
         prompt = `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.\n\n${prompt}`;
+      }
+      record = await this.knowledge.begin(run.id, input);
+      if (record.sources.length) {
+        prompt +=
+          '\n\nExplicitly selected source observations (preserve native access permissions):\n' +
+          record.sources
+            .map((source) =>
+              JSON.stringify({
+                scopeId: source.scopeId,
+                path: source.path,
+                sourceId: source.id,
+                sha256: source.hash,
+                snapshot: this.knowledge.blobPath(source.hash),
+              }),
+            )
+            .join('\n') +
+          '\nRetained snapshots are read-only references: never modify them. Read these observed bytes when grounding an artifact; report if access is unavailable.';
       }
       const binding = this.binding(input.scopeId, input.agent);
       if (input.newSession) await this.sessions.reset(binding);
@@ -205,6 +228,10 @@ export class AgentService {
       if (run.child) await killTree(run.child).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       if (run.cancelled) outcome = 'cancelled';
+      if (record)
+        await this.knowledge.finish(record, outcome).catch(() => {
+          this.event(run, 'error', '実行結果の記録に失敗しました。資料の保持版は残っています。');
+        });
       this.active = undefined;
       this.event(
         run,

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useImperativeHandle, type Ref } from 'react';
 import { Crepe } from '@milkdown/crepe';
+import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
@@ -13,12 +14,18 @@ export function Editor({
   text,
   mode,
   onChange,
+  onUpload,
+  resolveImage,
+  onError,
   ref,
   readOnly = false,
 }: {
   text: string;
   mode: 'rich' | 'source';
   onChange: (text: string) => void;
+  onUpload?: (file: File) => Promise<string>;
+  resolveImage?: (url: string) => Promise<string>;
+  onError?: (error: unknown) => void;
   ref?: Ref<EditorHandle>;
   readOnly?: boolean;
 }) {
@@ -54,7 +61,10 @@ export function Editor({
       snapshot.current = () => view.state.sliceDoc();
       return () => view.destroy();
     }
-    const element = root.current;
+    // Give each asynchronous Crepe lifecycle its own root (including React cleanup).
+    const element = document.createElement('div');
+    root.current.append(element);
+    const encoding = documentEncoding(initial.current);
     const markEdited = () => {
       userEdited = true;
     };
@@ -75,28 +85,68 @@ export function Editor({
     element.addEventListener('keydown', keyboard, true);
     element.addEventListener('pointerdown', toolbar, true);
     const crepe = new Crepe({
-      root: root.current,
-      defaultValue: initial.current,
-      features: { [Crepe.Feature.ImageBlock]: false, [Crepe.Feature.Latex]: false },
+      root: element,
+      defaultValue: encoding.body,
+      features: { [Crepe.Feature.Latex]: false },
+      featureConfigs: {
+        [Crepe.Feature.ImageBlock]: {
+          onUpload: async (file) => {
+            try {
+              if (readOnly || !onUpload) throw Error('このノートは読み取り専用です。');
+              markEdited();
+              return await onUpload(file);
+            } catch (error) {
+              onError?.(error);
+              return '';
+            }
+          },
+          proxyDomURL: async (url) => {
+            if (!url) return '';
+            try {
+              return (await resolveImage?.(url)) ?? '';
+            } catch {
+              return '';
+            }
+          },
+          blockUploadButton: '画像を選択',
+          inlineUploadButton: '画像を選択',
+          blockUploadPlaceholderText: '画像の相対パス',
+          inlineUploadPlaceholderText: '画像の相対パス',
+          blockCaptionPlaceholderText: 'キャプション',
+          blockConfirmButton: '追加',
+        },
+      },
     });
-    snapshot.current = () => (ready && userEdited ? crepe.getMarkdown() : initial.current);
+    crepe.editor.use(literalBlock).use(preserveBlocks);
+    snapshot.current = () =>
+      ready && userEdited ? encoding.restore(crepe.getMarkdown()) : initial.current;
     crepe.on((listener) =>
       listener.markdownUpdated((_ctx, value) => {
-        if (ready && !dead && userEdited) change.current(value);
+        if (ready && !dead && userEdited) change.current(encoding.restore(value));
       }),
     );
-    void crepe.create().then(() => {
-      if (dead) void crepe.destroy();
-      else ready = true;
-    });
+    void crepe
+      .create()
+      .then(() => {
+        if (dead) void crepe.destroy();
+        else {
+          ready = true;
+          crepe.setReadonly(readOnly);
+        }
+      })
+      .catch((error) => {
+        if (!dead) onError?.(error);
+      });
     return () => {
       dead = true;
+      const wasReady = ready;
       ready = false;
+      element.remove();
       for (const event of ['beforeinput', 'paste', 'drop'])
         element.removeEventListener(event, markEdited, true);
       element.removeEventListener('keydown', keyboard, true);
       element.removeEventListener('pointerdown', toolbar, true);
-      void crepe.destroy();
+      if (wasReady) void crepe.destroy();
     };
   }, [mode, readOnly]);
   return <div className={`document-editor ${mode}`} ref={root} data-testid="document-editor" />;
