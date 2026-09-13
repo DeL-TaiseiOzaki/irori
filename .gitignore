@@ -5,3 +5,4 @@ test-results/
 .local/
 *.log
 dist-website/
+out/

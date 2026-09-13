@@ -43,4 +43,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-irori's own distribution license is not selected in this initial private package. Installer preparation must complete the transitive/bundled dependency and native-binary notice inventory, signing and provider-distribution review.
+irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies, including optional Claude SDK native binary packages. Native-binary redistribution review, signing and provider-distribution review remain release gates.

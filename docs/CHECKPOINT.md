@@ -1,4 +1,8 @@
-# Checkpoint — Git collaboration and implementation reuse
+# Checkpoint — Packaging foundation and release decisions
+
+Latest follow-up, 2026-09-13: resume from [RELEASE-PLAN](RELEASE-PLAN.md), [PACKAGING](PACKAGING.md) and [ADR 002](decisions/002-release-and-workspace.md). Forge packaging/CI and download-state tests are implemented; the MIT license and Q01/Q02 decisions are recorded. Local Linux make/package, 55 tests with native controls, five UI suites and website checks passed. Native CI results must be checked against the pushed commit, and Windows/Mac installed-device acceptance remains separate. The next product change is workspace-level independent GitHub/Drive connections, preserving existing user data, followed by the remaining D03–D10 requirements.
+
+The inherited four uncommitted release-planning documents were retained and incorporated. The existing VM preview and its ignored sample/device data were not restarted, removed or reinitialized. No public deployment or real model execution is included. Earlier chronological checkpoint records follow; their older verification counts and open Q01/Q02 statements are historical.
 
 Date: 2026-09-13. This checkpoint includes Git collaboration and the completed implementation reuse audit following UI checkpoint `9c04abb`. The user authorized committing and pushing this work to `origin/main`. Build, 54 tests with all native controls enabled, and all five Electron UI scripts passed. No deployment or release is included. The running VM preview still needs an application restart to load this build.
 

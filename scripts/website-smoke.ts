@@ -1,9 +1,10 @@
 import { _electron as electron } from '@playwright/test';
-import { preview } from 'vite';
+import { build, preview } from 'vite';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { release, releaseSchema } from '../website/release';
 
 const temporary = await mkdtemp(path.join(tmpdir(), 'irori-website-'));
 const server = await preview({
@@ -49,8 +50,23 @@ try {
       await (image as HTMLImageElement).decode();
       if ((image as HTMLImageElement).naturalWidth !== 1254) throw Error('Brand icon did not load');
     });
-  assert.equal(await page.locator('.download-card button:disabled').count(), 3);
-  assert.equal(await page.locator('.download-card a').count(), 0);
+  async function checkDownloads(expected: typeof release) {
+    for (const [platform, item] of Object.entries(expected.downloads)) {
+      const card = page.locator(`.download-card[data-platform="${platform}"]`);
+      if (item) {
+        assert.equal(await card.locator('a').getAttribute('href'), item.url);
+        assert.equal(await card.locator('button').count(), 0);
+        assert.equal(
+          await card.locator('.artifact-info').innerText(),
+          `v${expected.version} · ${item.size}`,
+        );
+      } else {
+        assert.equal(await card.locator('button:disabled').count(), 1);
+        assert.equal(await card.locator('a').count(), 0);
+      }
+    }
+  }
+  await checkDownloads(release);
   await page.getByRole('link', { name: 'ダウンロードについて' }).click();
   await page.waitForURL('**/#download');
   await page.getByText('ブラウザで使うアプリですか？', { exact: true }).click();
@@ -70,9 +86,58 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await page.screenshot({ path: 'test-results/irori-website-mobile.png', fullPage: true });
+  const available = releaseSchema.parse({
+    version: '0.1.0-fixture',
+    downloads: {
+      'windows-x64': { url: 'https://example.invalid/irori/windows.exe', size: '100 MB' },
+      'macos-arm64': { url: 'https://example.invalid/irori/arm64.dmg', size: '101 MB' },
+      'macos-x64': { url: 'https://example.invalid/irori/x64.dmg', size: '102 MB' },
+    },
+  });
+  const fixtures = [
+    { version: null, downloads: { 'windows-x64': null, 'macos-arm64': null, 'macos-x64': null } },
+    { ...available, downloads: { ...available.downloads, 'macos-x64': null } },
+    available,
+  ];
+  for (const [index, fixture] of fixtures.entries()) {
+    const outDir = path.join(temporary, `site-${index}`);
+    // Inject at build time without editing the real manifest or published build output.
+    await build({
+      configFile: 'website/vite.config.ts',
+      logLevel: 'error',
+      build: { outDir },
+      plugins: [
+        {
+          name: 'release-fixture',
+          enforce: 'pre',
+          load(id) {
+            if (id === path.resolve('website/releases.json').replaceAll('\\', '/'))
+              return JSON.stringify(fixture);
+          },
+        },
+      ],
+    });
+    const fixtureServer = await preview({
+      configFile: 'website/vite.config.ts',
+      build: { outDir },
+      preview: { port: 0, host: '127.0.0.1' },
+    });
+    try {
+      const fixtureAddress = fixtureServer.httpServer.address();
+      assert(fixtureAddress && typeof fixtureAddress !== 'string');
+      await page.goto(`http://127.0.0.1:${fixtureAddress.port}/`);
+      await page.locator('.download-card').last().waitFor();
+      await checkDownloads(fixture);
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        fixtureServer.httpServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  }
   assert.deepEqual(errors, []);
   console.log(
-    'Website smoke passed: real browser, navigation, FAQ, unavailable downloads, screenshot asset and mobile layout.',
+    'Website smoke passed: real manifest plus unavailable/mixed/available fixtures, navigation, FAQ, images and mobile layout. Fixture downloads are not fetched.',
   );
 } finally {
   await app?.close();

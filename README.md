@@ -4,6 +4,8 @@ A desktop IDE/ADE for writing Markdown notes and running **local native coding h
 
 This independent repository contains the first working note + agent milestone. Electron is provisional; it is not a completed Windows/macOS release. The two sibling repositories remain independent and unchanged.
 
+Release follow-up: [Forge packaging and CI](docs/PACKAGING.md) now produce unsigned engineering candidates and test the packaged app outside the checkout. [Confirmed product decisions](docs/decisions/002-release-and-workspace.md) set MIT licensing, Windows 11 x64/MacBook M5 Pro arm64 acceptance, CSV/graph ontology presentation, and workspace-level independent GitHub/Drive connections. That connection migration remains implementation work; the usage below describes the existing KB-owned connection flow.
+
 ## Run
 
 Requires Node.js **24.15+ (24.x) or 26+**, npm, and a desktop session. Install and configure the desired `codex`, `claude`, `opencode` or `pi` CLI using its own setup/login flow. irori uses the installed CLI, its native configuration, and its existing authentication. Pi requires version 0.85+; native control probes used OpenCode 1.18.30 and Pi 0.85.1. See [harness compatibility](docs/HARNESSES.md).
@@ -91,7 +93,7 @@ Tests put detailed local evidence in ignored `test-results/` and mutate only dis
 
 Device data lives in Electron's standard `userData` directory (override with `IRORI_DATA_DIR` for tests). Workspace selections, account metadata, rclone credentials and checkout-specific cloud bindings stay there. Portable `.irori/cloud-mounts.json` declarations contain folder IDs and user-chosen relative names, with no account credentials or absolute paths. Disconnected attachments stay visible; cloud access requires verified folder identity and a live managed mount. Existing `contents` bytes are never moved or deleted by setup.
 
-Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, terminal, stable note/artifact identities and versioned provenance. See the acceptance matrix before treating the preview as a release. The distribution license for irori itself remains undecided; upstream notices are in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
+Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, terminal, stable note/artifact identities and versioned provenance. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
 
 ## Download website
 

@@ -1,6 +1,10 @@
 # Website and desktop distribution
 
+Current release work, priorities and completion gates are tracked in [RELEASE-PLAN](RELEASE-PLAN.md), reviewed against checkpoint `ce7234b` and live GitHub publication state.
+
 The end-user journey is: visit the website, choose a native installer, install irori, open a KB, and complete the selected agent's setup. Building the application from a checkout is a developer workflow, not the intended end-user installation flow.
+
+Forge packaging and an unsigned CI pipeline are now implemented; see [commands, package contents and evidence](PACKAGING.md). The MIT license and Windows 11 x64/MacBook M5 Pro arm64 acceptance devices are confirmed in [ADR 002](decisions/002-release-and-workspace.md). Test artifacts are not approved public downloads.
 
 ## Implemented website
 
@@ -14,7 +18,7 @@ npm run preview:website
 xvfb-run -a npm run test:website
 ```
 
-The current three installer slots (Windows x64, macOS Apple silicon, macOS Intel) are deliberately empty: no native installer has been built or verified. The page shows unavailable buttons. It does not advertise a source ZIP as an installer. There is no download-ready release and no published website from this session.
+The current three installer slots (Windows x64, macOS Apple silicon, macOS Intel) remain empty until each platform passes signed-candidate acceptance. The page shows unavailable buttons. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs. There is no download-ready release and no published website from this session.
 
 ## Publish the page
 

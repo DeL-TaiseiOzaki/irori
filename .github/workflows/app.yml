@@ -1,0 +1,77 @@
+name: Verify and package desktop
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run setup:electron
+      - name: Allow Chromium sandbox in the disposable runner
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run build
+      - run: npm test
+      - run: xvfb-run -a npm run test:ui
+      - run: npm run build:website
+      - run: xvfb-run -a npm run test:website
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: windows-2025
+            platform: win32
+            arch: x64
+          - os: macos-15
+            platform: darwin
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run setup:electron
+      - if: runner.os == 'Linux'
+        name: Allow Chromium sandbox in the disposable runner
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run make -- --arch=${{ matrix.arch }}
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:package
+      - if: runner.os != 'Linux'
+        run: npm run test:package
+      # Short-lived engineering artifacts, never GitHub Releases or website downloads.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-irori-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            out/make/**
+            test-results/package-smoke.json
+          if-no-files-found: error
+          retention-days: 7

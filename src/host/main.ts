@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import chokidar, { type FSWatcher } from 'chokidar';
@@ -12,10 +13,13 @@ import type { HostEvent, Space } from '../domain/types';
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers: FSWatcher[] = [];
+if (process.platform === 'win32') app.setAppUserModelId('com.squirrel.irori.irori');
+if (squirrelStartup) app.quit();
 if (process.env.IRORI_DATA_DIR) app.setPath('userData', path.resolve(process.env.IRORI_DATA_DIR));
 app
   .whenReady()
   .then(async () => {
+    if (squirrelStartup) return;
     const files = new FileService(app.getPath('userData'));
     await files.init();
     const emit = (event: HostEvent) => {

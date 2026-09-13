@@ -12,7 +12,7 @@ const artifact = z.object({
     }, 'Installer URLs must use HTTPS without credentials'),
   size: z.string().min(1),
 });
-const schema = z
+export const releaseSchema = z
   .object({
     version: z.string().min(1).nullable(),
     downloads: z.object({
@@ -24,5 +24,16 @@ const schema = z
   .refine(
     (value) =>
       value.version !== null || Object.values(value.downloads).every((item) => item === null),
+  )
+  .refine(
+    (value) =>
+      Object.entries(value.downloads).every(
+        ([platform, item]) =>
+          !item ||
+          new URL(item.url).pathname
+            .toLowerCase()
+            .endsWith(platform === 'windows-x64' ? '.exe' : '.dmg'),
+      ),
+    'Installer extension must match its platform',
   );
-export const release = schema.parse(data);
+export const release = releaseSchema.parse(data);
