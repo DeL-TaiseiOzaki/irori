@@ -1,6 +1,6 @@
 # Distributor Google OAuth setup
 
-irori delegates Drive authentication, refresh and folder APIs to the bundled, checksum-pinned rclone. The remaining external input is an OAuth client owned by the irori distributor. Ordinary users should only choose **Googleアカウントを追加** and consent in their browser.
+irori delegates Drive authentication, refresh and folder APIs to the bundled, checksum-pinned rclone. Ordinary users should only choose **Googleアカウントを追加** and consent in their browser. On 2026-09-13 the owner reported completing the client setup; both repository secret names and update timestamps were verified without reading their values. Version `0.1.2` is the first candidate built with those settings. [CHECKPOINT](CHECKPOINT.md) records its exact build/publication outcome.
 
 Do not fall back to rclone's shared client: rclone states that it is being retired during 2026. Use an application-owned client as described in the [rclone Drive guide](https://rclone.org/drive/#making-your-own-client-id).
 
@@ -17,4 +17,6 @@ The implemented scope remains `drive.readonly`. Selecting a folder in irori does
 
 ## Current boundary
 
-No real Google client was supplied or account consent completed during this implementation. Native rclone tests run the real account controller through the local browser handoff and cancellation with synthetic client configuration; they do not establish successful Google authentication, refresh, shared-drive access or filesystem mounting. The workflow and onboarding code are ready for the owner's client and device trial. Do not mark those external checks complete based on fixtures or the native control test.
+The owner registered the distributor settings and reported declaring broader Google Drive permissions for future writing. Declaring scopes in Google Auth Platform does not change the scopes irori requests: the current account controller still sends only `drive.readonly`. Durable uploads and the corresponding scope/re-consent change remain D04 work. No external Google project settings were changed by the agent.
+
+Configured package tests exercise the compiled client through bundled rclone, inspect its local redirect to Google's authorization endpoint, check the requested read-only scope and cancel the attempt. They intercept the browser launch before Google consent and record only booleans, without client values, OAuth URLs or account tokens. Local test credentials are synthetic; CI builds use repository secrets. This verifies packaged browser handoff and cleanup, not Google's acceptance of the client, successful user consent, refresh, shared-drive access or native filesystem mounting. Those steps still require the owner's device trial. Versions `0.1.0` and `0.1.1` remain unconfigured and do not receive new settings automatically.

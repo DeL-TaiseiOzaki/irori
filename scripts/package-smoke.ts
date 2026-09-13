@@ -129,6 +129,79 @@ try {
   assert.equal(cloudSetup.oauthConfigured, process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1');
   assert.equal(cloudSetup.available, true, cloudSetup.detail);
   assert.equal(cloudSetup.version, 'v1.75.1');
+  let oauthHandoff: {
+    googleAuthorization: boolean;
+    readonlyScope: boolean;
+    clientConfigured: boolean;
+  } | null = null;
+  if (cloudSetup.oauthConfigured) {
+    // Exercise the compiled client through real rclone, stopping before Google consent.
+    // Keep OAuth URLs/client values out of logs and evidence; inspect only the local redirect.
+    await application.evaluate(({ shell }) => {
+      const state = { restore: shell.openExternal, result: null as unknown };
+      Reflect.set(globalThis, 'iroriPackageOAuth', state);
+      shell.openExternal = async (address) => {
+        const result = {
+          googleAuthorization: false,
+          readonlyScope: false,
+          clientConfigured: false,
+        };
+        try {
+          const local = new URL(address);
+          if (local.origin !== 'http://127.0.0.1:53682' || local.pathname !== '/auth')
+            throw Error('Unexpected local OAuth endpoint');
+          const response = await fetch(local, {
+            redirect: 'manual',
+            signal: AbortSignal.timeout(10000),
+          });
+          const authorization = new URL(response.headers.get('location') ?? '');
+          result.googleAuthorization =
+            response.status === 307 &&
+            authorization.origin === 'https://accounts.google.com' &&
+            ['/o/oauth2/auth', '/o/oauth2/v2/auth'].includes(authorization.pathname);
+          result.readonlyScope =
+            authorization.searchParams.get('scope') ===
+            'https://www.googleapis.com/auth/drive.readonly';
+          const client = authorization.searchParams.get('client_id') ?? '';
+          result.clientConfigured =
+            client.endsWith('.apps.googleusercontent.com') &&
+            client !== 'synthetic-development-client';
+        } catch {
+          // Fixed boolean diagnostics prevent a failed URL assertion from revealing values.
+        }
+        state.result = result;
+      };
+    });
+    let accountId: string | undefined;
+    try {
+      accountId = (await page.evaluate(() => window.irori.addCloudAccount('Packaged OAuth trial')))
+        .id;
+      await expect
+        .poll(
+          () =>
+            application!.evaluate(
+              () => Reflect.get(globalThis, 'iroriPackageOAuth').result !== null,
+            ),
+          { timeout: 20000 },
+        )
+        .toBe(true);
+      oauthHandoff = await application.evaluate(
+        () => Reflect.get(globalThis, 'iroriPackageOAuth').result,
+      );
+      assert.deepEqual(oauthHandoff, {
+        googleAuthorization: true,
+        readonlyScope: true,
+        clientConfigured: true,
+      });
+    } finally {
+      if (accountId) await page.evaluate((id) => window.irori.cancelCloudAccount(id), accountId);
+      await application.evaluate(({ shell }) => {
+        shell.openExternal = Reflect.get(globalThis, 'iroriPackageOAuth').restore;
+        Reflect.deleteProperty(globalThis, 'iroriPackageOAuth');
+      });
+    }
+    assert.deepEqual(await page.evaluate(() => window.irori.cloudAccounts()), []);
+  }
   const root = path.join(temporary, '検証 KB');
   await mkdir(root);
   await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
@@ -227,12 +300,13 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned Forge package outside checkout; SDK imports, saved CSV graph and Japanese note save without model inference; not installed-device acceptance',
+          'Unsigned relocated Forge package; SDK imports, CSV graph, Japanese note/terminal file save and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
         runtime,
         cloudSetup,
+        oauthHandoff,
         inventory,
         artifacts,
       },
