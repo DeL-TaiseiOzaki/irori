@@ -1,4 +1,6 @@
-# Checkpoint — Published Google connection testing preview
+# Checkpoint — Conversation recovery continuation
+
+Verified source checkpoint, 2026-09-14: `9d79182e33eab11d1fcdff96d9d3961cf61ef3ee` is pushed and [CI 34773932413](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34773932413) passes verification plus Linux x64, Windows x64 and Mac arm64 packaging. The latest [HANDOFF](HANDOFF.md) records continuation priorities and remaining acceptance. Publication remains the earlier Windows 0.1.3 preview; source changes and short-lived CI artifacts are not a new release.
 
 Development continuation, 2026-09-14: [conversation recovery](CONVERSATIONS.md) is implemented after source checkpoint `2c9396a`. Local build, 75/78 behavior tests (three optional skips), all eight Electron suites, Linux packaging and relocated package restart/queue smoke pass. Source and device-local metadata changes do not alter the published 0.1.3 installer. Resume from current main and the latest [HANDOFF](HANDOFF.md); Google/device/model and full-release gates remain open.
 
