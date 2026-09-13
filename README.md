@@ -1,8 +1,8 @@
 # irori
 
-New implementation: [integrated native terminal](docs/TERMINAL.md) with automatic shell detection, plus bundled rclone and [distributor Google OAuth setup](docs/DISTRIBUTOR-GOOGLE.md). See [CHECKPOINT](docs/CHECKPOINT.md) for package/publication status; source changes alone do not update the public installer.
+Version 0.1.1 adds an [integrated native terminal](docs/TERMINAL.md) with automatic shell detection and bundles rclone. Google account login still awaits the distributor's OAuth client; [setup instructions](docs/DISTRIBUTOR-GOOGLE.md) explain that external requirement. See [CHECKPOINT](docs/CHECKPOINT.md) for exact package/publication evidence.
 
-[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
+[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.1-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
 
 CSV files have a paginated table and the existing source editor. Declared ontology CSV can be viewed as a hierarchy/subgraph with note links; native agents help construct the records. See [ontology display and agent setup](docs/ONTOLOGY.md).
 

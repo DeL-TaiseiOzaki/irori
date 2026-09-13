@@ -1,9 +1,9 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "downloads": {
     "windows-x64": {
-      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.0-preview.1/irori-0.1.0-windows-x64-Setup.exe",
-      "size": "259.3 MiB"
+      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.1-preview.1/irori-0.1.1-windows-x64-Setup.exe",
+      "size": "301.6 MiB"
     },
     "macos-arm64": null,
     "macos-x64": null
