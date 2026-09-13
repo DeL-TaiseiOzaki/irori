@@ -11,6 +11,7 @@ import type {
   Entry,
   Space,
   WorkspaceProfile,
+  CloudRoot,
 } from '../domain/types';
 const Editor = lazy(() =>
   import('../editor/Editor').then((module) => ({ default: module.Editor })),
@@ -21,7 +22,7 @@ import './style.css';
 import { Startup, RegisterSpace } from './Startup';
 import { Connections } from './Connections';
 import { GitPanel } from './GitPanel';
-import { LayerExplorer } from './LayerExplorer';
+import { LayerExplorer, Tree } from './LayerExplorer';
 import { appIcon } from './branding';
 import { Icon } from './Icon';
 import { agentIds, agentNames } from '../domain/types';
@@ -189,6 +190,8 @@ function App() {
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
+  const [cloudRoot, setCloudRoot] = useState<CloudRoot>(),
+    [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
@@ -248,7 +251,9 @@ function App() {
     const now = current.current;
     if (!now.doc) return;
     try {
-      const disk = await host.read(now.doc.scopeId, now.doc.path);
+      const disk = now.doc.workspaceId
+        ? await host.cloudRead(now.doc.workspaceId, now.doc.path)
+        : await host.read(now.doc.scopeId, now.doc.path);
       if (
         current.current.doc?.path !== now.doc.path ||
         current.current.doc?.scopeId !== now.doc.scopeId
@@ -391,10 +396,6 @@ function App() {
   }
   async function openWorkspace(profile: WorkspaceProfile) {
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
-    if (!available.length) {
-      report('利用できるスペースがありません。');
-      return;
-    }
     setWorkspace(profile);
     setActive(available[0]);
     setDoc(undefined);
@@ -402,11 +403,14 @@ function App() {
     setExternal(undefined);
     setStartup(false);
     setConnecting(true);
+    setCloudRoot(undefined);
     try {
-      for (const previousId of workspace?.scopeIds ?? []) {
+      setCloudRoot(await host.workspaceCloud(profile.id));
+      const nextIds = [...available.map((space) => space.scopeId), profile.id];
+      for (const previousId of workspace ? [...workspace.scopeIds, workspace.id] : []) {
         if (
-          !available.some((space) => space.scopeId === previousId) &&
-          spaces.some((space) => space.scopeId === previousId)
+          !nextIds.includes(previousId) &&
+          (previousId === workspace?.id || spaces.some((space) => space.scopeId === previousId))
         )
           for (const connection of await host.cloudConnections(previousId).catch((error) => {
             report(error);
@@ -415,13 +419,13 @@ function App() {
             if (connection.state === 'mounted' || connection.state === 'error')
               await host.disconnectCloud(previousId, connection.mountId).catch(report);
       }
-      for (const space of available)
-        for (const connection of await host.cloudConnections(space.scopeId).catch((error) => {
+      for (const id of nextIds)
+        for (const connection of await host.cloudConnections(id).catch((error) => {
           report(error);
           return [];
         })) {
           if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
-            await host.connectCloud(space.scopeId, connection.mountId).catch(() => {
+            await host.connectCloud(id, connection.mountId).catch(() => {
               setStatus('接続できないクラウドがあります。「クラウド接続」で確認できます。');
             });
           }
@@ -431,6 +435,32 @@ function App() {
     } finally {
       setConnecting(false);
       setRevision((v) => v + 1);
+    }
+  }
+  function showConnections(target: CloudRoot) {
+    setConnectionTarget(target);
+    setConnectionsOpen(true);
+  }
+  async function openCloud(root: CloudRoot, entry: Entry) {
+    if (entry.blocked) {
+      setStatus(entry.blocked);
+      return;
+    }
+    if (
+      dirty ||
+      running ||
+      connecting ||
+      (doc && (editor.current?.getText() ?? buffer) !== doc.text)
+    ) {
+      report('未保存のノートを保存し、実行を停止してから資料を開いてください。');
+      return;
+    }
+    try {
+      if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
+        load(await host.cloudRead(root.scopeId, entry.path));
+      else await host.openCloudFile(root.scopeId, entry.path);
+    } catch (error) {
+      report(error);
     }
   }
   if (startup)
@@ -480,13 +510,40 @@ function App() {
           }}
           onOpen={(space, entry) => void open(space, entry)}
           onConnect={(space) => {
-            if (selectSpace(space)) setConnectionsOpen(true);
+            if (selectSpace(space)) showConnections(space);
           }}
           onNote={(space) => {
             if (selectSpace(space)) setNewNote(true);
           }}
           onRefresh={() => setRevision((value) => value + 1)}
         />
+        {cloudRoot && (
+          <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
+            <div className="scope-heading">
+              <strong>
+                <Icon name="cloud" size={14} /> Google Drive
+              </strong>
+              <button
+                className="scope-action"
+                disabled={dirty || running || connecting}
+                onClick={() => showConnections(cloudRoot)}
+                aria-label="Drive フォルダを接続"
+              >
+                接続
+              </button>
+            </div>
+            <Tree
+              space={cloudRoot}
+              layer="contents"
+              directory="contents"
+              roots={{ entries: [] }}
+              revision={revision}
+              selected={doc}
+              readEntries={host.cloudEntries}
+              onOpen={(root, entry) => void openCloud(root, entry)}
+            />
+          </section>
+        )}
         <button
           className="add-space"
           disabled={running || dirty || connecting}
@@ -498,7 +555,9 @@ function App() {
       <main id="editor-main" tabIndex={-1}>
         <header>
           <div className="document-location" title={doc?.path}>
-            <span className="muted">{active?.name ?? 'ようこそ'}</span>
+            <span className="muted">
+              {doc?.workspaceId ? `${workspace?.name} · Drive` : (active?.name ?? 'ようこそ')}
+            </span>
             <Icon name="chevron" size={12} />
             <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
           </div>
@@ -517,10 +576,10 @@ function App() {
                 <Icon name="branch" /> 変更と履歴
               </button>
             )}
-            {active && (
+            {cloudRoot && (
               <button
                 disabled={running || dirty || connecting}
-                onClick={() => setConnectionsOpen(true)}
+                onClick={() => showConnections(cloudRoot)}
               >
                 <Icon name="cloud" /> クラウド接続
               </button>
@@ -665,10 +724,10 @@ function App() {
           </button>
         </footer>
       </main>
-      {connectionsOpen && active && (
+      {connectionsOpen && connectionTarget && (
         <Connections
-          key={active.scopeId}
-          space={active}
+          key={connectionTarget.scopeId}
+          space={connectionTarget}
           running={running}
           onClose={() => {
             setConnectionsOpen(false);

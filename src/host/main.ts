@@ -1,14 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { FileService } from './files';
 import { AgentService } from '../agents/service';
 import { CloudService } from '../cloud/service';
+import { WorkspaceCloudStorage } from '../cloud/storage';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
+import { isAppDocument } from './trust';
 import type { HostEvent, Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
@@ -28,14 +30,14 @@ app
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }));
+    const workspaces = new WorkspaceService(files);
     const cloud = new CloudService(
-      files,
+      new WorkspaceCloudStorage(files, workspaces),
       (url) => shell.openExternal(url),
       undefined,
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
     );
     files.cloud = cloud;
-    const workspaces = new WorkspaceService(files);
     let fileMutations = 0;
     const git = new GitService(files, () => !agents.busy && !cloud.busy && fileMutations === 0);
     async function changeFiles<T>(fn: () => Promise<T>) {
@@ -69,8 +71,7 @@ app
       watchers.push(watcher);
     }
     files.list().forEach(watch);
-    const entry = path.resolve(__dirname, '../dist/index.html');
-    const trustedURL = pathToFileURL(entry).href;
+    const entry = await realpath(path.resolve(__dirname, '../dist/index.html'));
     const icon = path.resolve(__dirname, '../assets/irori-icon.png');
     app.dock?.setIcon(icon);
     window = new BrowserWindow({
@@ -106,6 +107,20 @@ app
         throw Error('実行を停止してからクラウド接続を変更してください。');
       return changed(scopeId, operation);
     }
+    async function openFile(filename: string) {
+      const choice = await dialog.showMessageBox(window!, {
+        type: 'question',
+        message: '外部アプリで開きますか？',
+        detail: filename,
+        buttons: ['キャンセル', '開く'],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (choice.response === 1) {
+        const error = await shell.openPath(filename);
+        if (error) throw Error(error);
+      }
+    }
     const handlers = {
       gitStatus: (id) => git.status(id),
       gitDiff: (...args) => git.diff(...args),
@@ -123,8 +138,19 @@ app
       repositories: inspectRepository,
       workspaces: () => workspaces.list(),
       saveWorkspace: (...args) => workspaces.save(...args),
-      removeWorkspace: (id) => workspaces.remove(id),
+      removeWorkspace: async (id) => {
+        if (cloud.busy || agents.busy || git.busy)
+          throw Error('操作の完了後に登録を削除してください。');
+        await cloud.removeWorkspace(id, () => workspaces.remove(id));
+      },
       cloudSetup: () => cloud.setup(),
+      workspaceCloud: (id) => cloud.workspaceRoot(id),
+      cloudEntries: (...args) => cloud.entries(...args),
+      cloudRead: (...args) => cloud.read(...args),
+      openCloudFile: async (id, rel) => {
+        await cloud.workspaceRoot(id);
+        await openFile(await cloud.resolve(id, rel));
+      },
       cloudAccounts: () => cloud.accounts.list(),
       addCloudAccount: (name) => cloud.addAccount(name),
       cancelCloudAccount: (id) => cloud.cancelAccount(id),
@@ -173,18 +199,7 @@ app
       },
       openExternal: async (...args) => {
         const filename = await files.resolve(...args);
-        const choice = await dialog.showMessageBox(window!, {
-          type: 'question',
-          message: '外部アプリで開きますか？',
-          detail: filename,
-          buttons: ['キャンセル', '開く'],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        if (choice.response === 1) {
-          const error = await shell.openPath(filename);
-          if (error) throw Error(error);
-        }
+        await openFile(filename);
       },
       agents: () => agents.available(),
       agentSession: (...args) => agents.session(...args),
@@ -199,7 +214,11 @@ app
     } satisfies HostHandlers;
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {
       try {
-        if (event.sender !== window?.webContents || event.senderFrame?.url !== trustedURL)
+        if (
+          event.sender !== window?.webContents ||
+          event.senderFrame !== window.webContents.mainFrame ||
+          !(await isAppDocument(event.senderFrame.url, entry))
+        )
           throw Error('Untrusted renderer');
         return { ok: true, value: await dispatchHost(handlers, method, args) };
       } catch (error) {

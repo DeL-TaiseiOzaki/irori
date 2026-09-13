@@ -20,6 +20,7 @@ import { WorkspaceService, inspectRepository, githubRepository } from '../src/ho
 import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
 import { CloudAccounts } from '../src/cloud/accounts';
+import { WorkspaceCloudStorage } from '../src/cloud/storage';
 import type { RcloneAPI } from '../src/cloud/rclone';
 
 class FixtureRclone implements RcloneAPI {
@@ -64,6 +65,96 @@ async function fixture(t: any) {
   files.cloud = cloud;
   return { base, files, space, accountId, secondAccountId, rpc, cloud };
 }
+
+test('workspace Drive connections are independent of KB membership and survive restart without writing KB metadata', async (t) => {
+  const { base, files, space, rpc, accountId } = await fixture(t);
+  const workspaces = new WorkspaceService(files);
+  const first = await workspaces.save('Research', [space.scopeId]);
+  const second = await workspaces.save('Drive only', []);
+  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
+  files.cloud = cloud;
+  const root = await cloud.workspaceRoot(first.id);
+  assert.equal(root.workspace, true);
+  assert.equal(files.list().length, 1, 'Cloud storage is not registered as a KB');
+  const connection = await cloud.add({
+    scopeId: first.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '資料',
+    folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
+  });
+  assert.equal((await cloud.connections(first.id))[0].accountName, 'Personal account');
+  await assert.rejects(cloud.removeWorkspace(first.id, () => workspaces.remove(first.id)), /登録解除/);
+  assert.deepEqual(await cloud.connections(second.id), []);
+  await assert.rejects(readFile(path.join(space.root, '.irori/cloud-mounts.json')), {
+    code: 'ENOENT',
+  });
+  await workspaces.save('Renamed', [], first.id);
+  assert.equal((await cloud.workspaceRoot(first.id)).root, root.root);
+  assert.equal((await cloud.connections(first.id))[0].mountId, connection.mountId);
+
+  await mkdir(path.join(root.root, 'contents', '資料'), { recursive: true });
+  await writeFile(path.join(root.root, 'contents', '資料', 'note.md'), 'Existing local data');
+  await assert.rejects(cloud.read(first.id, 'contents/資料/note.md'), /未接続/);
+  await assert.rejects(cloud.read(first.id, '../outside.md'), /Invalid cloud path/);
+  await assert.rejects(
+    files.register(path.join(root.root, 'contents', '資料'), 'Invalid KB', 'personal'),
+    /workspace cloud storage/,
+  );
+  await cloud.edit(first.id, connection.mountId);
+  assert.equal(
+    await readFile(path.join(root.root, 'contents', '資料', 'note.md'), 'utf8'),
+    'Existing local data',
+  );
+
+  const other = await cloud.add({
+    scopeId: second.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: 'Independent',
+    folder: { id: 'folder-two', name: 'Second folder', parentId: 'root' },
+  });
+  const restarted = new FileService(path.join(base, 'device'));
+  await restarted.init();
+  const restored = new CloudService(
+    new WorkspaceCloudStorage(restarted, new WorkspaceService(restarted)),
+    async () => {},
+    rpc,
+  );
+  assert.equal((await restored.connections(second.id))[0].mountId, other.mountId);
+  assert.equal((await restored.connections(second.id))[0].state, 'disconnected');
+  const records = await readFile(
+    path.join((await restored.workspaceRoot(second.id)).root, '.irori/cloud-mounts.json'),
+    'utf8',
+  );
+  assert(!records.includes(accountId));
+  assert(!records.includes(base));
+});
+
+test('workspace cloud storage rejects aliases and retains legacy KB attachments in place', async (t) => {
+  const { base, files, space, rpc, accountId, cloud: legacy } = await fixture(t);
+  const attachment = await legacy.add({
+    scopeId: space.scopeId,
+    accountId,
+    contentsRoot: 'contents',
+    name: 'Legacy',
+    folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
+  });
+  const workspaces = new WorkspaceService(files);
+  const profile = await workspaces.save('Workspace', [space.scopeId]);
+  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
+  assert.equal((await cloud.connections(space.scopeId))[0].mountId, attachment.mountId);
+  const directory = path.join(files.dataDir, 'workspace-cloud');
+  await mkdir(directory);
+  const outside = path.join(base, 'outside');
+  await mkdir(outside);
+  await symlink(outside, path.join(directory, profile.id), 'dir');
+  await assert.rejects(cloud.workspaceRoot(profile.id), /must not be an alias/);
+  await assert.rejects(readFile(path.join(outside, '.irori/cloud-mounts.json')), {
+    code: 'ENOENT',
+  });
+  assert.equal((await cloud.connections(space.scopeId))[0].mountId, attachment.mountId);
+});
 
 test('Mount names support Japanese and spaces, and reject traversal and incompatible names', () => {
   for (const name of ['調査 資料', 'team-docs', 'équipe'])

@@ -79,6 +79,7 @@ try {
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
+  await page.getByText('表示分類（任意）', { exact: true }).click();
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();

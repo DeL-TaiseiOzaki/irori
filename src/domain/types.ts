@@ -32,6 +32,7 @@ export interface Document {
   text: string;
   hash: string;
   readOnly?: boolean;
+  workspaceId?: string;
   draft?: { text: string; baseHash: string };
 }
 export interface Question {
@@ -74,6 +75,13 @@ export interface WorkspaceProfile {
   id: string;
   name: string;
   scopeIds: string[];
+}
+export interface CloudRoot {
+  scopeId: string;
+  name: string;
+  root: string;
+  contents: string[];
+  workspace?: boolean;
 }
 export interface CloudAccount {
   id: string;
@@ -150,6 +158,10 @@ export interface HostAPI {
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
   removeWorkspace(id: string): Promise<void>;
   cloudSetup(): Promise<CloudSetup>;
+  workspaceCloud(id: string): Promise<CloudRoot>;
+  cloudEntries(id: string, path: string): Promise<Entry[]>;
+  cloudRead(id: string, path: string): Promise<Document>;
+  openCloudFile(id: string, path: string): Promise<void>;
   cloudAccounts(): Promise<CloudAccount[]>;
   addCloudAccount(name: string): Promise<CloudAccount>;
   cancelCloudAccount(id: string): Promise<void>;

@@ -9,7 +9,8 @@ import { Rclone, type RcloneAPI } from './rclone';
 import { cloudDeclaration, mountNameError, nameKey } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
 import { readLocalJson, writeLocalJson } from '../host/local-json';
-import type { FileService } from '../host/files';
+import { readTextDocument } from '../host/files';
+import type { CloudStorage } from './storage';
 import type {
   AddCloudAttachment,
   CloudAttachment,
@@ -40,7 +41,7 @@ export class CloudService {
   private states = new Map<string, { state: CloudConnection['state']; detail?: string }>();
   private stopping = false;
   constructor(
-    private files: FileService,
+    private files: CloudStorage,
     openBrowser: (url: string) => Promise<void>,
     private rpc: RcloneAPI = new Rclone(files.dataDir),
     oauth?: GoogleOAuth,
@@ -49,6 +50,29 @@ export class CloudService {
   }
   get busy() {
     return this.queue.busy;
+  }
+  async workspaceRoot(id: string) {
+    const root = await this.files.get(id);
+    if (!root.workspace) throw Error('Select a workspace for this operation');
+    return root;
+  }
+  removeWorkspace(id: string, remove: () => Promise<void>) {
+    return this.mutate(async () => {
+      await this.workspaceRoot(id);
+      if ((await this.declarations(id)).length)
+        throw Error(
+          'このワークスペースの Drive 接続を登録解除してから削除してください。KB と Drive のファイルは残ります。',
+        );
+      await remove();
+    });
+  }
+  async isWorkspacePath(root: string) {
+    for (const item of await this.files.list()) {
+      if (!item.workspace) continue;
+      const actual = await fs.realpath(item.root).catch(() => item.root);
+      if (within(actual, root)) return true;
+    }
+    return false;
   }
   addAccount(name: string) {
     return this.mutate(() => this.accounts.add(name));
@@ -134,7 +158,7 @@ export class CloudService {
     }
   }
   private async declarationFile(scopeId: string) {
-    const space = this.files.get(scopeId);
+    const space = await this.files.get(scopeId);
     const dir = await this.files.resolve(scopeId, '.irori');
     if (dir !== path.join(space.root, '.irori'))
       throw Error('Cloud metadata directory must not be an alias');
@@ -152,7 +176,7 @@ export class CloudService {
       .array(cloudDeclaration)
       .max(100)
       .parse(await readLocalJson(await this.declarationFile(scopeId), []));
-    const space = this.files.get(scopeId);
+    const space = await this.files.get(scopeId);
     const ids = new Set<string>();
     const paths = new Set<string>();
     for (const record of records) {
@@ -179,7 +203,7 @@ export class CloudService {
     if (
       binding.scopeId !== scopeId ||
       binding.mountId !== mountId ||
-      binding.root !== this.files.get(scopeId).root
+      binding.root !== (await this.files.get(scopeId)).root
     )
       return;
     return binding;
@@ -212,7 +236,7 @@ export class CloudService {
     );
   }
   private async parent(record: Pick<CloudAttachment, 'scopeId' | 'contentsRoot'>, create = false) {
-    const space = this.files.get(record.scopeId);
+    const space = await this.files.get(record.scopeId);
     if (!space.contents.includes(record.contentsRoot))
       throw Error('Declared contents root required');
     let current = space.root;
@@ -220,7 +244,11 @@ export class CloudService {
       if (!part || part === '.' || part === '..' || part.includes('\\'))
         throw Error('Invalid contents root');
       current = path.join(current, part);
-      if (owner(this.files.list(), current)?.scopeId !== space.scopeId)
+      const roots = await this.files.list();
+      if (
+        owner([...roots.filter((root) => root.scopeId !== space.scopeId), space], current)
+          ?.scopeId !== space.scopeId
+      )
         throw Error('Contents belongs to another scope');
       let stat;
       try {
@@ -279,7 +307,7 @@ export class CloudService {
         name: input.name,
         access: 'read-only',
       });
-      if (!this.files.get(input.scopeId).contents.includes(record.contentsRoot))
+      if (!(await this.files.get(input.scopeId)).contents.includes(record.contentsRoot))
         throw Error('contentsの登録先を選択してください。');
       if (
         records.some(
@@ -298,7 +326,7 @@ export class CloudService {
       await writeLocalJson(this.bindingFile(record.scopeId, record.mountId), {
         scopeId: record.scopeId,
         mountId: record.mountId,
-        root: this.files.get(record.scopeId).root,
+        root: (await this.files.get(record.scopeId)).root,
         accountId: input.accountId,
       });
       return (await this.connections(record.scopeId)).find(
@@ -323,7 +351,7 @@ export class CloudService {
         ...old,
         scopeId,
         mountId,
-        root: this.files.get(scopeId).root,
+        root: (await this.files.get(scopeId)).root,
         accountId,
       });
       this.states.delete(this.key(scopeId, mountId));
@@ -525,7 +553,13 @@ export class CloudService {
     this.states.set(key, { state: 'disconnected' });
   }
   async resolve(scopeId: string, rel: string) {
-    const target = path.join(this.files.get(scopeId).root, rel);
+    if (
+      !rel ||
+      rel.includes('\\') ||
+      rel.split('/').some((part) => !part || part === '.' || part === '..')
+    )
+      throw Error('Invalid cloud path');
+    const target = path.join((await this.files.get(scopeId)).root, rel);
     const entry = [...this.mounted.values()].find(
       (item) => item.attachment.scopeId === scopeId && within(item.target, target),
     );
@@ -536,7 +570,7 @@ export class CloudService {
     return actual;
   }
   async rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined> {
-    const space = this.files.get(scopeId);
+    const space = await this.files.get(scopeId);
     if (!space.contents.includes(rel)) return;
     const entries: Entry[] = (await this.connections(scopeId))
       .filter((record) => record.contentsRoot === rel)
@@ -562,6 +596,31 @@ export class CloudService {
           });
       }
     return entries;
+  }
+  async entries(id: string, rel: string): Promise<Entry[]> {
+    await this.workspaceRoot(id);
+    const roots = await this.rootEntries(id, rel);
+    if (roots) return roots;
+    const entries = await fs.readdir(await this.resolve(id, rel), { withFileTypes: true });
+    if (entries.length > 4000) throw Error('This directory exceeds the 4,000-entry limit');
+    return entries
+      .map((entry): Entry => ({
+        path: `${rel}/${entry.name}`,
+        name: entry.name,
+        directory: entry.isDirectory(),
+        note: /\.md$/i.test(entry.name),
+        layer: 'contents',
+        blocked: entry.isSymbolicLink() ? 'リンク先は開けません' : undefined,
+      }))
+      .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
+  }
+  async read(id: string, rel: string) {
+    await this.workspaceRoot(id);
+    return {
+      ...(await readTextDocument(await this.resolve(id, rel), id, rel)),
+      readOnly: true,
+      workspaceId: id,
+    };
   }
   async close() {
     this.stopping = true;

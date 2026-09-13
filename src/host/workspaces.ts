@@ -10,7 +10,7 @@ import type { WorkspaceProfile, RepositoryInfo } from '../domain/types';
 const profile = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
-  scopeIds: z.array(z.uuid()).min(1).max(100),
+  scopeIds: z.array(z.uuid()).max(100),
 });
 
 export class WorkspaceService {

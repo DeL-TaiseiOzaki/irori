@@ -1,5 +1,7 @@
 # UI direction — 2026-09-13
 
+Workspace follow-up: applied the local frontend-design skill to the independent Drive section. Retain Graphite `#25282c`, Raised graphite `#303439`, Paper `#fafaf8`, Ink `#22292e`, Ember `#c88435` and Noto Sans JP/system typography. Keep left alignment, existing tree controls and a quiet document column; add a bounded full-width Drive section beneath the layer explorer rather than another modal navigation system. Category selection moves into optional display settings. The real Electron screenshot was reviewed at desktop size: both attachment names/statuses and the active note remain visible. [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md) records behavior and regression evidence. No image assets or original five-pane reference were modified.
+
 ## Skills researched and used
 
 - Anthropic [frontend-design](https://github.com/anthropics/skills/tree/34040c9c568585f6929bedeaad110ad08f079624/skills/frontend-design): selected for deliberate product-specific visual direction, typography, content and screenshot critique. Installed locally at that revision.

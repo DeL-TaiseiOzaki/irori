@@ -1,6 +1,6 @@
 import { Dialog } from './Dialog';
 import { useEffect, useState } from 'react';
-import type { CloudFolder, Space } from '../domain/types';
+import type { CloudFolder, CloudRoot } from '../domain/types';
 import { mountNameError } from '../domain/connections';
 import { useResource } from './useResource';
 const host = window.irori;
@@ -17,7 +17,7 @@ export function Connections({
   running,
   onClose,
 }: {
-  space: Space;
+  space: CloudRoot;
   running: boolean;
   onClose: () => void;
 }) {
@@ -83,7 +83,11 @@ export function Connections({
             閉じる
           </button>
         </div>
-        <p>Google Driveのフォルダを、このスペースのcontentsに接続します。</p>
+        <p>
+          {space.workspace
+            ? 'Google Drive のフォルダを、このワークスペースに接続します。KB の追加・切り替えとは独立して使えます。'
+            : 'この KB に保存されている既存の接続を管理します。新しい接続はワークスペースの Drive 欄から追加できます。'}
+        </p>
         <p className="setup-state" role="status">
           {setup
             ? `${setup.version ? `rclone ${setup.version} · ` : ''}${setup.detail}`
@@ -305,7 +309,7 @@ export function Connections({
               </p>
               {invalidName && <p role="alert">{invalidName}</p>}
               <p className="muted">
-                読み取り専用で登録します。この名前をKBの接続情報に保存し、再接続時にも使用します。
+                読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。
               </p>
               <button className="primary" disabled={disabled || !!invalidName}>
                 {setup?.mountAvailable ? '登録して接続' : '接続先を登録'}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Document, Entry, Layer, Space } from '../domain/types';
+import type { CloudRoot, Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 
@@ -7,7 +7,7 @@ const host = window.irori;
 const categories = { personal: '個人', team: 'チーム', organization: '組織' };
 type Listing = { entries: Entry[]; error?: string };
 
-function Tree({
+export function Tree<T extends CloudRoot>({
   space,
   layer,
   directory = '',
@@ -15,17 +15,19 @@ function Tree({
   revision,
   selected,
   onOpen,
+  readEntries = host.entries,
 }: {
-  space: Space;
+  space: T;
   layer: Layer;
   directory?: string;
   roots: Listing;
   revision: number;
   selected?: Document;
-  onOpen: (space: Space, entry: Entry) => void;
+  onOpen: (space: T, entry: Entry) => void;
+  readEntries?: (id: string, path: string) => Promise<Entry[]>;
 }) {
   const listing = useResource(
-    () => host.entries(space.scopeId, directory),
+    () => readEntries(space.scopeId, directory),
     [space.scopeId, directory, revision],
     { enabled: !!directory },
   );
@@ -85,6 +87,7 @@ function Tree({
                 revision={revision}
                 selected={selected}
                 onOpen={onOpen}
+                readEntries={readEntries}
               />
             )}
           </div>

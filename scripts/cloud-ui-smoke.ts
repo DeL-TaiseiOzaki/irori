@@ -56,7 +56,7 @@ try {
   await page.getByLabel('ワークスペース名').fill('連携確認');
   await page.screenshot({ path: 'test-results/irori-startup.png' });
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
+  await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Googleアカウントを追加' })).toBeDisabled();
   await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
   await expect(page.locator('.folder-row')).toHaveCount(2);
@@ -146,7 +146,7 @@ try {
     ),
   ).toBe('error');
   await writeFile(declarationFile, originalDeclaration);
-  await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
+  await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   await expect(page.locator('.connection-card')).toHaveCount(2);
   await expect(page.locator('.connection-card').first()).toContainText('contents/調査 資料/');
   await expect(page.locator('.connection-card').nth(1)).toContainText('contents/納品物/');

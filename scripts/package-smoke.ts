@@ -102,6 +102,10 @@ try {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+  // URL spelling and in-document navigation must retain the same canonical trust boundary.
+  await page.evaluate(() => {
+    window.location.hash = 'packaged-smoke';
+  });
   const runtime = await application.evaluate(async ({ app }) => {
     const path = process.getBuiltinModule('node:path');
     const { createRequire } = process.getBuiltinModule('node:module');

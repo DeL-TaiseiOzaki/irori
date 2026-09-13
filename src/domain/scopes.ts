@@ -4,7 +4,7 @@ export function within(root: string, target: string): boolean {
   const rel = path.relative(root, target);
   return rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel));
 }
-export function owner(spaces: Space[], target: string): Space | undefined {
+export function owner<T extends { root: string }>(spaces: T[], target: string): T | undefined {
   return spaces
     .filter((s) => within(s.root, target))
     .sort((a, b) => b.root.length - a.root.length)[0];

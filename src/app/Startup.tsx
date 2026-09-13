@@ -194,19 +194,22 @@ export function RegisterSpace({
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
-            <label>
-              種類
-              <select
-                aria-label="スペースの種類"
-                value={category}
-                disabled={busy}
-                onChange={(e) => setCategory(e.target.value as Category)}
-              >
-                <option value="personal">個人</option>
-                <option value="team">チーム</option>
-                <option value="organization">組織</option>
-              </select>
-            </label>
+            <details>
+              <summary>表示分類（任意）</summary>
+              <label>
+                種類
+                <select
+                  aria-label="スペースの種類"
+                  value={category}
+                  disabled={busy}
+                  onChange={(e) => setCategory(e.target.value as Category)}
+                >
+                  <option value="personal">個人</option>
+                  <option value="team">チーム</option>
+                  <option value="organization">組織</option>
+                </select>
+              </label>
+            </details>
             <p className="muted">
               登録に必要な識別情報を .irori に作成し、contents
               をGitの対象外にします。既存ノートとGitの変更は保持します。
@@ -263,8 +266,7 @@ export function Startup({
     try {
       const saved = await host.saveWorkspace(name, selected, editing);
       setProfiles(await host.workspaces());
-      if (spaces.some((space) => saved.scopeIds.includes(space.scopeId))) onOpen(saved);
-      else setEditing(undefined);
+      onOpen(saved);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -341,7 +343,7 @@ export function Startup({
                     <button
                       className="workspace-card"
                       key={profile.id}
-                      disabled={busy || !available.length}
+                      disabled={busy}
                       onClick={() => onOpen(profile)}
                     >
                       <Icon name="grid" size={22} />
@@ -378,7 +380,10 @@ export function Startup({
                 );
               })}
             </div>
-            <p className="muted">登録を削除しても、KBフォルダ・ノート・クラウド接続は残ります。</p>
+            <p className="muted">
+              KBフォルダ・ノートは残ります。Drive
+              接続がある場合は、接続の登録解除後にワークスペースを削除できます。
+            </p>
           </section>
         )}
         <section>
@@ -451,12 +456,14 @@ export function Startup({
               disabled={busy}
               onChange={(e) => setName(e.target.value)}
             />
-            <button className="primary" disabled={busy || !selected.length}>
+            <button className="primary" disabled={busy}>
               {editing
                 ? spaces.some((space) => selected.includes(space.scopeId))
                   ? '変更を保存して開く'
                   : '変更を保存'
-                : '選択したスペースを開く'}
+                : selected.length
+                  ? '選択したスペースを開く'
+                  : 'ワークスペースを作成'}
             </button>
             {editing && (
               <button

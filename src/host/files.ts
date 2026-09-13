@@ -23,10 +23,25 @@ const declaration = z.object({
   contents: z.array(relative).min(1),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
+export async function readTextDocument(
+  filename: string,
+  scopeId: string,
+  rel: string,
+): Promise<Document> {
+  if (!/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(rel))
+    throw Error('Use the external application for this file format');
+  if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
+    throw Error('The text editor supports files up to 2 MiB');
+  const bytes = await fs.readFile(filename);
+  const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
+  return { scopeId, path: rel, text, hash: hash(bytes) };
+}
 export class FileService {
   cloud?: {
     resolve(scopeId: string, rel: string): Promise<string>;
     rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined>;
+    isWorkspacePath?(root: string): Promise<boolean>;
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
@@ -89,6 +104,8 @@ export class FileService {
     return paths;
   }
   private async validateRoot(candidate: Space) {
+    if (await this.cloud?.isWorkspacePath?.(candidate.root))
+      throw Error('A KB cannot be registered inside workspace cloud storage');
     for (const s of this.spaces) {
       if (s.root === candidate.root || s.scopeId === candidate.scopeId)
         throw Error('This space or identity is already registered');
@@ -222,14 +239,7 @@ export class FileService {
   }
   async read(id: string, rel: string): Promise<Document> {
     const filename = await this.resolve(id, rel);
-    if (!/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(rel))
-      throw Error('Use the external application for this file format');
-    if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
-      throw Error('The text editor supports files up to 2 MiB');
-    const bytes = await fs.readFile(filename);
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-    if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
-    const doc: Document = { scopeId: id, path: rel, text, hash: hash(bytes) };
+    const doc = await readTextDocument(filename, id, rel);
     if (classify(this.get(id), rel) === 'contents') return { ...doc, readOnly: true };
     try {
       doc.draft = z

@@ -2,6 +2,8 @@
 
 Date: 2026-09-13. The first onboarding and read-only connection implementation is available locally. Actual Google consent and successful native mounts remain acceptance gates; this is not a released cloud-sync feature.
 
+Current ownership: new Drive attachments are [independent workspace connections](WORKSPACE-DRIVE.md). The header cloud action and Google Drive section manage the workspace; original KB contents controls continue to manage legacy declarations without moving user data. The KB-owned flow below is retained for compatibility. OAuth configuration is now embedded through explicit distributor build inputs as described below.
+
 ## Setup and ordinary flow
 
 The developer/distributor supplies an installed rclone executable on the host's PATH, or sets `IRORI_RCLONE_PATH` to that executable. For an unpackaged checkout only, supply `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET` in the host environment. They are not renderer inputs and are removed from native agent child environments. Never commit real client configuration or provider tokens.

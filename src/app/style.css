@@ -750,6 +750,20 @@ textarea {
   overflow: auto;
   border-top: 1px solid var(--nav-rule);
 }
+.workspace-drive {
+  flex: 0 1 180px;
+  min-height: 80px;
+  overflow: auto;
+  border-bottom: 1px solid var(--nav-rule);
+  padding: 8px;
+}
+.workspace-drive .scope-heading strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-size: 12px;
+}
 .layer-pane {
   display: flex;
   flex-direction: column;
