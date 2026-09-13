@@ -22,11 +22,11 @@ The Windows x64 slot points to the exact CI-tested EXE in `v0.1.0-preview.1`. Bo
 
 ## Owner-authorized Windows testing preview
 
-Public entry: [irori download website](https://del-taiseiozaki.github.io/irori/). Assets: [Windows testing prerelease](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1). Both have been exercised anonymously, including a complete browser download with a matching SHA-256.
+Public entry: [irori download website](https://del-taiseiozaki.github.io/irori/). Assets: [Windows testing prerelease 0.1.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.1-preview.1). Both have been exercised anonymously, including a complete browser download with a matching SHA-256.
 
-[Preview notes](releases/0.1.0-preview.1.md) identify application commit `86839006bc49fd35cdbf58c5ed4998db1adfe0f6`, successful native CI run `34752136969`, the exact EXE size/hash and outstanding checks. App version `0.1.0` is unchanged. The EXE is renamed to `irori-0.1.0-windows-x64-Setup.exe` without changing its bytes. Only that EXE, its SHA-256 file and package evidence are attached to the prerelease; internal Squirrel feed files and local user/test data are not published.
+[Preview notes](releases/0.1.1-preview.1.md) identify application commit `3d5678cba27cc0fbcae438a6e4bda13e8aff1449`, successful native CI run `34755088101`, the exact EXE size/hash and outstanding checks. App version `0.1.1` includes the native terminal and bundled rclone; distributor Google client configuration remains absent. The EXE is renamed to `irori-0.1.1-windows-x64-Setup.exe` without changing its bytes. Only that EXE, its SHA-256 file and package evidence are attached to the prerelease; internal Squirrel feed files and local user/test data are not published. Pages run `34755588809` deploys website commit `809c170`; the fresh anonymous browser downloaded all 316,222,464 bytes with the CI/asset SHA-256. See [CHECKPOINT](CHECKPOINT.md) for the full hash and historical preview evidence.
 
-The exception is limited to making the existing Windows candidate available for the owner's trial. It does not authorize inference, cloud account configuration or publication of unverified Mac builds. All normal general-release gates below still apply. Installation, IME, native CLI accounts and actual GitHub synchronization on Windows 11 await the owner's device trial.
+The exception is limited to the tested Windows preview channel for the owner's trial, including the requested terminal/rclone follow-up. It does not authorize inference, changes to external Google account/project configuration or a Mac release. All normal general-release gates below still apply. Installation, IME, native CLI accounts and actual GitHub synchronization on Windows 11 await the owner's device trial.
 
 ## Publish the page
 
