@@ -184,6 +184,7 @@ try {
         ),
     )
     .toBe(true);
+  await expect(page.locator('.literal-block').filter({ hasText: '<br' })).toHaveCount(0);
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {

@@ -38,6 +38,9 @@ export const preserveBlocks = $remark('irori-preservation', () => () => (tree, f
     if (frontmatter && start < frontmatter.length)
       return start === 0 ? [{ type: 'iroriLiteral', value: frontmatter.trimEnd() }] : [];
     const raw = source.slice(start, end);
+    // Crepe serializes empty paragraphs as HTML breaks; display document spacing.
+    if (/^<br\s*\/?>(?:\s*)$/i.test(raw.trim()))
+      return [{ type: 'paragraph', children: [] }];
     if (node.type !== 'code' && /\[\[|^>\s*\[!|^\s*<|^\s*:::|\$\$|\{[%{]|\[\^[^\]]+\]/m.test(raw))
       return [{ type: 'iroriLiteral', value: raw }];
     return [node];
