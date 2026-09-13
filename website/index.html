@@ -95,7 +95,7 @@
           <div id="downloads" class="downloads" aria-label="OS 別のダウンロード"></div>
           <noscript
             ><p>
-              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.1-preview.1"
+              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.2-preview.1"
                 >GitHub の配布ページ</a
               >から Windows 用インストーラーを取得できます。
             </p></noscript
@@ -103,7 +103,7 @@
           <p class="release-note">
             署名なしの検証版です。Windows 11 実機でのインストール・日本語入力は確認待ちです。<br />
             まずは新しいフォルダや KB のコピーでお試しください。
-            <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.1-preview.1"
+            <a href="https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.2-preview.1"
               >変更点・検証範囲・SHA-256</a
             >
           </p>
@@ -174,12 +174,25 @@
             </p>
           </details>
           <details>
+            <summary>Google Drive にはどう接続しますか？</summary>
+            <p>
+              ワークスペース左下の Google Drive の「接続」から、アカウントを追加します。 ブラウザで
+              Google のアクセス許可を確認し、接続するフォルダを選んでください。 Windows
+              でフォルダを開くには <a href="https://winfsp.dev/rel/">WinFsp</a>
+              のインストールが必要です。接続画面にも案内があります。
+            </p>
+            <p>
+              現在は読み取り専用の接続テスト版です。Google
+              の設定でテストユーザーに制限している場合は、
+              登録済みのアカウントでお試しください。実アカウントでの接続・再接続は確認待ちです。
+            </p>
+          </details>
+          <details>
             <summary>すべての機能が使えますか？</summary>
             <p>
               ノート編集、Git 操作、CSV
               の表表示・ソース編集、設定済みオントロジーのグラフ表示、内蔵ターミナルを試せます。
-              Google 接続に使う rclone は同梱しましたが、配布側の Google
-              アプリ登録が未完了のため、アカウントの新規接続は準備中です。
+              Google 接続用の設定と rclone を組み込み、アカウント接続を試せる版になりました。
               クラウドへの書き込み、成果物と参照ソースの履歴管理などは未完成です。Windows 実機での
               CLI 連携も確認待ちです。
             </p>
