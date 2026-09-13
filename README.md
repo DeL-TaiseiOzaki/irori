@@ -1,6 +1,6 @@
 # irori
 
-Source version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.
+Version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.
 
 Version 0.1.3 retains the distributor's Google client configuration so account connection can be tried through the system browser. Actual consent and native mounts still need device acceptance; see [Google setup and scope](docs/DISTRIBUTOR-GOOGLE.md). The [integrated native terminal](docs/TERMINAL.md), automatic shell discovery and bundled rclone remain included. [CHECKPOINT](docs/CHECKPOINT.md) records exact package/publication evidence.
 
