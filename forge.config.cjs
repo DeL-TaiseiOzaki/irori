@@ -13,6 +13,9 @@ module.exports = {
       return !['package.json', 'LICENSE', 'docs', 'docs/THIRD_PARTY_NOTICES.md'].includes(relative);
     },
   },
+  // node-pty 1.1 ships Node-API Windows prebuilds, including ConPTY helpers.
+  // Reuse them instead of requiring a second, Electron-specific MSVC build.
+  rebuildConfig: { ignoreModules: process.platform === 'win32' ? ['node-pty'] : [] },
   plugins: [{ name: '@electron-forge/plugin-auto-unpack-natives', config: {} }],
   hooks: {
     packageAfterCopy: async (_config, buildPath, _electronVersion, platform, arch) => {
