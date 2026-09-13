@@ -47,7 +47,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
@@ -76,7 +76,7 @@ try {
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-  await page.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await expect(

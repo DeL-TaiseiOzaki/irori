@@ -50,6 +50,8 @@ app
     files.list().forEach(watch);
     const entry = path.resolve(__dirname, '../dist/index.html');
     const trustedURL = pathToFileURL(entry).href;
+    const icon = path.resolve(__dirname, '../assets/irori-icon.png');
+    app.dock?.setIcon(icon);
     window = new BrowserWindow({
       width: 1440,
       height: 940,
@@ -57,6 +59,7 @@ app
       minHeight: 680,
       backgroundColor: '#faf9f6',
       title: 'irori',
+      icon,
       webPreferences: {
         preload: path.join(__dirname, 'preload.cjs'),
         contextIsolation: true,

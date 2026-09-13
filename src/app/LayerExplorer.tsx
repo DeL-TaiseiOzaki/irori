@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Document, Entry, Layer, Space } from '../domain/types';
+import { Icon } from './Icon';
 
 const host = window.irori;
 const categories = { personal: '個人', team: 'チーム', organization: '組織' };
@@ -72,7 +73,10 @@ function Tree({
                   : onOpen(space, entry)
               }
             >
-              <span>{entry.directory ? (isOpen ? '⌄' : '›') : entry.note ? '▤' : '◻'}</span>
+              {entry.directory && (
+                <Icon name="chevron" size={11} className={isOpen ? 'rotated' : ''} />
+              )}
+              <Icon name={entry.directory ? 'folder' : 'file'} size={14} />
               <span className="filename">{entry.name.replace(/\.md$/, '')}</span>
               {entry.blocked && (
                 <span className="badge">{layer === 'contents' ? '未接続' : '利用不可'}</span>
@@ -135,7 +139,7 @@ function ScopeTree({
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
         >
-          {expanded ? '⌄' : '›'}
+          <Icon name="chevron" size={12} className={expanded ? 'rotated' : ''} />
         </button>
         <button
           className="space-title"
@@ -163,7 +167,7 @@ function ScopeTree({
             aria-label={`${space.name} にノートを作成`}
             onClick={() => onNote(space)}
           >
-            ＋
+            <Icon name="plus" size={14} />
           </button>
         )}
       </div>
@@ -233,35 +237,35 @@ export function LayerExplorer({
   const panes: { id: string; title: string; subtitle: string; layer: Layer; spaces: Space[] }[] = [
     {
       id: 'schema',
-      title: 'SCHEMA LAYER',
+      title: 'Schema',
       subtitle: '設定・エージェントの指示',
       layer: 'schema',
       spaces,
     },
     {
       id: 'my-kb',
-      title: 'MY KNOWLEDGE BASE',
+      title: '個人のナレッジ',
       subtitle: '個人のナレッジ',
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
     {
       id: 'team-kb',
-      title: 'TEAM KNOWLEDGE BASES',
+      title: 'チームのナレッジ',
       subtitle: 'チーム・組織のナレッジ',
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category !== 'personal'),
     },
     {
       id: 'my-contents',
-      title: 'MY CONTENTS',
+      title: '個人の資料',
       subtitle: '個人の資料・クラウド',
       layer: 'contents',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
     {
       id: 'team-contents',
-      title: 'TEAM CONTENTS',
+      title: 'チームの資料',
       subtitle: 'チーム・組織の資料',
       layer: 'contents',
       spaces: spaces.filter((s) => s.category !== 'personal'),
@@ -297,8 +301,22 @@ export function LayerExplorer({
                   )
                 }
               >
-                <span>{collapsed.includes(pane.id) ? '›' : '⌄'}</span>
+                <Icon
+                  name={
+                    pane.layer === 'schema'
+                      ? 'schema'
+                      : pane.layer === 'contents'
+                        ? 'cloud'
+                        : 'book'
+                  }
+                  size={14}
+                />
                 <span>{pane.title}</span>
+                <Icon
+                  name="chevron"
+                  size={10}
+                  className={collapsed.includes(pane.id) ? '' : 'rotated'}
+                />
               </button>
             </h2>
             {pane.id === 'schema' && (
@@ -307,7 +325,7 @@ export function LayerExplorer({
                 aria-label="エクスプローラーを更新"
                 onClick={onRefresh}
               >
-                ↻
+                <Icon name="refresh" size={14} />
               </button>
             )}
           </div>

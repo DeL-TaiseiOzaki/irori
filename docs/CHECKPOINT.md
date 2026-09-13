@@ -2,6 +2,10 @@
 
 Date: 2026-09-13. Status: paused at the user's request after they successfully opened and explored the VM preview in Chrome. This checkpoint is saved in the local irori Git history; no publication or release is implied. The earlier checkpoint is commit `095edd0`.
 
+## Subsequent work
+
+Checkpoint `2914ec4` was pushed to `origin/main` with user authorization. This follow-up checkpoint adopts the user-selected app icon and applies a modern visual system to startup, the five-pane workspace and assistant; see [UI direction, installed skills and verification](UI-DESIGN.md). The user authorized committing and pushing these changes on 2026-09-13. Build, 30 behavior tests and all four UI scripts passed; four opt-in native probes were skipped. The acceptance boundaries below still apply.
+
 ## Confirmed direction
 
 - irori's central requirement is one workspace linking multiple independent GitHub checkouts and multiple selected cloud folders/accounts. Physical repository placement remains undecided; named profiles preserve existing checkout locations.
@@ -24,15 +28,15 @@ Date: 2026-09-13. Status: paused at the user's request after they successfully o
 
 Tests are recorded from completed implementation work; no paid model calls or redundant full suite reruns are needed merely to create this checkpoint.
 
-| Check | Latest evidence |
-| --- | --- |
-| `npm run build` | Passed after the layered explorer change; existing dependency annotation and large-bundle warnings remain |
-| `npm test` | 30 passed, 0 failed; four opt-in native control probes skipped for the final UI change |
-| Native control probes at the preceding audit | All 34 tests passed with real rclone/OpenCode/Pi controls enabled; no Google consent or model inference |
-| `xvfb-run -a npm run test:ui` | All four scripts passed: editor/session, cloud protocol fixture, harness protocol fixtures and layered explorer |
-| Layered explorer fixture | Four spaces (personal, two teams, organization), schema isolation, nested contents precedence, same-name note ownership, unsaved-switch protection, AI context, cloud-action ownership, pane collapse and narrower-window AI controls |
-| Live browser preview | Updated layout inspected, browser login verified; user subsequently confirmed Chrome access and exploration |
-| Website | Earlier checkpoint's build/browser evidence is historical; website code was not changed during these additions |
+| Check                                        | Latest evidence                                                                                                                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build`                              | Passed after the layered explorer change; existing dependency annotation and large-bundle warnings remain                                                                                                                             |
+| `npm test`                                   | 30 passed, 0 failed; four opt-in native control probes skipped for the final UI change                                                                                                                                                |
+| Native control probes at the preceding audit | All 34 tests passed with real rclone/OpenCode/Pi controls enabled; no Google consent or model inference                                                                                                                               |
+| `xvfb-run -a npm run test:ui`                | All four scripts passed: editor/session, cloud protocol fixture, harness protocol fixtures and layered explorer                                                                                                                       |
+| Layered explorer fixture                     | Four spaces (personal, two teams, organization), schema isolation, nested contents precedence, same-name note ownership, unsaved-switch protection, AI context, cloud-action ownership, pane collapse and narrower-window AI controls |
+| Live browser preview                         | Updated layout inspected, browser login verified; user subsequently confirmed Chrome access and exploration                                                                                                                           |
+| Website                                      | Earlier checkpoint's build/browser evidence is historical; website code was not changed during these additions                                                                                                                        |
 
 Codex/Claude real-model evidence also belongs to the earlier milestone. Current OpenCode/Pi controls, seeded session tests and executable fixtures must not be presented as real model-turn or mounted-file acceptance. Details: [STATUS](STATUS.md), [HARNESSES](HARNESSES.md), [LAYERED-EXPLORER](LAYERED-EXPLORER.md), [CLOUD-SETUP](CLOUD-SETUP.md).
 

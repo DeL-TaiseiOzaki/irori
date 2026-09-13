@@ -42,6 +42,13 @@ try {
   await page.reload();
   await page.locator('.download-card').last().waitFor();
   assert.equal(await page.title(), 'irori — ノートから、次の仕事へ。');
+  await page
+    .locator('.brand .mark')
+    .first()
+    .evaluate(async (image) => {
+      await (image as HTMLImageElement).decode();
+      if ((image as HTMLImageElement).naturalWidth !== 1254) throw Error('Brand icon did not load');
+    });
   assert.equal(await page.locator('.download-card button:disabled').count(), 3);
   assert.equal(await page.locator('.download-card a').count(), 0);
   await page.getByRole('link', { name: 'ダウンロードについて' }).click();

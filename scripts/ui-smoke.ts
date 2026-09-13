@@ -57,6 +57,11 @@ const page = await app.firstWindow();
 page.on('pageerror', (error) => errors.push(String(error)));
 try {
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator('.brand-icon').evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBe(1254);
   const startupMs = Date.now() - launchStart;
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
@@ -64,7 +69,7 @@ try {
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: '▤ 日本語 note', exact: true }).click();
+  await page.getByRole('button', { name: '日本語 note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('顧客インタビュー');
   await expect(page.locator('.ProseMirror table.children')).toBeVisible();
   // Opening a rich document is not itself an edit.
@@ -101,7 +106,7 @@ try {
   await expect(page.locator('.versions')).toContainText('保持する下書き');
   await expect(page.locator('.versions')).toContainText('エージェントの別の変更。');
   await page.getByRole('button', { name: 'ディスク版を表示（下書きは保持）' }).click();
-  await page.getByRole('button', { name: '▤ 互換', exact: true }).click();
+  await page.getByRole('button', { name: '互換', exact: true }).click();
   await expect(page.locator('.cm-content')).toBeVisible();
   await page.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+End');
@@ -110,8 +115,8 @@ try {
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   if ((await readFile(path.join(kb, '互換.md'), 'utf8')) !== opaque + '互換編集')
     throw Error('Source edit lost BOM, CRLF or opaque Markdown');
-  await page.getByRole('button', { name: '▤ 日本語 note', exact: true }).click();
-  await page.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: '日本語 note', exact: true }).click();
+  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {
     for (const agent of ['codex', 'claude']) {
@@ -232,7 +237,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       const window = await restarted.firstWindow();
       window.on('pageerror', (error) => errors.push(String(error)));
       await window.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-      await window.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+      await window.getByRole('button', { name: 'AIに相談', exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).toBeVisible();
       await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
       if (cycle === 1) {

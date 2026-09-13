@@ -20,6 +20,8 @@ import './style.css';
 import { Startup, RegisterSpace } from './Startup';
 import { Connections } from './Connections';
 import { LayerExplorer } from './LayerExplorer';
+import { appIcon } from './branding';
+import { Icon } from './Icon';
 import { agentIds, agentNames } from '../domain/types';
 const host = window.irori;
 function Request({
@@ -437,9 +439,13 @@ function App() {
     );
   return (
     <div className={`app ${panel ? 'panel-open' : ''}`}>
+      <a className="skip-to-editor" href="#editor-main">
+        編集領域へ移動
+      </a>
       <aside className="sidebar">
         <div className="brand">
-          <span className="hearth">▪</span>irori<span className="preview">preview</span>
+          <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
+          irori<span className="preview">Preview</span>
         </div>
         <button
           className="workspace-switch"
@@ -452,7 +458,12 @@ function App() {
             setStartup(true);
           }}
         >
-          {workspace?.name ?? 'ワークスペース'} ▾
+          <Icon name="grid" />
+          <span>
+            <small>ワークスペース</small>
+            {workspace?.name ?? 'ワークスペース'}
+          </span>
+          <Icon name="chevron" className="rotated" size={13} />
         </button>
         <LayerExplorer
           spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
@@ -477,16 +488,15 @@ function App() {
           disabled={running || dirty || connecting}
           onClick={() => setAdd(true)}
         >
-          ＋ スペースを追加
+          <Icon name="plus" /> スペースを追加
         </button>
       </aside>
-      <main>
+      <main id="editor-main" tabIndex={-1}>
         <header>
-          <div>
-            {active?.name ?? 'ようこそ'}{' '}
-            <span className="muted">
-              / {doc?.path.split('/').slice(0, -1).join(' / ') ?? 'ナレッジ'}
-            </span>
+          <div className="document-location" title={doc?.path}>
+            <span className="muted">{active?.name ?? 'ようこそ'}</span>
+            <Icon name="chevron" size={12} />
+            <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
           </div>
           <div className="actions">
             {active && (
@@ -494,13 +504,13 @@ function App() {
                 disabled={running || dirty || connecting}
                 onClick={() => setConnectionsOpen(true)}
               >
-                クラウド接続
+                <Icon name="cloud" /> クラウド接続
               </button>
             )}
             {connecting && <small>接続を準備中…</small>}
             {active && (
               <button disabled={running || dirty} onClick={() => setNewNote(true)}>
-                ノートを作成
+                <Icon name="plus" /> ノートを作成
               </button>
             )}
             {doc && (
@@ -606,23 +616,34 @@ function App() {
           </>
         ) : (
           <div className="welcome">
-            <span className="welcome-mark">▪</span>
-            <h1>知識を育てる場所。</h1>
+            <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
+            <h1>ここから、考えを広げよう。</h1>
             <p>
-              ノートを書き、エージェントと考える。
+              左のナレッジからノートを開くと、編集を始められます。
               <br />
-              あなたの KB を開いて、はじめましょう。
+              新しいノートを作ったり、AIと一緒に整理することもできます。
             </p>
-            <button className="primary" onClick={() => setAdd(true)}>
-              KBフォルダを開く
-            </button>
+            <div className="welcome-actions">
+              <button
+                className="primary"
+                disabled={!active || running || connecting}
+                onClick={() => setNewNote(true)}
+              >
+                <Icon name="plus" />
+                新しいノートを作成
+              </button>
+              <button onClick={() => setAdd(true)}>
+                <Icon name="folder" />
+                KBフォルダを開く
+              </button>
+            </div>
             <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
           </div>
         )}
         <footer>
-          <span>{status}</span>
+          <span role="status">{status || (active ? `${active.name}で作業中` : '')}</span>
           <button className="consult" onClick={() => setPanel((p) => !p)}>
-            ✧ {panel ? 'AIパネルを閉じる' : 'AIに相談'}
+            <Icon name="sparkles" /> {panel ? 'AIパネルを閉じる' : 'AIに相談'}
           </button>
         </footer>
       </main>
@@ -640,9 +661,12 @@ function App() {
       {panel && (
         <aside className="agent-panel">
           <div className="agent-heading">
-            <h2>AIに相談</h2>
+            <h2>
+              <Icon name="sparkles" />
+              AIに相談
+            </h2>
             <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
-              ×
+              <Icon name="close" />
             </button>
           </div>
           <div className="agent-config">
@@ -691,7 +715,30 @@ function App() {
           </div>
           <div className="conversation" aria-live="polite">
             {events.length === 0 && (
-              <p className="muted">このノートを整理したり、内容をもとに成果物を作成できます。</p>
+              <div className="agent-empty">
+                <Icon name="sparkles" size={24} />
+                <p>考えを進める、もうひとつの視点。</p>
+                <small>このスペースのノートについて相談できます。</small>
+                <div className="prompt-suggestions">
+                  {['このノートの要点をまとめて', 'この内容から次のアクションを整理して'].map(
+                    (suggestion) => (
+                      <button
+                        key={suggestion}
+                        disabled={!doc || running}
+                        onClick={() => {
+                          setPrompt(suggestion);
+                          document
+                            .querySelector<HTMLTextAreaElement>('.composer textarea')
+                            ?.focus();
+                        }}
+                      >
+                        {suggestion}
+                        <Icon name="arrow" size={13} />
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
             )}
             {events.map((event, i) =>
               event.type === 'permission' || event.type === 'question' ? (

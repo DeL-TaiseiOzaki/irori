@@ -33,6 +33,7 @@ await fs.mkdir(state, { recursive: true, mode: 0o700 });
 await fs.mkdir(publicDir, { recursive: true, mode: 0o700 });
 await fs.cp(novnc, path.join(publicDir, 'novnc'), { recursive: true });
 await fs.copyFile(path.join(root, 'scripts/preview-vm.html'), path.join(publicDir, 'index.html'));
+await fs.copyFile(path.join(root, 'assets/irori-icon.png'), path.join(publicDir, 'irori-icon.png'));
 const passwordFile = path.join(state, 'password');
 const password = randomBytes(6).toString('base64url'); // VNC's eight-byte password limit.
 await fs.writeFile(passwordFile, password + '\n', { mode: 0o600 });

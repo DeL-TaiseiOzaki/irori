@@ -63,8 +63,8 @@ const app = await electron.launch({
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
 try {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   page.on('pageerror', (error) => errors.push(String(error)));
   await expect(page.getByRole('checkbox')).toHaveCount(4);
   for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
@@ -73,12 +73,12 @@ try {
   const personal = page.locator('.layer-pane.my-kb');
   const team = page.locator('.layer-pane.team-kb');
   await expect(page.locator('.layer-pane')).toHaveCount(5);
-  await expect(schema.getByRole('button', { name: '▤ AGENTS', exact: true })).toHaveCount(4);
+  await expect(schema.getByRole('button', { name: 'AGENTS', exact: true })).toHaveCount(4);
   await expect(personal.locator('.scope-tree')).toHaveCount(1);
   await expect(team.locator('.scope-tree')).toHaveCount(3);
   await expect(team.getByText('組織', { exact: true })).toBeVisible();
   await expect(personal.getByRole('button', { name: /AGENTS/ })).toHaveCount(0);
-  await expect(schema.getByRole('button', { name: '▤ README', exact: true })).toHaveCount(0);
+  await expect(schema.getByRole('button', { name: 'README', exact: true })).toHaveCount(0);
   await expect(
     page.locator('.layer-pane.my-contents').getByRole('button', { name: /調査 資料/ }),
   ).toHaveCount(1);
@@ -86,20 +86,20 @@ try {
     page.locator('.layer-pane.team-contents').getByRole('button', { name: /調査 資料/ }),
   ).toHaveCount(3);
   const personalSchema = schema.locator(`[data-scope-id="${spaces[0].scopeId}"]`);
-  await personalSchema.getByRole('button', { name: '› schema', exact: true }).click();
-  await expect(personalSchema.getByRole('button', { name: '▤ policy', exact: true })).toBeVisible();
+  await personalSchema.getByRole('button', { name: 'schema', exact: true }).click();
+  await expect(personalSchema.getByRole('button', { name: 'policy', exact: true })).toBeVisible();
   await expect(personalSchema.getByRole('button', { name: /raw|調査 資料/ })).toHaveCount(0);
-  await personalSchema.getByRole('button', { name: '▤ AGENTS', exact: true }).click();
+  await personalSchema.getByRole('button', { name: 'AGENTS', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('個人KB rules');
   const engineering = team.locator(`[data-scope-id="${spaces[1].scopeId}"]`);
   const research = team.locator(`[data-scope-id="${spaces[2].scopeId}"]`);
-  await engineering.getByRole('button', { name: '▤ README', exact: true }).click();
+  await engineering.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Engineering notes');
   await page.getByRole('button', { name: 'ソース', exact: true }).click();
   await page.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nEngineering edit\n');
-  await research.getByRole('button', { name: '▤ README', exact: true }).click();
+  await research.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('未保存');
   await expect(engineering.locator('[aria-current="page"]')).toContainText('README');
   await page.getByRole('button', { name: '保存 •', exact: true }).click();
@@ -109,10 +109,17 @@ try {
   );
   expect(await readFile(path.join(spaces[2].root, 'README.md'), 'utf8')).toBe('# Research notes\n');
   await page.getByRole('alert').getByRole('button', { name: '閉じる' }).click();
-  await research.getByRole('button', { name: '▤ README', exact: true }).click();
+  await research.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Research notes');
-  await page.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   await expect(page.locator('.context-chip')).toContainText('Research');
+  await page.getByRole('button', { name: 'このノートの要点をまとめて', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toHaveValue(
+    'このノートの要点をまとめて',
+  );
+  await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toBeFocused();
+  await expect(page.locator('.message.user')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/irori-layered-explorer.png' });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 800));
   await expect.poll(() => page.evaluate(() => innerWidth)).toBeLessThanOrEqual(1024);
@@ -129,9 +136,9 @@ try {
   );
   await expect(page.locator('.connection-card')).toContainText('schema/raw/調査 資料/');
   await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
-  await page.getByRole('button', { name: 'MY CONTENTS', exact: false }).click();
+  await page.getByRole('button', { name: '個人の資料', exact: false }).click();
   await expect(page.locator('.layer-pane.my-contents .layer-body')).toHaveCount(0);
-  await page.getByRole('button', { name: 'MY CONTENTS', exact: false }).click();
+  await page.getByRole('button', { name: '個人の資料', exact: false }).click();
   await expect(page.locator('.layer-pane.my-contents .layer-body')).toBeVisible();
   expect(errors).toEqual([]);
   await writeFile(
@@ -145,6 +152,7 @@ try {
           'unconfigured aliases visible without a mount',
           'same-name note ownership and dirty-switch protection',
           'agent context follows selected repository',
+          'prompt suggestions fill and focus the composer without starting a run',
           'cloud action targets its owning scope',
           'pane collapse and expansion',
         ],

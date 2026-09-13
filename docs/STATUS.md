@@ -1,6 +1,10 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Date: 2026-09-12. Repository: `irori`, independent of both KB_design reference repositories. The implementation is saved as a local Git checkpoint; see [CHECKPOINT](CHECKPOINT.md) for restart instructions. No push, deployment or release has been performed.
+Date: 2026-09-12. Repository: `irori`, independent of both KB_design reference repositories. The implementation is saved as a Git checkpoint; see [CHECKPOINT](CHECKPOINT.md) for restart instructions. Checkpoint `2914ec4` was subsequently pushed to `origin/main` with user authorization; no deployment or release has been performed.
+
+UI follow-up, 2026-09-13: applied the locally installed Anthropic frontend-design and Vercel web-design-guidelines skills to modernize startup, the five-pane workspace and the assistant. Graphite navigation, a paper writing surface, restrained amber accents and consistent SVG controls preserve the existing scope model. Build, 30 behavior tests and all four UI scripts pass; see [UI direction and review](UI-DESIGN.md). These UI/branding follow-ups are included in the next checkpoint after `2914ec4`, with commit and push authorized by the user.
+
+Branding follow-up, 2026-09-13: the user-selected PNG is now the shared icon for app branding, the desktop window/Dock configuration, website branding/favicons and VM viewer. The original bytes are preserved in `assets/irori-icon.png`; see [asset notes](../assets/README.md). Native installer packaging remains open.
 
 Pause checkpoint, 2026-09-13: the user successfully opened and explored the layered UI in Chrome and requested a checkpoint. The local checkpoint now includes workspace/cloud lifecycle management, all four harness adapters, the layered explorer and VM preview. Final UI-change evidence is build pass, 30 behavior tests passed with four native probes skipped, and all four UI scripts passed. The audit's earlier opt-in native control run passed all 34 tests without inference. [CHECKPOINT](CHECKPOINT.md) is the current restart entry; later sections retain chronological milestone evidence and their then-current limitations.
 
@@ -86,14 +90,14 @@ The host supervises an authenticated loopback rclone service, verifies child ide
 
 Verified on the final implementation:
 
-| Check | Result and boundary |
-| --- | --- |
-| `npm run build` | Pass; existing bundle-size warning remains |
-| Behavior suite with `IRORI_TEST_RCLONE_PATH` | 21 passed, zero failures/skips; plain `npm test` skips the one explicitly opt-in native rclone probe |
-| Native rclone v1.75.1, official archive checksum verified | Real child startup/PID, authenticated RC, unauthorized request rejection, native Drive config question and shutdown; no Google consent or mount |
-| `xvfb-run -a npm run test:ui` | Both actual Electron scripts pass: original editor/session regression plus explicit cloud protocol fixture |
-| Cloud UI fixture | Two-space workspace, two accounts, My/shared-drive selection, same-name folder IDs, user aliases, collision error, restart persistence; no actual remote/mount |
-| Visual inspection | Startup and cloud connection screenshots inspected; artifacts remain ignored |
+| Check                                                     | Result and boundary                                                                                                                                            |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build`                                           | Pass; existing bundle-size warning remains                                                                                                                     |
+| Behavior suite with `IRORI_TEST_RCLONE_PATH`              | 21 passed, zero failures/skips; plain `npm test` skips the one explicitly opt-in native rclone probe                                                           |
+| Native rclone v1.75.1, official archive checksum verified | Real child startup/PID, authenticated RC, unauthorized request rejection, native Drive config question and shutdown; no Google consent or mount                |
+| `xvfb-run -a npm run test:ui`                             | Both actual Electron scripts pass: original editor/session regression plus explicit cloud protocol fixture                                                     |
+| Cloud UI fixture                                          | Two-space workspace, two accounts, My/shared-drive selection, same-name folder IDs, user aliases, collision error, restart persistence; no actual remote/mount |
+| Visual inspection                                         | Startup and cloud connection screenshots inspected; artifacts remain ignored                                                                                   |
 
 No native agent inference was requested for this slice. Actual Google consent, FUSE/Windows/macOS mounts, cloud files through native harnesses and interruption/crash recovery remain unverified. This container lacks `/dev/fuse` and deployment OAuth configuration. Read/write cloud operations, pending uploads, attachment rename/removal, ready-account removal, Git collaboration and OpenCode/Pi are not implemented. [CLOUD-SETUP](CLOUD-SETUP.md) records setup, device/portable boundaries and the remaining gates. No installer, deployment, commit or push was produced by this implementation turn.
 

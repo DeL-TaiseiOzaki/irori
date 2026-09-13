@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Category, RepositoryInfo, Space, WorkspaceProfile } from '../domain/types';
+import { appIcon } from './branding';
+import { Icon } from './Icon';
 const host = window.irori;
 export function RegisterSpace({
   onRegistered,
@@ -201,13 +203,48 @@ export function Startup({
   }
   return (
     <div className="startup">
-      <div className="brand">
-        <span className="hearth">▪</span>irori<span className="preview">preview</span>
-      </div>
+      <aside className="startup-intro">
+        <div className="brand">
+          <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
+          irori<span className="preview">Preview</span>
+        </div>
+        <div className="intro-content">
+          <h2>
+            手元のノートと、
+            <br />
+            チームの資料を。
+          </h2>
+          <p>
+            リポジトリとクラウドをつないで、
+            <br />
+            知識を育てる作業場。
+          </p>
+          <div className="intro-layer">
+            <Icon name="schema" />
+            <span>
+              Schema<small>エージェントのルール</small>
+            </span>
+          </div>
+          <div className="intro-layer">
+            <Icon name="book" />
+            <span>
+              Knowledge Base<small>書いて、育てるノート</small>
+            </span>
+          </div>
+          <div className="intro-layer">
+            <Icon name="cloud" />
+            <span>
+              Contents<small>つながる資料とソース</small>
+            </span>
+          </div>
+        </div>
+        <p className="intro-footnote">あなたのファイル。あなたのワークスペース。</p>
+      </aside>
       <div className="startup-content">
-        <p className="eyebrow">REPOSITORIES + CLOUD FOLDERS</p>
         <h1>ワークスペースを選択</h1>
-        <p>複数のリポジトリとクラウドの資料を、ひとつの作業環境に。</p>
+        <p className="startup-lead">
+          保存した環境を開くか、スペースを組み合わせて新しく始めましょう。
+        </p>
         {profiles.length > 0 && (
           <section>
             <h2>登録済みのワークスペース</h2>
@@ -224,12 +261,14 @@ export function Startup({
                       disabled={busy || !available.length}
                       onClick={() => onOpen(profile)}
                     >
+                      <Icon name="grid" size={22} />
                       <strong>{profile.name}</strong>
                       <span>
                         {available.length} スペース
                         {available.length !== profile.scopeIds.length &&
                           ` · ${profile.scopeIds.length - available.length} 件は利用できません`}
                       </span>
+                      <Icon name="arrow" className="workspace-arrow" />
                     </button>
                     <div className="actions">
                       <button
@@ -309,7 +348,7 @@ export function Startup({
             ))}
           </div>
           <button disabled={busy} onClick={() => setAdding(true)}>
-            KBフォルダを開く
+            <Icon name="plus" /> KBフォルダを開く
           </button>
           <p className="muted">
             クローン済みのリポジトリや既存フォルダを追加できます。クラウドのアカウント・フォルダは、開いた後に「クラウド接続」から登録します。
