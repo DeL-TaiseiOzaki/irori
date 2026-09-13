@@ -2,9 +2,9 @@
 
 Source version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.
 
-Version 0.1.2 includes the distributor's Google client configuration so account connection can be tried through the system browser. Actual consent and native mounts still need device acceptance; see [Google setup and scope](docs/DISTRIBUTOR-GOOGLE.md). The [integrated native terminal](docs/TERMINAL.md), automatic shell discovery and bundled rclone remain included. [CHECKPOINT](docs/CHECKPOINT.md) records exact package/publication evidence.
+Version 0.1.3 retains the distributor's Google client configuration so account connection can be tried through the system browser. Actual consent and native mounts still need device acceptance; see [Google setup and scope](docs/DISTRIBUTOR-GOOGLE.md). The [integrated native terminal](docs/TERMINAL.md), automatic shell discovery and bundled rclone remain included. [CHECKPOINT](docs/CHECKPOINT.md) records exact package/publication evidence.
 
-[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.2-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
+[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.3-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
 
 CSV files have a paginated table and the existing source editor. Declared ontology CSV can be viewed as a hierarchy/subgraph with note links; native agents help construct the records. See [ontology display and agent setup](docs/ONTOLOGY.md).
 
@@ -101,7 +101,7 @@ Tests put detailed local evidence in ignored `test-results/` and mutate only dis
 
 Device data lives in Electron's standard `userData` directory (override with `IRORI_DATA_DIR` for tests). Workspace selections, account metadata, rclone credentials and checkout-specific cloud bindings stay there. New workspace cloud declarations live under device-local `workspace-cloud/<workspaceId>/.irori/cloud-mounts.json`; original KB declarations remain in place. Both contain folder IDs and user-chosen relative names, with no account credentials or absolute paths. Disconnected attachments stay visible; cloud access requires verified folder identity and a live managed mount. Existing `contents` bytes are never moved or deleted by setup.
 
-Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, portable identities and complete provenance. The new device-local source/run/artifact records are an incremental D06 implementation. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
+Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology scale, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, portable identities and complete provenance. The new device-local source/run/artifact records are an incremental D06 implementation. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
 
 ## Download website
 

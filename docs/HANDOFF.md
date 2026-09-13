@@ -1,8 +1,14 @@
 # irori continuation handoff
 
+Published update, 2026-09-14 JST: [Windows preview 0.1.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.3-preview.1) contains application commit `9b04ed263b88b4754d03c7b79ab78816f0d73b06`. [Native CI 34764163901](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34764163901) passes verification and Linux x64, Windows x64 and Mac arm64 packages, including continuous editor save/image rendering and the existing configured OAuth handoff/cancellation. The unchanged CI EXE is **318,416,896 bytes (303.7 MiB)**, SHA-256 `c6099224db0b6137824088e19e43976d573d823af150ead5350be7b6312f442d`; GitHub's uploaded-asset digest matches. The website manifest now selects 0.1.3 and both Mac slots remain disabled. Pages deployment and anonymous delivery are recorded in the following checkpoint update.
+
 Continuation after `d1b828c`: source version `0.1.3` addresses image paste, continuous document editing, bulk Git staging and queued conversations. It adds device-local source/run/artifact records and durable cloud-send preparation with an rclone delivery-engine test; Google remains read-only. See [implementation and limits](EDITING-AND-RECORDS.md). No new device result or real model permission was supplied. Native preview publication is recorded separately below when verified.
 
 Checkpoint requested by the owner after delivery of Windows preview `0.1.2`, 2026-09-13. The owner's "OK" acknowledged delivery and requested this handoff; no successful Google login, mounted-folder access or new Windows device result was reported. This checkpoint changes documentation only. At its start, `main` was clean at `dc53e52`; the subsequent documentation commit contains this file.
+
+## Immediate continuation after 0.1.3
+
+Read [continuous editing and retained records](EDITING-AND-RECORDS.md) before extending the editor, conversation queue, D04 or D06. The implementation is already committed and packaged; do not restart those features. Collect explicit Windows 0.1.2/0.1.3 Google/WinFsp/read/reconnect and new editor/IME/upgrade evidence. None has been reported during this continuation. Next independent work is writable capability/re-consent and account binding for actual cloud delivery, portable knowledge identity/provenance, move/rebind/search UI and queue/history persistence. Keep the full release gates and original model-execution restrictions. The first 0.1.3 CI run at `31dcb46` was intentionally cancelled after a visual check found literal HTML empty lines; the successful final run targets `9b04ed2`. The website screenshot uses disposable examples and submits no model prompt.
 
 ## Start here
 
