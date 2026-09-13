@@ -113,6 +113,8 @@ The Windows slot links the current unsigned testing preview; Mac downloads remai
 
 ## Resume from checkpoint
 
+Give a new session the [continuation prompt](docs/HANDOFF-PROMPT.md) to resume implementation from the latest saved source and verification boundaries.
+
 [Checkpoint and restart guide](docs/CHECKPOINT.md) records the accepted distribution direction, implemented work, verification evidence and remaining implementation. It distinguishes the published Windows testing preview from the still-open complete-release requirements.
 
 The implementation reuse audit is complete for the current feature set: shared host/queue/dialog/protocol code and matching service libraries are implemented. See [all decisions and validation](docs/REUSE-COMPLETION-2026-09-13.md).
