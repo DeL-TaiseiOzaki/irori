@@ -1,4 +1,13 @@
-# Checkpoint — Packaging, independent workspace Drive and CSV ontology
+# Checkpoint — Published Windows testing preview
+
+Publication follow-up, 2026-09-13: the owner asked to publish the download website for their Windows trial. [The public site](https://del-taiseiozaki.github.io/irori/) and [unsigned Windows x64 prerelease `v0.1.0-preview.1`](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1) are live. The release tag points to verified application commit `86839006bc49fd35cdbf58c5ed4998db1adfe0f6`; no desktop application code was changed for publication. Website commit `de0a60b0c6ab15d4e0bba48af985665d5b268fa2` is deployed by successful [Pages run 34753093494](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34753093494). GitHub Pages uses Actions with HTTPS enforced.
+
+Publication validation: application build and 60 behavior tests passed (four optional native controls skipped); website build and actual/mixed/available/unavailable browser checks passed. A fresh unauthenticated Electron browser opened the live HTTPS project page at desktop and mobile sizes, loaded its assets without HTTP/page errors, kept both Mac buttons disabled, and clicked the Windows link to download all 271,884,288 bytes. The downloaded SHA-256 matches the native CI evidence and GitHub asset digest: `b5ec525b85acdd2d8b44f62b0ac5c1fe353e0c0538066cac24fe535794c20ab8`. An independent anonymous HTTP download also returned 200 with the same bytes/hash. This verifies public delivery, not Windows 11 installation. [Preview notes](releases/0.1.0-preview.1.md) record prerequisites, support, package identity and limitations. Local publication artifacts/screenshots are ignored under `.local/publication/` and contain no user KB data.
+
+The owner's publication request is a narrow exception to the previous no-download gate for this testing preview. Full-release D03–D09 and native installed-device acceptance remain open; do not mark the general release complete. Mac downloads, Google account configuration and model inference were not included in this task. Next: collect the owner's Windows 11 installation/Japanese-input results against this exact installer, then continue the full-release work below.
+
+## Application checkpoint before preview publication
+
 
 Date: 2026-09-13. Continue in this independent repository on `main`. Start with [RELEASE-PLAN](RELEASE-PLAN.md), [PACKAGING](PACKAGING.md), [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md), [ONTOLOGY](ONTOLOGY.md) and [ADR 002](decisions/002-release-and-workspace.md). Inspect Git status/log and the latest CI run before interpreting historical entries below.
 
@@ -19,7 +28,7 @@ Next work, keeping all full-release requirements:
 3. D06: explicit multiple-source selection, durable note/artifact/run IDs, retained exact source versions/snapshots, curation and output provenance/reverse navigation; then search/rename/backlinks/properties. The CSV/graph presentation already exists and should not be reimplemented.
 4. D07–D10: native IME/performance/host comparison, credential protection, dependency redistribution review, signing/notarization, upgrade/rollback, new-user acceptance and only then public assets/Pages. Exact minimum OS versions/support contact/publisher route still need release decisions. Legacy Drive transfer and workspace-reference sharing/export remain open.
 
-Commit/push is authorized. Public deployment, external account changes and real model inference are not authorized by that instruction. No such operation was performed. The inherited four release-planning documents were preserved and incorporated. The VM preview and `.local/vm-preview/{samples,device}` were not restarted or modified.
+At the application checkpoint below, commit/push alone was authorized and no public deployment was performed. The subsequent Windows testing preview was separately authorized and published as recorded above; unrelated account changes and real model inference remain outside that authorization. The inherited four release-planning documents were preserved and incorporated. The VM preview and `.local/vm-preview/{samples,device}` were not restarted or modified.
 
 ## Historical checkpoint records
 

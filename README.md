@@ -1,5 +1,7 @@
 # irori
 
+[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.0-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
+
 CSV files have a paginated table and the existing source editor. Declared ontology CSV can be viewed as a hierarchy/subgraph with note links; native agents help construct the records. See [ontology display and agent setup](docs/ONTOLOGY.md).
 
 A desktop IDE/ADE for writing Markdown notes and running **local native coding harnesses** in the selected knowledge workspace. Codex, Claude Code, OpenCode and Pi are selectable; the new OpenCode/Pi adapters have native control tests but still need real model-turn acceptance.
@@ -8,7 +10,7 @@ This independent repository contains the first working note + agent milestone. E
 
 Release follow-up: [Forge packaging and CI](docs/PACKAGING.md) now produce unsigned engineering candidates and test the packaged app outside the checkout. [Confirmed product decisions](docs/decisions/002-release-and-workspace.md) set MIT licensing, Windows 11 x64/MacBook M5 Pro arm64 acceptance, CSV/graph ontology presentation, and workspace-level independent GitHub/Drive connections. New Drive attachments now belong directly to the workspace; [the workspace flow and legacy compatibility](docs/WORKSPACE-DRIVE.md) are implemented. Existing KB-owned attachments remain usable without moving files.
 
-## Run
+## Run from source
 
 Requires Node.js **24.15+ (24.x) or 26+**, npm, and a desktop session. Install and configure the desired `codex`, `claude`, `opencode` or `pi` CLI using its own setup/login flow. irori uses the installed CLI, its native configuration, and its existing authentication. Pi requires version 0.85+; native control probes used OpenCode 1.18.30 and Pi 0.85.1. See [harness compatibility](docs/HARNESSES.md).
 
@@ -20,7 +22,7 @@ npm run build
 npm start
 ```
 
-`setup:electron` downloads the pinned Electron binary; it is also useful when npm lifecycle scripts were disabled. Windows and macOS use the same npm commands from their own checkout path. Native installers are not available yet.
+`setup:electron` downloads the pinned Electron binary; it is also useful when npm lifecycle scripts were disabled. Windows and macOS use the same npm commands from their own checkout path. The Windows testing installer is available from the download page above; building from source is optional for developers.
 
 For this root-owned Linux development container, after the successful build:
 
