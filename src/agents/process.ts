@@ -3,13 +3,15 @@ import treeKill from 'tree-kill';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
-export function agentEnv(): NodeJS.ProcessEnv {
+export function agentEnv(source = process.env, platform = process.platform): NodeJS.ProcessEnv {
   // Preserve native provider authentication/configuration. Never inspect tokens.
-  const env = { ...process.env };
+  const env = { ...source };
   delete env.IRORI_GOOGLE_CLIENT_ID;
   delete env.IRORI_GOOGLE_CLIENT_SECRET;
   delete env.IRORI_BUILD_GOOGLE_CLIENT_ID;
   delete env.IRORI_BUILD_GOOGLE_CLIENT_SECRET;
+  // Windows inherits its native Path. Adding a separate PATH would shadow it in child_process.
+  if (platform === 'win32') return env;
   const extra = [
     path.join(homedir(), '.local', 'bin'),
     path.join(homedir(), '.cargo', 'bin'),
