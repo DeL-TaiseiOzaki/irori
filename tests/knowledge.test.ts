@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rename, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,7 @@ import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
 import { CloudOutbox, rcloneDelivery } from '../src/cloud/outbox';
 import { Rclone } from '../src/cloud/rclone';
+import { hostArguments } from '../src/domain/host-requests';
 async function fixture(t: any) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-knowledge-'));
   t.after(() => rm(base, { recursive: true, force: true }));
@@ -62,6 +63,116 @@ test('Run/source identities retain exact historical bytes, separate copies and e
   assert.equal(await restarted.sourceText(current), 'A later observed version\n');
   await writeFile(store.blobPath(current.hash), 'corrupt');
   await assert.rejects(store.bytes(current), /整合性/);
+});
+test('Source navigation follows repeated explicit moves, preserving versions and separate reused paths', async (t) => {
+  const { files, root, space, note, store } = await fixture(t);
+  const run = await store.begin(randomUUID(), {
+    scopeId: space.scopeId,
+    agent: 'codex',
+    prompt: 'fixture',
+    notePath: note.path,
+  });
+  const original = run.sources[0];
+  assert.deepEqual(await store.locate(original), {
+    state: 'matching',
+    current: { scopeId: space.scopeId, path: note.path },
+  });
+  await writeFile(path.join(root, note.path), 'Changed version');
+  assert.equal((await store.locate(original)).state, 'changed');
+  const changed = await store.capture(note);
+  await rename(path.join(root, note.path), path.join(root, '移動先.md'));
+  assert.equal((await store.locate(original)).state, 'missing');
+  const next = { scopeId: space.scopeId, path: '移動先.md' };
+  await assert.rejects(store.rebind(original, next), /版が一致/);
+  await store.rebind(changed, next);
+  assert.deepEqual(await store.locate(original), { state: 'changed', current: next });
+  assert.deepEqual(await store.locate(changed), { state: 'matching', current: next });
+  await rename(path.join(root, next.path), path.join(root, 'Again.md'));
+  const final = { ...next, path: 'Again.md' };
+  // Even the original historical path can locate the ID after a second move.
+  await store.rebind(changed, final);
+  await writeFile(path.join(root, note.path), note.text);
+  assert.notEqual((await store.capture(note)).id, original.id);
+  const restarted = new KnowledgeStore(files.dataDir, (ref) =>
+    files.resolve(ref.scopeId, ref.path),
+  );
+  assert.deepEqual(await restarted.locate(original), { state: 'changed', current: final });
+  assert.equal((await restarted.capture(final)).id, original.id);
+  assert.deepEqual((await restarted.history(space.scopeId)).runs[0].sources[0], original);
+  assert.equal(await restarted.sourceText(original), note.text);
+  assert.equal(await readFile(path.join(root, note.path), 'utf8'), note.text);
+});
+test('Rebinding rejects copies, occupied identities, wrong scopes and untrusted paths without moving bytes', async (t) => {
+  const { root, space, note, store, files, base } = await fixture(t);
+  const version = await store.capture(note);
+  const next = { scopeId: space.scopeId, path: 'copy.md' };
+  await writeFile(path.join(root, next.path), note.text);
+  await assert.rejects(store.rebind(version, next), /現在の場所に資料/);
+  const copy = await store.capture(next);
+  await rm(path.join(root, note.path));
+  await assert.rejects(store.rebind(version, next), /登録状態/);
+  await assert.rejects(
+    store.rebind({ ...version, id: randomUUID() }, { ...next, path: 'unused.md' }),
+    /登録状態/,
+  );
+  await assert.rejects(store.rebind(version, { ...next, scopeId: randomUUID() }), /同じスペース/);
+  for (const relative of [
+    '../outside.md',
+    '/absolute.md',
+    'C:/outside.md',
+    'C:outside.md',
+    'dir\\file.md',
+    'a/../b.md',
+    './copy.md',
+    'a//b.md',
+    'a\0.md',
+  ]) {
+    const destination = { ...next, path: relative };
+    assert.equal(hostArguments.rebindSource.safeParse([version, destination]).success, false);
+    await assert.rejects(store.rebind(version, destination));
+  }
+  // Existing records may contain POSIX names that are not portable new destinations.
+  assert.equal(
+    hostArguments.locateSource.safeParse([{ ...version, path: 'a:legacy.md' }]).success,
+    true,
+  );
+  const other = path.join(base, 'Other');
+  await mkdir(other);
+  const otherSpace = await files.register(other, 'Other', 'team');
+  await writeFile(path.join(other, 'source.md'), note.text);
+  await symlink(other, path.join(root, 'alias'), 'junction');
+  await assert.rejects(store.rebind(version, { ...next, path: 'alias/source.md' }), /boundary/);
+  assert.equal((await store.locate(version)).state, 'missing');
+  assert.equal((await store.capture(next)).id, copy.id);
+  assert.notEqual(
+    (await store.capture({ scopeId: otherSpace.scopeId, path: 'source.md' })).id,
+    version.id,
+  );
+  assert.equal(await readFile(path.join(root, next.path), 'utf8'), note.text);
+  assert.equal(await store.sourceText(version), note.text);
+});
+test('Unavailable and corrupt source locations never become a matching path or an automatic rebind', async (t) => {
+  const { files, root, note, store } = await fixture(t);
+  const version = await store.capture(note);
+  assert.deepEqual(await store.locate({ ...version, id: randomUUID() }), { state: 'unbound' });
+  const unavailable = new KnowledgeStore(files.dataDir, async () => {
+    throw Error('Connection unavailable');
+  });
+  assert.equal((await unavailable.locate(version)).state, 'unavailable');
+  await assert.rejects(
+    unavailable.rebind(version, { scopeId: version.scopeId, path: 'elsewhere.md' }),
+    /Connection unavailable/,
+  );
+  await rm(path.join(root, note.path));
+  await mkdir(path.join(root, note.path));
+  assert.equal((await store.locate(version)).state, 'unavailable');
+  const index = path.join(store.directory, `index-${version.scopeId}.json`);
+  await writeFile(index, JSON.stringify({ [version.path]: version.id, duplicate: version.id }));
+  await assert.rejects(store.locate(version), /重複/);
+  await assert.rejects(
+    store.rebind(version, { scopeId: version.scopeId, path: 'elsewhere.md' }),
+    /重複/,
+  );
 });
 test('Outbox retains unsent bytes across restart, uncertain completion and remote conflicts', async (t) => {
   const { files, note, store } = await fixture(t);

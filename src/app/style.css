@@ -1749,6 +1749,7 @@ footer > span {
 .knowledge-dialog {
   width: min(800px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
+  padding: 24px;
   overflow: auto;
   color: var(--ink);
   background: var(--paper);

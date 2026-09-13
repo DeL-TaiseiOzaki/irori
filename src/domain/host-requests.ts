@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { agentIds } from './types';
 import type { HostRequests } from './host-bridge';
-import { sourceRef, sourceVersion } from './knowledge';
+import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
 import { startInput } from './conversation';
 
@@ -19,6 +19,8 @@ export const hostArguments = {
   knowledgeHistory: z.tuple([id]),
   restoreSource: z.tuple([sourceVersion]),
   sourceText: z.tuple([sourceVersion]),
+  locateSource: z.tuple([sourceVersion]),
+  rebindSource: z.tuple([sourceVersion, sourceDestination]),
   registerArtifact: z.tuple([sourceRef, id]),
   pendingCloudWrites: z.tuple([id]),
   prepareCloudWrite: z.tuple([id, id, sourceRef]),

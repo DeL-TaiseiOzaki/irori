@@ -160,6 +160,13 @@ export interface HostAPI {
   knowledgeHistory(scopeId: string): Promise<import('./knowledge').KnowledgeHistory>;
   restoreSource(source: import('./knowledge').SourceVersion): Promise<void>;
   sourceText(source: import('./knowledge').SourceVersion): Promise<string>;
+  locateSource(
+    source: import('./knowledge').SourceVersion,
+  ): Promise<import('./knowledge').SourceLocation>;
+  rebindSource(
+    source: import('./knowledge').SourceVersion,
+    next: import('./knowledge').SourceRef,
+  ): Promise<void>;
   registerArtifact(
     source: import('./knowledge').SourceRef,
     runId: string,

@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { agentIds } from './types';
+const sourcePath = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(
+    (value) =>
+      !/^[a-z]:/i.test(value) &&
+      !value.includes('\\') &&
+      !value.includes('\0') &&
+      value.split('/').every((part) => part && part !== '.' && part !== '..'),
+  );
 export const sourceRef = z.object({ scopeId: z.uuid(), path: z.string().min(1).max(4096) });
+// Restrict new reconnection destinations without changing historical source record schemas.
+export const sourceDestination = sourceRef.extend({ path: sourcePath });
 export type SourceRef = z.infer<typeof sourceRef>;
 export const sourceVersion = z.object({
   ...sourceRef.shape,
@@ -10,6 +23,9 @@ export const sourceVersion = z.object({
   capturedAt: z.iso.datetime(),
 });
 export type SourceVersion = z.infer<typeof sourceVersion>;
+export type SourceLocation =
+  | { state: 'unbound' }
+  | { state: 'matching' | 'changed' | 'missing' | 'unavailable'; current: SourceRef };
 export const runRecord = z.object({
   id: z.uuid(),
   scopeId: z.uuid(),

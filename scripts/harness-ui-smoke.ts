@@ -97,9 +97,18 @@ try {
         observations.runs.some((run) => run.sources.some((source) => source.path === 'note.md')),
       ).toBe(true);
       await expect(page.getByLabel('送信待ち', { exact: true })).toHaveCount(0);
+      const requests = async () =>
+        (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+          .filter((entry) => entry.type === 'prompt');
       await page.getByLabel('エージェントへの指示').fill('hold');
       await page.getByRole('button', { name: '送信', exact: true }).click();
       await expect(page.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+      // The UI becomes stoppable during startup. Wait until this fixture actually receives
+      // the prompt before testing cancellation/restart of a dispatched turn.
+      await expect.poll(async () => (await requests()).length).toBe(3);
       await page.getByLabel('エージェントへの指示').fill('after cancellation');
       await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
       await page.getByLabel('エージェントへの指示').fill('discard queued message');
@@ -109,12 +118,6 @@ try {
       await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
         'after cancellation',
       );
-      const requests = async () =>
-        (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
-          .trim()
-          .split('\n')
-          .map((line) => JSON.parse(line))
-          .filter((entry) => entry.type === 'prompt');
       expect((await requests()).length).toBe(3);
       for (const cycle of [1, 2]) {
         await app.close();

@@ -430,20 +430,22 @@ function App() {
     try {
       if (entry.blocked) {
         setStatus(entry.blocked);
-        return;
+        return false;
       }
-      if (!(await save())) return;
+      if (!(await save())) return false;
       if ((running || sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
         setError('実行を停止してからスペースを切り替えてください。');
-        return;
+        return false;
       }
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
         const next = await host.read(space.scopeId, entry.path);
         setActive(space);
         load(next);
       } else await host.openExternal(space.scopeId, entry.path);
+      return true;
     } catch (e) {
       report(e);
+      return false;
     }
   }
   async function sendTurn(
@@ -581,15 +583,17 @@ function App() {
   async function openCloud(root: CloudRoot, entry: Entry) {
     if (entry.blocked) {
       setStatus(entry.blocked);
-      return;
+      return false;
     }
-    if (connecting || !(await save())) return;
+    if (connecting || !(await save())) return false;
     try {
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
         load(await host.cloudRead(root.scopeId, entry.path));
       else await host.openCloudFile(root.scopeId, entry.path);
+      return true;
     } catch (error) {
       report(error);
+      return false;
     }
   }
   if (startup)
@@ -1173,9 +1177,37 @@ function App() {
       )}
       {knowledgeOpen && active && (
         <KnowledgePanel
+          key={active.scopeId}
           space={active}
           doc={doc}
           cloudOwner={cloudRoot?.scopeId}
+          sourceNames={Object.fromEntries([
+            ...spaces
+              .filter((item) => workspace?.scopeIds.includes(item.scopeId))
+              .map((item) => [item.scopeId, item.name]),
+            ...(cloudRoot ? [[cloudRoot.scopeId, `${cloudRoot.name} / Drive`]] : []),
+          ])}
+          onOpen={async (source) => {
+            const target = spaces.find(
+              (item) =>
+                item.scopeId === source.scopeId && workspace?.scopeIds.includes(item.scopeId),
+            );
+            const entry: Entry = {
+              path: source.path,
+              name: source.path.split('/').at(-1)!,
+              directory: false,
+              note: /\.md$/i.test(source.path),
+              layer: 'Knowledge_Base',
+            };
+            if (!target && cloudRoot?.scopeId !== source.scopeId)
+              throw Error('この資料のスペースをワークスペースに追加してから開いてください。');
+            const opened = target ? await open(target, entry) : await openCloud(cloudRoot!, entry);
+            if (!opened)
+              throw Error(
+                'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+              );
+            setKnowledgeOpen(false);
+          }}
           onClose={() => setKnowledgeOpen(false)}
         />
       )}

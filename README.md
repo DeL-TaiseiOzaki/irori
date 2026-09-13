@@ -1,5 +1,7 @@
 # irori
 
+Development now adds [source/artifact record search and navigation](docs/KNOWLEDGE-NAVIGATION.md): inspect current file locations, follow version-specific run links, and reconnect a missing source to a matching moved file while retaining its ID and historical bytes. Records remain device-local; the public Windows installer is unchanged.
+
 Development after preview 0.1.3 now retains recent conversation history and pending instructions across restart. Restored queues wait for explicit resumption; interrupted turns are never automatically replayed. See [conversation recovery and limits](docs/CONVERSATIONS.md). The public Windows installer remains the separately published 0.1.3 build.
 
 Version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.

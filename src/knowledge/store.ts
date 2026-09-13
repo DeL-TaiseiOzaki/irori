@@ -7,6 +7,7 @@ import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-jso
 import { SerialQueue } from '../host/serial-queue';
 import {
   sourceRef,
+  sourceDestination,
   sourceVersion,
   runRecord,
   artifactRecord,
@@ -14,6 +15,7 @@ import {
   type SourceVersion,
   type RunRecord,
   type KnowledgeHistory,
+  type SourceLocation,
 } from '../domain/knowledge';
 import type { StartRun } from '../domain/types';
 
@@ -50,8 +52,7 @@ export class KnowledgeStore {
       // Re-read to reject a file that changed while being observed (no filesystem snapshot claim).
       if (hash(await fs.readFile(filename)) !== digest)
         throw Error('資料が変更中です。保存完了後に再試行してください。');
-      const indexFile = path.join(this.directory, `index-${ref.scopeId}.json`);
-      const index = z.record(z.string(), z.uuid()).parse(await readLocalJson(indexFile, {}));
+      const { filename: indexFile, entries: index } = await this.index(ref.scopeId);
       const known = Object.hasOwn(index, ref.path);
       const id = known ? index[ref.path] : randomUUID();
       if (!known) {
@@ -171,20 +172,70 @@ export class KnowledgeStore {
     if (text.includes('\0')) throw Error('この資料はバイナリ形式です。');
     return text;
   }
+  private async index(scopeId: string) {
+    z.uuid().parse(scopeId);
+    const filename = path.join(this.directory, `index-${scopeId}.json`);
+    const entries = z.record(z.string(), z.uuid()).parse(await readLocalJson(filename, {}));
+    if (new Set(Object.values(entries)).size !== Object.keys(entries).length)
+      throw Error('資料 ID の登録が重複しています。');
+    return { filename, entries };
+  }
+  locate(version: SourceVersion): Promise<SourceLocation> {
+    return this.queue.run(async () => {
+      sourceVersion.parse(version);
+      const { entries } = await this.index(version.scopeId);
+      const relative = Object.keys(entries).find((key) => entries[key] === version.id);
+      if (!relative) return { state: 'unbound' };
+      const current = { scopeId: version.scopeId, path: relative };
+      try {
+        const filename = await this.resolve(current);
+        const stat = await fs.stat(filename);
+        if (!stat.isFile()) return { state: 'unavailable', current };
+        if (stat.size !== version.size || stat.size > 64 * 1024 * 1024)
+          return { state: 'changed', current };
+        const digest = hash(await fs.readFile(filename));
+        return { state: digest === version.hash ? 'matching' : 'changed', current };
+      } catch (error) {
+        return {
+          state: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unavailable',
+          current,
+        };
+      }
+    });
+  }
   rebind(previous: SourceVersion, next: SourceRef) {
     return this.queue.run(async () => {
       sourceVersion.parse(previous);
-      sourceRef.parse(next);
+      sourceDestination.parse(next);
       if (previous.scopeId !== next.scopeId)
         throw Error('資料 ID は同じスペース内で再接続してください。');
-      const filename = await this.resolve(next);
-      if (hash(await fs.readFile(filename)) !== previous.hash)
-        throw Error('移動先の版が一致しません。');
-      const indexFile = path.join(this.directory, `index-${next.scopeId}.json`);
-      const index = z.record(z.string(), z.uuid()).parse(await readLocalJson(indexFile, {}));
-      if (index[previous.path] !== previous.id || index[next.path])
+      const { filename: indexFile, entries: index } = await this.index(next.scopeId);
+      const current = Object.keys(index).find((key) => index[key] === previous.id);
+      if (!current || Object.hasOwn(index, next.path))
         throw Error('資料の登録状態が変わっています。');
-      delete index[previous.path];
+      // Copies never inherit an existing identity. Only explicitly reconnect a missing source.
+      let missing = false;
+      try {
+        await this.resolve({ scopeId: previous.scopeId, path: current });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        missing = true;
+      }
+      if (!missing)
+        throw Error('現在の場所に資料があります。コピーには別の資料 ID を使ってください。');
+      await this.bytes(previous);
+      const filename = await this.resolve(next);
+      const stat = await fs.stat(filename);
+      if (!stat.isFile() || stat.size !== previous.size || stat.size > 64 * 1024 * 1024)
+        throw Error('移動先の版が一致しません。');
+      if (
+        hash(await fs.readFile(filename)) !== previous.hash ||
+        hash(await fs.readFile(filename)) !== previous.hash
+      )
+        throw Error('移動先の版が一致しません。');
+      // Resolve again before recording; preserve all historical paths and bytes.
+      if ((await this.resolve(next)) !== filename) throw Error('移動先が変更中です。');
+      delete index[current];
       index[next.path] = previous.id;
       await writeLocalJson(indexFile, index);
     });

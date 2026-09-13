@@ -189,6 +189,8 @@ app
         }
       },
       sourceText: (source) => knowledge.sourceText(source),
+      locateSource: (source) => knowledge.locate(source),
+      rebindSource: (source, next) => changeFiles(() => knowledge.rebind(source, next)),
       registerArtifact: (source, runId) => changeFiles(() => knowledge.artifact(source, runId)),
       pendingCloudWrites: async (id) => {
         await cloud.declarations(id);

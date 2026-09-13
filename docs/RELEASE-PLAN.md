@@ -1,5 +1,7 @@
 # Release readiness and remaining work
 
+Source continuation after `1afe3bb`, 2026-09-14: [D06 record search and navigation](KNOWLEDGE-NAVIGATION.md) now expose current source locations, explicit same-scope matching-version reconnection and version-specific artifact/run links. Portable shared identities, full-text KB search/backlinks/properties, in-app moves and real generated-artifact acceptance remain open. D04 writable capability/re-consent and exact account binding remain the next independent cloud implementation.
+
 Source continuation, 2026-09-14: [conversation recovery](CONVERSATIONS.md) adds bounded device-local display history and durable pending instructions, with explicit restart resumption and no replay of interrupted runs. Complete native-model restart acceptance and broader history management remain open. The published Windows 0.1.3 preview has not changed.
 
 Current engineering evidence: 0.1.3's [native CI](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34764163901) passes all package targets. The Windows testing channel is updated; Mac publication remains disabled. D04 now has durable preparation/restore and an isolated rclone delivery-engine test, while Google writes/re-consent remain open. D06 now has device-local source/run IDs, retained bytes and manual artifact/reverse references; portable identities, broader navigation and real produced-artifact acceptance remain open. See [scope and validation](EDITING-AND-RECORDS.md). These are progress within D04/D06, not completion of their release gates.

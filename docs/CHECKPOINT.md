@@ -1,4 +1,8 @@
-# Checkpoint — Conversation recovery continuation
+# Checkpoint — Knowledge navigation continuation
+
+Development continuation after `1afe3bb`, 2026-09-14: [source/artifact navigation](KNOWLEDGE-NAVIGATION.md) adds record search, current-file resolution/opening, explicit matching-version reconnection and version-specific reverse links. This advances D06 using the existing private record store; shared portable identities and general KB search remain open. Continue from current main and the latest [HANDOFF](HANDOFF.md). The Windows 0.1.3 public installer, Google read-only scope and native-model/device acceptance boundaries remain unchanged.
+
+Local evidence for this continuation: production build, 78/81 behavior tests with three optional native-control skips, all nine Electron suites and changed-document local links pass. Source-location identity, wrong-version/copy/alias rejection, cross-workspace navigation guards, reverse links and restart are covered with disposable files and no model inference. No new package/release/device result is implied by these checks.
 
 Owner-requested checkpoint, 2026-09-14: the repository was clean at `c43419ac43af9efd8da89f3e9c262928f7e09ffc`, matching remote main. Application source remains `9d79182`; its recorded CI was rechecked as successful on all three package platforms. This documentation-only checkpoint adds a [copyable continuation prompt](HANDOFF-PROMPT.md). No application change, new release or device/model acceptance was added. Validation for checkpointing is documentation-link/Git-reference checking and `git diff --check`; prior runtime evidence is retained without rerunning the suites.
 
