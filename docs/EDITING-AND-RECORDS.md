@@ -1,5 +1,7 @@
 # Continuous editing and retained records — 0.1.3
 
+Source follow-up, 2026-09-14: [conversation recovery](CONVERSATIONS.md) now persists bounded history and pending instructions, with explicit restart resumption and no automatic replay of interrupted work. The in-memory limitation below describes the published 0.1.3 preview; the remaining D04/D06 gates still apply.
+
 This continuation addresses the owner's note, Git and conversation feedback at checkpoint `d1b828c`. It keeps the existing Milkdown/CodeMirror editors, native Git runner, provider adapters, rclone and CI. No provider model inference or real Google account operation is part of its automated verification.
 
 ## Writing and images

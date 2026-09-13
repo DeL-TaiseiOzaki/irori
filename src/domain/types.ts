@@ -43,6 +43,8 @@ export interface Question {
 }
 export type AgentAnswers = Record<string, string | string[]>;
 export interface AgentEvent {
+  scopeId?: string;
+  agent?: AgentId;
   role?: 'user';
   runId: string;
   type: 'status' | 'text' | 'tool' | 'permission' | 'question' | 'error' | 'done';
@@ -238,6 +240,17 @@ export interface HostAPI {
   openExternal(scopeId: string, path: string): Promise<void>;
   agents(): Promise<AgentInfo[]>;
   agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;
+  agentConversation(
+    scopeId: string,
+    agent: AgentId,
+  ): Promise<import('./conversation').Conversation>;
+  queueAgentMessage(input: StartRun): Promise<import('./conversation').QueuedMessage[]>;
+  removeQueuedMessage(
+    scopeId: string,
+    agent: AgentId,
+    id: string,
+  ): Promise<import('./conversation').QueuedMessage[]>;
+  startQueuedMessage(scopeId: string, agent: AgentId, id: string): Promise<string>;
   resetAgentSession(scopeId: string, agent: AgentId): Promise<void>;
   start(input: StartRun): Promise<string>;
   cancel(): Promise<void>;

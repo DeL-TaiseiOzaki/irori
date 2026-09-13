@@ -26,10 +26,17 @@ const watchers: FSWatcher[] = [];
 if (process.platform === 'win32') app.setAppUserModelId('com.squirrel.irori.irori');
 if (squirrelStartup) app.quit();
 if (process.env.IRORI_DATA_DIR) app.setPath('userData', path.resolve(process.env.IRORI_DATA_DIR));
+const ownsDeviceData = !squirrelStartup && app.requestSingleInstanceLock();
+if (!ownsDeviceData) app.quit();
+app.on('second-instance', () => {
+  if (window?.isMinimized()) window.restore();
+  window?.show();
+  window?.focus();
+});
 app
   .whenReady()
   .then(async () => {
-    if (squirrelStartup) return;
+    if (!ownsDeviceData) return;
     const files = new FileService(app.getPath('userData'));
     await files.init();
     const emit = (event: HostEvent) => {
@@ -69,6 +76,10 @@ app
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }), knowledge);
     let fileMutations = 0;
     const git = new GitService(files, () => !agents.busy && !cloud.busy && fileMutations === 0);
+    function canStartAgent() {
+      if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
+      if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
+    }
     async function changeFiles<T>(fn: () => Promise<T>) {
       if (git.busy) throw Error('Git 操作の完了後に保存・登録してください。');
       fileMutations++;
@@ -121,8 +132,12 @@ app
     });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     // A reloaded/crashed renderer cannot keep controlling its old sessions.
-    window.webContents.on('render-process-gone', () => void terminals.closeAll());
-    window.webContents.on('did-start-loading', () => void terminals.closeAll());
+    const stopRendererSessions = () => {
+      void terminals.closeAll();
+      void agents.cancel();
+    };
+    window.webContents.on('render-process-gone', stopRendererSessions);
+    window.webContents.on('did-start-loading', stopRendererSessions);
     window.webContents.on('will-navigate', (event) => event.preventDefault());
     window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
       callback(false),
@@ -276,11 +291,17 @@ app
       },
       agents: () => agents.available(),
       agentSession: (...args) => agents.session(...args),
+      agentConversation: (...args) => agents.conversation(...args),
+      queueAgentMessage: (input) => agents.queueMessage(input),
+      removeQueuedMessage: (...args) => agents.removeQueued(...args),
+      startQueuedMessage: async (...args) => {
+        canStartAgent();
+        return agents.startQueued(...args, canStartAgent);
+      },
       resetAgentSession: (...args) => agents.resetSession(...args),
       start: (input) => {
-        if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
-        if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
-        return agents.start(input);
+        canStartAgent();
+        return agents.startAccepted(input);
       },
       cancel: () => agents.cancel(),
       respond: (...args) => agents.respond(...args),
@@ -332,6 +353,15 @@ app
           if (answer.response !== 1) return;
         }
         await agents.cancel();
+        try {
+          await agents.flush();
+        } catch {
+          await dialog.showMessageBox(window!, {
+            type: 'error',
+            message: '会話履歴を保存できませんでした。再試行してください。',
+          });
+          return;
+        }
         await terminals.closeAll();
         await git.close();
         try {

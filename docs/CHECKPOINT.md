@@ -1,5 +1,7 @@
 # Checkpoint — Published Google connection testing preview
 
+Development continuation, 2026-09-14: [conversation recovery](CONVERSATIONS.md) is implemented after source checkpoint `2c9396a`. Local build, 75/78 behavior tests (three optional skips), all eight Electron suites, Linux packaging and relocated package restart/queue smoke pass. Source and device-local metadata changes do not alter the published 0.1.3 installer. Resume from current main and the latest [HANDOFF](HANDOFF.md); Google/device/model and full-release gates remain open.
+
 Final delivery checkpoint, 2026-09-14 JST: [Pages run 34764740194](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34764740194) successfully deployed website commit `44bcd2bc8cf682cca257cee54a9dbe837cb4b601` to [the download site](https://del-taiseiozaki.github.io/irori/). At `2026-09-13T15:10:49.647Z`, a fresh anonymous desktop/mobile browser downloaded all **318,416,896 bytes** of the Windows 0.1.3 installer and matched SHA-256 `c6099224db0b6137824088e19e43976d573d823af150ead5350be7b6312f442d` with the native CI/release evidence. No page/HTTP errors occurred; both Mac downloads remained disabled. Application source is `9b04ed2`; implementation/follow-up commits and the publication commit are pushed. This final documentation-only commit records the completed delivery.
 
 No Windows device/Google/IME/upgrade result was supplied, and no real model test was authorized or executed. Read-only Google access, complete-release gates, untouched neighboring repositories and preserved `.local/vm-preview/{samples,device}` data remain explicit boundaries. Continue from current main using [implementation details and remaining work](EDITING-AND-RECORDS.md), rather than repeating OAuth setup or the completed editor/Git/queue work.
@@ -135,7 +137,7 @@ The full R01–R12 matrix and sequencing remain in [ACCEPTANCE](ACCEPTANCE.md). 
 4. Offline space relocation/unregistration, note search/rename/backlinks, broad Markdown/IME and scale acceptance, ontology UX (Q01), optional terminal and versioned artifact/source provenance.
 5. Native Windows/macOS testing, installers/signing/updating, provider distribution review and performance budgets. Electron remains provisional; no equivalent Tauri comparison is complete. Repository placement policy (Q02) is also open.
 
-Known limits include the narrow external-writer race at save, bounded watcher depth, device-local credentials protected by file permissions rather than OS vault integration, in-memory conversation display history and unverified native crash/mount recovery. The development container launcher uses its explicit root-only Chromium sandbox exception.
+Known limits include the narrow external-writer race at save, bounded watcher depth, device-local credentials protected by file permissions rather than OS vault integration, bounded conversation display history (see CONVERSATIONS.md) and unverified native crash/mount recovery. The development container launcher uses its explicit root-only Chromium sandbox exception.
 
 Locate this checkpoint commit with:
 

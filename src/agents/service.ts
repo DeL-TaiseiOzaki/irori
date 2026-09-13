@@ -18,9 +18,17 @@ import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import type { FileService } from '../host/files';
 import { SessionStore, type SessionBinding } from './sessions';
+import { ConversationStore } from './conversations';
+import { startInput } from '../domain/conversation';
 type Reply = { allow: boolean; answers?: AgentAnswers };
 type Run = {
   id: string;
+  binding: SessionBinding;
+  queuedId?: string;
+  recorded?: boolean;
+  accepted: Promise<void>;
+  accept: () => void;
+  reject: (error: unknown) => void;
   cancelled: boolean;
   abort: AbortController;
   child?: ChildProcess;
@@ -34,6 +42,7 @@ type Run = {
 export class AgentService {
   private active?: Run;
   private sessions: SessionStore;
+  private conversations: ConversationStore;
   private resetting = false;
   private requests = new Map<string, (reply: Reply) => void>();
   constructor(
@@ -44,6 +53,13 @@ export class AgentService {
     ),
   ) {
     this.sessions = new SessionStore(files.dataDir);
+    this.conversations = new ConversationStore(files.dataDir, () => {
+      const run = this.active;
+      if (run) {
+        this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
+        void this.cancel();
+      }
+    });
   }
   get busy() {
     return !!this.active || this.resetting;
@@ -54,10 +70,47 @@ export class AgentService {
   session(scopeId: string, agent: AgentId) {
     return this.sessions.status(this.binding(scopeId, agent));
   }
+  conversation(scopeId: string, agent: AgentId) {
+    return this.conversations.read(this.binding(scopeId, agent));
+  }
+  queueMessage(input: StartRun) {
+    input = startInput.parse(input);
+    if (input.newSession) throw Error('新しい会話は送信待ちを完了してから開始してください。');
+    if (
+      this.resetting ||
+      (this.active &&
+        (this.active.binding.scopeId !== input.scopeId ||
+          this.active.binding.agent !== input.agent))
+    )
+      throw Error('実行中のスペース・CLIに指示を追加してください。');
+    return this.conversations.enqueue(this.binding(input.scopeId, input.agent), input);
+  }
+  removeQueued(scopeId: string, agent: AgentId, id: string) {
+    return this.conversations.remove(this.binding(scopeId, agent), id);
+  }
+  async startQueued(scopeId: string, agent: AgentId, id: string, canStart = () => {}) {
+    const { queued } = await this.conversation(scopeId, agent);
+    const next = queued[0];
+    if (!next || next.id !== id) throw Error('送信待ちの順序が変わりました。');
+    canStart();
+    const runId = this.start({ ...next, scopeId, agent }, id);
+    await this.active!.accepted;
+    return runId;
+  }
+  async startAccepted(input: StartRun) {
+    const id = this.start(input);
+    await this.active!.accepted;
+    return id;
+  }
+  flush() {
+    return this.conversations.flush();
+  }
   async resetSession(scopeId: string, agent: AgentId) {
     if (this.busy) throw Error('実行を停止してから会話の継続をリセットしてください。');
     this.resetting = true;
     try {
+      if ((await this.conversation(scopeId, agent)).queued.length)
+        throw Error('送信待ちを完了または取り消してから会話をリセットしてください。');
       await this.sessions.reset(this.binding(scopeId, agent));
     } finally {
       this.resetting = false;
@@ -91,17 +144,31 @@ export class AgentService {
       }),
     );
   }
-  start(input: StartRun): string {
+  start(input: StartRun, queuedId?: string): string {
     if (this.busy) throw Error('An agent is already running. Stop it before starting another.');
+    input = startInput.parse(input);
     if (!input.prompt.trim() || input.prompt.length > 32000)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.files.get(input.scopeId);
     let close!: () => void;
+    let accept!: () => void;
+    let reject!: (error: unknown) => void;
+    const accepted = new Promise<void>((resolve, fail) => {
+      accept = resolve;
+      reject = fail;
+    });
+    // Direct service callers can observe failure through events instead of awaiting acceptance.
+    void accepted.catch(() => {});
     const closed = new Promise<void>((resolve) => {
       close = resolve;
     });
     const run: Run = {
       id: randomUUID(),
+      binding: this.binding(input.scopeId, input.agent),
+      queuedId,
+      accepted,
+      accept,
+      reject,
       cancelled: false,
       abort: new AbortController(),
       closed,
@@ -113,7 +180,29 @@ export class AgentService {
     return run.id;
   }
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
-    this.emit({ runId: run.id, type, text, ...extra });
+    const event = this.publish(run, type, text, extra);
+    if (run.recorded)
+      void this.conversations.event(run.binding, event).catch(() => {
+        this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
+        void this.cancel();
+      });
+  }
+  private publish(
+    run: Run,
+    type: AgentEvent['type'],
+    text: string,
+    extra: Partial<AgentEvent> = {},
+  ) {
+    const event = {
+      runId: run.id,
+      scopeId: run.binding.scopeId,
+      agent: run.binding.agent,
+      type,
+      text,
+      ...extra,
+    };
+    this.emit(event);
+    return event;
   }
   private ask(run: Run, text: string, details: unknown, questions?: Question[]): Promise<Reply> {
     if (run.cancelled) return Promise.resolve({ allow: false });
@@ -159,6 +248,11 @@ export class AgentService {
     let resuming = false;
     let record: RunRecord | undefined;
     try {
+      await this.conversations.begin(run.binding, run.id, input, run.queuedId);
+      run.recorded = true;
+      run.accept();
+      if (input.newSession) this.publish(run, 'status', '新しい会話を開始します。');
+      this.publish(run, 'status', input.prompt, { role: 'user' });
       if (run.cancelled) return;
       const space = this.files.get(input.scopeId);
       let prompt = input.prompt;
@@ -211,6 +305,7 @@ export class AgentService {
         else await runOpenCode(context);
       }
     } catch (e) {
+      run.reject(e);
       if (!run.cancelled) {
         outcome = 'failed';
         this.event(run, 'error', String(e));
@@ -232,17 +327,28 @@ export class AgentService {
         await this.knowledge.finish(record, outcome).catch(() => {
           this.event(run, 'error', '実行結果の記録に失敗しました。資料の保持版は残っています。');
         });
+      const done: AgentEvent = {
+        runId: run.id,
+        type: 'done',
+        outcome,
+        text:
+          outcome === 'completed'
+            ? '完了'
+            : outcome === 'cancelled'
+              ? '停止しました'
+              : '実行に失敗しました',
+      };
+      if (run.recorded) {
+        try {
+          await this.conversations.finish(run.binding, done);
+        } catch {
+          done.outcome = 'failed';
+          done.text =
+            '実行は終了しましたが、会話履歴を保存できませんでした。変更内容を確認してください。';
+        }
+      }
       this.active = undefined;
-      this.event(
-        run,
-        'done',
-        outcome === 'completed'
-          ? '完了'
-          : outcome === 'cancelled'
-            ? '停止しました'
-            : '実行に失敗しました',
-        { outcome },
-      );
+      this.publish(run, 'done', done.text, { outcome: done.outcome });
       run.close();
     }
   }

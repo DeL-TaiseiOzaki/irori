@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
-import { SessionStore } from '../src/agents/sessions';
+import { SessionStore, sessionKey } from '../src/agents/sessions';
 import type { AgentEvent, AgentId } from '../src/domain/types';
 
 const fixtureOptions = {
@@ -139,5 +139,61 @@ test(
     const result = await execute('pi', '/fixture');
     assert.equal(result.events.at(-1)?.outcome, 'completed');
     assert.equal(result.events.filter((e) => e.type === 'text').length, 0);
+  },
+);
+
+test(
+  'Durable queue claims launch once, retain history and reject session resets with pending messages',
+  fixtureOptions,
+  async (t) => {
+    const { space, files, calls } = await setup(t);
+    let completed!: () => void;
+    const done = new Promise<void>((resolve) => {
+      completed = resolve;
+    });
+    const service = new AgentService(files, (event) => {
+      if (event.type === 'done') completed();
+    });
+    t.after(() => service.cancel());
+    const input = {
+      scopeId: space.scopeId,
+      agent: 'pi' as const,
+      prompt: 'queued instruction',
+      notePath: 'note.md',
+    };
+    await service.queueMessage(input);
+    const queue = await service.queueMessage({ ...input, prompt: 'keep pending' });
+    await assert.rejects(service.resetSession(space.scopeId, 'pi'), /送信待ち/);
+    const starts = await Promise.allSettled([
+      service.startQueued(space.scopeId, 'pi', queue[0].id),
+      service.startQueued(space.scopeId, 'pi', queue[0].id),
+    ]);
+    assert.equal(starts.filter((result) => result.status === 'fulfilled').length, 1);
+    await done;
+    assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
+    await assert.rejects(service.startQueued(space.scopeId, 'pi', queue[0].id), /順序/);
+    const restarted = new AgentService(files, () => {});
+    const recovered = await restarted.conversation(space.scopeId, 'pi');
+    assert.equal(recovered.queued[0].prompt, 'keep pending');
+    assert.equal(recovered.events.filter((event) => event.role === 'user').length, 1);
+    assert.equal(recovered.events.at(-1)?.outcome, 'completed');
+    await restarted.removeQueued(space.scopeId, 'pi', queue[1].id);
+    await restarted.resetSession(space.scopeId, 'pi');
+    assert.deepEqual((await restarted.conversation(space.scopeId, 'pi')).events, recovered.events);
+    const filename = path.join(
+      files.dataDir,
+      'agent-conversations',
+      sessionKey({
+        scopeId: space.scopeId,
+        agent: 'pi',
+        root: space.root,
+      }) + '.json',
+    );
+    await writeFile(filename, '{broken');
+    const damaged = new AgentService(files, () => {});
+    await assert.rejects(damaged.startAccepted(input));
+    await damaged.cancel();
+    assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
+    assert.equal(await readFile(filename, 'utf8'), '{broken');
   },
 );

@@ -1,5 +1,6 @@
 import { KnowledgePanel } from './KnowledgePanel';
 import type { SourceRef } from '../domain/knowledge';
+import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -174,7 +175,7 @@ function SessionControls({
         {!session
           ? '会話の状態を確認中…'
           : session.state === 'saved'
-            ? '次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。'
+            ? '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。'
             : session.state === 'empty'
               ? '次の実行で新しい会話を始めます。'
               : session.detail}
@@ -185,7 +186,7 @@ function SessionControls({
             会話の継続をリセット
           </button>
           <small>
-            このスペース・エージェントの継続を解除します。ノートとCLI側の履歴は残ります。
+            このスペース・エージェントの継続を解除します。ノートと保存した履歴は残ります。
           </small>
         </>
       )}
@@ -224,28 +225,53 @@ function App() {
     [fresh, setFresh] = useState(false);
   const [sending, setSending] = useState(false);
   const submitting = useRef(false);
-  const [queued, setQueued] = useState<
-    Array<{ id: number; prompt: string; notePath?: string; sources: SourceRef[] }>
-  >([]);
-  const queueId = useRef(0);
+  const [queued, setQueued] = useState<QueuedMessage[]>([]);
   const [queuePaused, setQueuePaused] = useState(false);
+  const [conversationReady, setConversationReady] = useState(false);
+  const [conversationError, setConversationError] = useState('');
+  const [historyTruncated, setHistoryTruncated] = useState(false);
+  const [historyReload, setHistoryReload] = useState(0);
+  const eventRevision = useRef(0);
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [newNote, setNewNote] = useState(false);
-  const histories = useRef(new Map<string, AgentEvent[]>());
   const conversationKey = useRef('');
   function updateEvents(update: (events: AgentEvent[]) => AgentEvent[]) {
-    setEvents((previous) => {
-      const next = update(previous);
-      histories.current.set(conversationKey.current, next);
-      return next;
-    });
+    setEvents(update);
   }
   useEffect(() => {
+    let current = true;
     conversationKey.current = `${active?.scopeId ?? ''}:${agent}`;
-    setEvents(histories.current.get(conversationKey.current) ?? []);
+    setEvents([]);
+    setQueued([]);
+    setQueuePaused(true);
     setFresh(false);
-  }, [active?.scopeId, agent]);
+    setConversationReady(false);
+    setConversationError('');
+    setHistoryTruncated(false);
+    if (active)
+      void (async () => {
+        // A renderer reload stops native work. If its final events race the read, reread
+        // the host snapshot instead of overwriting newer events with an older result.
+        while (current) {
+          const revision = eventRevision.current;
+          const value = await host.agentConversation(active.scopeId, agent);
+          if (!current) return;
+          if (revision !== eventRevision.current) continue;
+          setEvents(value.events);
+          setQueued(value.queued);
+          setRunning(!!value.activeRunId);
+          setHistoryTruncated(value.truncated);
+          setConversationReady(true);
+          return;
+        }
+      })().catch((error) => {
+        if (current) setConversationError(String(error));
+      });
+    return () => {
+      current = false;
+    };
+  }, [active?.scopeId, agent, historyReload]);
   const conversation = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
   useEffect(() => {
@@ -304,14 +330,12 @@ function App() {
         void reconcile();
       } else if (event.type === 'agent') {
         const incoming = event.event;
+        if (conversationKey.current !== `${incoming.scopeId}:${incoming.agent}`) return;
+        eventRevision.current++;
         updateEvents((all) => {
-          const last = all.at(-1);
-          if (incoming.type === 'text' && last?.type === 'text' && last.runId === incoming.runId)
-            return [
-              ...all.slice(0, -1),
-              { ...last, text: (last.text + incoming.text).slice(-200000) },
-            ];
-          return [...all, incoming].slice(-400);
+          const next = appendConversationEvent(all, incoming).slice(-400);
+          const last = next.at(-1)!;
+          return [...next.slice(0, -1), { ...last, text: last.text.slice(-200000) }];
         });
         if (incoming.type === 'done') {
           setRunning(false);
@@ -431,8 +455,7 @@ function App() {
     setError('');
     followConversation.current = true;
     setRunning(true);
-    if (newSession) updateEvents(() => []);
-    const runId = await host.start({
+    await host.start({
       scopeId: active!.scopeId,
       agent,
       prompt: message,
@@ -440,10 +463,9 @@ function App() {
       newSession,
       sources: selectedSources,
     });
-    updateEvents((all) => [...all, { runId, type: 'status', role: 'user', text: message }]);
   }
   async function start() {
-    if (!active || submitting.current || !prompt.trim()) return;
+    if (!active || !conversationReady || submitting.current || !prompt.trim()) return;
     submitting.current = true;
     setSending(true);
     const message = prompt;
@@ -451,12 +473,19 @@ function App() {
       if (!(await save())) return;
       const notePath = doc?.scopeId === active.scopeId ? doc.path : undefined;
       if (running || queued.length) {
-        if (queued.length >= 20) throw Error('送信待ちは 20 件までです。');
-        setQueued((all) => [
-          ...all,
-          { id: ++queueId.current, prompt: message, notePath, sources: [...sources] },
-        ]);
-      } else await sendTurn(message, notePath, fresh);
+        setQueued(
+          await host.queueAgentMessage({
+            scopeId: active.scopeId,
+            agent,
+            prompt: message,
+            notePath,
+            sources,
+          }),
+        );
+      } else {
+        setQueuePaused(false);
+        await sendTurn(message, notePath, fresh);
+      }
       setPrompt((value) => (value === message ? '' : value));
       setFresh(false);
     } catch (e) {
@@ -468,7 +497,15 @@ function App() {
     }
   }
   useEffect(() => {
-    if (running || sending || queuePaused || external || !queued.length || submitting.current)
+    if (
+      !conversationReady ||
+      running ||
+      sending ||
+      queuePaused ||
+      external ||
+      !queued.length ||
+      submitting.current
+    )
       return;
     const next = queued[0];
     submitting.current = true;
@@ -479,7 +516,9 @@ function App() {
         return;
       }
       try {
-        await sendTurn(next.prompt, next.notePath, false, next.sources);
+        setRunning(true);
+        followConversation.current = true;
+        await host.startQueuedMessage(active!.scopeId, agent, next.id);
         setQueued((all) => all.filter((item) => item.id !== next.id));
       } catch (error) {
         setRunning(false);
@@ -490,7 +529,7 @@ function App() {
       submitting.current = false;
       setSending(false);
     });
-  }, [running, sending, queued, queuePaused, external]);
+  }, [conversationReady, running, sending, queued, queuePaused, external]);
   async function openWorkspace(profile: WorkspaceProfile) {
     setSources([]);
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
@@ -959,16 +998,26 @@ function App() {
                 key={`${active.scopeId}:${agent}`}
                 scopeId={active.scopeId}
                 agent={agent}
-                running={running}
+                running={running || sending || queued.length > 0 || !conversationReady}
                 onError={report}
                 onReset={() => {
                   if (conversationKey.current !== `${active.scopeId}:${agent}`) return;
-                  updateEvents(() => []);
                   setFresh(false);
                 }}
               />
             )}
           </div>
+          {!conversationReady && (
+            <div className="hint" role="status">
+              {conversationError || '保存した会話を読み込んでいます…'}
+              {conversationError && (
+                <button onClick={() => setHistoryReload((value) => value + 1)}>再試行</button>
+              )}
+            </div>
+          )}
+          {historyTruncated && (
+            <div className="hint">保存上限により、古い履歴や長い出力の一部を省略しています。</div>
+          )}
           <div
             className="conversation"
             aria-live="polite"
@@ -1033,20 +1082,33 @@ function App() {
           {queued.length > 0 && (
             <div className="message-queue" aria-label="送信待ち">
               <strong>送信待ち {queued.length} 件</strong>
+              {queuePaused && (
+                <p>送信待ちはこの端末に保存されています。内容を確認して再開してください。</p>
+              )}
               {queued.map((item) => (
                 <div key={item.id}>
                   <span>{item.prompt}</span>
                   <button
                     disabled={sending}
                     aria-label={`送信待ち ${item.id} を削除`}
-                    onClick={() => setQueued((all) => all.filter((entry) => entry.id !== item.id))}
+                    onClick={() => {
+                      setSending(true);
+                      void host
+                        .removeQueuedMessage(active!.scopeId, agent, item.id)
+                        .then(setQueued)
+                        .catch(report)
+                        .finally(() => setSending(false));
+                    }}
                   >
                     取消
                   </button>
                 </div>
               ))}
               {queuePaused && (
-                <button disabled={running || sending} onClick={() => setQueuePaused(false)}>
+                <button
+                  disabled={running || sending || !conversationReady}
+                  onClick={() => setQueuePaused(false)}
+                >
                   送信を再開
                 </button>
               )}
@@ -1094,6 +1156,7 @@ function App() {
                 className="primary"
                 disabled={
                   !active ||
+                  !conversationReady ||
                   sending ||
                   connecting ||
                   !prompt.trim() ||

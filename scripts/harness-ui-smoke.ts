@@ -102,16 +102,70 @@ try {
       await expect(page.getByRole('button', { name: '停止', exact: true })).toBeVisible();
       await page.getByLabel('エージェントへの指示').fill('after cancellation');
       await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
+      await page.getByLabel('エージェントへの指示').fill('discard queued message');
+      await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
       await page.getByRole('button', { name: '停止', exact: true }).click();
       await expect(page.getByRole('button', { name: '送信を再開', exact: true })).toBeEnabled();
       await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
         'after cancellation',
       );
+      const requests = async () =>
+        (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+          .filter((entry) => entry.type === 'prompt');
+      expect((await requests()).length).toBe(3);
+      for (const cycle of [1, 2]) {
+        await app.close();
+        app = await launch();
+        page = await app.firstWindow();
+        page.on('pageerror', (error) => errors.push(String(error)));
+        await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+        await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+        await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+        await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
+          'after cancellation',
+        );
+        await expect(page.locator('.message.done')).toHaveCount(3);
+        await expect(page.locator('.message.user').first()).toHaveText('dialog');
+        await expect(page.locator('.conversation')).toContainText('日本語');
+        await expect(page.locator('.request')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+        expect((await requests()).length).toBe(3);
+        const pending = await page.evaluate(
+          (id) => window.irori.agentConversation(id, 'pi'),
+          space.scopeId,
+        );
+        expect(pending.queued[0].notePath).toBe('second.md');
+        if (cycle === 1) {
+          await page
+            .getByLabel('送信待ち', { exact: true })
+            .locator('div')
+            .filter({ hasText: 'discard queued message' })
+            .getByRole('button')
+            .click();
+          await expect(page.getByLabel('送信待ち', { exact: true })).not.toContainText(
+            'discard queued message',
+          );
+        } else expect(pending.queued).toHaveLength(1);
+      }
       await page.getByRole('button', { name: '送信を再開', exact: true }).click();
       await expect(page.locator('.message.done')).toHaveCount(4);
+      expect((await requests()).length).toBe(4);
+      await page.getByLabel('エージェントへの指示').fill('dialog reload');
+      await page.getByRole('button', { name: '送信', exact: true }).click();
+      await expect(page.locator('.request')).toBeVisible();
+      await page.reload();
+      await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+      await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+      await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+      await expect(page.locator('.message.done')).toHaveCount(5);
+      await expect(page.locator('.request')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
     await expect(
-      page.getByText('次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。', {
+      page.getByText('次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。', {
         exact: true,
       }),
     ).toBeVisible();
@@ -145,6 +199,9 @@ try {
           'fixture mutation',
           'session status after restart',
           'per-provider reset',
+          'history and queue retained across two host restarts',
+          'no automatic replay, exact queued note selection and durable removal',
+          'renderer reload stops native work and never restores live approval controls',
         ],
         errors,
       },

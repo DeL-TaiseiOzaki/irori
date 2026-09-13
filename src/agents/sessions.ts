@@ -7,6 +7,11 @@ import type { AgentId, AgentSession } from '../domain/types';
 import { agentIds } from '../domain/types';
 
 export type SessionBinding = { scopeId: string; agent: AgentId; root: string };
+export function sessionKey(binding: SessionBinding) {
+  return createHash('sha256')
+    .update(JSON.stringify([binding.scopeId, binding.agent, binding.root]))
+    .digest('hex');
+}
 const record = z
   .object({
     schemaVersion: z.literal(1),
@@ -22,9 +27,7 @@ const record = z
 export class SessionStore {
   constructor(private dataDir: string) {}
   private filename(binding: SessionBinding) {
-    const key = createHash('sha256')
-      .update(JSON.stringify([binding.scopeId, binding.agent, binding.root]))
-      .digest('hex');
+    const key = sessionKey(binding);
     return path.join(this.dataDir, 'agent-sessions', key + '.json');
   }
   async read(binding: SessionBinding) {

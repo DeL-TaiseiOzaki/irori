@@ -1,5 +1,7 @@
 # irori continuation handoff
 
+Development continuation, 2026-09-14: implemented [device-local conversation recovery](CONVERSATIONS.md) after checkpoint `2c9396a`. Recent display history and accepted pending instructions now persist by exact checkout/KB/CLI. Restored queues wait for explicit resumption; interrupted runs are not replayed, restored requests have no live controls, and current hosts use Electron's single-instance lock per device profile. Existing native session handles and the published 0.1.3 installer are unchanged. Follow-up verification is recorded in STATUS; source changes and CI artifacts do not constitute a newly published installer.
+
 Final delivery checkpoint, 2026-09-14 JST: [Pages run 34764740194](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34764740194) successfully deployed website commit `44bcd2bc8cf682cca257cee54a9dbe837cb4b601` to [the download site](https://del-taiseiozaki.github.io/irori/). At `2026-09-13T15:10:49.647Z`, a fresh anonymous desktop/mobile browser downloaded all **318,416,896 bytes** of the Windows 0.1.3 installer and matched SHA-256 `c6099224db0b6137824088e19e43976d573d823af150ead5350be7b6312f442d` with the native CI/release evidence. No page/HTTP errors occurred; both Mac downloads remained disabled. Application source is `9b04ed2`; implementation/follow-up commits and the publication commit are pushed. This final documentation-only commit records the completed delivery.
 
 No Windows device/Google/IME/upgrade result was supplied, and no real model test was authorized or executed. Read-only Google access, complete-release gates, untouched neighboring repositories and preserved `.local/vm-preview/{samples,device}` data remain explicit boundaries. Continue from current main using [implementation details and remaining work](EDITING-AND-RECORDS.md), rather than repeating OAuth setup or the completed editor/Git/queue work.
@@ -12,7 +14,7 @@ Checkpoint requested by the owner after delivery of Windows preview `0.1.2`, 202
 
 ## Immediate continuation after 0.1.3
 
-Read [continuous editing and retained records](EDITING-AND-RECORDS.md) before extending the editor, conversation queue, D04 or D06. The implementation is already committed and packaged; do not restart those features. Collect explicit Windows 0.1.2/0.1.3 Google/WinFsp/read/reconnect and new editor/IME/upgrade evidence. None has been reported during this continuation. Next independent work is writable capability/re-consent and account binding for actual cloud delivery, portable knowledge identity/provenance, move/rebind/search UI and queue/history persistence. Keep the full release gates and original model-execution restrictions. The first 0.1.3 CI run at `31dcb46` was intentionally cancelled after a visual check found literal HTML empty lines; the successful final run targets `9b04ed2`. The website screenshot uses disposable examples and submits no model prompt.
+Read [continuous editing and retained records](EDITING-AND-RECORDS.md) before extending the editor, conversation queue, D04 or D06. The implementation is already committed and packaged; do not restart those features. Collect explicit Windows 0.1.2/0.1.3 Google/WinFsp/read/reconnect and new editor/IME/upgrade evidence. None has been reported during this continuation. Next independent work is writable capability/re-consent and account binding for actual cloud delivery, portable knowledge identity/provenance, move/rebind/search UI and broader conversation history management. Keep the full release gates and original model-execution restrictions. The first 0.1.3 CI run at `31dcb46` was intentionally cancelled after a visual check found literal HTML empty lines; the successful final run targets `9b04ed2`. The website screenshot uses disposable examples and submits no model prompt.
 
 ## Start here
 
@@ -73,7 +75,7 @@ D01's Q01/Q02/license/device choices and D02's native packaging foundation are i
 
 ## Validation and implementation cautions
 
-The last application change passed build, 64 of 67 behavior tests (three optional provider controls skipped), eight Electron UI suites and all three native package jobs. Website build and real/mixed/available/unavailable browser checks passed. These checks used no model inference. Documentation-only checkpointing does not rerun or extend that runtime evidence.
+The published 0.1.3 application passed build, 69 of 72 behavior tests (three optional provider controls skipped), eight Electron UI suites and all three native package jobs. Subsequent source verification is recorded in STATUS. Website build and real/mixed/available/unavailable browser checks passed. These checks used no model inference. Documentation-only checkpointing does not rerun or extend that runtime evidence.
 
 Node requirement is `^24.15.0 || >=26.0.0`; this workspace has Node 24.21.0 in `node_modules/.bin`, while the system Node may be 20. For code changes, use the appropriate existing scripts under a supported Node runtime:
 

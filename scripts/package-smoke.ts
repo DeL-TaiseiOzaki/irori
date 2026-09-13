@@ -91,22 +91,24 @@ try {
   // A packaged build must not use a development machine's OAuth environment.
   env.IRORI_GOOGLE_CLIENT_ID = 'synthetic-development-client';
   env.IRORI_GOOGLE_CLIENT_SECRET = 'synthetic-development-secret';
-  application = await electron.launch({
-    executablePath: path.join(
-      relocated,
-      ...(mac
-        ? ['irori.app', 'Contents', 'MacOS', 'irori']
-        : [process.platform === 'win32' ? 'irori.exe' : 'irori']),
-    ),
-    // Root containers have no user sandbox and often only 64 MiB of /dev/shm.
-    args:
-      process.platform === 'linux' && process.getuid?.() === 0
-        ? ['--no-sandbox', '--disable-dev-shm-usage']
-        : [],
-    cwd: temporary,
-    env,
-    timeout: 60_000,
-  });
+  const launchPackaged = () =>
+    electron.launch({
+      executablePath: path.join(
+        relocated,
+        ...(mac
+          ? ['irori.app', 'Contents', 'MacOS', 'irori']
+          : [process.platform === 'win32' ? 'irori.exe' : 'irori']),
+      ),
+      // Root containers have no user sandbox and often only 64 MiB of /dev/shm.
+      args:
+        process.platform === 'linux' && process.getuid?.() === 0
+          ? ['--no-sandbox', '--disable-dev-shm-usage']
+          : [],
+      cwd: temporary,
+      env,
+      timeout: 60_000,
+    });
+  application = await launchPackaged();
   const page = await application.firstWindow();
   application.on('console', (message) => {
     if (message.text().startsWith('PACKAGE_RENDERER_EXIT ')) console.error(message.text());
@@ -309,6 +311,7 @@ try {
     );
     return {
       packaged: app.isPackaged,
+      ownsDeviceData: app.hasSingleInstanceLock(),
       version: app.getVersion(),
       electron: process.versions.electron,
       node: process.versions.node,
@@ -317,9 +320,43 @@ try {
     };
   });
   assert.equal(runtime.packaged, true);
+  assert.equal(runtime.ownsDeviceData, true);
   assert.equal(runtime.version, packaged.version);
   assert.equal(runtime.opencode, 'function');
   assert.equal(runtime.claude, 'function');
+  const conversationScope = await page.evaluate(async () => {
+    const space = (await window.irori.spaces())[0];
+    await window.irori.queueAgentMessage({
+      scopeId: space.scopeId,
+      agent: 'codex',
+      prompt: 'Packaged pending instruction 日本語',
+      notePath: 'note.md',
+      sources: [{ scopeId: space.scopeId, path: 'note.md' }],
+    });
+    return space.scopeId;
+  });
+  await application.close();
+  application = await launchPackaged();
+  const restored = await application.firstWindow();
+  restored.on('pageerror', (error) => errors.push(error.message));
+  await restored.locator('.workspace-card').first().click();
+  await restored.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await expect(restored.getByLabel('送信待ち', { exact: true })).toContainText(
+    'Packaged pending instruction 日本語',
+  );
+  await expect(restored.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+  const savedConversation = await restored.evaluate(
+    (id) => window.irori.agentConversation(id, 'codex'),
+    conversationScope,
+  );
+  assert.equal(savedConversation.queued[0].notePath, 'note.md');
+  assert.equal(savedConversation.queued[0].sources?.[0].scopeId, conversationScope);
+  assert.equal(savedConversation.events.length, 0); // No native prompt has been submitted.
+  await restored
+    .getByLabel('送信待ち', { exact: true })
+    .getByRole('button', { name: /を削除$/ })
+    .click();
+  await expect(restored.getByLabel('送信待ち', { exact: true })).toHaveCount(0);
   await application.close();
   application = undefined;
   assert.deepEqual(errors, []);
@@ -342,7 +379,7 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned relocated Forge package; SDK imports, retained editor, local image paste/read, CSV graph, Japanese note/terminal file save and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Unsigned relocated Forge package; SDK imports, retained editor, local image paste/read, CSV graph, Japanese note/terminal file save, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,

@@ -3,6 +3,7 @@ import { agentIds } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
+import { startInput } from './conversation';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -100,17 +101,12 @@ export const hostArguments = {
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),
   agentSession: z.tuple([id, z.enum(agentIds)]),
+  agentConversation: z.tuple([id, z.enum(agentIds)]),
+  queueAgentMessage: z.tuple([startInput]),
+  removeQueuedMessage: z.tuple([id, z.enum(agentIds), id]),
+  startQueuedMessage: z.tuple([id, z.enum(agentIds), id]),
   resetAgentSession: z.tuple([id, z.enum(agentIds)]),
-  start: z.tuple([
-    z.object({
-      scopeId: id,
-      agent: z.enum(agentIds),
-      prompt: z.string().min(1).max(32000),
-      notePath: path.optional(),
-      newSession: z.boolean().optional(),
-      sources: z.array(sourceRef).max(20).optional(),
-    }),
-  ]),
+  start: z.tuple([startInput]),
   cancel: z.tuple([]),
   respond: z.tuple([
     id,

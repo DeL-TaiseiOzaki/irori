@@ -292,7 +292,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       { scopeId: space.scopeId, root: space.root, agent },
       `fixture-${agent}-handle`,
     );
-  const savedText = '次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。';
+  const savedText = '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。';
   for (const cycle of [1, 2]) {
     const restarted = await electron.launch({
       args: [
