@@ -1497,6 +1497,94 @@ footer > span {
   margin-top: 16px;
   flex-wrap: wrap;
 }
+.csv-preview {
+  padding: 16px 28px;
+}
+.csv-preview .actions {
+  flex-wrap: wrap;
+}
+.csv-scroll {
+  overflow: auto;
+  max-height: 70vh;
+}
+.csv-preview table,
+.ontology-list table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.csv-preview th,
+.csv-preview td,
+.ontology-list th,
+.ontology-list td {
+  border: 1px solid #d7dce1;
+  padding: 9px 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 90px;
+}
+.csv-preview th,
+.ontology-list th {
+  background: #f0f2f2;
+  position: sticky;
+  top: 0;
+}
+.ontology-panel {
+  width: 1100px;
+  background: #fafaf8;
+}
+.ontology-panel h2 {
+  margin: 0;
+  flex: 1;
+}
+.ontology-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ontology-controls label {
+  flex: 1;
+  min-width: 180px;
+}
+.ontology-controls select {
+  max-width: 290px;
+}
+.ontology-graph {
+  height: 390px;
+  border: 1px solid #d7dce1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ontology-graph .react-flow__node-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafaf8;
+  color: #22292e;
+  border: 1px solid #b9a184;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  padding: 8px;
+}
+.ontology-graph .react-flow__node-default:focus-visible {
+  outline: 3px solid #c88435;
+}
+.ontology-selection {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-height: 55px;
+  flex-wrap: wrap;
+}
+.ontology-list {
+  margin-bottom: 18px;
+  overflow: auto;
+  max-height: 260px;
+}
 @media (max-width: 1120px) {
   .app.panel-open {
     grid-template-columns: 380px minmax(0, 1fr);

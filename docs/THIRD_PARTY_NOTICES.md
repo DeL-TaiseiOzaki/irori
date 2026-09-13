@@ -8,6 +8,7 @@ This preview depends on installed npm packages; exact versions and integrity has
 | Electron | MIT, node_modules/electron/LICENSE; binary distribution LICENSE and LICENSES.chromium.html |
 | Milkdown Crepe and Milkdown packages | MIT, package LICENSE files; ProseMirror/remark dependencies retain their own notices |
 | CodeMirror packages | MIT, package LICENSE files |
+| Papa Parse, React Flow (`@xyflow/react` / `@xyflow/system`), Dagre / graphlib | MIT, each package LICENSE; graph projection is loaded on demand |
 | Chokidar, cross-spawn, tree-kill, Zod | MIT, package LICENSE files |
 | OpenCode SDK, eventsource-parser | MIT, each package LICENSE; the SDK is loaded in the host on demand |
 | write-file-atomic | ISC, node_modules/write-file-atomic/LICENSE.md; signal-exit retains its ISC license |

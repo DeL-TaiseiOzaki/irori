@@ -11,6 +11,7 @@ import { WorkspaceCloudStorage } from '../cloud/storage';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { isAppDocument } from './trust';
+import { readOntology } from './ontology';
 import type { HostEvent, Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
@@ -144,6 +145,7 @@ app
         await cloud.removeWorkspace(id, () => workspaces.remove(id));
       },
       cloudSetup: () => cloud.setup(),
+      ontology: (id) => readOntology(files, id),
       workspaceCloud: (id) => cloud.workspaceRoot(id),
       cloudEntries: (...args) => cloud.entries(...args),
       cloudRead: (...args) => cloud.read(...args),
@@ -238,7 +240,8 @@ app
         }
         // The renderer persists drafts continuously; give it an explicit final opportunity.
         try {
-          await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
+          if (!window?.webContents.isCrashed())
+            await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
         } catch (error) {
           if (!window?.webContents.isCrashed()) {
             await dialog.showMessageBox(window!, {

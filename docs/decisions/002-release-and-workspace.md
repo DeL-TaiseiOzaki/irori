@@ -14,6 +14,8 @@ CLI agents build the ontology in collaboration with people. irori presents it: b
 
 Preserve unknown CSV columns and existing IDs. Do not assume every CSV is ontology. A declared column mapping can express node IDs/labels/note links and relation endpoints without requiring a bulk rewrite into one hard-coded ontology schema. Hierarchy and subgraph visibility are required presentation features, not implicitly deferred graph features.
 
+Implemented in [ONTOLOGY](../ONTOLOGY.md): CSV table/source mode, explicit field mapping, parent hierarchy/descendant and group filters, graph controls, linked notes and preparation of a native-agent setup request. Immutable source versions and note/artifact/run identity remain D06 work; CSV revision fingerprints do not complete provenance.
+
 ## Q02 — Workspace joins independent repositories and cloud folders
 
 A workspace can attach multiple GitHub KB repositories in arbitrarily named folders and multiple specifically selected Google Drive folders. Multiple accounts are allowed for both services. Google Drive connections are independent of GitHub repositories. Users must not have to reason about personal/team/organization classification to connect them.

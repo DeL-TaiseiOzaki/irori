@@ -6,6 +6,7 @@ import { createReadStream } from 'node:fs';
 import { cp, glob, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { ontologyFixture } from '../tests/fixtures/ontology';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
@@ -93,12 +94,28 @@ try {
         ? ['irori.app', 'Contents', 'MacOS', 'irori']
         : [process.platform === 'win32' ? 'irori.exe' : 'irori']),
     ),
-    args: process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : [],
+    // Root containers have no user sandbox and often only 64 MiB of /dev/shm.
+    args:
+      process.platform === 'linux' && process.getuid?.() === 0
+        ? ['--no-sandbox', '--disable-dev-shm-usage']
+        : [],
     cwd: temporary,
     env,
     timeout: 60_000,
   });
   const page = await application.firstWindow();
+  application.on('console', (message) => {
+    if (message.text().startsWith('PACKAGE_RENDERER_EXIT ')) console.error(message.text());
+  });
+  await application.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows())
+      window.webContents.on('render-process-gone', (_event, detail) =>
+        console.error(
+          'PACKAGE_RENDERER_EXIT ' +
+            JSON.stringify({ reason: detail.reason, exitCode: detail.exitCode }),
+        ),
+      );
+  });
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
@@ -106,6 +123,40 @@ try {
   await page.evaluate(() => {
     window.location.hash = 'packaged-smoke';
   });
+  assert.equal(
+    (await page.evaluate(() => window.irori.cloudSetup())).oauthConfigured,
+    process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1',
+  );
+  const root = path.join(temporary, '検証 KB');
+  await mkdir(root);
+  await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
+  await page.evaluate(async (root) => {
+    const space = await window.irori.register(root, '配布検証', 'personal');
+    const note = await window.irori.read(space.scopeId, 'note.md');
+    await window.irori.save({ ...note, text: '# Packaged edit 日本語\n' });
+  }, root);
+  assert.equal(await readFile(path.join(root, 'note.md'), 'utf8'), '# Packaged edit 日本語\n');
+  await mkdir(path.join(root, 'ontology'));
+  await writeFile(
+    path.join(root, '.irori/ontology.json'),
+    JSON.stringify(ontologyFixture.declaration),
+  );
+  await writeFile(
+    path.join(root, ontologyFixture.declaration.entities.path),
+    ontologyFixture.entities,
+  );
+  await writeFile(
+    path.join(root, ontologyFixture.declaration.relations.path),
+    ontologyFixture.relations,
+  );
+  await page.reload();
+  await page.getByRole('checkbox', { name: /配布検証/ }).check();
+  await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
+  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
+  ).toHaveCount(4);
+  await page.keyboard.press('Escape');
   const runtime = await application.evaluate(async ({ app }) => {
     const path = process.getBuiltinModule('node:path');
     const { createRequire } = process.getBuiltinModule('node:module');
@@ -136,19 +187,6 @@ try {
   assert.equal(runtime.version, packaged.version);
   assert.equal(runtime.opencode, 'function');
   assert.equal(runtime.claude, 'function');
-  assert.equal(
-    (await page.evaluate(() => window.irori.cloudSetup())).oauthConfigured,
-    process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1',
-  );
-  const root = path.join(temporary, '検証 KB');
-  await mkdir(root);
-  await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
-  await page.evaluate(async (root) => {
-    const space = await window.irori.register(root, '配布検証', 'personal');
-    const note = await window.irori.read(space.scopeId, 'note.md');
-    await window.irori.save({ ...note, text: '# Packaged edit 日本語\n' });
-  }, root);
-  assert.equal(await readFile(path.join(root, 'note.md'), 'utf8'), '# Packaged edit 日本語\n');
   await application.close();
   application = undefined;
   assert.deepEqual(errors, []);
@@ -171,7 +209,8 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned Forge package outside checkout; SDK loading without model inference; not installed-device acceptance',
+          'Unsigned Forge package outside checkout; SDK imports, saved CSV graph and Japanese note save without model inference; not installed-device acceptance',
+        rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
         runtime,
@@ -183,7 +222,7 @@ try {
     ) + '\n',
   );
   console.log(
-    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save and normal shutdown.`,
+    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, CSV graph and normal shutdown.`,
   );
 } catch (error) {
   // Preserve the actual failure if Windows briefly retains an executable handle during cleanup.

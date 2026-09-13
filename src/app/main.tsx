@@ -16,6 +16,12 @@ import type {
 const Editor = lazy(() =>
   import('../editor/Editor').then((module) => ({ default: module.Editor })),
 );
+const CsvPreview = lazy(() =>
+  import('./CsvPreview').then((module) => ({ default: module.CsvPreview })),
+);
+const OntologyPanel = lazy(() =>
+  import('./OntologyPanel').then((module) => ({ default: module.OntologyPanel })),
+);
 import type { EditorHandle } from '../editor/Editor';
 import { sourceOnly } from '../editor/preservation';
 import './style.css';
@@ -193,13 +199,14 @@ function App() {
   const [cloudRoot, setCloudRoot] = useState<CloudRoot>(),
     [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
+  const [ontologyOpen, setOntologyOpen] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
     [buffer, setBuffer] = useState('');
   const [revision, setRevision] = useState(0),
     [editorKey, setEditorKey] = useState(0),
-    [mode, setMode] = useState<'rich' | 'source'>('rich'),
+    [mode, setMode] = useState<'rich' | 'source' | 'table'>('rich'),
     [external, setExternal] = useState<Document>();
   const [error, setError] = useState(''),
     [status, setStatus] = useState(''),
@@ -237,7 +244,11 @@ function App() {
     setBuffer(next.text);
     setExternal(undefined);
     setMode(
-      !next.readOnly && /\.md$/i.test(next.path) && !sourceOnly(next.text) ? 'rich' : 'source',
+      /\.csv$/i.test(next.path)
+        ? 'table'
+        : !next.readOnly && /\.md$/i.test(next.path) && !sourceOnly(next.text)
+          ? 'rich'
+          : 'source',
     );
     setEditorKey((k) => k + 1);
     setStatus(next.readOnly ? 'クラウド資料・読み取り専用' : 'この端末に保存済み');
@@ -584,6 +595,14 @@ function App() {
                 <Icon name="cloud" /> クラウド接続
               </button>
             )}
+            {active && (
+              <button
+                disabled={running || dirty || connecting}
+                onClick={() => setOntologyOpen(true)}
+              >
+                オントロジー
+              </button>
+            )}
             {connecting && <small>接続を準備中…</small>}
             {active && (
               <button disabled={running || dirty} onClick={() => setNewNote(true)}>
@@ -639,6 +658,18 @@ function App() {
             <div className="doc-toolbar">
               <span>{dirty ? '未保存' : status}</span>
               <div className="actions">
+                {/\.csv$/i.test(doc.path) && (
+                  <button
+                    className={mode === 'table' ? 'selected' : ''}
+                    onClick={() => {
+                      setBuffer(editor.current?.getText() ?? buffer);
+                      setMode('table');
+                      setEditorKey((key) => key + 1);
+                    }}
+                  >
+                    表
+                  </button>
+                )}
                 <button
                   className={mode === 'rich' ? 'selected' : ''}
                   disabled={doc.readOnly || !!sourceOnly(buffer) || !doc.path.endsWith('.md')}
@@ -680,14 +711,18 @@ function App() {
             )}
             <div className="document-scroll">
               <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
-                <Editor
-                  ref={editor}
-                  key={editorKey}
-                  text={buffer}
-                  mode={mode}
-                  readOnly={doc.readOnly}
-                  onChange={setBuffer}
-                />
+                {mode === 'table' ? (
+                  <CsvPreview key={editorKey} text={buffer} />
+                ) : (
+                  <Editor
+                    ref={editor}
+                    key={editorKey}
+                    text={buffer}
+                    mode={mode}
+                    readOnly={doc.readOnly}
+                    onChange={setBuffer}
+                  />
+                )}
               </Suspense>
             </div>
           </>
@@ -877,6 +912,32 @@ function App() {
             </div>
           </div>
         </aside>
+      )}
+      {ontologyOpen && active && (
+        <Suspense fallback={<p className="hint">オントロジーを開いています…</p>}>
+          <OntologyPanel
+            space={active}
+            revision={revision}
+            onClose={() => setOntologyOpen(false)}
+            onConfigure={() => {
+              setOntologyOpen(false);
+              setPanel(true);
+              const request =
+                'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
+              setPrompt((previous) => (previous ? `${previous}\n\n${request}` : request));
+            }}
+            onOpen={(relative) => {
+              setOntologyOpen(false);
+              void open(active, {
+                path: relative,
+                name: relative.split('/').at(-1)!,
+                directory: false,
+                note: /\.md$/i.test(relative),
+                layer: 'Knowledge_Base',
+              });
+            }}
+          />
+        </Suspense>
       )}
       {gitOpen && active && (
         <GitPanel

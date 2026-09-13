@@ -1,5 +1,7 @@
 # irori
 
+CSV files have a paginated table and the existing source editor. Declared ontology CSV can be viewed as a hierarchy/subgraph with note links; native agents help construct the records. See [ontology display and agent setup](docs/ONTOLOGY.md).
+
 A desktop IDE/ADE for writing Markdown notes and running **local native coding harnesses** in the selected knowledge workspace. Codex, Claude Code, OpenCode and Pi are selectable; the new OpenCode/Pi adapters have native control tests but still need real model-turn acceptance.
 
 This independent repository contains the first working note + agent milestone. Electron is provisional; it is not a completed Windows/macOS release. The two sibling repositories remain independent and unchanged.

@@ -180,6 +180,7 @@ export interface HostAPI {
   register(root: string, name: string, category: Category): Promise<Space>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
+  ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
   createNote(scopeId: string, name: string): Promise<Document>;

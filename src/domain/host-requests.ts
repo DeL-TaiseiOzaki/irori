@@ -63,6 +63,7 @@ export const hostArguments = {
   register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
+  ontology: z.tuple([id]),
   save: z.tuple([document]),
   draft: z.tuple([document]),
   createNote: z.tuple([id, z.string().max(120)]),

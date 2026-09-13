@@ -1,10 +1,29 @@
-# Checkpoint — Packaging foundation and release decisions
+# Checkpoint — Packaging, independent workspace Drive and CSV ontology
 
-Workspace follow-up: [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md) now implements new Drive attachments independently of KB membership, including empty workspaces and unchanged legacy attachments. Build, 60 tests with native controls and six UI suites pass locally. Explicit legacy transfer, real cloud authentication/mounts/writes, CSV/graph ontology, selected-source identity/provenance and D05–D10 acceptance remain open. Start with this follow-up and current native CI evidence before interpreting the preceding checkpoint's next-step statements.
+Date: 2026-09-13. Continue in this independent repository on `main`. Start with [RELEASE-PLAN](RELEASE-PLAN.md), [PACKAGING](PACKAGING.md), [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md), [ONTOLOGY](ONTOLOGY.md) and [ADR 002](decisions/002-release-and-workspace.md). Inspect Git status/log and the latest CI run before interpreting historical entries below.
 
-Latest follow-up, 2026-09-13: resume from [RELEASE-PLAN](RELEASE-PLAN.md), [PACKAGING](PACKAGING.md) and [ADR 002](decisions/002-release-and-workspace.md). Forge packaging/CI and download-state tests are implemented; the MIT license and Q01/Q02 decisions are recorded. Local Linux make/package, 55 tests with native controls, five UI suites and website checks passed. Native CI results must be checked against the pushed commit, and Windows/Mac installed-device acceptance remains separate. The next product change is workspace-level independent GitHub/Drive connections, preserving existing user data, followed by the remaining D03–D10 requirements.
+Implemented and verified in this continuation:
 
-The inherited four uncommitted release-planning documents were retained and incorporated. The existing VM preview and its ignored sample/device data were not restarted, removed or reinitialized. No public deployment or real model execution is included. Earlier chronological checkpoint records follow; their older verification counts and open Q01/Q02 statements are historical.
+- Forge EXE/DMG/ZIP packaging, app verification/native package CI, relocated own-executable SDK/save tests, actual package dependency/checksum inventory and website download-state fixtures.
+- MIT license; recorded Windows 11 Ryzen 9/x64 and MacBook M5 Pro/arm64 acceptance devices. Q01 is CSV editing/note links with hierarchy/subgraph visualization, constructed by native agents with people. Q02 joins arbitrary independent GitHub KBs and selected Drive folders in a workspace with multiple accounts.
+- Workspace-owned Drive storage outside KBs, empty workspaces, optional category selection, two-account UI, preserved legacy attachments, guarded profile deletion and shared read-only cloud browsing. Native Git authentication remains per repository; multiple-account GUI onboarding/acceptance is still open.
+- Declared ontology column mappings, CSV table/source mode, hierarchy/subgraph filtering, note links, invalidation and a prepared native-agent setup request. Unknown columns and IDs remain intact; no automatic CSV/Markdown rewrite. Source hashes currently describe saved display revisions, not retained immutable provenance.
+- Native package defects fixed: Mac framework-copy links, Windows ASAR paths, canonical renderer trust, inherited Windows PATH and closure after a renderer crash. Root-container smoke uses Chromium's temporary-file shared-memory fallback for the VM's 64 MiB `/dev/shm`; no production launch override was added.
+
+Local evidence: build, 64 behavior tests with all four optional native controls enabled (zero failed/skipped), seven UI suites, Linux make/packaged SDK/Japanese save/CSV graph and website build/browser fixtures pass. The forced-renderer-crash close regression passes. Native baseline [CI 34751330082](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34751330082) passes Linux x64, Windows x64 and Mac arm64 at `713222a`; the later ontology commit requires its own exact CI evidence in PACKAGING.
+
+Next work, keeping all full-release requirements:
+
+1. D03/D05: distributor OAuth project and real two-account/shared-drive mounts, native GitHub/account/CLI onboarding and authorized real-model acceptance on the user's devices. Build-time OAuth integration is ready; Google config and usable native mounts are absent here.
+2. D04: durable staged cloud writes, remote confirmation, interruption/restart recovery and re-consent design. Current permissions/mounts remain read-only.
+3. D06: explicit multiple-source selection, durable note/artifact/run IDs, retained exact source versions/snapshots, curation and output provenance/reverse navigation; then search/rename/backlinks/properties. The CSV/graph presentation already exists and should not be reimplemented.
+4. D07–D10: native IME/performance/host comparison, credential protection, dependency redistribution review, signing/notarization, upgrade/rollback, new-user acceptance and only then public assets/Pages. Exact minimum OS versions/support contact/publisher route still need release decisions. Legacy Drive transfer and workspace-reference sharing/export remain open.
+
+Commit/push is authorized. Public deployment, external account changes and real model inference are not authorized by that instruction. No such operation was performed. The inherited four release-planning documents were preserved and incorporated. The VM preview and `.local/vm-preview/{samples,device}` were not restarted or modified.
+
+## Historical checkpoint records
+
+The following entries preserve their original verification counts and proposals. Their open Q01/Q02 statements and next-work lists are superseded by the current checkpoint above.
 
 Date: 2026-09-13. This checkpoint includes Git collaboration and the completed implementation reuse audit following UI checkpoint `9c04abb`. The user authorized committing and pushing this work to `origin/main`. Build, 54 tests with all native controls enabled, and all five Electron UI scripts passed. No deployment or release is included. The running VM preview still needs an application restart to load this build.
 
