@@ -6,6 +6,8 @@ import type { ChildProcess } from 'node:child_process';
 export function agentEnv(): NodeJS.ProcessEnv {
   // Preserve native provider authentication/configuration. Never inspect tokens.
   const env = { ...process.env };
+  delete env.IRORI_GOOGLE_CLIENT_ID;
+  delete env.IRORI_GOOGLE_CLIENT_SECRET;
   const extra = [
     path.join(homedir(), '.local', 'bin'),
     path.join(homedir(), '.cargo', 'bin'),

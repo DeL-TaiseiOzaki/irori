@@ -1,10 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { AgentEvent, AgentId, AgentInfo, Question, StartRun } from '../domain/types';
+import type {
+  AgentEvent,
+  AgentId,
+  AgentInfo,
+  AgentAnswers,
+  Question,
+  StartRun,
+} from '../domain/types';
+import { agentIds, agentNames } from '../domain/types';
+import { runPi } from './pi';
+import { runOpenCode } from './opencode';
+import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import type { FileService } from '../host/files';
-type Reply = { allow: boolean; answers?: Record<string, string> };
+import { SessionStore, type SessionBinding } from './sessions';
+type Reply = { allow: boolean; answers?: AgentAnswers };
 type Run = {
   id: string;
   cancelled: boolean;
@@ -19,26 +31,54 @@ type Run = {
 };
 export class AgentService {
   private active?: Run;
-  private sessions = new Map<string, string>();
+  private sessions: SessionStore;
+  private resetting = false;
   private requests = new Map<string, (reply: Reply) => void>();
   constructor(
     private files: FileService,
     private emit: (event: AgentEvent) => void,
-  ) {}
+  ) {
+    this.sessions = new SessionStore(files.dataDir);
+  }
   get busy() {
-    return !!this.active;
+    return !!this.active || this.resetting;
+  }
+  private binding(scopeId: string, agent: AgentId): SessionBinding {
+    return { scopeId, agent, root: this.files.get(scopeId).root };
+  }
+  session(scopeId: string, agent: AgentId) {
+    return this.sessions.status(this.binding(scopeId, agent));
+  }
+  async resetSession(scopeId: string, agent: AgentId) {
+    if (this.busy) throw Error('実行を停止してから会話の継続をリセットしてください。');
+    this.resetting = true;
+    try {
+      await this.sessions.reset(this.binding(scopeId, agent));
+    } finally {
+      this.resetting = false;
+    }
   }
   async available(): Promise<AgentInfo[]> {
     return Promise.all(
-      (['codex', 'claude'] as AgentId[]).map(async (id) => {
+      agentIds.map(async (id) => {
         try {
           const v = await version(id);
           return {
             id,
             version: v,
             available: true,
-            tested: v.includes(id === 'codex' ? '0.154.0' : '2.1.232'),
-            detail: '既存のCLI認証・設定を使用',
+            tested:
+              id === 'codex'
+                ? v.includes('0.154.0')
+                : id === 'claude'
+                  ? v.includes('2.1.232')
+                  : false,
+            detail:
+              id === 'pi'
+                ? 'Piのネイティブ設定を使用。標準のツール実行には許可ダイアログがありません。プロジェクト拡張はPi側の信頼設定に従います。'
+                : id === 'opencode'
+                  ? 'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。'
+                  : '既存のCLI認証・設定を使用',
           };
         } catch (e) {
           return { id, version: '', available: false, tested: false, detail: String(e) };
@@ -47,7 +87,7 @@ export class AgentService {
     );
   }
   start(input: StartRun): string {
-    if (this.active) throw Error('An agent is already running. Stop it before starting another.');
+    if (this.busy) throw Error('An agent is already running. Stop it before starting another.');
     if (!input.prompt.trim() || input.prompt.length > 32000)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.files.get(input.scopeId);
@@ -82,7 +122,7 @@ export class AgentService {
       });
     });
   }
-  respond(id: string, allow: boolean, answers?: Record<string, string>) {
+  respond(id: string, allow: boolean, answers?: AgentAnswers) {
     const resolve = this.requests.get(id);
     if (!resolve) throw Error('This request has already ended');
     this.requests.delete(id);
@@ -111,6 +151,7 @@ export class AgentService {
       void this.cancel();
     }, 600000);
     let outcome: AgentEvent['outcome'] = 'completed';
+    let resuming = false;
     try {
       if (run.cancelled) return;
       const space = this.files.get(input.scopeId);
@@ -119,19 +160,43 @@ export class AgentService {
         await this.files.resolve(input.scopeId, input.notePath);
         prompt = `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.\n\n${prompt}`;
       }
-      const key = `${input.scopeId}:${input.agent}`;
-      if (input.newSession) this.sessions.delete(key);
-      this.event(
-        run,
-        'status',
-        `${input.agent === 'codex' ? 'Codex' : 'Claude Code'} を ${space.name} で実行中`,
-      );
-      if (input.agent === 'codex') await this.codex(run, space.root, prompt, key);
-      else await this.claude(run, space.root, prompt, key);
+      const binding = this.binding(input.scopeId, input.agent);
+      if (input.newSession) await this.sessions.reset(binding);
+      const saved = await this.sessions.read(binding);
+      resuming = !!saved;
+      if (run.cancelled) return;
+      if (saved) this.event(run, 'status', '保存済みの会話を引き継ぎます。');
+      this.event(run, 'status', `${agentNames[input.agent]} を ${space.name} で実行中`);
+      if (input.agent === 'codex')
+        await this.codex(run, space.root, prompt, binding, saved?.handle);
+      else if (input.agent === 'claude')
+        await this.claude(run, space.root, prompt, binding, saved?.handle);
+      else {
+        const context: NativeContext = {
+          cwd: space.root,
+          prompt,
+          session: saved?.handle,
+          signal: run.abort.signal,
+          child: (child) => {
+            run.child = child;
+          },
+          event: (type, text, extra) => this.event(run, type, text, extra),
+          ask: (text, details, questions) => this.ask(run, text, details, questions),
+          saveSession: (handle) => this.sessions.save(binding, handle),
+        };
+        if (input.agent === 'pi') await runPi(context);
+        else await runOpenCode(context);
+      }
     } catch (e) {
       if (!run.cancelled) {
         outcome = 'failed';
         this.event(run, 'error', String(e));
+        if (resuming)
+          this.event(
+            run,
+            'error',
+            '前回の会話を引き継ぐ実行に失敗しました。再試行するか、会話の継続をリセットして新しい会話を始めてください。',
+          );
       }
     } finally {
       clearTimeout(timer);
@@ -154,7 +219,13 @@ export class AgentService {
       run.close();
     }
   }
-  private async codex(run: Run, cwd: string, prompt: string, key: string) {
+  private async codex(
+    run: Run,
+    cwd: string,
+    prompt: string,
+    binding: SessionBinding,
+    session?: string,
+  ) {
     const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd);
     run.child = child;
     let finished = false;
@@ -215,7 +286,6 @@ export class AgentService {
       capabilities: { experimentalApi: true },
     });
     rpc.send({ method: 'initialized', params: {} });
-    const session = this.sessions.get(key);
     const params = {
       cwd,
       approvalPolicy: 'on-request',
@@ -227,7 +297,7 @@ export class AgentService {
       session ? { ...params, threadId: session } : params,
     );
     run.threadId = thread.thread.id;
-    this.sessions.set(key, thread.thread.id);
+    await this.sessions.save(binding, thread.thread.id);
     this.event(run, 'status', 'Codex: ワークスペース書き込み・必要時に許可を確認');
     if (run.cancelled) return;
     const turn = await rpc.request('turn/start', {
@@ -258,7 +328,11 @@ export class AgentService {
         answers: Object.fromEntries(
           questions.map((q) => [
             q.id,
-            { answers: [reply.allow ? (reply.answers?.[q.id] ?? '') : 'User declined to answer.'] },
+            {
+              answers: reply.allow
+                ? [reply.answers?.[q.id] ?? ''].flat()
+                : ['User declined to answer.'],
+            },
           ]),
         ),
       };
@@ -276,7 +350,13 @@ export class AgentService {
     }
     rpc.send({ id: m.id, result });
   }
-  private async claude(run: Run, cwd: string, prompt: string, key: string) {
+  private async claude(
+    run: Run,
+    cwd: string,
+    prompt: string,
+    binding: SessionBinding,
+    session?: string,
+  ) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
     let stderr = '';
     let sawResult = false;
@@ -291,7 +371,7 @@ export class AgentService {
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: 'default',
         includePartialMessages: true,
-        resume: this.sessions.get(key),
+        resume: session,
         abortController: run.abort,
         spawnClaudeCodeProcess: (options) => {
           const child = launch(options.command, options.args, options.cwd ?? cwd, options.env);
@@ -307,10 +387,22 @@ export class AgentService {
               id: q.question,
               title: q.question,
               options: q.options?.map((o: any) => o.label),
+              multiple: q.multiSelect === true,
             }));
             const reply = await this.ask(run, 'Claude Code からの質問', input, questions);
             return reply.allow
-              ? { behavior: 'allow', updatedInput: { ...input, answers: reply.answers } }
+              ? {
+                  behavior: 'allow',
+                  updatedInput: {
+                    ...input,
+                    answers: Object.fromEntries(
+                      Object.entries(reply.answers ?? {}).map(([key, value]) => [
+                        key,
+                        Array.isArray(value) ? value.join(', ') : value,
+                      ]),
+                    ),
+                  },
+                }
               : { behavior: 'deny', message: 'User declined to answer' };
           }
           const reply = await this.ask(run, `${tool} の許可`, input);
@@ -323,8 +415,8 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
-        if ('session_id' in msg && typeof msg.session_id === 'string')
-          this.sessions.set(key, msg.session_id);
+        if (msg.type === 'system' && msg.subtype === 'init')
+          await this.sessions.save(binding, msg.session_id);
         if (msg.type === 'stream_event') {
           const event = msg.event;
           if (event.type === 'message_start') streamed = false;

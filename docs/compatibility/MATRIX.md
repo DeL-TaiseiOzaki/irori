@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Verified date: 2026-09-12; Linux x86_64 container only.
+Verified dates: 2026-09-12 and connection follow-up 2026-09-13; Linux x86_64 container only. Earlier provider evidence was not repeated for the connection slice.
 
 | Component | Pinned/observed version | Disposition |
 |---|---|---|
@@ -13,9 +13,13 @@ Verified date: 2026-09-12; Linux x86_64 container only.
 | Claude Code | 2.1.232 | Actual installed binary, native account login, note mutation, permit/deny/question/cancel |
 | Claude Agent SDK | 0.3.269 | Pinned controller using installed native executable, not bundled CLI |
 | Tauri 2 | not installed/built | Comparison candidate; Linux webkit2gtk-4.1 SDK absent |
-| Git/rclone/PTY | not integrated | Backlog, no collaboration/terminal claims |
+| Git | host executable | Read-only root/remote/branch/change inspection on disposable checkout; collaboration remains backlog |
+| rclone | 1.75.1 local test binary, not bundled | Real authenticated RC, config questions and shutdown pass; account/folder/mount logic has explicit protocol fixtures; real Google consent and native mounts unverified |
+| OpenCode | 1.18.30 local native probe | Native server/session/SSE controls and adapter/UI fixtures; model inference unverified |
+| Pi | 0.85.1 local native probe | Native RPC, extension dialog, lazy persistence and seeded native restart; model inference unverified |
+| PTY | not integrated | Optional terminal remains backlog |
 
-Native credential status was checked without copying tokens. Both providers' existing account sign-in was available. Native authentication expiry, clean-machine sign-in and release/distribution conditions remain outstanding. Native settings/rules are left enabled, but loading every skill/MCP/ancestor-rule combination has not been verified. Claude user-input smoke also exercised same-process-app session continuation; histories are not persisted by irori across app restart.
+Native credential status was checked without copying tokens. Both providers' existing account sign-in was available. Native authentication expiry, clean-machine sign-in and release/distribution conditions remain outstanding. Native settings/rules are left enabled, but loading every skill/MCP/ancestor-rule combination has not been verified. Claude user-input smoke also exercised same-process-app session continuation. As of 2026-09-13, device-local session handles persist per scope/provider/checkout with explicit reset; protocol and seeded Electron restart tests pass, but native-provider restart acceptance remains open. Conversation display history is not persisted by irori across app restart.
 
 ## Markdown boundary
 
@@ -25,9 +29,9 @@ Detected BOM, CRLF, frontmatter, wiki links/embeds, Obsidian callouts, HTML-like
 
 ## Filesystem/lifecycle limits
 
-- Resolve canonical path and ownership at every file operation. Ordinary symbolic links and contents are visibly blocked in navigation. Reads/saves cannot follow an alias into a foreign scope or outside the selected root. Windows junction/case/Unicode behavior is unverified.
+- Resolve canonical path and ownership at every file operation. Ordinary symbolic links and unverified contents are visibly blocked. Cloud text access requires a live verified managed mount and is read-only. Reads/saves cannot follow an alias into a foreign scope or outside the selected root. Windows junction/case/Unicode behavior is unverified.
 - A directory lists at most 4,000 entries. Watchers descend six levels, exclude contents/node_modules/.git, and are invalidation hints. Manual reload exists; deeper external changes are not automatically observed.
 - Save checks the base hash twice and keeps a recovery draft plus prior observed bytes. Atomic replacement has a remaining narrow race with arbitrary external writers between final check and rename. This is not an OS compare-and-swap. Managed saves are serialized and blocked during managed agent runs. Power-loss/fsync and multi-instance coordination remain release work.
-- Inaccessible space bindings are retained on disk, but unavailable-space display/rebind/removal UI is not implemented. Mount declarations remain visible and unverified; no remote folders are crawled or silently hydrated.
+- Inaccessible space bindings are retained on disk. Startup profiles count unavailable scopes; full unavailable-space rebind/removal UI remains open. Cloud declarations retain user-chosen names and selected folder IDs, with device-local account rebinding/reconnection. Folder browsing is lazy; successful native mounts and mount-aware external refresh remain unverified/unimplemented respectively. See [cloud setup](../CLOUD-SETUP.md).
 - Agent timeout: ten minutes; protocol request timeout: 45 seconds. Cancellation aborts the SDK/turn, then terminates the process group on POSIX or tree-kill on Windows. Native Windows tree cleanup is not yet tested.
 - Supported approval shapes include command/file approvals and per-turn additional permissions, plus tool user-input questions. Unknown protocol requests (including currently unsupported MCP elicitation/dynamic forms) fail closed and produce an explicit error. No feature parity is implied for rejected requests.

@@ -3,6 +3,8 @@ import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { processTree } from './process-metrics';
+import { FileService } from '../src/host/files';
+import { SessionStore } from '../src/agents/sessions';
 const base = await mkdtemp(path.join(tmpdir(), 'irori UI 日本語 '));
 const kb = path.join(base, 'KB folder');
 await mkdir(kb);
@@ -54,13 +56,14 @@ const sampler = setInterval(() => {
 const page = await app.firstWindow();
 page.on('pageerror', (error) => errors.push(String(error)));
 try {
-  await expect(page.getByText('知識を育てる場所。')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
   const startupMs = Date.now() - launchStart;
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
+  await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '▤ 日本語 note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('顧客インタビュー');
   await expect(page.locator('.ProseMirror table.children')).toBeVisible();
@@ -201,4 +204,65 @@ try {
 } finally {
   clearInterval(sampler);
   await app.close();
+}
+
+if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
+  // Seeded handles exercise actual host persistence/IPC/UI across process restarts.
+  // They do not represent a successful native provider resume.
+  const files = new FileService(env.IRORI_DATA_DIR);
+  await files.init();
+  const space = files.list()[0];
+  const store = new SessionStore(files.dataDir);
+  for (const agent of ['codex', 'claude'] as const)
+    await store.save(
+      { scopeId: space.scopeId, root: space.root, agent },
+      `fixture-${agent}-handle`,
+    );
+  const savedText = '次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。';
+  for (const cycle of [1, 2]) {
+    const restarted = await electron.launch({
+      args: [
+        ...(process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+        '.',
+      ],
+      env,
+      timeout: 30000,
+    });
+    try {
+      const window = await restarted.firstWindow();
+      window.on('pageerror', (error) => errors.push(String(error)));
+      await window.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+      await window.getByRole('button', { name: '✧ AIに相談', exact: true }).click();
+      await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+      await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
+      if (cycle === 1) {
+        await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+        await window.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
+      }
+      await expect(
+        window.getByText('次の実行で新しい会話を始めます。', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+      ).toHaveCount(0);
+      await window.getByLabel('エージェント', { exact: true }).selectOption('codex');
+      await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+      if (cycle === 2) await window.screenshot({ path: 'test-results/irori-session-recovery.png' });
+      expect(errors).toEqual([]);
+    } finally {
+      await restarted.close();
+    }
+  }
+  const report = {
+    nativeProviderResume: 'not exercised',
+    checks: [
+      'saved handle status after host process restart',
+      'provider-specific reset through ordinary panel',
+      'reset persists through second restart',
+      'other provider session retained',
+    ],
+    errors,
+  };
+  await writeFile('test-results/ui-sessions.json', JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report));
 }

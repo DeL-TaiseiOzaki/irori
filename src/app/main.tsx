@@ -2,12 +2,14 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AgentEvent,
+  AgentAnswers,
   AgentId,
   AgentInfo,
-  Category,
+  AgentSession,
   Document,
   Entry,
   Space,
+  WorkspaceProfile,
 } from '../domain/types';
 const Editor = lazy(() =>
   import('../editor/Editor').then((module) => ({ default: module.Editor })),
@@ -15,76 +17,11 @@ const Editor = lazy(() =>
 import type { EditorHandle } from '../editor/Editor';
 import { sourceOnly } from '../editor/preservation';
 import './style.css';
+import { Startup, RegisterSpace } from './Startup';
+import { Connections } from './Connections';
+import { LayerExplorer } from './LayerExplorer';
+import { agentIds, agentNames } from '../domain/types';
 const host = window.irori;
-const labels = { personal: '個人', team: 'チーム', organization: '組織' };
-function Tree({
-  space,
-  directory = '',
-  revision,
-  open,
-}: {
-  space: Space;
-  directory?: string;
-  revision: number;
-  open: (entry: Entry) => void;
-}) {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [expanded, setExpanded] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let active = true;
-    void host
-      .entries(space.scopeId, directory)
-      .then((e) => {
-        if (active) {
-          setEntries(e);
-          setError('');
-        }
-      })
-      .catch((e) => {
-        if (active) setError(String(e));
-      });
-    return () => {
-      active = false;
-    };
-  }, [space.scopeId, directory, revision]);
-  return (
-    <div className="tree">
-      {error && <small role="alert">{error}</small>}
-      {entries.map((entry) => (
-        <div key={entry.path}>
-          <button
-            className={`tree-row ${entry.blocked ? 'muted' : ''}`}
-            title={entry.blocked ?? entry.path}
-            onClick={() =>
-              entry.directory && !entry.blocked
-                ? setExpanded((v) =>
-                    v.includes(entry.path) ? v.filter((p) => p !== entry.path) : [...v, entry.path],
-                  )
-                : open(entry)
-            }
-          >
-            <span>
-              {entry.directory
-                ? expanded.includes(entry.path)
-                  ? '⌄'
-                  : '›'
-                : entry.note
-                  ? '▤'
-                  : '◻'}
-            </span>
-            <span className="filename">{entry.name.replace(/\.md$/, '')}</span>
-            {entry.layer === 'schema' && <span className="badge">ルール</span>}
-            {entry.layer === 'contents' && <span className="badge">未接続</span>}
-          </button>
-          {entry.directory && expanded.includes(entry.path) && (
-            <Tree space={space} directory={entry.path} revision={revision} open={open} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 function Request({
   event,
   ended,
@@ -94,7 +31,7 @@ function Request({
   ended: boolean;
   onError: (e: unknown) => void;
 }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<AgentAnswers>({});
   const [done, setDone] = useState(false);
   async function reply(allow: boolean) {
     try {
@@ -114,23 +51,59 @@ function Request({
         <pre>{event.details}</pre>
       </details>
       {event.questions?.map((q) => (
-        <label key={q.id}>
-          {q.title}
+        <fieldset className="agent-question" key={q.id}>
+          <legend>{q.title}</legend>
           {q.options && (
             <div className="choices">
               {q.options.map((o) => (
-                <button key={o} onClick={() => setAnswers((a) => ({ ...a, [q.id]: o }))}>
+                <button
+                  key={o}
+                  aria-pressed={
+                    q.multiple ? (answers[q.id] ?? []).includes(o) : answers[q.id] === o
+                  }
+                  onClick={() =>
+                    setAnswers((a) => {
+                      const previous = a[q.id];
+                      const values = Array.isArray(previous)
+                        ? previous
+                        : previous
+                          ? [previous]
+                          : [];
+                      return {
+                        ...a,
+                        [q.id]: q.multiple
+                          ? values.includes(o)
+                            ? values.filter((v) => v !== o)
+                            : [...values, o]
+                          : o,
+                      };
+                    })
+                  }
+                >
                   {o}
                 </button>
               ))}
             </div>
           )}
-          <input
-            aria-label={q.title}
-            value={answers[q.id] ?? ''}
-            onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-          />
-        </label>
+          {q.multiple ? (
+            <textarea
+              aria-label={q.title}
+              placeholder="複数の回答は1行ずつ入力"
+              value={
+                Array.isArray(answers[q.id])
+                  ? (answers[q.id] as string[]).join('\n')
+                  : (answers[q.id] ?? '')
+              }
+              onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value.split('\n') }))}
+            />
+          ) : (
+            <input
+              aria-label={q.title}
+              value={answers[q.id] ?? ''}
+              onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+            />
+          )}
+        </fieldset>
       ))}
       <div className="actions">
         <button onClick={() => void reply(false)}>拒否</button>
@@ -141,7 +114,76 @@ function Request({
     </div>
   );
 }
+function SessionControls({
+  scopeId,
+  agent,
+  running,
+  onReset,
+  onError,
+}: {
+  scopeId: string;
+  agent: AgentId;
+  running: boolean;
+  onReset: () => void;
+  onError: (error: unknown) => void;
+}) {
+  const [session, setSession] = useState<AgentSession>();
+  const [resetting, setResetting] = useState(false);
+  useEffect(() => {
+    let current = true;
+    void host
+      .agentSession(scopeId, agent)
+      .then((value) => {
+        if (current) setSession(value);
+      })
+      .catch((error) => {
+        if (current) setSession({ state: 'unavailable', detail: String(error) });
+      });
+    return () => {
+      current = false;
+    };
+  }, [scopeId, agent, running]);
+  async function reset() {
+    setResetting(true);
+    try {
+      await host.resetAgentSession(scopeId, agent);
+      setSession({ state: 'empty' });
+      onReset();
+    } catch (error) {
+      onError(error);
+    } finally {
+      setResetting(false);
+    }
+  }
+  return (
+    <div className="session-controls">
+      <small role="status">
+        {!session
+          ? '会話の状態を確認中…'
+          : session.state === 'saved'
+            ? '次の実行で前回の会話を引き継ぎます。会話本文の再表示には未対応です。'
+            : session.state === 'empty'
+              ? '次の実行で新しい会話を始めます。'
+              : session.detail}
+      </small>
+      {session && session.state !== 'empty' && (
+        <>
+          <button disabled={running || resetting} onClick={() => void reset()}>
+            会話の継続をリセット
+          </button>
+          <small>
+            このスペース・エージェントの継続を解除します。ノートとCLI側の履歴は残ります。
+          </small>
+        </>
+      )}
+    </div>
+  );
+}
 function App() {
+  const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
+    [startup, setStartup] = useState(true);
+  const [connectionsOpen, setConnectionsOpen] = useState(false),
+    [connecting, setConnecting] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
@@ -160,9 +202,6 @@ function App() {
     [prompt, setPrompt] = useState(''),
     [fresh, setFresh] = useState(false);
   const [add, setAdd] = useState(false),
-    [folder, setFolder] = useState(''),
-    [name, setName] = useState(''),
-    [category, setCategory] = useState<Category>('personal'),
     [noteName, setNoteName] = useState(''),
     [newNote, setNewNote] = useState(false);
   const histories = useRef(new Map<string, AgentEvent[]>());
@@ -177,6 +216,7 @@ function App() {
   useEffect(() => {
     conversationKey.current = `${active?.scopeId ?? ''}:${agent}`;
     setEvents(histories.current.get(conversationKey.current) ?? []);
+    setFresh(false);
   }, [active?.scopeId, agent]);
   const editor = useRef<EditorHandle>(null);
   const current = useRef({ doc, buffer });
@@ -187,9 +227,11 @@ function App() {
     setDoc(next);
     setBuffer(next.text);
     setExternal(undefined);
-    setMode(/\.md$/i.test(next.path) && !sourceOnly(next.text) ? 'rich' : 'source');
+    setMode(
+      !next.readOnly && /\.md$/i.test(next.path) && !sourceOnly(next.text) ? 'rich' : 'source',
+    );
     setEditorKey((k) => k + 1);
-    setStatus('この端末に保存済み');
+    setStatus(next.readOnly ? 'クラウド資料・読み取り専用' : 'この端末に保存済み');
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -259,7 +301,7 @@ function App() {
     };
   }, []);
   async function save() {
-    if (!doc) return;
+    if (!doc || doc.readOnly) return;
     try {
       const saved = await host.save({ ...doc, text: editor.current?.getText() ?? buffer });
       load(saved);
@@ -278,6 +320,21 @@ function App() {
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   });
+  function selectSpace(space: Space) {
+    if (dirty || (doc && (editor.current?.getText() ?? buffer) !== doc.text)) {
+      report('未保存のノートを保存してから移動してください。');
+      return false;
+    }
+    if (running || connecting) return false;
+    if (active?.scopeId !== space.scopeId) {
+      setActive(space);
+      setDoc(undefined);
+      setBuffer('');
+      setExternal(undefined);
+      setStatus('');
+    }
+    return true;
+  }
   async function open(space: Space, entry: Entry) {
     try {
       if (entry.blocked) {
@@ -292,10 +349,11 @@ function App() {
         setError('実行を停止してからスペースを切り替えてください。');
         return;
       }
-      setActive(space);
-      if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
-        load(await host.read(space.scopeId, entry.path));
-      else await host.openExternal(space.scopeId, entry.path);
+      if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
+        const next = await host.read(space.scopeId, entry.path);
+        setActive(space);
+        load(next);
+      } else await host.openExternal(space.scopeId, entry.path);
     } catch (e) {
       report(e);
     }
@@ -316,6 +374,7 @@ function App() {
         notePath: doc?.scopeId === active.scopeId ? doc.path : undefined,
         newSession: fresh,
       });
+      if (fresh) updateEvents(() => []);
       updateEvents((all) => [...all, { runId: 'user', type: 'status', text: `あなた: ${prompt}` }]);
       setPrompt('');
       setFresh(false);
@@ -324,47 +383,100 @@ function App() {
       report(e);
     }
   }
+  async function openWorkspace(profile: WorkspaceProfile) {
+    const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+    if (!available.length) {
+      report('利用できるスペースがありません。');
+      return;
+    }
+    setWorkspace(profile);
+    setActive(available[0]);
+    setDoc(undefined);
+    setBuffer('');
+    setExternal(undefined);
+    setStartup(false);
+    setConnecting(true);
+    try {
+      for (const previousId of workspace?.scopeIds ?? []) {
+        if (
+          !available.some((space) => space.scopeId === previousId) &&
+          spaces.some((space) => space.scopeId === previousId)
+        )
+          for (const connection of await host.cloudConnections(previousId).catch((error) => {
+            report(error);
+            return [];
+          }))
+            if (connection.state === 'mounted' || connection.state === 'error')
+              await host.disconnectCloud(previousId, connection.mountId).catch(report);
+      }
+      for (const space of available)
+        for (const connection of await host.cloudConnections(space.scopeId).catch((error) => {
+          report(error);
+          return [];
+        })) {
+          if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
+            await host.connectCloud(space.scopeId, connection.mountId).catch(() => {
+              setStatus('接続できないクラウドがあります。「クラウド接続」で確認できます。');
+            });
+          }
+        }
+    } catch (error) {
+      report(error);
+    } finally {
+      setConnecting(false);
+      setRevision((v) => v + 1);
+    }
+  }
+  if (startup)
+    return (
+      <Startup
+        spaces={spaces}
+        refresh={refreshSpaces}
+        onOpen={(profile) => void openWorkspace(profile)}
+      />
+    );
   return (
     <div className={`app ${panel ? 'panel-open' : ''}`}>
       <aside className="sidebar">
         <div className="brand">
           <span className="hearth">▪</span>irori<span className="preview">preview</span>
         </div>
-        <div className="space-list">
-          {(['personal', 'team', 'organization'] as Category[]).map((group) => (
-            <section key={group}>
-              <h2>{labels[group]}</h2>
-              {spaces
-                .filter((s) => s.category === group)
-                .map((space) => (
-                  <div className="space" key={space.scopeId}>
-                    <button
-                      className={`space-title ${active?.scopeId === space.scopeId ? 'active' : ''}`}
-                      disabled={dirty || running}
-                      onClick={() => {
-                        if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-                          setError('未保存のノートを保存してから移動してください。');
-                          return;
-                        }
-                        setActive(space);
-                        setDoc(undefined);
-                        setBuffer('');
-                      }}
-                    >
-                      <span>⌄</span>
-                      {space.name}
-                    </button>
-                    <Tree
-                      space={space}
-                      revision={revision}
-                      open={(entry) => void open(space, entry)}
-                    />
-                  </div>
-                ))}
-            </section>
-          ))}
-        </div>
-        <button className="add-space" disabled={running || dirty} onClick={() => setAdd(true)}>
+        <button
+          className="workspace-switch"
+          disabled={dirty || running || connecting}
+          onClick={() => {
+            if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
+              report('未保存のノートを保存してから移動してください。');
+              return;
+            }
+            setStartup(true);
+          }}
+        >
+          {workspace?.name ?? 'ワークスペース'} ▾
+        </button>
+        <LayerExplorer
+          spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
+          activeId={active?.scopeId}
+          selected={doc}
+          revision={revision}
+          locked={dirty || running || connecting}
+          onSelect={(space) => {
+            selectSpace(space);
+          }}
+          onOpen={(space, entry) => void open(space, entry)}
+          onConnect={(space) => {
+            if (selectSpace(space)) setConnectionsOpen(true);
+          }}
+          onNote={(space) => {
+            if (selectSpace(space)) setNewNote(true);
+          }}
+          onRefresh={() => setRevision((value) => value + 1)}
+        />
+        <button
+          className="add-space"
+          disabled={running || dirty || connecting}
+          onClick={() => setAdd(true)}
+        >
           ＋ スペースを追加
         </button>
       </aside>
@@ -377,6 +489,15 @@ function App() {
             </span>
           </div>
           <div className="actions">
+            {active && (
+              <button
+                disabled={running || dirty || connecting}
+                onClick={() => setConnectionsOpen(true)}
+              >
+                クラウド接続
+              </button>
+            )}
+            {connecting && <small>接続を準備中…</small>}
             {active && (
               <button disabled={running || dirty} onClick={() => setNewNote(true)}>
                 ノートを作成
@@ -392,6 +513,11 @@ function App() {
             )}
           </div>
         </header>
+        {!doc && status && (
+          <p className="hint" role="status">
+            {status}
+          </p>
+        )}
         {error && (
           <div className="error" role="alert">
             {error}
@@ -428,7 +554,7 @@ function App() {
               <div className="actions">
                 <button
                   className={mode === 'rich' ? 'selected' : ''}
-                  disabled={!!sourceOnly(buffer) || !doc.path.endsWith('.md')}
+                  disabled={doc.readOnly || !!sourceOnly(buffer) || !doc.path.endsWith('.md')}
                   onClick={() => {
                     setBuffer(editor.current?.getText() ?? buffer);
                     setMode('rich');
@@ -472,6 +598,7 @@ function App() {
                   key={editorKey}
                   text={buffer}
                   mode={mode}
+                  readOnly={doc.readOnly}
                   onChange={setBuffer}
                 />
               </Suspense>
@@ -499,11 +626,24 @@ function App() {
           </button>
         </footer>
       </main>
+      {connectionsOpen && active && (
+        <Connections
+          key={active.scopeId}
+          space={active}
+          running={running}
+          onClose={() => {
+            setConnectionsOpen(false);
+            setRevision((v) => v + 1);
+          }}
+        />
+      )}
       {panel && (
         <aside className="agent-panel">
           <div className="agent-heading">
             <h2>AIに相談</h2>
-            <button onClick={() => setPanel(false)}>×</button>
+            <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
+              ×
+            </button>
           </div>
           <div className="agent-config">
             <select
@@ -512,8 +652,11 @@ function App() {
               disabled={running}
               onChange={(e) => setAgent(e.target.value as AgentId)}
             >
-              <option value="codex">Codex</option>
-              <option value="claude">Claude Code</option>
+              {agentIds.map((id) => (
+                <option key={id} value={id}>
+                  {agentNames[id]}
+                </option>
+              ))}
             </select>
             <small>{infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}</small>
             {infos.find((i) => i.id === agent)?.available === false && (
@@ -530,6 +673,21 @@ function App() {
               {doc ? ` / ${doc.path.split('/').at(-1)}` : ''}
             </div>
             <small>保存したノートを参照し、このスペースでツールを実行します。</small>
+            <small>{infos.find((i) => i.id === agent)?.detail}</small>
+            {active && (
+              <SessionControls
+                key={`${active.scopeId}:${agent}`}
+                scopeId={active.scopeId}
+                agent={agent}
+                running={running}
+                onError={report}
+                onReset={() => {
+                  if (conversationKey.current !== `${active.scopeId}:${agent}`) return;
+                  updateEvents(() => []);
+                  setFresh(false);
+                }}
+              />
+            )}
           </div>
           <div className="conversation" aria-live="polite">
             {events.length === 0 && (
@@ -582,6 +740,7 @@ function App() {
                   className="primary"
                   disabled={
                     !active ||
+                    connecting ||
                     !prompt.trim() ||
                     !!external ||
                     infos.find((i) => i.id === agent)?.available !== true
@@ -596,91 +755,26 @@ function App() {
         </aside>
       )}
       {add && (
-        <div className="modal-backdrop">
-          <form
-            className="modal"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void host
-                .register(folder, name, category)
-                .then((s) => {
-                  setActive(s);
-                  setDoc(undefined);
-                  setBuffer('');
-                  setAdd(false);
-                  setFolder('');
-                  setName('');
-                  return refreshSpaces();
-                })
-                .catch(report);
-            }}
-          >
-            <h2>スペースを追加</h2>
-            <label>
-              KBフォルダ
-              <div className="actions">
-                <input
-                  aria-label="KBフォルダ"
-                  value={folder}
-                  onChange={(e) => setFolder(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    void host
-                      .chooseFolder()
-                      .then((p) => {
-                        if (p) {
-                          setFolder(p);
-                          if (!name) setName(p.split(/[/\\]/).at(-1) ?? 'My KB');
-                        }
-                      })
-                      .catch(report)
-                  }
-                >
-                  選択
-                </button>
-              </div>
-            </label>
-            <label>
-              スペース名
-              <input
-                aria-label="スペース名"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label>
-              種類
-              <select
-                aria-label="スペースの種類"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as Category)}
-              >
-                {Object.entries(labels).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="hint">
-              初回は識別情報を .irori/scope.json に作成し、contents を Git
-              の対象外にします。既存ノートは移動しません。登録済み KB
-              は保存された名前・種類を使用します。
-            </p>
-            <div className="actions">
-              <button type="button" onClick={() => setAdd(false)}>
-                キャンセル
-              </button>
-              <button className="primary" type="submit">
-                登録して開く
-              </button>
-            </div>
-          </form>
-        </div>
+        <RegisterSpace
+          onCancel={() => setAdd(false)}
+          onRegistered={(space) => {
+            setAdd(false);
+            void (async () => {
+              await refreshSpaces();
+              if (workspace)
+                setWorkspace(
+                  await host.saveWorkspace(
+                    workspace.name,
+                    [...workspace.scopeIds, space.scopeId],
+                    workspace.id,
+                  ),
+                );
+              setActive(space);
+              setDoc(undefined);
+              setBuffer('');
+            })().catch(report);
+          }}
+        />
       )}
       {newNote && (
         <div className="modal-backdrop">

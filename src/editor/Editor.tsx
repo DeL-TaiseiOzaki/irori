@@ -14,11 +14,13 @@ export function Editor({
   mode,
   onChange,
   ref,
+  readOnly = false,
 }: {
   text: string;
   mode: 'rich' | 'source';
   onChange: (text: string) => void;
   ref?: Ref<EditorHandle>;
+  readOnly?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const change = useRef(onChange);
@@ -37,6 +39,8 @@ export function Editor({
         state: EditorState.create({
           doc: initial.current,
           extensions: [
+            EditorState.readOnly.of(readOnly),
+            EditorView.editable.of(!readOnly),
             EditorState.lineSeparator.of(initial.current.includes('\r\n') ? '\r\n' : '\n'),
             basicSetup,
             markdown(),
@@ -94,6 +98,6 @@ export function Editor({
       element.removeEventListener('pointerdown', toolbar, true);
       void crepe.destroy();
     };
-  }, [mode]);
+  }, [mode, readOnly]);
   return <div className={`document-editor ${mode}`} ref={root} data-testid="document-editor" />;
 }

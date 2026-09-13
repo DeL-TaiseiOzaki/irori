@@ -1,3 +1,4 @@
+import { agentIds } from '../domain/types';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -5,6 +6,9 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { z } from 'zod';
 import { FileService } from './files';
 import { AgentService } from '../agents/service';
+import { CloudService } from '../cloud/service';
+import { WorkspaceService, inspectRepository } from './workspaces';
+import { providerId } from '../domain/connections';
 import type { HostEvent, Space } from '../domain/types';
 let window: BrowserWindow | undefined;
 let closing = false;
@@ -19,6 +23,9 @@ app
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }));
+    const cloud = new CloudService(files, (url) => shell.openExternal(url));
+    files.cloud = cloud;
+    const workspaces = new WorkspaceService(files);
     function watch(space: Space) {
       let timer: NodeJS.Timeout | undefined;
       const watcher = chokidar.watch(space.root, {
@@ -78,6 +85,95 @@ app
           throw Error('Untrusted renderer');
         let value: unknown;
         switch (method) {
+          case 'repositories':
+            value = await inspectRepository(rel.parse(args[0]));
+            break;
+          case 'workspaces':
+            value = await workspaces.list();
+            break;
+          case 'saveWorkspace':
+            value = await workspaces.save(
+              z.string().trim().min(1).max(120).parse(args[0]),
+              z.array(id).min(1).max(100).parse(args[1]),
+              id.optional().parse(args[2]),
+            );
+            break;
+          case 'cloudSetup':
+            value = await cloud.setup();
+            break;
+          case 'removeWorkspace':
+            value = await workspaces.remove(id.parse(args[0]));
+            break;
+          case 'cloudAccounts':
+            value = await cloud.accounts.list();
+            break;
+          case 'addCloudAccount':
+            value = await cloud.addAccount(z.string().trim().min(1).max(120).parse(args[0]));
+            break;
+          case 'cancelCloudAccount':
+            value = await cloud.cancelAccount(id.parse(args[0]));
+            break;
+          case 'removeCloudAccount':
+            if (agents.busy) throw Error('実行を停止してからアカウントを登録解除してください。');
+            value = await cloud.removeAccount(id.parse(args[0]));
+            break;
+          case 'cloudDrives':
+            value = await cloud.accounts.drives(id.parse(args[0]));
+            break;
+          case 'cloudFolders':
+            value = await cloud.accounts.folders(
+              id.parse(args[0]),
+              providerId.parse(args[1]),
+              providerId.optional().parse(args[2]),
+            );
+            break;
+          case 'cloudConnections':
+            value = await cloud.connections(id.parse(args[0]));
+            break;
+          case 'addCloudAttachment': {
+            if (agents.busy) throw Error('実行を停止してからクラウド接続を登録してください。');
+            const input = z
+              .object({
+                scopeId: id,
+                accountId: id,
+                name: z.string().max(200),
+                contentsRoot: rel,
+                folder: z.object({
+                  id: providerId,
+                  name: z.string().max(1024),
+                  parentId: providerId,
+                  driveId: providerId.optional(),
+                }),
+              })
+              .parse(args[0]);
+            value = await cloud.add(input);
+            emit({ type: 'files', scopeId: input.scopeId });
+            break;
+          }
+          case 'connectCloud':
+          case 'disconnectCloud':
+          case 'renameCloud':
+          case 'removeCloud':
+          case 'bindCloud': {
+            if (agents.busy) throw Error('実行を停止してからクラウド接続を変更してください。');
+            const scopeId = id.parse(args[0]),
+              mountId = id.parse(args[1]);
+            try {
+              value =
+                method === 'connectCloud'
+                  ? await cloud.connect(scopeId, mountId)
+                  : method === 'disconnectCloud'
+                    ? await cloud.disconnect(scopeId, mountId)
+                    : method === 'renameCloud'
+                      ? await cloud.edit(scopeId, mountId, z.string().max(200).parse(args[2]))
+                      : method === 'removeCloud'
+                        ? await cloud.edit(scopeId, mountId)
+                        : await cloud.bind(scopeId, mountId, id.parse(args[2]));
+            } finally {
+              emit({ type: 'files', scopeId });
+            }
+            break;
+          }
           case 'spaces':
             value = files.list();
             break;
@@ -90,7 +186,10 @@ app
             break;
           }
           case 'register': {
-            if (agents.busy) throw Error('Stop the agent before registering a space');
+            if (agents.busy || cloud.busy)
+              throw Error('Stop ongoing operations before registering a space');
+            const inspection = await inspectRepository(rel.parse(args[0]));
+            if (inspection.kind === 'unavailable') throw Error(inspection.detail);
             const s = await files.register(
               rel.parse(args[0]),
               z.string().min(1).max(120).parse(args[1]),
@@ -137,12 +236,19 @@ app
           case 'agents':
             value = await agents.available();
             break;
+          case 'agentSession':
+            value = await agents.session(id.parse(args[0]), z.enum(agentIds).parse(args[1]));
+            break;
+          case 'resetAgentSession':
+            value = await agents.resetSession(id.parse(args[0]), z.enum(agentIds).parse(args[1]));
+            break;
           case 'start':
+            if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
             value = agents.start(
               z
                 .object({
                   scopeId: id,
-                  agent: z.enum(['claude', 'codex']),
+                  agent: z.enum(agentIds),
                   prompt: z.string().min(1).max(32000),
                   notePath: rel.optional(),
                   newSession: z.boolean().optional(),
@@ -159,7 +265,12 @@ app
               z.boolean().parse(args[1]),
               args[2] === undefined
                 ? undefined
-                : z.record(z.string(), z.string().max(16000)).parse(args[2]),
+                : z
+                    .record(
+                      z.string(),
+                      z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]),
+                    )
+                    .parse(args[2]),
             );
             break;
           default:
@@ -196,6 +307,16 @@ app
           if (answer.response !== 1) return;
         }
         await agents.cancel();
+        try {
+          await cloud.close();
+        } catch (error) {
+          await dialog.showMessageBox(window!, {
+            type: 'error',
+            message: 'クラウド接続を終了できませんでした。再試行してください。',
+            detail: String(error),
+          });
+          return;
+        }
         await Promise.all(watchers.map((w) => w.close()));
         closing = true;
         window?.close();

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>irori · VM プレビュー</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      color: #263942;
+      background: #f6f7f4;
+      font:
+        14px system-ui,
+        sans-serif;
+    }
+    header {
+      min-height: 54px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      border-bottom: 1px solid #d9e1da;
+    }
+    strong {
+      font-size: 20px;
+    }
+    input,
+    button,
+    textarea {
+      font: inherit;
+      padding: 8px 12px;
+      border: 1px solid #ccd6d0;
+      border-radius: 6px;
+    }
+    button {
+      cursor: pointer;
+      background: #236c63;
+      color: white;
+    }
+    #screen {
+      height: calc(100vh - 62px);
+      overflow: auto;
+      background: #202a2d;
+    }
+    #login {
+      display: flex;
+      gap: 8px;
+    }
+    #text-entry {
+      background: white;
+      padding: 12px 20px;
+    }
+    textarea {
+      width: min(680px, 80vw);
+      vertical-align: middle;
+    }
+    small {
+      color: #65776e;
+    }
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+  <header>
+    <strong>irori</strong><span id="status" role="status">接続パスワードを入力</span>
+    <form id="login">
+      <input
+        type="password"
+        id="password"
+        aria-label="接続パスワード"
+        autocomplete="current-password"
+        required
+      /><button id="connect" disabled>画面を開く</button>
+    </form>
+    <button id="toggle" type="button" hidden>日本語入力</button
+    ><small>VM 上の実際のアプリを操作します</small>
+  </header>
+  <div id="text-entry" hidden>
+    <p>先にアプリ内の入力先をクリックしてください。ここで日本語を変換してから送れます。</p>
+    <textarea id="text" aria-label="送信するテキスト" maxlength="4000" rows="2"></textarea>
+    <button id="send">入力を送る</button>
+  </div>
+  <div id="screen"></div>
+  <script type="module">
+    import RFB from './novnc/core/rfb.js';
+    const screen = document.querySelector('#screen'),
+      status = document.querySelector('#status'),
+      form = document.querySelector('#login');
+    const toggle = document.querySelector('#toggle'),
+      entry = document.querySelector('#text-entry'),
+      text = document.querySelector('#text');
+    let rfb;
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      rfb?.disconnect();
+      screen.replaceChildren();
+      const password = document.querySelector('#password').value;
+      rfb = new RFB(
+        screen,
+        `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/websockify`,
+        { credentials: { password } },
+      );
+      rfb.scaleViewport = true;
+      rfb.resizeSession = false;
+      rfb.showDotCursor = true;
+      rfb.addEventListener('connect', () => {
+        status.textContent = '接続中 · 操作できます';
+        form.hidden = true;
+        toggle.hidden = false;
+        document.querySelector('#password').value = '';
+      });
+      rfb.addEventListener('disconnect', () => {
+        status.textContent = '切断しました。再接続できます';
+        form.hidden = false;
+        toggle.hidden = true;
+      });
+      rfb.addEventListener('securityfailure', () => {
+        status.textContent = '認証できません。パスワードを確認してください';
+      });
+    });
+    toggle.addEventListener('click', () => {
+      entry.hidden = !entry.hidden;
+      screen.style.height = entry.hidden ? 'calc(100vh - 62px)' : 'calc(100vh - 198px)';
+    });
+    document.querySelector('#send').addEventListener('click', async () => {
+      if (!rfb) return;
+      const value = text.value;
+      entry.hidden = true;
+      screen.style.height = 'calc(100vh - 62px)';
+      rfb.focus();
+      for (const character of value) {
+        const code = character.codePointAt(0);
+        const keysym =
+          character === '\n'
+            ? 0xff0d
+            : character === '\t'
+              ? 0xff09
+              : code <= 255
+                ? code
+                : 0x01000000 + code;
+        rfb.sendKey(keysym);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      text.value = '';
+    });
+    document.querySelector('#connect').disabled = false;
+  </script>
+</html>

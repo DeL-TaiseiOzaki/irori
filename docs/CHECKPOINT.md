@@ -1,83 +1,65 @@
-# Checkpoint — note editing, native agents, and download website
+# Checkpoint — layered workspace, native harnesses and cloud onboarding
 
-Date: 2026-09-12. This is a local development checkpoint, not a release.
+Date: 2026-09-13. Status: paused at the user's request after they successfully opened and explored the VM preview in Chrome. This checkpoint is saved in the local irori Git history; no publication or release is implied. The earlier checkpoint is commit `095edd0`.
 
-## User intent at pause
+## Confirmed direction
 
-The user accepted the website/download distribution direction and intends to continue all remaining implementation later. The immediate request is to checkpoint the work and pause implementation. Do not interpret this checkpoint as permission to publish a website, push a release, or mark the backlog complete.
+- irori's central requirement is one workspace linking multiple independent GitHub checkouts and multiple selected cloud folders/accounts. Physical repository placement remains undecided; named profiles preserve existing checkout locations.
+- Users choose the actual folder name beneath `contents` for each cloud attachment. Provider folder identity remains independent of that name.
+- Codex, Claude Code, OpenCode and Pi use their native local harnesses and configuration. Scope boundaries, permissions and conversation bindings remain separate.
+- The original LayeredKB UI reference is `../LayeredKB-vscode-extention/images/image2.png`. Its three-row, five-pane navigation is implemented: full-width Schema; personal/team Knowledge Base; personal/team contents. Organization spaces retain explicit labels in the team column. The reference repository/image was not modified by this work.
+- The user confirmed that Chrome can open and interact with the preview. This is a UI viewing checkpoint, not acceptance of real Google mounts, all harness capabilities or a finished release.
 
-The intended product remains a desktop IDE/ADE where actual local Claude Code and Codex processes edit KB notes, run tools and produce artifacts. End users should eventually visit the website, download a Windows/Mac installer, install it, open their KB and complete agent setup without a developer build workflow.
+## Saved implementation
 
-## Saved state
+- Named startup workspace profiles with creation, editing and removal; multiple existing-checkout inspection and registration; offline scope-ID retention during profile edits.
+- Read-only Google Drive account/folder/shared-drive onboarding, private rclone configuration and authenticated loopback RC, exact provider IDs, mount identity checks, connect/disconnect/rebind, alias rename, attachment removal and unused account removal. Existing local bytes and remote files are preserved by management operations.
+- Per-scope/provider native session handles and explicit reset, all four selectable harness adapters, streamed events, native questions/permissions where supported, cancellation and process cleanup. OpenCode/Pi have native control and protocol-fixture evidence; their actual model-turn acceptance remains open.
+- Layered explorer with independent pane scrolling/collapse, scope groups, selected-file highlighting, lazy directory reads and per-space note/cloud actions. Root listings are shared across panes; classification and ownership remain host-authoritative. No native instructions are merged across repositories.
+- Existing rich/source Markdown editing, save/conflict/recovery behavior, scoped agent context and website/download scaffolding remain available.
+- Audit fixes include independent-scope reconnection failures, overlapping polling, missing placeholders, attachment count limits and read-only save shortcuts. See [audit](AUDIT-2026-09-13.md).
+- Actual Electron desktop browser preview with persistent sample KBs, noVNC and a Japanese input helper. See [VM preview](VM-PREVIEW.md).
 
-- Independent irori application with React, provisional Electron host, Milkdown Crepe rich editing, CodeMirror source editing and a typed host boundary.
-- Explicit personal/team/organization spaces, portable scope UUIDs, ownership-first three-layer classification and contents boundaries.
-- Note save, external refresh, dirty conflict display, local recovery drafts and conservative Markdown byte preservation.
-- Both actual native agents selectable in the normal AI panel, with streaming, permission/user-input handling and process cancellation. Native account authentication remains provider-owned.
-- Explicit Linux root-container startup and actionable startup diagnostics.
-- Japanese landing/download website, actual fixture screenshot, responsive layout, FAQ and Windows x64 / Mac Apple silicon / Mac Intel slots.
-- Separate static website build, validated release manifest and manual GitHub Pages workflow. Distribution direction: GitHub Pages for the entrance and GitHub Releases for installer assets. No native installers or public deployment exist; all download slots remain unavailable.
-- Source, lockfile, behavior/UI/provider test scripts, dependency notices, host assessment, acceptance backlog and sanitized measurement evidence.
+## Verification at this checkpoint
 
-Both sibling repositories remain clean and independent:
+Tests are recorded from completed implementation work; no paid model calls or redundant full suite reruns are needed merely to create this checkpoint.
 
-| Repository | Revision at checkpoint |
+| Check | Latest evidence |
 | --- | --- |
-| LayeredKB-vscode-extention | `2a2e7e04ee2d393584682669303457211ff7711c` |
-| claudian-orchestra-template | `fa74f2a14665459b63ed98566b5f833627d728be` |
+| `npm run build` | Passed after the layered explorer change; existing dependency annotation and large-bundle warnings remain |
+| `npm test` | 30 passed, 0 failed; four opt-in native control probes skipped for the final UI change |
+| Native control probes at the preceding audit | All 34 tests passed with real rclone/OpenCode/Pi controls enabled; no Google consent or model inference |
+| `xvfb-run -a npm run test:ui` | All four scripts passed: editor/session, cloud protocol fixture, harness protocol fixtures and layered explorer |
+| Layered explorer fixture | Four spaces (personal, two teams, organization), schema isolation, nested contents precedence, same-name note ownership, unsaved-switch protection, AI context, cloud-action ownership, pane collapse and narrower-window AI controls |
+| Live browser preview | Updated layout inspected, browser login verified; user subsequently confirmed Chrome access and exploration |
+| Website | Earlier checkpoint's build/browser evidence is historical; website code was not changed during these additions |
 
-KB_design itself is not a Git repository. Product specifications remain in `../docs/irori/`; no parent repository, monorepo or submodule was introduced.
+Codex/Claude real-model evidence also belongs to the earlier milestone. Current OpenCode/Pi controls, seeded session tests and executable fixtures must not be presented as real model-turn or mounted-file acceptance. Details: [STATUS](STATUS.md), [HARNESSES](HARNESSES.md), [LAYERED-EXPLORER](LAYERED-EXPLORER.md), [CLOUD-SETUP](CLOUD-SETUP.md).
 
-## Verification already completed
+## Resume and preview access
 
-These are the recorded results from the implementation session; provider tests were not repeated merely to create this checkpoint.
+1. Read `AGENTS.md`, `README.md`, this checkpoint, `docs/STATUS.md`, `docs/ACCEPTANCE.md` and the relevant implementation document. Inspect `git status` before editing.
+2. Stay in the independent irori repository. KB_design is not a monorepo. The sibling reference repositories have not been changed by this implementation; preserve user-owned additions, including the UI image.
+3. Inspect the current environment before assuming a preview is running. At pause, the browser viewer was available on VM loopback port 6080. A checkpoint does not recreate running processes, dependencies or ignored device state.
+4. Forward port 6080 using the connected VS Code window's Ports view and open its displayed local address in Chrome. The user's embedded browser had shown `ERR_CONNECTION_REFUSED`, while Chrome worked. Use the actual forwarded address if VS Code assigns another local port.
+5. Read the password from `.local/vm-preview/password`; it changes on launcher restart and is never stored in this checkpoint. Runtime metadata is in `.local/vm-preview/runtime.json`. Sample notes and edits live in `.local/vm-preview/samples`, and preview device data in `.local/vm-preview/device`; these are ignored and not backed up by the Git commit.
+6. If the viewer is stopped, use `npm run preview:vm`. First-time VM setup, including `npm run setup:preview` and OS prerequisites, is in [VM-PREVIEW](VM-PREVIEW.md). A fresh app checkout needs Node 24+, `npm ci`, `npm run setup:electron` and `npm run build`.
 
-| Check | Result |
-| --- | --- |
-| Application build and typecheck | Pass |
-| Application behavior suite | 9 tests pass |
-| Electron UI smoke under Xvfb | Pass: real rich/source edits, Japanese text, preservation, external refresh and conflicts |
-| Real provider tests | Both Codex and Claude read/edit a disposable note; both also exercised through the ordinary app panel |
-| Lifecycle probes | Claude deny/question/continuation and both cancellation paths exercised; real Codex question/denial acceptance remains open |
-| Website build and browser smoke | Pass: navigation, FAQ, unavailable downloads, screenshot asset and mobile overflow check |
-| Website visual review | Desktop and mobile screenshots inspected; copies saved alongside measurements |
+For code changes run `npm run build` and `npm test`; renderer changes also require `xvfb-run -a npm run test:ui`. Real-provider inference remains opt-in and must be separately authorized, using disposable KBs. Close irori normally to flush drafts and shut down native services before restarting the preview; refreshing only Chrome does not reload the Electron host.
 
-Detailed results and practical limitations: [STATUS](STATUS.md), [measurements](measurements/2026-09-12.md), [sanitized evidence](measurements/2026-09-12-evidence.json), [compatibility matrix](compatibility/MATRIX.md).
+## Remaining work
 
-Raw provider transcripts, temporary KB paths, logs, generated bundles, dependencies and local device state are excluded from Git. Build outputs can be regenerated from the lockfile. Existing ignored test artifacts remain on this machine.
+The full R01–R12 matrix and sequencing remain in [ACCEPTANCE](ACCEPTANCE.md). Next priorities:
 
-## Remaining work and restart order
+1. Supply deployment Google OAuth configuration and a native mount environment, then verify real consent, multiple accounts/shared drives, failure/recovery and actual mounted paths from every harness. This VM lacks `/dev/fuse` and the deployment OAuth settings.
+2. Git clone/fetch/diff/history/commit/push and conflict handling; cloud write/upload support with durable pending-write recovery; moved-folder and expired-account recovery.
+3. Real model turns and native restart/resume for OpenCode/Pi, remaining Codex question/denial gates, native capability parity and transcript redisplay.
+4. Offline space relocation/unregistration, note search/rename/backlinks, broad Markdown/IME and scale acceptance, ontology UX (Q01), optional terminal and versioned artifact/source provenance.
+5. Native Windows/macOS testing, installers/signing/updating, provider distribution review and performance budgets. Electron remains provisional; no equivalent Tauri comparison is complete. Repository placement policy (Q02) is also open.
 
-The full R01–R12 backlog is retained in [ACCEPTANCE](ACCEPTANCE.md). Do not replace it with this shorter restart list.
+Known limits include the narrow external-writer race at save, bounded watcher depth, device-local credentials protected by file permissions rather than OS vault integration, in-memory conversation display history and unverified native crash/mount recovery. The development container launcher uses its explicit root-only Chromium sandbox exception.
 
-1. Close remaining agent/editor reliability gates: real Codex question/deny, persisted per-space session recovery, expired-login/version errors, native rules/skills/MCP parity, Japanese IME and broader Markdown preservation.
-2. Build first-run CLI detection and install/login guidance. The current development app requires separately installed and authenticated native CLIs.
-3. Prepare native packaging and a Windows/Mac architecture test matrix; validate real install, launch, file operations, agent permissions and cancellation. Signing/notarization, distribution licensing and updater work remain open. Use [DISTRIBUTION](DISTRIBUTION.md) to connect only verified installer URLs to the website, then publish and test the public flow.
-4. Revisit the provisional host with measured equivalent workloads. Linux app-only RSS is about 690 MiB, with the measured Claude process tree around 1 GiB; this exceeds the proposed editing budget. Tauri plus a Node sidecar remains a candidate, not a completed comparison. See [ADR 001](decisions/001-initial-host.md).
-5. Complete file safety/scale, stable note identities, search/backlinks/rename, offline/rebind UI and ontology after its interaction decision.
-6. Implement GitHub collaboration and selected-folder cloud mounts with independent Git/cloud recovery, followed by optional terminal and durable artifact/source-version provenance. Existing contents entries stay unavailable until folder identity and mount verification exist.
-
-Known safety/compatibility limits include the final-hash-check/rename external-writer race, bounded watcher depth, no restart-resume, incomplete dialect/IME coverage and unverified native-platform isolation. The root-container startup explicitly disables Chromium's OS sandbox; ordinary application startup does not do so automatically.
-
-Q01 (ontology interaction) and Q02 (physical repository placement policy) are still unanswered. Acceptance of website distribution does not resolve them or finalize Electron over Tauri.
-
-## Resume
-
-Read `AGENTS.md`, `README.md`, this checkpoint, `docs/STATUS.md`, `docs/ACCEPTANCE.md` and the relevant decision/distribution document. Recheck the worktree and environment before editing. Continue in irori only unless a separate reference-repository change is actually needed and authorized.
-
-With dependencies already installed, the independent checks are:
-
-```sh
-npm run build
-npm test
-xvfb-run -a npm run test:ui
-npm run build:website
-xvfb-run -a npm run test:website
-```
-
-A fresh checkout needs Node 24+, `npm ci` and `npm run setup:electron`. Desktop startup needs a real accessible GUI; Xvfb smoke creates a virtual test window, not a browser-accessible application. Website preview uses `npm run dev:website`. Real-provider checks are separately opt-in, consume the native account allowance and must use disposable KBs.
-
-To locate this checkpoint in Git:
+Locate this checkpoint commit with:
 
 ```sh
 git log -1 --format='%h %s' -- docs/CHECKPOINT.md

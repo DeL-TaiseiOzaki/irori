@@ -14,8 +14,19 @@ export function classify(space: Space, relative: string): Layer {
   if (space.contents.some((root) => p === root || p.startsWith(root + '/'))) return 'contents';
   const top = p.split('/')[0];
   if (
-    ['schema', '.irori', '.claude', '.codex', '.cursor', '.gemini', '.hermes'].includes(top) ||
-    ['AGENTS.md', 'CLAUDE.md', '.mcp.json'].includes(p)
+    [
+      'schema',
+      '.irori',
+      '.claude',
+      '.codex',
+      '.opencode',
+      '.pi',
+      '.agents',
+      '.cursor',
+      '.gemini',
+      '.hermes',
+    ].includes(top) ||
+    ['AGENTS.md', 'CLAUDE.md', '.mcp.json', 'opencode.json', 'opencode.jsonc'].includes(p)
   )
     return 'schema';
   return 'Knowledge_Base';

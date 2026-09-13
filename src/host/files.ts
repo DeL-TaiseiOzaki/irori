@@ -22,6 +22,10 @@ const declaration = z.object({
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 export class FileService {
+  cloud?: {
+    resolve(scopeId: string, rel: string): Promise<string>;
+    rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined>;
+  };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
   private queue: Promise<unknown> = Promise.resolve();
@@ -165,6 +169,7 @@ export class FileService {
     const requested = path.resolve(s.root, rel);
     if (!within(s.root, requested) || owner(this.spaces, requested)?.scopeId !== id)
       throw Error('Path belongs to another space');
+    if (classify(s, rel) === 'contents' && this.cloud) return this.cloud.resolve(id, rel);
     const actual = await fs.realpath(requested);
     if (!within(s.root, actual) || owner(this.spaces, actual)?.scopeId !== id)
       throw Error('Path alias crosses a space boundary');
@@ -179,6 +184,8 @@ export class FileService {
   }
   async entries(id: string, rel: string): Promise<Entry[]> {
     const s = this.get(id);
+    const cloudEntries = await this.cloud?.rootEntries(id, rel);
+    if (cloudEntries) return cloudEntries;
     const dir = await this.resolve(id, rel, true);
     const files = (await fs.readdir(dir, { withFileTypes: true })).filter(
       (f) => !['.git', 'node_modules'].includes(f.name),
@@ -196,7 +203,8 @@ export class FileService {
         layer,
         note: /\.md$/i.test(f.name),
         blocked:
-          layer === 'contents'
+          layer === 'contents' &&
+          !(this.cloud && (s.contents.includes(p) || classify(s, rel) === 'contents'))
             ? '接続未検証・ローカル保存先としては使用できません'
             : f.isSymbolicLink()
               ? 'リンク先はこの版では開けません'
@@ -212,7 +220,7 @@ export class FileService {
             directory: true,
             layer: 'contents',
             note: false,
-            blocked: '未接続',
+            blocked: this.cloud ? undefined : '未接続',
           });
     return out.sort(
       (a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name),
@@ -228,6 +236,7 @@ export class FileService {
     const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
     if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
     const doc: Document = { scopeId: id, path: rel, text, hash: hash(bytes) };
+    if (classify(this.get(id), rel) === 'contents') return { ...doc, readOnly: true };
     try {
       doc.draft = z
         .object({ text: z.string(), baseHash: z.string() })
@@ -259,6 +268,8 @@ export class FileService {
   }
   async save(doc: Document): Promise<Document> {
     return this.serialized(async () => {
+      if (classify(this.get(doc.scopeId), doc.path) === 'contents')
+        throw Error('このクラウド接続は読み取り専用です。');
       await this.writeDraft(doc);
       const filename = await this.resolve(doc.scopeId, doc.path);
       const before = await fs.readFile(filename);
