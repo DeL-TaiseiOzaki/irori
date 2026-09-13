@@ -1,5 +1,7 @@
 # Desktop packaging foundation
 
+Latest verified implementation: [CI run 34752136969](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34752136969), commit `8683900`, passes clean verification and all Linux x64 / Windows x64 / Mac arm64 jobs. The actual relocated packages pass reload, SDK imports, Japanese note save, CSV graph loading and normal shutdown. Local verification is 64/64 tests with native controls, seven UI suites, website fixtures and the forced-renderer-crash close regression. The paragraphs below retain earlier diagnostic evidence. This remains unsigned engineering evidence; installation on the user's Windows 11/Ryzen 9 and M5 Pro devices, signing and provider acceptance are still open.
+
 Date: 2026-09-13. D02 implementation after `ce7234b`; unsigned engineering builds only.
 
 Verified native baseline: [run 34751330082](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34751330082), commit `713222a`, passes clean verification and every Linux x64 / Windows x64 / Mac arm64 maker and relocated-app smoke. Windows renderer trust and native Git PATH fixes are exercised there. These are engineering packages, not signed installers or Windows 11/M5 Pro installed-device acceptance. The ontology follow-up adds a packaged CSV graph check; use its own run for that later evidence.

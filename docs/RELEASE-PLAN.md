@@ -1,6 +1,6 @@
 # Release readiness and remaining work
 
-Implementation update: native Forge CI passes on Linux x64, Windows x64 and Mac arm64 at `713222a`. [Workspace Drive](WORKSPACE-DRIVE.md) is independent of KB membership. [Ontology presentation](ONTOLOGY.md) adds CSV table/source editing, declared column mappings, hierarchy/subgraph graphs and note links. D06 still requires note/artifact/run identities, selected-source version retention/provenance, search and reverse links; these changes do not waive D03–D10 gates.
+Implementation update: [native Forge CI](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34752136969) passes on Linux x64, Windows x64 and Mac arm64 at `8683900`, including packaged CSV graphs. [Workspace Drive](WORKSPACE-DRIVE.md) is independent of KB membership. [Ontology presentation](ONTOLOGY.md) adds CSV table/source editing, declared column mappings, hierarchy/subgraph graphs and note links. D06 still requires note/artifact/run identities, selected-source version retention/provenance, search and reverse links; these changes do not waive D03–D10 gates.
 
 Reviewed: 2026-09-13, against pushed checkpoint `ce7234b`. This plan treats deployment as the currently agreed public website plus installable Windows/macOS desktop application. It preserves the full first-release requirements; an earlier limited beta would be a separate scope decision. It does not introduce a hosted application backend, billing system or realtime collaboration service.
 
