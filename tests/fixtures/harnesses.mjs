@@ -124,6 +124,8 @@ export function run(kind) {
     pending = undefined;
   };
   const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    const route = url.pathname;
     const auth =
       'Basic ' +
       Buffer.from(
@@ -139,27 +141,29 @@ export function run(kind) {
     const body = raw ? JSON.parse(raw) : undefined;
     log({
       method: req.method,
-      route: req.url,
+      route,
       body,
-      directory: req.headers['x-opencode-directory'],
+      directory:
+        req.headers['x-opencode-directory'] ??
+        encodeURIComponent(url.searchParams.get('directory') ?? ''),
     });
-    if (req.url === '/event') {
+    if (route === '/event') {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       sse = res;
       emit('server.connected', {});
       return;
     }
     res.setHeader('content-type', 'application/json');
-    if (req.url === '/global/health')
+    if (route === '/global/health')
       return res.end(JSON.stringify({ healthy: true, version: 'fixture' }));
-    if (req.url === '/session' || (req.url === '/session/' + sessionID && req.method === 'GET')) {
+    if (route === '/session' || (route === '/session/' + sessionID && req.method === 'GET')) {
       if (fs.existsSync('fail-resume') && req.method === 'GET') {
         res.writeHead(404);
         return res.end('{}');
       }
       return res.end(JSON.stringify(session));
     }
-    if (req.url === '/session/' + sessionID + '/message') {
+    if (route === '/session/' + sessionID + '/message') {
       const text = body.parts[0].text;
       if (text.includes('crash')) return process.exit(2);
       if (text.includes('fail'))
@@ -181,7 +185,7 @@ export function run(kind) {
       else finish();
       return;
     }
-    if (req.url === '/permission/permission/reply') {
+    if (route === '/permission/permission/reply') {
       res.end('true');
       emit('question.asked', {
         id: 'question',
@@ -196,7 +200,7 @@ export function run(kind) {
       });
       return;
     }
-    if (req.url === '/question/question/reply' || req.url === '/question/question/reject') {
+    if (route === '/question/question/reply' || route === '/question/question/reject') {
       res.end('true');
       finish();
       return;

@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { SerialQueue } from '../host/serial-queue';
 import { CloudAccounts } from './accounts';
 import { Rclone, type RcloneAPI } from './rclone';
 import { cloudDeclaration, mountNameError, nameKey } from '../domain/connections';
@@ -33,8 +34,7 @@ type Mounted = {
 };
 export class CloudService {
   readonly accounts: CloudAccounts;
-  private queue: Promise<unknown> = Promise.resolve();
-  private pending = 0;
+  private queue = new SerialQueue();
   private mounted = new Map<string, Mounted>();
   private states = new Map<string, { state: CloudConnection['state']; detail?: string }>();
   private stopping = false;
@@ -46,7 +46,7 @@ export class CloudService {
     this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser);
   }
   get busy() {
-    return this.pending > 0;
+    return this.queue.busy;
   }
   addAccount(name: string) {
     return this.mutate(() => this.accounts.add(name));
@@ -77,12 +77,7 @@ export class CloudService {
   }
   private mutate<T>(fn: () => Promise<T>): Promise<T> {
     if (this.stopping) return Promise.reject(Error('クラウドサービスは終了中です。'));
-    this.pending++;
-    const next = this.queue.then(fn).finally(() => {
-      this.pending--;
-    });
-    this.queue = next.catch(() => {});
-    return next;
+    return this.queue.run(fn);
   }
   async setup(): Promise<CloudSetup> {
     try {
@@ -569,7 +564,7 @@ export class CloudService {
   async close() {
     this.stopping = true;
     try {
-      await this.queue;
+      await this.queue.idle();
       await this.accounts.close();
       for (const mounted of this.mounted.values())
         await this.unmount(mounted.attachment.scopeId, mounted.attachment.mountId);

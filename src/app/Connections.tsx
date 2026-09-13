@@ -1,12 +1,8 @@
+import { Dialog } from './Dialog';
 import { useEffect, useState } from 'react';
-import type {
-  CloudAccount,
-  CloudConnection,
-  CloudFolder,
-  CloudSetup,
-  Space,
-} from '../domain/types';
+import type { CloudFolder, Space } from '../domain/types';
 import { mountNameError } from '../domain/connections';
+import { useResource } from './useResource';
 const host = window.irori;
 const states = {
   unconfigured: 'アカウント未設定',
@@ -25,129 +21,62 @@ export function Connections({
   running: boolean;
   onClose: () => void;
 }) {
-  const [setup, setSetup] = useState<CloudSetup>(),
-    [accounts, setAccounts] = useState<CloudAccount[]>([]),
-    [connections, setConnections] = useState<CloudConnection[]>([]);
   const [accountId, setAccountId] = useState(''),
     [accountName, setAccountName] = useState('');
-  const [drives, setDrives] = useState<CloudFolder[]>([]),
-    [trail, setTrail] = useState<CloudFolder[]>([]),
-    [folders, setFolders] = useState<CloudFolder[]>([]);
+  const [trail, setTrail] = useState<CloudFolder[]>([]);
   const [selected, setSelected] = useState<CloudFolder>(),
     [name, setName] = useState(''),
     [contentsRoot, setContentsRoot] = useState(space.contents[0]);
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
-    [loadingDrives, setLoadingDrives] = useState(false),
-    [loadingFolders, setLoadingFolders] = useState(false),
     [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<string>(),
     [newName, setNewName] = useState('');
   const current = trail.at(-1);
-  const loading = loadingDrives || loadingFolders;
+  const setupRead = useResource(() => host.cloudSetup(), [space.scopeId, revision]);
+  const overview = useResource(
+    () => Promise.all([host.cloudAccounts(), host.cloudConnections(space.scopeId)]),
+    [space.scopeId, revision],
+    { interval: 2000 },
+  );
+  const driveRead = useResource(() => host.cloudDrives(accountId), [accountId], {
+    enabled: !!accountId,
+  });
+  const folderRead = useResource(
+    () => host.cloudFolders(accountId, current!.id, current!.driveId),
+    [accountId, current?.id, current?.driveId],
+    { enabled: !!accountId && !!current },
+  );
+  const setup = setupRead.data;
+  const [accounts = [], connections = []] = overview.data ?? [];
+  const drives = driveRead.data ?? [],
+    folders = folderRead.data ?? [];
+  const loading = driveRead.loading || folderRead.loading;
+  const issue = error || setupRead.error || overview.error || driveRead.error || folderRead.error;
   useEffect(() => {
-    let live = true;
-    void host
-      .cloudSetup()
-      .then((value) => {
-        if (live) setSetup(value);
-      })
-      .catch((e) => {
-        if (live) setError(String(e));
-      });
-    let timer: ReturnType<typeof setTimeout>;
-    const update = () => {
-      void Promise.all([host.cloudAccounts(), host.cloudConnections(space.scopeId)])
-        .then(([a, c]) => {
-          if (live) {
-            setAccounts(a);
-            setConnections(c);
-          }
-        })
-        .catch((e) => {
-          if (live) setError(String(e));
-        })
-        .finally(() => {
-          if (live) timer = setTimeout(update, 2000);
-        });
-    };
-    update();
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [space.scopeId, revision]);
+    setTrail(driveRead.data?.slice(0, 1) ?? []);
+  }, [driveRead.data]);
   useEffect(() => {
-    let live = true;
-    setDrives([]);
-    setTrail([]);
-    setFolders([]);
     setSelected(undefined);
     setName('');
-    setLoadingDrives(false);
-    if (accountId) {
-      setLoadingDrives(true);
-      void host
-        .cloudDrives(accountId)
-        .then((value) => {
-          if (live) {
-            setDrives(value);
-            setTrail(value.length ? [value[0]] : []);
-          }
-        })
-        .catch((e) => {
-          if (live) setError(String(e));
-        })
-        .finally(() => {
-          if (live) setLoadingDrives(false);
-        });
-    }
-    return () => {
-      live = false;
-    };
-  }, [accountId]);
-  useEffect(() => {
-    let live = true;
-    setFolders([]);
-    setSelected(undefined);
-    setName('');
-    setLoadingFolders(false);
-    if (accountId && current) {
-      setLoadingFolders(true);
-      void host
-        .cloudFolders(accountId, current.id, current.driveId)
-        .then((value) => {
-          if (live) setFolders(value);
-        })
-        .catch((e) => {
-          if (live) setError(String(e));
-        })
-        .finally(() => {
-          if (live) setLoadingFolders(false);
-        });
-    }
-    return () => {
-      live = false;
-    };
   }, [accountId, current?.id, current?.driveId]);
   async function perform(fn: () => Promise<unknown>) {
     setBusy(true);
     setError('');
     try {
       await fn();
-      setRevision((v) => v + 1);
     } catch (e) {
       setError(String(e));
-      setRevision((v) => v + 1);
     } finally {
+      setRevision((v) => v + 1);
       setBusy(false);
     }
   }
   const disabled = busy || running;
   const invalidName = selected ? mountNameError(name) : undefined;
   return (
-    <div className="modal-backdrop">
-      <div className="modal connections" role="dialog" aria-modal="true" aria-label="クラウド接続">
+    <Dialog label="クラウド接続" busy={busy} onClose={onClose}>
+      <div className="modal connections">
         <div className="actions">
           <h2>{space.name} のクラウド接続</h2>
           <button disabled={busy} onClick={onClose}>
@@ -165,9 +94,9 @@ export function Connections({
             このビルドではGoogleログインの配布設定が未完了です。新しいアカウントの追加は利用できません。
           </p>
         )}
-        {error && (
+        {issue && (
           <p className="error" role="alert">
-            {error}
+            {issue}
           </p>
         )}
         <section>
@@ -246,8 +175,6 @@ export function Connections({
               onChange={(e) => {
                 setTrail([]);
                 setSelected(undefined);
-                setDrives([]);
-                setFolders([]);
                 setError('');
                 setAccountId(e.target.value);
               }}
@@ -491,6 +418,6 @@ export function Connections({
           )}
         </section>
       </div>
-    </div>
+    </Dialog>
   );
 }

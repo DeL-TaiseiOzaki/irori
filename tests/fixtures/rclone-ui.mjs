@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Deliberate protocol fixture for cloud UI tests. Never used by normal application startup.
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 const expected =
   'Basic ' +
   Buffer.from(`${process.env.RCLONE_RC_USER}:${process.env.RCLONE_RC_PASS}`).toString('base64');
@@ -20,6 +22,20 @@ const server = http.createServer(async (request, response) => {
   else if (method === 'backend/command')
     result = { result: [{ id: 'shared-fixture', name: '共有ドライブ' }] };
   else if (method === 'operations/list') {
+    if (params.fs.root_folder_id === 'folder-second') {
+      const marker = (name) => path.join(process.env.IRORI_DATA_DIR, name);
+      fs.writeFileSync(marker('folder-pending'), 'pending');
+      while (!fs.existsSync(marker('folder-release')))
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      response.setHeader('Content-Type', 'application/json');
+      response.end(
+        JSON.stringify({
+          list: [{ ID: 'late-folder', Name: '古いアカウントの結果', IsDir: true }],
+        }),
+      );
+      fs.writeFileSync(marker('folder-finished'), 'finished');
+      return;
+    }
     const work = params.fs.team_drive === 'shared-fixture';
     result = {
       list: work

@@ -60,6 +60,24 @@ try {
   await expect(page.getByRole('button', { name: 'Googleアカウントを追加' })).toBeDisabled();
   await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
   await expect(page.locator('.folder-row')).toHaveCount(2);
+  // A response from an old account must not overwrite the currently displayed folders.
+  await page.locator('.folder-row').nth(1).getByRole('button', { name: '開く' }).click();
+  await expect
+    .poll(() => readFile(path.join(files.dataDir, 'folder-pending'), 'utf8').catch(() => ''))
+    .toBe('pending');
+  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[1].id);
+  await page.getByLabel('ドライブ', { exact: true }).selectOption('shared-fixture');
+  await expect(page.locator('.folder-row')).toHaveCount(1);
+  await expect(page.locator('.folder-row')).toContainText('成果物');
+  await writeFile(path.join(files.dataDir, 'folder-release'), 'release');
+  await expect
+    .poll(() => readFile(path.join(files.dataDir, 'folder-finished'), 'utf8').catch(() => ''))
+    .toBe('finished');
+  await page.waitForTimeout(100);
+  await expect(page.locator('.folder-row')).toHaveCount(1);
+  await expect(page.locator('.folder-row')).toContainText('成果物');
+  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
+  await expect(page.locator('.folder-row')).toHaveCount(2);
   await page.locator('.folder-row').nth(1).getByRole('radio').check();
   await page.getByLabel('contents内のフォルダ名').fill('調査 資料');
   await expect(page.locator('.mount-preview')).toContainText('contents/調査 資料/');

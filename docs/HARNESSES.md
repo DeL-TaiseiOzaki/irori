@@ -1,5 +1,7 @@
 # Native harness adapters
 
+Transport follow-up, 2026-09-13: OpenCode uses the matching official SDK 1.18.30 for HTTP methods and types, with irori's bounded fetch and eventsource-parser subscription. Codex/Pi now share bounded JSONL framing and request lifetimes. The native entry points and saved handles below remain unchanged. Build, all five UI scripts and all 54 tests (including native controls) pass; no model inference was used. The ACP trial and migration decisions are in [reuse completion](REUSE-COMPLETION-2026-09-13.md).
+
 Date: 2026-09-13. Codex, Claude Code, OpenCode and Pi are selectable in the ordinary AI panel. OpenCode/Pi are new integration previews; their real model-driven note edits and cloud-file access have not been accepted yet. No additional model API or embedded replacement agent was introduced.
 
 ## Native configuration and lifecycle

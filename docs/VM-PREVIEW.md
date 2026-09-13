@@ -25,6 +25,8 @@ The noVNC client is pinned to 1.7.0 in an ignored local tools installation and c
 
 Open the saved **irori を試す** workspace. It contains independent personal/team sample KBs and editable Japanese welcome notes. Samples and edits survive restarts; seeding does not overwrite existing notes. This preview uses separate irori device data, while native CLI authentication/configuration still belongs to the VM user.
 
+The 2026-09-13 Git implementation session also created a device-local **Git連携を試す** workspace with **Git・お試しKB**. Open **共有を試す.md → 変更と履歴** to inspect the prepared change, commit and share. Its `origin` is a disposable bare repository on this VM, so sharing this sample does not publish to GitHub. This additional demo and its history live only in ignored preview state; the generic launcher does not recreate them on a fresh checkout. Existing personal/team samples were preserved byte-for-byte when the preview was restarted.
+
 Try rich/source editing, saves, new notes, space switching, four-harness selection, conversation reset and cloud setup diagnostics. Real AI execution uses the installed native CLI and its account. The locally installed OpenCode/Pi test binaries are added to this preview's PATH when available; no provider/model output is mocked. Google consent and cloud mounts still require their outstanding OAuth/native prerequisites.
 
 If direct Japanese IME input does not reach the remote desktop, first click the input destination in irori, then use **日本語入力** in the browser toolbar. Compose/convert text locally and select **入力を送る** to send Unicode keystrokes to the focused VM input. This is a preview input helper, not native-platform IME acceptance.

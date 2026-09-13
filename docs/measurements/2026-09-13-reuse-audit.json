@@ -1,0 +1,573 @@
+{
+  "date": "2026-09-13",
+  "node": "v24.21.0",
+  "gitVersion": "git version 2.34.1",
+  "scope": "Disposable local fixtures only; no model requests or external remotes",
+  "git": {
+    "rounds": 7,
+    "measurements": {
+      "status": {
+        "baseline": {
+          "samples": [
+            {
+              "gitProcesses": 23,
+              "ms": 102.24
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 88.51
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 92.65
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 94.83
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 100.31
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 104.96
+            },
+            {
+              "gitProcesses": 23,
+              "ms": 103.24
+            }
+          ],
+          "medianMs": 100.31,
+          "gitProcesses": 23
+        },
+        "batchGitPaths": {
+          "samples": [
+            {
+              "gitProcesses": 15,
+              "ms": 66.26
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 65.18
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 105.03
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 78.98
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 78.28
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 74.92
+            },
+            {
+              "gitProcesses": 15,
+              "ms": 73.82
+            }
+          ],
+          "medianMs": 74.92,
+          "gitProcesses": 15
+        }
+      },
+      "diff": {
+        "baseline": {
+          "samples": [
+            {
+              "gitProcesses": 46,
+              "ms": 219.78
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 206.5
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 207.64
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 211.68
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 208.89
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 236.2
+            },
+            {
+              "gitProcesses": 46,
+              "ms": 200.36
+            }
+          ],
+          "medianMs": 208.89,
+          "gitProcesses": 46
+        },
+        "batchGitPaths": {
+          "samples": [
+            {
+              "gitProcesses": 30,
+              "ms": 134.23
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 133.95
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 133.58
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 130.06
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 131.44
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 136.08
+            },
+            {
+              "gitProcesses": 30,
+              "ms": 126.32
+            }
+          ],
+          "medianMs": 133.58,
+          "gitProcesses": 30
+        }
+      },
+      "stage": {
+        "baseline": {
+          "samples": [
+            {
+              "gitProcesses": 92,
+              "ms": 409.57
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 414.87
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 369.49
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 472.97
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 403.38
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 401.09
+            },
+            {
+              "gitProcesses": 92,
+              "ms": 385.01
+            }
+          ],
+          "medianMs": 403.38,
+          "gitProcesses": 92
+        },
+        "batchGitPaths": {
+          "samples": [
+            {
+              "gitProcesses": 60,
+              "ms": 259.43
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 266.76
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 270.15
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 266.73
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 276.58
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 263.58
+            },
+            {
+              "gitProcesses": 60,
+              "ms": 265.37
+            }
+          ],
+          "medianMs": 266.73,
+          "gitProcesses": 60
+        }
+      }
+    },
+    "checked": [
+      "identical status object and version",
+      "staged status",
+      "UTF-8 path",
+      "pre-staged contents blocked",
+      "stale review rejected",
+      "linked worktree status and MERGE_HEAD"
+    ],
+    "limitations": "Warm tiny fixture; no Windows/macOS, concurrent administrative-directory relocation, hooks, network latency or full Git acceptance suite for prototype"
+  },
+  "simpleGit": {
+    "version": "3.36.0",
+    "exactFilenames": true,
+    "conclusions": "Parsing probe only; does not validate cancellation/output bounds/transaction safety"
+  },
+  "sse": [
+    {
+      "lineEnding": "LF",
+      "existingEvents": 1,
+      "eventsourceParserEvents": 1
+    },
+    {
+      "lineEnding": "CRLF",
+      "existingEvents": 1,
+      "eventsourceParserEvents": 1
+    },
+    {
+      "lineEnding": "CR",
+      "existingEvents": 0,
+      "eventsourceParserEvents": 1
+    }
+  ],
+  "sseBufferLimit": "max-buffer-size-exceeded",
+  "queryCore": {
+    "version": "5.102.8",
+    "fiveConcurrentReadsCallbackInvocations": 1,
+    "scopedInvalidation": true,
+    "offlineLocalRead": true,
+    "lateResponseIsolation": true,
+    "limitations": "Core cache probe; React UI and IPC cancellation integration not tested"
+  },
+  "opencodeSdk": {
+    "version": "1.18.30",
+    "entrypoint": "@opencode-ai/sdk/v2/client",
+    "fetchesAfterAwaitSubscribe": 0,
+    "fetchesAfterFirstNext": 1,
+    "conclusion": "Subscription is lazy; retain an explicit HTTP-header readiness barrier before sending prompts"
+  },
+  "electronNode": "24.20.0",
+  "packages": [
+    {
+      "name": "simple-git",
+      "version": "3.36.0",
+      "license": "MIT",
+      "dependencies": {
+        "debug": "^4.4.0",
+        "@kwsites/file-exists": "^1.1.1",
+        "@simple-git/argv-parser": "^1.1.0",
+        "@kwsites/promise-deferred": "^1.1.1",
+        "@simple-git/args-pathspec": "^1.0.3"
+      },
+      "peerDependencies": null,
+      "engines": null,
+      "repository": {
+        "url": "git+https://github.com/steveukx/git-js.git",
+        "type": "git",
+        "directory": "simple-git"
+      }
+    },
+    {
+      "name": "eventsource-parser",
+      "version": "4.1.0",
+      "license": "MIT",
+      "dependencies": null,
+      "peerDependencies": null,
+      "engines": {
+        "node": ">=22.12"
+      },
+      "repository": {
+        "url": "git+ssh://git@github.com/rexxars/eventsource-parser.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "@tanstack/react-query",
+      "version": "5.102.8",
+      "license": "MIT",
+      "dependencies": {
+        "@tanstack/query-core": "5.102.8"
+      },
+      "peerDependencies": {
+        "react": "^18 || ^19"
+      },
+      "engines": null,
+      "repository": {
+        "url": "git+https://github.com/TanStack/query.git",
+        "type": "git",
+        "directory": "packages/react-query"
+      }
+    },
+    {
+      "name": "@codemirror/merge",
+      "version": "6.12.2",
+      "license": "MIT",
+      "dependencies": {
+        "style-mod": "^4.1.0",
+        "@codemirror/view": "^6.17.0",
+        "@lezer/highlight": "^1.0.0",
+        "@codemirror/state": "^6.0.0",
+        "@codemirror/language": "^6.0.0"
+      },
+      "peerDependencies": null,
+      "engines": null,
+      "repository": {
+        "url": "git+https://code.haverbeke.berlin/codemirror/merge.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "write-file-atomic",
+      "version": "8.0.0",
+      "license": "ISC",
+      "dependencies": {
+        "signal-exit": "^4.0.1"
+      },
+      "peerDependencies": null,
+      "engines": {
+        "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+      },
+      "repository": {
+        "url": "git+https://github.com/npm/write-file-atomic.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "execa",
+      "version": "10.0.1",
+      "license": "MIT",
+      "dependencies": {
+        "figures": "^6.1.0",
+        "is-stream": "^4.0.1",
+        "pretty-ms": "^9.3.0",
+        "get-stream": "^9.0.1",
+        "signal-exit": "^4.1.0",
+        "yoctocolors": "^2.1.2",
+        "is-plain-obj": "^4.1.0",
+        "npm-run-path": "^6.0.0",
+        "human-signals": "^8.0.1",
+        "which-command": "^0.1.0",
+        "strip-final-newline": "^4.0.0",
+        "@sindresorhus/merge-streams": "^4.0.0"
+      },
+      "peerDependencies": null,
+      "engines": {
+        "node": ">=22"
+      },
+      "repository": {
+        "url": "git+https://github.com/sindresorhus/execa.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "@opencode-ai/sdk",
+      "version": "1.18.30",
+      "license": "MIT",
+      "dependencies": {
+        "cross-spawn": "7.0.6"
+      },
+      "peerDependencies": null,
+      "engines": null,
+      "repository": null
+    },
+    {
+      "name": "@opencode/client",
+      "version": "2.0.3",
+      "license": "MIT",
+      "dependencies": {
+        "@opencode/schema": "2.0.3",
+        "@opencode/protocol": "2.0.3"
+      },
+      "peerDependencies": {
+        "effect": "4.0.0-rc.112",
+        "solid-js": ">=1.9.0"
+      },
+      "engines": null,
+      "repository": {
+        "url": "git+https://github.com/anomalyco/opencode.git",
+        "type": "git",
+        "directory": "packages/client"
+      }
+    },
+    {
+      "name": "@headless-tree/react",
+      "version": "1.7.0",
+      "license": "MIT",
+      "dependencies": null,
+      "peerDependencies": {
+        "react": "*",
+        "react-dom": "*",
+        "@headless-tree/core": "*"
+      },
+      "engines": null,
+      "repository": {
+        "url": "git+ssh://git@github.com/lukasbach/headless-tree.git",
+        "type": "git",
+        "directory": "packages/react"
+      }
+    },
+    {
+      "name": "@pierre/diffs",
+      "version": "1.4.2",
+      "license": "apache-2.0",
+      "dependencies": {
+        "diff": "9.0.0",
+        "shiki": "^3.0.0 || ^4.0.0",
+        "lru_map": "0.4.1",
+        "@pierre/theme": "2.0.0",
+        "@pierre/theming": "1.0.1",
+        "hast-util-to-html": "9.0.5",
+        "@shikijs/transformers": "^3.0.0 || ^4.0.0"
+      },
+      "peerDependencies": {
+        "react": "^18.3.1 || ^19.0.0",
+        "react-dom": "^18.3.1 || ^19.0.0"
+      },
+      "engines": null,
+      "repository": null
+    },
+    {
+      "name": "@agentclientprotocol/sdk",
+      "version": "1.4.0",
+      "license": "Apache-2.0",
+      "dependencies": null,
+      "peerDependencies": {
+        "zod": "^3.25.0 || ^4.0.0"
+      },
+      "engines": null,
+      "repository": {
+        "url": "git+https://github.com/agentclientprotocol/typescript-sdk.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "@agentclientprotocol/codex-acp",
+      "version": "1.11.0",
+      "license": "Apache-2.0",
+      "dependencies": {
+        "zod": "^4.0.0",
+        "diff": "^9.0.0",
+        "open": "^11.0.1",
+        "@openai/codex": "^0.153.4",
+        "vscode-jsonrpc": "^9.0.1",
+        "@agentclientprotocol/sdk": "^1.4.0"
+      },
+      "peerDependencies": null,
+      "engines": null,
+      "repository": {
+        "url": "git+https://github.com/agentclientprotocol/codex-acp.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "@agentclientprotocol/claude-agent-acp",
+      "version": "0.76.0",
+      "license": "Apache-2.0",
+      "dependencies": {
+        "zod": "^4.0.0",
+        "@agentclientprotocol/sdk": "1.4.0",
+        "@anthropic-ai/claude-agent-sdk": "0.3.257"
+      },
+      "peerDependencies": null,
+      "engines": {
+        "node": ">=22"
+      },
+      "repository": {
+        "url": "git+https://github.com/agentclientprotocol/claude-agent-acp.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "pi-acp",
+      "version": "0.0.33",
+      "license": "MIT",
+      "dependencies": {
+        "zod": "^3.25.0",
+        "@agentclientprotocol/sdk": "^0.26.0"
+      },
+      "peerDependencies": null,
+      "engines": {
+        "node": ">=20"
+      },
+      "repository": {
+        "url": "git+https://github.com/svkozak/pi-acp.git",
+        "type": "git"
+      }
+    },
+    {
+      "name": "@earendil-works/pi-client",
+      "version": "0.85.1",
+      "license": "MIT",
+      "dependencies": {
+        "@earendil-works/chord": "^0.85.1",
+        "@earendil-works/pi-protocol": "^0.85.1"
+      },
+      "peerDependencies": null,
+      "engines": {
+        "node": ">=22.19.0"
+      },
+      "repository": {
+        "url": "git+https://github.com/earendil-works/pi.git",
+        "type": "git",
+        "directory": "packages/client"
+      }
+    }
+  ],
+  "sourceSha256": {
+    "src/agents/adapter.ts": "4e48ca44c1baf872bc8ad2ee3889e16bb3f362e2d407d9ea6bf387dcb43ddb58",
+    "src/agents/opencode.ts": "0b4b7fc58b5318710f791d5fc474323235c5602d7ef59314b03b86b0c1d268ae",
+    "src/agents/pi.ts": "1f9468e4d7361dd1b31c06ce5b39c3b64a0df87ba34301a9e9d16c6d96608c0c",
+    "src/agents/process.ts": "f98c0eb3c3095ee8f42b720a5c2fe0ef11d3a0a9c7b41a9772dc56688085d5a3",
+    "src/agents/rpc.ts": "ca48a22111ec7c179c3229d1c14d49dadf8f573a5d1e03e5d754c770b49e6c65",
+    "src/agents/service.ts": "1495b9d63c2e85db781648ad80f0150a2c6b4cda1f974ae8b127688e689a6c0c",
+    "src/agents/sessions.ts": "9a48abd83f1d2adf641aad5ff981bf9c5d7c642709e8863be38df605fcc83c74",
+    "src/app/Connections.tsx": "60deca24466356f0d243b29132997719ea108766a0165c802fee82ae76c5fa4b",
+    "src/app/GitPanel.tsx": "f8e1df090ea1d4f3c2a2fa14fb28201bab5938f181f666633476505115f5d146",
+    "src/app/Icon.tsx": "513c99abd948a612f7d76f69a5abb6a1e733561aaf5ccdc5df9377f1ec5d9323",
+    "src/app/LayerExplorer.tsx": "216d9cdf1c0058ee9515d9f4e538c01ae80d4fd14abce1381e66b7f15c3985a4",
+    "src/app/Startup.tsx": "4af599d434b5148f8138f7f14bde48ea6289c442bb98ec6fb25bdfc1d50d5ea3",
+    "src/app/branding.ts": "4a9947bab200dce904a020ec2ea2757b5fcd145c3ea4fc6adaa8f11ef77d16f1",
+    "src/app/main.tsx": "20e7439ac9ebbfc15976683cee373616ba0158a530c7bc97f989b70448dba026",
+    "src/app/style.css": "8e6e578cf4c0a829a05e9e3ab342578137209752f31ec864a427ad8dd1741c63",
+    "src/cloud/accounts.ts": "7ca23565c1b28e8935177146450a39d7705c9781f4c3c2c03ace8d40113d2df0",
+    "src/cloud/rclone.ts": "ec80d5d33ade83cc605cb579d9c0ddd1def46527c058bf1fb8525133f11ca16a",
+    "src/cloud/service.ts": "c545f2c1419035605f9f166ea45ee683aefdd51f870e98bc84f7f68d7551ce58",
+    "src/domain/connections.ts": "3927724145d7dde3a0734ebdcc92c156f75e58801ac2c59ce22ffb226d9cfadf",
+    "src/domain/git.ts": "5e0a97db7f86a1f6e3260e08f9af9fd3f412935182f72e466ae280151d34ab33",
+    "src/domain/scopes.ts": "c8523f62858fed4efc58f33004db453d1d3403bc7feb8a1cc4182a7ea4787a17",
+    "src/domain/types.ts": "0b6efcd7ab928a1f3d4471b657d152c53493ebd10c2e653fb0811034a16df1eb",
+    "src/editor/Editor.tsx": "a16c9138d932e93cb204d86fa42b54c573f181a3e9c5aa7bd54dedfba6d61f97",
+    "src/editor/preservation.ts": "2146e2029aebe7cc3ae0b602971a838ac310dd6b890c41badfe0a180c1408206",
+    "src/env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+    "src/git/process.ts": "968b148dc2daab13c885d7669381394106e45ba845c2589c71895e1ec92a7936",
+    "src/git/service.ts": "95ccdda2fb8e0deb3c19a782ecb42be10388011ff101c5cd06c81dee286ae42c",
+    "src/host/files.ts": "e7310f8d2d9f8811840414f544fda2082e7d21e91f835072141e3a9f9c57419c",
+    "src/host/local-json.ts": "c7b54027d7eff01d9c0ed0c8471daef6dfcd21d92167364ee075ce4231c76863",
+    "src/host/main.ts": "8e759ae4b093bd1c4485d2394ae325af929f085f14b1ec11ee73c6faf10c9051",
+    "src/host/preload.ts": "639105b5bc17a72f0f2c5ea4fc99a4008d55feba6da8e914e2e94f53184889b7",
+    "src/host/workspaces.ts": "6dc01f2ffa8c15ff43de01bf40a3ae2d314774c2e4c3af1c3a04e48afbf483b9"
+  },
+  "applicationManifestSha256": {
+    "package.json": "c3704b824a82e5b97d710a91036c6bec300fad1ff8931948976b416680838f98",
+    "package-lock.json": "3045e9a602d498bf5fbd10e06a404f4c9e151f996276e15f65332f8354c7c4eb"
+  }
+}

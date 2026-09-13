@@ -1,0 +1,267 @@
+{
+  "date": "2026-09-13",
+  "node": "v24.21.0",
+  "git": "git version 2.34.1",
+  "rounds": 5,
+  "method": "Interleaved baseline/current samples; tiny disposable repository and local bare remote; preparation and renderer work excluded",
+  "measurements": {
+    "status": {
+      "before": {
+        "gitProcesses": 23,
+        "medianMs": 103.83,
+        "samples": [
+          {
+            "gitProcesses": 23,
+            "ms": 93.85
+          },
+          {
+            "gitProcesses": 23,
+            "ms": 109.62
+          },
+          {
+            "gitProcesses": 23,
+            "ms": 103.83
+          },
+          {
+            "gitProcesses": 23,
+            "ms": 106.96
+          },
+          {
+            "gitProcesses": 23,
+            "ms": 97.39
+          }
+        ]
+      },
+      "after": {
+        "gitProcesses": 16,
+        "medianMs": 69.61,
+        "samples": [
+          {
+            "gitProcesses": 16,
+            "ms": 72.22
+          },
+          {
+            "gitProcesses": 16,
+            "ms": 72.94
+          },
+          {
+            "gitProcesses": 16,
+            "ms": 69.44
+          },
+          {
+            "gitProcesses": 16,
+            "ms": 69.61
+          },
+          {
+            "gitProcesses": 16,
+            "ms": 64.33
+          }
+        ]
+      }
+    },
+    "diff": {
+      "before": {
+        "gitProcesses": 46,
+        "medianMs": 222.09,
+        "samples": [
+          {
+            "gitProcesses": 46,
+            "ms": 192.56
+          },
+          {
+            "gitProcesses": 46,
+            "ms": 278.75
+          },
+          {
+            "gitProcesses": 46,
+            "ms": 276.87
+          },
+          {
+            "gitProcesses": 46,
+            "ms": 222.09
+          },
+          {
+            "gitProcesses": 46,
+            "ms": 215.79
+          }
+        ]
+      },
+      "after": {
+        "gitProcesses": 32,
+        "medianMs": 160.87,
+        "samples": [
+          {
+            "gitProcesses": 32,
+            "ms": 156.71
+          },
+          {
+            "gitProcesses": 32,
+            "ms": 160.87
+          },
+          {
+            "gitProcesses": 32,
+            "ms": 170.17
+          },
+          {
+            "gitProcesses": 32,
+            "ms": 162.38
+          },
+          {
+            "gitProcesses": 32,
+            "ms": 130.29
+          }
+        ]
+      }
+    },
+    "stage": {
+      "before": {
+        "gitProcesses": 92,
+        "medianMs": 414,
+        "samples": [
+          {
+            "gitProcesses": 92,
+            "ms": 414
+          },
+          {
+            "gitProcesses": 92,
+            "ms": 433.21
+          },
+          {
+            "gitProcesses": 92,
+            "ms": 384.53
+          },
+          {
+            "gitProcesses": 92,
+            "ms": 494.73
+          },
+          {
+            "gitProcesses": 92,
+            "ms": 410.38
+          }
+        ]
+      },
+      "after": {
+        "gitProcesses": 64,
+        "medianMs": 298.36,
+        "samples": [
+          {
+            "gitProcesses": 64,
+            "ms": 306.94
+          },
+          {
+            "gitProcesses": 64,
+            "ms": 289.01
+          },
+          {
+            "gitProcesses": 64,
+            "ms": 298.36
+          },
+          {
+            "gitProcesses": 64,
+            "ms": 309.73
+          },
+          {
+            "gitProcesses": 64,
+            "ms": 291.12
+          }
+        ]
+      }
+    }
+  },
+  "sourceLines": {
+    "before": 9068,
+    "after": 8997,
+    "net": -71,
+    "changedFiles": [
+      {
+        "path": "src/agents/opencode.ts",
+        "before": 280,
+        "after": 261,
+        "sha256": "a7817164148d4b303bd87117d75a0b253907f25c123538c2f3ebfca182af83f0"
+      },
+      {
+        "path": "src/app/Connections.tsx",
+        "before": 496,
+        "after": 422,
+        "sha256": "6e19d5b32c1b73ac2bbaa04ba26a08653c673819283da348001071c455f2d61a"
+      },
+      {
+        "path": "src/app/GitPanel.tsx",
+        "before": 723,
+        "after": 728,
+        "sha256": "5b889faf8fa58a2dad252ddc0f258219a2ea13e8424f1b65b2f4348c7815e357"
+      },
+      {
+        "path": "src/app/LayerExplorer.tsx",
+        "before": 363,
+        "after": 357,
+        "sha256": "eb858b2f430466e9a722be619fac8f516ee6134292500b41f6058cfb140e40f4"
+      },
+      {
+        "path": "src/app/Startup.tsx",
+        "before": 502,
+        "after": 489,
+        "sha256": "ef92c531b83df924b772cbac4f7cda60c261b47b9554e37587aebb7a6b77d057"
+      },
+      {
+        "path": "src/app/useResource.ts",
+        "before": 0,
+        "after": 44,
+        "sha256": "201fa61456d395162c72212d26f8c6aedcc1e52304224b8c56015d0fc0e88ee0"
+      },
+      {
+        "path": "src/cloud/rclone.ts",
+        "before": 139,
+        "after": 138,
+        "sha256": "a8b9748f6ec30a6db2f6bcc3d12ad5920c26b7e4a32b4dd8ff3242f95da456b8"
+      },
+      {
+        "path": "src/git/process.ts",
+        "before": 105,
+        "after": 106,
+        "sha256": "c2dea5125129686328b16dd5bae85aa3a527f1dbcbe53dd3b78cdba8717abbb2"
+      },
+      {
+        "path": "src/git/service.ts",
+        "before": 711,
+        "after": 719,
+        "sha256": "1f459c86a13a1f9491421c435b87ce8c2e4821373d67356eef13e8d9246cc007"
+      },
+      {
+        "path": "src/host/http.ts",
+        "before": 0,
+        "after": 19,
+        "sha256": "08ba3a798221b3407c6d4a850a78ca0ce4687b7b4a45864bdf3e525bc85ccab5"
+      },
+      {
+        "path": "src/host/workspaces.ts",
+        "before": 174,
+        "after": 139,
+        "sha256": "27871aa5df3535c5c272057c6e8f108689e429e1be6b117a74f95d05c9b2ce4d"
+      }
+    ],
+    "counting": "Physical src lines, including added shared modules; excludes tests/docs/dependencies"
+  },
+  "validation": {
+    "build": "passed",
+    "behaviorTests": {
+      "passed": 46,
+      "skipped": 4,
+      "failed": 0
+    },
+    "uiScripts": [
+      "editor/session",
+      "cloud with delayed prior-account response",
+      "harness protocol fixtures",
+      "layered explorer",
+      "Git with local bare remotes"
+    ],
+    "nativeModelTurns": "not run",
+    "nativePlatforms": "not verified"
+  },
+  "dependency": {
+    "added": "eventsource-parser@4.1.0",
+    "transitiveRuntimeDependencies": 0
+  },
+  "note": "The final implementation retains an independent administrative-directory resolution for the final index check; unlike the earlier audit prototype, it uses 16/32/64 Git processes."
+}

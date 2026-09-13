@@ -129,6 +129,22 @@ export interface StartRun {
   newSession?: boolean;
 }
 export interface HostAPI {
+  gitStatus(scopeId: string): Promise<GitStatus>;
+  gitDiff(scopeId: string, path: string, staged: boolean): Promise<GitDiff>;
+  gitHistory(scopeId: string, offset: number): Promise<GitHistory>;
+  gitCommitDiff(scopeId: string, oid: string): Promise<string>;
+  gitStage(scopeId: string, path: string, staged: boolean, version: string): Promise<GitStatus>;
+  gitCommit(scopeId: string, message: string, version: string): Promise<GitStatus>;
+  gitSync(scopeId: string, action: GitSyncAction, version: string): Promise<GitStatus>;
+  gitConflict(scopeId: string, path: string): Promise<GitConflict>;
+  gitResolve(
+    scopeId: string,
+    path: string,
+    text: string | null,
+    version: string,
+  ): Promise<GitStatus>;
+  gitClone(input: CloneRepository): Promise<string>;
+  gitOpenRepository(scopeId: string): Promise<void>;
   repositories(root: string): Promise<RepositoryInfo>;
   workspaces(): Promise<WorkspaceProfile[]>;
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
@@ -170,3 +186,11 @@ declare global {
     iroriFlushDraft?: () => Promise<void>;
   }
 }
+import type {
+  GitStatus,
+  GitDiff,
+  GitHistory,
+  GitConflict,
+  GitSyncAction,
+  CloneRepository,
+} from './git';

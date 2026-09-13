@@ -2,7 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { launch, killTree, agentEnv } from '../agents/process';
+import { SerialQueue } from './serial-queue';
+import { GitProcess } from '../git/process';
 import { readLocalJson, writeLocalJson } from './local-json';
 import type { FileService } from './files';
 import type { WorkspaceProfile, RepositoryInfo } from '../domain/types';
@@ -13,7 +14,7 @@ const profile = z.object({
 });
 
 export class WorkspaceService {
-  private queue: Promise<unknown> = Promise.resolve();
+  private queue = new SerialQueue();
   constructor(private files: FileService) {}
   async list(): Promise<WorkspaceProfile[]> {
     return z
@@ -21,7 +22,7 @@ export class WorkspaceService {
       .parse(await readLocalJson(path.join(this.files.dataDir, 'workspaces.json'), []));
   }
   save(name: string, scopeIds: string[], id?: string) {
-    const operation = this.queue.then(async () => {
+    return this.queue.run(async () => {
       scopeIds = [...new Set(scopeIds)];
       const current = await this.list();
       if (id && !current.some((item) => item.id === id)) throw Error('Unknown workspace');
@@ -39,11 +40,9 @@ export class WorkspaceService {
       ]);
       return value;
     });
-    this.queue = operation.catch(() => {});
-    return operation;
   }
   remove(id: string) {
-    const operation = this.queue.then(async () => {
+    return this.queue.run(async () => {
       const current = await this.list();
       if (!current.some((item) => item.id === id)) throw Error('Unknown workspace');
       await writeLocalJson(
@@ -51,51 +50,9 @@ export class WorkspaceService {
         current.filter((item) => item.id !== id),
       );
     });
-    this.queue = operation.catch(() => {});
-    return operation;
   }
 }
 
-async function git(cwd: string, args: string[]) {
-  const env = agentEnv();
-  for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key];
-  env.GIT_TERMINAL_PROMPT = '0';
-  env.GIT_OPTIONAL_LOCKS = '0';
-  const child = launch(
-    'git',
-    ['--no-optional-locks', '-c', 'core.fsmonitor=false', ...args],
-    cwd,
-    env,
-  );
-  return new Promise<string>((resolve, reject) => {
-    let stdout = '';
-    let stopped = false;
-    const timer = setTimeout(() => {
-      stopped = true;
-      void killTree(child);
-      reject(Error('Git inspection timed out'));
-    }, 8000);
-    child.stdout?.on('data', (b) => {
-      stdout += b.toString();
-      if (stdout.length > 1024 * 1024 && !stopped) {
-        stopped = true;
-        void killTree(child);
-        reject(Error('Git output exceeds limit'));
-      }
-    });
-    child.stderr?.resume();
-    child.stdin?.end();
-    child.on('error', () => {
-      clearTimeout(timer);
-      reject(Error('Gitを起動できません。'));
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (!stopped)
-        code === 0 ? resolve(stdout.trimEnd()) : reject(Error('Git情報を取得できません。'));
-    });
-  });
-}
 export function githubRepository(remote: string): string | undefined {
   // Return only an owner/repository identity; never display embedded credentials or query strings.
   const scp = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(remote);
@@ -111,6 +68,9 @@ export function githubRepository(remote: string): string | undefined {
   }
 }
 export async function inspectRepository(root: string): Promise<RepositoryInfo> {
+  const runner = new GitProcess();
+  const git = async (cwd: string, args: string[]) =>
+    (await runner.run(cwd, args, { inspection: true })).trimEnd();
   try {
     root = await fs.realpath(root);
     if (!(await fs.stat(root)).isDirectory()) throw Error('フォルダを選択してください。');
@@ -170,5 +130,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       kind: 'unavailable',
       detail: 'フォルダまたはGit情報を確認できません。接続先とアクセス権を確認してください。',
     };
+  } finally {
+    await runner.close();
   }
 }

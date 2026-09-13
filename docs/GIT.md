@@ -1,0 +1,42 @@
+# Per-space Git collaboration
+
+Design direction, 2026-09-13: extend the existing writing workspace with a focused change-review sheet. Retain graphite `#25282c`, paper `#fafaf8`, ink `#22292e`, muted `#626b75`, rule `#dfe3e5` and ember `#c88435`. Use the existing Noto Sans JP/system typography; reserve monospace for patches and revisions. A left-aligned file/history list sits beside a broad review surface; the owning space and remote remain visible above both. Separate local commit controls from remote sharing. This makes repository ownership, already central to the five-pane explorer, the organizing principle rather than adding a generic dashboard.
+
+```text
+space / branch                         remote / receive / share
+changes | history
+file selection         diff or conflict versions
+                       commit message / commit selected changes
+```
+
+## Implemented journey
+
+Open **変更と履歴** after saving the active note. The space selector keeps each independent repository's changes, branch and history separate. Select a changed file to review its working-tree diff, then use **commit 対象に追加**. Already staged changes appear separately and can be inspected or removed from the index without reverting the working file. Partial staging performed in another tool is preserved: a commit includes the displayed index, while later unstaged edits stay on disk. The confirmation lists all staged paths and the message before the native commit runs. It does not push.
+
+**履歴** paginates local commits, with first-parent commit diffs. **取得** fetches the selected remote branch without updating notes. Counts describe the locally observed remote-tracking history, not a continuous online observation. **受信** fetches and accepts only a fast-forward into a clean working tree. **履歴を統合** explicitly starts Git's normal merge without an automatic merge commit. Conflicts show base/ours/theirs and a manual result field. Resolving a supported text conflict saves the result, stages that path, and retains the observed versions in private device-local `git-recovery/` files before replacement. Delete/modify conflicts offer an explicit deletion choice. Finishing the merge requires a reviewed commit.
+
+**共有内容を確認** names the space, branch, remote and exact commit to push. Push uses one explicit source OID and destination branch; it disables force, recursive submodule publication and follow-tags, and refuses mirror/multiple-push-URL remotes. Native rejection retains local commits and index/worktree changes. GitHub remotes offer an explicit **GitHub を開く** action for access settings and pull-request workflows; irori does not create pull requests or bypass branch protections.
+
+**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization and then returns to the existing inspected registration flow. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
+
+## Boundaries and recovery
+
+- Native Git runs through typed, Zod-validated HostAPI calls. No raw renderer command/IPC interface is added. Arguments and literal pathspecs preserve spaces, Japanese, newlines and glob-like filenames without shell interpolation. Native credential helpers, SSH, hooks and signing remain effective; provider model calls are unnecessary.
+- Git mutations queue per working tree. The host prevents overlap with agent execution, file saves/registration and cloud attachment changes. Shutdown waits for Git operations to finish. Process output and runtime are bounded (4 MiB; 30 seconds locally, 90 seconds for transport); termination settles before releasing the mutation lock.
+- Review tokens detect observed HEAD/index/remote changes and changed selected file bytes before staging or resolving. An outdated commit or push review is rejected. Unsaved conflict text blocks navigation and remains in the sheet after a stale-resolution rejection so the user can review the new versions and retry.
+- Contents and nested registered scopes are excluded from working-tree scans and history diffs. A separate index inspection surfaces already staged foreign paths and blocks their commit; users can unstage them. Symlink/directory/submodule staging is refused. Incoming edits to contents, nested ownership or the active scope declaration are refused before merge. Scope declaration reconciliation needs a separate future implementation.
+- No hard reset, worktree restore, implicit stash, forced push or automatic conflict choice is used. Index-only removal is explicit, including removing an initial staged file whose working bytes have changed. Existing hooks may reject an operation; their raw output and credential-bearing transport diagnostics are not returned to the renderer.
+
+These checks coordinate this application instance, not arbitrary external Git clients or hostile concurrent filesystem writers. There remains a narrow check-to-operation race; native Git's own index/ref locks and conflict checks still apply. Hooks and native configuration belong to the user's repository trust model. Rebase/cherry-pick continuation, merge abort, branch creation/switching, remote editing, automatic fetch, and binary/large-file conflict editing are outside this slice. Uncommitted resolution typing survives refresh/rejection in the live sheet but is not a persistent crash-recovery draft. Text review/resolution is bounded at 2 MiB; Git output and change lists also have limits.
+
+## Verification
+
+`npm run build` passes. `npm test` passes 42 behavior tests, with four opt-in native harness/rclone controls skipped. The 12 new Git tests use real temporary repositories and local bare remotes: exact paths and initial commits, partial staging, unstage without deleting work, stale reviews, scope/contents isolation, native hook rejection and diagnostic redaction, serialization of duplicate commits, fetch/fast-forward/push, divergent history, text and delete/modify merge resolution with recovery copies, remote retargeting, and clone input/destination validation.
+
+`xvfb-run -a npm run test:ui` passes all five scripts: existing editor/session, cloud protocol fixtures, harness protocol fixtures, layered explorer, and the new Git journey. The actual Electron Git journey additionally tests review/commit/share, history isolation, native divergence and merge, preserving unsaved resolution text after a stale-result rejection, editor refresh, modal focus return, 1024px bounds, and real clone/registration. Clone's GitHub URL is rewritten to a disposable local bare repository through a test-only Git config; this is real Git execution, not an authenticated GitHub transport acceptance test. Screenshot/log evidence stays in ignored `test-results/`.
+
+Live GitHub login/credential-expiry/branch-protection acceptance and native Windows/macOS execution remain open. No real account publication, real cloud operation, inference, installer or release is implied by the local fixtures.
+
+The running VM preview was restarted normally after verification. Its separate **Git連携を試す** workspace provides a prepared diff and a local bare remote for review/commit/share; existing personal/team sample bytes were preserved. The demo is ignored device state, described in [VM-PREVIEW](VM-PREVIEW.md).
+
+Git behavior follows the native executable and first-party documentation: [status porcelain](https://git-scm.com/docs/git-status), [staging and commit](https://git-scm.com/docs/git-commit), [index-only restore](https://git-scm.com/docs/git-restore), [merge without automatic commits](https://git-scm.com/docs/git-merge), and [explicit push refspecs](https://git-scm.com/docs/git-push). Authentication uses existing credential helpers/SSH. No provider model call is needed for this feature.

@@ -1,4 +1,6 @@
 import { build } from 'esbuild';
+import { tsImport } from 'tsx/esm/api';
+const { hostArguments } = await tsImport('../src/domain/host-requests.ts', import.meta.url);
 await build({
   entryPoints: ['src/host/main.ts'],
   outfile: 'dist-host/main.cjs',
@@ -15,4 +17,5 @@ await build({
   platform: 'node',
   format: 'cjs',
   external: ['electron'],
+  define: { HOST_METHODS: JSON.stringify(Object.keys(hostArguments)) },
 });

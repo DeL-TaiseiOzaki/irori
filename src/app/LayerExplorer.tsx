@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
+import { useResource } from './useResource';
 
 const host = window.irori;
 const categories = { personal: '個人', team: 'チーム', organization: '組織' };
@@ -23,26 +24,19 @@ function Tree({
   selected?: Document;
   onOpen: (space: Space, entry: Entry) => void;
 }) {
-  const [listing, setListing] = useState<Listing>();
+  const listing = useResource(
+    () => host.entries(space.scopeId, directory),
+    [space.scopeId, directory, revision],
+    { enabled: !!directory },
+  );
   const [expanded, setExpanded] = useState<string[]>(
     directory ? [] : ['Knowledge_Base', ...space.contents],
   );
-  useEffect(() => {
-    if (!directory) return;
-    let live = true;
-    void host
-      .entries(space.scopeId, directory)
-      .then((entries) => {
-        if (live) setListing({ entries });
-      })
-      .catch((error) => {
-        if (live) setListing({ entries: [], error: String(error) });
-      });
-    return () => {
-      live = false;
-    };
-  }, [space.scopeId, directory, revision]);
-  const data = directory ? listing : roots;
+  const data = directory
+    ? listing.data || listing.error
+      ? { entries: listing.data ?? [], error: listing.error }
+      : undefined
+    : roots;
   const entries = data?.entries.filter((entry) => entry.layer === layer) ?? [];
   return (
     <div className="tree">

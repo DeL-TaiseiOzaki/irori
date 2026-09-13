@@ -1,3 +1,4 @@
+import { Dialog } from './Dialog';
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
@@ -19,6 +20,7 @@ import { sourceOnly } from '../editor/preservation';
 import './style.css';
 import { Startup, RegisterSpace } from './Startup';
 import { Connections } from './Connections';
+import { GitPanel } from './GitPanel';
 import { LayerExplorer } from './LayerExplorer';
 import { appIcon } from './branding';
 import { Icon } from './Icon';
@@ -182,10 +184,12 @@ function SessionControls({
   );
 }
 function App() {
+  const [creatingNote, setCreatingNote] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
+  const [gitOpen, setGitOpen] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
@@ -303,7 +307,7 @@ function App() {
     };
   }, []);
   async function save() {
-    if (!doc || doc.readOnly) return;
+    if (!doc || doc.readOnly || gitOpen) return;
     try {
       const saved = await host.save({ ...doc, text: editor.current?.getText() ?? buffer });
       load(saved);
@@ -499,6 +503,20 @@ function App() {
             <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
           </div>
           <div className="actions">
+            {active && (
+              <button
+                disabled={running || dirty || connecting}
+                onClick={() => {
+                  if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
+                    report('未保存のノートを保存してから Git の変更を確認してください。');
+                    return;
+                  }
+                  setGitOpen(true);
+                }}
+              >
+                <Icon name="branch" /> 変更と履歴
+              </button>
+            )}
             {active && (
               <button
                 disabled={running || dirty || connecting}
@@ -801,6 +819,17 @@ function App() {
           </div>
         </aside>
       )}
+      {gitOpen && active && (
+        <GitPanel
+          spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
+          initialScope={active.scopeId}
+          onClose={() => setGitOpen(false)}
+          onChanged={() => {
+            setRevision((r) => r + 1);
+            void reconcile();
+          }}
+        />
+      )}
       {add && (
         <RegisterSpace
           onCancel={() => setAdd(false)}
@@ -824,12 +853,13 @@ function App() {
         />
       )}
       {newNote && (
-        <div className="modal-backdrop">
+        <Dialog label="ノートを作成" busy={creatingNote} onClose={() => setNewNote(false)}>
           <form
             className="modal"
             onSubmit={(e) => {
               e.preventDefault();
-              if (active)
+              if (active && !creatingNote) {
+                setCreatingNote(true);
                 void host
                   .createNote(active.scopeId, noteName)
                   .then((d) => {
@@ -838,7 +868,9 @@ function App() {
                     setNoteName('');
                     setRevision((r) => r + 1);
                   })
-                  .catch(report);
+                  .catch(report)
+                  .finally(() => setCreatingNote(false));
+              }
             }}
           >
             <h2>ノートを作成</h2>
@@ -850,13 +882,15 @@ function App() {
               required
             />
             <div className="actions">
-              <button type="button" onClick={() => setNewNote(false)}>
+              <button type="button" disabled={creatingNote} onClick={() => setNewNote(false)}>
                 キャンセル
               </button>
-              <button className="primary">作成</button>
+              <button className="primary" disabled={creatingNote}>
+                作成
+              </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </div>
   );

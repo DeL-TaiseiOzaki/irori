@@ -1,6 +1,9 @@
 import type { CSSProperties } from 'react';
 
 const paths = {
+  branch:
+    'M6 3v12a4 4 0 0 0 4 4h4m4-13v2a4 4 0 0 1-4 4H6M8 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 1a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm-2 15a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
+  history: 'M3 11a9 9 0 1 1 2 7M3 4v7h7m2-5v6l4 2',
   chevron: 'm9 5 7 7-7 7',
   folder: 'M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z',
   file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6M8 13h8M8 17h5',

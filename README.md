@@ -6,7 +6,7 @@ This independent repository contains the first working note + agent milestone. E
 
 ## Run
 
-Requires Node.js **24+**, npm, and a desktop session. Install and configure the desired `codex`, `claude`, `opencode` or `pi` CLI using its own setup/login flow. irori uses the installed CLI, its native configuration, and its existing authentication. Pi requires version 0.85+; native control probes used OpenCode 1.18.30 and Pi 0.85.1. See [harness compatibility](docs/HARNESSES.md).
+Requires Node.js **24.15+ (24.x) or 26+**, npm, and a desktop session. Install and configure the desired `codex`, `claude`, `opencode` or `pi` CLI using its own setup/login flow. irori uses the installed CLI, its native configuration, and its existing authentication. Pi requires version 0.85+; native control probes used OpenCode 1.18.30 and Pi 0.85.1. See [harness compatibility](docs/HARNESSES.md).
 
 ```sh
 cd /workspace/KB_design/irori
@@ -34,7 +34,7 @@ xvfb-run -a npm run test:ui
 
 This runs UI checks and writes `test-results/irori-desktop.png`, then exits. `xvfb-run -a npm run start:container` can keep the app running on a virtual display, but that virtual window is not automatically visible to you.
 
-If the system Node is still 20, `npm ci` emits engine warnings even though subsequent npm scripts use the pinned local Node 24. The pasted run completed installation and compilation; those warnings were not the root-user startup failure. Use Node 24+ for dependency installation on development machines. The Vite chunk-size warning concerns bundle size and does not mean that the build failed.
+If the system Node is still 20, `npm ci` emits engine warnings even though subsequent npm scripts use the pinned local Node 24. The pasted run completed installation and compilation; those warnings were not the root-user startup failure. Use a supported Node 24.15+ or 26+ runtime for dependency installation on development machines. The Vite chunk-size warning concerns bundle size and does not mean that the build failed.
 
 1. Startup shows **ワークスペースを選択**. Select a saved workspace, or use **KBフォルダを開く** to register existing local checkouts/folders with a name and personal/team/organization category. The preview inspects the Git root, GitHub repository, branch and local changes.
 2. **登録して開く** explicitly creates `.irori/scope.json` for a new registration and adds `/contents/` to `.gitignore`. Existing Markdown is not moved. Select one or more registered spaces, name the workspace and press **選択したスペースを開く**. Each checkout keeps its own Git history and native agent configuration; irori does not initialize or publish a repository.
@@ -46,6 +46,14 @@ If the system Node is still 20, `npm ci` emits engine warnings even though subse
 8. The left explorer follows the [LayeredKB layout](docs/LAYERED-EXPLORER.md): Schema above, personal/team Knowledge Base in the middle, and personal/team contents below. Expand the owning space to browse files; use its **＋** to create a note or **接続** to manage cloud folders. These views preserve separate repository settings and agent conversations.
 
 CLI-native rules/settings/skills/MCP discovery remain the provider's responsibility. irori never combines every team's instructions. Native ancestor discovery still applies; registration is an ownership boundary, not an OS sandbox. Codex requests workspace-write/on-request/user review; Claude uses default permissions and native user/project/local settings. Existing native allow/deny rules remain effective.
+
+## GitHub and Git collaboration
+
+Open **変更と履歴** to review the active space's changes and commit history. Inspect a file, add its saved changes to **commit 対象**, and review the file list/message before committing locally. Existing staged changes remain visible; partial staging is preserved. **共有内容を確認** previews a separate push to that repository's remote branch.
+
+**取得** updates remote observations. **受信** accepts clean fast-forwards; **履歴を統合** starts a native merge and opens conflicts for manual review, saving recovery copies before resolution. Finish a merge with a reviewed commit. No automatic stash, hard reset or force-push is used. The startup **GitHub から取得** flow clones into a new selected folder and continues normal space registration. Native Git credentials, hooks and signing settings apply.
+
+The feature is exercised with real disposable Git repositories and local bare remotes through both service and Electron tests. Live GitHub authentication/branch-protection acceptance and Windows/macOS execution remain outstanding. See [Git workflow, limits and evidence](docs/GIT.md).
 
 ## Cloud connection preview
 
@@ -83,7 +91,7 @@ Tests put detailed local evidence in ignored `test-results/` and mutate only dis
 
 Device data lives in Electron's standard `userData` directory (override with `IRORI_DATA_DIR` for tests). Workspace selections, account metadata, rclone credentials and checkout-specific cloud bindings stay there. Portable `.irori/cloud-mounts.json` declarations contain folder IDs and user-chosen relative names, with no account credentials or absolute paths. Disconnected attachments stay visible; cloud access requires verified folder identity and a live managed mount. Existing `contents` bytes are never moved or deleted by setup.
 
-Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, GitHub collaboration, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, terminal, stable note/artifact identities and versioned provenance. See the acceptance matrix before treating the preview as a release. The distribution license for irori itself remains undecided; upstream notices are in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
+Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology UI, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, terminal, stable note/artifact identities and versioned provenance. See the acceptance matrix before treating the preview as a release. The distribution license for irori itself remains undecided; upstream notices are in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
 
 ## Download website
 
@@ -94,3 +102,5 @@ Windows and Mac installer buttons currently show **配布準備中** because no 
 ## Resume from checkpoint
 
 [Checkpoint and restart guide](docs/CHECKPOINT.md) records the accepted distribution direction, implemented work, verification evidence and remaining implementation. This is a local development checkpoint, not a downloadable release.
+
+The implementation reuse audit is complete for the current feature set: shared host/queue/dialog/protocol code and matching service libraries are implemented. See [all decisions and validation](docs/REUSE-COMPLETION-2026-09-13.md).

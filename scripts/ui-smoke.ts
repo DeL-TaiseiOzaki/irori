@@ -64,6 +64,19 @@ try {
     .toBe(1254);
   const startupMs = Date.now() - launchStart;
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
+  const registration = page.getByRole('dialog', { name: 'スペース登録' });
+  await expect(registration).toBeVisible();
+  await expect.poll(() => registration.evaluate((element) => element.matches(':modal'))).toBe(true);
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Tab');
+    await expect
+      .poll(() => registration.evaluate((element) => element.contains(document.activeElement)))
+      .toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(registration).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'KBフォルダを開く' })).toBeFocused();
+  await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
   await page.getByLabel('スペースの種類').selectOption('team');

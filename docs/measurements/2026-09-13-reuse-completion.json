@@ -1,0 +1,307 @@
+{
+  "date": "2026-09-13",
+  "scope": "Current-feature reuse audit completion; not release acceptance",
+  "sourceLines": {
+    "auditBaseline": 9068,
+    "firstSlice": 8997,
+    "completed": 8950
+  },
+  "compiledPreloadBytes": {
+    "before": 3085,
+    "after": 1555
+  },
+  "runtime": {
+    "developmentNode": "24.21.0",
+    "electron": "44.3.0",
+    "electronNode": "24.20.0",
+    "requiredNode": "^24.15.0 || >=26.0.0"
+  },
+  "packages": {
+    "@opencode-ai/sdk": {
+      "version": "1.18.30",
+      "license": "MIT",
+      "engines": null,
+      "dependencies": {
+        "cross-spawn": "7.0.6"
+      }
+    },
+    "eventsource-parser": {
+      "version": "4.1.0",
+      "license": "MIT",
+      "engines": {
+        "node": ">=22.12"
+      },
+      "dependencies": null
+    },
+    "write-file-atomic": {
+      "version": "8.0.0",
+      "license": "ISC",
+      "engines": {
+        "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+      },
+      "dependencies": {
+        "signal-exit": "^4.0.1"
+      }
+    },
+    "signal-exit": {
+      "version": "4.1.0",
+      "license": "ISC",
+      "engines": {
+        "node": ">=14"
+      },
+      "dependencies": null
+    }
+  },
+  "validation": {
+    "build": "passed",
+    "behavior": {
+      "passed": 54,
+      "failed": 0,
+      "skipped": 0,
+      "nativeControlsEnabled": 4
+    },
+    "ui": {
+      "passed": ["editor and restart", "cloud", "harness fixtures", "layered explorer", "Git"],
+      "failed": 0
+    },
+    "modelTurns": 0,
+    "realCloudAccountOperations": 0,
+    "liveGithubOperations": 0
+  },
+  "acpNativeTrial": {
+    "version": "1.18.30",
+    "modelTurns": 0,
+    "protocolVersion": 1,
+    "capabilities": {
+      "loadSession": true,
+      "mcpCapabilities": {
+        "http": true,
+        "sse": true
+      },
+      "promptCapabilities": {
+        "embeddedContext": true,
+        "image": true
+      },
+      "sessionCapabilities": {
+        "close": {},
+        "fork": {},
+        "list": {},
+        "resume": {}
+      }
+    },
+    "created": true,
+    "cancelled": true,
+    "resumed": true,
+    "foreignRootRejected": false
+  },
+  "codexTypeGeneration": {
+    "version": "0.154.0",
+    "files": 711,
+    "lines": 7807,
+    "adopted": false
+  },
+  "source": [
+    {
+      "path": "agents/adapter.ts",
+      "lines": 20,
+      "sha256": "4e48ca44c1baf872bc8ad2ee3889e16bb3f362e2d407d9ea6bf387dcb43ddb58"
+    },
+    {
+      "path": "agents/json-lines.ts",
+      "lines": 98,
+      "sha256": "f71c5eae1f59c36bfa287ec2db593fc81d2705e91688c4157f2b211835b123d5"
+    },
+    {
+      "path": "agents/opencode.ts",
+      "lines": 297,
+      "sha256": "cfb3571d86772d0e47e5b447be1983bc9770b7431f74c1bc23c4b25f1f485968"
+    },
+    {
+      "path": "agents/pi.ts",
+      "lines": 213,
+      "sha256": "74269b1b28bcffec4ab7b52e2088fa720f64be4a8bc0a86c085e6993710a7bc4"
+    },
+    {
+      "path": "agents/process.ts",
+      "lines": 66,
+      "sha256": "f98c0eb3c3095ee8f42b720a5c2fe0ef11d3a0a9c7b41a9772dc56688085d5a3"
+    },
+    {
+      "path": "agents/rpc.ts",
+      "lines": 37,
+      "sha256": "d1a40d31fa7b55afd0c170ca58167e03075978c245b6d72de4e63a08897d9366"
+    },
+    {
+      "path": "agents/service.ts",
+      "lines": 447,
+      "sha256": "1495b9d63c2e85db781648ad80f0150a2c6b4cda1f974ae8b127688e689a6c0c"
+    },
+    {
+      "path": "agents/sessions.ts",
+      "lines": 70,
+      "sha256": "621db23e389bdf2650a044847aed8c7ceed815c86888d3a4e7d094c4a6ecc6e7"
+    },
+    {
+      "path": "app/Connections.tsx",
+      "lines": 423,
+      "sha256": "51b8194a1d830b566a9d00f69450d73001cf7478c5f1507c1eed3e7931f469b8"
+    },
+    {
+      "path": "app/Dialog.tsx",
+      "lines": 39,
+      "sha256": "0f162c9b1d7a128f1e9f4949cec9fe4441904d22ac4c0c641de2645c88951da3"
+    },
+    {
+      "path": "app/GitPanel.tsx",
+      "lines": 711,
+      "sha256": "bc327dca9c898a11ab34f37fb1859244cebb047818e1e4ba7d2a8d5190651084"
+    },
+    {
+      "path": "app/Icon.tsx",
+      "lines": 51,
+      "sha256": "513c99abd948a612f7d76f69a5abb6a1e733561aaf5ccdc5df9377f1ec5d9323"
+    },
+    {
+      "path": "app/LayerExplorer.tsx",
+      "lines": 357,
+      "sha256": "eb858b2f430466e9a722be619fac8f516ee6134292500b41f6058cfb140e40f4"
+    },
+    {
+      "path": "app/Startup.tsx",
+      "lines": 490,
+      "sha256": "490b04b879cb1d94e44ff0a6caf73058249962857a683a97672e4343c3177734"
+    },
+    {
+      "path": "app/branding.ts",
+      "lines": 1,
+      "sha256": "4a9947bab200dce904a020ec2ea2757b5fcd145c3ea4fc6adaa8f11ef77d16f1"
+    },
+    {
+      "path": "app/main.tsx",
+      "lines": 898,
+      "sha256": "f81ec64f01cfaa8f26646271149d70c6e6179edb6e06587dbbdc8b4d8723de85"
+    },
+    {
+      "path": "app/style.css",
+      "lines": 1550,
+      "sha256": "42504a06d19408c58bb98bf2a7d1fc47102976dd5b586ef463c94ad003b46e11"
+    },
+    {
+      "path": "app/useResource.ts",
+      "lines": 44,
+      "sha256": "201fa61456d395162c72212d26f8c6aedcc1e52304224b8c56015d0fc0e88ee0"
+    },
+    {
+      "path": "cloud/accounts.ts",
+      "lines": 270,
+      "sha256": "7ca23565c1b28e8935177146450a39d7705c9781f4c3c2c03ace8d40113d2df0"
+    },
+    {
+      "path": "cloud/rclone.ts",
+      "lines": 138,
+      "sha256": "a8b9748f6ec30a6db2f6bcc3d12ad5920c26b7e4a32b4dd8ff3242f95da456b8"
+    },
+    {
+      "path": "cloud/service.ts",
+      "lines": 577,
+      "sha256": "585a000c0090bad63fe4983fbe7a62332a75287abf09c72eb7edf75149effbff"
+    },
+    {
+      "path": "domain/connections.ts",
+      "lines": 34,
+      "sha256": "3927724145d7dde3a0734ebdcc92c156f75e58801ac2c59ce22ffb226d9cfadf"
+    },
+    {
+      "path": "domain/git.ts",
+      "lines": 59,
+      "sha256": "5e0a97db7f86a1f6e3260e08f9af9fd3f412935182f72e466ae280151d34ab33"
+    },
+    {
+      "path": "domain/host-bridge.ts",
+      "lines": 11,
+      "sha256": "92c9359bd7e08e0d0588237a4ac867a8abdcf0b28ed7ce6b0a16e56d90153753"
+    },
+    {
+      "path": "domain/host-requests.ts",
+      "lines": 102,
+      "sha256": "eafc4f0417972c9b76d6dd8edcbde95d827f3f74188d8a3c450c18e72a313eb9"
+    },
+    {
+      "path": "domain/scopes.ts",
+      "lines": 33,
+      "sha256": "c8523f62858fed4efc58f33004db453d1d3403bc7feb8a1cc4182a7ea4787a17"
+    },
+    {
+      "path": "domain/types.ts",
+      "lines": 196,
+      "sha256": "0b6efcd7ab928a1f3d4471b657d152c53493ebd10c2e653fb0811034a16df1eb"
+    },
+    {
+      "path": "editor/Editor.tsx",
+      "lines": 103,
+      "sha256": "a16c9138d932e93cb204d86fa42b54c573f181a3e9c5aa7bd54dedfba6d61f97"
+    },
+    {
+      "path": "editor/preservation.ts",
+      "lines": 9,
+      "sha256": "2146e2029aebe7cc3ae0b602971a838ac310dd6b890c41badfe0a180c1408206"
+    },
+    {
+      "path": "env.d.ts",
+      "lines": 1,
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "git/process.ts",
+      "lines": 106,
+      "sha256": "c2dea5125129686328b16dd5bae85aa3a527f1dbcbe53dd3b78cdba8717abbb2"
+    },
+    {
+      "path": "git/service.ts",
+      "lines": 719,
+      "sha256": "1f459c86a13a1f9491421c435b87ce8c2e4821373d67356eef13e8d9246cc007"
+    },
+    {
+      "path": "host/files.ts",
+      "lines": 304,
+      "sha256": "57315c734d7472f6b58c9dad32e31f231cb38c57b2a2b3190c2ce854f0ff139e"
+    },
+    {
+      "path": "host/http.ts",
+      "lines": 22,
+      "sha256": "c52b5c4228beb81378f16e1596d6f9cbabb49cc4360f9b3678c30e28c832222e"
+    },
+    {
+      "path": "host/local-json.ts",
+      "lines": 29,
+      "sha256": "a6f93fa0a5e5848c8de29cd4aa6ebc79490dd797c279f10eab11c49082b51f1e"
+    },
+    {
+      "path": "host/main.ts",
+      "lines": 253,
+      "sha256": "4cae451ae1ee94bde242d8a138cbbcb02fd870eff198685310150e2d49eae3d6"
+    },
+    {
+      "path": "host/preload.ts",
+      "lines": 19,
+      "sha256": "92d1082a0b44a660c1696ff57d56ba7afbcb5a738605cf5ed6fa2b8fc113232d"
+    },
+    {
+      "path": "host/serial-queue.ts",
+      "lines": 17,
+      "sha256": "74a966a1ca39a4406b4d8d43050dd2b34ba24a63d62468244f5f8f302853de1b"
+    },
+    {
+      "path": "host/workspaces.ts",
+      "lines": 136,
+      "sha256": "19deb7016f42958fece39ab07f4088cff9fed5372defea1ca8b704f3fd729c86"
+    }
+  ],
+  "limitations": [
+    "ACP native control is not full provider model-turn parity",
+    "Private directories and same-process queues do not lock out external writers",
+    "File fsync is not a complete crash consistency guarantee",
+    "Windows/macOS and live cloud/GitHub acceptance are not established",
+    "Existing VM preview was not restarted"
+  ]
+}

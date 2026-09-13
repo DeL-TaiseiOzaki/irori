@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { writeLocalJson } from '../host/local-json';
 import { z } from 'zod';
 import type { AgentId, AgentSession } from '../domain/types';
 import { agentIds } from '../domain/types';
@@ -61,15 +62,7 @@ export class SessionStore {
       handle,
       updatedAt: new Date().toISOString(),
     });
-    const filename = this.filename(binding);
-    await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
-    const temporary = filename + '.' + randomUUID() + '.tmp';
-    try {
-      await fs.writeFile(temporary, JSON.stringify(value) + '\n', { flag: 'wx', mode: 0o600 });
-      await fs.rename(temporary, filename);
-    } finally {
-      await fs.rm(temporary, { force: true });
-    }
+    await writeLocalJson(this.filename(binding), value);
   }
   async reset(binding: SessionBinding) {
     await fs.rm(this.filename(binding), { force: true });

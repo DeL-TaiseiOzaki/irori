@@ -1,14 +1,13 @@
-import { agentIds } from '../domain/types';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import chokidar, { type FSWatcher } from 'chokidar';
-import { z } from 'zod';
+import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { FileService } from './files';
 import { AgentService } from '../agents/service';
 import { CloudService } from '../cloud/service';
 import { WorkspaceService, inspectRepository } from './workspaces';
-import { providerId } from '../domain/connections';
+import { GitService } from '../git/service';
 import type { HostEvent, Space } from '../domain/types';
 let window: BrowserWindow | undefined;
 let closing = false;
@@ -26,6 +25,17 @@ app
     const cloud = new CloudService(files, (url) => shell.openExternal(url));
     files.cloud = cloud;
     const workspaces = new WorkspaceService(files);
+    let fileMutations = 0;
+    const git = new GitService(files, () => !agents.busy && !cloud.busy && fileMutations === 0);
+    async function changeFiles<T>(fn: () => Promise<T>) {
+      if (git.busy) throw Error('Git 操作の完了後に保存・登録してください。');
+      fileMutations++;
+      try {
+        return await fn();
+      } finally {
+        fileMutations--;
+      }
+    }
     function watch(space: Space) {
       let timer: NodeJS.Timeout | undefined;
       const watcher = chokidar.watch(space.root, {
@@ -73,213 +83,114 @@ app
     window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
       callback(false),
     );
-    const text = z.string().max(2 * 1024 * 1024),
-      id = z.uuid(),
-      rel = z.string().max(4096);
-    const doc = z.object({
-      scopeId: id,
-      path: rel,
-      text,
-      hash: z.string().regex(/^[a-f0-9]{64}$/),
-    });
+    async function changed<T>(scopeId: string, operation: () => Promise<T>) {
+      try {
+        return await operation();
+      } finally {
+        emit({ type: 'files', scopeId });
+      }
+    }
+    function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
+      if (agents.busy || git.busy)
+        throw Error('実行を停止してからクラウド接続を変更してください。');
+      return changed(scopeId, operation);
+    }
+    const handlers = {
+      gitStatus: (id) => git.status(id),
+      gitDiff: (...args) => git.diff(...args),
+      gitHistory: (...args) => git.history(...args),
+      gitCommitDiff: (...args) => git.commitDiff(...args),
+      gitConflict: (...args) => git.conflict(...args),
+      gitStage: (...args) => changed(args[0], () => git.stage(...args)),
+      gitCommit: (...args) => changed(args[0], () => git.commit(...args)),
+      gitSync: (...args) => changed(args[0], () => git.sync(...args)),
+      gitResolve: (...args) => changed(args[0], () => git.resolve(...args)),
+      gitClone: (input) => git.clone(input),
+      gitOpenRepository: async (id) => {
+        await shell.openExternal(await git.repositoryURL(id));
+      },
+      repositories: inspectRepository,
+      workspaces: () => workspaces.list(),
+      saveWorkspace: (...args) => workspaces.save(...args),
+      removeWorkspace: (id) => workspaces.remove(id),
+      cloudSetup: () => cloud.setup(),
+      cloudAccounts: () => cloud.accounts.list(),
+      addCloudAccount: (name) => cloud.addAccount(name),
+      cancelCloudAccount: (id) => cloud.cancelAccount(id),
+      removeCloudAccount: (id) => {
+        if (agents.busy || git.busy)
+          throw Error('実行を停止してからアカウントを登録解除してください。');
+        return cloud.removeAccount(id);
+      },
+      cloudDrives: (id) => cloud.accounts.drives(id),
+      cloudFolders: (...args) => cloud.accounts.folders(...args),
+      cloudConnections: (id) => cloud.connections(id),
+      addCloudAttachment: (input) => changeCloud(input.scopeId, () => cloud.add(input)),
+      connectCloud: (...args) => changeCloud(args[0], () => cloud.connect(...args)),
+      disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
+      renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
+      spaces: () => files.list(),
+      chooseFolder: async () => {
+        const choice = await dialog.showOpenDialog(window!, {
+          properties: ['openDirectory'],
+          title: 'KBフォルダを選択',
+        });
+        return choice.canceled ? null : choice.filePaths[0];
+      },
+      register: async (root, name, category) => {
+        if (agents.busy || cloud.busy || git.busy)
+          throw Error('Stop ongoing operations before registering a space');
+        const inspection = await inspectRepository(root);
+        if (inspection.kind === 'unavailable') throw Error(inspection.detail);
+        const space = await changeFiles(() => files.register(root, name, category));
+        watch(space);
+        return space;
+      },
+      entries: (...args) => files.entries(...args),
+      read: (...args) => files.read(...args),
+      save: (doc) => {
+        if (agents.busy)
+          throw Error('エージェント実行中は保存できません。停止後に変更を確認してください。');
+        return changeFiles(() => files.save(doc));
+      },
+      draft: (doc) => files.draft(doc),
+      createNote: (...args) => {
+        if (agents.busy) throw Error('Stop the agent before creating a note');
+        return changeFiles(() => files.createNote(...args));
+      },
+      openExternal: async (...args) => {
+        const filename = await files.resolve(...args);
+        const choice = await dialog.showMessageBox(window!, {
+          type: 'question',
+          message: '外部アプリで開きますか？',
+          detail: filename,
+          buttons: ['キャンセル', '開く'],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (choice.response === 1) {
+          const error = await shell.openPath(filename);
+          if (error) throw Error(error);
+        }
+      },
+      agents: () => agents.available(),
+      agentSession: (...args) => agents.session(...args),
+      resetAgentSession: (...args) => agents.resetSession(...args),
+      start: (input) => {
+        if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
+        if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
+        return agents.start(input);
+      },
+      cancel: () => agents.cancel(),
+      respond: (...args) => agents.respond(...args),
+    } satisfies HostHandlers;
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {
       try {
         if (event.sender !== window?.webContents || event.senderFrame?.url !== trustedURL)
           throw Error('Untrusted renderer');
-        let value: unknown;
-        switch (method) {
-          case 'repositories':
-            value = await inspectRepository(rel.parse(args[0]));
-            break;
-          case 'workspaces':
-            value = await workspaces.list();
-            break;
-          case 'saveWorkspace':
-            value = await workspaces.save(
-              z.string().trim().min(1).max(120).parse(args[0]),
-              z.array(id).min(1).max(100).parse(args[1]),
-              id.optional().parse(args[2]),
-            );
-            break;
-          case 'cloudSetup':
-            value = await cloud.setup();
-            break;
-          case 'removeWorkspace':
-            value = await workspaces.remove(id.parse(args[0]));
-            break;
-          case 'cloudAccounts':
-            value = await cloud.accounts.list();
-            break;
-          case 'addCloudAccount':
-            value = await cloud.addAccount(z.string().trim().min(1).max(120).parse(args[0]));
-            break;
-          case 'cancelCloudAccount':
-            value = await cloud.cancelAccount(id.parse(args[0]));
-            break;
-          case 'removeCloudAccount':
-            if (agents.busy) throw Error('実行を停止してからアカウントを登録解除してください。');
-            value = await cloud.removeAccount(id.parse(args[0]));
-            break;
-          case 'cloudDrives':
-            value = await cloud.accounts.drives(id.parse(args[0]));
-            break;
-          case 'cloudFolders':
-            value = await cloud.accounts.folders(
-              id.parse(args[0]),
-              providerId.parse(args[1]),
-              providerId.optional().parse(args[2]),
-            );
-            break;
-          case 'cloudConnections':
-            value = await cloud.connections(id.parse(args[0]));
-            break;
-          case 'addCloudAttachment': {
-            if (agents.busy) throw Error('実行を停止してからクラウド接続を登録してください。');
-            const input = z
-              .object({
-                scopeId: id,
-                accountId: id,
-                name: z.string().max(200),
-                contentsRoot: rel,
-                folder: z.object({
-                  id: providerId,
-                  name: z.string().max(1024),
-                  parentId: providerId,
-                  driveId: providerId.optional(),
-                }),
-              })
-              .parse(args[0]);
-            value = await cloud.add(input);
-            emit({ type: 'files', scopeId: input.scopeId });
-            break;
-          }
-          case 'connectCloud':
-          case 'disconnectCloud':
-          case 'renameCloud':
-          case 'removeCloud':
-          case 'bindCloud': {
-            if (agents.busy) throw Error('実行を停止してからクラウド接続を変更してください。');
-            const scopeId = id.parse(args[0]),
-              mountId = id.parse(args[1]);
-            try {
-              value =
-                method === 'connectCloud'
-                  ? await cloud.connect(scopeId, mountId)
-                  : method === 'disconnectCloud'
-                    ? await cloud.disconnect(scopeId, mountId)
-                    : method === 'renameCloud'
-                      ? await cloud.edit(scopeId, mountId, z.string().max(200).parse(args[2]))
-                      : method === 'removeCloud'
-                        ? await cloud.edit(scopeId, mountId)
-                        : await cloud.bind(scopeId, mountId, id.parse(args[2]));
-            } finally {
-              emit({ type: 'files', scopeId });
-            }
-            break;
-          }
-          case 'spaces':
-            value = files.list();
-            break;
-          case 'chooseFolder': {
-            const choice = await dialog.showOpenDialog(window!, {
-              properties: ['openDirectory'],
-              title: 'KBフォルダを選択',
-            });
-            value = choice.canceled ? null : choice.filePaths[0];
-            break;
-          }
-          case 'register': {
-            if (agents.busy || cloud.busy)
-              throw Error('Stop ongoing operations before registering a space');
-            const inspection = await inspectRepository(rel.parse(args[0]));
-            if (inspection.kind === 'unavailable') throw Error(inspection.detail);
-            const s = await files.register(
-              rel.parse(args[0]),
-              z.string().min(1).max(120).parse(args[1]),
-              z.enum(['personal', 'team', 'organization']).parse(args[2]),
-            );
-            watch(s);
-            value = s;
-            break;
-          }
-          case 'entries':
-            value = await files.entries(id.parse(args[0]), rel.parse(args[1]));
-            break;
-          case 'read':
-            value = await files.read(id.parse(args[0]), rel.parse(args[1]));
-            break;
-          case 'save':
-            if (agents.busy)
-              throw Error('エージェント実行中は保存できません。停止後に変更を確認してください。');
-            value = await files.save(doc.parse(args[0]));
-            break;
-          case 'draft':
-            value = await files.draft(doc.parse(args[0]));
-            break;
-          case 'createNote':
-            if (agents.busy) throw Error('Stop the agent before creating a note');
-            value = await files.createNote(id.parse(args[0]), z.string().max(120).parse(args[1]));
-            break;
-          case 'openExternal': {
-            const filename = await files.resolve(id.parse(args[0]), rel.parse(args[1]));
-            const choice = await dialog.showMessageBox(window!, {
-              type: 'question',
-              message: '外部アプリで開きますか？',
-              detail: filename,
-              buttons: ['キャンセル', '開く'],
-              defaultId: 0,
-              cancelId: 0,
-            });
-            if (choice.response === 1) {
-              const error = await shell.openPath(filename);
-              if (error) throw Error(error);
-            }
-            break;
-          }
-          case 'agents':
-            value = await agents.available();
-            break;
-          case 'agentSession':
-            value = await agents.session(id.parse(args[0]), z.enum(agentIds).parse(args[1]));
-            break;
-          case 'resetAgentSession':
-            value = await agents.resetSession(id.parse(args[0]), z.enum(agentIds).parse(args[1]));
-            break;
-          case 'start':
-            if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
-            value = agents.start(
-              z
-                .object({
-                  scopeId: id,
-                  agent: z.enum(agentIds),
-                  prompt: z.string().min(1).max(32000),
-                  notePath: rel.optional(),
-                  newSession: z.boolean().optional(),
-                })
-                .parse(args[0]),
-            );
-            break;
-          case 'cancel':
-            value = await agents.cancel();
-            break;
-          case 'respond':
-            value = agents.respond(
-              id.parse(args[0]),
-              z.boolean().parse(args[1]),
-              args[2] === undefined
-                ? undefined
-                : z
-                    .record(
-                      z.string(),
-                      z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]),
-                    )
-                    .parse(args[2]),
-            );
-            break;
-          default:
-            throw Error('Unknown host operation');
-        }
-        return { ok: true, value };
+        return { ok: true, value: await dispatchHost(handlers, method, args) };
       } catch (error) {
         return { ok: false, error: String(error) };
       }
@@ -288,6 +199,13 @@ app
       if (closing) return;
       event.preventDefault();
       void (async () => {
+        if (git.busy) {
+          await dialog.showMessageBox(window!, {
+            message: 'Git 操作が実行中です。完了後にウィンドウを閉じてください。',
+            buttons: ['戻る'],
+          });
+          return;
+        }
         // The renderer persists drafts continuously; give it an explicit final opportunity.
         try {
           await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
@@ -310,6 +228,7 @@ app
           if (answer.response !== 1) return;
         }
         await agents.cancel();
+        await git.close();
         try {
           await cloud.close();
         } catch (error) {

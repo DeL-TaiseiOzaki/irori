@@ -7,6 +7,54 @@ import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
 import { launch, killTree } from '../src/agents/process';
 import { Rpc } from '../src/agents/rpc';
+import { PiRpc } from '../src/agents/pi';
+
+test('Both native JSONL envelopes preserve fragmented UTF-8 and bound records before a newline', async () => {
+  for (const provider of ['codex', 'pi']) {
+    for (const oversized of [false, true]) {
+      const child = launch(
+        process.execPath,
+        [
+          '-e',
+          `
+        process.stdin.once('data', () => {
+          if (${oversized}) { process.stdout.write('x'.repeat(8 * 1024 * 1024 + 1)); return; }
+          const response = ${
+            provider === 'pi'
+              ? "{ type: 'response', id: '1', success: true, data: '日本語' }"
+              : "{ id: 1, result: '日本語' }"
+          };
+          const bytes = Buffer.from(JSON.stringify(response) + '\\r\\n');
+          let i = 0;
+          const timer = setInterval(() => { process.stdout.write(bytes.subarray(i, ++i)); if(i === bytes.length) clearInterval(timer); }, 1);
+        });
+      `,
+        ],
+        process.cwd(),
+      );
+      const abort = new AbortController();
+      const rpc =
+        provider === 'pi'
+          ? new PiRpc(
+              child,
+              () => {},
+              () => {},
+              abort.signal,
+            )
+          : new Rpc(child, () => {});
+      try {
+        const request = rpc.request('probe', {});
+        if (oversized) {
+          await assert.rejects(request, /exceeds limit/);
+          await assert.rejects(rpc.request('again', {}), /stopped/);
+        } else assert.equal(await request, '日本語');
+      } finally {
+        rpc.fail(Error('Test ended'));
+        await killTree(child);
+      }
+    }
+  }
+});
 test('RPC rejects pending requests after process crash and handles fragmented JSON lines', async () => {
   const child = launch(
     process.execPath,

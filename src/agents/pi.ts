@@ -1,92 +1,43 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { StringDecoder } from 'node:string_decoder';
+import { JsonLineConnection } from './json-lines';
 import type { ChildProcess } from 'node:child_process';
 import { launch, version } from './process';
 import type { NativeContext } from './adapter';
 
-// Pi uses LF-delimited JSON, not JSON-RPC. Bound partial records before parsing.
+// Pi uses its own response envelopes, not JSON-RPC.
 export class PiRpc {
-  private next = 0;
-  private pending = new Map<
-    string,
-    { resolve(v: any): void; reject(e: Error): void; timer: NodeJS.Timeout }
-  >();
-  private dead = false;
+  private connection: JsonLineConnection;
   constructor(
-    readonly child: ChildProcess,
+    child: ChildProcess,
     incoming: (event: any) => void,
     failure: (error: Error) => void,
     signal: AbortSignal,
   ) {
-    let buffer = '';
-    const decoder = new StringDecoder('utf8');
-    const fail = (error: Error) => {
-      if (!this.dead) {
-        this.fail(error);
-        failure(error);
-      }
-    };
-    child.stdout!.on('data', (chunk: Buffer) => {
-      if (this.dead) return;
-      buffer += decoder.write(chunk);
-      if (buffer.length > 8 * 1024 * 1024) return fail(Error('Pi protocol record exceeds limit'));
-      let index: number;
-      while ((index = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, index).replace(/\r$/, '');
-        buffer = buffer.slice(index + 1);
-        if (!line) continue;
-        try {
-          const event = JSON.parse(line);
-          if (!event || typeof event.type !== 'string') throw Error('Missing event type');
-          if (event.type === 'response') {
-            const pending = this.pending.get(event.id);
-            if (pending) {
-              this.pending.delete(event.id);
-              clearTimeout(pending.timer);
-              event.success === true
-                ? pending.resolve(event.data)
-                : pending.reject(Error(String(event.error ?? 'Pi request failed')));
-            }
-          } else incoming(event);
-        } catch {
-          fail(Error('Pi returned an invalid protocol record'));
-          return;
-        }
-      }
-    });
-    child.stderr?.resume();
-    child.on('error', fail);
-    child.stdin!.on('error', fail);
-    child.on('close', (code) => fail(Error(`Pi exited before completion (${code})`)));
-    signal.addEventListener('abort', () => fail(Error('Pi run cancelled')), { once: true });
-    if (signal.aborted) fail(Error('Pi run cancelled'));
+    this.connection = new JsonLineConnection(
+      child,
+      (event) => {
+        if (typeof event.type !== 'string') throw Error('Missing Pi event type');
+        if (event.type === 'response')
+          this.connection.accept(
+            event.id,
+            event.data,
+            event.success === true ? undefined : String(event.error ?? 'Pi request failed'),
+          );
+        else incoming(event);
+      },
+      failure,
+      signal,
+    );
   }
   send(value: unknown) {
-    if (!this.dead) this.child.stdin!.write(JSON.stringify(value) + '\n');
+    this.connection.send(value);
   }
   request(type: string, values: Record<string, unknown> = {}): Promise<any> {
-    if (this.dead) return Promise.reject(Error('Pi process has stopped'));
-    const id = String(++this.next);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => {
-          this.pending.delete(id);
-          reject(Error(`Pi request timed out: ${type}`));
-        },
-        type === 'prompt' ? 600000 : 45000,
-      );
-      this.pending.set(id, { resolve, reject, timer });
-      this.send({ ...values, id, type });
-    });
+    return this.connection.request({ ...values, type }, type === 'prompt' ? 600000 : 45000);
   }
   fail(error: Error) {
-    this.dead = true;
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(error);
-    }
-    this.pending.clear();
+    this.connection.fail(error);
   }
 }
 

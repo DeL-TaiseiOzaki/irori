@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import { launch, killTree, agentEnv } from '../agents/process';
+import { readJson } from '../host/http';
 
 export interface RcloneAPI {
   call(method: string, params?: Record<string, unknown>): Promise<any>;
@@ -122,9 +123,7 @@ export class Rclone implements RcloneAPI {
         signal: AbortSignal.timeout(45000),
       });
       if (!response.ok) throw Error(`rclone request failed (${response.status})`);
-      const body = await response.text();
-      if (body.length > 8 * 1024 * 1024) throw Error('Cloud response exceeds limit');
-      return JSON.parse(body);
+      return await readJson(response);
     } catch {
       // RC error bodies can contain credentials, input parameters and machine paths.
       throw Error('クラウド操作に失敗しました。接続・ログイン状態を確認して再試行してください。');

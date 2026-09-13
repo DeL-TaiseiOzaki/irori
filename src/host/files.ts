@@ -2,6 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { SerialQueue } from './serial-queue';
+import { writeLocalFile, writeLocalJson } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space } from '../domain/types';
 const relative = z
@@ -28,13 +30,8 @@ export class FileService {
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
-  private queue: Promise<unknown> = Promise.resolve();
+  private queue = new SerialQueue();
   constructor(readonly dataDir: string) {}
-  private serialized<T>(fn: () => Promise<T>): Promise<T> {
-    const next = this.queue.then(fn);
-    this.queue = next.catch(() => {});
-    return next;
-  }
   async init() {
     await fs.mkdir(this.dataDir, { recursive: true, mode: 0o700 });
     try {
@@ -103,7 +100,7 @@ export class FileService {
     }
   }
   async register(root: string, name: string, category: Category): Promise<Space> {
-    return this.serialized(async () => {
+    return this.queue.run(async () => {
       root = await fs.realpath(root);
       if (!(await fs.stat(root)).isDirectory()) throw Error('Choose a KB directory');
       let s: Space;
@@ -156,10 +153,7 @@ export class FileService {
         ...this.bindings.filter((b) => b.scopeId !== s.scopeId),
         { root: s.root, scopeId: s.scopeId },
       ];
-      await this.atomic(
-        path.join(this.dataDir, 'spaces.json'),
-        JSON.stringify(this.bindings, null, 2),
-      );
+      await writeLocalJson(path.join(this.dataDir, 'spaces.json'), this.bindings);
       return s;
     });
   }
@@ -250,24 +244,15 @@ export class FileService {
     return path.join(this.dataDir, `draft-${hash(doc.scopeId + '\0' + doc.path)}.json`);
   }
   async draft(doc: Document) {
-    return this.serialized(() => this.writeDraft(doc));
+    return this.queue.run(() => this.writeDraft(doc));
   }
   private async writeDraft(doc: Document) {
     this.get(doc.scopeId);
     relative.parse(doc.path);
-    await this.atomic(this.draftPath(doc), JSON.stringify({ text: doc.text, baseHash: doc.hash }));
-  }
-  private async atomic(filename: string, text: string) {
-    const temp = `${filename}.${randomUUID()}.tmp`;
-    try {
-      await fs.writeFile(temp, text, { mode: 0o600, flag: 'wx' });
-      await fs.rename(temp, filename);
-    } finally {
-      await fs.rm(temp, { force: true });
-    }
+    await writeLocalJson(this.draftPath(doc), { text: doc.text, baseHash: doc.hash });
   }
   async save(doc: Document): Promise<Document> {
-    return this.serialized(async () => {
+    return this.queue.run(async () => {
       if (classify(this.get(doc.scopeId), doc.path) === 'contents')
         throw Error('このクラウド接続は読み取り専用です。');
       await this.writeDraft(doc);
@@ -277,7 +262,7 @@ export class FileService {
         throw Error('CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。');
       if (hash(doc.text) !== doc.hash) {
         // Retain the previous observed version against a racing external writer.
-        await this.atomic(
+        await writeLocalFile(
           path.join(this.dataDir, `backup-${hash(before)}.txt`),
           before.toString('utf8'),
         );

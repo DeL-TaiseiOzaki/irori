@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { OpenCodeServer } from '../src/agents/opencode';
+import { OpenCodeServer, data } from '../src/agents/opencode';
 import { PiRpc, runPi } from '../src/agents/pi';
 import { launch, killTree, agentEnv } from '../src/agents/process';
 import type { ChildProcess } from 'node:child_process';
@@ -33,12 +33,12 @@ test(
     assert.equal((await server.start()).healthy, true);
     const response = await server.request('/global/health');
     assert.equal((await fetch(response.url)).status, 401);
-    const session = await server.json('/session', 'POST', {});
+    const session = await data(server.client.session.create());
     assert.equal(
       await import('node:fs/promises').then((fs) => fs.realpath(session.directory)),
       cwd,
     );
-    assert.equal((await server.json('/session/' + session.id)).id, session.id);
+    assert.equal((await data(server.client.session.get({ sessionID: session.id }))).id, session.id);
     let connected = false;
     const [events] = await server.events((event) => {
       if (event.type === 'server.connected') connected = true;
@@ -46,10 +46,10 @@ test(
     const ending = events.catch(() => {});
     for (let n = 0; n < 100 && !connected; n++) await new Promise((r) => setTimeout(r, 10));
     assert.ok(connected);
-    await server.json('/session/' + session.id, 'DELETE');
+    await data(server.client.session.delete({ sessionID: session.id }));
     server.stop();
     await ending;
-    await assert.rejects(server.json('/global/health'));
+    await assert.rejects(data(server.client.global.health()));
   },
 );
 
