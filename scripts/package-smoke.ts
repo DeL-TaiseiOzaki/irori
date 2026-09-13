@@ -181,7 +181,11 @@ try {
   console.log(
     `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save and normal shutdown.`,
   );
+} catch (error) {
+  // Preserve the actual failure if Windows briefly retains an executable handle during cleanup.
+  console.error('Packaged app verification failed:', error);
+  throw error;
 } finally {
   await application?.close();
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
