@@ -19,6 +19,12 @@ context needed for the task:
   `../docs/irori/` are historical; current decisions and implementation records
   take precedence.
 
+For every new feature, create a dedicated branch from the current integration
+branch before implementation. Verify the change, commit and push the feature
+branch, then open a pull request targeting `main`. Do not commit or push new
+features directly to `main`; leave the PR open unless merging is authorized.
+This supersedes older handoff wording about direct commit/push authorization.
+
 Keep filesystem/process operations behind `src/domain/types.ts`'s `HostAPI`.
 Never expose raw IPC, Node access or shell execution to document content.
 Use disposable KBs for mutation tests. Keep credentials, provider transcripts

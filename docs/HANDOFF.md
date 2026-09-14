@@ -1,5 +1,11 @@
 # irori continuation handoff
 
+Workflow update, 2026-09-14: the owner requires every future new feature to start
+on a dedicated branch and be submitted through a PR to `main`. Verify and push
+the feature branch, open the PR and leave it open unless merging is authorized.
+This supersedes older direct-to-main feature commit/push instructions; earlier
+checkpoint hashes below remain historical evidence.
+
 Source 0.1.5 daily recovery work is merged into `main` as
 `278f5a407e270752057dbe4a10574a9450644934` and published. Read
 [RECOVERY-AND-NOTE-TOOLS](RECOVERY-AND-NOTE-TOOLS.md) for private composer/Git
@@ -106,7 +112,7 @@ Continue development in `/workspace/KB_design/irori`, an independent Git reposit
 
 Follow [AGENTS](../AGENTS.md) and use [STATUS](STATUS.md) to locate the current work. Load [README](../README.md) for setup, the [host decision](decisions/001-initial-host.md) for architecture changes, [confirmed product decisions](decisions/002-release-and-workspace.md) for product constraints, and [CHECKPOINT](CHECKPOINT.md) / [RELEASE-PLAN](RELEASE-PLAN.md) for delivery. The current sections and actual code supersede historical milestone statements. Open only the topic needed from [DISTRIBUTOR-GOOGLE](DISTRIBUTOR-GOOGLE.md), [CLOUD-SETUP](CLOUD-SETUP.md), [TERMINAL](TERMINAL.md), [PACKAGING](PACKAGING.md), [ACCEPTANCE](ACCEPTANCE.md), [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md) and [ONTOLOGY](ONTOLOGY.md). The [initial workspace specifications](../../docs/irori/) are historical; their old Q01/Q02 proposals are superseded by ADR 002.
 
-Respond in Japanese. Write code, identifiers, technical documents and commit messages in English. The user prioritizes simple code and established libraries, expects implementation and verification, and has authorized commit/push. Complete independent work while waiting for device/account input. Read [the completed reuse assessment](REUSE-COMPLETION-2026-09-13.md) before proposing another broad library migration; Git collaboration and native adapters already exist.
+Respond in Japanese. Write code, identifiers, technical documents and commit messages in English. The user prioritizes simple code and established libraries, expects implementation and verification, and has authorized feature-branch commit/push and PR creation. Every new feature must follow the branch/PR workflow above. Complete independent work while waiting for device/account input. Read [the completed reuse assessment](REUSE-COMPLETION-2026-09-13.md) before proposing another broad library migration; Git collaboration and native adapters already exist.
 
 ## Public delivery and exact identities
 
@@ -183,7 +189,7 @@ Use disposable KBs for mutation tests. Keep filesystem/process work behind the t
 
 ## Authorization and local state
 
-The owner authorized development, verification and commit/push, and separately requested the Windows testing download channel and the terminal/Google follow-ups. Preserve that existing authorization for necessary tested updates; do not re-ask for already authorized work. The narrow unsigned Windows preview is not approval for a complete general release, a Mac release, unrelated external account changes, or paid native model execution. Follow AGENTS for real provider tests; do not run `test:agents` or real-model UI tests without the required authorization, or bypass provider authentication/permissions.
+The owner authorized development, verification, feature-branch commit/push and PR creation, and separately requested the Windows testing download channel and the terminal/Google follow-ups. Every new feature now requires a dedicated branch and PR; previous commit/push authorization does not permit direct feature changes on `main` or imply merge authorization. Preserve authorization for necessary tested work without re-asking. The narrow unsigned Windows preview is not approval for a complete general release, a Mac release, unrelated external account changes, or paid native model execution. Follow AGENTS for real provider tests; do not run `test:agents` or real-model UI tests without the required authorization, or bypass provider authentication/permissions.
 
 The old VM preview may still be running older code. `.local/vm-preview/samples` and `.local/vm-preview/device` contain untracked user data: preserve them and do not reset/delete them. This checkpoint did not restart that preview. `.local/publication/`, `.local/rclone/`, `.local/downloads/`, `out/` and `test-results/` hold ignored tools/test artifacts, including a synthetic-client local package; publish only the verified CI artifact for the exact intended commit. The anonymous download checker is `.local/publication/check-site.mjs`, not a tracked production dependency.
 
