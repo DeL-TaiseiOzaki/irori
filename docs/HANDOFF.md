@@ -1,5 +1,18 @@
 # irori continuation handoff
 
+Windows 0.1.4 publication, 2026-09-14: the owner authorized merging PR #2 and
+publishing the Windows update. PR #2 is merged as
+`e72a62b53950b2ddb3f9132f4e66f341a74f80fc`; its Git tree exactly matches native CI
+34841807049's tested PR merge. The
+[0.1.4 preview](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.4-preview.1)
+is public with the unchanged verified EXE, checksum and Windows package evidence.
+The EXE is 318,426,624 bytes with SHA-256
+`ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b`; GitHub's asset
+digest matches. The website manifest is updated to 0.1.4, with Mac slots disabled.
+Pages deployment and anonymous delivery still need their own completion record.
+The previous installed version and installed 0.1.4 acceptance remain unknown;
+the owner's approval is publication authorization, not a successful device test.
+
 Daily-workflow branch, 2026-09-14: source version 0.1.4 on
 `feat/daily-editing-workflow` implements the repeated installed-app feedback.
 See [Daily workflow](DAILY-WORKFLOW.md) for the save/immediate-undo fix, native

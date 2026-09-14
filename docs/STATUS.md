@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Authorized publication, 2026-09-14: [PR #2](https://github.com/DeL-TaiseiOzaki/irori/pull/2)
+is merged as `e72a62b53950b2ddb3f9132f4e66f341a74f80fc`. The
+[Windows 0.1.4 preview](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.4-preview.1)
+publishes the unchanged EXE from successful native CI 34841807049; the tested
+PR-merge tree exactly matches the final merged tree. The installer is
+318,426,624 bytes, SHA-256
+`ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b`, matching GitHub's
+uploaded digest. [Release notes](releases/0.1.4-preview.1.md) record changes and
+the exact identity. The website manifest selects 0.1.4; Pages deployment and
+anonymous download verification are recorded separately when completed. Mac
+downloads remain disabled. No Windows installed-device acceptance was supplied.
+
 Daily-workflow follow-up, 2026-09-14: source version 0.1.4 addresses repeated
 installed-app feedback. [Daily workflow](DAILY-WORKFLOW.md) records the reproduced
 save/immediate-undo notification bug and its fix, native OS clipboard coverage,
