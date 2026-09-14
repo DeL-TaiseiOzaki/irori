@@ -53,3 +53,7 @@ if (Object.values(release.downloads).some(Boolean)) {
   document.querySelector('#release-status')!.textContent =
     `v${release.version} 開発プレビュー — 実機での動作確認用です。`;
 }
+if (release.notes) {
+  // Assigned as a URL property; the manifest keeps this link on the published release.
+  document.querySelector<HTMLAnchorElement>('#release-notes')!.href = release.notes;
+}

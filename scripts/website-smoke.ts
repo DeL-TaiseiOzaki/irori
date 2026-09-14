@@ -51,6 +51,10 @@ try {
       if ((image as HTMLImageElement).naturalWidth !== 1254) throw Error('Brand icon did not load');
     });
   async function checkDownloads(expected: typeof release) {
+    assert.equal(
+      await page.locator('#release-notes').getAttribute('href'),
+      expected.notes ?? 'https://github.com/DeL-TaiseiOzaki/irori/releases',
+    );
     for (const [platform, item] of Object.entries(expected.downloads)) {
       const card = page.locator(`.download-card[data-platform="${platform}"]`);
       if (item) {
@@ -88,6 +92,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-website-mobile.png', fullPage: true });
   const available = releaseSchema.parse({
     version: '0.1.0-fixture',
+    notes: 'https://example.invalid/irori/releases/tag/v0.1.0-fixture',
     downloads: {
       'windows-x64': { url: 'https://example.invalid/irori/windows.exe', size: '100 MB' },
       'macos-arm64': { url: 'https://example.invalid/irori/arm64.dmg', size: '101 MB' },
@@ -95,7 +100,11 @@ try {
     },
   });
   const fixtures = [
-    { version: null, downloads: { 'windows-x64': null, 'macos-arm64': null, 'macos-x64': null } },
+    {
+      version: null,
+      notes: null,
+      downloads: { 'windows-x64': null, 'macos-arm64': null, 'macos-x64': null },
+    },
     { ...available, downloads: { ...available.downloads, 'macos-x64': null } },
     available,
   ];
