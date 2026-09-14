@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -10,7 +10,7 @@
     "start": "node scripts/start.mjs",
     "dev": "npm run build && npm start",
     "test": "tsx --test tests/*.test.ts",
-    "test:ui": "tsx scripts/ui-smoke.ts && tsx scripts/cloud-ui-smoke.ts && tsx scripts/harness-ui-smoke.ts && tsx scripts/layers-ui-smoke.ts && tsx scripts/git-ui-smoke.ts && tsx scripts/workspace-cloud-ui-smoke.ts && tsx scripts/knowledge-ui-smoke.ts && tsx scripts/ontology-ui-smoke.ts && tsx scripts/terminal-ui-smoke.ts && tsx scripts/search-ui-smoke.ts",
+    "test:ui": "tsx scripts/ui-smoke.ts && tsx scripts/cloud-ui-smoke.ts && tsx scripts/harness-ui-smoke.ts && tsx scripts/layers-ui-smoke.ts && tsx scripts/git-ui-smoke.ts && tsx scripts/workspace-cloud-ui-smoke.ts && tsx scripts/knowledge-ui-smoke.ts && tsx scripts/ontology-ui-smoke.ts && tsx scripts/terminal-ui-smoke.ts && tsx scripts/search-ui-smoke.ts && tsx scripts/updates-ui-smoke.ts && tsx scripts/daily-workflow-ui-smoke.ts",
     "test:agents": "tsx scripts/real-agents.ts",
     "typecheck": "tsc --noEmit",
     "test:lifecycle": "tsx scripts/lifecycle-agents.ts",

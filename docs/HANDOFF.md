@@ -1,5 +1,22 @@
 # irori continuation handoff
 
+Source 0.1.5 daily recovery work is on `feature/daily-workflow-recovery`, not the
+previous release branch. Read [RECOVERY-AND-NOTE-TOOLS](RECOVERY-AND-NOTE-TOOLS.md)
+for private composer/Git drafts, manual update checks, image feedback, safe
+note organization and match navigation. The public installer and website stay
+at verified 0.1.4; merging or publishing this feature is not authorized by this
+continuation. Final branch verification belongs in STATUS and the open PR.
+
+Local combined verification passes: build/typecheck, 127/131 behavior tests
+(four explicit environment skips), all twelve UI suites, website build and
+fixtures, Linux x64 Forge/relocated packaged smoke and documentation/format
+checks. New packaged checks exercise private composer/conflict drafts and
+recoverable deleted notes after restart without inference. Preserve the
+reconciliation generation/hash guard: delayed file reads must not invent
+conflicts after another read/save has updated the editor. Search mapping uses
+original-source Markdown AST text positions; hidden URL matches do not map to
+unrelated visible text. Native CI results belong to the PR, not a new release.
+
 Windows 0.1.4 public delivery is verified, 2026-09-14. The owner authorized
 merging and publishing; both PR #2 (application) and PR #3 (release metadata)
 are merged. Pages run 34843640838 deployed website revision `e32ed4e`.

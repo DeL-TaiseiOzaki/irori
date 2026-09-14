@@ -209,10 +209,26 @@ try {
   const root = path.join(temporary, '検証 KB');
   await mkdir(root);
   await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
-  await page.evaluate(async (root) => {
+  const recovery = await page.evaluate(async (root) => {
     const space = await window.irori.register(root, '配布検証', 'personal');
     const note = await window.irori.read(space.scopeId, 'note.md');
     await window.irori.save({ ...note, text: '# Packaged edit 日本語\n' });
+    const created = await window.irori.createNote(space.scopeId, '復元対象', 'Tools');
+    const moved = await window.irori.moveNote(created, 'Tools/名前変更.md');
+    if (moved.hash !== created.hash || moved.notice)
+      throw Error('Packaged move did not preserve source identity');
+    const trashed = await window.irori.trashNote(moved);
+    const composer = await window.irori.draftWrite(
+      { kind: 'composer', scopeId: space.scopeId, agent: 'pi' },
+      { text: 'Packaged unsent draft 日本語' },
+      null,
+    );
+    const conflict = await window.irori.draftWrite(
+      { kind: 'git-resolution', scopeId: space.scopeId, path: 'note.md' },
+      { text: 'Packaged conflict draft', baseVersion: 'a'.repeat(64) },
+      null,
+    );
+    return { scopeId: space.scopeId, trashed, composer, conflict };
   }, root);
   assert.equal(await readFile(path.join(root, 'note.md'), 'utf8'), '# Packaged edit 日本語\n');
   await mkdir(path.join(root, 'ontology'));
@@ -390,6 +406,40 @@ try {
   application = await launchPackaged();
   const restored = await application.firstWindow();
   restored.on('pageerror', (error) => errors.push(error.message));
+  const restoredRecovery = await restored.evaluate(async (recovery) => {
+    const composerKey = {
+      kind: 'composer' as const,
+      scopeId: recovery.scopeId,
+      agent: 'pi' as const,
+    };
+    const conflictKey = {
+      kind: 'git-resolution' as const,
+      scopeId: recovery.scopeId,
+      path: 'note.md',
+    };
+    const composer = await window.irori.draftRead(composerKey);
+    const conflict = await window.irori.draftRead(conflictKey);
+    const trashed = await window.irori.trashedNotes(recovery.scopeId);
+    const note = await window.irori.restoreNote(recovery.scopeId, recovery.trashed.id);
+    await window.irori.draftWrite(composerKey, { text: null }, composer!.revision);
+    return {
+      composer,
+      conflict,
+      trashed,
+      note,
+      cleared: await window.irori.draftRead(composerKey),
+    };
+  }, recovery);
+  assert.deepEqual(restoredRecovery.composer, { ...recovery.composer, baseVersion: undefined });
+  assert.deepEqual(restoredRecovery.conflict, recovery.conflict);
+  assert.equal(restoredRecovery.trashed[0].id, recovery.trashed.id);
+  assert.equal(restoredRecovery.note.hash, recovery.trashed.hash);
+  assert.equal(restoredRecovery.note.notice, undefined);
+  assert.equal(restoredRecovery.cleared?.text, null);
+  assert.equal(
+    await readFile(path.join(root, 'Tools/名前変更.md'), 'utf8'),
+    restoredRecovery.note.text,
+  );
   await restored.locator('.workspace-card').first().click();
   await restored.getByRole('button', { name: 'AIに相談', exact: true }).click();
   await expect(restored.getByLabel('送信待ち', { exact: true })).toContainText(
@@ -430,7 +480,7 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned relocated Forge package; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Unsigned relocated Forge package; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,

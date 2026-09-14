@@ -6,6 +6,9 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { FileService } from './files';
 import { SearchService } from './search';
+import { DraftService } from './drafts';
+import { UpdateService } from './updates';
+import { version as appVersion } from '../../package.json';
 import { ImageService } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
@@ -41,6 +44,12 @@ app
     const files = new FileService(app.getPath('userData'));
     await files.init();
     const search = new SearchService(files);
+    const drafts = new DraftService(files);
+    const updates = new UpdateService({
+      currentVersion: appVersion,
+      platform: process.platform,
+      arch: process.arch,
+    });
     const emit = (event: HostEvent) => {
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
@@ -171,6 +180,49 @@ app
       }
     }
     const handlers = {
+      draftRead: (key) => drafts.read(key),
+      draftWrite: (...args) => drafts.write(...args),
+      checkForUpdates: () => updates.check(),
+      openUpdatePage: (target) => updates.open(target, (url) => shell.openExternal(url)),
+      moveNote: (ref, destination) =>
+        changeFiles(() =>
+          changed(ref.scopeId, async () => {
+            if (agents.busy || cloud.busy)
+              throw Error('実行と接続の準備が終わってからノートを整理してください。');
+            const source = await knowledge.capture(ref);
+            if (source.hash !== ref.hash)
+              throw Error('ノートが変更されています。開き直して確認してください。');
+            const next = await files.moveNote(ref, destination);
+            if (next.path === ref.path) return next;
+            try {
+              await knowledge.rebind(source, { scopeId: next.scopeId, path: next.path });
+              return next;
+            } catch {
+              return {
+                ...next,
+                notice:
+                  'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
+              };
+            }
+          }),
+        ),
+      trashNote: (ref) =>
+        changeFiles(() =>
+          changed(ref.scopeId, async () => {
+            if (agents.busy || cloud.busy)
+              throw Error('実行と接続の準備が終わってからノートを整理してください。');
+            return files.trashNote(ref);
+          }),
+        ),
+      trashedNotes: (id) => files.trashedNotes(id),
+      restoreNote: (id, trashId) =>
+        changeFiles(() =>
+          changed(id, async () => {
+            if (agents.busy || cloud.busy)
+              throw Error('実行と接続の準備が終わってから復元してください。');
+            return files.restoreNote(id, trashId);
+          }),
+        ),
       search: (...args) => search.search(...args),
       knowledgeHistory: (id) => {
         files.get(id);
@@ -359,6 +411,7 @@ app
         }
         await agents.cancel();
         try {
+          await drafts.idle();
           await agents.flush();
         } catch {
           await dialog.showMessageBox(window!, {

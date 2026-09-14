@@ -1,0 +1,33 @@
+.update-notice {
+  font-size: 12px;
+  line-height: 1.5;
+  min-width: 0;
+}
+.update-notice > button {
+  background: transparent;
+  border-color: transparent;
+  padding: 4px 6px;
+  font-size: inherit;
+}
+.update-notice-result {
+  padding: 6px;
+  overflow-wrap: anywhere;
+}
+.update-notice-result p {
+  margin: 0 0 6px;
+}
+.update-notice-version {
+  opacity: 0.78;
+}
+.update-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.update-notice-actions button {
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 5px 7px;
+}

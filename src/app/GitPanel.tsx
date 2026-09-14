@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
 import { Icon } from './Icon';
+import { useDraft } from './useDraft';
 import './git-panel.css';
 const host = window.irori;
 const stateNames: Record<string, string> = {
@@ -130,8 +131,7 @@ function RepositoryPanel({
   const [diff, setDiff] = useState<GitDiff>(),
     [conflict, setConflict] = useState<GitConflict>(),
     [resolution, setResolution] = useState('');
-  const [message, setMessage] = useState(''),
-    [confirmation, setConfirmation] = useState<'commit' | GitSyncAction>();
+  const [confirmation, setConfirmation] = useState<'commit' | GitSyncAction>();
   const [history, setHistory] = useState<GitCommit[]>([]),
     [more, setMore] = useState(false),
     [commit, setCommit] = useState<GitCommit>(),
@@ -143,6 +143,29 @@ function RepositoryPanel({
     reads = useRef(0),
     statusReads = useRef(0);
   const resolutionDraft = useRef<{ path: string; text: string } | undefined>(undefined);
+  const messageDraft = useDraft({ scopeId: space.scopeId, kind: 'git-commit' }, space.root);
+  const message = messageDraft.text;
+  const resolutionPath =
+    resolutionDraft.current?.path ??
+    (selection && status?.changes.find((entry) => entry.path === selection.path)?.conflict
+      ? selection.path
+      : undefined);
+  const storedResolution = useDraft(
+    resolutionPath
+      ? {
+          scopeId: space.scopeId,
+          kind: 'git-resolution',
+          path: resolutionPath,
+        }
+      : null,
+    space.root,
+  );
+  const draftBlocked =
+    !messageDraft.ready ||
+    messageDraft.pending ||
+    !!messageDraft.error ||
+    (!!resolutionPath &&
+      (!storedResolution.ready || storedResolution.pending || !!storedResolution.error));
   const confirmationVersion = useRef('');
   const conflictDirty = !!conflict && resolution !== (conflict.working ?? '');
   const reviewing = tab === 'history' ? !!commit : !!selection;
@@ -157,8 +180,8 @@ function RepositoryPanel({
     [],
   );
   useEffect(() => {
-    onBusy(busy || conflictDirty);
-  }, [busy, conflictDirty]);
+    onBusy(busy || conflictDirty || draftBlocked);
+  }, [busy, conflictDirty, draftBlocked]);
   function accept(value: GitStatus) {
     if (alive.current) {
       setStatus(value);
@@ -198,6 +221,9 @@ function RepositoryPanel({
     setNotice('');
     setConfirmation(undefined);
     try {
+      if (!(await messageDraft.flush()) || !(await storedResolution.flush())) {
+        throw Error('下書きを保存してから Git 操作を再試行してください。');
+      }
       if (!(await beforeAction())) return;
       const value = await fn();
       if (value) accept(value);
@@ -298,6 +324,7 @@ function RepositoryPanel({
   const conflicts = status.changes.filter((c) => c.conflict);
   const chosen = status.changes.find((c) => c.path === selection?.path);
   const canCommit =
+    !draftBlocked &&
     !!status.branch &&
     status.operation !== 'other' &&
     !conflicts.length &&
@@ -315,6 +342,17 @@ function RepositoryPanel({
   function confirm(action: GitSyncAction) {
     confirmationVersion.current = status!.version;
     setConfirmation(action);
+  }
+  async function resolveConflict(text: string | null) {
+    if (!selection || !conflict) return;
+    const acknowledged = storedResolution.snapshot().record?.revision;
+    const value = await host.gitResolve(space.scopeId, selection.path, text, conflict.version);
+    if (!(await storedResolution.clear(acknowledged)))
+      throw Error(
+        '統合は解決しましたが、下書きの完了を保存できませんでした。保存を再試行してください。',
+      );
+    resolutionDraft.current = undefined;
+    return value;
   }
   return (
     <>
@@ -345,8 +383,12 @@ function RepositoryPanel({
           e.preventDefault();
           if (!canCommit || !message.trim()) return;
           void perform(async () => {
+            const acknowledged = messageDraft.snapshot().record?.revision;
             const value = await host.gitCommit(space.scopeId, message, status.version);
-            setMessage('');
+            if (!(await messageDraft.clear(acknowledged)))
+              throw Error(
+                'コミットしましたが、下書きの完了を保存できませんでした。保存を再試行してください。',
+              );
             return value;
           }, 'この端末の履歴に commit しました。');
         }}
@@ -356,10 +398,10 @@ function RepositoryPanel({
           <input
             aria-label="commit メッセージ"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => messageDraft.setText(e.target.value)}
             placeholder="メッセージを入力してコミット"
             maxLength={10000}
-            disabled={busy}
+            disabled={busy || !messageDraft.ready}
             required
           />
         </label>
@@ -371,18 +413,33 @@ function RepositoryPanel({
           コミット{staged.length ? ` (${staged.length})` : ''}
         </button>
       </form>
+      {(messageDraft.error || storedResolution.error) && (
+        <div className="git-notice error" role="alert">
+          <p>{messageDraft.error || storedResolution.error}</p>
+          <button
+            onClick={() => void Promise.all([messageDraft.retry(), storedResolution.retry()])}
+          >
+            下書きの保存を再試行
+          </button>
+        </div>
+      )}
+      {(messageDraft.pending || storedResolution.pending) && (
+        <p className="git-notice" aria-live="polite">
+          下書きをこの端末に保存中…
+        </p>
+      )}
       <div className="git-toolbar">
         <div className="git-tabs" role="group" aria-label="Git の表示">
           <button
             aria-pressed={tab === 'changes'}
-            disabled={busy || conflictDirty}
+            disabled={busy || conflictDirty || draftBlocked}
             onClick={() => setTab('changes')}
           >
             変更 <span>{status.changes.length}</span>
           </button>
           <button
             aria-pressed={tab === 'history'}
-            disabled={busy || conflictDirty}
+            disabled={busy || conflictDirty || draftBlocked}
             onClick={() => {
               setTab('history');
               void perform(() => loadHistory());
@@ -393,7 +450,7 @@ function RepositoryPanel({
         </div>
         <div className="actions">
           <button
-            disabled={busy || conflictDirty}
+            disabled={busy || conflictDirty || draftBlocked}
             onClick={() =>
               void perform(async () => {
                 if (tab === 'history') await loadHistory();
@@ -406,7 +463,7 @@ function RepositoryPanel({
           <details className="git-more-actions">
             <summary aria-label="その他の Git 操作">その他</summary>
             <button
-              disabled={busy || conflictDirty || !canSync}
+              disabled={busy || conflictDirty || draftBlocked || !canSync}
               onClick={() =>
                 void perform(
                   () => host.gitSync(space.scopeId, 'fetch', status.version),
@@ -447,7 +504,9 @@ function RepositoryPanel({
           </button>
           <button
             className="primary"
-            disabled={busy || conflictDirty || !canSync || status.operation !== 'none'}
+            disabled={
+              busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
+            }
             onClick={() => confirm('push')}
           >
             Push
@@ -526,7 +585,7 @@ function RepositoryPanel({
                       aria-pressed={
                         selection?.path === entry.path && selection.staged === group.staged
                       }
-                      disabled={busy || conflictDirty}
+                      disabled={busy || conflictDirty || draftBlocked}
                       onClick={() => {
                         setError('');
                         setSelection({ path: entry.path, staged: group.staged });
@@ -612,7 +671,7 @@ function RepositoryPanel({
           >
             <div className="git-review-navigation">
               <button
-                disabled={busy || conflictDirty}
+                disabled={busy || conflictDirty || draftBlocked}
                 onClick={() => {
                   reads.current++;
                   setSelection(undefined);
@@ -659,6 +718,36 @@ function RepositoryPanel({
                 </div>
                 {conflict ? (
                   <>
+                    {storedResolution.ready &&
+                      storedResolution.record?.text != null &&
+                      resolutionDraft.current?.path !== conflict.path && (
+                        <div
+                          className="git-notice git-warning"
+                          role="region"
+                          aria-label="統合の下書きの復元"
+                        >
+                          <p>
+                            {storedResolution.record.baseVersion === conflict.version
+                              ? 'この端末に未完了の統合の下書きがあります。'
+                              : '保存後に Git の状態が変わっています。現在の内容と下書きを比較してから編集に戻してください。'}
+                          </p>
+                          <details>
+                            <summary>保存済みの下書きを確認</summary>
+                            <pre>{storedResolution.record.text || '（空の内容）'}</pre>
+                          </details>
+                          <button
+                            disabled={busy || draftBlocked}
+                            onClick={() => {
+                              const text = storedResolution.record!.text!;
+                              resolutionDraft.current = { path: conflict.path, text };
+                              setResolution(text);
+                              storedResolution.setText(text, conflict.version);
+                            }}
+                          >
+                            下書きを編集に戻す
+                          </button>
+                        </div>
+                      )}
                     <div className="git-conflict-versions">
                       {[
                         { label: '共通の元データ', value: conflict.base },
@@ -681,13 +770,14 @@ function RepositoryPanel({
                           <textarea
                             aria-label="統合する内容"
                             value={resolution}
-                            disabled={busy}
+                            disabled={busy || !storedResolution.ready}
                             onChange={(e) => {
                               resolutionDraft.current = {
                                 path: conflict.path,
                                 text: e.target.value,
                               };
                               setResolution(e.target.value);
+                              storedResolution.setText(e.target.value, conflict.version);
                             }}
                             spellCheck={false}
                           />
@@ -700,8 +790,10 @@ function RepositoryPanel({
                             <button
                               disabled={busy}
                               onClick={() => {
-                                resolutionDraft.current = undefined;
-                                setResolution(conflict.working ?? '');
+                                const text = conflict.working ?? '';
+                                resolutionDraft.current = { path: conflict.path, text };
+                                setResolution(text);
+                                storedResolution.setText(text, conflict.version);
                               }}
                             >
                               統合の編集を戻す
@@ -709,21 +801,10 @@ function RepositoryPanel({
                           )}
                           {(conflict.ours === undefined || conflict.theirs === undefined) && (
                             <button
-                              disabled={busy || loadingReview}
+                              disabled={busy || loadingReview || draftBlocked}
                               onClick={() =>
                                 void perform(
-                                  () =>
-                                    host
-                                      .gitResolve(
-                                        space.scopeId,
-                                        selection.path,
-                                        null,
-                                        conflict.version,
-                                      )
-                                      .then((value) => {
-                                        resolutionDraft.current = undefined;
-                                        return value;
-                                      }),
+                                  () => resolveConflict(null),
                                   '削除として解決しました。commit で統合を完了できます。',
                                 )
                               }
@@ -733,21 +814,10 @@ function RepositoryPanel({
                           )}
                           <button
                             className="primary"
-                            disabled={busy || loadingReview}
+                            disabled={busy || loadingReview || draftBlocked}
                             onClick={() =>
                               void perform(
-                                () =>
-                                  host
-                                    .gitResolve(
-                                      space.scopeId,
-                                      selection.path,
-                                      resolution,
-                                      conflict.version,
-                                    )
-                                    .then((value) => {
-                                      resolutionDraft.current = undefined;
-                                      return value;
-                                    }),
+                                () => resolveConflict(resolution),
                                 '統合内容を保存し、commit 対象に追加しました。',
                               )
                             }
@@ -839,8 +909,12 @@ function RepositoryPanel({
                 void perform(
                   async () => {
                     if (confirmation === 'commit') {
+                      const acknowledged = messageDraft.snapshot().record?.revision;
                       const value = await host.gitCommit(space.scopeId, message, status.version);
-                      setMessage('');
+                      if (!(await messageDraft.clear(acknowledged)))
+                        throw Error(
+                          'コミットしましたが、下書きの完了を保存できませんでした。保存を再試行してください。',
+                        );
                       return value;
                     }
                     return host.gitSync(space.scopeId, confirmation, confirmationVersion.current);

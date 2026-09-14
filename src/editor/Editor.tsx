@@ -1,7 +1,8 @@
-import { useEffect, useRef, useImperativeHandle, type Ref } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, type Ref } from 'react';
 import { Crepe } from '@milkdown/crepe';
-import { serializerCtx } from '@milkdown/kit/core';
-import { Plugin } from '@milkdown/kit/prose/state';
+import { serializerCtx, editorViewCtx, remarkCtx } from '@milkdown/kit/core';
+import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
+import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import { EditorView } from '@codemirror/view';
@@ -22,6 +23,8 @@ export function Editor({
   onError,
   ref,
   readOnly = false,
+  searchTarget,
+  onSearchResult,
 }: {
   text: string;
   mode: 'rich' | 'source';
@@ -31,7 +34,12 @@ export function Editor({
   onError?: (error: unknown) => void;
   ref?: Ref<EditorHandle>;
   readOnly?: boolean;
+  searchTarget?: SearchTarget;
+  onSearchResult?: (found: boolean) => void;
 }) {
+  const [imageErrors, setImageErrors] = useState<string[]>([]);
+  const navigation = useRef({ searchTarget, onSearchResult });
+  navigation.current = { searchTarget, onSearchResult };
   const root = useRef<HTMLDivElement>(null);
   const change = useRef(onChange);
   change.current = onChange;
@@ -62,6 +70,19 @@ export function Editor({
         }),
       });
       snapshot.current = () => view.state.sliceDoc();
+      if (navigation.current.searchTarget) {
+        // CodeMirror positions count a line separator as one character, even
+        // when sliceDoc preserves the original CRLF encoding on disk.
+        const match = sourceMatch(view.state.doc.toString(), navigation.current.searchTarget);
+        if (match) {
+          view.dispatch({
+            selection: { anchor: match.from, head: match.to },
+            scrollIntoView: true,
+          });
+          view.focus();
+        }
+        navigation.current.onSearchResult?.(!!match);
+      }
       return () => view.destroy();
     }
     // Give each asynchronous Crepe lifecycle its own root (including React cleanup).
@@ -108,6 +129,10 @@ export function Editor({
             try {
               return (await resolveImage?.(url)) ?? '';
             } catch {
+              if (!dead)
+                setImageErrors((errors) =>
+                  errors.includes(url) ? errors : [...errors, url].slice(0, 10),
+                );
               return '';
             }
           },
@@ -147,6 +172,27 @@ export function Editor({
         else {
           ready = true;
           crepe.setReadonly(readOnly);
+          const target = navigation.current.searchTarget;
+          if (target) {
+            const found = crepe.editor.action((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const match = richMatch(
+                view.state.doc,
+                initial.current,
+                target,
+                ctx.get(remarkCtx).parse(initial.current),
+              );
+              if (!match) return false;
+              view.dispatch(
+                view.state.tr
+                  .setSelection(TextSelection.create(view.state.doc, match.from, match.to))
+                  .scrollIntoView(),
+              );
+              view.focus();
+              return true;
+            });
+            navigation.current.onSearchResult?.(found);
+          }
         }
       })
       .catch((error) => {
@@ -164,5 +210,23 @@ export function Editor({
       if (wasReady) void crepe.destroy();
     };
   }, [mode, readOnly]);
-  return <div className={`document-editor ${mode}`} ref={root} data-testid="document-editor" />;
+  return (
+    <>
+      {imageErrors.length > 0 && (
+        <div className="hint image-errors" role="alert">
+          <strong>表示できない画像があります。</strong>
+          <p>
+            画像ファイルの場所・接続と、対応形式（PNG・JPEG・GIF・WebP、20 MiB
+            以下）を確認して、ノートを開き直してください。本文の画像リンクは保持しています。
+          </p>
+          <ul>
+            {imageErrors.map((url) => (
+              <li key={url}>{url}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className={`document-editor ${mode}`} ref={root} data-testid="document-editor" />
+    </>
+  );
 }

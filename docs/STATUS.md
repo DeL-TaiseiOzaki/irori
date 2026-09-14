@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Daily recovery continuation, source 0.1.5: [recovery and note tools](RECOVERY-AND-NOTE-TOOLS.md)
+adds private unsent/commit/conflict drafts, explicit conflict recovery, manual
+update checks, visible image-resolution failures, guarded note destination /
+rename / move / recoverable deletion, and search match navigation. Work belongs
+to the separate `feature/daily-workflow-recovery` branch; no merge or installer
+publication is included. Production build/typecheck, **131 behavior tests
+(127 passed; three optional native controls and one case-insensitive-filesystem
+check skipped)**, all **twelve Electron UI suites**, website build/fixtures,
+formatting, diff and local documentation links pass. Linux x64 Forge packaging
+and relocated smoke pass, including draft and deleted-note recovery after
+restart, note move/source identity, clipboard/save/undo and existing native
+startup checks. All tests use disposable data without model inference.
+Integrated testing reproduced and fixed stale external-file reads inventing a
+conflict after a newer read, and a moved note leaving an obsolete-path error.
+Deterministic reordered-read and successful note-operation UI checks pass.
+The published Windows installer remains the exact 0.1.4 artifact below.
+
 Windows 0.1.4 delivery is complete. [Pages 34843640838](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34843640838)
 deployed website revision `e32ed4e5aca7f4415f0f3e3e4008a44ba9caa703`; a fresh
 anonymous desktop/mobile browser downloaded the complete installer at

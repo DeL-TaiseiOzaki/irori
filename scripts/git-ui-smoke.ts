@@ -1,9 +1,114 @@
-import { _electron as electron, expect } from '@playwright/test';
+import {
+  _electron as electron,
+  expect,
+  type ElectronApplication,
+  type Page,
+} from '@playwright/test';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import type { Space } from '../src/domain/types';
+
+async function checkConcurrentReconcile(
+  app: ElectronApplication,
+  page: Page,
+  root: string,
+  scopeId: string,
+) {
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  // Hold actual read responses in the main-process fixture, never replacing the renderer's HostAPI.
+  await app.evaluate(({ ipcMain }, scopeId) => {
+    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+    const original = (
+      ipcMain as unknown as { _invokeHandlers: Map<string, Handler> }
+    )._invokeHandlers.get('irori')!;
+    const fixture = {
+      original,
+      holding: true,
+      pending: [] as { value: unknown; resolve: (value: unknown) => void }[],
+    };
+    (globalThis as unknown as { gitReadFixture: typeof fixture }).gitReadFixture = fixture;
+    ipcMain.removeHandler('irori');
+    ipcMain.handle('irori', async (event, method, ...args) => {
+      const result = await original(event, method, ...args);
+      if (method !== 'read' || args[0] !== scopeId || args[1] !== 'README.md' || !fixture.holding)
+        return result;
+      return new Promise((resolve) => fixture.pending.push({ value: result, resolve }));
+    });
+  }, scopeId);
+  try {
+    const text = await readFile(path.join(root, 'README.md'), 'utf8');
+    await writeFile(path.join(root, 'README.md'), `${text}\nConcurrent reconcile fixture\n`);
+    await app.evaluate(({ BrowserWindow }, scopeId) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.webContents.send('irori:event', { type: 'files', scopeId });
+      window.webContents.send('irori:event', { type: 'files', scopeId });
+    }, scopeId);
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () =>
+            (globalThis as unknown as { gitReadFixture: { pending: unknown[] } }).gitReadFixture
+              .pending.length,
+        ),
+      )
+      .toBeGreaterThanOrEqual(2);
+    await app.evaluate(() => {
+      const fixture = (
+        globalThis as unknown as {
+          gitReadFixture: {
+            holding: boolean;
+            pending: { value: unknown; resolve: (value: unknown) => void }[];
+          };
+        }
+      ).gitReadFixture;
+      fixture.holding = false;
+      const newest = fixture.pending.pop()!;
+      newest.resolve(newest.value);
+    });
+    await expect(page.locator('.document-editor')).toContainText('Concurrent reconcile fixture');
+    await app.evaluate(() => {
+      const fixture = (
+        globalThis as unknown as {
+          gitReadFixture: {
+            pending: { value: unknown; resolve: (value: unknown) => void }[];
+          };
+        }
+      ).gitReadFixture;
+      for (const pending of fixture.pending.splice(0)) pending.resolve(pending.value);
+    });
+    await page.evaluate(async (scopeId) => {
+      await window.irori.gitStatus(scopeId);
+      await new Promise(requestAnimationFrame);
+    }, scopeId);
+    await expect(page.locator('.conflict')).toHaveCount(0);
+    await expect(page.locator('.document-editor')).toContainText('Concurrent reconcile fixture');
+    await page.locator('.ProseMirror').click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await page.keyboard.insertText('Saved after concurrent refresh\n');
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect
+      .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
+      .toContain('Saved after concurrent refresh');
+  } finally {
+    await app.evaluate(({ ipcMain }) => {
+      type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+      const fixture = (
+        globalThis as unknown as {
+          gitReadFixture: {
+            original: Handler;
+            pending: { value: unknown; resolve: (value: unknown) => void }[];
+          };
+        }
+      ).gitReadFixture;
+      for (const pending of fixture.pending) pending.resolve(pending.value);
+      ipcMain.removeHandler('irori');
+      ipcMain.handle('irori', fixture.original);
+    });
+  }
+}
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori git UI '));
 function git(root: string, ...args: string[]) {
@@ -23,7 +128,7 @@ function git(root: string, ...args: string[]) {
 }
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-const spaces = [];
+const spaces: Space[] = [];
 for (const [name, category] of [
   ['個人KB', 'personal'],
   ['チームKB', 'team'],
@@ -70,17 +175,19 @@ const env = {
   GIT_CONFIG_GLOBAL: globalConfig,
 } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({
-  args: [
-    ...(process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : []),
-    '.',
-  ],
-  env,
-});
+const launch = () =>
+  electron.launch({
+    args: [
+      ...(process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+      '.',
+    ],
+    env,
+  });
+let app = await launch();
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
 try {
-  const page = await app.firstWindow();
+  let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await expect(page.getByRole('checkbox')).toHaveCount(2);
@@ -94,8 +201,8 @@ try {
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
   await page.getByRole('button', { name: 'ソース管理', exact: true }).click();
-  const sidebar = page.getByRole('complementary', { name: 'ソース管理' });
-  const panel = page.locator('.git-sidebar, .git-workspace-detail');
+  let sidebar = page.getByRole('complementary', { name: 'ソース管理' });
+  let panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(sidebar).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.ProseMirror')).toBeVisible();
@@ -105,6 +212,7 @@ try {
   await expect
     .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
     .toContain('Editing with source control open');
+  await checkConcurrentReconcile(app, page, root, spaces[0].scopeId);
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('+UI saved 日本語');
@@ -189,6 +297,56 @@ try {
   await panel
     .getByRole('textbox', { name: '統合する内容' })
     .fill('# Combined\n\nLocal 日本語\nPeer 日本語\n');
+  await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Unfinished merge message');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (scopeId) =>
+          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'README.md' }))
+            ?.text,
+        spaces[0].scopeId,
+      ),
+    )
+    .toBe('# Combined\n\nLocal 日本語\nPeer 日本語\n');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (scopeId) => (await window.irori.draftRead({ kind: 'git-commit', scopeId }))?.text,
+        spaces[0].scopeId,
+      ),
+    )
+    .toBe('Unfinished merge message');
+  await app.close();
+  await writeFile(path.join(root, 'README.md'), 'Native content changed while irori was closed\n');
+  app = await launch();
+  page = await app.firstWindow();
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
+  await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+  await page
+    .locator('.layer-pane.my-kb')
+    .getByRole('button', { name: 'README', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'ソース管理', exact: true }).click();
+  sidebar = page.getByRole('complementary', { name: 'ソース管理' });
+  panel = page.locator('.git-sidebar, .git-workspace-detail');
+  await expect(panel.getByRole('textbox', { name: 'commit メッセージ' })).toHaveValue(
+    'Unfinished merge message',
+  );
+  await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
+  await expect(panel.getByRole('region', { name: '統合の下書きの復元' })).toContainText(
+    'Git の状態が変わっています',
+  );
+  await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
+    'Native content changed while irori was closed\n',
+  );
+  await panel.getByRole('button', { name: '下書きを編集に戻す', exact: true }).click();
+  await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
+    '# Combined\n\nLocal 日本語\nPeer 日本語\n',
+  );
+  expect(await readFile(path.join(root, 'README.md'), 'utf8')).toBe(
+    'Native content changed while irori was closed\n',
+  );
   await page.screenshot({ path: 'test-results/irori-git-conflict.png' });
   await expect(panel.getByRole('button', { name: 'Git 画面を閉じる' })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
@@ -210,8 +368,37 @@ try {
   );
   await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 0 件');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (scopeId) =>
+          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'README.md' }))
+            ?.text,
+        spaces[0].scopeId,
+      ),
+    )
+    .toBe(null);
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Merge reviewed versions');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
+  try {
+    await expect(
+      panel.getByRole('status').filter({ hasText: 'この端末の履歴に commit しました。' }),
+    ).toBeVisible();
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        mergeCommitDiagnostics: {
+          alerts: await page.getByRole('alert').allTextContents(),
+          status: await page.getByRole('status').allTextContents(),
+          head: git(root, 'log', '-1', '--format=%s'),
+          changes: git(root, 'status', '--porcelain'),
+          document: await readFile(path.join(root, 'README.md'), 'utf8'),
+          editor: await page.locator('.document-editor').allTextContents(),
+        },
+      }),
+    );
+    throw error;
+  }
   await expect(panel.locator('.git-warning')).toHaveCount(0);
   expect(git(root, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 800));
@@ -247,6 +434,7 @@ try {
       {
         checks: [
           'Git review flushes the current editor',
+          'late duplicate file-read responses cannot invent an external conflict or block a later save',
           'nonmodal source control keeps the note editable and autosaving',
           'diff returns to the mounted note without closing source control',
           'row and bulk stage/unstage and direct local commit through reviewed file list',
@@ -256,6 +444,9 @@ try {
           'fetch and divergent receive refusal',
           'native merge, both conflict versions, manual resolution and merge commit',
           'dirty conflict blocks closing, repository switching and returning to the note',
+          'unsent commit message and conflict resolution draft survive a full Electron restart',
+          'stale conflict draft restores only explicitly and never overwrites the native file until resolution',
+          'successful conflict resolution acknowledges and durably clears its draft',
           'editor refresh after source control closes',
           '1024px sidebar bounds',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
