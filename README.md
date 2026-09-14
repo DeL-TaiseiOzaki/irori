@@ -1,5 +1,7 @@
 # irori
 
+Development now adds [local KB text search](docs/KB-SEARCH.md). Choose **KB内を検索** in the sidebar, select a KB and search its saved text; results show matching lines and open the current note. Search preserves KB/layer boundaries and reports incomplete results when limits or unreadable files prevent a complete scan. The public Windows installer is unchanged.
+
 Development now adds [source/artifact record search and navigation](docs/KNOWLEDGE-NAVIGATION.md): inspect current file locations, follow version-specific run links, and reconnect a missing source to a matching moved file while retaining its ID and historical bytes. Records remain device-local; the public Windows installer is unchanged.
 
 Development after preview 0.1.3 now retains recent conversation history and pending instructions across restart. Restored queues wait for explicit resumption; interrupted turns are never automatically replayed. See [conversation recovery and limits](docs/CONVERSATIONS.md). The public Windows installer remains the separately published 0.1.3 build.

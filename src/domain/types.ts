@@ -157,6 +157,7 @@ export interface StartRun {
   sources?: import('./knowledge').SourceRef[];
 }
 export interface HostAPI {
+  search(scopeId: string, query: string): Promise<import('./search').KnowledgeSearch>;
   knowledgeHistory(scopeId: string): Promise<import('./knowledge').KnowledgeHistory>;
   restoreSource(source: import('./knowledge').SourceVersion): Promise<void>;
   sourceText(source: import('./knowledge').SourceVersion): Promise<string>;

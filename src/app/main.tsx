@@ -1,4 +1,5 @@
 import { KnowledgePanel } from './KnowledgePanel';
+import { SearchPanel } from './SearchPanel';
 import type { SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
@@ -203,6 +204,7 @@ function App() {
     [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
@@ -631,6 +633,15 @@ function App() {
             {workspace?.name ?? 'ワークスペース'}
           </span>
           <Icon name="chevron" className="rotated" size={13} />
+        </button>
+        <button
+          className="workspace-search"
+          disabled={
+            !spaces.some((space) => workspace?.scopeIds.includes(space.scopeId)) || connecting
+          }
+          onClick={() => setSearchOpen(true)}
+        >
+          <Icon name="search" /> KB内を検索
         </button>
         <LayerExplorer
           spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
@@ -1174,6 +1185,32 @@ function App() {
             </div>
           </div>
         </aside>
+      )}
+      {searchOpen && (
+        <SearchPanel
+          spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
+          initialScopeId={active?.scopeId}
+          beforeSearch={save}
+          onOpen={async (scopeId, hit) => {
+            const target = spaces.find(
+              (space) => space.scopeId === scopeId && workspace?.scopeIds.includes(space.scopeId),
+            );
+            if (!target) throw Error('この KB をワークスペースに追加してから開いてください。');
+            const opened = await open(target, {
+              path: hit.path,
+              name: hit.path.split('/').at(-1)!,
+              directory: false,
+              note: /\.md$/i.test(hit.path),
+              layer: 'Knowledge_Base',
+            });
+            if (!opened)
+              throw Error(
+                'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+              );
+            setSearchOpen(false);
+          }}
+          onClose={() => setSearchOpen(false)}
+        />
       )}
       {knowledgeOpen && active && (
         <KnowledgePanel

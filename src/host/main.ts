@@ -5,6 +5,7 @@ import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { FileService } from './files';
+import { SearchService } from './search';
 import { ImageService } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
@@ -39,6 +40,7 @@ app
     if (!ownsDeviceData) return;
     const files = new FileService(app.getPath('userData'));
     await files.init();
+    const search = new SearchService(files);
     const emit = (event: HostEvent) => {
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
     };
@@ -169,6 +171,7 @@ app
       }
     }
     const handlers = {
+      search: (...args) => search.search(...args),
       knowledgeHistory: (id) => {
         files.get(id);
         return knowledge.history(id);

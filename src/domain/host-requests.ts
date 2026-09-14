@@ -4,6 +4,7 @@ import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
 import { startInput } from './conversation';
+import { searchQuery } from './search';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -16,6 +17,7 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
+  search: z.tuple([id, searchQuery]),
   knowledgeHistory: z.tuple([id]),
   restoreSource: z.tuple([sourceVersion]),
   sourceText: z.tuple([sourceVersion]),

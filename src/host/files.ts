@@ -23,13 +23,13 @@ const declaration = z.object({
   contents: z.array(relative).min(1),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
+export const textFilePattern = /\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i;
 export async function readTextDocument(
   filename: string,
   scopeId: string,
   rel: string,
 ): Promise<Document> {
-  if (!/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(rel))
-    throw Error('Use the external application for this file format');
+  if (!textFilePattern.test(rel)) throw Error('Use the external application for this file format');
   if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
     throw Error('The text editor supports files up to 2 MiB');
   const bytes = await fs.readFile(filename);
