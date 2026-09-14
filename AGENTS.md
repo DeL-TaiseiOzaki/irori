@@ -1,9 +1,36 @@
 # irori contributor contract
 
-This is an independent repository. Do not modify or combine the histories of the two sibling reference repositories.
+irori is the independent Electron / React / TypeScript desktop IDE/ADE. It owns
+note editing, knowledge and Drive connections, and execution of local CLI
+agents. LayeredKB offers irori capabilities in VS Code; `irori-templete` is the
+recommended main-KB repository template under development. Keep each
+repository's changes and Git history separate.
 
-Read README.md, docs/STATUS.md and docs/decisions/001-initial-host.md before continuing substantial work. Product requirements live in ../docs/irori when this checkout is inside KB_design; docs/ACCEPTANCE.md preserves the implementation backlog here.
+Within `KB_design`, follow the [workspace contract](../AGENTS.md); shared agent
+skills and runtime configuration live at the workspace root. Load only the
+context needed for the task:
 
-Communicate with the user in Japanese. Write identifiers, technical documents and commit messages in English. Keep filesystem/process operations behind src/domain/types.ts's HostAPI. Never expose raw IPC, Node access, or shell execution to document content. Never substitute mocked/model-API chat for a real local CLI acceptance test.
+- Setup and current features: [README](README.md).
+- Resuming development or checking completion: [STATUS](docs/STATUS.md),
+  [HANDOFF](docs/HANDOFF.md) and the actual Git diff.
+- Host or architecture changes: [initial host decision](docs/decisions/001-initial-host.md).
+- Product behavior: relevant [decisions](docs/decisions/) and
+  [acceptance backlog](docs/ACCEPTANCE.md). The initial specifications in
+  `../docs/irori/` are historical; current decisions and implementation records
+  take precedence.
 
-Use disposable KBs for mutation tests. Keep credentials, provider transcripts and machine paths out of tracked evidence. npm run build and npm test are required for code changes; use npm run test:ui for renderer changes. Real provider tests are opt-in and use the user's existing CLI account; run them only when agent execution testing is authorized. They may consume the native account's allowance. Do not bypass provider permissions or modify authentication to make a test pass.
+Keep filesystem/process operations behind `src/domain/types.ts`'s `HostAPI`.
+Never expose raw IPC, Node access or shell execution to document content.
+Use disposable KBs for mutation tests. Keep credentials, provider transcripts
+and machine paths out of tracked evidence.
+
+For code changes, `npm run build` and `npm test` are required; also run
+`npm run test:ui` for renderer changes. Documentation-only changes need link
+and diff checks. Real provider tests use the user's existing CLI account and
+may consume its allowance; run them only when agent execution testing is
+authorized. Do not bypass provider permissions or modify authentication to
+make a test pass. Mocks and model-API chat cannot substitute for a real local
+CLI acceptance test.
+
+Respond in Japanese; write code, identifiers, technical documents and commit
+messages in English.
