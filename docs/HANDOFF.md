@@ -1,5 +1,23 @@
 # irori continuation handoff
 
+Windows 0.1.4 public delivery is verified, 2026-09-14. The owner authorized
+merging and publishing; both PR #2 (application) and PR #3 (release metadata)
+are merged. Pages run 34843640838 deployed website revision `e32ed4e`.
+At `2026-09-14T12:31:36.870Z`, a fresh anonymous desktop/mobile browser downloaded
+all 318,426,624 installer bytes and matched SHA-256
+`ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b`
+against CI/release evidence. Page/HTTP errors were empty; Mac remains disabled.
+See [CHECKPOINT](CHECKPOINT.md) for exact identities. Next device check: close the
+old application, install the new EXE, verify **0.1.4 Preview**, then paste an image
+and continue typing after save/undo. No successful owner-device test is implied.
+
+A post-publication CI rerun (34843622651) exposed a timing assumption in the new
+save/undo fixture: adjacent setup and tested edits within ProseMirror's default
+500 ms history group can both be undone. The fixture now pauses 600 ms before
+the tested edit, preserving immediate save/undo and every assertion. Three
+focused UI runs, typecheck and formatting pass. This is a test-only correction;
+the published executable and its verified source/bytes are unchanged.
+
 Windows 0.1.4 publication, 2026-09-14: the owner authorized merging PR #2 and
 publishing the Windows update. PR #2 is merged as
 `e72a62b53950b2ddb3f9132f4e66f341a74f80fc`; its Git tree exactly matches native CI
