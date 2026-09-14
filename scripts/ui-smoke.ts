@@ -111,6 +111,10 @@ try {
   await page.keyboard.insertText('\nUIで編集しました。\n');
   await page.getByRole('button', { name: '保存 •', exact: true }).click();
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  // ProseMirror groups adjacent edits within its default 500 ms newGroupDelay.
+  // Separate setup typing from the edit under test; saving does not close history.
+  // Keep the following edit/save/undo immediate to catch the 200 ms listener race.
+  await page.waitForTimeout(600);
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');

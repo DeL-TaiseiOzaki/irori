@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Windows 0.1.4 delivery is complete. [Pages 34843640838](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34843640838)
+deployed website revision `e32ed4e5aca7f4415f0f3e3e4008a44ba9caa703`; a fresh
+anonymous desktop/mobile browser downloaded the complete installer at
+`2026-09-14T12:31:36.870Z`, with its 318,426,624 bytes and SHA-256 matching native
+CI and the public release. No page/HTTP errors occurred; Mac remains disabled.
+[CHECKPOINT](CHECKPOINT.md) records the exact source, website and artifact
+identities. The owner's Windows installation/upgrade result remains pending.
+
+Post-publication test follow-up: CI 34843622651 hit an Undo history-group timing
+assumption in the new fixture. A 600 ms pause before its tested edit separates
+that edit from setup, while leaving immediate save/undo and all assertions
+unchanged. Three focused UI runs pass. No application code or published bytes
+change for this fixture correction.
+
 Authorized publication, 2026-09-14: [PR #2](https://github.com/DeL-TaiseiOzaki/irori/pull/2)
 is merged as `e72a62b53950b2ddb3f9132f4e66f341a74f80fc`. The
 [Windows 0.1.4 preview](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.4-preview.1)

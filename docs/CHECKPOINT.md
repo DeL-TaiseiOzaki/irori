@@ -1,4 +1,30 @@
-# Checkpoint — Knowledge navigation continuation
+# Checkpoint — Windows 0.1.4 delivery
+
+Completed public delivery, 2026-09-14: the owner authorized merging the daily
+workflow PR and publishing the Windows update. [PR #2](https://github.com/DeL-TaiseiOzaki/irori/pull/2)
+merged application source as `e72a62b53950b2ddb3f9132f4e66f341a74f80fc`.
+[Native CI 34841807049](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34841807049)
+passed verification and all three package platforms. Its PR-merge tree exactly
+equals that merged source; the Windows EXE was not rebuilt or modified for
+publication. [Release notes](releases/0.1.4-preview.1.md) record both commits,
+the common tree and the package limits.
+
+[PR #3](https://github.com/DeL-TaiseiOzaki/irori/pull/3) merged the download metadata
+as `e32ed4e5aca7f4415f0f3e3e4008a44ba9caa703`.
+[Pages 34843640838](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34843640838)
+successfully deployed that exact website revision. At
+`2026-09-14T12:31:36.870Z`, a fresh anonymous desktop/mobile browser downloaded
+all **318,426,624 bytes** of `irori-0.1.4-windows-x64-Setup.exe` from the public
+page. SHA-256
+`ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b`
+matches native CI, the renamed local file and GitHub's release-asset digest.
+There were no page/HTTP errors, and both Mac download slots remain disabled.
+
+No installed Windows 0.1.4 result, Google consent/mount result or real model
+turn was supplied. Ask for the displayed version and the original paste/edit
+steps when the owner tests the update. The original installed version remains
+unknown. User KB/device data and the old VM preview were not reset or restarted.
+The entries below retain their historical source/publication evidence.
 
 Verified and pushed application source, 2026-09-14: `54eeee41b6c93d44297e5896613c70b0b271e9b0`. [CI 34776177942](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34776177942) passes verification and all three native package jobs, including relocated package smoke. Local build, 78/81 behavior tests (three optional skips), all nine UI suites and documentation-link checks pass. The later documentation-only checkpoint updates [the continuation prompt](HANDOFF-PROMPT.md). Public installer/site, neighboring repositories and `.local/vm-preview/{samples,device}` remain unchanged.
 
