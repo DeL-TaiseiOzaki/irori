@@ -61,6 +61,11 @@ error and preservation of an external-edit conflict. The initial focus failure
 was fixed by focusing the input after the dialog opens; the final complete UI
 run passes.
 
+Hosted verification: [CI 34810865845](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34810865845)
+passes at `ac935a9160f5e0a0be3d77a23e71d24073e53fcb`, including the verification
+job and Linux x64, Windows x64 and Mac arm64 package/relocated-startup checks.
+The public testing installer remains the earlier 0.1.3 build.
+
 This is on-demand search of saved local text. Indexed large-vault search,
 cross-KB searching, binary document extraction, cloud search, unsaved-buffer
 search and direct line/cursor navigation remain separate work. Existing
