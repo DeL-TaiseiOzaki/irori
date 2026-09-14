@@ -18,7 +18,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#ダウンロード)
 
 [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
-[リリースノート](docs/releases/0.1.4-preview.1.md) ・
+[リリースノート](docs/releases/0.1.5-preview.1.md) ・
 [ドキュメント](#ドキュメント) ・
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -36,11 +36,11 @@
 
 | プラットフォーム | 状態 | 取得先 |
 | --- | --- | --- |
-| **Windows 11 x64** | 検証版 `0.1.4 preview`（署名なし） | [インストーラー .exe（303.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.4-preview.1/irori-0.1.4-windows-x64-Setup.exe) |
+| **Windows 11 x64** | 検証版 `0.1.5 preview`（署名なし） | [インストーラー .exe（303.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.1/irori-0.1.5-windows-x64-Setup.exe) |
 | macOS（Apple Silicon / Intel） | 配布準備中 | — |
 | Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
 
-- SHA-256 `ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b` / 318,426,624 バイト。検証記録は [リリースノート v0.1.4-preview.1](docs/releases/0.1.4-preview.1.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- SHA-256 `847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491` / 318,439,424 バイト。検証記録は [リリースノート v0.1.5-preview.1](docs/releases/0.1.5-preview.1.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
 - 署名なしのため、Windows が発行元を確認できない旨の警告を表示することがあります。
 - AMD Ryzen・Intel の **x64 向け**です。Windows ARM 版ではありません。
 - Windows 11 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
@@ -71,7 +71,7 @@ CLI 側のルール・設定・スキル・MCP の探索は各プロバイダの
 
 ## 現在のステータス
 
-公開中の配布物は **Windows x64 の署名なし検証版 0.1.4 preview** です。完成版リリースではありません。
+公開中の配布物は **Windows x64 の署名なし検証版 0.1.5 preview** です。完成版リリースではありません。
 
 確認待ち・未実装の主な項目:
 

@@ -18,7 +18,7 @@ A desktop IDE/ADE for writing notes and continuing them with local CLI coding ag
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#download)
 
 [Download site](https://del-taiseiozaki.github.io/irori/) ·
-[Release notes](docs/releases/0.1.4-preview.1.md) ·
+[Release notes](docs/releases/0.1.5-preview.1.md) ·
 [Documentation](#documentation) ·
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -38,11 +38,11 @@ The distribution entrance is the **[download site](https://del-taiseiozaki.githu
 
 | Platform | Status | Get it |
 | --- | --- | --- |
-| **Windows 11 x64** | Testing preview `0.1.4` (unsigned) | [Installer .exe (303.7 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.4-preview.1/irori-0.1.4-windows-x64-Setup.exe) |
+| **Windows 11 x64** | Testing preview `0.1.5` (unsigned) | [Installer .exe (303.7 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.1/irori-0.1.5-windows-x64-Setup.exe) |
 | macOS (Apple Silicon / Intel) | Not published yet | — |
 | Linux | No installer planned | [Run from source](#run-from-source) |
 
-- SHA-256 `ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b`, 318,426,624 bytes. Verification evidence is in the [0.1.4-preview.1 release notes](docs/releases/0.1.4-preview.1.md) and [CHECKPOINT](docs/CHECKPOINT.md).
+- SHA-256 `847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491`, 318,439,424 bytes. Verification evidence is in the [0.1.5-preview.1 release notes](docs/releases/0.1.5-preview.1.md) and [CHECKPOINT](docs/CHECKPOINT.md).
 - The installer is unsigned, so Windows may show its unknown-publisher warning.
 - Built for **x64** (AMD Ryzen / Intel). This is not a Windows ARM build.
 - Installation, IME and CLI integration on real Windows 11 devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
@@ -73,7 +73,7 @@ Rules, settings, skills and MCP discovery remain each provider's responsibility.
 
 ## Project status
 
-The only published build is the **unsigned Windows x64 testing preview 0.1.4**. It is not a completed release.
+The only published build is the **unsigned Windows x64 testing preview 0.1.5**. It is not a completed release.
 
 Still outstanding:
 
