@@ -1,15 +1,18 @@
 import { z } from 'zod';
 import data from './releases.json';
 
+// Chained string checks all run, so a malformed value must fail rather than throw here.
+function isPlainHttps(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
 // A release entry is enabled only after an actual installer has been published.
 const artifact = z.object({
-  url: z
-    .string()
-    .url()
-    .refine((value) => {
-      const url = new URL(value);
-      return url.protocol === 'https:' && !url.username && !url.password;
-    }, 'Installer URLs must use HTTPS without credentials'),
+  url: z.string().url().refine(isPlainHttps, 'Installer URLs must use HTTPS without credentials'),
   size: z.string().min(1),
 });
 export const releaseSchema = z
@@ -19,7 +22,7 @@ export const releaseSchema = z
     notes: z
       .string()
       .url()
-      .refine((value) => new URL(value).protocol === 'https:', 'Notes URLs must use HTTPS')
+      .refine(isPlainHttps, 'Notes URLs must use HTTPS without credentials')
       .nullable(),
     downloads: z.object({
       'windows-x64': artifact.nullable(),
