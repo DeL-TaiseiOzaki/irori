@@ -18,12 +18,23 @@ relocated package, the local copy taken from the CI artifact, and an anonymous
 (HTTP 200), which also matches the release's own `SHA256SUMS.txt`. Only that EXE,
 its SHA-256 file and the package evidence are attached.
 
-Website metadata moves to `v0.1.5-preview.1` in the same change. The page's
-release-evidence link is now taken from the manifest instead of separately edited
-markup, because the previously published page had been left pointing at
-`v0.1.3-preview.1` while its download slot already served 0.1.4. Pages deployment
-evidence for this revision is recorded in the follow-up entry once the publish
-workflow has run and the live page has been checked.
+Website metadata moved to `v0.1.5-preview.1` in
+[PR #7](https://github.com/DeL-TaiseiOzaki/irori/pull/7), merged as
+`4aa79c766c76eae557c091a9e03773e1e6c6bb36`, and
+[Pages 34896164099](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34896164099)
+successfully deployed exactly that revision at `2026-09-14T21:00:31Z`. A fresh
+browser then loaded the public page and observed `v0.1.5 開発プレビュー`, the
+Windows card linking `irori-0.1.5-windows-x64-Setup.exe` at `v0.1.5 · 303.7 MiB`,
+both Mac slots still disabled, and no page errors or failed requests.
+
+The page's release-evidence link is now taken from the manifest instead of
+separately edited markup: the previously published page had been left pointing at
+`v0.1.3-preview.1` while its download slot already served 0.1.4. It now resolves
+to the published `v0.1.5-preview.1` notes, the `noscript` fallback points at the
+releases index, and both the schema and the browser smoke check that a published
+version always names its notes. The shipped manual update check was also run
+against the live endpoint as a 0.1.4 Windows x64 install: it reports 0.1.5 as
+available with the exact release and installer URLs it requires.
 
 No installed Windows 0.1.5 result, upgrade-from-0.1.4 result, Google
 consent/mount result or real model turn is implied. Ask for the displayed
