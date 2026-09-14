@@ -1,124 +1,161 @@
+<div align="center">
+
+<img src="assets/irori-icon.png" alt="" width="112" height="112">
+
 # irori
 
-Development now adds [local KB text search](docs/KB-SEARCH.md). Choose **KB内を検索** in the sidebar, select a KB and search its saved text; results show matching lines and open the current note. Search preserves KB/layer boundaries and reports incomplete results when limits or unreadable files prevent a complete scan. The public Windows installer is unchanged.
+**ノートから、次の仕事へ。**
 
-Development now adds [source/artifact record search and navigation](docs/KNOWLEDGE-NAVIGATION.md): inspect current file locations, follow version-specific run links, and reconnect a missing source to a matching moved file while retaining its ID and historical bytes. Records remain device-local; the public Windows installer is unchanged.
+ノートを書き、その続きをローカルの CLI エージェントと進める、知識のためのデスクトップ IDE/ADE。
 
-Development after preview 0.1.3 now retains recent conversation history and pending instructions across restart. Restored queues wait for explicit resumption; interrupted turns are never automatically replayed. See [conversation recovery and limits](docs/CONVERSATIONS.md). The public Windows installer remains the separately published 0.1.3 build.
+**日本語** | [English](README.en.md)
 
-Version `0.1.3` adds continuous document editing, local `_assets` images, bulk Git staging, queued native conversations and private source/artifact/cloud-preparation records. See [editing and retained records](docs/EDITING-AND-RECORDS.md) for behavior and remaining D04/D06 boundaries.
+<a href="https://del-taiseiozaki.github.io/irori/"><img src="https://img.shields.io/badge/%E2%AC%87%20%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89-irori%20for%20Windows-c2410c?style=for-the-badge" alt="irori をダウンロード"></a>
 
-Version 0.1.3 retains the distributor's Google client configuration so account connection can be tried through the system browser. Actual consent and native mounts still need device acceptance; see [Google setup and scope](docs/DISTRIBUTOR-GOOGLE.md). The [integrated native terminal](docs/TERMINAL.md), automatic shell discovery and bundled rclone remain included. [CHECKPOINT](docs/CHECKPOINT.md) records exact package/publication evidence.
+[![Release](https://img.shields.io/github/v/release/DeL-TaiseiOzaki/irori?include_prereleases&label=release)](https://github.com/DeL-TaiseiOzaki/irori/releases)
+[![CI](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml/badge.svg)](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#ダウンロード)
 
-[Download irori](https://del-taiseiozaki.github.io/irori/) — an unsigned Windows x64 testing preview is available. See [preview notes and checksums](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.3-preview.1). Windows 11 device acceptance is pending; Mac downloads remain unavailable.
+[ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
+[リリースノート](docs/releases/0.1.4-preview.1.md) ・
+[ドキュメント](#ドキュメント) ・
+[Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
-CSV files have a paginated table and the existing source editor. Declared ontology CSV can be viewed as a hierarchy/subgraph with note links; native agents help construct the records. See [ontology display and agent setup](docs/ONTOLOGY.md).
+<img src="website/public/app-preview.png" alt="irori の開発画面。左にスペースとノート一覧、中央に日本語のノート、右に Codex を選択した AI パネル。" width="860">
 
-A desktop IDE/ADE for writing Markdown notes and running **local native coding harnesses** in the selected knowledge workspace. Codex, Claude Code, OpenCode and Pi are selectable; the new OpenCode/Pi adapters have native control tests but still need real model-turn acceptance.
+<sub>実際の開発画面です。表示内容は検証用のサンプルです。</sub>
 
-This independent repository contains the first working note + agent milestone. Electron is provisional; it is not a completed Windows/macOS release. The two sibling repositories remain independent and unchanged.
+</div>
 
-Release follow-up: [Forge packaging and CI](docs/PACKAGING.md) now produce unsigned engineering candidates and test the packaged app outside the checkout. [Confirmed product decisions](docs/decisions/002-release-and-workspace.md) set MIT licensing, Windows 11 x64/MacBook M5 Pro arm64 acceptance, CSV/graph ontology presentation, and workspace-level independent GitHub/Drive connections. New Drive attachments now belong directly to the workspace; [the workspace flow and legacy compatibility](docs/WORKSPACE-DRIVE.md) are implemented. Existing KB-owned attachments remain usable without moving files.
+---
 
-## Run from source
+## ダウンロード
 
-Requires Node.js **24.15+ (24.x) or 26+**, npm, and a desktop session. Install and configure the desired `codex`, `claude`, `opencode` or `pi` CLI using its own setup/login flow. irori uses the installed CLI, its native configuration, and its existing authentication. Pi requires version 0.85+; native control probes used OpenCode 1.18.30 and Pi 0.85.1. See [harness compatibility](docs/HARNESSES.md).
+配布の入口は **[ダウンロードサイト](https://del-taiseiozaki.github.io/irori/)** です。ブラウザで動くアプリではなく、パソコンにインストールして使います。
+
+| プラットフォーム | 状態 | 取得先 |
+| --- | --- | --- |
+| **Windows 11 x64** | 検証版 `0.1.4 preview`（署名なし） | [インストーラー .exe（303.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.4-preview.1/irori-0.1.4-windows-x64-Setup.exe) |
+| macOS（Apple Silicon / Intel） | 配布準備中 | — |
+| Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
+
+- SHA-256 `ffaa1ba1afc3ee358af1aee55860cca83fc294d69819907d277de6c5424de16b` / 318,426,624 バイト。検証記録は [リリースノート v0.1.4-preview.1](docs/releases/0.1.4-preview.1.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- 署名なしのため、Windows が発行元を確認できない旨の警告を表示することがあります。
+- AMD Ryzen・Intel の **x64 向け**です。Windows ARM 版ではありません。
+- Windows 11 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
+
+インストール後に必要なもの:
+
+1. [Git for Windows](https://git-scm.com/downloads/win) — ノートの履歴と共有に使います。
+2. 使いたい CLI（`claude` / `codex` / `opencode` / `pi`）を各サービスの手順でインストールし、ログインしておきます。AI の利用には各サービスの利用条件・料金が適用されます。ノート編集だけなら CLI の設定は不要です。
+3. ノートを置く KB フォルダ（新規フォルダ、または既存の Git チェックアウト）。
+
+## irori とは
+
+- **ノートを書く。** 見たまま編集できる Markdown エディタ。自動保存、`_assets/` への画像貼り付け、Cmd/Ctrl+S での選択・undo 維持。Markdown ファイルが常に正本です。
+- **AI と続きを進める。** Claude Code・Codex・OpenCode・Pi を、選んだ作業場所でそのまま起動。インストール済み CLI と、その認証・設定をそのまま使います。irori は独自の API キーを要求しません。
+- **知識のつながりを見る。** CSV を表とグラフで見渡し、宣言済みオントロジーを階層／サブグラフとして表示して、つながるノートへ移動できます。
+- **手元に残る。** ノートは選んだフォルダの Markdown のまま。Git 操作、Google Drive 接続（読み取り専用の試験実装）、内蔵ターミナルはすべてアプリの中から扱えます。
+
+## 使い方
+
+1. 起動して **ワークスペースを選択**。**KBフォルダを開く** で既存のフォルダやチェックアウトを名前付きで登録します。**登録して開く** が `.irori/scope.json` を作成し、`/contents/` を `.gitignore` に追加します。既存の Markdown は移動しません。
+2. ノートを開くか **ノートを作成**。ドキュメント表示のまま編集でき、画像はノート隣の `_assets/` に入ります。
+3. **AIに相談** でハーネスを選び、指示を送信。実行中の要求・質問はパネルに表示され、**停止** でプロセスツリーを停止します。次の指示は **送信待ちに追加** で予約でき、会話は再起動後も復元されます（再開は明示操作）。
+4. **ソース管理**（変更と履歴）で差分確認・ステージング・コミット。取得／受信／統合は明示的な確認付きで、自動 stash・hard reset・force push は行いません。
+5. **クラウド接続** で Google アカウントとフォルダを登録（読み取り専用の接続試験）。Windows でのマウントには [WinFsp](https://winfsp.dev/rel/) が必要です。
+6. 画面下の **ターミナル** で、その KB のフォルダからシェルを起動できます。
+
+CLI 側のルール・設定・スキル・MCP の探索は各プロバイダの責任範囲です。irori が複数チームの指示をまとめて混ぜることはありません。登録は所有境界であり、OS サンドボックスではありません。
+
+## 現在のステータス
+
+公開中の配布物は **Windows x64 の署名なし検証版 0.1.4 preview** です。完成版リリースではありません。
+
+確認待ち・未実装の主な項目:
+
+- Windows 11 / macOS 実機での受け入れ（インストール、IME、CLI 連携、GitHub 同期）
+- 実アカウントでの Google 同意・ネイティブマウント、Drive への書き込み（現在は読み取り専用）
+- OpenCode / Pi の実モデルターン受け入れ（ネイティブ制御テストは通過済み）
+- インストーラー署名、Mac 配布、規模・性能、Markdown 保存範囲の拡大、端末をまたぐ履歴共有
+
+判定済み・暫定・未着手の区別は [ACCEPTANCE](docs/ACCEPTANCE.md)、現在地は [STATUS](docs/STATUS.md)、配布の証跡は [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+
+## ソースから実行
+
+開発者向けの手順です。利用するだけならインストーラーを使ってください。
+
+必要環境: Node.js **24.15+（24.x）または 26+**、npm、デスクトップセッション。Pi は 0.85+ が必要で、ネイティブ制御の確認には OpenCode 1.18.30 / Pi 0.85.1 を使用しました（[ハーネス互換性](docs/HARNESSES.md)）。
 
 ```sh
-cd /workspace/KB_design/irori
+git clone https://github.com/DeL-TaiseiOzaki/irori.git
+cd irori
 npm ci
 npm run setup:electron
 npm run build
 npm start
 ```
 
-`setup:electron` downloads the pinned Electron binary; it is also useful when npm lifecycle scripts were disabled. Windows and macOS use the same npm commands from their own checkout path. The Windows testing installer is available from the download page above; building from source is optional for developers.
+`setup:electron` は固定版 Electron を取得します（npm のライフサイクルスクリプトを無効化している場合にも有効）。Windows・macOS も同じコマンドを各自のチェックアウトで実行します。
 
-For this root-owned Linux development container, after the successful build:
+- **root ユーザーの Linux コンテナ**では、ビルド後に `npm run start:container` を使います。Chromium の OS サンドボックスを無効化する明示的なコマンドで、エージェントの権限方針は変更しません。通常のデスクトップでは非 root ユーザーで `npm start` を使ってください。
+- **GUI が実際に見えること**が前提です。SSH やコンテナのシェルだけでは Electron のウィンドウは表示されません。Linux VM で試す場合は `npm run preview:vm`（[VM プレビュー](docs/VM-PREVIEW.md)）、ヘッドレス確認は `xvfb-run -a npm run test:ui` を使います。
+- システムの Node が 20 のままだと `npm ci` が engine 警告を出しますが、以降の npm スクリプトは固定版 Node 24 を使います。Vite のチャンクサイズ警告もビルド失敗ではありません。
 
-```sh
-npm run start:container
-```
-
-This explicit command disables Chromium's OS sandbox for the Linux test environment. It uses the current GUI display and does not change agent permission policy. Ordinary `npm start` now explains the root restriction before launching Electron instead of ending in a Chromium fatal error. On a normal desktop, use a non-root user and `npm start`.
-
-A GUI display must actually be accessible to you. An SSH/container shell alone does not show an Electron window on your laptop. For interactive use on a Linux VM, `npm run preview:vm` now starts a private browser viewer of the actual desktop with sample KBs; see [VM preview setup](docs/VM-PREVIEW.md). For headless verification, use:
+### 配布サイトのプレビュー
 
 ```sh
-xvfb-run -a npm run test:ui
+npm run dev:website      # ローカルプレビュー
+npm run build:website    # dist-website/ に静的出力
 ```
 
-This runs UI checks and writes `test-results/irori-desktop.png`, then exits. `xvfb-run -a npm run start:container` can keep the app running on a virtual display, but that virtual window is not automatically visible to you.
+`website/` が配布の入口です。デスクトップアプリをブラウザで動かすものではありません。公開手順は [DISTRIBUTION](docs/DISTRIBUTION.md) にあります。
 
-If the system Node is still 20, `npm ci` emits engine warnings even though subsequent npm scripts use the pinned local Node 24. The pasted run completed installation and compilation; those warnings were not the root-user startup failure. Use a supported Node 24.15+ or 26+ runtime for dependency installation on development machines. The Vite chunk-size warning concerns bundle size and does not mean that the build failed.
-
-1. Startup shows **ワークスペースを選択**. Select a saved workspace, or use **KBフォルダを開く** to register existing local checkouts/folders with a name and optional display category. The preview inspects the Git root, GitHub repository, branch and local changes.
-2. **登録して開く** explicitly creates `.irori/scope.json` for a new registration and adds `/contents/` to `.gitignore`. Existing Markdown is not moved. Select one or more registered spaces, name the workspace and press **選択したスペースを開く**. Each checkout keeps its own Git history and native agent configuration; irori does not initialize or publish a repository.
-3. Open a note or choose **ノートを作成**. Markdown stays in document view with Crepe's slash/table/image controls. Paste images into `_assets/` beside the note. Notes auto-save; Cmd/Ctrl+S keeps the current selection and undo history.
-4. Open **AIに相談**, choose a harness, and enter an instruction. **送信** saves the current note and starts the real CLI in that space. Enter sends; Shift+Enter adds a newline. While working, **送信待ちに追加** queues the next message and the current note/source selection for automatic continuation after success. Native requests/questions appear in the panel; **停止** cancels the process tree. The panel explains that standard Pi tools run without built-in approval prompts; its extension dialogs are supported. OpenCode keeps its native permission configuration.
-5. A clean editor refreshes after agent/external changes. A dirty editor shows both versions. Recovery drafts remain device-local.
-6. The next run attempts to continue the previous native conversation, including after restarting irori. The panel restores recent display history and pending messages for this checkout/space/provider. Restored messages wait for **送信を再開**; an interrupted turn is not automatically replayed. **会話の継続をリセット** detaches the native session after pending instructions are finished/cancelled and retains notes and history. **新しい会話** resets before the next run and marks the boundary in the history. Native-provider restart acceptance remains outstanding.
-7. Saved workspace cards support editing and removal. Cloud connections support changing the chosen local folder name, removing disconnected attachments and removing unused accounts. Removing a workspace or attachment keeps KB notes and remote files. See the [implementation audit](docs/AUDIT-2026-09-13.md) for fixes, verification and remaining features.
-8. The left explorer follows the [LayeredKB layout](docs/LAYERED-EXPLORER.md): Schema above, personal/team Knowledge Base in the middle, and personal/team contents below. Expand the owning space to browse files; use its **＋** to create a note or **接続** to manage cloud folders. These views preserve separate repository settings and agent conversations.
-
-CLI-native rules/settings/skills/MCP discovery remain the provider's responsibility. irori never combines every team's instructions. Native ancestor discovery still applies; registration is an ownership boundary, not an OS sandbox. Codex requests workspace-write/on-request/user review; Claude uses default permissions and native user/project/local settings. Existing native allow/deny rules remain effective.
-
-## GitHub and Git collaboration
-
-Open **変更と履歴** to review the active space's changes and commit history. Inspect saved changes, use **すべて追加** or per-file staging, and commit the displayed staged list/message with **コミット**. **すべて解除** removes staged selections without changing file bytes. Existing staged changes remain visible; partial staging is preserved. **共有内容を確認** previews a separate push to that repository's remote branch.
-
-**取得** updates remote observations. **受信** accepts clean fast-forwards; **履歴を統合** starts a native merge and opens conflicts for manual review, saving recovery copies before resolution. Finish a merge with a reviewed commit. No automatic stash, hard reset or force-push is used. The startup **GitHub から取得** flow clones into a new selected folder and continues normal space registration. Native Git credentials, hooks and signing settings apply.
-
-The feature is exercised with real disposable Git repositories and local bare remotes through both service and Electron tests. Live GitHub authentication/branch-protection acceptance and Windows/macOS execution remain outstanding. See [Git workflow, limits and evidence](docs/GIT.md).
-
-## Cloud connection preview
-
-Open a workspace and choose **クラウド接続**, or use **接続** in the **Google Drive** section. A workspace may be created before registering any KB; its Drive attachments remain independent of KB membership. The new flow registers named Google accounts through the system browser, browses My Drive/shared-drive folders and lets you choose the actual **contents内のフォルダ名** with a path preview. Multiple accounts and folders can be registered independently. Japanese and spaces are supported; collisions and occupied paths are rejected. The Drive folder ID and your chosen local name persist separately.
-
-The host manages a private rclone configuration and read-only mounts. Saved attachments reconnect when their workspace opens; individual failures leave local notes usable. Mounted Markdown opens as a read-only document. **資料と成果物** can retain selected source versions and prepare recoverable local copies for future Drive delivery. Google uploads remain disabled; this is not general offline caching or completed D04 recovery. Google consent and successful native mounts have **not** been accepted on real accounts/platforms yet.
-
-Development prerequisites are an installed `rclone` executable (or host environment `IRORI_RCLONE_PATH`), a working native mount facility, and an irori-owned Google desktop OAuth application's `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET` in the host environment. The application explains missing prerequisites and disables account creation if OAuth configuration is absent. These are developer/distribution setup requirements; the intended shipped flow will not ask ordinary users to configure rclone or create Google Cloud projects. See [cloud setup](docs/CLOUD-SETUP.md) for the current boundary and verification.
-
-## Verification
+### 検証
 
 ```sh
 npm run build
 npm test
-# Actual Electron; Linux CI needs xvfb-run -a before this command:
+# 実際の Electron。Linux CI では先に xvfb-run -a が必要:
 npm run test:ui
-# Actual provider accounts and disposable KBs; consumes native account allowance:
+# 実アカウントと使い捨て KB を使用。ネイティブアカウントの利用枠を消費します:
 npm run test:agents
 npm run test:lifecycle
-# Both providers through the actual UI (POSIX example):
+# 両プロバイダを実際の UI で（POSIX の例）:
 IRORI_UI_REAL_AGENTS=1 xvfb-run -a npm run test:ui
 ```
 
-PowerShell: set `$env:IRORI_UI_REAL_AGENTS="1"`, then run `npm run test:ui` on the desktop. Native-platform acceptance is still outstanding.
+PowerShell では `$env:IRORI_UI_REAL_AGENTS="1"` を設定してからデスクトップで `npm run test:ui` を実行します。詳細な証跡は Git 管理外の `test-results/` に出力され、使い捨てディレクトリのみを変更します。
 
-Tests put detailed local evidence in ignored `test-results/` and mutate only disposable directories. [Status](docs/STATUS.md) records what was actually exercised. [Acceptance/backlog](docs/ACCEPTANCE.md) retains all confirmed requirements. [Host decision](docs/decisions/001-initial-host.md), [compatibility](docs/compatibility/MATRIX.md), and [measurements](docs/measurements/2026-09-12.md) distinguish verified, provisional, and outstanding work.
+## 実装境界
 
-## Implementation boundary
+- React レンダラー → 型付き・検証済みの `HostAPI` → Electron preload/main。レンダラーからの Node アクセス、生 IPC の公開、リモートページ遷移、ドキュメント内スクリプト実行は行いません。認証付きループバックの rclone サービスはホストのみが制御します。
+- ドキュメント編集は Milkdown Crepe、その他のテキスト／CSV ソースは CodeMirror 6。Markdown が正本で、未対応ブロックは文字列のまま保持されます。
+- Node の `FileService` が正規化パス、スコープ所有権、可搬 UUID 宣言、ローカルのバインディング／下書き／バックアップ、遅延ディレクトリ列挙、ウォッチャ、版を意識した書き込みを担当します。
+- Codex はネイティブ app-server JSONL、Claude は Claude Agent SDK が未改変の `claude` 実行ファイルを制御します。セッションハンドルと表示履歴・保留メッセージは、スコープ UUID・プロバイダ・正規化チェックアウトルートに紐づけて端末データに保存されます。復元に失敗してもハンドルを保持し、黙って新しい会話に切り替えることはありません。
+- 端末データは Electron 標準の `userData`（テストは `IRORI_DATA_DIR` で上書き）。ワークスペース選択、アカウントメタデータ、rclone 資格情報、クラウドバインディングはそこに残り、既存の `contents` のバイト列はセットアップで移動・削除されません。
 
-- React renderer → typed, validated `HostAPI` → Electron preload/main. No renderer Node access, raw IPC export, remote page navigation, or document script execution. The host alone controls a private authenticated loopback rclone service.
-- Milkdown Crepe document editor + CodeMirror 6 for other text/CSV source. Markdown is authoritative; detected unsupported blocks remain literal within the document.
-- Node `FileService`: canonical paths, scope ownership, portable UUID declarations, local bindings/drafts/backups, bounded lazy directory listing, watchers, version-aware writes.
-- Codex native app-server JSONL; Claude Agent SDK controls the installed unmodified `claude` binary. SDK import and processes are on demand. Session handles and separately bounded display history/pending messages persist in device data, bound to scope UUID, provider and canonical checkout root. Resume errors retain the handle for retry or explicit reset; irori does not silently fall back to a new conversation.
-- One native agent turn and one current irori host per device profile; subsequent messages can queue. Concurrent editor saves retain version checks and recovery drafts. This does not lock out other programs or hosts using different device profiles.
+設計判断は [ホスト決定 ADR 001](docs/decisions/001-initial-host.md) と [リリース・ワークスペース決定 ADR 002](docs/decisions/002-release-and-workspace.md) を参照してください。
 
-Device data lives in Electron's standard `userData` directory (override with `IRORI_DATA_DIR` for tests). Workspace selections, account metadata, rclone credentials and checkout-specific cloud bindings stay there. New workspace cloud declarations live under device-local `workspace-cloud/<workspaceId>/.irori/cloud-mounts.json`; original KB declarations remain in place. Both contain folder IDs and user-chosen relative names, with no account credentials or absolute paths. Disconnected attachments stay visible; cloud access requires verified folder identity and a live managed mount. Existing `contents` bytes are never moved or deleted by setup.
+## ドキュメント
 
-Known limits include native Windows/Mac testing, scale/performance, broader Markdown preservation and IME, ontology scale, live GitHub authentication/branch-protection acceptance, native cloud-mount acceptance and uploads, OpenCode/Pi model-turn acceptance, portable identities and complete provenance. The new device-local source/run/artifact records are an incremental D06 implementation. See the acceptance matrix before treating the preview as a release. irori is [MIT licensed](LICENSE); upstream dependencies retain their own terms in [THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md).
+| 目的 | ドキュメント |
+| --- | --- |
+| 配布と公開手順 | [DISTRIBUTION](docs/DISTRIBUTION.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
+| 現在地と受け入れ範囲 | [STATUS](docs/STATUS.md) / [ACCEPTANCE](docs/ACCEPTANCE.md) / [CHECKPOINT](docs/CHECKPOINT.md) |
+| 日々の編集と記録 | [DAILY-WORKFLOW](docs/DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](docs/EDITING-AND-RECORDS.md) / [RECOVERY-AND-NOTE-TOOLS](docs/RECOVERY-AND-NOTE-TOOLS.md) |
+| エージェントと会話 | [HARNESSES](docs/HARNESSES.md) / [CONVERSATIONS](docs/CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](docs/WORKSPACE-CONNECTIONS.md) |
+| Git とクラウド | [GIT](docs/GIT.md) / [CLOUD-SETUP](docs/CLOUD-SETUP.md) / [WORKSPACE-DRIVE](docs/WORKSPACE-DRIVE.md) / [DISTRIBUTOR-GOOGLE](docs/DISTRIBUTOR-GOOGLE.md) |
+| 画面と知識の表示 | [UI-DESIGN](docs/UI-DESIGN.md) / [LAYERED-EXPLORER](docs/LAYERED-EXPLORER.md) / [ONTOLOGY](docs/ONTOLOGY.md) / [KB-SEARCH](docs/KB-SEARCH.md) / [KNOWLEDGE-NAVIGATION](docs/KNOWLEDGE-NAVIGATION.md) / [TERMINAL](docs/TERMINAL.md) |
+| 開発環境 | [VM-PREVIEW](docs/VM-PREVIEW.md) / [互換性マトリクス](docs/compatibility/MATRIX.md) / [計測](docs/measurements/2026-09-12.md) |
 
-## Download website
+開発を引き継ぐ場合は [HANDOFF](docs/HANDOFF.md) と [継続プロンプト](docs/HANDOFF-PROMPT.md) から始めてください。コントリビューターの取り決めは [AGENTS.md](AGENTS.md) にあります。
 
-The Japanese landing/download page is in `website/`. Run `npm run dev:website` to preview it in a browser, or `npm run build:website` to produce the static `dist-website/` output. This page is the distribution entrance; it does not run the desktop application in a browser.
+## 不具合の報告
 
-The Windows slot links the current unsigned testing preview; Mac downloads remain disabled. The manual GitHub Pages workflow and release-asset configuration are documented in [distribution](docs/DISTRIBUTION.md). Published installer identities and delivery evidence are recorded in CHECKPOINT.
+[GitHub Issues](https://github.com/DeL-TaiseiOzaki/irori/issues) に、表示されているバージョン・OS・実際のメッセージを添えてお知らせください。ノートの本文、認証情報、OAuth の URL は載せないでください。
 
-## Resume from checkpoint
+## ライセンス
 
-Give a new session the [continuation prompt](docs/HANDOFF-PROMPT.md) to resume implementation from the latest saved source and verification boundaries.
-
-[Checkpoint and restart guide](docs/CHECKPOINT.md) records the accepted distribution direction, implemented work, verification evidence and remaining implementation. It distinguishes the published Windows testing preview from the still-open complete-release requirements.
-
-The implementation reuse audit is complete for the current feature set: shared host/queue/dialog/protocol code and matching service libraries are implemented. See [all decisions and validation](docs/REUSE-COMPLETION-2026-09-13.md).
+[MIT License](LICENSE)。依存ライブラリはそれぞれの条件に従います（[THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)）。
