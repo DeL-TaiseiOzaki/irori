@@ -1,11 +1,13 @@
 # irori continuation handoff
 
-Source 0.1.5 daily recovery work is on `feature/daily-workflow-recovery`, not the
-previous release branch. Read [RECOVERY-AND-NOTE-TOOLS](RECOVERY-AND-NOTE-TOOLS.md)
-for private composer/Git drafts, manual update checks, image feedback, safe
-note organization and match navigation. The public installer and website stay
-at verified 0.1.4; merging or publishing this feature is not authorized by this
-continuation. Final branch verification belongs in STATUS and the open PR.
+Source 0.1.5 daily recovery work is merged into `main` as
+`278f5a407e270752057dbe4a10574a9450644934` and published. Read
+[RECOVERY-AND-NOTE-TOOLS](RECOVERY-AND-NOTE-TOOLS.md) for private composer/Git
+drafts, manual update checks, image feedback, safe note organization and match
+navigation. The public installer and website are now the verified 0.1.5 preview;
+[its release notes](releases/0.1.5-preview.1.md) and [CHECKPOINT](CHECKPOINT.md)
+hold the exact package and delivery evidence. The next device step is the
+owner's installation of the 0.1.5 EXE over 0.1.4.
 
 Local combined verification passes: build/typecheck, 127/131 behavior tests
 (four explicit environment skips), all twelve UI suites, website build and

@@ -1,4 +1,34 @@
-# Checkpoint — Windows 0.1.4 delivery
+# Checkpoint — Windows 0.1.5 delivery
+
+Completed public delivery, 2026-09-15: the owner authorized publishing the
+already merged daily-recovery work, whose earlier continuation had deliberately
+stopped before release. [PR #5](https://github.com/DeL-TaiseiOzaki/irori/pull/5)
+merged application source as `278f5a407e270752057dbe4a10574a9450644934`.
+[Native CI 34853768104](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34853768104)
+passed verification and all three package platforms for exactly that commit.
+Its Windows artifact was published without rebuilding or modifying the EXE; only
+its download filename changed. [Release notes](releases/0.1.5-preview.1.md)
+record the source commit, the CI run and the package limits.
+
+The published installer is **318,439,424 bytes** with SHA-256
+`847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491`. That hash is
+identical in three places: the `package-smoke.json` CI recorded while testing the
+relocated package, the local copy taken from the CI artifact, and an anonymous
+`https` download of all 318,439,424 published bytes at `2026-09-15T03:12Z`
+(HTTP 200), which also matches the release's own `SHA256SUMS.txt`. Only that EXE,
+its SHA-256 file and the package evidence are attached.
+
+Website metadata moves to `v0.1.5-preview.1` in the same change. The page's
+release-evidence link is now taken from the manifest instead of separately edited
+markup, because the previously published page had been left pointing at
+`v0.1.3-preview.1` while its download slot already served 0.1.4. Pages deployment
+evidence for this revision is recorded in the follow-up entry once the publish
+workflow has run and the live page has been checked.
+
+No installed Windows 0.1.5 result, upgrade-from-0.1.4 result, Google
+consent/mount result or real model turn is implied. Ask for the displayed
+version after the owner installs the update. User KB and device data were not
+touched.
 
 Completed public delivery, 2026-09-14: the owner authorized merging the daily
 workflow PR and publishing the Windows update. [PR #2](https://github.com/DeL-TaiseiOzaki/irori/pull/2)

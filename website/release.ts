@@ -15,6 +15,12 @@ const artifact = z.object({
 export const releaseSchema = z
   .object({
     version: z.string().min(1).nullable(),
+    // The published notes page is part of the manifest so it cannot be left on an older release.
+    notes: z
+      .string()
+      .url()
+      .refine((value) => new URL(value).protocol === 'https:', 'Notes URLs must use HTTPS')
+      .nullable(),
     downloads: z.object({
       'windows-x64': artifact.nullable(),
       'macos-arm64': artifact.nullable(),
@@ -24,6 +30,10 @@ export const releaseSchema = z
   .refine(
     (value) =>
       value.version !== null || Object.values(value.downloads).every((item) => item === null),
+  )
+  .refine(
+    (value) => (value.version === null) === (value.notes === null),
+    'A published version must name its release notes',
   )
   .refine(
     (value) =>

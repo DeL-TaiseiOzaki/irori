@@ -15,7 +15,22 @@ startup checks. All tests use disposable data without model inference.
 Integrated testing reproduced and fixed stale external-file reads inventing a
 conflict after a newer read, and a moved note leaving an obsolete-path error.
 Deterministic reordered-read and successful note-operation UI checks pass.
-The published Windows installer remains the exact 0.1.4 artifact below.
+That work is now merged into `main` and published as the Windows 0.1.5 preview
+below.
+
+Windows 0.1.5 delivery, 2026-09-15: the owner authorized publishing the merged
+daily-recovery work. [PR #5](https://github.com/DeL-TaiseiOzaki/irori/pull/5)
+merged application source as `278f5a407e270752057dbe4a10574a9450644934`, and
+[CI 34853768104](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34853768104)
+passed verification and all three package platforms for exactly that commit.
+Its Windows artifact is published unchanged except for its download filename:
+318,439,424 bytes, SHA-256
+`847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491`, matching the
+hash CI recorded in its own package smoke. The download website now serves
+`v0.1.5-preview.1`, and its release-notes link is taken from the manifest so it
+cannot be left on an older release. See [CHECKPOINT](CHECKPOINT.md) for the exact
+identities and the deployment/download evidence. The owner's Windows
+installation, upgrade from 0.1.4 and IME results remain pending.
 
 Windows 0.1.4 delivery is complete. [Pages 34843640838](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34843640838)
 deployed website revision `e32ed4e5aca7f4415f0f3e3e4008a44ba9caa703`; a fresh
