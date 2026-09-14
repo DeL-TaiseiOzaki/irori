@@ -1,5 +1,13 @@
 # Desktop packaging foundation
 
+Windows 0.1.4 release: [preview notes](releases/0.1.4-preview.1.md) identify the
+unchanged EXE from [CI 34841807049](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34841807049).
+All three native package jobs pass trusted OS clipboard paste and continuous
+editing checks. The CI PR-merge tree equals merged application source
+`e72a62b53950b2ddb3f9132f4e66f341a74f80fc`; exact commits/tree are recorded in the
+notes. The uploaded EXE digest matches CI evidence. Public website delivery and
+installed-device results remain separate evidence in CHECKPOINT/HANDOFF.
+
 Current package evidence: version `0.1.3`, source `9b04ed2`, [CI 34764163901](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34764163901), passes verification and Linux x64 / Windows x64 / Mac arm64 package jobs. Native icon resources, local image bytes/rendering and editing after save are now checked alongside existing SDK, CSV, terminal and configured read-only OAuth handoff tests. The Windows EXE is published and anonymously download/hash verified; see [CHECKPOINT](CHECKPOINT.md). Installed-device acceptance, signing and Mac publication remain separate.
 
 Latest verified implementation: [CI run 34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), commit `b51a54b`, passes clean verification and all Linux x64 / Windows x64 / Mac arm64 jobs for version `0.1.2`. Copied packages pass reload, SDK imports, Japanese note save, CSV graph loading, actual terminal keyboard input/Japanese file creation, bundled rclone startup and normal shutdown. Configured packages also start/cancel account onboarding with the compiled distributor client, inspect the local redirect to Google's authorization endpoint and verify the exact read-only scope; evidence contains booleans only. These tests stop before Google consent. Verification includes 64 passed behavior tests with three optional provider controls skipped, eight UI suites and website fixtures. Windows reuses node-pty's official Node-API prebuilds. [Preview notes](releases/0.1.2-preview.1.md) identify the Windows bytes and [CHECKPOINT](CHECKPOINT.md) records public delivery. The paragraphs below retain earlier diagnostic evidence. This remains unsigned engineering evidence; installation on the user's Windows 11/Ryzen 9 and M5 Pro devices, signing, Google consent/refresh/mounts and provider acceptance are still open.
