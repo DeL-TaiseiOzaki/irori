@@ -111,6 +111,53 @@ try {
   await page.keyboard.insertText('\nUIで編集しました。\n');
   await page.getByRole('button', { name: '保存 •', exact: true }).click();
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('保存後も入力を続けます。');
+  const selection = () =>
+    editor.evaluate((element) => {
+      const selected = window.getSelection();
+      return {
+        focused: element === document.activeElement,
+        text: selected?.anchorNode?.textContent,
+        offset: selected?.anchorOffset,
+      };
+    });
+  const beforeSave = await selection();
+  expect(beforeSave.focused).toBe(true);
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  expect(await selection()).toEqual(beforeSave);
+  await expect(editor).toHaveAttribute('data-lifecycle', 'original');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(editor).not.toContainText('保存後も入力を続けます。');
+  await expect(editor).toContainText('UIで編集しました。');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes(
+        '保存後も入力を続けます。',
+      ),
+    )
+    .toBe(false);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(editor).toContainText('保存後も入力を続けます。');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes(
+        '保存後も入力を続けます。',
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.insertText('自動保存後も編集できます。');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes(
+        '自動保存後も編集できます。',
+      ),
+    )
+    .toBe(true);
+  await expect(editor).toHaveAttribute('data-lifecycle', 'original');
   await writeFile(path.join(kb, '日本語 note.md'), input + '\n外部の変更を反映しました。\n');
   await expect(page.locator('.document-editor')).toContainText('外部の変更を反映しました。');
   await page.locator('.ProseMirror').click();
@@ -139,22 +186,36 @@ try {
   )
     throw Error('Document edit lost BOM, CRLF or opaque Markdown');
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
-  const png =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6VEQAAAAASUVORK5CYII=';
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
-  await page.locator('.ProseMirror').evaluate((element, bytes) => {
-    const transfer = new DataTransfer();
-    transfer.items.add(
-      new File([Uint8Array.from(atob(bytes), (c) => c.charCodeAt(0))], '貼付.png', {
-        type: 'image/png',
+  const clipboardPng = await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const png = nativeImage
+      .createFromBitmap(Buffer.from([0x22, 0x66, 0xcc, 0xff]), {
+        width: 1,
+        height: 1,
+      })
+      .toPNG();
+    await clipboard.write([
+      new ClipboardItem({
+        'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }),
       }),
+    ]);
+    const item = (await clipboard.read())[0];
+    const image = (await item.getType('image/png')) as Blob;
+    return Buffer.from(await image.arrayBuffer()).toString('base64');
+  });
+  await page.locator('.ProseMirror').evaluate((element) => {
+    element.addEventListener(
+      'paste',
+      (event) => {
+        element.setAttribute('data-native-paste', String(event.isTrusted));
+      },
+      { once: true },
     );
-    element.dispatchEvent(
-      new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }),
-    );
-  }, png);
+  });
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('data-native-paste', 'true');
   await expect
     .poll(() =>
       page
@@ -172,7 +233,7 @@ try {
   const imageMarkdown = await readFile(path.join(kb, '日本語 note.md'), 'utf8');
   expect(imageMarkdown).not.toMatch(/blob:|data:image/);
   const imageRelative = imageMarkdown.match(/_assets\/image-[a-f0-9]+\.png/)![0];
-  expect(await readFile(path.join(kb, imageRelative))).toEqual(Buffer.from(png, 'base64'));
+  expect(await readFile(path.join(kb, imageRelative))).toEqual(Buffer.from(clipboardPng, 'base64'));
   await page.getByRole('button', { name: '互換', exact: true }).click();
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
   await expect
@@ -259,8 +320,8 @@ try {
       'rich Markdown table',
       'rich Japanese edit/save',
       'no-op bytes',
-      'repeated document save without remount',
-      'local image paste, automatic save, relative bytes and reopen',
+      'repeated document save retaining focus, selection, undo/redo and editing after autosave',
+      'native clipboard image paste, automatic save, relative bytes and reopen',
       'edited BOM/CRLF/frontmatter preservation',
       'clean external refresh',
       'dirty conflict',
@@ -307,6 +368,8 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       window.on('pageerror', (error) => errors.push(String(error)));
       await window.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await window.getByRole('button', { name: 'AIに相談', exact: true }).click();
+      await expect(window.getByText(savedText, { exact: true })).not.toBeVisible();
+      await window.getByLabel('会話と接続の設定', { exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).toBeVisible();
       await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
       if (cycle === 1) {

@@ -1,7 +1,7 @@
 import { Dialog } from './Dialog';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
-import { appIcon } from './branding';
+import { appIcon, appVersion } from './branding';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 const host = window.irori;
@@ -291,7 +291,7 @@ export function Startup({
       <aside className="startup-intro">
         <div className="brand">
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
-          irori<span className="preview">Preview</span>
+          irori<span className="preview">{appVersion} Preview</span>
         </div>
         <div className="intro-content">
           <h2>

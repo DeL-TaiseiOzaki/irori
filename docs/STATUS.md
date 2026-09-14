@@ -1,5 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Daily-workflow follow-up, 2026-09-14: source version 0.1.4 addresses repeated
+installed-app feedback. [Daily workflow](DAILY-WORKFLOW.md) records the reproduced
+save/immediate-undo notification bug and its fix, native OS clipboard coverage,
+the compact assistant and nonmodal Git source-control sidebar. App startup and
+workspace branding now display the version. The exact Windows installation
+that produced the report remains unidentified; image paste was not reproduced
+as broken on the current Linux implementation.
+
+Local verification: production build passes; **88 behavior tests, 85 passed
+and three optional native controls skipped**; all **ten Electron UI suites**
+pass on the final renderer. Website build and real/mixed/available/unavailable
+fixtures also pass. Focused package verification exercises native clipboard
+paste, saved asset bytes/reopening and continuous editing outside the checkout.
+The UI suites cover save/undo/redo/autosave, source-control editing, partial
+staging, sync/conflict recovery and assistant settings/queue recovery. The first
+full UI attempts exposed old layer-test selectors; those now target accessible
+names without weakening behavior assertions. No real model inference, Google
+account operation, user-data reset or installer/site publication occurred.
+This work uses a feature branch/PR; public Windows remains 0.1.3 until a
+separately approved release. Native CI results belong to the PR checks.
+
 Verified search checkpoint, 2026-09-14: application commit `ac935a9160f5e0a0be3d77a23e71d24073e53fcb` is pushed. [CI 34810865845](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34810865845) passes verification (build, behavior/UI suites and website fixtures) and Linux x64, Windows x64 and Mac arm64 package jobs with relocated packaged-app smoke. These are engineering checks; actual installed-device, Google-account and model acceptance remain open. No new installer or website release was published.
 
 Development continuation, 2026-09-14: [local KB text search](KB-SEARCH.md) adds on-demand literal body search within one workspace KB. The sidebar dialog saves the editor before querying, shows paths/line previews, opens current files through existing guards, and discards responses after query/scope changes or closing. Search excludes schema, contents/Drive, hidden entries, links and registered nested KBs; file/result/I/O limits and unreadable files produce explicit incomplete results. Indexed large-vault and cross-KB/cloud search, exact cursor navigation, portable identities, backlinks/properties/file moves and D04 Google writes remain open. The public Windows installer remains the separate `9b04ed2` build.

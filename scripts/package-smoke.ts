@@ -233,21 +233,47 @@ try {
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Packaged edit 日本語');
-  const png =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6VEQAAAAASUVORK5CYII=';
-  const reference = await page.evaluate(async (png) => {
-    const space = (await window.irori.spaces())[0];
-    const url = await window.irori.saveImage(
-      space.scopeId,
-      'note.md',
-      Uint8Array.from(atob(png), (c) => c.charCodeAt(0)),
+  const clipboardPng = await application.evaluate(
+    async ({ clipboard, ClipboardItem, nativeImage }) => {
+      const png = nativeImage
+        .createFromBitmap(Buffer.from([0x22, 0x66, 0xcc, 0xff]), {
+          width: 1,
+          height: 1,
+        })
+        .toPNG();
+      await clipboard.write([
+        new ClipboardItem({
+          'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }),
+        }),
+      ]);
+      const item = (await clipboard.read())[0];
+      const image = (await item.getType('image/png')) as Blob;
+      return Buffer.from(await image.arrayBuffer()).toString('base64');
+    },
+  );
+  await page.locator('.ProseMirror').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.locator('.ProseMirror').evaluate((element) => {
+    element.addEventListener(
+      'paste',
+      (event) => {
+        element.setAttribute('data-native-paste', String(event.isTrusted));
+      },
+      { once: true },
     );
-    const note = await window.irori.read(space.scopeId, 'note.md');
-    await window.irori.save({ ...note, text: note.text + `\n![Image](${url})\n` });
-    return url;
-  }, png);
-  assert.equal(await readFile(path.join(root, reference), 'base64'), png);
-  await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+  });
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('data-native-paste', 'true');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(root, 'note.md'), 'utf8')).includes('_assets/image-'),
+    )
+    .toBe(true);
+  const imageMarkdown = await readFile(path.join(root, 'note.md'), 'utf8');
+  expect(imageMarkdown).not.toMatch(/blob:|data:image/);
+  const reference = imageMarkdown.match(/_assets\/image-[a-f0-9]+\.png/)![0];
+  assert.equal(await readFile(path.join(root, reference), 'base64'), clipboardPng);
   await expect
     .poll(() =>
       page
@@ -271,6 +297,31 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
+  await expect(page.locator('.ProseMirror')).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(page.locator('.ProseMirror')).not.toContainText('Continuous packaged edit');
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit');
+  await page.keyboard.insertText(' after saving');
+  await expect
+    .poll(async () =>
+      (await readFile(path.join(root, 'note.md'), 'utf8')).includes(
+        'Continuous packaged edit after saving',
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
+  await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+  await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit after saving');
+  await expect
+    .poll(() =>
+      page
+        .locator('.ProseMirror img')
+        .evaluateAll((images) =>
+          images.some((image) => (image as HTMLImageElement).naturalWidth === 1),
+        ),
+    )
+    .toBe(true);
   await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
   await expect(
     page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
@@ -379,7 +430,7 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned relocated Forge package; SDK imports, retained editor, local image paste/read, CSV graph, Japanese note/terminal file save, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Unsigned relocated Forge package; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,

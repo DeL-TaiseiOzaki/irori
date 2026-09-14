@@ -1,5 +1,10 @@
 # Continuous editing and retained records — 0.1.3
 
+The [0.1.4 daily-workflow follow-up](DAILY-WORKFLOW.md) addresses repeated
+installed-app feedback, fixes save/undo notification loss, adds native clipboard
+coverage and revises the assistant and Git UI. The sections below describe the
+earlier implementation and its remaining record/cloud boundaries.
+
 Source follow-up, 2026-09-14: [record search and source/artifact navigation](KNOWLEDGE-NAVIGATION.md) now expose explicit matching-version reconnection after a move, current-file status/opening, artifact links and version-specific reverse navigation. Shared portable identities, full-text search and in-app file moves remain open.
 
 Source follow-up, 2026-09-14: [conversation recovery](CONVERSATIONS.md) now persists bounded history and pending instructions, with explicit restart resumption and no automatic replay of interrupted work. The in-memory limitation below describes the published 0.1.3 preview; the remaining D04/D06 gates still apply.

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useImperativeHandle, type Ref } from 'react';
 import { Crepe } from '@milkdown/crepe';
+import { serializerCtx } from '@milkdown/kit/core';
+import { Plugin } from '@milkdown/kit/prose/state';
+import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
@@ -117,14 +120,26 @@ export function Editor({
         },
       },
     });
-    crepe.editor.use(literalBlock).use(preserveBlocks);
+    crepe.editor
+      .use(literalBlock)
+      .use(preserveBlocks)
+      .use(
+        // The debounced Markdown listener can skip a quick save/undo back to its
+        // previous value, leaving the saved document and React draft out of sync.
+        $prose(
+          (ctx) =>
+            new Plugin({
+              view: () => ({
+                update: (view, previous) => {
+                  if (ready && !dead && userEdited && !view.state.doc.eq(previous.doc))
+                    change.current(encoding.restore(ctx.get(serializerCtx)(view.state.doc)));
+                },
+              }),
+            }),
+        ),
+      );
     snapshot.current = () =>
       ready && userEdited ? encoding.restore(crepe.getMarkdown()) : initial.current;
-    crepe.on((listener) =>
-      listener.markdownUpdated((_ctx, value) => {
-        if (ready && !dead && userEdited) change.current(encoding.restore(value));
-      }),
-    );
     void crepe
       .create()
       .then(() => {
