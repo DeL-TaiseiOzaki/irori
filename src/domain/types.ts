@@ -157,6 +157,23 @@ export interface StartRun {
   sources?: import('./knowledge').SourceRef[];
 }
 export interface HostAPI {
+  draftRead(key: import('./drafts').DraftKey): Promise<import('./drafts').DraftRecord | null>;
+  draftWrite(
+    key: import('./drafts').DraftKey,
+    value: import('./drafts').DraftValue,
+    expectedRevision: string | null,
+  ): Promise<import('./drafts').DraftRecord>;
+  checkForUpdates(): Promise<import('./updates').UpdateCheck>;
+  openUpdatePage(target: import('./updates').UpdateTarget): Promise<void>;
+  moveNote(
+    ref: import('./note-operations').NoteRef,
+    destination: string,
+  ): Promise<Document & { notice?: string }>;
+  trashNote(
+    ref: import('./note-operations').NoteRef,
+  ): Promise<import('./note-operations').TrashedNote>;
+  trashedNotes(scopeId: string): Promise<import('./note-operations').TrashedNote[]>;
+  restoreNote(scopeId: string, trashId: string): Promise<Document & { notice?: string }>;
   search(scopeId: string, query: string): Promise<import('./search').KnowledgeSearch>;
   knowledgeHistory(scopeId: string): Promise<import('./knowledge').KnowledgeHistory>;
   restoreSource(source: import('./knowledge').SourceVersion): Promise<void>;
@@ -244,7 +261,7 @@ export interface HostAPI {
   readImage(scopeId: string, note: string, url: string): Promise<string>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
-  createNote(scopeId: string, name: string): Promise<Document>;
+  createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
   openExternal(scopeId: string, path: string): Promise<void>;
   agents(): Promise<AgentInfo[]>;
   agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;

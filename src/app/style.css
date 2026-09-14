@@ -859,6 +859,10 @@ textarea {
 .workspace-search:hover {
   background: var(--nav-raised);
 }
+.workspace-trash {
+  margin: 8px 14px;
+  flex-shrink: 0;
+}
 .layer-explorer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1148,6 +1152,7 @@ main > header .actions {
 .doc-toolbar {
   padding: 14px 24px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -1158,6 +1163,13 @@ main > header .actions {
   background: #eceeef;
   border-radius: 7px;
   padding: 3px;
+}
+.doc-toolbar > .actions {
+  flex-wrap: wrap;
+}
+.doc-toolbar > span,
+.image-errors {
+  overflow-wrap: anywhere;
 }
 .doc-toolbar button {
   font-size: 11px;

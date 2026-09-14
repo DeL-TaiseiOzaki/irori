@@ -1,5 +1,14 @@
 # Acceptance matrix and implementation backlog
 
+Source 0.1.5 continuation: [recovery and note tools](RECOVERY-AND-NOTE-TOOLS.md)
+adds unsent/commit/conflict recovery, manual Windows update discovery,
+image-resolution feedback, guarded note create/rename/move/trash/restore and
+search selection for unambiguous rendered matches. These advance R01/R03/R04
+and R08 without closing native installed-device, automatic updating, shared
+provenance, backlink rewriting, full transcript management or cloud gates.
+Older dated rows below retain their original scope; use the linked detail and
+current STATUS for implemented boundaries.
+
 Current D06 continuation, 2026-09-14: [local KB text search](KB-SEARCH.md) adds bounded literal search of saved Knowledge_Base text in one workspace KB, matching-line previews, guarded file opening and explicit incomplete results. It complements [source/artifact record navigation](KNOWLEDGE-NAVIGATION.md), metadata search, matching-version reconnection and version-specific reverse links. Portable identities, indexed/cross-KB/cloud search, exact line navigation, backlinks/properties/file moves and real generated-artifact acceptance remain open. Retained bytes and manually associated artifacts remain private to the device.
 
 Ontology follow-up: [CSV tables and declared ontology graphs](ONTOLOGY.md) now support basic source editing, note links, parent/descendant and group filters, invalid-data feedback and a prepared native-agent setup request. Build, 64 behavior tests with all native controls enabled, all seven UI suites, Linux make/packaged CSV graph and website checks pass. The forced-renderer-crash shutdown regression also passes. Stable note/artifact/run identity, retained source versions and provenance remain D06 work. [Native CI 34752136969](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34752136969) passes all three package platforms, including the CSV graph, at implementation commit `8683900`.

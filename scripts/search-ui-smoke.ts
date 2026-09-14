@@ -24,6 +24,11 @@ await writeFile(
   '# A quiet note\n\nORBITAL insight lives in the body.\nLiteral a.*b example.\n',
 );
 await writeFile(path.join(root, 'editing.md'), '# Editing\n');
+await writeFile(
+  path.join(root, 'navigation.md'),
+  '# Navigation\n\nWaypoint first\n\nWaypoint second\n\n**ambig**uous [other](ambiguous)\n',
+);
+await writeFile(path.join(root, 'line-endings.txt'), 'First\r\n\r\nCRLFMatch\r\n');
 await writeFile(path.join(root, 'orbital-filename.md'), '# Filename only\n');
 for (const name of [
   'AGENTS.md',
@@ -86,7 +91,33 @@ try {
   await results.getByRole('button').click();
   await expect(panel).toHaveCount(0);
   await expect(editor).toContainText('ORBITAL insight');
-  await expect(launcher).toBeFocused();
+  await expect(page.getByText('3 行目の一致箇所を選択しました。', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('ORBITAL');
+  await expect(editor).toBeFocused();
+
+  await launcher.click();
+  await query.fill('Waypoint');
+  await submit.click();
+  await expect(results.locator('li')).toHaveCount(2);
+  await results.getByRole('button').last().click();
+  await expect(page.getByText('5 行目の一致箇所を選択しました。', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.anchorNode?.parentElement?.textContent))
+    .toBe('Waypoint second');
+  await launcher.click();
+  await query.fill('ambiguous');
+  await submit.click();
+  await results.getByRole('button').click();
+  await expect(page.getByText(/一致箇所を安全に特定できませんでした/)).toBeVisible();
+  await launcher.click();
+  await query.fill('CRLFMatch');
+  await submit.click();
+  await results.getByRole('button').click();
+  await expect(page.getByText('3 行目の一致箇所を選択しました。', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('CRLFMatch');
+  expect(await readFile(path.join(root, 'line-endings.txt'), 'utf8')).toBe(
+    'First\r\n\r\nCRLFMatch\r\n',
+  );
 
   await launcher.click();
   await query.fill('orbital');

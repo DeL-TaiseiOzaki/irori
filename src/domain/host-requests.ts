@@ -5,6 +5,8 @@ import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
 import { startInput } from './conversation';
 import { searchQuery } from './search';
+import { draftKey, draftValue, draftRevision } from './drafts';
+import { noteRef } from './note-operations';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -17,6 +19,14 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
+  draftRead: z.tuple([draftKey]),
+  draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
+  checkForUpdates: z.tuple([]),
+  openUpdatePage: z.tuple([z.enum(['release', 'download'])]),
+  moveNote: z.tuple([noteRef, path]),
+  trashNote: z.tuple([noteRef]),
+  trashedNotes: z.tuple([id]),
+  restoreNote: z.tuple([id, id]),
   search: z.tuple([id, searchQuery]),
   knowledgeHistory: z.tuple([id]),
   restoreSource: z.tuple([sourceVersion]),
@@ -101,7 +111,7 @@ export const hostArguments = {
   readImage: z.tuple([id, path, path]),
   save: z.tuple([document]),
   draft: z.tuple([document]),
-  createNote: z.tuple([id, z.string().max(120)]),
+  createNote: z.tuple([id, z.string().max(120), path.optional()]),
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),
   agentSession: z.tuple([id, z.enum(agentIds)]),

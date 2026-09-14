@@ -16,7 +16,7 @@ export function SearchPanel({
   spaces: Space[];
   initialScopeId?: string;
   beforeSearch: () => Promise<boolean>;
-  onOpen: (scopeId: string, hit: SearchHit) => Promise<void>;
+  onOpen: (scopeId: string, hit: SearchHit, query: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [scopeId, setScopeId] = useState(
@@ -86,7 +86,7 @@ export function SearchPanel({
     setOpening(true);
     setError('');
     try {
-      await onOpen(result.scopeId, hit);
+      await onOpen(result.scopeId, hit, result.query);
     } catch (error) {
       setError(String(error));
     } finally {

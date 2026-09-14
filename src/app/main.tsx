@@ -1,5 +1,10 @@
 import { KnowledgePanel } from './KnowledgePanel';
 import { SearchPanel } from './SearchPanel';
+import { classify } from '../domain/scopes';
+import { useDraft, flushDrafts } from './useDraft';
+import { UpdateNotice } from './UpdateNotice';
+import { NoteActions, TrashNotes } from './NoteActions';
+import type { SearchTarget } from '../editor/search-navigation';
 import type { SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
@@ -209,6 +214,9 @@ function App() {
   const assistantSettings = useRef<HTMLDetailsElement>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<SearchTarget>();
+  const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
@@ -227,8 +235,15 @@ function App() {
     [infos, setInfos] = useState<AgentInfo[]>([]);
   const [events, setEvents] = useState<AgentEvent[]>([]),
     [running, setRunning] = useState(false),
-    [prompt, setPrompt] = useState(''),
     [fresh, setFresh] = useState(false);
+  const composer = useDraft(
+    active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
+    active?.root,
+  );
+  const prompt = composer.text;
+  function setPrompt(value: string | ((previous: string) => string)) {
+    composer.setText(typeof value === 'function' ? value(composer.snapshot().text) : value);
+  }
   const [sending, setSending] = useState(false);
   const submitting = useRef(false);
   const [queued, setQueued] = useState<QueuedMessage[]>([]);
@@ -240,6 +255,7 @@ function App() {
   const eventRevision = useRef(0);
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
+    [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
     [newNote, setNewNote] = useState(false);
   const conversationKey = useRef('');
   function updateEvents(update: (events: AgentEvent[]) => AgentEvent[]) {
@@ -288,13 +304,25 @@ function App() {
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
   const saving = useRef<Promise<boolean> | undefined>(undefined);
+  const organizing = useRef(false);
+  const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
   const report = (e: unknown) => setError(String(e));
-  function load(next: Document) {
+  function load(next: Document, navigation?: SearchTarget) {
+    reconciliation.current++;
+    current.current = { doc: next, buffer: next.text, external: undefined };
+    setSearchTarget(navigation);
+    setSearchNotice('');
     setDoc(next);
     setBuffer(next.text);
     setExternal(undefined);
-    setMode(/\.csv$/i.test(next.path) ? 'table' : /\.md$/i.test(next.path) ? 'rich' : 'source');
+    setMode(
+      /\.csv$/i.test(next.path) && !navigation
+        ? 'table'
+        : /\.md$/i.test(next.path)
+          ? 'rich'
+          : 'source',
+    );
     setEditorKey((k) => k + 1);
     setStatus(next.readOnly ? 'クラウド資料・読み取り専用' : 'この端末に保存済み');
   }
@@ -304,7 +332,10 @@ function App() {
     setActive((a) => a ?? list[0]);
   }
   async function reconcile() {
+    const generation = ++reconciliation.current;
+    if (organizing.current) return;
     if (saving.current) await saving.current;
+    if (generation !== reconciliation.current) return;
     const now = current.current;
     if (!now.doc) return;
     try {
@@ -312,6 +343,9 @@ function App() {
         ? await host.cloudRead(now.doc.workspaceId, now.doc.path)
         : await host.read(now.doc.scopeId, now.doc.path);
       if (
+        generation !== reconciliation.current ||
+        organizing.current ||
+        current.current.doc?.hash !== now.doc.hash ||
         current.current.doc?.path !== now.doc.path ||
         current.current.doc?.scopeId !== now.doc.scopeId
       )
@@ -324,7 +358,14 @@ function App() {
         } else load(disk);
       }
     } catch (e) {
-      report(e);
+      if (
+        !organizing.current &&
+        generation === reconciliation.current &&
+        current.current.doc?.hash === now.doc.hash &&
+        current.current.doc?.scopeId === now.doc.scopeId &&
+        current.current.doc?.path === now.doc.path
+      )
+        report(e);
     }
   }
   useEffect(() => {
@@ -359,6 +400,7 @@ function App() {
   }, [doc, buffer, dirty]);
   useEffect(() => {
     window.iroriFlushDraft = async () => {
+      await flushDrafts();
       const c = current.current;
       const latest = editor.current?.getText() ?? c.buffer;
       if (c.doc && latest !== c.doc.text) await host.draft({ ...c.doc, text: latest });
@@ -422,6 +464,7 @@ function App() {
   });
   async function selectSpace(space: Space) {
     if (gitBusy) return false;
+    if (!(await composer.flush())) return false;
     if (!(await save())) return false;
     if (running || queued.length || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
@@ -433,9 +476,10 @@ function App() {
     }
     return true;
   }
-  async function open(space: Space, entry: Entry) {
+  async function open(space: Space, entry: Entry, navigation?: SearchTarget) {
     if (gitBusy) return false;
     try {
+      if (!(await composer.flush())) return false;
       if (entry.blocked) {
         setStatus(entry.blocked);
         return false;
@@ -448,7 +492,7 @@ function App() {
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
         const next = await host.read(space.scopeId, entry.path);
         setActive(space);
-        load(next);
+        load(next, navigation);
       } else await host.openExternal(space.scopeId, entry.path);
       return true;
     } catch (e) {
@@ -475,11 +519,22 @@ function App() {
     });
   }
   async function start() {
-    if (!active || !conversationReady || submitting.current || gitBusy || !prompt.trim()) return;
+    if (
+      !active ||
+      !conversationReady ||
+      !composer.ready ||
+      composer.error ||
+      submitting.current ||
+      gitBusy ||
+      !prompt.trim()
+    )
+      return;
     submitting.current = true;
     setSending(true);
     const message = prompt;
     try {
+      if (!(await composer.flush())) return;
+      const draftRevision = composer.snapshot().record?.revision;
       if (!(await save())) return;
       const notePath = doc?.scopeId === active.scopeId ? doc.path : undefined;
       if (running || queued.length) {
@@ -496,7 +551,10 @@ function App() {
         setQueuePaused(false);
         await sendTurn(message, notePath, fresh);
       }
-      setPrompt((value) => (value === message ? '' : value));
+      if (!(await composer.clear(draftRevision)))
+        report(
+          '指示は受け付けられましたが、入力欄の下書きを消去できませんでした。再送信せず、保存を再試行してください。',
+        );
       setFresh(false);
     } catch (e) {
       if (!running) setRunning(false);
@@ -629,6 +687,7 @@ function App() {
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
           irori<span className="preview">{appVersion} Preview</span>
         </div>
+        <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
         <button
           className="workspace-switch"
           disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
@@ -637,7 +696,9 @@ function App() {
               report('未保存のノートを保存してから移動してください。');
               return;
             }
-            setStartup(true);
+            void flushDrafts()
+              .then(() => setStartup(true))
+              .catch(report);
           }}
         >
           <Icon name="grid" />
@@ -722,11 +783,31 @@ function App() {
             }}
             onNote={(space) => {
               void selectSpace(space).then((selected) => {
-                if (selected) setNewNote(true);
+                if (selected) {
+                  setNoteDirectory(
+                    doc?.scopeId === space.scopeId
+                      ? doc.path.split('/').slice(0, -1).join('/')
+                      : 'Knowledge_Base/Notes',
+                  );
+                  setNewNote(true);
+                }
               });
             }}
             onRefresh={() => setRevision((value) => value + 1)}
           />
+          {active && (
+            <button
+              className="workspace-search workspace-trash"
+              disabled={running || sending || gitBusy || connecting}
+              onClick={() => {
+                void save().then((saved) => {
+                  if (saved) setTrashOpen(true);
+                });
+              }}
+            >
+              削除したノートを復元
+            </button>
+          )}
           {cloudRoot && (
             <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
               <div className="scope-heading">
@@ -855,6 +936,62 @@ function App() {
               <div className="doc-toolbar">
                 <span>{dirty ? '保存待ち' : status}</span>
                 <div className="actions">
+                  {!doc.readOnly &&
+                    /\.md$/i.test(doc.path) &&
+                    spaces.some(
+                      (space) =>
+                        space.scopeId === doc.scopeId &&
+                        classify(space, doc.path) === 'Knowledge_Base',
+                    ) && (
+                      <NoteActions
+                        key={`${doc.scopeId}:${doc.path}`}
+                        doc={doc}
+                        onBusyChange={(busy) => {
+                          reconciliation.current++;
+                          organizing.current = busy;
+                          if (!busy) void reconcile();
+                        }}
+                        beforeChange={async () => {
+                          if (running || sending || queued.length || gitBusy || connecting)
+                            throw Error(
+                              '実行・Git 操作・接続が完了してからノートを整理してください。',
+                            );
+                          if (!(await save())) return null;
+                          return current.current.doc ?? null;
+                        }}
+                        onChanged={(next, notice) => {
+                          const previous = doc;
+                          if (next) {
+                            load(next);
+                            setSources((all) =>
+                              all.map((ref) =>
+                                ref.scopeId === previous.scopeId && ref.path === previous.path
+                                  ? { scopeId: next.scopeId, path: next.path }
+                                  : ref,
+                              ),
+                            );
+                          } else {
+                            current.current = { doc: undefined, buffer: '', external: undefined };
+                            setDoc(undefined);
+                            setBuffer('');
+                            setExternal(undefined);
+                            setSources((all) =>
+                              all.filter(
+                                (ref) =>
+                                  ref.scopeId !== previous.scopeId || ref.path !== previous.path,
+                              ),
+                            );
+                          }
+                          setRevision((value) => value + 1);
+                          setStatus(
+                            notice ??
+                              (next
+                                ? 'ノートの場所を変更しました。参照元のリンクは必要に応じて更新してください。'
+                                : 'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。'),
+                          );
+                        }}
+                      />
+                    )}
                   <button
                     disabled={
                       sources.length >= 20 ||
@@ -924,6 +1061,11 @@ function App() {
                 </div>
               )}
               <div className="document-scroll">
+                {searchNotice && (
+                  <p className="hint" role="status">
+                    {searchNotice}
+                  </p>
+                )}
                 <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
                   {mode === 'table' ? (
                     <CsvPreview key={editorKey} text={buffer} />
@@ -936,6 +1078,14 @@ function App() {
                       readOnly={doc.readOnly}
                       onChange={setBuffer}
                       onError={report}
+                      searchTarget={searchTarget}
+                      onSearchResult={(found) =>
+                        setSearchNotice(
+                          found
+                            ? `${searchTarget?.line} 行目の一致箇所を選択しました。`
+                            : '一致箇所を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。再検索して確認してください。',
+                        )
+                      }
                       onUpload={async (file) =>
                         host.saveImage(
                           doc.scopeId,
@@ -1234,6 +1384,8 @@ function App() {
               aria-label="エージェントへの指示"
               placeholder="ノートについて相談、編集を依頼…"
               value={prompt}
+              disabled={!composer.ready || sending}
+              maxLength={100000}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
                 if (
@@ -1247,12 +1399,33 @@ function App() {
                 }
               }}
             />
+            {composer.error ? (
+              <div className="hint" role="alert">
+                {composer.error}
+                <button onClick={() => void composer.retry()}>下書き保存を再試行</button>
+              </div>
+            ) : (
+              <small className="muted" role="status">
+                {!composer.ready
+                  ? '下書きを読み込み中…'
+                  : composer.pending
+                    ? '下書きを保存中…'
+                    : prompt
+                      ? '未送信の下書きをこの端末に保存済み'
+                      : ''}
+              </small>
+            )}
             <div className="composer-actions">
               <select
                 aria-label="エージェント"
                 value={agent}
                 disabled={running || sending || queued.length > 0 || gitBusy}
-                onChange={(e) => setAgent(e.target.value as AgentId)}
+                onChange={(e) => {
+                  const next = e.target.value as AgentId;
+                  void composer.flush().then((saved) => {
+                    if (saved) setAgent(next);
+                  });
+                }}
               >
                 {agentIds.map((id) => (
                   <option key={id} value={id}>
@@ -1276,6 +1449,8 @@ function App() {
                   disabled={
                     !active ||
                     !conversationReady ||
+                    !composer.ready ||
+                    !!composer.error ||
                     sending ||
                     gitBusy ||
                     connecting ||
@@ -1297,18 +1472,22 @@ function App() {
           spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
           initialScopeId={active?.scopeId}
           beforeSearch={save}
-          onOpen={async (scopeId, hit) => {
+          onOpen={async (scopeId, hit, query) => {
             const target = spaces.find(
               (space) => space.scopeId === scopeId && workspace?.scopeIds.includes(space.scopeId),
             );
             if (!target) throw Error('この KB をワークスペースに追加してから開いてください。');
-            const opened = await open(target, {
-              path: hit.path,
-              name: hit.path.split('/').at(-1)!,
-              directory: false,
-              note: /\.md$/i.test(hit.path),
-              layer: 'Knowledge_Base',
-            });
+            const opened = await open(
+              target,
+              {
+                path: hit.path,
+                name: hit.path.split('/').at(-1)!,
+                directory: false,
+                note: /\.md$/i.test(hit.path),
+                layer: 'Knowledge_Base',
+              },
+              { query, line: hit.line, preview: hit.preview },
+            );
             if (!opened)
               throw Error(
                 'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
@@ -1410,8 +1589,10 @@ function App() {
               e.preventDefault();
               if (active && !creatingNote) {
                 setCreatingNote(true);
-                void host
-                  .createNote(active.scopeId, noteName)
+                void (async () => {
+                  if (!(await save())) throw Error('現在のノートを保存してから作成してください。');
+                  return host.createNote(active.scopeId, noteName, noteDirectory);
+                })()
                   .then((d) => {
                     load(d);
                     setNewNote(false);
@@ -1431,6 +1612,16 @@ function App() {
               placeholder="ノート名"
               required
             />
+            <label>
+              保存先フォルダー（KB 内の相対パス）
+              <input
+                aria-label="保存先フォルダー"
+                value={noteDirectory}
+                onChange={(event) => setNoteDirectory(event.target.value)}
+                maxLength={4096}
+                placeholder="Knowledge_Base/Notes"
+              />
+            </label>
             <div className="actions">
               <button type="button" disabled={creatingNote} onClick={() => setNewNote(false)}>
                 キャンセル
@@ -1441,6 +1632,18 @@ function App() {
             </div>
           </form>
         </Dialog>
+      )}
+      {trashOpen && active && (
+        <TrashNotes
+          scopeId={active.scopeId}
+          onClose={() => setTrashOpen(false)}
+          onRestored={(next, notice) => {
+            setTrashOpen(false);
+            load(next);
+            setStatus(notice ?? 'ノートを元の場所に復元しました。');
+            setRevision((value) => value + 1);
+          }}
+        />
       )}
     </div>
   );

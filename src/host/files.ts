@@ -6,6 +6,14 @@ import { SerialQueue } from './serial-queue';
 import { writeLocalFile, writeLocalJson } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space } from '../domain/types';
+import {
+  imagesForNoteMove,
+  noteFilename,
+  noteRef,
+  trashedNote,
+  type NoteRef,
+  type TrashedNote,
+} from '../domain/note-operations';
 const relative = z
   .string()
   .min(1)
@@ -297,24 +305,223 @@ export class FileService {
       return this.read(doc.scopeId, doc.path);
     });
   }
-  async createNote(id: string, name: string) {
-    if (!name.trim() || /[\\/:*?"<>|]/.test(name) || name.startsWith('.'))
-      throw Error('Choose a simple note name');
-    const s = this.get(id);
-    const rel = `Knowledge_Base/Notes/${name.replace(/\.md$/i, '')}.md`;
-    // Validate every existing ancestor before mkdir can follow a symlink.
-    for (const dir of ['Knowledge_Base', 'Knowledge_Base/Notes']) {
-      try {
-        await this.resolve(id, dir);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
-        await fs.mkdir(path.join(s.root, dir));
-        await this.resolve(id, dir);
+  private noteLocation(id: string, rel: string, directory = false) {
+    const space = this.get(id);
+    if (!(directory && rel === '')) relative.parse(rel);
+    if (
+      /[\u0000-\u001f\\:*?"<>|]/.test(rel) ||
+      rel.split('/').some((part) => part.startsWith('.') || /[. ]$/.test(part)) ||
+      classify(space, rel) !== 'Knowledge_Base' ||
+      owner(this.spaces, path.join(space.root, rel))?.scopeId !== id ||
+      (!directory &&
+        (!/\.md$/i.test(rel) ||
+          noteFilename(path.posix.basename(rel)).toLowerCase() !==
+            path.posix.basename(rel).toLowerCase()))
+    )
+      throw Error('同じスペースのナレッジ内にある Markdown ノートを指定してください。');
+    return path.join(space.root, rel);
+  }
+  private async noteDirectory(id: string, rel: string, create = false) {
+    this.noteLocation(id, rel, true);
+    let prefix = '';
+    for (const part of rel.split('/').filter(Boolean)) {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      const filename = this.noteLocation(id, prefix, true);
+      let stat = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT' || !create) throw error;
+      });
+      if (!stat) {
+        await fs.mkdir(filename);
+        stat = await fs.lstat(filename);
       }
+      if (stat.isSymbolicLink() || !stat.isDirectory())
+        throw Error('フォルダの alias / シンボリックリンクは操作できません。');
+      if ((await this.resolve(id, prefix)) !== filename)
+        throw Error('フォルダの alias が変更されています。');
     }
-    await fs.writeFile(path.join(s.root, rel), `# ${name.replace(/\.md$/i, '')}\n\n`, {
-      flag: 'wx',
+    return this.resolve(id, rel, true);
+  }
+  private async existingNote(ref: NoteRef) {
+    noteRef.parse(ref);
+    const filename = this.noteLocation(ref.scopeId, ref.path);
+    await this.noteDirectory(
+      ref.scopeId,
+      path.posix.dirname(ref.path) === '.' ? '' : path.posix.dirname(ref.path),
+    );
+    const stat = await fs.lstat(filename);
+    if (!stat.isFile() || stat.isSymbolicLink())
+      throw Error('通常の Markdown ノートを選択してください。');
+    const doc = await this.read(ref.scopeId, ref.path);
+    if (doc.hash !== ref.hash)
+      throw Error('CONFLICT: ノートが変更されています。開き直してください。');
+    if (doc.draft && doc.draft.text !== doc.text)
+      throw Error('未保存の下書きを保存または解決してからノートを整理してください。');
+    return { filename, doc, stat };
+  }
+  async createNote(id: string, name: string, directory = 'Knowledge_Base/Notes') {
+    return this.queue.run(async () => {
+      const filename = noteFilename(name);
+      const rel = directory ? `${directory}/${filename}` : filename;
+      const destination = this.noteLocation(id, rel);
+      await this.noteDirectory(id, directory, true);
+      await fs.writeFile(destination, `# ${filename.slice(0, -3)}\n\n`, { flag: 'wx' });
+      return this.read(id, rel);
     });
-    return this.read(id, rel);
+  }
+  async moveNote(ref: NoteRef, destinationPath: string): Promise<Document> {
+    return this.queue.run(async () => {
+      const source = await this.existingNote(ref);
+      const destination = this.noteLocation(ref.scopeId, destinationPath);
+      if (ref.path === destinationPath) return source.doc;
+      const from = path.posix.dirname(ref.path);
+      const to = path.posix.dirname(destinationPath);
+      const assets = from === to ? [] : imagesForNoteMove(source.doc.text);
+      await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
+      // Exclusive publication must reject existing files, directories and aliases.
+      if (
+        await fs.lstat(destination).then(
+          () => true,
+          (error: NodeJS.ErrnoException) => {
+            if (error.code !== 'ENOENT') throw error;
+            return false;
+          },
+        )
+      )
+        throw Error('移動先には既にファイルがあります。別の名前を指定してください。');
+      for (const asset of assets) {
+        const oldRel = path.posix.join(from, asset);
+        const newRel = path.posix.join(to, asset);
+        await this.noteDirectory(ref.scopeId, path.posix.dirname(oldRel));
+        const oldFile = await this.resolve(ref.scopeId, oldRel);
+        const stat = await fs.lstat(path.join(this.get(ref.scopeId).root, oldRel));
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 20 * 1024 * 1024)
+          throw Error('画像ファイルを確認してください。');
+        const bytes = await fs.readFile(oldFile);
+        if (hash(bytes) !== path.posix.basename(asset).slice(6, 70))
+          throw Error('ノートの画像が変更されています。');
+        await this.noteDirectory(ref.scopeId, path.posix.dirname(newRel), true);
+        const newFile = path.join(this.get(ref.scopeId).root, newRel);
+        try {
+          await fs.writeFile(newFile, bytes, { flag: 'wx' });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          const existing = await fs.lstat(newFile);
+          if (
+            !existing.isFile() ||
+            existing.isSymbolicLink() ||
+            hash(await fs.readFile(newFile)) !== hash(bytes)
+          )
+            throw Error('移動先の画像と内容が一致しません。');
+        }
+      }
+      await this.existingNote(ref);
+      await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
+      // Flush copied bytes before removing the source. Directory-entry durability
+      // still depends on the host filesystem; this is not a power-loss transaction.
+      const copied = await fs.open(destination, 'wx', source.stat.mode);
+      try {
+        await copied.writeFile(source.doc.text);
+        await copied.sync();
+      } finally {
+        await copied.close();
+      }
+      const latest = await this.existingNote(ref);
+      if (latest.stat.ino !== source.stat.ino || hash(await fs.readFile(destination)) !== ref.hash)
+        throw Error('CONFLICT: 移動中にノートが変更されました。両方のファイルを確認してください。');
+      await fs.unlink(source.filename);
+      return this.read(ref.scopeId, destinationPath);
+    });
+  }
+  private trashPath(id: string) {
+    z.uuid().parse(id);
+    return path.join(this.dataDir, 'note-trash', `${id}.json`);
+  }
+  private async trashRecord(id: string) {
+    if ((await fs.stat(this.trashPath(id))).size > 16 * 1024 * 1024)
+      throw Error('削除したノートの記録が大きすぎます。');
+    const value = JSON.parse(await fs.readFile(this.trashPath(id), 'utf8'));
+    const record = trashedNote
+      .extend({
+        text: z.string().max(2 * 1024 * 1024),
+        restored: z.boolean(),
+        checkoutRootHash: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .parse(value);
+    if (record.id !== id || hash(record.text) !== record.hash)
+      throw Error('削除したノートの保存内容が一致しません。');
+    return record;
+  }
+  async trashNote(ref: NoteRef): Promise<TrashedNote> {
+    return this.queue.run(async () => {
+      const source = await this.existingNote(ref);
+      const record = {
+        ...noteRef.parse(ref),
+        id: randomUUID(),
+        deletedAt: new Date().toISOString(),
+        text: source.doc.text,
+        restored: false,
+        checkoutRootHash: hash(this.get(ref.scopeId).root),
+      };
+      // Retain bytes first. A failure or interruption never removes the recovery copy.
+      await writeLocalJson(this.trashPath(record.id), record);
+      const latest = await this.existingNote(ref);
+      if (latest.stat.ino !== source.stat.ino)
+        throw Error('CONFLICT: ノートが置き換えられています。');
+      await fs.unlink(source.filename);
+      return trashedNote.parse(record);
+    });
+  }
+  async trashedNotes(scopeId: string): Promise<TrashedNote[]> {
+    this.get(scopeId);
+    const names = await fs
+      .readdir(path.join(this.dataDir, 'note-trash'))
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+        return [];
+      });
+    const result: TrashedNote[] = [];
+    for (const name of names) {
+      if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue;
+      const record = await this.trashRecord(name.slice(0, -5));
+      if (
+        record.scopeId === scopeId &&
+        record.checkoutRootHash === hash(this.get(scopeId).root) &&
+        !record.restored
+      )
+        result.push(trashedNote.parse(record));
+    }
+    return result.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  }
+  async restoreNote(scopeId: string, trashId: string): Promise<Document & { notice?: string }> {
+    return this.queue.run(async () => {
+      const record = await this.trashRecord(trashId);
+      if (
+        record.scopeId !== scopeId ||
+        record.checkoutRootHash !== hash(this.get(scopeId).root) ||
+        record.restored
+      )
+        throw Error('復元するノートを確認してください。');
+      const destination = this.noteLocation(scopeId, record.path);
+      const directory = path.posix.dirname(record.path);
+      await this.noteDirectory(scopeId, directory === '.' ? '' : directory, true);
+      const restored = await fs.open(destination, 'wx');
+      try {
+        await restored.writeFile(record.text);
+        await restored.sync();
+      } finally {
+        await restored.close();
+      }
+      const doc = await this.read(scopeId, record.path);
+      try {
+        await writeLocalJson(this.trashPath(trashId), { ...record, restored: true });
+        return doc;
+      } catch {
+        return {
+          ...doc,
+          notice:
+            'ノートは復元しましたが、削除済み一覧の更新に失敗しました。このノートを再度復元する必要はありません。',
+        };
+      }
+    });
   }
 }
