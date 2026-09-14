@@ -33,7 +33,7 @@ import { Startup, RegisterSpace } from './Startup';
 import { Connections } from './Connections';
 import { GitPanel } from './GitPanel';
 import { LayerExplorer, Tree } from './LayerExplorer';
-import { appIcon } from './branding';
+import { appIcon, appVersion } from './branding';
 import { Icon } from './Icon';
 import { agentIds, agentNames } from '../domain/types';
 const host = window.irori;
@@ -203,6 +203,10 @@ function App() {
   const [cloudRoot, setCloudRoot] = useState<CloudRoot>(),
     [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   const [gitOpen, setGitOpen] = useState(false);
+  const [gitReview, setGitReview] = useState(false);
+  const [gitBusy, setGitBusy] = useState(false);
+  const [gitDetailTarget, setGitDetailTarget] = useState<HTMLDivElement | null>(null);
+  const assistantSettings = useRef<HTMLDetailsElement>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sources, setSources] = useState<SourceRef[]>([]);
@@ -399,12 +403,12 @@ function App() {
     return success;
   }
   useEffect(() => {
-    if (!dirty || doc?.readOnly || external || gitOpen) return;
+    if (!dirty || doc?.readOnly || external || gitBusy) return;
     const timer = setTimeout(() => {
       void save();
     }, 1000);
     return () => clearTimeout(timer);
-  }, [dirty, buffer, doc, external, gitOpen]);
+  }, [dirty, buffer, doc, external, gitBusy]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.terminal-panel')) return;
@@ -417,6 +421,7 @@ function App() {
     return () => window.removeEventListener('keydown', key);
   });
   async function selectSpace(space: Space) {
+    if (gitBusy) return false;
     if (!(await save())) return false;
     if (running || queued.length || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
@@ -429,6 +434,7 @@ function App() {
     return true;
   }
   async function open(space: Space, entry: Entry) {
+    if (gitBusy) return false;
     try {
       if (entry.blocked) {
         setStatus(entry.blocked);
@@ -469,7 +475,7 @@ function App() {
     });
   }
   async function start() {
-    if (!active || !conversationReady || submitting.current || !prompt.trim()) return;
+    if (!active || !conversationReady || submitting.current || gitBusy || !prompt.trim()) return;
     submitting.current = true;
     setSending(true);
     const message = prompt;
@@ -505,6 +511,7 @@ function App() {
       !conversationReady ||
       running ||
       sending ||
+      gitBusy ||
       queuePaused ||
       external ||
       !queued.length ||
@@ -533,8 +540,11 @@ function App() {
       submitting.current = false;
       setSending(false);
     });
-  }, [conversationReady, running, sending, queued, queuePaused, external]);
+  }, [conversationReady, running, sending, queued, queuePaused, external, gitBusy]);
   async function openWorkspace(profile: WorkspaceProfile) {
+    if (gitBusy) return;
+    setGitOpen(false);
+    setGitReview(false);
     setSources([]);
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
     setWorkspace(profile);
@@ -583,6 +593,7 @@ function App() {
     setConnectionsOpen(true);
   }
   async function openCloud(root: CloudRoot, entry: Entry) {
+    if (gitBusy) return false;
     if (entry.blocked) {
       setStatus(entry.blocked);
       return false;
@@ -607,18 +618,20 @@ function App() {
       />
     );
   return (
-    <div className={`app ${panel ? 'panel-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}>
+    <div
+      className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}
+    >
       <a className="skip-to-editor" href="#editor-main">
         編集領域へ移動
       </a>
       <aside className="sidebar">
         <div className="brand">
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
-          irori<span className="preview">Preview</span>
+          irori<span className="preview">{appVersion} Preview</span>
         </div>
         <button
           className="workspace-switch"
-          disabled={dirty || running || connecting || !!terminalSpace}
+          disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
           onClick={() => {
             if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
               report('未保存のノートを保存してから移動してください。');
@@ -634,71 +647,121 @@ function App() {
           </span>
           <Icon name="chevron" className="rotated" size={13} />
         </button>
-        <button
-          className="workspace-search"
-          disabled={
-            !spaces.some((space) => workspace?.scopeIds.includes(space.scopeId)) || connecting
-          }
-          onClick={() => setSearchOpen(true)}
-        >
-          <Icon name="search" /> KB内を検索
-        </button>
-        <LayerExplorer
-          spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
-          activeId={active?.scopeId}
-          selected={doc}
-          revision={revision}
-          locked={running || sending || queued.length > 0 || connecting}
-          onSelect={(space) => {
-            void selectSpace(space);
-          }}
-          onOpen={(space, entry) => void open(space, entry)}
-          onConnect={(space) => {
-            void selectSpace(space).then((selected) => {
-              if (selected) showConnections(space);
-            });
-          }}
-          onNote={(space) => {
-            void selectSpace(space).then((selected) => {
-              if (selected) setNewNote(true);
-            });
-          }}
-          onRefresh={() => setRevision((value) => value + 1)}
-        />
-        {cloudRoot && (
-          <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
-            <div className="scope-heading">
-              <strong>
-                <Icon name="cloud" size={14} /> Google Drive
-              </strong>
-              <button
-                className="scope-action"
-                disabled={dirty || running || connecting}
-                onClick={() => showConnections(cloudRoot)}
-                aria-label="Drive フォルダを接続"
-              >
-                接続
-              </button>
-            </div>
-            <Tree
-              space={cloudRoot}
-              layer="contents"
-              directory="contents"
-              roots={{ entries: [] }}
-              revision={revision}
-              selected={doc}
-              readEntries={host.cloudEntries}
-              onOpen={(root, entry) => void openCloud(root, entry)}
-            />
-          </section>
+        <nav className="workspace-views" aria-label="ワークスペースの表示">
+          <button
+            aria-pressed={!gitOpen}
+            disabled={gitBusy}
+            onClick={() => {
+              setGitOpen(false);
+              setGitReview(false);
+            }}
+          >
+            <Icon name="folder" /> ノート
+          </button>
+          <button
+            aria-pressed={gitOpen}
+            disabled={!active || running || sending || queued.length > 0 || connecting || gitBusy}
+            onClick={() => {
+              void save().then((saved) => {
+                if (saved) setGitOpen(true);
+              });
+            }}
+          >
+            <Icon name="branch" /> ソース管理
+          </button>
+        </nav>
+        {gitOpen && active && (
+          <GitPanel
+            spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
+            initialScope={active.scopeId}
+            detailTarget={gitDetailTarget}
+            onReviewChange={setGitReview}
+            onBusyChange={setGitBusy}
+            revision={revision}
+            beforeAction={async () => {
+              if (running || sending || queued.length > 0 || connecting) {
+                report('実行が終わってから Git を操作してください。');
+                return false;
+              }
+              return save();
+            }}
+            onClose={() => {
+              setGitOpen(false);
+              setGitReview(false);
+            }}
+            onChanged={() => {
+              setRevision((r) => r + 1);
+              void reconcile();
+            }}
+          />
         )}
-        <button
-          className="add-space"
-          disabled={running || dirty || connecting}
-          onClick={() => setAdd(true)}
-        >
-          <Icon name="plus" /> スペースを追加
-        </button>
+        <div className="explorer-content" hidden={gitOpen}>
+          <button
+            className="workspace-search"
+            disabled={
+              !spaces.some((space) => workspace?.scopeIds.includes(space.scopeId)) || connecting
+            }
+            onClick={() => setSearchOpen(true)}
+          >
+            <Icon name="search" /> KB内を検索
+          </button>
+          <LayerExplorer
+            spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
+            activeId={active?.scopeId}
+            selected={doc}
+            revision={revision}
+            locked={running || sending || queued.length > 0 || connecting}
+            onSelect={(space) => {
+              void selectSpace(space);
+            }}
+            onOpen={(space, entry) => void open(space, entry)}
+            onConnect={(space) => {
+              void selectSpace(space).then((selected) => {
+                if (selected) showConnections(space);
+              });
+            }}
+            onNote={(space) => {
+              void selectSpace(space).then((selected) => {
+                if (selected) setNewNote(true);
+              });
+            }}
+            onRefresh={() => setRevision((value) => value + 1)}
+          />
+          {cloudRoot && (
+            <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
+              <div className="scope-heading">
+                <strong>
+                  <Icon name="cloud" size={14} /> Google Drive
+                </strong>
+                <button
+                  className="scope-action"
+                  disabled={dirty || running || connecting}
+                  onClick={() => showConnections(cloudRoot)}
+                  aria-label="Drive フォルダを接続"
+                >
+                  接続
+                </button>
+              </div>
+              <Tree
+                space={cloudRoot}
+                layer="contents"
+                directory="contents"
+                roots={{ entries: [] }}
+                revision={revision}
+                selected={doc}
+                readEntries={host.cloudEntries}
+                onOpen={(root, entry) => void openCloud(root, entry)}
+              />
+            </section>
+          )}
+          <button
+            className="add-space"
+            disabled={running || dirty || connecting}
+            onClick={() => setAdd(true)}
+          >
+            <Icon name="plus" /> スペースを追加
+          </button>
+        </div>
       </aside>
       <main id="editor-main" tabIndex={-1}>
         <header>
@@ -710,21 +773,9 @@ function App() {
             <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
           </div>
           <div className="actions">
-            {active && (
-              <button
-                disabled={running || queued.length > 0 || connecting}
-                onClick={() => {
-                  void save().then((saved) => {
-                    if (saved) setGitOpen(true);
-                  });
-                }}
-              >
-                <Icon name="branch" /> 変更と履歴
-              </button>
-            )}
             {cloudRoot && (
               <button
-                disabled={running || dirty || connecting}
+                disabled={running || dirty || connecting || gitBusy}
                 onClick={() => showConnections(cloudRoot)}
               >
                 <Icon name="cloud" /> クラウド接続
@@ -732,7 +783,7 @@ function App() {
             )}
             {active && (
               <button
-                disabled={running || dirty || connecting}
+                disabled={running || dirty || connecting || gitBusy}
                 onClick={() => setOntologyOpen(true)}
               >
                 オントロジー
@@ -741,7 +792,7 @@ function App() {
             {connecting && <small>接続を準備中…</small>}
             {active && (
               <button
-                disabled={connecting}
+                disabled={connecting || gitBusy}
                 onClick={() => {
                   void save().then((saved) => {
                     if (saved) setNewNote(true);
@@ -753,7 +804,9 @@ function App() {
             )}
             {doc && (
               <>
-                <button onClick={() => void reconcile()}>再読み込み</button>
+                <button disabled={gitBusy} onClick={() => void reconcile()}>
+                  再読み込み
+                </button>
                 <button disabled={!dirty || !!external} onClick={() => void save()}>
                   保存{dirty ? ' •' : ''}
                 </button>
@@ -795,131 +848,134 @@ function App() {
             </button>
           </div>
         )}
-        {doc ? (
-          <>
-            <div className="doc-toolbar">
-              <span>{dirty ? '保存待ち' : status}</span>
-              <div className="actions">
-                <button
-                  disabled={
-                    sources.length >= 20 ||
-                    sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path)
-                  }
-                  onClick={() => {
-                    void save().then((saved) => {
-                      if (saved)
-                        setSources((all) => [...all, { scopeId: doc.scopeId, path: doc.path }]);
-                    });
-                  }}
-                >
-                  参照に追加
-                </button>
-                {active && (
+        <div className="git-detail-slot" ref={setGitDetailTarget} hidden={!gitReview} />
+        <div className="note-surface" hidden={gitReview}>
+          {doc ? (
+            <>
+              <div className="doc-toolbar">
+                <span>{dirty ? '保存待ち' : status}</span>
+                <div className="actions">
                   <button
+                    disabled={
+                      sources.length >= 20 ||
+                      sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path)
+                    }
                     onClick={() => {
                       void save().then((saved) => {
-                        if (saved) setKnowledgeOpen(true);
+                        if (saved)
+                          setSources((all) => [...all, { scopeId: doc.scopeId, path: doc.path }]);
                       });
                     }}
                   >
-                    資料と成果物
+                    参照に追加
                   </button>
-                )}
+                  {active && (
+                    <button
+                      onClick={() => {
+                        void save().then((saved) => {
+                          if (saved) setKnowledgeOpen(true);
+                        });
+                      }}
+                    >
+                      資料と成果物
+                    </button>
+                  )}
+                </div>
+                <div className="actions">
+                  {/\.csv$/i.test(doc.path) && (
+                    <button
+                      className={mode === 'table' ? 'selected' : ''}
+                      onClick={() => {
+                        setBuffer(editor.current?.getText() ?? buffer);
+                        setMode('table');
+                        setEditorKey((key) => key + 1);
+                      }}
+                    >
+                      表
+                    </button>
+                  )}
+                  {!/\.md$/i.test(doc.path) && (
+                    <button
+                      className={mode === 'source' ? 'selected' : ''}
+                      onClick={() => {
+                        setBuffer(editor.current?.getText() ?? buffer);
+                        setMode('source');
+                        setEditorKey((k) => k + 1);
+                      }}
+                    >
+                      ソース
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="actions">
-                {/\.csv$/i.test(doc.path) && (
+              {doc.draft && doc.draft.text !== doc.text && (
+                <div className="hint">
+                  復元できる下書きがあります。
                   <button
-                    className={mode === 'table' ? 'selected' : ''}
                     onClick={() => {
-                      setBuffer(editor.current?.getText() ?? buffer);
-                      setMode('table');
-                      setEditorKey((key) => key + 1);
-                    }}
-                  >
-                    表
-                  </button>
-                )}
-                {!/\.md$/i.test(doc.path) && (
-                  <button
-                    className={mode === 'source' ? 'selected' : ''}
-                    onClick={() => {
-                      setBuffer(editor.current?.getText() ?? buffer);
-                      setMode('source');
+                      setBuffer(doc.draft!.text);
+                      setMode(/\.md$/i.test(doc.path) ? 'rich' : 'source');
                       setEditorKey((k) => k + 1);
+                      if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
                     }}
                   >
-                    ソース
+                    下書きを復元
                   </button>
-                )}
+                </div>
+              )}
+              <div className="document-scroll">
+                <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
+                  {mode === 'table' ? (
+                    <CsvPreview key={editorKey} text={buffer} />
+                  ) : (
+                    <Editor
+                      ref={editor}
+                      key={editorKey}
+                      text={buffer}
+                      mode={mode}
+                      readOnly={doc.readOnly}
+                      onChange={setBuffer}
+                      onError={report}
+                      onUpload={async (file) =>
+                        host.saveImage(
+                          doc.scopeId,
+                          doc.path,
+                          new Uint8Array(await file.arrayBuffer()),
+                        )
+                      }
+                      resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
+                    />
+                  )}
+                </Suspense>
               </div>
-            </div>
-            {doc.draft && doc.draft.text !== doc.text && (
-              <div className="hint">
-                復元できる下書きがあります。
+            </>
+          ) : (
+            <div className="welcome">
+              <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
+              <h1>ここから、考えを広げよう。</h1>
+              <p>
+                左のナレッジからノートを開くと、編集を始められます。
+                <br />
+                新しいノートを作ったり、AIと一緒に整理することもできます。
+              </p>
+              <div className="welcome-actions">
                 <button
-                  onClick={() => {
-                    setBuffer(doc.draft!.text);
-                    setMode(/\.md$/i.test(doc.path) ? 'rich' : 'source');
-                    setEditorKey((k) => k + 1);
-                    if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
-                  }}
+                  className="primary"
+                  disabled={!active || running || connecting}
+                  onClick={() => setNewNote(true)}
                 >
-                  下書きを復元
+                  <Icon name="plus" />
+                  新しいノートを作成
+                </button>
+                <button onClick={() => setAdd(true)}>
+                  <Icon name="folder" />
+                  KBフォルダを開く
                 </button>
               </div>
-            )}
-            <div className="document-scroll">
-              <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
-                {mode === 'table' ? (
-                  <CsvPreview key={editorKey} text={buffer} />
-                ) : (
-                  <Editor
-                    ref={editor}
-                    key={editorKey}
-                    text={buffer}
-                    mode={mode}
-                    readOnly={doc.readOnly}
-                    onChange={setBuffer}
-                    onError={report}
-                    onUpload={async (file) =>
-                      host.saveImage(
-                        doc.scopeId,
-                        doc.path,
-                        new Uint8Array(await file.arrayBuffer()),
-                      )
-                    }
-                    resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
-                  />
-                )}
-              </Suspense>
+              <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
             </div>
-          </>
-        ) : (
-          <div className="welcome">
-            <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
-            <h1>ここから、考えを広げよう。</h1>
-            <p>
-              左のナレッジからノートを開くと、編集を始められます。
-              <br />
-              新しいノートを作ったり、AIと一緒に整理することもできます。
-            </p>
-            <div className="welcome-actions">
-              <button
-                className="primary"
-                disabled={!active || running || connecting}
-                onClick={() => setNewNote(true)}
-              >
-                <Icon name="plus" />
-                新しいノートを作成
-              </button>
-              <button onClick={() => setAdd(true)}>
-                <Icon name="folder" />
-                KBフォルダを開く
-              </button>
-            </div>
-            <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
-          </div>
-        )}
+          )}
+        </div>
         {terminalSpace && (
           <Suspense fallback={<p className="hint">ターミナルを開いています…</p>}>
             <TerminalPanel space={terminalSpace} onClose={() => setTerminalSpace(undefined)} />
@@ -957,71 +1013,81 @@ function App() {
               <Icon name="sparkles" />
               AIに相談
             </h2>
-            <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
-              <Icon name="close" />
-            </button>
-          </div>
-          <div className="agent-config">
-            <select
-              aria-label="エージェント"
-              value={agent}
-              disabled={running || sending || queued.length > 0}
-              onChange={(e) => setAgent(e.target.value as AgentId)}
-            >
-              {agentIds.map((id) => (
-                <option key={id} value={id}>
-                  {agentNames[id]}
-                </option>
-              ))}
-            </select>
-            <small>{infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}</small>
-            {infos.find((i) => i.id === agent)?.available === false && (
-              <p role="alert">
-                CLI が見つかりません。インストールとネイティブログインを確認してください。
-              </p>
-            )}
-            {infos.find((i) => i.id === agent)?.available &&
-              infos.find((i) => i.id === agent)?.tested === false && (
-                <small>このCLIバージョンは未検証です。</small>
-              )}
-            <div className="context-chip">
-              {active?.name ?? 'スペース未選択'}
-              {doc ? ` / ${doc.path.split('/').at(-1)}` : ''}
-            </div>
-            {sources.length > 0 && (
-              <div className="selected-sources" aria-label="選択した参照資料">
-                {sources.map((source) => (
-                  <div key={`${source.scopeId}:${source.path}`}>
-                    <span>
-                      {spaces.find((space) => space.scopeId === source.scopeId)?.name ?? 'Drive'} /{' '}
-                      {source.path}
-                    </span>
+            <div className="actions">
+              <button
+                aria-label="新しい会話"
+                title="次の送信から新しい会話"
+                aria-pressed={fresh}
+                disabled={running || sending || queued.length > 0}
+                onClick={() => {
+                  setFresh((value) => !value);
+                  document.querySelector<HTMLTextAreaElement>('.composer textarea')?.focus();
+                }}
+              >
+                <Icon name="plus" />
+              </button>
+              <details
+                className="agent-settings"
+                ref={assistantSettings}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.currentTarget.open = false;
+                    event.currentTarget.querySelector('summary')?.focus();
+                  }
+                }}
+              >
+                <summary aria-label="会話と接続の設定" title="会話と接続の設定">
+                  •••
+                </summary>
+                <div className="agent-settings-sheet">
+                  <div className="agent-settings-heading">
+                    <strong>会話と接続</strong>
                     <button
-                      aria-label={`${source.path} を参照から外す`}
-                      onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
+                      aria-label="会話の設定を閉じる"
+                      onClick={() => {
+                        if (assistantSettings.current) {
+                          assistantSettings.current.open = false;
+                          assistantSettings.current.querySelector('summary')?.focus();
+                        }
+                      }}
                     >
-                      ×
+                      <Icon name="close" />
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
-            <small>ノートは自動保存され、このスペースで会話が続きます。</small>
-            <small>{infos.find((i) => i.id === agent)?.detail}</small>
-            {active && (
-              <SessionControls
-                key={`${active.scopeId}:${agent}`}
-                scopeId={active.scopeId}
-                agent={agent}
-                running={running || sending || queued.length > 0 || !conversationReady}
-                onError={report}
-                onReset={() => {
-                  if (conversationKey.current !== `${active.scopeId}:${agent}`) return;
-                  setFresh(false);
-                }}
-              />
-            )}
+                  <p>
+                    {agentNames[agent]}{' '}
+                    <span>{infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}</span>
+                  </p>
+                  <p>{infos.find((i) => i.id === agent)?.detail}</p>
+                  {infos.find((i) => i.id === agent)?.available &&
+                    infos.find((i) => i.id === agent)?.tested === false && (
+                      <p>このCLIバージョンは未検証です。</p>
+                    )}
+                  {active && (
+                    <SessionControls
+                      key={`${active.scopeId}:${agent}`}
+                      scopeId={active.scopeId}
+                      agent={agent}
+                      running={running || sending || queued.length > 0 || !conversationReady}
+                      onError={report}
+                      onReset={() => {
+                        if (conversationKey.current !== `${active.scopeId}:${agent}`) return;
+                        setFresh(false);
+                      }}
+                    />
+                  )}
+                </div>
+              </details>
+              <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
+                <Icon name="close" />
+              </button>
+            </div>
           </div>
+          {infos.find((i) => i.id === agent)?.available === false && (
+            <p className="agent-connection-error" role="alert">
+              CLI が見つかりません。インストールとネイティブログインを確認してください。
+            </p>
+          )}
           {!conversationReady && (
             <div className="hint" role="status">
               {conversationError || '保存した会話を読み込んでいます…'}
@@ -1045,9 +1111,7 @@ function App() {
           >
             {events.length === 0 && (
               <div className="agent-empty">
-                <Icon name="sparkles" size={24} />
-                <p>考えを進める、もうひとつの視点。</p>
-                <small>このスペースのノートについて相談できます。</small>
+                <p>ノートについて相談する</p>
                 <div className="prompt-suggestions">
                   {['このノートの要点をまとめて', 'この内容から次のアクションを整理して'].map(
                     (suggestion) => (
@@ -1130,18 +1194,45 @@ function App() {
             </div>
           )}
           <div className="composer">
-            <label className="new-session">
-              <input
-                type="checkbox"
-                checked={fresh}
-                disabled={running || sending || queued.length > 0}
-                onChange={(e) => setFresh(e.target.checked)}
-              />
-              新しい会話
-            </label>
+            {fresh && (
+              <p className="new-session" role="status">
+                次の送信から新しい会話を始めます。
+                <button onClick={() => setFresh(false)}>取り消す</button>
+              </p>
+            )}
+            <div className="composer-context" aria-label="相談の対象">
+              <span className="context-chip" title={active?.name}>
+                <Icon name="folder" size={12} />
+                {active?.name ?? 'スペース未選択'}
+              </span>
+              {doc?.scopeId === active?.scopeId && doc && (
+                <span className="context-chip" title={doc.path}>
+                  <Icon name="file" size={12} />
+                  {doc.path.split('/').at(-1)}
+                </span>
+              )}
+            </div>
+            {sources.length > 0 && (
+              <div className="selected-sources" aria-label="選択した参照資料">
+                {sources.map((source) => (
+                  <div key={`${source.scopeId}:${source.path}`}>
+                    <span title={source.path}>
+                      {spaces.find((space) => space.scopeId === source.scopeId)?.name ?? 'Drive'} /{' '}
+                      {source.path}
+                    </span>
+                    <button
+                      aria-label={`${source.path} を参照から外す`}
+                      onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               aria-label="エージェントへの指示"
-              placeholder="このノートから、何を作りますか？"
+              placeholder="ノートについて相談、編集を依頼…"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -1156,32 +1247,47 @@ function App() {
                 }
               }}
             />
-            <div className="actions">
-              {running && (
-                <button
-                  onClick={() => {
-                    setQueuePaused(true);
-                    void host.cancel().catch(report);
-                  }}
-                >
-                  停止
-                </button>
-              )}
-              <button
-                className="primary"
-                disabled={
-                  !active ||
-                  !conversationReady ||
-                  sending ||
-                  connecting ||
-                  !prompt.trim() ||
-                  !!external ||
-                  infos.find((i) => i.id === agent)?.available !== true
-                }
-                onClick={() => void start()}
+            <div className="composer-actions">
+              <select
+                aria-label="エージェント"
+                value={agent}
+                disabled={running || sending || queued.length > 0 || gitBusy}
+                onChange={(e) => setAgent(e.target.value as AgentId)}
               >
-                {running || queued.length ? '送信待ちに追加' : '送信'}
-              </button>
+                {agentIds.map((id) => (
+                  <option key={id} value={id}>
+                    {agentNames[id]}
+                  </option>
+                ))}
+              </select>
+              <div className="actions">
+                {running && (
+                  <button
+                    onClick={() => {
+                      setQueuePaused(true);
+                      void host.cancel().catch(report);
+                    }}
+                  >
+                    停止
+                  </button>
+                )}
+                <button
+                  className="primary"
+                  disabled={
+                    !active ||
+                    !conversationReady ||
+                    sending ||
+                    gitBusy ||
+                    connecting ||
+                    !prompt.trim() ||
+                    !!external ||
+                    infos.find((i) => i.id === agent)?.available !== true
+                  }
+                  onClick={() => void start()}
+                >
+                  {running || queued.length ? '送信待ちに追加' : '送信'}
+                </button>
+              </div>
             </div>
           </div>
         </aside>
@@ -1273,17 +1379,6 @@ function App() {
             }}
           />
         </Suspense>
-      )}
-      {gitOpen && active && (
-        <GitPanel
-          spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
-          initialScope={active.scopeId}
-          onClose={() => setGitOpen(false)}
-          onChanged={() => {
-            setRevision((r) => r + 1);
-            void reconcile();
-          }}
-        />
       )}
       {add && (
         <RegisterSpace

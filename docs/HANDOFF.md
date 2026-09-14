@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Daily-workflow branch, 2026-09-14: source version 0.1.4 on
+`feat/daily-editing-workflow` implements the repeated installed-app feedback.
+See [Daily workflow](DAILY-WORKFLOW.md) for the save/immediate-undo fix, native
+clipboard tests, compact assistant, source-control sidebar and version display.
+Production build, 85/88 behavior tests (three optional skips), all ten UI suites
+and website checks pass locally. The Git UI preserves partial staging and
+conflict drafts while allowing note editing beside source control. Linux package
+smoke covers trusted OS paste and continuous editing outside the checkout;
+native CI is recorded on the feature PR. Do not confuse this source change with
+an update to the owner's Windows installation or public download: the published
+Windows preview remains 0.1.3, and the reported installed version is unknown.
+Leave the feature PR open until merging is authorized; a new installer release
+requires verified native CI bytes and the existing publication procedure.
+
 Verified search checkpoint, 2026-09-14: application commit `ac935a9160f5e0a0be3d77a23e71d24073e53fcb` is pushed. [CI 34810865845](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34810865845) succeeds in verification and all Linux x64/Windows x64/Mac arm64 package jobs, including relocated packaged-app smoke. Local build, 85/88 behavior tests (three optional skips), all ten Electron UI suites, formatting and documentation-link checks pass. This following documentation checkpoint records the completed verification; the public Windows installer remains `9b04ed2` / `v0.1.3-preview.1`.
 
 Development continuation, 2026-09-14: [local KB text search](KB-SEARCH.md) is implemented after the source-navigation checkpoint. **KB内を検索** searches saved Knowledge_Base text in one current-workspace KB, displays matching lines and opens the current document through the editor/workspace/agent guards. The host enforces the existing scope boundaries, skips unreadable or oversized files, bounds traversal/read work and marks incomplete results. Query/scope changes and closing discard stale responses. No persistent index, cloud fetching or cross-KB search is included.

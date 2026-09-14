@@ -108,7 +108,7 @@ try {
   await research.getByRole('button', { name: 'README', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Research notes');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
-  await expect(page.locator('.context-chip')).toContainText('Research');
+  await expect(page.getByLabel('相談の対象')).toContainText('Research');
   await page.getByRole('button', { name: 'このノートの要点をまとめて', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toHaveValue(
     'このノートの要点をまとめて',
@@ -124,7 +124,10 @@ try {
   expect(panelBounds!.x + panelBounds!.width).toBeLessThanOrEqual(
     await page.evaluate(() => innerWidth),
   );
-  await page.locator('.agent-heading button').click();
+  await page
+    .locator('.agent-heading')
+    .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
+    .click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'クラウド接続' })).toContainText(

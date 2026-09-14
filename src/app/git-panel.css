@@ -1,0 +1,211 @@
+.git-sidebar {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  color: var(--ink);
+  background: var(--paper);
+}
+.git-sidebar-heading,
+.git-sidebar-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.git-sidebar-heading {
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  font-size: 13px;
+}
+.git-sidebar-heading > button {
+  display: flex;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+}
+.git-sidebar > label {
+  padding: 4px 12px;
+}
+.git-sidebar > label select {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  font-size: 12px;
+}
+.git-sidebar .git-repository-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 6px 12px 10px;
+  font-size: 12px;
+}
+.git-sidebar .git-repository-bar > div:first-child {
+  justify-content: space-between;
+}
+.git-sidebar .git-repository-bar .git-remote {
+  margin: 0;
+}
+.git-sidebar .git-commit-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  padding: 10px 12px;
+  border-top: 0;
+}
+.git-sidebar .git-commit-form input {
+  min-width: 0;
+  font-size: 12px;
+  padding: 8px;
+}
+.git-sidebar .git-commit-form button {
+  padding: 7px;
+  font-size: 12px;
+}
+.git-sidebar button.primary {
+  color: #fff;
+  background: var(--nav);
+}
+.git-sidebar .git-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+.git-sidebar .git-toolbar .actions {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.git-sidebar .git-toolbar button {
+  padding: 4px 6px;
+  font-size: 11px;
+}
+.git-more-actions {
+  position: relative;
+  font-size: 11px;
+}
+.git-more-actions summary {
+  cursor: pointer;
+  padding: 5px 6px;
+}
+.git-more-actions[open] {
+  flex-basis: 100%;
+}
+.git-more-actions[open] button {
+  margin: 4px 4px 0 0;
+}
+.git-sidebar .git-notice {
+  padding: 8px 12px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.git-sidebar .git-list {
+  flex: 1 0 100px;
+  overflow: visible;
+  border: 0;
+  padding-bottom: 8px;
+  background: transparent;
+}
+.git-sidebar .git-list h3 {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 10px 6px;
+  font-size: 11px;
+}
+.git-sidebar .git-list h3 .git-stage-all {
+  margin-left: auto;
+  padding: 2px;
+  font-size: 10px;
+}
+.git-sidebar .git-list p {
+  padding: 0 12px;
+  font-size: 11px;
+}
+.git-file-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-right: 6px;
+}
+.git-sidebar .git-file {
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 6px;
+  font-size: 11px;
+}
+.git-sidebar .git-file > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-sidebar .git-file-state {
+  width: 24px;
+  font-size: 10px;
+}
+.git-sidebar .git-stage-file {
+  flex-shrink: 0;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  font-size: 18px;
+  border: 0;
+  background: transparent;
+}
+.git-sidebar .git-stage-file:hover:not(:disabled) {
+  background: #e7e9e7;
+}
+.git-sidebar .git-confirmation {
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 12px;
+  max-height: none;
+  font-size: 12px;
+}
+.git-sidebar .git-confirmation > div:first-child {
+  min-width: 0;
+  flex-basis: 100%;
+}
+.git-sidebar .git-confirmation .actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.git-sidebar .git-confirmation button {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.git-sidebar .git-empty {
+  padding: 20px 12px;
+  font-size: 12px;
+}
+.git-sidebar .git-empty h2 {
+  font-size: 14px;
+}
+.git-workspace-detail {
+  height: 100%;
+  background: var(--paper);
+}
+.git-review-navigation {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.git-review-navigation button {
+  font-size: 12px;
+}
+.git-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

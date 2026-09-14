@@ -49,9 +49,23 @@ try {
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  const settings = () => page.getByLabel('会話と接続の設定', { exact: true });
+  await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
+  await page.getByRole('button', { name: '新しい会話', exact: true }).click();
+  await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
+  await expect(page.getByText('次の送信から新しい会話を始めます。')).toBeVisible();
+  await page.getByRole('button', { name: '取り消す', exact: true }).click();
+  await expect(page.getByRole('button', { name: '新しい会話', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
+    await settings().click();
     await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(settings()).toBeFocused();
+    await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
     await page.getByLabel('エージェントへの指示').fill('dialog');
     await page.getByRole('button', { name: '送信', exact: true }).click();
     if (agent === 'pi') {
@@ -167,11 +181,13 @@ try {
       await expect(page.locator('.request')).toHaveCount(0);
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
+    await settings().click();
     await expect(
       page.getByText('次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。', {
         exact: true,
       }),
     ).toBeVisible();
+    await settings().click();
   }
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain('Fixture OpenCode edit');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
@@ -183,11 +199,13 @@ try {
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
+    await settings().click();
     await expect(
       page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
     await expect(page.getByText('次の実行で新しい会話を始めます。', { exact: true })).toBeVisible();
+    await settings().click();
   }
   expect(errors).toEqual([]);
   await writeFile(
@@ -197,6 +215,8 @@ try {
         evidence: 'Explicit protocol fixtures; no native model inference',
         checks: [
           'Pi/OpenCode panel selection',
+          'compact assistant with optional session diagnostics and keyboard dismissal',
+          'new conversation intent and cancellation preserve the composer',
           'native-shaped denial and question responses',
           'stream completion',
           'fixture mutation',

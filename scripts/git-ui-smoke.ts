@@ -93,11 +93,37 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  await page.getByRole('button', { name: '変更と履歴', exact: true }).click();
-  const panel = page.getByRole('dialog', { name: 'Git の変更と履歴' });
-  await expect(panel).toBeVisible();
+  await page.getByRole('button', { name: 'ソース管理', exact: true }).click();
+  const sidebar = page.getByRole('complementary', { name: 'ソース管理' });
+  const panel = page.locator('.git-sidebar, .git-workspace-detail');
+  await expect(sidebar).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.ProseMirror')).toBeVisible();
+  await page.locator('.ProseMirror').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.insertText('Editing with source control open\n');
+  await expect
+    .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
+    .toContain('Editing with source control open');
+  await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('+UI saved 日本語');
+  await expect(panel.getByLabel('差分', { exact: true })).toContainText(
+    'Editing with source control open',
+  );
+  await panel.getByRole('button', { name: 'ノートに戻る' }).click();
+  await expect(page.locator('.ProseMirror')).toBeVisible();
+  await expect(sidebar).toBeVisible();
+  await panel.getByRole('button', { name: 'README.md をステージする', exact: true }).click();
+  await expect(
+    panel.getByRole('button', { name: 'README.md をステージから外す', exact: true }),
+  ).toBeEnabled();
+  expect(git(root, 'diff', '--cached', '--', 'README.md')).toContain('UI saved 日本語');
+  await panel.getByRole('button', { name: 'README.md をステージから外す', exact: true }).click();
+  await expect(
+    panel.getByRole('button', { name: 'README.md をステージする', exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({ path: 'test-results/irori-source-control.png' });
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
@@ -106,10 +132,16 @@ try {
   await expect(panel.getByRole('status')).toContainText('すべて外しました');
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('まとめて追加');
+  await writeFile(path.join(root, 'extra.md'), '# Extra after staging');
+  await panel.getByRole('button', { name: '更新', exact: true }).click();
+  await expect(panel.locator('.git-file').filter({ hasText: 'extra.md' })).toHaveCount(2);
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('UI note update');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('この端末の履歴に commit');
   expect(git(root, 'show', 'HEAD:README.md')).toContain('UI saved 日本語');
+  expect(git(root, 'show', 'HEAD:extra.md')).toBe('# Extra staged note');
+  expect(await readFile(path.join(root, 'extra.md'), 'utf8')).toBe('# Extra after staging');
+  await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
   await panel.getByRole('button', { name: '履歴', exact: true }).click();
   await panel.locator('.git-history-item').filter({ hasText: 'UI note update' }).click();
@@ -121,11 +153,11 @@ try {
   await expect(panel.locator('.git-history-item')).toHaveCount(1);
   await expect(panel.locator('.git-history-item')).toContainText('チームKB initial');
   await panel.getByLabel('Git のスペース').selectOption(spaces[0].scopeId);
-  await panel.getByRole('button', { name: '共有内容を確認' }).click();
+  await panel.getByRole('button', { name: 'Push', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Git 操作の確認' })).toContainText(
     'origin / main',
   );
-  await panel.getByRole('button', { name: 'このブランチを共有' }).click();
+  await panel.getByRole('button', { name: 'Push を実行', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('リモートへの送信が完了');
   expect(git(remote, 'show', 'main:README.md')).toContain('UI saved 日本語');
 
@@ -138,13 +170,14 @@ try {
   git(root, 'add', '.');
   git(root, 'commit', '-m', 'Local competing change');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
-  await expect(panel.getByRole('button', { name: '取得', exact: true })).toBeEnabled();
-  await panel.getByRole('button', { name: '取得', exact: true }).click();
+  await panel.getByLabel('その他の Git 操作').click();
+  await expect(panel.getByRole('button', { name: 'Fetch', exact: true })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Fetch', exact: true }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText(
     '送信待ち 1 commit ・ 受信待ち 1 commit',
   );
-  await panel.getByRole('button', { name: '受信', exact: true }).click();
-  await panel.getByRole('button', { name: '変更を受信', exact: true }).click();
+  await panel.getByRole('button', { name: 'Pull', exact: true }).click();
+  await panel.getByRole('button', { name: 'Pull を実行', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('分岐');
   await panel.getByRole('button', { name: '履歴を統合', exact: true }).click();
   await panel.getByRole('button', { name: '履歴の統合を開始' }).click();
@@ -158,12 +191,17 @@ try {
     .fill('# Combined\n\nLocal 日本語\nPeer 日本語\n');
   await page.screenshot({ path: 'test-results/irori-git-conflict.png' });
   await expect(panel.getByRole('button', { name: 'Git 画面を閉じる' })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
+  await expect(panel.getByLabel('Git のスペース')).toBeDisabled();
   await page.keyboard.press('Escape');
-  await expect(panel).toBeVisible();
+  await expect(sidebar).toBeVisible();
   await writeFile(path.join(root, 'README.md'), 'External conflict working copy\n');
   await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
   await expect(panel.getByRole('alert')).toContainText('確認後');
-  await expect(panel.locator('.git-detail')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('region', { name: 'Git の差分' })).toHaveAttribute(
+    'aria-busy',
+    'false',
+  );
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
     '# Combined\n\nLocal 日本語\nPeer 日本語\n',
   );
@@ -177,13 +215,12 @@ try {
   await expect(panel.locator('.git-warning')).toHaveCount(0);
   expect(git(root, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1024, 800));
-  const bounds = await panel.boundingBox();
+  const bounds = await sidebar.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1024);
-  await page.keyboard.press('Escape');
-  await expect(panel).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Git 画面を閉じる' }).click();
+  await expect(sidebar).toHaveCount(0);
   await expect(page.locator('.document-editor')).toContainText('Combined');
-  await expect(page.getByRole('button', { name: '変更と履歴', exact: true })).toBeFocused();
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await page.getByRole('button', { name: 'スペースを追加', exact: true }).click();
@@ -210,13 +247,17 @@ try {
       {
         checks: [
           'Git review flushes the current editor',
-          'bulk stage/unstage and direct local commit through reviewed file list',
+          'nonmodal source control keeps the note editable and autosaving',
+          'diff returns to the mounted note without closing source control',
+          'row and bulk stage/unstage and direct local commit through reviewed file list',
+          'partial staging commits the index and preserves later worktree edits',
           'per-space history isolation',
           'explicit single-branch push to disposable bare remote',
           'fetch and divergent receive refusal',
           'native merge, both conflict versions, manual resolution and merge commit',
-          'editor refresh and modal focus return',
-          '1024px dialog bounds',
+          'dirty conflict blocks closing, repository switching and returning to the note',
+          'editor refresh after source control closes',
+          '1024px sidebar bounds',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
         ],
         errors,
