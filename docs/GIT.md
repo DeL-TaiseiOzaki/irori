@@ -1,23 +1,52 @@
 # Per-space Git collaboration
 
-Version 0.1.3 adds bulk stage/unstage and direct local commit from the displayed staged list/message. Opening Git flushes the note automatically. Single-file staging, partial index contents and separate push confirmation remain. See [the follow-up](EDITING-AND-RECORDS.md).
+Version 0.1.4 provides a nonmodal **ソース管理** sidebar, file-row and bulk
+stage/unstage, a top commit composer and center-pane diffs. Opening Git flushes
+the note automatically; editing and autosave continue beside the pane. The note
+stays mounted while a diff is displayed. Partial index contents and separate
+push confirmation remain. See [the daily-workflow follow-up](DAILY-WORKFLOW.md).
 
-Design direction, 2026-09-13: extend the existing writing workspace with a focused change-review sheet. Retain graphite `#25282c`, paper `#fafaf8`, ink `#22292e`, muted `#626b75`, rule `#dfe3e5` and ember `#c88435`. Use the existing Noto Sans JP/system typography; reserve monospace for patches and revisions. A left-aligned file/history list sits beside a broad review surface; the owning space and remote remain visible above both. Separate local commit controls from remote sharing. This makes repository ownership, already central to the five-pane explorer, the organizing principle rather than adding a generic dashboard.
+The original 2026-09-13 change-review sheet established the graphite `#25282c`,
+paper `#fafaf8`, ink `#22292e`, muted `#626b75`, rule `#dfe3e5` and ember `#c88435`
+palette. The sidebar keeps those tokens and existing Noto Sans JP/system
+typography, with monospace for patches and revisions. Repository ownership and
+the distinction between local commits and remote operations remain visible.
 
 ```text
-space / branch                         remote / receive / share
+repository / branch       note or selected diff
+commit message / commit   return to note
 changes | history
-file selection         diff or conflict versions
-                       commit message / commit selected changes
+file selection / + / -
 ```
 
 ## Implemented journey
 
-Open **変更と履歴** after saving the active note. The space selector keeps each independent repository's changes, branch and history separate. Select a changed file to review its working-tree diff, then use **commit 対象に追加**. Already staged changes appear separately and can be inspected or removed from the index without reverting the working file. Partial staging performed in another tool is preserved: a commit includes the displayed index, while later unstaged edits stay on disk. The confirmation lists all staged paths and the message before the native commit runs. It does not push.
+Open **ソース管理** in workspace navigation. The repository selector keeps each
+independent repository's changes, branch and history separate. Select a file to
+review its diff, or use its row's **＋**/**−** to stage/unstage. Already staged
+changes appear separately and can be inspected or removed from the index without
+reverting the working file. Partial staging performed in another tool is
+preserved: a commit includes the displayed index, while later unstaged edits
+stay on disk. The staged list and message are the review; **コミット** creates
+the local commit directly. It does not push.
 
-**履歴** paginates local commits, with first-parent commit diffs. **取得** fetches the selected remote branch without updating notes. Counts describe the locally observed remote-tracking history, not a continuous online observation. **受信** fetches and accepts only a fast-forward into a clean working tree. **履歴を統合** explicitly starts Git's normal merge without an automatic merge commit. Conflicts show base/ours/theirs and a manual result field. Resolving a supported text conflict saves the result, stages that path, and retains the observed versions in private device-local `git-recovery/` files before replacement. Delete/modify conflicts offer an explicit deletion choice. Finishing the merge requires a reviewed commit.
+**履歴** paginates local commits, with first-parent commit diffs. **その他 → Fetch**
+fetches the selected remote branch without updating notes. Counts describe the
+locally observed remote-tracking history, not a continuous online observation.
+**Pull** fetches and accepts only a fast-forward into a clean working tree.
+**その他 → 履歴を統合** explicitly starts Git's normal merge without an automatic
+merge commit. Conflicts show base/ours/theirs and a manual result field. Resolving
+a supported text conflict saves the result, stages that path, and retains the
+observed versions in private device-local `git-recovery/` files before replacement.
+Delete/modify conflicts offer an explicit deletion choice. Finishing the merge
+requires a reviewed commit.
 
-**共有内容を確認** names the space, branch, remote and exact commit to push. Push uses one explicit source OID and destination branch; it disables force, recursive submodule publication and follow-tags, and refuses mirror/multiple-push-URL remotes. Native rejection retains local commits and index/worktree changes. GitHub remotes offer an explicit **GitHub を開く** action for access settings and pull-request workflows; irori does not create pull requests or bypass branch protections.
+**Push** opens a confirmation naming the space, branch, remote and exact commit
+to push. Push uses one explicit source OID and destination branch; it disables
+force, recursive submodule publication and follow-tags, and refuses
+mirror/multiple-push-URL remotes. Native rejection retains local commits and
+index/worktree changes. GitHub remotes offer an explicit **GitHub を開く** action
+under **その他**; irori does not create pull requests or bypass branch protections.
 
 **スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization and then returns to the existing inspected registration flow. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
 
