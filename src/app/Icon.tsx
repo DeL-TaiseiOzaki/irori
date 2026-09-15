@@ -9,12 +9,16 @@ import {
   Folder,
   GitBranch,
   LayoutGrid,
+  Monitor,
+  Moon,
   Network,
   Plus,
   RefreshCw,
   RotateCcwClock,
   Search,
   Sparkles,
+  Sun,
+  SunMoon,
   Terminal,
   X,
 } from 'lucide-react';
@@ -39,6 +43,10 @@ const icons = {
   arrow: ArrowRight,
   check: Check,
   grid: LayoutGrid,
+  appearance: SunMoon,
+  system: Monitor,
+  light: Sun,
+  dark: Moon,
 } as const;
 
 export function Icon({

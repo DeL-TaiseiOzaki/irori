@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Appearance and device preferences, 2026-09-16: the sidebar carries a theme menu
+(system, light, dark) and the choice is kept in a new device record,
+`device-settings.json`, alongside pane sizes. Two faults behind that work are
+also fixed: the renderer is loaded from a file URL, where browser storage is not
+kept between sessions, so the pane sizes ADR 003 introduced never actually
+survived a restart; and `useDefaultLayout` was given a fixed list of panel
+identifiers while the group writes under the ones rendered, so a saved layout was
+looked for under another name. Electron's `nativeTheme.themeSource` does not
+reach `prefers-color-scheme` on this Linux environment, so the renderer resolves
+the choice and writes `data-theme` for the stylesheet while the host still sets
+`themeSource` for the window chrome. Verification: build/typecheck/format,
+**141 behaviour tests (134 passed, seven environment-gated skips)** including the
+new `tests/settings.test.ts`, and all **twelve Electron UI suites**, where
+`ui-smoke` now asserts the chosen theme and a dragged sidebar width both survive
+a restart. No installer, website or published release changes.
+
 Assistant links, 2026-09-16: a reply's Markdown links open in the user's browser
 through a new `openUrl` host route, and `AgentMarkdown` hands the address to it
 instead of showing dead text. The address is validated twice — the request

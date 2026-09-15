@@ -38,6 +38,8 @@ const app = await electron.launch({
   timeout: 30000,
 });
 const errors: string[] = [];
+// Measured before the restart and checked after it.
+let chosenWidth = 0;
 let peak: Awaited<ReturnType<typeof processTree>>;
 let samples = 0;
 let sampling = false;
@@ -86,6 +88,30 @@ try {
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('顧客インタビュー');
   await expect(page.locator('.ProseMirror table.children')).toBeVisible();
+  // The reader's own light/dark choice, applied at once and kept for next launch.
+  const dark = () => page.evaluate(() => document.documentElement.dataset.theme === 'dark');
+  await expect.poll(dark).toBe(false);
+  await page.getByLabel(/表示テーマ/).click();
+  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  await expect.poll(dark).toBe(true);
+  await page.getByLabel(/表示テーマ/).click();
+  await page.getByRole('menuitemradio', { name: 'システムに合わせる', exact: true }).click();
+  await expect.poll(dark).toBe(false);
+  await page.getByLabel(/表示テーマ/).click();
+  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  await expect.poll(dark).toBe(true);
+  // Pane sizes are the reader's too, and the device record keeps both.
+  const paneWidth = () =>
+    page.locator('.explorer-pane').evaluate((element) => element.getBoundingClientRect().width);
+  const startWidth = await paneWidth();
+  const handle = page.locator('.pane-handle').first();
+  const grip = (await handle.boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 90, grip.y + grip.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(paneWidth).toBeGreaterThan(startWidth + 40);
+  chosenWidth = await paneWidth();
   // Opening a rich document is not itself an edit.
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   if ((await readFile(path.join(kb, '日本語 note.md'), 'utf8')) !== input)
@@ -370,7 +396,19 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
     try {
       const window = await restarted.firstWindow();
       window.on('pageerror', (error) => errors.push(String(error)));
+      // The chosen theme and pane width survive the restart, before a workspace
+      // is opened: the renderer's own storage does not persist on a file URL.
+      await expect
+        .poll(() => window.evaluate(() => document.documentElement.dataset.theme === 'dark'))
+        .toBe(true);
       await window.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+      await expect
+        .poll(() =>
+          window
+            .locator('.explorer-pane')
+            .evaluate((element) => element.getBoundingClientRect().width),
+        )
+        .toBeGreaterThan(chosenWidth - 12);
       await window.getByRole('button', { name: 'AIに相談', exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).not.toBeVisible();
       await window.getByLabel('会話と接続の設定', { exact: true }).click();

@@ -10,6 +10,8 @@ import { appendConversationEvent, type QueuedMessage } from '../domain/conversat
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
 import { AgentMarkdown } from './AgentMarkdown';
+import { applyTheme, layoutStorage, loadDeviceSettings, watchSystemTheme } from './device-settings';
+import { Appearance } from './Appearance';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { Toggle } from '@base-ui/react/toggle';
 import { ToggleGroup } from '@base-ui/react/toggle-group';
@@ -19,7 +21,7 @@ import {
   Separator as PaneSeparator,
   useDefaultLayout,
 } from 'react-resizable-panels';
-import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AgentEvent,
@@ -679,15 +681,28 @@ function App() {
   }
   // Pane sizes are the user's, not the stylesheet's: the group remembers each
   // layout per set of visible panes.
+  // The identifiers must describe the panes actually on screen: the group stores
+  // a layout per configuration, and a set that is only partly rendered would be
+  // written under one name and looked for under another.
+  const workspacePanes = useMemo(
+    () => (panel ? ['explorer', 'workspace', 'assistant'] : ['explorer', 'workspace']),
+    [panel],
+  );
+  const documentPanes = useMemo(
+    () => (terminalSpace ? ['document', 'terminal'] : ['document']),
+    [terminalSpace],
+  );
   const workspaceLayout = useDefaultLayout({
     id: 'irori-workspace',
-    panelIds: ['explorer', 'workspace', 'assistant'],
+    panelIds: workspacePanes,
     onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
   });
   const documentLayout = useDefaultLayout({
     id: 'irori-document',
-    panelIds: ['document', 'terminal'],
+    panelIds: documentPanes,
     onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
   });
   if (startup)
     return (
@@ -715,6 +730,7 @@ function App() {
             <div className="brand">
               <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
               irori<span className="preview">{appVersion} Preview</span>
+              <Appearance onError={report} />
             </div>
             <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
             <button
@@ -1749,8 +1765,14 @@ function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
     </div>
   );
 }
-createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary FallbackComponent={AppCrash}>
-    <App />
-  </ErrorBoundary>,
-);
+// The device record carries the theme and the pane sizes, so it is read before
+// the first render rather than applied over one.
+watchSystemTheme();
+void loadDeviceSettings().finally(() => {
+  applyTheme();
+  createRoot(document.getElementById('root')!).render(
+    <ErrorBoundary FallbackComponent={AppCrash}>
+      <App />
+    </ErrorBoundary>,
+  );
+});
