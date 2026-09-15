@@ -279,15 +279,16 @@ try {
   git(root, 'commit', '-m', 'Local competing change');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.getByLabel('その他の Git 操作').click();
-  await expect(panel.getByRole('button', { name: 'Fetch', exact: true })).toBeEnabled();
-  await panel.getByRole('button', { name: 'Fetch', exact: true }).click();
+  await expect(panel.getByRole('menuitem', { name: 'Fetch', exact: true })).toBeEnabled();
+  await panel.getByRole('menuitem', { name: 'Fetch', exact: true }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText(
     '送信待ち 1 commit ・ 受信待ち 1 commit',
   );
   await panel.getByRole('button', { name: 'Pull', exact: true }).click();
   await panel.getByRole('button', { name: 'Pull を実行', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('分岐');
-  await panel.getByRole('button', { name: '履歴を統合', exact: true }).click();
+  await panel.getByLabel('その他の Git 操作').click();
+  await panel.getByRole('menuitem', { name: '履歴を統合', exact: true }).click();
   await panel.getByRole('button', { name: '履歴の統合を開始' }).click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 1 件');
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();

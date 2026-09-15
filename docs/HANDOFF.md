@@ -1,5 +1,16 @@
 # irori continuation handoff
 
+UI foundation, 2026-09-15: the renderer's design tokens, dark palette, icon set,
+resizable panes and popup primitives are migrated on `feat/ui-foundation`; see
+[ADR 003](decisions/003-ui-foundation.md) and STATUS for the verification. Build,
+behaviour tests and all twelve UI suites pass locally. The branch changes no
+product behaviour and no published bytes. When continuing, prefer extending the
+token roles over adding literal colours, and reach for Base UI before writing a
+new popup by hand. The follow-ups this foundation was built for — splitting the
+assistant panel into conversation and activity surfaces, showing agent edits as a
+reviewable diff in the note, and a ⌘K command palette — are product behaviour
+changes and need their own branches.
+
 Workflow update, 2026-09-14: the owner requires every future new feature to start
 on a dedicated branch and be submitted through a PR to `main`. Verify and push
 the feature branch, open the PR and leave it open unless merging is authorized.
@@ -116,16 +127,16 @@ Respond in Japanese. Write code, identifiers, technical documents and commit mes
 
 ## Public delivery and exact identities
 
-| Item | Verified value |
-| --- | --- |
-| Download site | https://del-taiseiozaki.github.io/irori/ |
-| Release | `v0.1.2-preview.1`, public unsigned Windows x64 prerelease |
-| Application commit | `b51a54b1f9fb36423edf56ed6a1bec961839e165` |
-| Native CI | [34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), all jobs successful |
-| Website commit | `94bc9ce3caa9bc71ef5b6a3975283ddb8f14b7c5` |
-| Pages deployment | [34761649567](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761649567), successful |
-| Installer | `irori-0.1.2-windows-x64-Setup.exe`, 316,222,976 bytes (301.6 MiB) |
-| SHA-256 | `b3cb5c71cb8311ad9043ad79e31632254ab8169d0b1e7de1412d41979f5012bd` |
+| Item               | Verified value                                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| Download site      | https://del-taiseiozaki.github.io/irori/                                                              |
+| Release            | `v0.1.2-preview.1`, public unsigned Windows x64 prerelease                                            |
+| Application commit | `b51a54b1f9fb36423edf56ed6a1bec961839e165`                                                            |
+| Native CI          | [34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), all jobs successful |
+| Website commit     | `94bc9ce3caa9bc71ef5b6a3975283ddb8f14b7c5`                                                            |
+| Pages deployment   | [34761649567](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761649567), successful          |
+| Installer          | `irori-0.1.2-windows-x64-Setup.exe`, 316,222,976 bytes (301.6 MiB)                                    |
+| SHA-256            | `b3cb5c71cb8311ad9043ad79e31632254ab8169d0b1e7de1412d41979f5012bd`                                    |
 
 The unchanged Windows CI EXE was renamed and published with `SHA256SUMS.txt` and `windows-package-evidence.json`. At 14:07 UTC on 2026-09-13, a fresh unauthenticated browser checked the live desktop/mobile page and downloaded all bytes with the same hash as CI and GitHub's asset digest. Both Mac download slots remain disabled. [Release notes](releases/0.1.2-preview.1.md) describe the trial. Continue from current `main`; the release commit identifies the binary, not the latest documentation.
 

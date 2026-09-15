@@ -6,11 +6,55 @@ import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import { EditorView } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
+// CodeMirror ships a light-only default theme. Expressing the source editor in
+// design tokens instead lets one definition follow the document theme, so the
+// rendered and the source view never disagree about the palette.
+const sourceTheme = EditorView.theme({
+  '&': { color: 'var(--ink)', backgroundColor: 'var(--paper)' },
+  '.cm-content': { caretColor: 'var(--ink)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--ink)' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: 'var(--surface-selected)',
+  },
+  '.cm-activeLine': { backgroundColor: 'var(--surface-sunken)' },
+  '.cm-gutters': {
+    color: 'var(--ink-faint)',
+    backgroundColor: 'var(--surface-sunken)',
+    border: 'none',
+  },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--surface-selected)', color: 'var(--ink)' },
+  '.cm-selectionMatch': { backgroundColor: 'var(--ember-wash)' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'var(--surface-selected)',
+    color: 'var(--muted)',
+    border: 'none',
+  },
+  '.cm-panels, .cm-tooltip': {
+    backgroundColor: 'var(--surface)',
+    color: 'var(--ink)',
+    border: '1px solid var(--rule)',
+  },
+});
+
+const sourceHighlight = HighlightStyle.define([
+  { tag: tags.heading, color: 'var(--ink)', fontWeight: '700' },
+  { tag: tags.strong, fontWeight: '700' },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  { tag: [tags.link, tags.url], color: 'var(--ember-ink)', textDecoration: 'underline' },
+  { tag: tags.monospace, color: 'var(--danger)' },
+  { tag: tags.quote, color: 'var(--muted)' },
+  { tag: [tags.processingInstruction, tags.punctuation, tags.meta], color: 'var(--ink-faint)' },
+  { tag: tags.list, color: 'var(--ember-ink)' },
+]);
+
 export interface EditorHandle {
   getText(): string;
 }
@@ -60,6 +104,8 @@ export function Editor({
             EditorState.readOnly.of(readOnly),
             EditorView.editable.of(!readOnly),
             EditorState.lineSeparator.of(initial.current.includes('\r\n') ? '\r\n' : '\n'),
+            Prec.high(syntaxHighlighting(sourceHighlight)),
+            sourceTheme,
             basicSetup,
             markdown(),
             EditorView.lineWrapping,
