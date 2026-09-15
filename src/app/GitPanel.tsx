@@ -145,6 +145,7 @@ function RepositoryPanel({
   const alive = useRef(true),
     active = useRef(false),
     reads = useRef(0),
+    commitReads = useRef(0),
     statusReads = useRef(0);
   const resolutionDraft = useRef<{ path: string; text: string } | undefined>(undefined);
   const messageDraft = useDraft({ scopeId: space.scopeId, kind: 'git-commit' }, space.root);
@@ -197,6 +198,7 @@ function RepositoryPanel({
     return () => {
       alive.current = false;
       reads.current++;
+      commitReads.current++;
     };
   }, [space.scopeId]);
   useEffect(() => {
@@ -250,7 +252,10 @@ function RepositoryPanel({
   }
   useEffect(() => {
     if (tab !== 'changes') {
+      // Leaving the changes view discards its in-flight read, so the flag that
+      // reports one must not survive: it also disables the conflict actions.
       reads.current++;
+      setLoadingReview(false);
       return;
     }
     if (!selection) {
@@ -299,14 +304,14 @@ function RepositoryPanel({
     }
   }
   async function showCommit(value: GitCommit) {
-    const generation = ++reads.current;
+    const generation = ++commitReads.current;
     setCommit(value);
     setCommitPatch('');
     try {
       const patch = await host.gitCommitDiff(space.scopeId, value.oid);
-      if (generation === reads.current && alive.current) setCommitPatch(patch);
+      if (generation === commitReads.current && alive.current) setCommitPatch(patch);
     } catch (e) {
-      if (generation === reads.current && alive.current) setError(String(e));
+      if (generation === commitReads.current && alive.current) setError(String(e));
     }
   }
   if (!status)
@@ -691,6 +696,7 @@ function RepositoryPanel({
                 disabled={busy || conflictDirty || draftBlocked}
                 onClick={() => {
                   reads.current++;
+                  commitReads.current++;
                   setSelection(undefined);
                   setCommit(undefined);
                 }}

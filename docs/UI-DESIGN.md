@@ -1,5 +1,13 @@
 # UI direction — 2026-09-13
 
+Palette update, 2026-09-15: the colours below are still the product's direction,
+but they are no longer written into the stylesheet. Every colour now resolves
+through a semantic token, and a second designed palette follows the operating
+system theme — see [ADR 003](decisions/003-ui-foundation.md) for the roles and
+[ADR 004](decisions/004-ui-library-adoption.md) for the editor chrome that follows
+them. Read the token block in `src/app/style.css` for current values, and
+[UI findings](UI-FINDINGS-2026-09-15.md) for what is still open.
+
 The [0.1.4 daily-workflow follow-up](DAILY-WORKFLOW.md) supersedes the earlier
 assistant and Git sheet layout. It retains the palette and typography while
 moving session/CLI diagnostics into an optional menu, placing reference chips
