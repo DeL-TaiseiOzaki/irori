@@ -4,6 +4,7 @@ import path from 'node:path';
 import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
+import { webAddress } from '../domain/links';
 import { FileService } from './files';
 import { SearchService } from './search';
 import { DraftService } from './drafts';
@@ -255,6 +256,13 @@ app
         const target = (await cloud.declarations(id)).find((item) => item.mountId === mountId);
         if (!target) throw Error('送信先の接続が見つかりません。');
         return outbox.prepare({ ownerId: id, mountId, folderId: target.folderId }, source);
+      },
+      // Validation runs at the boundary; the host checks the address again
+      // rather than trusting that it did.
+      openUrl: async (url) => {
+        const address = webAddress(url);
+        if (!address) throw Error('http または https のリンクだけを開けます。');
+        await shell.openExternal(address.href);
       },
       openCloudSetupHelp: () =>
         shell.openExternal(

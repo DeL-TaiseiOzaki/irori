@@ -209,6 +209,16 @@ try {
     'const ok = true;',
   );
   await expect(page.locator('.message-markdown').first()).not.toContainText('###');
+  // A reply's link is opened through the host, which allows only web addresses,
+  // and the renderer must not hand a script URL to the page in the first place.
+  await expect(page.getByRole('link', { name: '公開ページ', exact: true })).toHaveAttribute(
+    'href',
+    'https://example.com/irori',
+  );
+  expect(
+    await page.getByRole('link', { name: '危険', exact: true }).getAttribute('href'),
+  ).not.toMatch(/javascript/i);
+  await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();

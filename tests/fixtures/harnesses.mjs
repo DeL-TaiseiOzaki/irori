@@ -20,7 +20,7 @@ export function run(kind) {
     // A Markdown reply on request, so the renderer can be checked against real
     // assistant formatting instead of plain text only.
     const markdownReply =
-      '### 手順\n\n1. \`note.md\` を開く\n2. 見出しを追加\n\n\`\`\`ts\nconst ok = true;\n\`\`\`\n';
+      '### 手順\n\n1. \`note.md\` を開く\n2. 見出しを追加\n\n[公開ページ](https://example.com/irori)\n\n[危険](javascript:alert(1))\n\n\`\`\`ts\nconst ok = true;\n\`\`\`\n';
     const complete = (error = false, text = '日本語\u2028の応答') => {
       send({ type: 'message_start', message: { role: 'assistant' } });
       send({

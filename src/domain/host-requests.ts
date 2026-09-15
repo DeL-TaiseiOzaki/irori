@@ -7,6 +7,7 @@ import { startInput } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
+import { externalUrl } from './links';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -23,6 +24,7 @@ export const hostArguments = {
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),
   openUpdatePage: z.tuple([z.enum(['release', 'download'])]),
+  openUrl: z.tuple([externalUrl]),
   moveNote: z.tuple([noteRef, path]),
   trashNote: z.tuple([noteRef]),
   trashedNotes: z.tuple([id]),
