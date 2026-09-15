@@ -84,7 +84,10 @@ test('workspace Drive connections are independent of KB membership and survive r
     folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
   });
   assert.equal((await cloud.connections(first.id))[0].accountName, 'Personal account');
-  await assert.rejects(cloud.removeWorkspace(first.id, () => workspaces.remove(first.id)), /登録解除/);
+  await assert.rejects(
+    cloud.removeWorkspace(first.id, () => workspaces.remove(first.id)),
+    /登録解除/,
+  );
   assert.deepEqual(await cloud.connections(second.id), []);
   await assert.rejects(readFile(path.join(space.root, '.irori/cloud-mounts.json')), {
     code: 'ENOENT',
