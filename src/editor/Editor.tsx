@@ -55,6 +55,53 @@ const sourceHighlight = HighlightStyle.define([
   { tag: tags.list, color: 'var(--ember-ink)' },
 ]);
 
+// Crepe's editor chrome ships English copy. The product is Japanese, so the
+// strings come from its own configuration rather than from new components.
+const japaneseEditorChrome = {
+  [Crepe.Feature.Placeholder]: { text: '本文を入力…' },
+  [Crepe.Feature.LinkTooltip]: {
+    inputPlaceholder: 'リンク先を貼り付け…',
+    editButton: '編集',
+    removeButton: '削除',
+    confirmButton: '確定',
+  },
+  [Crepe.Feature.CodeMirror]: {
+    // Code blocks inside the note are CodeMirror as well; share the token theme.
+    theme: [sourceTheme, syntaxHighlighting(sourceHighlight)],
+    searchPlaceholder: '言語を検索…',
+    noResultText: '該当する言語がありません',
+    copyText: 'コピー',
+    previewLabel: 'プレビュー',
+  },
+  [Crepe.Feature.BlockEdit]: {
+    textGroup: {
+      label: 'テキスト',
+      text: { label: '本文' },
+      h1: { label: '見出し 1' },
+      h2: { label: '見出し 2' },
+      h3: { label: '見出し 3' },
+      h4: { label: '見出し 4' },
+      h5: { label: '見出し 5' },
+      h6: { label: '見出し 6' },
+      quote: { label: '引用' },
+      divider: { label: '区切り線' },
+    },
+    listGroup: {
+      label: 'リスト',
+      bulletList: { label: '箇条書き' },
+      orderedList: { label: '番号付き' },
+      taskList: { label: 'タスク' },
+    },
+    advancedGroup: {
+      label: 'ブロック',
+      image: { label: '画像' },
+      codeBlock: { label: 'コード' },
+      table: { label: '表' },
+      math: { label: '数式' },
+    },
+  },
+} as const;
+
 export interface EditorHandle {
   getText(): string;
 }
@@ -159,6 +206,7 @@ export function Editor({
       defaultValue: encoding.body,
       features: { [Crepe.Feature.Latex]: false },
       featureConfigs: {
+        ...japaneseEditorChrome,
         [Crepe.Feature.ImageBlock]: {
           onUpload: async (file) => {
             try {

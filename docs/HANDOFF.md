@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+Renderer libraries, 2026-09-15: `feat/ui-library-adoption` follows the UI
+foundation with Markdown assistant replies, Japanese Crepe chrome, Base UI toggle
+groups and an application error boundary; see
+[ADR 004](decisions/004-ui-library-adoption.md) and STATUS. Before proposing another
+library, read that ADR's rejected list — TanStack Query, virtualisation, a tree
+component, tooltips, toasts, a diff library and electron-updater were each examined
+against this codebase. When agent output needs richer display, extend
+`AgentMarkdown`'s component overrides rather than relaxing them: the renderer must
+not navigate or fetch on untrusted output.
+
 UI foundation, 2026-09-15: the renderer's design tokens, dark palette, icon set,
 resizable panes and popup primitives are migrated on `feat/ui-foundation`; see
 [ADR 003](decisions/003-ui-foundation.md) and STATUS for the verification. Build,

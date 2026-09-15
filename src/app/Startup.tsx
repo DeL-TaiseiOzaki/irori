@@ -1,4 +1,6 @@
 import { Dialog } from './Dialog';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
 import { appIcon, appVersion } from './branding';
@@ -55,24 +57,21 @@ export function RegisterSpace({
       >
         <h2>リポジトリ・KBフォルダを登録</h2>
         {!folder && (
-          <div className="git-registration-mode" role="group" aria-label="リポジトリの取得方法">
-            <button
-              type="button"
-              disabled={busy}
-              aria-pressed={!cloneMode}
-              onClick={() => setCloneMode(false)}
-            >
+          <ToggleGroup
+            className="git-registration-mode"
+            aria-label="リポジトリの取得方法"
+            value={[cloneMode ? 'clone' : 'folder']}
+            onValueChange={(next) => {
+              if (next[0]) setCloneMode(next[0] === 'clone');
+            }}
+          >
+            <Toggle type="button" value="folder" disabled={busy}>
               既存のフォルダ
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              aria-pressed={cloneMode}
-              onClick={() => setCloneMode(true)}
-            >
+            </Toggle>
+            <Toggle type="button" value="clone" disabled={busy}>
               GitHub から取得
-            </button>
-          </div>
+            </Toggle>
+          </ToggleGroup>
         )}
         {cloneMode && !folder ? (
           <>

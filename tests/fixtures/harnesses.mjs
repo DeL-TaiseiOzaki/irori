@@ -17,11 +17,15 @@ export function run(kind) {
     const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
     let waiting;
     let active = false;
-    const complete = (error = false) => {
+    // A Markdown reply on request, so the renderer can be checked against real
+    // assistant formatting instead of plain text only.
+    const markdownReply =
+      '### 手順\n\n1. \`note.md\` を開く\n2. 見出しを追加\n\n\`\`\`ts\nconst ok = true;\n\`\`\`\n';
+    const complete = (error = false, text = '日本語\u2028の応答') => {
       send({ type: 'message_start', message: { role: 'assistant' } });
       send({
         type: 'message_update',
-        assistantMessageEvent: { type: 'text_delta', delta: '日本語\u2028の応答' },
+        assistantMessageEvent: { type: 'text_delta', delta: text },
       });
       send({
         type: 'message_end',
@@ -29,7 +33,7 @@ export function run(kind) {
           role: 'assistant',
           stopReason: error ? 'error' : 'stop',
           errorMessage: error ? 'Fixture provider error' : undefined,
-          content: [{ type: 'text', text: '日本語\u2028の応答' }],
+          content: [{ type: 'text', text }],
         },
       });
       send({ type: 'agent_end', messages: [], willRetry: false });
@@ -76,7 +80,11 @@ export function run(kind) {
             title: 'Fixture confirmation',
             message: 'Proceed?',
           });
-        } else complete(message.message.includes('fail'));
+        } else
+          complete(
+            message.message.includes('fail'),
+            message.message.includes('markdown') ? markdownReply : undefined,
+          );
       }
       if (message.type === 'extension_ui_response') {
         if (waiting === 'confirm') {
