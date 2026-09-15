@@ -7,6 +7,20 @@ import { Icon } from './Icon';
 
 const host = window.irori;
 
+function token(name: string, fallback: string) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function terminalTheme() {
+  return {
+    background: token('--term-bg', '#202627'),
+    foreground: token('--term-text', '#e0e5e1'),
+    cursor: token('--ember-on-nav', '#d8b57a'),
+    selectionBackground: token('--term-rule', '#465550'),
+  };
+}
+
 export default function TerminalPanel({ space, onClose }: { space: Space; onClose: () => void }) {
   const container = useRef<HTMLDivElement>(null);
   const session = useRef<TerminalSession | undefined>(undefined);
@@ -28,13 +42,15 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
       cursorBlink: true,
       scrollback: 3000,
       allowProposedApi: false,
-      theme: {
-        background: '#202627',
-        foreground: '#e0e5e1',
-        cursor: '#d8b57a',
-        selectionBackground: '#465550',
-      },
+      theme: terminalTheme(),
     });
+    // xterm paints on a canvas and cannot read CSS variables, so the tokens are
+    // resolved here and reapplied when the operating system theme changes.
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const repaint = () => {
+      term.options.theme = terminalTheme();
+    };
+    scheme.addEventListener('change', repaint);
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container.current!);
@@ -94,6 +110,7 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
       });
     return () => {
       disposed = true;
+      scheme.removeEventListener('change', repaint);
       unsubscribe();
       observer.disconnect();
       input.dispose();

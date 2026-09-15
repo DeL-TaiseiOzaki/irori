@@ -8,6 +8,13 @@ import type { SearchTarget } from '../editor/search-navigation';
 import type { SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
+import { Popover } from '@base-ui/react/popover';
+import {
+  Group as PaneGroup,
+  Panel as Pane,
+  Separator as PaneSeparator,
+  useDefaultLayout,
+} from 'react-resizable-panels';
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
@@ -211,7 +218,6 @@ function App() {
   const [gitReview, setGitReview] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitDetailTarget, setGitDetailTarget] = useState<HTMLDivElement | null>(null);
-  const assistantSettings = useRef<HTMLDetailsElement>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -667,6 +673,18 @@ function App() {
       return false;
     }
   }
+  // Pane sizes are the user's, not the stylesheet's: the group remembers each
+  // layout per set of visible panes.
+  const workspaceLayout = useDefaultLayout({
+    id: 'irori-workspace',
+    panelIds: ['explorer', 'workspace', 'assistant'],
+    onlySaveAfterUserInteractions: true,
+  });
+  const documentLayout = useDefaultLayout({
+    id: 'irori-document',
+    panelIds: ['document', 'terminal'],
+    onlySaveAfterUserInteractions: true,
+  });
   if (startup)
     return (
       <Startup
@@ -682,469 +700,832 @@ function App() {
       <a className="skip-to-editor" href="#editor-main">
         編集領域へ移動
       </a>
-      <aside className="sidebar">
-        <div className="brand">
-          <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
-          irori<span className="preview">{appVersion} Preview</span>
-        </div>
-        <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
-        <button
-          className="workspace-switch"
-          disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
-          onClick={() => {
-            if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-              report('未保存のノートを保存してから移動してください。');
-              return;
-            }
-            void flushDrafts()
-              .then(() => setStartup(true))
-              .catch(report);
-          }}
-        >
-          <Icon name="grid" />
-          <span>
-            <small>ワークスペース</small>
-            {workspace?.name ?? 'ワークスペース'}
-          </span>
-          <Icon name="chevron" className="rotated" size={13} />
-        </button>
-        <nav className="workspace-views" aria-label="ワークスペースの表示">
-          <button
-            aria-pressed={!gitOpen}
-            disabled={gitBusy}
-            onClick={() => {
-              setGitOpen(false);
-              setGitReview(false);
-            }}
-          >
-            <Icon name="folder" /> ノート
-          </button>
-          <button
-            aria-pressed={gitOpen}
-            disabled={!active || running || sending || queued.length > 0 || connecting || gitBusy}
-            onClick={() => {
-              void save().then((saved) => {
-                if (saved) setGitOpen(true);
-              });
-            }}
-          >
-            <Icon name="branch" /> ソース管理
-          </button>
-        </nav>
-        {gitOpen && active && (
-          <GitPanel
-            spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
-            initialScope={active.scopeId}
-            detailTarget={gitDetailTarget}
-            onReviewChange={setGitReview}
-            onBusyChange={setGitBusy}
-            revision={revision}
-            beforeAction={async () => {
-              if (running || sending || queued.length > 0 || connecting) {
-                report('実行が終わってから Git を操作してください。');
-                return false;
-              }
-              return save();
-            }}
-            onClose={() => {
-              setGitOpen(false);
-              setGitReview(false);
-            }}
-            onChanged={() => {
-              setRevision((r) => r + 1);
-              void reconcile();
-            }}
-          />
-        )}
-        <div className="explorer-content" hidden={gitOpen}>
-          <button
-            className="workspace-search"
-            disabled={
-              !spaces.some((space) => workspace?.scopeIds.includes(space.scopeId)) || connecting
-            }
-            onClick={() => setSearchOpen(true)}
-          >
-            <Icon name="search" /> KB内を検索
-          </button>
-          <LayerExplorer
-            spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
-            activeId={active?.scopeId}
-            selected={doc}
-            revision={revision}
-            locked={running || sending || queued.length > 0 || connecting}
-            onSelect={(space) => {
-              void selectSpace(space);
-            }}
-            onOpen={(space, entry) => void open(space, entry)}
-            onConnect={(space) => {
-              void selectSpace(space).then((selected) => {
-                if (selected) showConnections(space);
-              });
-            }}
-            onNote={(space) => {
-              void selectSpace(space).then((selected) => {
-                if (selected) {
-                  setNoteDirectory(
-                    doc?.scopeId === space.scopeId
-                      ? doc.path.split('/').slice(0, -1).join('/')
-                      : 'Knowledge_Base/Notes',
-                  );
-                  setNewNote(true);
-                }
-              });
-            }}
-            onRefresh={() => setRevision((value) => value + 1)}
-          />
-          {active && (
+      <PaneGroup
+        className="workspace-panes"
+        orientation="horizontal"
+        defaultLayout={workspaceLayout.defaultLayout}
+        onLayoutChanged={workspaceLayout.onLayoutChanged}
+      >
+        <Pane id="explorer" className="explorer-pane" defaultSize={400} minSize={260} maxSize={560}>
+          <aside className="sidebar">
+            <div className="brand">
+              <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
+              irori<span className="preview">{appVersion} Preview</span>
+            </div>
+            <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
             <button
-              className="workspace-search workspace-trash"
-              disabled={running || sending || gitBusy || connecting}
+              className="workspace-switch"
+              disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
               onClick={() => {
-                void save().then((saved) => {
-                  if (saved) setTrashOpen(true);
-                });
+                if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
+                  report('未保存のノートを保存してから移動してください。');
+                  return;
+                }
+                void flushDrafts()
+                  .then(() => setStartup(true))
+                  .catch(report);
               }}
             >
-              削除したノートを復元
+              <Icon name="grid" />
+              <span>
+                <small>ワークスペース</small>
+                {workspace?.name ?? 'ワークスペース'}
+              </span>
+              <Icon name="chevron" className="rotated" size={13} />
             </button>
-          )}
-          {cloudRoot && (
-            <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
-              <div className="scope-heading">
-                <strong>
-                  <Icon name="cloud" size={14} /> Google Drive
-                </strong>
-                <button
-                  className="scope-action"
-                  disabled={dirty || running || connecting}
-                  onClick={() => showConnections(cloudRoot)}
-                  aria-label="Drive フォルダを接続"
-                >
-                  接続
-                </button>
-              </div>
-              <Tree
-                space={cloudRoot}
-                layer="contents"
-                directory="contents"
-                roots={{ entries: [] }}
-                revision={revision}
-                selected={doc}
-                readEntries={host.cloudEntries}
-                onOpen={(root, entry) => void openCloud(root, entry)}
-              />
-            </section>
-          )}
-          <button
-            className="add-space"
-            disabled={running || dirty || connecting}
-            onClick={() => setAdd(true)}
-          >
-            <Icon name="plus" /> スペースを追加
-          </button>
-        </div>
-      </aside>
-      <main id="editor-main" tabIndex={-1}>
-        <header>
-          <div className="document-location" title={doc?.path}>
-            <span className="muted">
-              {doc?.workspaceId ? `${workspace?.name} · Drive` : (active?.name ?? 'ようこそ')}
-            </span>
-            <Icon name="chevron" size={12} />
-            <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
-          </div>
-          <div className="actions">
-            {cloudRoot && (
+            <nav className="workspace-views" aria-label="ワークスペースの表示">
               <button
-                disabled={running || dirty || connecting || gitBusy}
-                onClick={() => showConnections(cloudRoot)}
+                aria-pressed={!gitOpen}
+                disabled={gitBusy}
+                onClick={() => {
+                  setGitOpen(false);
+                  setGitReview(false);
+                }}
               >
-                <Icon name="cloud" /> クラウド接続
+                <Icon name="folder" /> ノート
               </button>
-            )}
-            {active && (
               <button
-                disabled={running || dirty || connecting || gitBusy}
-                onClick={() => setOntologyOpen(true)}
-              >
-                オントロジー
-              </button>
-            )}
-            {connecting && <small>接続を準備中…</small>}
-            {active && (
-              <button
-                disabled={connecting || gitBusy}
+                aria-pressed={gitOpen}
+                disabled={
+                  !active || running || sending || queued.length > 0 || connecting || gitBusy
+                }
                 onClick={() => {
                   void save().then((saved) => {
-                    if (saved) setNewNote(true);
+                    if (saved) setGitOpen(true);
                   });
                 }}
               >
-                <Icon name="plus" /> ノートを作成
+                <Icon name="branch" /> ソース管理
               </button>
+            </nav>
+            {gitOpen && active && (
+              <GitPanel
+                spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
+                initialScope={active.scopeId}
+                detailTarget={gitDetailTarget}
+                onReviewChange={setGitReview}
+                onBusyChange={setGitBusy}
+                revision={revision}
+                beforeAction={async () => {
+                  if (running || sending || queued.length > 0 || connecting) {
+                    report('実行が終わってから Git を操作してください。');
+                    return false;
+                  }
+                  return save();
+                }}
+                onClose={() => {
+                  setGitOpen(false);
+                  setGitReview(false);
+                }}
+                onChanged={() => {
+                  setRevision((r) => r + 1);
+                  void reconcile();
+                }}
+              />
             )}
-            {doc && (
-              <>
-                <button disabled={gitBusy} onClick={() => void reconcile()}>
-                  再読み込み
-                </button>
-                <button disabled={!dirty || !!external} onClick={() => void save()}>
-                  保存{dirty ? ' •' : ''}
-                </button>
-              </>
-            )}
-          </div>
-        </header>
-        {!doc && status && (
-          <p className="hint" role="status">
-            {status}
-          </p>
-        )}
-        {error && (
-          <div className="error" role="alert">
-            {error}
-            <button onClick={() => setError('')}>閉じる</button>
-          </div>
-        )}
-        {external && (
-          <div className="conflict" role="alert">
-            <strong>外部でノートが変更されました。未保存の編集を保持しています。</strong>
-            <div className="versions">
-              <label>
-                あなたの編集<pre>{buffer}</pre>
-              </label>
-              <label>
-                ディスク上の最新版<pre>{external.text}</pre>
-              </label>
-            </div>
-            <button onClick={() => load(external)}>ディスク版を表示（下書きは保持）</button>
-            <button
-              onClick={() => {
-                setDoc(external);
-                setExternal(undefined);
-                setStatus('最新版を基準に、編集内容を確認して保存してください');
-              }}
-            >
-              編集を維持して手動で統合
-            </button>
-          </div>
-        )}
-        <div className="git-detail-slot" ref={setGitDetailTarget} hidden={!gitReview} />
-        <div className="note-surface" hidden={gitReview}>
-          {doc ? (
-            <>
-              <div className="doc-toolbar">
-                <span>{dirty ? '保存待ち' : status}</span>
-                <div className="actions">
-                  {!doc.readOnly &&
-                    /\.md$/i.test(doc.path) &&
-                    spaces.some(
-                      (space) =>
-                        space.scopeId === doc.scopeId &&
-                        classify(space, doc.path) === 'Knowledge_Base',
-                    ) && (
-                      <NoteActions
-                        key={`${doc.scopeId}:${doc.path}`}
-                        doc={doc}
-                        onBusyChange={(busy) => {
-                          reconciliation.current++;
-                          organizing.current = busy;
-                          if (!busy) void reconcile();
-                        }}
-                        beforeChange={async () => {
-                          if (running || sending || queued.length || gitBusy || connecting)
-                            throw Error(
-                              '実行・Git 操作・接続が完了してからノートを整理してください。',
-                            );
-                          if (!(await save())) return null;
-                          return current.current.doc ?? null;
-                        }}
-                        onChanged={(next, notice) => {
-                          const previous = doc;
-                          if (next) {
-                            load(next);
-                            setSources((all) =>
-                              all.map((ref) =>
-                                ref.scopeId === previous.scopeId && ref.path === previous.path
-                                  ? { scopeId: next.scopeId, path: next.path }
-                                  : ref,
-                              ),
-                            );
-                          } else {
-                            current.current = { doc: undefined, buffer: '', external: undefined };
-                            setDoc(undefined);
-                            setBuffer('');
-                            setExternal(undefined);
-                            setSources((all) =>
-                              all.filter(
-                                (ref) =>
-                                  ref.scopeId !== previous.scopeId || ref.path !== previous.path,
-                              ),
-                            );
-                          }
-                          setRevision((value) => value + 1);
-                          setStatus(
-                            notice ??
-                              (next
-                                ? 'ノートの場所を変更しました。参照元のリンクは必要に応じて更新してください。'
-                                : 'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。'),
-                          );
-                        }}
-                      />
-                    )}
-                  <button
-                    disabled={
-                      sources.length >= 20 ||
-                      sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path)
+            <div className="explorer-content" hidden={gitOpen}>
+              <button
+                className="workspace-search"
+                disabled={
+                  !spaces.some((space) => workspace?.scopeIds.includes(space.scopeId)) || connecting
+                }
+                onClick={() => setSearchOpen(true)}
+              >
+                <Icon name="search" /> KB内を検索
+              </button>
+              <LayerExplorer
+                spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
+                activeId={active?.scopeId}
+                selected={doc}
+                revision={revision}
+                locked={running || sending || queued.length > 0 || connecting}
+                onSelect={(space) => {
+                  void selectSpace(space);
+                }}
+                onOpen={(space, entry) => void open(space, entry)}
+                onConnect={(space) => {
+                  void selectSpace(space).then((selected) => {
+                    if (selected) showConnections(space);
+                  });
+                }}
+                onNote={(space) => {
+                  void selectSpace(space).then((selected) => {
+                    if (selected) {
+                      setNoteDirectory(
+                        doc?.scopeId === space.scopeId
+                          ? doc.path.split('/').slice(0, -1).join('/')
+                          : 'Knowledge_Base/Notes',
+                      );
+                      setNewNote(true);
                     }
+                  });
+                }}
+                onRefresh={() => setRevision((value) => value + 1)}
+              />
+              {active && (
+                <button
+                  className="workspace-search workspace-trash"
+                  disabled={running || sending || gitBusy || connecting}
+                  onClick={() => {
+                    void save().then((saved) => {
+                      if (saved) setTrashOpen(true);
+                    });
+                  }}
+                >
+                  削除したノートを復元
+                </button>
+              )}
+              {cloudRoot && (
+                <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
+                  <div className="scope-heading">
+                    <strong>
+                      <Icon name="cloud" size={14} /> Google Drive
+                    </strong>
+                    <button
+                      className="scope-action"
+                      disabled={dirty || running || connecting}
+                      onClick={() => showConnections(cloudRoot)}
+                      aria-label="Drive フォルダを接続"
+                    >
+                      接続
+                    </button>
+                  </div>
+                  <Tree
+                    space={cloudRoot}
+                    layer="contents"
+                    directory="contents"
+                    roots={{ entries: [] }}
+                    revision={revision}
+                    selected={doc}
+                    readEntries={host.cloudEntries}
+                    onOpen={(root, entry) => void openCloud(root, entry)}
+                  />
+                </section>
+              )}
+              <button
+                className="add-space"
+                disabled={running || dirty || connecting}
+                onClick={() => setAdd(true)}
+              >
+                <Icon name="plus" /> スペースを追加
+              </button>
+            </div>
+          </aside>
+        </Pane>
+        <PaneSeparator className="pane-handle" aria-label="サイドバーの幅" />
+        <Pane id="workspace" className="workspace-pane" minSize={360}>
+          <main id="editor-main" tabIndex={-1}>
+            <header>
+              <div className="document-location" title={doc?.path}>
+                <span className="muted">
+                  {doc?.workspaceId ? `${workspace?.name} · Drive` : (active?.name ?? 'ようこそ')}
+                </span>
+                <Icon name="chevron" size={12} />
+                <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
+              </div>
+              <div className="actions">
+                {cloudRoot && (
+                  <button
+                    disabled={running || dirty || connecting || gitBusy}
+                    onClick={() => showConnections(cloudRoot)}
+                  >
+                    <Icon name="cloud" /> クラウド接続
+                  </button>
+                )}
+                {active && (
+                  <button
+                    disabled={running || dirty || connecting || gitBusy}
+                    onClick={() => setOntologyOpen(true)}
+                  >
+                    オントロジー
+                  </button>
+                )}
+                {connecting && <small>接続を準備中…</small>}
+                {active && (
+                  <button
+                    disabled={connecting || gitBusy}
                     onClick={() => {
                       void save().then((saved) => {
-                        if (saved)
-                          setSources((all) => [...all, { scopeId: doc.scopeId, path: doc.path }]);
+                        if (saved) setNewNote(true);
                       });
                     }}
                   >
-                    参照に追加
+                    <Icon name="plus" /> ノートを作成
                   </button>
-                  {active && (
+                )}
+                {doc && (
+                  <>
+                    <button disabled={gitBusy} onClick={() => void reconcile()}>
+                      再読み込み
+                    </button>
+                    <button disabled={!dirty || !!external} onClick={() => void save()}>
+                      保存{dirty ? ' •' : ''}
+                    </button>
+                  </>
+                )}
+              </div>
+            </header>
+            {!doc && status && (
+              <p className="hint" role="status">
+                {status}
+              </p>
+            )}
+            {error && (
+              <div className="error" role="alert">
+                {error}
+                <button onClick={() => setError('')}>閉じる</button>
+              </div>
+            )}
+            {external && (
+              <div className="conflict" role="alert">
+                <strong>外部でノートが変更されました。未保存の編集を保持しています。</strong>
+                <div className="versions">
+                  <label>
+                    あなたの編集<pre>{buffer}</pre>
+                  </label>
+                  <label>
+                    ディスク上の最新版<pre>{external.text}</pre>
+                  </label>
+                </div>
+                <button onClick={() => load(external)}>ディスク版を表示（下書きは保持）</button>
+                <button
+                  onClick={() => {
+                    setDoc(external);
+                    setExternal(undefined);
+                    setStatus('最新版を基準に、編集内容を確認して保存してください');
+                  }}
+                >
+                  編集を維持して手動で統合
+                </button>
+              </div>
+            )}
+            <PaneGroup
+              className="document-panes"
+              orientation="vertical"
+              defaultLayout={documentLayout.defaultLayout}
+              onLayoutChanged={documentLayout.onLayoutChanged}
+            >
+              <Pane id="document" className="document-pane" minSize={180}>
+                <div className="git-detail-slot" ref={setGitDetailTarget} hidden={!gitReview} />
+                <div className="note-surface" hidden={gitReview}>
+                  {doc ? (
+                    <>
+                      <div className="doc-toolbar">
+                        <span>{dirty ? '保存待ち' : status}</span>
+                        <div className="actions">
+                          {!doc.readOnly &&
+                            /\.md$/i.test(doc.path) &&
+                            spaces.some(
+                              (space) =>
+                                space.scopeId === doc.scopeId &&
+                                classify(space, doc.path) === 'Knowledge_Base',
+                            ) && (
+                              <NoteActions
+                                key={`${doc.scopeId}:${doc.path}`}
+                                doc={doc}
+                                onBusyChange={(busy) => {
+                                  reconciliation.current++;
+                                  organizing.current = busy;
+                                  if (!busy) void reconcile();
+                                }}
+                                beforeChange={async () => {
+                                  if (running || sending || queued.length || gitBusy || connecting)
+                                    throw Error(
+                                      '実行・Git 操作・接続が完了してからノートを整理してください。',
+                                    );
+                                  if (!(await save())) return null;
+                                  return current.current.doc ?? null;
+                                }}
+                                onChanged={(next, notice) => {
+                                  const previous = doc;
+                                  if (next) {
+                                    load(next);
+                                    setSources((all) =>
+                                      all.map((ref) =>
+                                        ref.scopeId === previous.scopeId &&
+                                        ref.path === previous.path
+                                          ? { scopeId: next.scopeId, path: next.path }
+                                          : ref,
+                                      ),
+                                    );
+                                  } else {
+                                    current.current = {
+                                      doc: undefined,
+                                      buffer: '',
+                                      external: undefined,
+                                    };
+                                    setDoc(undefined);
+                                    setBuffer('');
+                                    setExternal(undefined);
+                                    setSources((all) =>
+                                      all.filter(
+                                        (ref) =>
+                                          ref.scopeId !== previous.scopeId ||
+                                          ref.path !== previous.path,
+                                      ),
+                                    );
+                                  }
+                                  setRevision((value) => value + 1);
+                                  setStatus(
+                                    notice ??
+                                      (next
+                                        ? 'ノートの場所を変更しました。参照元のリンクは必要に応じて更新してください。'
+                                        : 'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。'),
+                                  );
+                                }}
+                              />
+                            )}
+                          <button
+                            disabled={
+                              sources.length >= 20 ||
+                              sources.some(
+                                (ref) => ref.scopeId === doc.scopeId && ref.path === doc.path,
+                              )
+                            }
+                            onClick={() => {
+                              void save().then((saved) => {
+                                if (saved)
+                                  setSources((all) => [
+                                    ...all,
+                                    { scopeId: doc.scopeId, path: doc.path },
+                                  ]);
+                              });
+                            }}
+                          >
+                            参照に追加
+                          </button>
+                          {active && (
+                            <button
+                              onClick={() => {
+                                void save().then((saved) => {
+                                  if (saved) setKnowledgeOpen(true);
+                                });
+                              }}
+                            >
+                              資料と成果物
+                            </button>
+                          )}
+                        </div>
+                        <div className="actions">
+                          {/\.csv$/i.test(doc.path) && (
+                            <button
+                              className={mode === 'table' ? 'selected' : ''}
+                              onClick={() => {
+                                setBuffer(editor.current?.getText() ?? buffer);
+                                setMode('table');
+                                setEditorKey((key) => key + 1);
+                              }}
+                            >
+                              表
+                            </button>
+                          )}
+                          {!/\.md$/i.test(doc.path) && (
+                            <button
+                              className={mode === 'source' ? 'selected' : ''}
+                              onClick={() => {
+                                setBuffer(editor.current?.getText() ?? buffer);
+                                setMode('source');
+                                setEditorKey((k) => k + 1);
+                              }}
+                            >
+                              ソース
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {doc.draft && doc.draft.text !== doc.text && (
+                        <div className="hint">
+                          復元できる下書きがあります。
+                          <button
+                            onClick={() => {
+                              setBuffer(doc.draft!.text);
+                              setMode(/\.md$/i.test(doc.path) ? 'rich' : 'source');
+                              setEditorKey((k) => k + 1);
+                              if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
+                            }}
+                          >
+                            下書きを復元
+                          </button>
+                        </div>
+                      )}
+                      <div className="document-scroll">
+                        {searchNotice && (
+                          <p className="hint" role="status">
+                            {searchNotice}
+                          </p>
+                        )}
+                        <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
+                          {mode === 'table' ? (
+                            <CsvPreview key={editorKey} text={buffer} />
+                          ) : (
+                            <Editor
+                              ref={editor}
+                              key={editorKey}
+                              text={buffer}
+                              mode={mode}
+                              readOnly={doc.readOnly}
+                              onChange={setBuffer}
+                              onError={report}
+                              searchTarget={searchTarget}
+                              onSearchResult={(found) =>
+                                setSearchNotice(
+                                  found
+                                    ? `${searchTarget?.line} 行目の一致箇所を選択しました。`
+                                    : '一致箇所を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。再検索して確認してください。',
+                                )
+                              }
+                              onUpload={async (file) =>
+                                host.saveImage(
+                                  doc.scopeId,
+                                  doc.path,
+                                  new Uint8Array(await file.arrayBuffer()),
+                                )
+                              }
+                              resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
+                            />
+                          )}
+                        </Suspense>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="welcome">
+                      <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
+                      <h1>ここから、考えを広げよう。</h1>
+                      <p>
+                        左のナレッジからノートを開くと、編集を始められます。
+                        <br />
+                        新しいノートを作ったり、AIと一緒に整理することもできます。
+                      </p>
+                      <div className="welcome-actions">
+                        <button
+                          className="primary"
+                          disabled={!active || running || connecting}
+                          onClick={() => setNewNote(true)}
+                        >
+                          <Icon name="plus" />
+                          新しいノートを作成
+                        </button>
+                        <button onClick={() => setAdd(true)}>
+                          <Icon name="folder" />
+                          KBフォルダを開く
+                        </button>
+                      </div>
+                      <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
+                    </div>
+                  )}
+                </div>
+              </Pane>
+              {terminalSpace && (
+                <>
+                  <PaneSeparator className="pane-handle" aria-label="ターミナルの高さ" />
+                  <Pane id="terminal" className="terminal-pane" defaultSize={300} minSize={120}>
+                    <Suspense fallback={<p className="hint">ターミナルを開いています…</p>}>
+                      <TerminalPanel
+                        space={terminalSpace}
+                        onClose={() => setTerminalSpace(undefined)}
+                      />
+                    </Suspense>
+                  </Pane>
+                </>
+              )}
+            </PaneGroup>
+            <footer>
+              <span role="status">{status || (active ? `${active.name}で作業中` : '')}</span>
+              <button
+                disabled={!active && !terminalSpace}
+                aria-expanded={!!terminalSpace}
+                onClick={() => setTerminalSpace((value) => (value ? undefined : active))}
+              >
+                <Icon name="terminal" /> {terminalSpace ? 'ターミナルを終了' : 'ターミナル'}
+              </button>
+              <button className="consult" onClick={() => setPanel((p) => !p)}>
+                <Icon name="sparkles" /> {panel ? 'AIパネルを閉じる' : 'AIに相談'}
+              </button>
+            </footer>
+          </main>
+        </Pane>
+        {panel && (
+          <>
+            <PaneSeparator className="pane-handle" aria-label="AIパネルの幅" />
+            <Pane
+              id="assistant"
+              className="assistant-pane"
+              defaultSize={380}
+              minSize={280}
+              maxSize={620}
+            >
+              <aside className="agent-panel">
+                <div className="agent-heading">
+                  <h2>
+                    <Icon name="sparkles" />
+                    AIに相談
+                  </h2>
+                  <div className="actions">
                     <button
+                      aria-label="新しい会話"
+                      title="次の送信から新しい会話"
+                      aria-pressed={fresh}
+                      disabled={running || sending || queued.length > 0}
                       onClick={() => {
-                        void save().then((saved) => {
-                          if (saved) setKnowledgeOpen(true);
+                        setFresh((value) => !value);
+                        document.querySelector<HTMLTextAreaElement>('.composer textarea')?.focus();
+                      }}
+                    >
+                      <Icon name="plus" />
+                    </button>
+                    <Popover.Root>
+                      <Popover.Trigger
+                        className="agent-settings"
+                        aria-label="会話と接続の設定"
+                        title="会話と接続の設定"
+                      >
+                        •••
+                      </Popover.Trigger>
+                      <Popover.Portal>
+                        <Popover.Positioner side="bottom" align="end" sideOffset={6}>
+                          <Popover.Popup className="agent-settings-sheet">
+                            <div className="agent-settings-heading">
+                              <Popover.Title render={<strong />}>会話と接続</Popover.Title>
+                              <Popover.Close aria-label="会話の設定を閉じる">
+                                <Icon name="close" />
+                              </Popover.Close>
+                            </div>
+                            <p>
+                              {agentNames[agent]}{' '}
+                              <span>
+                                {infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}
+                              </span>
+                            </p>
+                            <p>{infos.find((i) => i.id === agent)?.detail}</p>
+                            {infos.find((i) => i.id === agent)?.available &&
+                              infos.find((i) => i.id === agent)?.tested === false && (
+                                <p>このCLIバージョンは未検証です。</p>
+                              )}
+                            {active && (
+                              <SessionControls
+                                key={`${active.scopeId}:${agent}`}
+                                scopeId={active.scopeId}
+                                agent={agent}
+                                running={
+                                  running || sending || queued.length > 0 || !conversationReady
+                                }
+                                onError={report}
+                                onReset={() => {
+                                  if (conversationKey.current !== `${active.scopeId}:${agent}`)
+                                    return;
+                                  setFresh(false);
+                                }}
+                              />
+                            )}
+                          </Popover.Popup>
+                        </Popover.Positioner>
+                      </Popover.Portal>
+                    </Popover.Root>
+                    <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
+                      <Icon name="close" />
+                    </button>
+                  </div>
+                </div>
+                {infos.find((i) => i.id === agent)?.available === false && (
+                  <p className="agent-connection-error" role="alert">
+                    CLI が見つかりません。インストールとネイティブログインを確認してください。
+                  </p>
+                )}
+                {!conversationReady && (
+                  <div className="hint" role="status">
+                    {conversationError || '保存した会話を読み込んでいます…'}
+                    {conversationError && (
+                      <button onClick={() => setHistoryReload((value) => value + 1)}>再試行</button>
+                    )}
+                  </div>
+                )}
+                {historyTruncated && (
+                  <div className="hint">
+                    保存上限により、古い履歴や長い出力の一部を省略しています。
+                  </div>
+                )}
+                <div
+                  className="conversation"
+                  aria-live="polite"
+                  ref={conversation}
+                  onScroll={() => {
+                    const element = conversation.current!;
+                    followConversation.current =
+                      element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+                  }}
+                >
+                  {events.length === 0 && (
+                    <div className="agent-empty">
+                      <p>ノートについて相談する</p>
+                      <div className="prompt-suggestions">
+                        {['このノートの要点をまとめて', 'この内容から次のアクションを整理して'].map(
+                          (suggestion) => (
+                            <button
+                              key={suggestion}
+                              disabled={!doc || running}
+                              onClick={() => {
+                                setPrompt(suggestion);
+                                document
+                                  .querySelector<HTMLTextAreaElement>('.composer textarea')
+                                  ?.focus();
+                              }}
+                            >
+                              {suggestion}
+                              <Icon name="arrow" size={13} />
+                            </button>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {events.map((event, i) =>
+                    event.type === 'permission' || event.type === 'question' ? (
+                      <Request
+                        key={`${event.runId}-${i}`}
+                        event={event}
+                        ended={events.some((e) => e.runId === event.runId && e.type === 'done')}
+                        onError={report}
+                      />
+                    ) : (
+                      <div
+                        className={`message ${event.role === 'user' ? 'user' : event.type}`}
+                        key={`${event.runId}-${i}`}
+                      >
+                        {event.type === 'tool' ? (
+                          <details>
+                            <summary>{event.text}</summary>
+                            <pre>{event.details}</pre>
+                          </details>
+                        ) : (
+                          <span>{event.text}</span>
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+                {queued.length > 0 && (
+                  <div className="message-queue" aria-label="送信待ち">
+                    <strong>送信待ち {queued.length} 件</strong>
+                    {queuePaused && (
+                      <p>送信待ちはこの端末に保存されています。内容を確認して再開してください。</p>
+                    )}
+                    {queued.map((item) => (
+                      <div key={item.id}>
+                        <span>{item.prompt}</span>
+                        <button
+                          disabled={sending}
+                          aria-label={`送信待ち ${item.id} を削除`}
+                          onClick={() => {
+                            setSending(true);
+                            void host
+                              .removeQueuedMessage(active!.scopeId, agent, item.id)
+                              .then(setQueued)
+                              .catch(report)
+                              .finally(() => setSending(false));
+                          }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ))}
+                    {queuePaused && (
+                      <button
+                        disabled={running || sending || !conversationReady}
+                        onClick={() => setQueuePaused(false)}
+                      >
+                        送信を再開
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="composer">
+                  {fresh && (
+                    <p className="new-session" role="status">
+                      次の送信から新しい会話を始めます。
+                      <button onClick={() => setFresh(false)}>取り消す</button>
+                    </p>
+                  )}
+                  <div className="composer-context" aria-label="相談の対象">
+                    <span className="context-chip" title={active?.name}>
+                      <Icon name="folder" size={12} />
+                      {active?.name ?? 'スペース未選択'}
+                    </span>
+                    {doc?.scopeId === active?.scopeId && doc && (
+                      <span className="context-chip" title={doc.path}>
+                        <Icon name="file" size={12} />
+                        {doc.path.split('/').at(-1)}
+                      </span>
+                    )}
+                  </div>
+                  {sources.length > 0 && (
+                    <div className="selected-sources" aria-label="選択した参照資料">
+                      {sources.map((source) => (
+                        <div key={`${source.scopeId}:${source.path}`}>
+                          <span title={source.path}>
+                            {spaces.find((space) => space.scopeId === source.scopeId)?.name ??
+                              'Drive'}{' '}
+                            / {source.path}
+                          </span>
+                          <button
+                            aria-label={`${source.path} を参照から外す`}
+                            onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <textarea
+                    aria-label="エージェントへの指示"
+                    placeholder="ノートについて相談、編集を依頼…"
+                    value={prompt}
+                    disabled={!composer.ready || sending}
+                    maxLength={100000}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        !e.nativeEvent.isComposing &&
+                        e.keyCode !== 229
+                      ) {
+                        e.preventDefault();
+                        void start();
+                      }
+                    }}
+                  />
+                  {composer.error ? (
+                    <div className="hint" role="alert">
+                      {composer.error}
+                      <button onClick={() => void composer.retry()}>下書き保存を再試行</button>
+                    </div>
+                  ) : (
+                    <small className="muted" role="status">
+                      {!composer.ready
+                        ? '下書きを読み込み中…'
+                        : composer.pending
+                          ? '下書きを保存中…'
+                          : prompt
+                            ? '未送信の下書きをこの端末に保存済み'
+                            : ''}
+                    </small>
+                  )}
+                  <div className="composer-actions">
+                    <select
+                      aria-label="エージェント"
+                      value={agent}
+                      disabled={running || sending || queued.length > 0 || gitBusy}
+                      onChange={(e) => {
+                        const next = e.target.value as AgentId;
+                        void composer.flush().then((saved) => {
+                          if (saved) setAgent(next);
                         });
                       }}
                     >
-                      資料と成果物
-                    </button>
-                  )}
+                      {agentIds.map((id) => (
+                        <option key={id} value={id}>
+                          {agentNames[id]}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="actions">
+                      {running && (
+                        <button
+                          onClick={() => {
+                            setQueuePaused(true);
+                            void host.cancel().catch(report);
+                          }}
+                        >
+                          停止
+                        </button>
+                      )}
+                      <button
+                        className="primary"
+                        disabled={
+                          !active ||
+                          !conversationReady ||
+                          !composer.ready ||
+                          !!composer.error ||
+                          sending ||
+                          gitBusy ||
+                          connecting ||
+                          !prompt.trim() ||
+                          !!external ||
+                          infos.find((i) => i.id === agent)?.available !== true
+                        }
+                        onClick={() => void start()}
+                      >
+                        {running || queued.length ? '送信待ちに追加' : '送信'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="actions">
-                  {/\.csv$/i.test(doc.path) && (
-                    <button
-                      className={mode === 'table' ? 'selected' : ''}
-                      onClick={() => {
-                        setBuffer(editor.current?.getText() ?? buffer);
-                        setMode('table');
-                        setEditorKey((key) => key + 1);
-                      }}
-                    >
-                      表
-                    </button>
-                  )}
-                  {!/\.md$/i.test(doc.path) && (
-                    <button
-                      className={mode === 'source' ? 'selected' : ''}
-                      onClick={() => {
-                        setBuffer(editor.current?.getText() ?? buffer);
-                        setMode('source');
-                        setEditorKey((k) => k + 1);
-                      }}
-                    >
-                      ソース
-                    </button>
-                  )}
-                </div>
-              </div>
-              {doc.draft && doc.draft.text !== doc.text && (
-                <div className="hint">
-                  復元できる下書きがあります。
-                  <button
-                    onClick={() => {
-                      setBuffer(doc.draft!.text);
-                      setMode(/\.md$/i.test(doc.path) ? 'rich' : 'source');
-                      setEditorKey((k) => k + 1);
-                      if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
-                    }}
-                  >
-                    下書きを復元
-                  </button>
-                </div>
-              )}
-              <div className="document-scroll">
-                {searchNotice && (
-                  <p className="hint" role="status">
-                    {searchNotice}
-                  </p>
-                )}
-                <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
-                  {mode === 'table' ? (
-                    <CsvPreview key={editorKey} text={buffer} />
-                  ) : (
-                    <Editor
-                      ref={editor}
-                      key={editorKey}
-                      text={buffer}
-                      mode={mode}
-                      readOnly={doc.readOnly}
-                      onChange={setBuffer}
-                      onError={report}
-                      searchTarget={searchTarget}
-                      onSearchResult={(found) =>
-                        setSearchNotice(
-                          found
-                            ? `${searchTarget?.line} 行目の一致箇所を選択しました。`
-                            : '一致箇所を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。再検索して確認してください。',
-                        )
-                      }
-                      onUpload={async (file) =>
-                        host.saveImage(
-                          doc.scopeId,
-                          doc.path,
-                          new Uint8Array(await file.arrayBuffer()),
-                        )
-                      }
-                      resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
-                    />
-                  )}
-                </Suspense>
-              </div>
-            </>
-          ) : (
-            <div className="welcome">
-              <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
-              <h1>ここから、考えを広げよう。</h1>
-              <p>
-                左のナレッジからノートを開くと、編集を始められます。
-                <br />
-                新しいノートを作ったり、AIと一緒に整理することもできます。
-              </p>
-              <div className="welcome-actions">
-                <button
-                  className="primary"
-                  disabled={!active || running || connecting}
-                  onClick={() => setNewNote(true)}
-                >
-                  <Icon name="plus" />
-                  新しいノートを作成
-                </button>
-                <button onClick={() => setAdd(true)}>
-                  <Icon name="folder" />
-                  KBフォルダを開く
-                </button>
-              </div>
-              <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
-            </div>
-          )}
-        </div>
-        {terminalSpace && (
-          <Suspense fallback={<p className="hint">ターミナルを開いています…</p>}>
-            <TerminalPanel space={terminalSpace} onClose={() => setTerminalSpace(undefined)} />
-          </Suspense>
+              </aside>
+            </Pane>
+          </>
         )}
-        <footer>
-          <span role="status">{status || (active ? `${active.name}で作業中` : '')}</span>
-          <button
-            disabled={!active && !terminalSpace}
-            aria-expanded={!!terminalSpace}
-            onClick={() => setTerminalSpace((value) => (value ? undefined : active))}
-          >
-            <Icon name="terminal" /> {terminalSpace ? 'ターミナルを終了' : 'ターミナル'}
-          </button>
-          <button className="consult" onClick={() => setPanel((p) => !p)}>
-            <Icon name="sparkles" /> {panel ? 'AIパネルを閉じる' : 'AIに相談'}
-          </button>
-        </footer>
-      </main>
+      </PaneGroup>
       {connectionsOpen && connectionTarget && (
         <Connections
           key={connectionTarget.scopeId}
@@ -1155,317 +1536,6 @@ function App() {
             setRevision((v) => v + 1);
           }}
         />
-      )}
-      {panel && (
-        <aside className="agent-panel">
-          <div className="agent-heading">
-            <h2>
-              <Icon name="sparkles" />
-              AIに相談
-            </h2>
-            <div className="actions">
-              <button
-                aria-label="新しい会話"
-                title="次の送信から新しい会話"
-                aria-pressed={fresh}
-                disabled={running || sending || queued.length > 0}
-                onClick={() => {
-                  setFresh((value) => !value);
-                  document.querySelector<HTMLTextAreaElement>('.composer textarea')?.focus();
-                }}
-              >
-                <Icon name="plus" />
-              </button>
-              <details
-                className="agent-settings"
-                ref={assistantSettings}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.currentTarget.open = false;
-                    event.currentTarget.querySelector('summary')?.focus();
-                  }
-                }}
-              >
-                <summary aria-label="会話と接続の設定" title="会話と接続の設定">
-                  •••
-                </summary>
-                <div className="agent-settings-sheet">
-                  <div className="agent-settings-heading">
-                    <strong>会話と接続</strong>
-                    <button
-                      aria-label="会話の設定を閉じる"
-                      onClick={() => {
-                        if (assistantSettings.current) {
-                          assistantSettings.current.open = false;
-                          assistantSettings.current.querySelector('summary')?.focus();
-                        }
-                      }}
-                    >
-                      <Icon name="close" />
-                    </button>
-                  </div>
-                  <p>
-                    {agentNames[agent]}{' '}
-                    <span>{infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}</span>
-                  </p>
-                  <p>{infos.find((i) => i.id === agent)?.detail}</p>
-                  {infos.find((i) => i.id === agent)?.available &&
-                    infos.find((i) => i.id === agent)?.tested === false && (
-                      <p>このCLIバージョンは未検証です。</p>
-                    )}
-                  {active && (
-                    <SessionControls
-                      key={`${active.scopeId}:${agent}`}
-                      scopeId={active.scopeId}
-                      agent={agent}
-                      running={running || sending || queued.length > 0 || !conversationReady}
-                      onError={report}
-                      onReset={() => {
-                        if (conversationKey.current !== `${active.scopeId}:${agent}`) return;
-                        setFresh(false);
-                      }}
-                    />
-                  )}
-                </div>
-              </details>
-              <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
-                <Icon name="close" />
-              </button>
-            </div>
-          </div>
-          {infos.find((i) => i.id === agent)?.available === false && (
-            <p className="agent-connection-error" role="alert">
-              CLI が見つかりません。インストールとネイティブログインを確認してください。
-            </p>
-          )}
-          {!conversationReady && (
-            <div className="hint" role="status">
-              {conversationError || '保存した会話を読み込んでいます…'}
-              {conversationError && (
-                <button onClick={() => setHistoryReload((value) => value + 1)}>再試行</button>
-              )}
-            </div>
-          )}
-          {historyTruncated && (
-            <div className="hint">保存上限により、古い履歴や長い出力の一部を省略しています。</div>
-          )}
-          <div
-            className="conversation"
-            aria-live="polite"
-            ref={conversation}
-            onScroll={() => {
-              const element = conversation.current!;
-              followConversation.current =
-                element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-            }}
-          >
-            {events.length === 0 && (
-              <div className="agent-empty">
-                <p>ノートについて相談する</p>
-                <div className="prompt-suggestions">
-                  {['このノートの要点をまとめて', 'この内容から次のアクションを整理して'].map(
-                    (suggestion) => (
-                      <button
-                        key={suggestion}
-                        disabled={!doc || running}
-                        onClick={() => {
-                          setPrompt(suggestion);
-                          document
-                            .querySelector<HTMLTextAreaElement>('.composer textarea')
-                            ?.focus();
-                        }}
-                      >
-                        {suggestion}
-                        <Icon name="arrow" size={13} />
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-            )}
-            {events.map((event, i) =>
-              event.type === 'permission' || event.type === 'question' ? (
-                <Request
-                  key={`${event.runId}-${i}`}
-                  event={event}
-                  ended={events.some((e) => e.runId === event.runId && e.type === 'done')}
-                  onError={report}
-                />
-              ) : (
-                <div
-                  className={`message ${event.role === 'user' ? 'user' : event.type}`}
-                  key={`${event.runId}-${i}`}
-                >
-                  {event.type === 'tool' ? (
-                    <details>
-                      <summary>{event.text}</summary>
-                      <pre>{event.details}</pre>
-                    </details>
-                  ) : (
-                    <span>{event.text}</span>
-                  )}
-                </div>
-              ),
-            )}
-          </div>
-          {queued.length > 0 && (
-            <div className="message-queue" aria-label="送信待ち">
-              <strong>送信待ち {queued.length} 件</strong>
-              {queuePaused && (
-                <p>送信待ちはこの端末に保存されています。内容を確認して再開してください。</p>
-              )}
-              {queued.map((item) => (
-                <div key={item.id}>
-                  <span>{item.prompt}</span>
-                  <button
-                    disabled={sending}
-                    aria-label={`送信待ち ${item.id} を削除`}
-                    onClick={() => {
-                      setSending(true);
-                      void host
-                        .removeQueuedMessage(active!.scopeId, agent, item.id)
-                        .then(setQueued)
-                        .catch(report)
-                        .finally(() => setSending(false));
-                    }}
-                  >
-                    取消
-                  </button>
-                </div>
-              ))}
-              {queuePaused && (
-                <button
-                  disabled={running || sending || !conversationReady}
-                  onClick={() => setQueuePaused(false)}
-                >
-                  送信を再開
-                </button>
-              )}
-            </div>
-          )}
-          <div className="composer">
-            {fresh && (
-              <p className="new-session" role="status">
-                次の送信から新しい会話を始めます。
-                <button onClick={() => setFresh(false)}>取り消す</button>
-              </p>
-            )}
-            <div className="composer-context" aria-label="相談の対象">
-              <span className="context-chip" title={active?.name}>
-                <Icon name="folder" size={12} />
-                {active?.name ?? 'スペース未選択'}
-              </span>
-              {doc?.scopeId === active?.scopeId && doc && (
-                <span className="context-chip" title={doc.path}>
-                  <Icon name="file" size={12} />
-                  {doc.path.split('/').at(-1)}
-                </span>
-              )}
-            </div>
-            {sources.length > 0 && (
-              <div className="selected-sources" aria-label="選択した参照資料">
-                {sources.map((source) => (
-                  <div key={`${source.scopeId}:${source.path}`}>
-                    <span title={source.path}>
-                      {spaces.find((space) => space.scopeId === source.scopeId)?.name ?? 'Drive'} /{' '}
-                      {source.path}
-                    </span>
-                    <button
-                      aria-label={`${source.path} を参照から外す`}
-                      onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <textarea
-              aria-label="エージェントへの指示"
-              placeholder="ノートについて相談、編集を依頼…"
-              value={prompt}
-              disabled={!composer.ready || sending}
-              maxLength={100000}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing &&
-                  e.keyCode !== 229
-                ) {
-                  e.preventDefault();
-                  void start();
-                }
-              }}
-            />
-            {composer.error ? (
-              <div className="hint" role="alert">
-                {composer.error}
-                <button onClick={() => void composer.retry()}>下書き保存を再試行</button>
-              </div>
-            ) : (
-              <small className="muted" role="status">
-                {!composer.ready
-                  ? '下書きを読み込み中…'
-                  : composer.pending
-                    ? '下書きを保存中…'
-                    : prompt
-                      ? '未送信の下書きをこの端末に保存済み'
-                      : ''}
-              </small>
-            )}
-            <div className="composer-actions">
-              <select
-                aria-label="エージェント"
-                value={agent}
-                disabled={running || sending || queued.length > 0 || gitBusy}
-                onChange={(e) => {
-                  const next = e.target.value as AgentId;
-                  void composer.flush().then((saved) => {
-                    if (saved) setAgent(next);
-                  });
-                }}
-              >
-                {agentIds.map((id) => (
-                  <option key={id} value={id}>
-                    {agentNames[id]}
-                  </option>
-                ))}
-              </select>
-              <div className="actions">
-                {running && (
-                  <button
-                    onClick={() => {
-                      setQueuePaused(true);
-                      void host.cancel().catch(report);
-                    }}
-                  >
-                    停止
-                  </button>
-                )}
-                <button
-                  className="primary"
-                  disabled={
-                    !active ||
-                    !conversationReady ||
-                    !composer.ready ||
-                    !!composer.error ||
-                    sending ||
-                    gitBusy ||
-                    connecting ||
-                    !prompt.trim() ||
-                    !!external ||
-                    infos.find((i) => i.id === agent)?.available !== true
-                  }
-                  onClick={() => void start()}
-                >
-                  {running || queued.length ? '送信待ちに追加' : '送信'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
       )}
       {searchOpen && (
         <SearchPanel

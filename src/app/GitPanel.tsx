@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
+import { Menu } from '@base-ui/react/menu';
 import { Icon } from './Icon';
 import { useDraft } from './useDraft';
 import './git-panel.css';
@@ -122,6 +123,7 @@ function RepositoryPanel({
   externalRevision: number;
   beforeAction: () => Promise<boolean>;
 }) {
+  const menuHost = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<GitStatus>(),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
@@ -428,7 +430,7 @@ function RepositoryPanel({
           下書きをこの端末に保存中…
         </p>
       )}
-      <div className="git-toolbar">
+      <div className="git-toolbar" ref={menuHost}>
         <div className="git-tabs" role="group" aria-label="Git の表示">
           <button
             aria-pressed={tab === 'changes'}
@@ -460,36 +462,49 @@ function RepositoryPanel({
           >
             <Icon name="refresh" /> 更新
           </button>
-          <details className="git-more-actions">
-            <summary aria-label="その他の Git 操作">その他</summary>
-            <button
-              disabled={busy || conflictDirty || draftBlocked || !canSync}
-              onClick={() =>
-                void perform(
-                  () => host.gitSync(space.scopeId, 'fetch', status.version),
-                  'リモートの状態を取得しました。ノートは変更していません。',
-                )
-              }
-            >
-              Fetch
-            </button>
-            <button
-              disabled={busy || !canSync || !!status.changes.length || status.operation !== 'none'}
-              onClick={() => confirm('merge')}
-            >
-              履歴を統合
-            </button>
-            {status.remote?.repository && (
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void host.gitOpenRepository(space.scopeId).catch((e) => setError(String(e)))
-                }
-              >
-                GitHub を開く
-              </button>
-            )}
-          </details>
+          {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
+          <Menu.Root modal={false}>
+            <Menu.Trigger className="git-more-actions" aria-label="その他の Git 操作">
+              その他
+            </Menu.Trigger>
+            {/* The menu stays inside the source-control aside so it is grouped
+                with the panel it acts on. */}
+            <Menu.Portal container={menuHost}>
+              <Menu.Positioner side="bottom" align="start" sideOffset={6}>
+                <Menu.Popup className="git-menu">
+                  <Menu.Item
+                    disabled={busy || conflictDirty || draftBlocked || !canSync}
+                    onClick={() =>
+                      void perform(
+                        () => host.gitSync(space.scopeId, 'fetch', status.version),
+                        'リモートの状態を取得しました。ノートは変更していません。',
+                      )
+                    }
+                  >
+                    Fetch
+                  </Menu.Item>
+                  <Menu.Item
+                    disabled={
+                      busy || !canSync || !!status.changes.length || status.operation !== 'none'
+                    }
+                    onClick={() => confirm('merge')}
+                  >
+                    履歴を統合
+                  </Menu.Item>
+                  {status.remote?.repository && (
+                    <Menu.Item
+                      disabled={busy}
+                      onClick={() =>
+                        void host.gitOpenRepository(space.scopeId).catch((e) => setError(String(e)))
+                      }
+                    >
+                      GitHub を開く
+                    </Menu.Item>
+                  )}
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
           <button
             disabled={
               busy ||

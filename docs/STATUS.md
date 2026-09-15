@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+UI foundation migration, 2026-09-15: `feat/ui-foundation` replaces the renderer's
+hand-written UI machinery with third-party primitives without changing product
+behaviour. Every colour now resolves through semantic design tokens, a designed
+dark palette follows `prefers-color-scheme`, and the Crepe, CodeMirror and xterm
+surfaces take their palette from those same tokens instead of three separate
+built-in themes. Icons come from lucide-react; the sidebar, note and assistant
+columns and the terminal split are resizable panes that remember the size the
+user chose; the assistant settings popover and the source-control overflow menu
+are Base UI components rather than `<details>` disclosures with hand-written
+Escape and focus handling. The native `<dialog>` wrapper and the Milkdown editor
+engine are kept deliberately. See [ADR 003](decisions/003-ui-foundation.md).
+Local verification passes: build/typecheck, **132 behaviour tests (125 passed,
+seven environment-gated skips)** and all **twelve Electron UI suites** under Xvfb,
+plus light and dark screenshots of the running application. Source-control
+overflow entries are menu items now, so `git-ui-smoke` queries them by menu-item
+role and reopens the menu for the second entry; its assertions are unchanged.
+No installer, website or published release changes.
+
 Daily recovery continuation, source 0.1.5: [recovery and note tools](RECOVERY-AND-NOTE-TOOLS.md)
 adds private unsent/commit/conflict drafts, explicit conflict recovery, manual
 update checks, visible image-resolution failures, guarded note destination /
