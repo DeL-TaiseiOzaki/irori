@@ -26,9 +26,11 @@ passed verification and all three package platforms for exactly that commit.
 Its Windows artifact is published unchanged except for its download filename:
 318,439,424 bytes, SHA-256
 `847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491`, matching the
-hash CI recorded in its own package smoke. The download website now serves
-`v0.1.5-preview.1`, and its release-notes link is taken from the manifest so it
-cannot be left on an older release. See [CHECKPOINT](CHECKPOINT.md) for the exact
+hash CI recorded in its own package smoke. [Pages 34896164099](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34896164099)
+deployed website revision `4aa79c766c76eae557c091a9e03773e1e6c6bb36`, and the
+live page was checked in a browser: it serves `v0.1.5-preview.1` with the Mac
+slots disabled and no page errors. Its release-notes link is taken from the
+manifest, so it cannot be left on an older release again. See [CHECKPOINT](CHECKPOINT.md) for the exact
 identities and the deployment/download evidence. The owner's Windows
 installation, upgrade from 0.1.4 and IME results remain pending.
 
