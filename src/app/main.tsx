@@ -1251,7 +1251,12 @@ function App() {
                       </Popover.Trigger>
                       <Popover.Portal>
                         <Popover.Positioner side="bottom" align="end" sideOffset={6}>
-                          <Popover.Popup className="agent-settings-sheet">
+                          {/* Opening with the pointer left the close button focused.
+                              Keyboard users still get the default focus move. */}
+                          <Popover.Popup
+                            className="agent-settings-sheet"
+                            initialFocus={(interaction) => interaction === 'keyboard'}
+                          >
                             <div className="agent-settings-heading">
                               <Popover.Title render={<strong />}>会話と接続</Popover.Title>
                               <Popover.Close aria-label="会話の設定を閉じる">
