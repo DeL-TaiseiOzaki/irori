@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
 import { realpath, open as openFileHandle } from 'node:fs/promises';
@@ -6,6 +6,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
 import { FileService } from './files';
+import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { DraftService } from './drafts';
 import { UpdateService } from './updates';
@@ -44,6 +45,10 @@ app
     if (!ownsDeviceData) return;
     const files = new FileService(app.getPath('userData'));
     await files.init();
+    const settings = new SettingsService(app.getPath('userData'));
+    // The chosen theme reaches Chromium before the window exists, so the first
+    // paint is already the reader's, without the renderer having to repaint.
+    nativeTheme.themeSource = (await settings.read()).theme;
     const search = new SearchService(files);
     const drafts = new DraftService(files);
     const updates = new UpdateService({
@@ -263,6 +268,12 @@ app
         const address = webAddress(url);
         if (!address) throw Error('http または https のリンクだけを開けます。');
         await shell.openExternal(address.href);
+      },
+      deviceSettings: () => settings.read(),
+      saveDeviceSettings: async (patch) => {
+        const next = await settings.save(patch);
+        nativeTheme.themeSource = next.theme;
+        return next;
       },
       openCloudSetupHelp: () =>
         shell.openExternal(

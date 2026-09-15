@@ -60,13 +60,33 @@ carries its real address, that a `javascript:` link does not, and that
 Opening is still a deliberate act by the reader: the click is theirs, the target
 is in the tooltip, and nothing opens on its own.
 
-## 3. The dark palette follows the operating system only
+## 3. Choosing light or dark — fixed, and it was not working at all
 
-The tokens support an explicit choice — every dark rule is guarded by
-`:root:not([data-theme='light'])` — but nothing in the application sets
-`data-theme`, so a user cannot pick light or dark independently of the OS, and
-cannot keep irori light on a dark desktop. Adding it is a settings surface, not
-a palette change.
+The sidebar now carries an appearance menu with system, light and dark. Getting
+there turned up two faults behind the original note.
+
+- **The renderer keeps nothing.** It is loaded from a file URL, where browser
+  storage is not kept between sessions. A choice stored there — and the pane
+  sizes from ADR 003, which used the same storage — was gone on the next launch.
+  Both now live in the host's device record (`device-settings.json`), read before
+  the first render.
+- **The pane group was asked for the wrong layout.** `useDefaultLayout` builds its
+  storage key from the panel identifiers it is given, while the group writes under
+  the identifiers actually rendered. Passing the full list including the assistant
+  meant reading one name and writing another, so a size never came back even
+  within a session. The identifiers now describe what is on screen.
+- **`prefers-color-scheme` could not be driven.** Setting Electron's
+  `nativeTheme.themeSource` does not reach the media query on this Linux
+  environment: the host reported `shouldUseDarkColors`, and the renderer still
+  answered light, so a reader following a dark desktop would have seen the light
+  palette. The renderer therefore resolves the choice itself and writes
+  `data-theme`, which the stylesheet keys off; the host still sets
+  `themeSource`, which owns the window chrome and native dialogs.
+
+`ui-smoke` chooses dark, checks it applies, returns to system, chooses dark again,
+drags the sidebar wider, and asserts both the theme and the width after a restart.
+`tests/settings.test.ts` covers defaults, merging, a damaged record and the
+validator's bounds.
 
 ## 4. Formatting is not gated — fixed for code
 

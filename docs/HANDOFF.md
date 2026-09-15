@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+Device preferences, 2026-09-16: theme and pane sizes live in
+`device-settings.json` through `deviceSettings`/`saveDeviceSettings`, not in the
+renderer. Browser storage is not durable here — the window is a file URL — so do
+not reach for `localStorage` for anything that must survive a launch. When a
+resizable group gains or loses a pane, update the identifier list passed to
+`useDefaultLayout` with it, or the layout is written and read under different
+names. The stylesheet follows `data-theme` on the root, which the renderer
+resolves; `nativeTheme.themeSource` is set for the operating system and cannot be
+relied on to change `prefers-color-scheme`.
+
 Source-control reads, 2026-09-16: the dropped-read defects in `RepositoryPanel`
 are fixed (commit diffs have their own generation, the status read depends on
 `conflictDirty`, the review refreshes in place, a click during another operation

@@ -7,7 +7,9 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color-scheme: light;
+  /* Both schemes are supported, which is also what lets prefers-color-scheme
+     follow the reader’s choice instead of being pinned to light. */
+  color-scheme: light dark;
 
   /* surfaces */
   --paper: #fafaf8;
@@ -91,79 +93,81 @@
 }
 
 /* The dark palette is a second full set of roles, not an inversion: the
-   sidebar stays darker than the note so the same hierarchy survives. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
+   sidebar stays darker than the note so the same hierarchy survives. The
+   renderer resolves the choice — the reader’s, or the system’s when they
+   follow it — into data-theme, because prefers-color-scheme alone cannot be
+   driven from the application on every platform. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --paper: #16181a;
-    --surface: #1e2124;
-    --surface-sunken: #202326;
-    --surface-panel: #1a1d20;
-    --surface-inset: #26292d;
-    --surface-selected: #2d3236;
+  --paper: #16181a;
+  --surface: #1e2124;
+  --surface-sunken: #202326;
+  --surface-panel: #1a1d20;
+  --surface-inset: #26292d;
+  --surface-selected: #2d3236;
 
-    --ink: #e6e5e0;
-    --muted: #9aa3ab;
-    --ink-faint: #7c858d;
+  --ink: #e6e5e0;
+  --muted: #9aa3ab;
+  --ink-faint: #7c858d;
 
-    --rule: #32373b;
-    --rule-soft: #2c3134;
-    --rule-strong: #3b4146;
-    --rule-hover: #4a5157;
+  --rule: #32373b;
+  --rule-soft: #2c3134;
+  --rule-strong: #3b4146;
+  --rule-hover: #4a5157;
 
-    --nav: #101214;
-    --nav-raised: #1b1e21;
-    --nav-rule: #2a2e32;
-    --nav-control: #343a40;
-    --nav-hover: #24282c;
-    --nav-border: #383e44;
-    --nav-border-hover: #59616a;
-    --nav-text: #dfe3e6;
-    --nav-text-strong: #f2f2ef;
-    --nav-muted: #99a2aa;
-    --nav-chip: #2b3035;
-    --nav-chip-text: #d8dde1;
-    --nav-scrollbar: #4b535b;
-    --nav-selected: #3a2f22;
-    --nav-selected-text: #f3cf9e;
+  --nav: #101214;
+  --nav-raised: #1b1e21;
+  --nav-rule: #2a2e32;
+  --nav-control: #343a40;
+  --nav-hover: #24282c;
+  --nav-border: #383e44;
+  --nav-border-hover: #59616a;
+  --nav-text: #dfe3e6;
+  --nav-text-strong: #f2f2ef;
+  --nav-muted: #99a2aa;
+  --nav-chip: #2b3035;
+  --nav-chip-text: #d8dde1;
+  --nav-scrollbar: #4b535b;
+  --nav-selected: #3a2f22;
+  --nav-selected-text: #f3cf9e;
 
-    --ember: #d9954a;
-    --ember-ink: #e0a25c;
-    --ember-border: #7a5c33;
-    --ember-wash: #2a2218;
-    --ember-pressed: #3c3122;
-    --ember-on-nav: #e8b06c;
-    --focus-ring: #e0a25c;
-    --accent-control: #d9954a;
+  --ember: #d9954a;
+  --ember-ink: #e0a25c;
+  --ember-border: #7a5c33;
+  --ember-wash: #2a2218;
+  --ember-pressed: #3c3122;
+  --ember-on-nav: #e8b06c;
+  --focus-ring: #e0a25c;
+  --accent-control: #d9954a;
 
-    --danger: #e39885;
-    --danger-strong: #eda291;
-    --danger-surface: #2e211d;
-    --danger-wash: #32211f;
-    --danger-on-nav: #ffb4a2;
-    --added: #8fc7a5;
-    --added-wash: #1c2a22;
-    --hunk: #9aa8e0;
-    --hunk-wash: #1f2333;
-    --warn-ink: #e6c07a;
-    --warn-wash: #2e2717;
-    --state-ink: #8fa697;
+  --danger: #e39885;
+  --danger-strong: #eda291;
+  --danger-surface: #2e211d;
+  --danger-wash: #32211f;
+  --danger-on-nav: #ffb4a2;
+  --added: #8fc7a5;
+  --added-wash: #1c2a22;
+  --hunk: #9aa8e0;
+  --hunk-wash: #1f2333;
+  --warn-ink: #e6c07a;
+  --warn-wash: #2e2717;
+  --state-ink: #8fa697;
 
-    --term-bg: #131618;
-    --term-text: #dfe4e0;
-    --term-muted: #9aa8a0;
-    --term-rule: #2b3431;
-    --term-control: #222829;
-    --term-control-border: #3b4442;
+  --term-bg: #131618;
+  --term-text: #dfe4e0;
+  --term-muted: #9aa8a0;
+  --term-rule: #2b3431;
+  --term-control: #222829;
+  --term-control-border: #3b4442;
 
-    --backdrop: #0a0c0dcc;
-    --shadow-toggle: 0 1px 3px #00000059;
-    --shadow-sheet: 0 8px 24px #00000066;
-    --shadow-modal: 0 24px 90px #00000080;
-    --shadow-panel: -12px 0 35px #00000066;
-  }
+  --backdrop: #0a0c0dcc;
+  --shadow-toggle: 0 1px 3px #00000059;
+  --shadow-sheet: 0 8px 24px #00000066;
+  --shadow-modal: 0 24px 90px #00000080;
+  --shadow-panel: -12px 0 35px #00000066;
 }
+
 .terminal-panel {
   height: 100%;
   min-height: 0;
@@ -2335,4 +2339,51 @@ footer > span {
   background: var(--surface-sunken);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Appearance choice: the sidebar's own control, so it sits with the workspace
+   rather than inside a conversation setting. */
+.appearance {
+  margin-left: auto;
+  padding: 5px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--nav-muted);
+  border-radius: 6px;
+}
+.appearance:hover {
+  background: var(--nav-hover);
+  border-color: var(--nav-border);
+  color: var(--nav-text);
+}
+.appearance-menu {
+  z-index: 40;
+  min-width: 210px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sheet);
+  outline: none;
+  font-size: 12px;
+}
+.appearance-menu [role='menuitemradio'] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.appearance-menu [role='menuitemradio'] > span {
+  margin-right: auto;
+}
+.appearance-menu [role='menuitemradio'] > .ui-icon:first-child {
+  color: var(--ember-ink);
+}
+.appearance-menu [role='menuitemradio'][data-highlighted] {
+  background: var(--surface-selected);
 }

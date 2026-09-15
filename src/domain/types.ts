@@ -156,6 +156,12 @@ export interface StartRun {
   newSession?: boolean;
   sources?: import('./knowledge').SourceRef[];
 }
+export interface DeviceSettings {
+  theme: 'system' | 'light' | 'dark';
+  /** Pane layouts per group, kept here because file-URL storage is not durable. */
+  layouts: Record<string, string>;
+}
+
 export interface HostAPI {
   draftRead(key: import('./drafts').DraftKey): Promise<import('./drafts').DraftRecord | null>;
   draftWrite(
@@ -265,6 +271,8 @@ export interface HostAPI {
   openExternal(scopeId: string, path: string): Promise<void>;
   /** Opens an http or https address from agent output in the user's browser. */
   openUrl(url: string): Promise<void>;
+  deviceSettings(): Promise<DeviceSettings>;
+  saveDeviceSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
   agents(): Promise<AgentInfo[]>;
   agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;
   agentConversation(

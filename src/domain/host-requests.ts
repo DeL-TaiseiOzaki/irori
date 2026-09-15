@@ -25,6 +25,13 @@ export const hostArguments = {
   checkForUpdates: z.tuple([]),
   openUpdatePage: z.tuple([z.enum(['release', 'download'])]),
   openUrl: z.tuple([externalUrl]),
+  deviceSettings: z.tuple([]),
+  saveDeviceSettings: z.tuple([
+    z.object({
+      theme: z.enum(['system', 'light', 'dark']).optional(),
+      layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
+    }),
+  ]),
   moveNote: z.tuple([noteRef, path]),
   trashNote: z.tuple([noteRef]),
   trashedNotes: z.tuple([id]),

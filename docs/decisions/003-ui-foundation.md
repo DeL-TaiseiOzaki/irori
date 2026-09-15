@@ -36,6 +36,11 @@ Keep the products' own design language and behaviour; replace the machinery unde
 5. **react-resizable-panels for layout.** The sidebar, workspace and assistant
    panes, and the terminal split, are resizable and remember the size the user
    chose. The grid variants and the narrow-window overlay are gone.
+   Corrected 2026-09-16: as first written, that memory did not work. The layout
+   went to browser storage, which a file URL does not keep between sessions, and
+   the group was given a fixed list of panel identifiers, so a layout saved for
+   the panes on screen was looked for under the name of a different set. Sizes
+   now live in the device record and the identifiers describe what is rendered.
 6. **Base UI for popup behaviour.** The assistant settings popover and the
    source-control overflow menu are Base UI `Popover` and `Menu`. Anchoring,
    outside dismissal, Escape and focus restoration are no longer hand-written. The
