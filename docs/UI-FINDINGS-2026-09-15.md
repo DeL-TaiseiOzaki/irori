@@ -5,24 +5,36 @@ Things noticed while moving the renderer onto shared primitives
 that are not part of either change. Recorded so they are decided deliberately
 rather than rediscovered.
 
-## 1. A file event restarts an in-flight diff read
+## 1. Reads discarded by a shared generation counter — partly fixed
 
-`RepositoryPanel`'s review effect depends on `[selection, revision, tab]`, and
-`main.tsx` bumps `revision` on every host `files` event. Opening a diff therefore
-starts a read, and any file event — including the burst a merge or checkout
-produces — increments `reads.current`, discards the response that is on its way
-and starts another. While that repeats, the panel keeps showing
-`差分を読み込み中…`.
+`RepositoryPanel` guards every read with one `reads` counter. The changes-view
+effect depends on `[selection, revision, tab]`, and `main.tsx` bumps `revision`
+on every host `files` event, so selecting a commit and then receiving a file
+event — the burst a commit or merge produces — incremented the counter and made
+`showCommit` discard the patch that was already on its way. The history view then
+showed `差分を読み込み中…` with nothing left to complete it. CI hit exactly this on
+[run 34949816519](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34949816519)
+at `git-ui-smoke.ts:256`, so it is not specific to the development container.
 
-This is why `git-ui-smoke` fails intermittently in the development container on a
-five second diff expectation, and passes on its own. The test is not wrong: the
-panel really has not produced the diff yet. CI has passed every run so far.
+Fixed here: a commit diff has its own `commitReads` counter, so the changes view
+can no longer invalidate it, and leaving the changes tab clears `loadingReview`
+instead of leaving a flag that also disables the conflict actions.
 
-The fix is not simply a longer timeout. A read for an unchanged target should be
-allowed to finish, with one refresh queued behind it, instead of being restarted
-per event; and a refresh should keep the current diff visible rather than
-clearing it. That deserves a reproduction test that emits a file-event burst
-during a read, so it is left as its own change.
+Still open, and deliberately not changed in the same pass:
+
+- A file event still restarts an in-flight _changes_ diff read rather than
+  letting it finish with one refresh queued behind it, and the current diff is
+  cleared while it reloads.
+- `git-ui-smoke` has a second intermittent failure around conflict resolution
+  (`未解決 0 件` after the second resolve). It reproduced once here without the
+  fixes above and has not reappeared with them, which is not enough to call it
+  explained. Note that `perform()` returns silently when another operation is
+  active, so a dropped click leaves no trace — that is the first thing to
+  instrument.
+
+A reproduction that interleaves deterministically needs a way to hold the host
+read open; `git-ui-smoke` now refreshes immediately after selecting a commit,
+which exercises the path realistically but does not guarantee the overlap.
 
 ## 2. Links in an assistant reply are inert
 

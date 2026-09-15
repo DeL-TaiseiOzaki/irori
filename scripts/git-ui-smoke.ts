@@ -253,6 +253,9 @@ try {
   expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
   await panel.getByRole('button', { name: '履歴', exact: true }).click();
   await panel.locator('.git-history-item').filter({ hasText: 'UI note update' }).click();
+  // Refreshing (or any file event) while the commit diff is in flight must not
+  // discard the patch and leave the loading text on screen.
+  await panel.getByRole('button', { name: '更新', exact: true }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('UI saved 日本語');
   await page.screenshot({ path: 'test-results/irori-git-history.png' });
   await panel.getByLabel('Git のスペース').selectOption(spaces[1].scopeId);
