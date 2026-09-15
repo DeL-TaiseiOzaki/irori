@@ -243,6 +243,17 @@ try {
   await writeFile(path.join(root, 'extra.md'), '# Extra after staging');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await expect(panel.locator('.git-file').filter({ hasText: 'extra.md' })).toHaveCount(2);
+  // A burst of file events must refresh the open diff rather than restart it:
+  // the view keeps its content and still ends on the newest bytes.
+  await panel.locator('.git-file').filter({ hasText: 'extra.md' }).last().click();
+  await expect(panel.getByLabel('差分', { exact: true })).toContainText('Extra after staging');
+  for (const line of ['burst one', 'burst two', 'burst three'])
+    await writeFile(path.join(root, 'extra.md'), `# Extra after staging\n\n${line}\n`);
+  await expect(panel.getByLabel('差分', { exact: true })).toContainText('burst three');
+  await expect(panel.getByLabel('差分', { exact: true })).not.toContainText('差分を読み込み中');
+  await writeFile(path.join(root, 'extra.md'), '# Extra after staging');
+  await expect(panel.getByLabel('差分', { exact: true })).not.toContainText('burst three');
+  await panel.getByRole('button', { name: 'ノートに戻る' }).click();
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('UI note update');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('この端末の履歴に commit');

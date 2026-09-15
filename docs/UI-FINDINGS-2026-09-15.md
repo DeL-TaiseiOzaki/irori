@@ -35,10 +35,13 @@ read still reports itself through `aria-busy`, which the panel actions and
 `git-ui-smoke` wait on — dropping that signal made the suite fail every run,
 which is how the missing status dependency was finally isolated.
 
-Verified with six `git-ui-smoke` runs and the full twelve-suite chain. One gap
-remains: a refresh still restarts an in-flight read for the same target instead
-of letting it finish with one refresh queued behind it. With the content no
-longer blanked, that is invisible to the reader.
+Verified with six `git-ui-smoke` runs and the full twelve-suite chain.
+
+Follow-up, 2026-09-16: a refresh of the file already being read no longer
+restarts that read. It waits and queues a single repeat, which re-runs the effect
+so the choice between a diff and a conflict is made from the state that exists by
+then. `git-ui-smoke` writes a burst of file events over an open diff and asserts
+the view keeps its content and ends on the newest bytes.
 
 ## 2. Links in an assistant reply are inert
 

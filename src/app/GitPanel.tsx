@@ -147,7 +147,9 @@ function RepositoryPanel({
     reads = useRef(0),
     commitReads = useRef(0),
     statusReads = useRef(0),
-    shownReview = useRef('');
+    shownReview = useRef(''),
+    reviewInFlight = useRef<{ target: string; again: boolean }>(undefined);
+  const [reviewRepeat, setReviewRepeat] = useState(0);
   const resolutionDraft = useRef<{ path: string; text: string } | undefined>(undefined);
   const messageDraft = useDraft({ scopeId: space.scopeId, kind: 'git-commit' }, space.root);
   const message = messageDraft.text;
@@ -260,11 +262,13 @@ function RepositoryPanel({
       // reports one must not survive: it also disables the conflict actions.
       reads.current++;
       shownReview.current = '';
+      reviewInFlight.current = undefined;
       setLoadingReview(false);
       return;
     }
     if (!selection) {
       shownReview.current = '';
+      reviewInFlight.current = undefined;
       setDiff(undefined);
       setConflict(undefined);
       setLoadingReview(false);
@@ -274,16 +278,24 @@ function RepositoryPanel({
     // A file event re-reads the same target. Replace what is on screen only when
     // the target itself changed; otherwise refresh it in place, so a burst of
     // events cannot leave the reader looking at the loading text.
+    // A refresh of the file already being read waits for that read instead of
+    // restarting it, and queues one repeat so the newest state still arrives.
+    if (reviewInFlight.current?.target === target) {
+      reviewInFlight.current.again = true;
+      return;
+    }
     const replacing = shownReview.current !== target;
     shownReview.current = target;
     const entry = status?.changes.find((c) => c.path === selection.path);
     if (!entry) {
       shownReview.current = '';
+      reviewInFlight.current = undefined;
       setSelection(undefined);
       return;
     }
     const conflicted = !!entry.conflict && !entry.blocked;
     const generation = ++reads.current;
+    reviewInFlight.current = { target, again: false };
     // The read is still in flight either way — callers and assistive technology
     // read that from aria-busy — but only a new target blanks what is shown.
     setLoadingReview(true);
@@ -310,9 +322,15 @@ function RepositoryPanel({
         if (generation === reads.current && alive.current) setError(String(e));
       })
       .finally(() => {
-        if (generation === reads.current && alive.current) setLoadingReview(false);
+        if (generation !== reads.current || !alive.current) return;
+        const repeat = reviewInFlight.current?.again;
+        reviewInFlight.current = undefined;
+        // The queued repeat re-runs this effect, so the branch between a diff
+        // and a conflict is decided from the state that exists by then.
+        if (repeat) setReviewRepeat((value) => value + 1);
+        else setLoadingReview(false);
       });
-  }, [selection, revision, tab]);
+  }, [selection, revision, tab, reviewRepeat]);
   async function loadHistory(append = false) {
     const page = await host.gitHistory(space.scopeId, append ? history.length : 0);
     if (alive.current) {
