@@ -43,14 +43,22 @@ so the choice between a diff and a conflict is made from the state that exists b
 then. `git-ui-smoke` writes a burst of file events over an open diff and asserts
 the view keeps its content and ends on the newest bytes.
 
-## 2. Links in an assistant reply are inert
+## 2. Links in an assistant reply — fixed
 
-`AgentMarkdown` renders a Markdown link as text with its target in the tooltip,
-because there is no validated way to open a URL: `HostAPI` exposes
-`openExternal(scopeId, path)` for files in a space and fixed help/update pages,
-not arbitrary URLs from model output. Opening one would need a host route that
-accepts `http`/`https` only, rejects everything else, and is reviewed as a
-security boundary. Until then the target is visible but not clickable.
+A reply's links open in the user's browser through a new `openUrl` host route.
+The address is validated twice: `src/domain/links.ts` is the request validator, so
+an invalid address never leaves the renderer's IPC boundary, and the host parses
+it again before calling `shell.openExternal` rather than trusting that it did.
+Only `http` and `https` with a host are accepted — `file:`, `javascript:`,
+`data:`, `mailto:` and application schemes are refused, as is anything over 2048
+characters. react-markdown already neutralises a script URL before it reaches the
+page, so a bad link fails twice over. `tests/links.test.ts` covers the validator
+and the preload allowlist entry, and `harness-ui-smoke` asserts a reply's link
+carries its real address, that a `javascript:` link does not, and that
+`openUrl` rejects one.
+
+Opening is still a deliberate act by the reader: the click is theirs, the target
+is in the tooltip, and nothing opens on its own.
 
 ## 3. The dark palette follows the operating system only
 

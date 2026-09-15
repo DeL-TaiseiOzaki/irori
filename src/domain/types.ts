@@ -263,6 +263,8 @@ export interface HostAPI {
   draft(doc: Document): Promise<void>;
   createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
   openExternal(scopeId: string, path: string): Promise<void>;
+  /** Opens an http or https address from agent output in the user's browser. */
+  openUrl(url: string): Promise<void>;
   agents(): Promise<AgentInfo[]>;
   agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;
   agentConversation(

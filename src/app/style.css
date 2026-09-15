@@ -2280,11 +2280,22 @@ footer > span {
   border-top: 1px solid var(--rule);
   margin: 10px 0;
 }
-/* Untrusted output does not navigate; the target stays readable instead. */
+/* A reply opens its links through the host, which allows only web addresses. */
 .message-link {
   color: var(--ember-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
+  cursor: pointer;
+}
+.message-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.message-link-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 11.5px;
 }
 .message-image {
   color: var(--muted);

@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Assistant links, 2026-09-16: a reply's Markdown links open in the user's browser
+through a new `openUrl` host route, and `AgentMarkdown` hands the address to it
+instead of showing dead text. The address is validated twice — the request
+validator in `src/domain/links.ts` keeps an invalid one from leaving the IPC
+boundary, and the host parses it again before `shell.openExternal` — accepting
+only `http` and `https` with a host, under 2048 characters. `file:`,
+`javascript:`, `data:`, `mailto:` and application schemes are refused, and
+react-markdown already neutralises a script URL before it reaches the page.
+Nothing opens on its own: the click is the reader's and the target is in the
+tooltip. Verification: build/typecheck/format, **136 behaviour tests (129 passed,
+seven environment-gated skips)** including the new `tests/links.test.ts`, and all
+**twelve Electron UI suites**, where `harness-ui-smoke` asserts a reply's link
+carries its real address, a `javascript:` link does not, and `openUrl` rejects
+one. No installer, website or published release changes.
+
 Source-control read fixes, 2026-09-16: `fix/git-panel-reads` repairs the dropped
 reads that [UI findings](UI-FINDINGS-2026-09-15.md) recorded. A status read
 skipped because a merge draft was unsaved never happened, so the panel could keep
