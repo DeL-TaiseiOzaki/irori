@@ -146,7 +146,8 @@ function RepositoryPanel({
     active = useRef(false),
     reads = useRef(0),
     commitReads = useRef(0),
-    statusReads = useRef(0);
+    statusReads = useRef(0),
+    shownReview = useRef('');
   const resolutionDraft = useRef<{ path: string; text: string } | undefined>(undefined);
   const messageDraft = useDraft({ scopeId: space.scopeId, kind: 'git-commit' }, space.root);
   const message = messageDraft.text;
@@ -216,9 +217,12 @@ function RepositoryPanel({
     return () => {
       cancelled = true;
     };
-  }, [space.scopeId, externalRevision]);
+  }, [space.scopeId, externalRevision, conflictDirty]);
   async function perform(fn: () => Promise<GitStatus | void>, success = '') {
-    if (active.current) return;
+    if (active.current) {
+      setNotice('別の Git 操作を実行中です。完了してから再度実行してください。');
+      return;
+    }
     active.current = true;
     statusReads.current++;
     setBusy(true);
@@ -255,39 +259,52 @@ function RepositoryPanel({
       // Leaving the changes view discards its in-flight read, so the flag that
       // reports one must not survive: it also disables the conflict actions.
       reads.current++;
+      shownReview.current = '';
       setLoadingReview(false);
       return;
     }
     if (!selection) {
+      shownReview.current = '';
       setDiff(undefined);
       setConflict(undefined);
       setLoadingReview(false);
       return;
     }
-    const generation = ++reads.current;
-    setLoadingReview(true);
-    setDiff(undefined);
-    if (!resolutionDraft.current) setConflict(undefined);
+    const target = `${selection.path}:${selection.staged}`;
+    // A file event re-reads the same target. Replace what is on screen only when
+    // the target itself changed; otherwise refresh it in place, so a burst of
+    // events cannot leave the reader looking at the loading text.
+    const replacing = shownReview.current !== target;
+    shownReview.current = target;
     const entry = status?.changes.find((c) => c.path === selection.path);
     if (!entry) {
+      shownReview.current = '';
       setSelection(undefined);
       return;
     }
-    const fetch =
-      entry.conflict && !entry.blocked
-        ? host.gitConflict(space.scopeId, selection.path).then((value) => {
-            if (generation === reads.current && alive.current) {
-              setConflict(value);
-              setResolution(
-                resolutionDraft.current?.path === value.path
-                  ? resolutionDraft.current.text
-                  : (value.working ?? ''),
-              );
-            }
-          })
-        : host.gitDiff(space.scopeId, selection.path, selection.staged).then((value) => {
-            if (generation === reads.current && alive.current) setDiff(value);
-          });
+    const conflicted = !!entry.conflict && !entry.blocked;
+    const generation = ++reads.current;
+    // The read is still in flight either way — callers and assistive technology
+    // read that from aria-busy — but only a new target blanks what is shown.
+    setLoadingReview(true);
+    if (replacing) setDiff(undefined);
+    // A resolved file must lose its conflict state even during an in-place
+    // refresh: it is what re-enables the ordinary status reads.
+    if (!resolutionDraft.current && (replacing || !conflicted)) setConflict(undefined);
+    const fetch = conflicted
+      ? host.gitConflict(space.scopeId, selection.path).then((value) => {
+          if (generation === reads.current && alive.current) {
+            setConflict(value);
+            setResolution(
+              resolutionDraft.current?.path === value.path
+                ? resolutionDraft.current.text
+                : (value.working ?? ''),
+            );
+          }
+        })
+      : host.gitDiff(space.scopeId, selection.path, selection.staged).then((value) => {
+          if (generation === reads.current && alive.current) setDiff(value);
+        });
     void fetch
       .catch((e) => {
         if (generation === reads.current && alive.current) setError(String(e));

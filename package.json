@@ -13,6 +13,7 @@
     "test:ui": "tsx scripts/ui-smoke.ts && tsx scripts/cloud-ui-smoke.ts && tsx scripts/harness-ui-smoke.ts && tsx scripts/layers-ui-smoke.ts && tsx scripts/git-ui-smoke.ts && tsx scripts/workspace-cloud-ui-smoke.ts && tsx scripts/knowledge-ui-smoke.ts && tsx scripts/ontology-ui-smoke.ts && tsx scripts/terminal-ui-smoke.ts && tsx scripts/search-ui-smoke.ts && tsx scripts/updates-ui-smoke.ts && tsx scripts/daily-workflow-ui-smoke.ts",
     "test:agents": "tsx scripts/real-agents.ts",
     "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check src scripts tests",
     "test:lifecycle": "tsx scripts/lifecycle-agents.ts",
     "setup:electron": "node node_modules/electron/install.js",
     "start:container": "node scripts/start.mjs --container",

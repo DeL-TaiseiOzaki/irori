@@ -28,6 +28,7 @@ jobs:
       - run: node scripts/prepare-rclone.mjs
       - name: Allow Chromium sandbox in the disposable runner
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run format:check
       - run: npm run build
       - run: npm test
         env:

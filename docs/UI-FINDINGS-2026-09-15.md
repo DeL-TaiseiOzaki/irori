@@ -5,36 +5,40 @@ Things noticed while moving the renderer onto shared primitives
 that are not part of either change. Recorded so they are decided deliberately
 rather than rediscovered.
 
-## 1. Reads discarded by a shared generation counter — partly fixed
+## 1. Reads dropped by shared guards — fixed
 
-`RepositoryPanel` guards every read with one `reads` counter. The changes-view
-effect depends on `[selection, revision, tab]`, and `main.tsx` bumps `revision`
-on every host `files` event, so selecting a commit and then receiving a file
-event — the burst a commit or merge produces — incremented the counter and made
-`showCommit` discard the patch that was already on its way. The history view then
-showed `差分を読み込み中…` with nothing left to complete it. CI hit exactly this on
-[run 34949816519](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34949816519)
-at `git-ui-smoke.ts:256`, so it is not specific to the development container.
+`RepositoryPanel` guarded every read with one `reads` counter and skipped its
+status read on conditions that were not dependencies, so three different reads
+could be dropped with nothing left to complete them.
 
-Fixed here: a commit diff has its own `commitReads` counter, so the changes view
-can no longer invalidate it, and leaving the changes tab clears `loadingReview`
-instead of leaving a flag that also disables the conflict actions.
+- **A commit diff discarded by the changes view.** The changes effect depends on
+  `[selection, revision, tab]` and `main.tsx` bumps `revision` on every host
+  `files` event, so the burst a commit or merge produces invalidated the patch
+  `showCommit` had already requested; the history view then kept showing
+  `差分を読み込み中…`. CI reproduced it in
+  [run 34949816519](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34949816519).
+  A commit diff now has its own `commitReads` counter.
+- **A status read skipped while a merge draft was unsaved.** That read returns
+  early when `conflictDirty` is true, but `conflictDirty` was not in its
+  dependency list, so a read skipped for that reason never happened: after the
+  draft was resolved the panel kept reporting the old unresolved count. This is
+  the intermittent `未解決 0 件` failure in `git-ui-smoke`. `conflictDirty` is now
+  a dependency, so resolving the draft runs the read that was skipped.
+- **A dropped click with no trace.** `perform()` returned silently when another
+  operation was active. The buttons are disabled from state while the guard is a
+  ref, so a click inside that window did nothing and said nothing; it now leaves
+  a notice.
 
-Still open, and deliberately not changed in the same pass:
+A file event also used to blank the diff being read. The review refreshes in
+place now: only a different file, side or view replaces what is on screen. The
+read still reports itself through `aria-busy`, which the panel actions and
+`git-ui-smoke` wait on — dropping that signal made the suite fail every run,
+which is how the missing status dependency was finally isolated.
 
-- A file event still restarts an in-flight _changes_ diff read rather than
-  letting it finish with one refresh queued behind it, and the current diff is
-  cleared while it reloads.
-- `git-ui-smoke` has a second intermittent failure around conflict resolution
-  (`未解決 0 件` after the second resolve). It reproduced once here without the
-  fixes above and has not reappeared with them, which is not enough to call it
-  explained. Note that `perform()` returns silently when another operation is
-  active, so a dropped click leaves no trace — that is the first thing to
-  instrument.
-
-A reproduction that interleaves deterministically needs a way to hold the host
-read open; `git-ui-smoke` now refreshes immediately after selecting a commit,
-which exercises the path realistically but does not guarantee the overlap.
+Verified with six `git-ui-smoke` runs and the full twelve-suite chain. One gap
+remains: a refresh still restarts an in-flight read for the same target instead
+of letting it finish with one refresh queued behind it. With the content no
+longer blanked, that is invisible to the reader.
 
 ## 2. Links in an assistant reply are inert
 
@@ -53,14 +57,14 @@ The tokens support an explicit choice — every dark rule is guarded by
 cannot keep irori light on a dark desktop. Adding it is a settings surface, not
 a palette change.
 
-## 4. Formatting is not gated
+## 4. Formatting is not gated — fixed for code
 
-`npm run build`, `npm test` and `npm run test:ui` run in CI; Prettier does not.
-On `main`, `src/editor/preservation.ts` and `tests/connections.test.ts` are not
-Prettier-clean, so `npx prettier --check src scripts tests` fails on a tree with
-no local changes. Either add a check step and format those two files, or drop the
-expectation that the whole tree is formatted. Reformatting them as a side effect
-of unrelated work is what the contributor contract asks us not to do.
+`npm run format:check` (`prettier --check src scripts tests`) runs in CI before
+the build, and the two code files that had drifted — `src/editor/preservation.ts`
+and `tests/connections.test.ts` — are formatted. The gate covers code only.
+Fifteen files in the tree are not Prettier-clean; the rest are Markdown records
+whose line breaks carry the history of past work, so `prettier --check .` is
+still expected to fail and reformatting them would be churn.
 
 ## 5. `docs/UI-DESIGN.md` predates the token system
 

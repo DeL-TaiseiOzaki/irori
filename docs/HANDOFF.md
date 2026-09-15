@@ -1,5 +1,16 @@
 # irori continuation handoff
 
+Source-control reads, 2026-09-16: the dropped-read defects in `RepositoryPanel`
+are fixed (commit diffs have their own generation, the status read depends on
+`conflictDirty`, the review refreshes in place, a click during another operation
+leaves a notice). Read [UI findings](UI-FINDINGS-2026-09-15.md) before touching
+that panel: its guards are refs and derived state, and an early return in an
+effect whose condition is not a dependency silently drops the read for good.
+`aria-busy` on the review region is load-bearing — `git-ui-smoke` waits on it.
+Open items there: a refresh still restarts an in-flight read for the same target,
+assistant links stay inert until a validated URL route exists, and the dark
+palette still follows the operating system only.
+
 Renderer libraries, 2026-09-15: `feat/ui-library-adoption` follows the UI
 foundation with Markdown assistant replies, Japanese Crepe chrome, Base UI toggle
 groups and an application error boundary; see

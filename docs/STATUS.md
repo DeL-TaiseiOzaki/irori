@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Source-control read fixes, 2026-09-16: `fix/git-panel-reads` repairs the dropped
+reads that [UI findings](UI-FINDINGS-2026-09-15.md) recorded. A status read
+skipped because a merge draft was unsaved never happened, so the panel could keep
+reporting the old unresolved count after the draft was resolved: `conflictDirty`
+is now a dependency of that read. A file event no longer blanks the diff being
+read — only a different file, side or view replaces what is shown, while
+`aria-busy` still reports the read in flight — and `perform()` leaves a notice
+instead of silently discarding a click that arrives during another operation.
+`npm run format:check` now gates `src`, `scripts` and `tests` in CI, and the two
+code files that had drifted are formatted. Verification: build/typecheck,
+format check, **132 behaviour tests (125 passed, seven environment-gated skips)**,
+the full **twelve Electron UI suites** and six consecutive `git-ui-smoke` runs,
+which previously failed intermittently on `未解決 0 件`. No installer, website or
+published release changes.
+
 Renderer library adoption, 2026-09-15: `feat/ui-library-adoption` continues the
 foundation work by using libraries the application already ships. Assistant replies
 render as Markdown (`react-markdown` with `remark-gfm`) instead of one plain span,
