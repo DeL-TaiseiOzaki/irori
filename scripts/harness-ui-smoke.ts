@@ -197,6 +197,18 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  // An assistant reply is Markdown: it reaches the conversation as structure, not
+  // as the characters the model wrote.
+  await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+  await page.getByLabel('エージェントへの指示').fill('markdown fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message-markdown li').first()).toContainText('note.md を開く');
+  await expect(page.locator('.message-markdown li').nth(1)).toContainText('見出しを追加');
+  await expect(page.locator('.message-markdown h3').first()).toHaveText('手順');
+  await expect(page.locator('.message-markdown pre code').first()).toContainText(
+    'const ok = true;',
+  );
+  await expect(page.locator('.message-markdown').first()).not.toContainText('###');
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();

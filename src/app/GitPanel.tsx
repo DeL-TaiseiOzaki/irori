@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
 import { Menu } from '@base-ui/react/menu';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { Icon } from './Icon';
 import { useDraft } from './useDraft';
 import './git-panel.css';
@@ -431,25 +433,25 @@ function RepositoryPanel({
         </p>
       )}
       <div className="git-toolbar" ref={menuHost}>
-        <div className="git-tabs" role="group" aria-label="Git の表示">
-          <button
-            aria-pressed={tab === 'changes'}
-            disabled={busy || conflictDirty || draftBlocked}
-            onClick={() => setTab('changes')}
-          >
+        {/* One pressed view at a time, with the group's own roving focus. */}
+        <ToggleGroup
+          className="git-tabs"
+          aria-label="Git の表示"
+          value={[tab]}
+          onValueChange={(next) => {
+            const selected = next[0];
+            if (!selected || selected === tab) return;
+            setTab(selected as typeof tab);
+            if (selected === 'history') void perform(() => loadHistory());
+          }}
+        >
+          <Toggle value="changes" disabled={busy || conflictDirty || draftBlocked}>
             変更 <span>{status.changes.length}</span>
-          </button>
-          <button
-            aria-pressed={tab === 'history'}
-            disabled={busy || conflictDirty || draftBlocked}
-            onClick={() => {
-              setTab('history');
-              void perform(() => loadHistory());
-            }}
-          >
+          </Toggle>
+          <Toggle value="history" disabled={busy || conflictDirty || draftBlocked}>
             履歴
-          </button>
-        </div>
+          </Toggle>
+        </ToggleGroup>
         <div className="actions">
           <button
             disabled={busy || conflictDirty || draftBlocked}

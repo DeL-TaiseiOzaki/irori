@@ -9,6 +9,10 @@ import type { SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
+import { AgentMarkdown } from './AgentMarkdown';
+import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
+import { Toggle } from '@base-ui/react/toggle';
+import { ToggleGroup } from '@base-ui/react/toggle-group';
 import {
   Group as PaneGroup,
   Panel as Pane,
@@ -733,31 +737,35 @@ function App() {
               </span>
               <Icon name="chevron" className="rotated" size={13} />
             </button>
-            <nav className="workspace-views" aria-label="ワークスペースの表示">
-              <button
-                aria-pressed={!gitOpen}
-                disabled={gitBusy}
-                onClick={() => {
+            <ToggleGroup
+              className="workspace-views"
+              aria-label="ワークスペースの表示"
+              value={[gitOpen ? 'source-control' : 'notes']}
+              onValueChange={(next) => {
+                const selected = next[0];
+                if (!selected) return;
+                if (selected === 'notes') {
                   setGitOpen(false);
                   setGitReview(false);
-                }}
-              >
-                <Icon name="folder" /> ノート
-              </button>
-              <button
-                aria-pressed={gitOpen}
-                disabled={
-                  !active || running || sending || queued.length > 0 || connecting || gitBusy
-                }
-                onClick={() => {
+                } else {
                   void save().then((saved) => {
                     if (saved) setGitOpen(true);
                   });
-                }}
+                }
+              }}
+            >
+              <Toggle value="notes" disabled={gitBusy}>
+                <Icon name="folder" /> ノート
+              </Toggle>
+              <Toggle
+                value="source-control"
+                disabled={
+                  !active || running || sending || queued.length > 0 || connecting || gitBusy
+                }
               >
                 <Icon name="branch" /> ソース管理
-              </button>
-            </nav>
+              </Toggle>
+            </ToggleGroup>
             {gitOpen && active && (
               <GitPanel
                 spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
@@ -1356,8 +1364,10 @@ function App() {
                             <summary>{event.text}</summary>
                             <pre>{event.details}</pre>
                           </details>
-                        ) : (
+                        ) : event.role === 'user' ? (
                           <span>{event.text}</span>
+                        ) : (
+                          <AgentMarkdown text={event.text} />
                         )}
                       </div>
                     ),
@@ -1718,4 +1728,24 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+// A render failure used to leave an empty window. The boundary keeps the failure
+// visible and recoverable without restarting the application.
+function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
+  return (
+    <div className="app-crash" role="alert">
+      <h1>画面の描画でエラーが発生しました</h1>
+      <p>
+        保存済みのノートには影響しません。未保存の編集は失われることがあります。再表示しても直らない場合は、アプリを再起動してください。
+      </p>
+      <pre>{String(error)}</pre>
+      <button className="primary" onClick={resetErrorBoundary}>
+        再表示
+      </button>
+    </div>
+  );
+}
+createRoot(document.getElementById('root')!).render(
+  <ErrorBoundary FallbackComponent={AppCrash}>
+    <App />
+  </ErrorBoundary>,
+);

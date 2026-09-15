@@ -1,5 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Renderer library adoption, 2026-09-15: `feat/ui-library-adoption` continues the
+foundation work by using libraries the application already ships. Assistant replies
+render as Markdown (`react-markdown` with `remark-gfm`) instead of one plain span,
+with link and image overrides so untrusted model output can neither navigate the
+application nor fetch anything. Crepe's slash menu, placeholder, link tooltip and
+code-block panel carry Japanese copy through `featureConfigs`, and the same
+configuration hands code blocks the token-driven CodeMirror theme, so code inside a
+note follows the application theme. The source-control, workspace and registration
+mode switches are Base UI toggle groups with roving focus rather than buttons
+tracking `aria-pressed` by hand, and `react-error-boundary` turns a render failure
+into a visible, retryable state instead of an empty window. See
+[ADR 004](decisions/004-ui-library-adoption.md), which also records what was
+considered and rejected (TanStack Query, virtualisation, a tree component, tooltips
+and toasts, a diff library, electron-updater). Verification: build/typecheck,
+**132 behaviour tests (125 passed, seven environment-gated skips)** and all
+**twelve Electron UI suites** under Xvfb, including new `harness-ui-smoke`
+assertions that a Markdown reply arrives as structure. `git-ui-smoke` is
+timing-sensitive in the development container: it failed twice on a five second
+diff expectation under load and passed alone and in quiet full chains.
+No installer, website or published release changes.
+
 UI foundation migration, 2026-09-15: `feat/ui-foundation` replaces the renderer's
 hand-written UI machinery with third-party primitives without changing product
 behaviour. Every colour now resolves through semantic design tokens, a designed
