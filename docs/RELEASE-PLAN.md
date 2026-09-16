@@ -1,5 +1,20 @@
 # Release readiness and remaining work
 
+Publication scope update, 2026-09-16: the owner asked for the Mac build to be
+downloadable. The authorized route is an Apple silicon testing prerelease
+alongside the existing Windows one, published together from a single CI run.
+Enabling it required a real defect fix rather than only a manifest edit: Forge
+produced Mac bundles with no code signature, which Gatekeeper rejects as damaged
+after a browser download. Packaging now ad-hoc signs the bundle, the Mac package
+job verifies both the built bundle and the copy inside the disk image, and the
+manual update check resolves the Mac installer instead of reporting Windows as
+the only distribution. See [DISTRIBUTION](DISTRIBUTION.md) and
+[PACKAGING](PACKAGING.md). Intel Mac stays disabled under D01, since nothing
+builds or tests it. This is a narrow preview exception like the Windows one; D03
+through D09 and the installed-device part of D10 remain required, and D08's
+signing row still needs a Developer ID identity and notarization, which an ad-hoc
+signature does not provide.
+
 Source continuation after `1afe3bb`, 2026-09-14: [D06 record search and navigation](KNOWLEDGE-NAVIGATION.md) now expose current source locations, explicit same-scope matching-version reconnection and version-specific artifact/run links. Portable shared identities, full-text KB search/backlinks/properties, in-app moves and real generated-artifact acceptance remain open. D04 writable capability/re-consent and exact account binding remain the next independent cloud implementation.
 
 Source continuation, 2026-09-14: [conversation recovery](CONVERSATIONS.md) adds bounded device-local display history and durable pending instructions, with explicit restart resumption and no replay of interrupted runs. Complete native-model restart acceptance and broader history management remain open. The published Windows 0.1.3 preview has not changed.

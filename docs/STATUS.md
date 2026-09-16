@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Mac packaging and update targets, 2026-09-16: the Mac package is signed, so a
+downloaded build can be opened. Forge had no `osxSign`, and `@electron/packager`
+signs only when that option is present, so every Mac package shipped with no
+bundle seal and Mach-O members still identifying themselves as `Electron`. That
+build launches in CI, where no file carries a quarantine attribute, and is
+rejected as damaged after a browser download. Packaging now signs ad-hoc, with
+`continueOnError` off so a signing failure fails the build. The signing library
+applies hardened runtime and Electron's entitlements by default and ignores a
+top-level override, so that state is asserted instead of configured.
+`test:package` verifies both the built bundle and the copy inside the disk
+image — seal, deep strict verification, bundle identifier, an ad-hoc signature
+and the hardened runtime flag — and records Gatekeeper's own verdict rather than
+asserting it, because unnotarized code is rejected by design. The manual
+update check no longer treats Windows x64 as the only distribution: it resolves
+one published installer name per target, so an Apple silicon Mac finds the disk
+image and every other target still reports that nothing is published for it.
+Verification: [CI 35062273261](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35062273261)
+passes verification and all three package jobs for `6007508`. This is packaging
+and delivery work; no installed-Mac acceptance is implied.
+
 Appearance and device preferences, 2026-09-16: the sidebar carries a theme menu
 (system, light, dark) and the choice is kept in a new device record,
 `device-settings.json`, alongside pane sizes. Two faults behind that work are
