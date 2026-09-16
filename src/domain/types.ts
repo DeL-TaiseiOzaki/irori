@@ -155,6 +155,8 @@ export interface StartRun {
   notePath?: string;
   newSession?: boolean;
   sources?: import('./knowledge').SourceRef[];
+  /** Name of a skill package this KB declares, prepended to the request. */
+  skill?: string;
 }
 export interface DeviceSettings {
   theme: 'system' | 'light' | 'dark';
@@ -263,6 +265,8 @@ export interface HostAPI {
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
+  /** Skill packages this KB declares in `.agents/skills/`. */
+  skills(scopeId: string): Promise<import('./skills').SkillListing>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
   readImage(scopeId: string, note: string, url: string): Promise<string>;
   save(doc: Document): Promise<Document>;

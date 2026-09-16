@@ -1689,6 +1689,12 @@ footer > span {
   justify-content: space-between;
   gap: 8px;
 }
+.composer-selects {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
 .composer-actions select {
   min-width: 0;
   max-width: 140px;

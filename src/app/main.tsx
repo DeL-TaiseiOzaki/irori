@@ -6,6 +6,7 @@ import { UpdateNotice } from './UpdateNotice';
 import { NoteActions, TrashNotes } from './NoteActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { SourceRef } from '../domain/knowledge';
+import type { AgentSkill, SkillProblem } from '../domain/skills';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
@@ -230,6 +231,9 @@ function App() {
   const [searchTarget, setSearchTarget] = useState<SearchTarget>();
   const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
+  const [skills, setSkills] = useState<AgentSkill[]>([]);
+  const [skillProblems, setSkillProblems] = useState<SkillProblem[]>([]);
+  const [skill, setSkill] = useState('');
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
@@ -306,6 +310,35 @@ function App() {
       current = false;
     };
   }, [active?.scopeId, agent, historyReload]);
+  // Skills are files in the KB, so an agent can add one mid-session. Reread when
+  // the space changes and when a run settles, rather than caching for the session.
+  useEffect(() => {
+    if (!active) {
+      setSkills([]);
+      setSkillProblems([]);
+      return;
+    }
+    let current = true;
+    void host
+      .skills(active.scopeId)
+      .then((listing) => {
+        if (!current) return;
+        setSkills(listing.skills);
+        setSkillProblems(listing.problems);
+      })
+      .catch((error) => {
+        if (!current) return;
+        setSkills([]);
+        setSkillProblems([{ directory: '.agents/skills', message: String(error) }]);
+      });
+    return () => {
+      current = false;
+    };
+  }, [active?.scopeId, running]);
+  // A skill that disappeared, or a space that does not declare it, must not be sent.
+  useEffect(() => {
+    if (skill && !skills.some((s) => s.name === skill)) setSkill('');
+  }, [skill, skills]);
   const conversation = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
   useEffect(() => {
@@ -528,6 +561,7 @@ function App() {
       notePath,
       newSession,
       sources: selectedSources,
+      skill: skill || undefined,
     });
   }
   async function start() {
@@ -557,6 +591,7 @@ function App() {
             prompt: message,
             notePath,
             sources,
+            skill: skill || undefined,
           }),
         );
       } else {
@@ -1502,24 +1537,50 @@ function App() {
                             : ''}
                     </small>
                   )}
+                  {skillProblems.length > 0 && (
+                    <small className="muted" role="status">
+                      読み込めないスキル: {skillProblems.map((p) => p.directory).join('、')}
+                    </small>
+                  )}
                   <div className="composer-actions">
-                    <select
-                      aria-label="エージェント"
-                      value={agent}
-                      disabled={running || sending || queued.length > 0 || gitBusy}
-                      onChange={(e) => {
-                        const next = e.target.value as AgentId;
-                        void composer.flush().then((saved) => {
-                          if (saved) setAgent(next);
-                        });
-                      }}
-                    >
-                      {agentIds.map((id) => (
-                        <option key={id} value={id}>
-                          {agentNames[id]}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="composer-selects">
+                      {skills.length > 0 && (
+                        <select
+                          aria-label="スキル"
+                          className="composer-skill"
+                          value={skill}
+                          title={
+                            skills.find((s) => s.name === skill)?.description ?? 'スキルを使わない'
+                          }
+                          disabled={sending || gitBusy}
+                          onChange={(e) => setSkill(e.target.value)}
+                        >
+                          <option value="">スキルなし</option>
+                          {skills.map((s) => (
+                            <option key={s.name} value={s.name} title={s.description}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <select
+                        aria-label="エージェント"
+                        value={agent}
+                        disabled={running || sending || queued.length > 0 || gitBusy}
+                        onChange={(e) => {
+                          const next = e.target.value as AgentId;
+                          void composer.flush().then((saved) => {
+                            if (saved) setAgent(next);
+                          });
+                        }}
+                      >
+                        {agentIds.map((id) => (
+                          <option key={id} value={id}>
+                            {agentNames[id]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="actions">
                       {running && (
                         <button

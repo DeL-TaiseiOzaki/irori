@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+KB-declared skills, 2026-09-16: a knowledge base can carry its own procedures in
+`.agents/skills/<name>/SKILL.md`, and the composer offers them beside the agent
+selector. Choosing one prepends its instructions to the request, naming the
+schema-layer path they came from and leaving the user's words last, so the same
+skill reaches whichever of the four harnesses is selected rather than being
+duplicated into one directory per CLI. A package that cannot be read is named
+under the composer instead of disappearing; a package must resolve inside its own
+KB's schema layer and must not be an alias; a run naming a skill the space does
+not declare fails rather than running without it. irori never writes into that
+directory. Verification: production build, **147 behaviour tests (143 passed,
+four opt-in native controls skipped)** including the new `tests/skills.test.ts`
+and a Pi protocol fixture asserting delivery ahead of the request, and all
+**thirteen Electron UI suites**, where the new `scripts/skills-ui-smoke.ts`
+drives the picker, the unreadable-package notice and space isolation. See
+[SKILLS](SKILLS.md). No installer, website or published release changes, and no
+model inference. This is the irori half of `irori-templete` ADR 001 D9; nothing
+about a user's KB content is assumed beyond that directory.
+
 Two published targets, 2026-09-16: the website manifest describes Windows x64
 and macOS arm64 only. The `macos-x64` field is removed from the schema, the
 manifest, the page and the grid rather than held open at `null`, because Intel

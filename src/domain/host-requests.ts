@@ -112,6 +112,7 @@ export const hostArguments = {
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
+  skills: z.tuple([id]),
   saveImage: z.tuple([
     id,
     path,

@@ -21,6 +21,7 @@ import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
+import { readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
 import type { HostEvent, Space } from '../domain/types';
@@ -311,6 +312,7 @@ app
       },
       cloudSetup: () => cloud.setup(),
       ontology: (id) => readOntology(files, id),
+      skills: (id) => readSkills(files, id),
       workspaceCloud: (id) => cloud.workspaceRoot(id),
       cloudEntries: (...args) => cloud.entries(...args),
       cloudRead: (...args) => cloud.read(...args),

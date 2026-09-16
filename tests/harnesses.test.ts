@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
 import { SessionStore, sessionKey } from '../src/agents/sessions';
-import type { AgentEvent, AgentId } from '../src/domain/types';
+import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 
 const fixtureOptions = {
   skip: process.platform === 'win32' && 'POSIX executable fixture',
@@ -40,7 +40,12 @@ async function setup(t: any) {
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-  const execute = async (agent: AgentId, prompt: string, cancel = false) => {
+  const execute = async (
+    agent: AgentId,
+    prompt: string,
+    cancel = false,
+    extra: Partial<StartRun> = {},
+  ) => {
     const events: AgentEvent[] = [];
     let end!: () => void;
     const done = new Promise<void>((resolve) => {
@@ -58,7 +63,7 @@ async function setup(t: any) {
       if (event.type === 'done') end();
     });
     t.after(() => service.cancel());
-    service.start({ scopeId: space.scopeId, agent, prompt });
+    service.start({ scopeId: space.scopeId, agent, prompt, ...extra });
     if (cancel && agent === 'opencode') {
       for (
         let n = 0;
@@ -195,5 +200,35 @@ test(
     await damaged.cancel();
     assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
     assert.equal(await readFile(filename, 'utf8'), '{broken');
+  },
+);
+
+test(
+  'A chosen skill reaches the harness ahead of the request, and an undeclared one stops the run',
+  fixtureOptions,
+  async (t) => {
+    const { root, calls, execute } = await setup(t);
+    await mkdir(path.join(root, '.agents', 'skills', 'distill'), { recursive: true });
+    await writeFile(
+      path.join(root, '.agents', 'skills', 'distill', 'SKILL.md'),
+      '---\nname: distill\ndescription: Files yesterday.\n---\n\nOnly ever append.\n',
+    );
+
+    const run = await execute('pi', 'sort out yesterday', false, { skill: 'distill' });
+    assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+    assert.ok(
+      run.events.some((e) => e.type === 'status' && e.text.includes('distill')),
+      'the conversation records which skill ran',
+    );
+    const sent = (await calls()).find((call: any) => call.type === 'prompt').message as string;
+    assert.ok(sent.includes('Only ever append.'), 'the instructions are delivered');
+    assert.ok(
+      sent.indexOf('Only ever append.') < sent.indexOf('sort out yesterday'),
+      'the request stays last',
+    );
+
+    const refused = await execute('pi', 'sort out yesterday', false, { skill: 'promote' });
+    assert.equal(refused.events.at(-1)?.outcome, 'failed');
+    assert.ok(refused.events.some((e) => e.type === 'error' && e.text.includes('promote')));
   },
 );
