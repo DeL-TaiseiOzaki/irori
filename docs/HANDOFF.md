@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+Resume here, 2026-09-16: the Mac download is public at
+[v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3),
+and nobody has yet confirmed it starts on a Mac. Ask the owner for that result
+before treating Mac delivery as finished, and before starting notarization or
+any further Mac work. The first published Mac build was verified, hashed and
+deployed, and still could not launch; see [CHECKPOINT](CHECKPOINT.md) for what
+that cost and why CI missed it. Intel Mac is out of scope and its mechanism is
+removed, not disabled.
+
 Mac delivery, 2026-09-16: the Mac download is enabled. Read
 [PACKAGING](PACKAGING.md) before touching `forge.config.cjs`: the Mac bundle must
 stay signed, and `osxSign.continueOnError` must stay `false`, or Forge will

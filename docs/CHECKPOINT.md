@@ -1,4 +1,135 @@
-# Checkpoint — Apple silicon Mac 0.1.5 delivery
+# Checkpoint — Mac 0.1.5 delivery
+
+Session of 2026-09-16. The owner asked for the Mac build to be downloadable, and
+later asked for Intel Mac to be removed as a target. Both are done and public.
+**What is not yet known is whether the published build starts on the owner's
+machine.** That single answer is the next thing this work needs.
+
+## What the owner has to do next
+
+Install
+[v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3)
+on the MacBook M5 Pro, after deleting any earlier `/Applications/irori.app`
+— an earlier copy may have been re-signed by hand during diagnosis — and report
+whether it opens, then the displayed version, Japanese input, native CLI
+accounts and Git operations. Two answers are outstanding from the previous
+attempt: whether `codesign --force --deep --sign - /Applications/irori.app` made
+the broken build start, which would independently confirm the diagnosis, and the
+exact wording of the first-launch dialog on macOS 26.7, which the page currently
+describes rather than quotes.
+
+## The delivery, and the build that did not run
+
+The section below this one recorded `v0.1.5-preview.2` as a completed delivery.
+That was wrong, and the correction is the useful part of this checkpoint. The
+package was signed, verified, published, downloaded and hash-checked, and it
+could not start on the machine it was published for. From the owner's device,
+macOS 26.7 arm64:
+
+```
+dyld: Library not loaded: @rpath/Electron Framework.framework/Electron Framework
+  Reason: ... code signature ... not valid for use in process:
+  mapping process and mapped file (non-platform) have different Team IDs
+```
+
+That is library validation, which the hardened runtime enforces. It requires
+every library a process loads to carry the main executable's Team ID, and an
+ad-hoc signature has none, so macOS refused to let irori load its own framework.
+
+Two failures of verification let that reach a download.
+
+1. **The runner did not match the target.** The Mac package job ran on
+   `macos-15` while [ADR 002](decisions/002-release-and-workspace.md) names a
+   macOS 26 acceptance device. That job launched the package and drove node-pty
+   and bundled rclone — on an operating system that does not enforce this. A
+   package job is evidence about the operating system it ran on; an older runner
+   is not verification of the published target.
+2. **An assertion locked in the broken state.** After finding that
+   `osxSign.hardenedRuntime: false` never reaches codesign, the flag's presence
+   was asserted rather than questioned, reasoning that it must be harmless
+   because the runner launched the build. That inverted the check: it would have
+   failed the fix and passed the crash.
+
+[PR #23](https://github.com/DeL-TaiseiOzaki/irori/pull/23) disables the hardened
+runtime through the `optionsForFile` callback, asserts the flag absent, and
+moves the Mac package job to `macos-26`.
+
+## Published
+
+| tag | asset | bytes | SHA-256 |
+| --- | --- | --- | --- |
+| [v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3) | `irori-0.1.5-macos-arm64.dmg` | 283,865,020 | `8fe20a9fe5eac6ca644bf7c0d366da1ee9c20c62a9c47df51b64fd39a9ab2fc0` |
+| [v0.1.5-preview.2](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2) | `irori-0.1.5-windows-x64-Setup.exe` | 322,282,496 | `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea` |
+
+The Mac image comes from
+[CI 35068768535](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35068768535)
+for application source `7e45b2aeb9e815720250d83e92d1d943f246925f`, published
+unchanged except for its download filename. Its digest is identical in four
+places: the `package-smoke.json` that run recorded while testing the package, the
+local copy taken from the artifact, GitHub's uploaded-asset digest, and an
+anonymous `https` download of all 283,865,020 bytes, which also matches the
+release's `SHA256SUMS.txt`.
+
+Only the Mac installer was republished. The Windows installer is the same
+application code and stays at `v0.1.5-preview.2`; rebuilding it would give
+Windows readers different bytes to re-verify for nothing. The manifest therefore
+points its two slots at two tags, and the release-evidence link follows the newer
+notes, which say so.
+
+On macOS 26, the package job recorded the same result for the built bundle and
+for the copy inside the disk image: identifier `io.github.deltaiseiozaki.irori`,
+an ad-hoc signature, **no hardened runtime flag**, `valid on disk`, `satisfies
+its Designated Requirement`, and `spctl: rejected`. The last line is the expected
+verdict for unnotarized code and is recorded rather than asserted, because it
+describes what a reader meets: an unverified-developer refusal that System
+Settings clears once. That step is documented on the page, in the release notes
+and in both READMEs.
+
+Website commit `377877eb0c9d85211e9ba06832d5809412a2a4ae` is deployed by
+[Pages 35076994342](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35076994342)
+at `2026-09-16T09:01:55Z`. A fresh browser loaded the public page and observed
+`v0.1.5 開発プレビュー`, both downloads linked at their published sizes, the
+first-launch text, release evidence pointing at `v0.1.5-preview.3`, and no page
+errors or failed requests.
+
+## Intel Mac removed
+
+The owner decided irori will not target Intel Macs, so
+[PR #25](https://github.com/DeL-TaiseiOzaki/irori/pull/25) removes the mechanism
+rather than leaving a disabled card: the `macos-x64` field is gone from the
+manifest schema, the key from the manifest, the card from the page, and the
+third column from the grid. The browser fixtures still exercise a partially
+released manifest, now with Windows published and the Mac download unavailable.
+The page and both READMEs say Intel Macs are not supported instead of calling
+them unpublished. ADR 002 records the decision and supersedes its own earlier
+line, which had treated an Intel download as awaiting acceptance evidence.
+
+## Releases no longer pass through a workstation
+
+`.github/workflows/release.yml` is manually dispatched and takes a run id, a tag
+and which installers to publish. It refuses a run that did not complete
+successfully, a commit that is not an ancestor of `main`, a tag that is
+malformed or already exists, and missing release notes; it publishes only the
+installer each package job recorded, matching size and digest before and after
+renaming. Write access is scoped to that one job, and `app.yml` stays read-only.
+It has not been exercised yet — every release so far was assembled by hand, which
+is what prompted it — so its first real use needs watching.
+
+## Still open
+
+Installed-Mac acceptance is the blocker described above. Developer ID signing and
+notarization remain separate work and will require turning the hardened runtime
+back on, which needs its own device verification rather than a CI result. Google
+connections remain read-only, and no real mount has been observed on a Mac. The
+remaining release gates in [RELEASE-PLAN](RELEASE-PLAN.md) are unchanged. User KB
+and device data were not touched.
+
+## Checkpoint — Apple silicon Mac 0.1.5 delivery (superseded)
+
+The record below described `v0.1.5-preview.2` as a completed delivery. Its
+evidence about signing, publication and the deployed page is accurate; its
+conclusion is not. That build does not start on macOS 26, for the reason given
+above. Retained as the history of how the first Mac download was produced.
 
 Completed public delivery, 2026-09-16: the owner asked for the Mac build to be
 downloadable. It was not a manifest edit. Every Mac package Forge had produced
