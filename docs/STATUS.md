@@ -275,7 +275,7 @@ Latest audit: workspace edit/removal, offline scope retention, attachment rename
 ## Implemented and exercised
 
 - Actual Electron window with Japanese UI, native KB folder chooser, explicit personal/team/organization registration and lazy explorer.
-- LayeredKB reference layout: schema across the top, personal/team Knowledge Base panes in the middle and personal/team contents panes below. Repository ownership stays explicit; independent scroll/collapse and per-scope note/cloud actions are implemented. See [LAYERED-EXPLORER](LAYERED-EXPLORER.md) for the four-space renderer regression.
+- irori-extention reference layout: schema across the top, personal/team Knowledge Base panes in the middle and personal/team contents panes below. Repository ownership stays explicit; independent scroll/collapse and per-scope note/cloud actions are implemented. See [LAYERED-EXPLORER](LAYERED-EXPLORER.md) for the four-space renderer regression.
 - Portable UUID scope declarations in the KB, absolute path bindings in device data, contents override, nested scope ownership, alias rejection in both registration orders, and reference-derived regression scenarios.
 - Milkdown Crepe rich editor plus CodeMirror source mode, note creation, save, external invalidation, recovery drafts, conflict versions and explicit manual reconciliation. Save/source switching/shutdown use a current editor snapshot rather than only the delayed rich-editor change callback.
 - Both **Codex and Claude Code selectable in the ordinary AI panel**, actual locally installed processes in the selected fixture KB, native account authentication left intact, streamed output and tool events, allow/deny requests and cancellation.

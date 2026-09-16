@@ -144,7 +144,7 @@ After the release candidate passes, the final external steps are: publish the ve
 | R08 ontology, notes and artifacts                  | D06                                                                                |
 | R09 versioned many-to-many lineage                 | D06, D04–D05 recovery gates                                                        |
 | R10 arbitrary formats and handling boundaries      | D03, D06–D07                                                                       |
-| R11 LayeredKB ownership/reference discipline       | D03–D07, D09–D10                                                                   |
+| R11 irori-extention ownership/reference discipline       | D03–D07, D09–D10                                                                   |
 | R12 practical reuse                                | Completed audit supplies the foundation; D02 uses established distribution tooling |
 
 The original planning pass performed no deployment or feature implementation. The follow-up adds packaging/CI and download-state tests; [PACKAGING](PACKAGING.md) records its evidence and remaining gates. No release or Pages deployment is included.

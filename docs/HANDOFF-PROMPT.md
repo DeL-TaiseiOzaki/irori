@@ -6,7 +6,7 @@ Updated after the local KB text-search continuation on 2026-09-14. Give this fil
 
 Take over **irori** development from the local text-search, source-navigation and conversation-recovery checkpoints. Continue implementation and verification of the remaining product requirements. Choose a bounded next implementation with executable acceptance checks; make independent progress while waiting for device/account evidence.
 
-Work in the independent `irori/` repository inside the `KB_design/` workspace. If this file is the only entry point available, the repository root is its parent directory's parent. `KB_design/` itself is not a Git repository. LayeredKB brings irori capabilities to VS Code; `irori-templete` is the intended recommended main-KB repository template. Their histories and contracts remain independent.
+Work in the independent `irori/` repository inside the `KB_design/` workspace. If this file is the only entry point available, the repository root is its parent directory's parent. `KB_design/` itself is not a Git repository. irori-extention brings irori capabilities to VS Code; `irori-templete` is the intended recommended main-KB repository template. Their histories and contracts remain independent.
 
 Respond to the user in Japanese. Write code, identifiers, technical documents and commit messages in English. The user prefers simple code and established libraries. Every new feature must start on a dedicated branch and be submitted through a PR to `main`. Development, verification, feature-branch commit/push and PR creation are authorized; do not ask again for routine work already covered by that authorization. Leave the PR open unless merging is authorized. New user directions override this historical handoff.
 
@@ -52,7 +52,7 @@ Start with actual status/diffs and state the next bounded change and its checks.
 - The owner already supplied distributor Google configuration through repository secrets `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET`. Do not request initial registration again, retrieve their values or copy them into chat/evidence. Current OAuth requests and mounts are still read-only; actual consent/refresh, WinFsp mounts and writable access remain unaccepted.
 - Use disposable KBs for mutation tests. Preserve `.local/vm-preview/samples` and `.local/vm-preview/device`; they are user data. The existing VM preview may still run older code. Do not reset/delete its data or assume it automatically uses new builds.
 - Keep credentials, private notes, provider transcripts and device paths out of tracked evidence. Ignored build/test/download artifacts are not release sources of truth; publish only verified artifacts for the intended source commit.
-- Shared agent configuration and skills now live directly under KB_design, outside irori's Git history. Sibling repositories retain their own contributor contracts and product documents. Preserve the existing shared-configuration migration changes and LayeredKB's untracked `images/image2.png`; they are separate from this application continuation.
+- Shared agent configuration and skills now live directly under KB_design, outside irori's Git history. Sibling repositories retain their own contributor contracts and product documents. Preserve the existing shared-configuration migration changes and irori-extention's untracked `images/image2.png`; they are separate from this application continuation.
 
 ## Commands and completion checks
 

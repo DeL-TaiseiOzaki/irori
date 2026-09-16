@@ -19,11 +19,11 @@ This preview depends on installed npm packages; exact versions and integrity has
 | Node.js development runtime | node_modules/node/node_modules/node-bin-setup and platform binary distribution notices; development dependency, not an independently chosen irori binary-redistribution license |
 | TypeScript, Vite, esbuild, tsx, Playwright and types | Development dependencies; preserve each upstream license when distributing relevant files |
 
-No Claudian runtime source or code from claudian-orchestra-template was copied. Their role was reference/design evidence. LayeredKB's older default layer engine was not imported because it encodes the superseded four-layer/path-derived identity model. Its scope/contents regression scenarios were adapted into tests/layeredkb.test.ts, credited below; the new domain implementation follows the current design invariants.
+No Claudian runtime source or code from claudian-orchestra-template was copied. Their role was reference/design evidence. irori-extention's older default layer engine was not imported because it encodes the superseded four-layer/path-derived identity model. Its scope/contents regression scenarios were adapted into tests/irori-extention.test.ts, credited below; the new domain implementation follows the current design invariants.
 
-LayeredKB reference: revision `2a2e7e04ee2d393584682669303457211ff7711c`, `src/test/unit/scopes.test.ts`, `src/scopes.ts`, `src/layers.ts` and `.claude/docs/DESIGN.md`. Template reference: `fa74f2a14665459b63ed98566b5f833627d728be`. Both were unchanged at inspection.
+irori-extention reference: revision `2a2e7e04ee2d393584682669303457211ff7711c`, `src/test/unit/scopes.test.ts`, `src/scopes.ts`, `src/layers.ts` and `.claude/docs/DESIGN.md`. Template reference: `fa74f2a14665459b63ed98566b5f833627d728be`. Both were unchanged at inspection.
 
-## LayeredKB MIT notice (adapted test scenarios)
+## irori-extention MIT notice (adapted test scenarios)
 
 MIT License
 
