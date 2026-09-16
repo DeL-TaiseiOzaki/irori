@@ -2,11 +2,11 @@ import path from 'node:path';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
-import type { DeviceSettings } from '../domain/types';
+import { markdownFonts, type DeviceSettings } from '../domain/types';
 
 const settings = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
-  markdownFont: z.enum(['sans', 'serif', 'mono']).default('sans'),
+  markdownFont: z.enum(markdownFonts).default('sans'),
   // The pane library owns this format; it is stored as written and bounded.
   layouts: z.record(z.string().max(64), z.string().max(4096)).default({}),
 });

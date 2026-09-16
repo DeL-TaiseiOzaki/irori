@@ -5,6 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { SettingsService } from '../src/host/settings';
 import { hostArguments } from '../src/domain/host-requests';
+import { markdownFonts } from '../src/domain/types';
 
 async function service() {
   const dir = await mkdtemp(path.join(tmpdir(), 'irori settings '));
@@ -23,10 +24,10 @@ test('a device without a record starts with the default appearance and no layout
 test('a choice is written down and read back after a restart', async () => {
   const { dir, settings } = await service();
   await settings.save({ theme: 'dark' });
-  await settings.save({ markdownFont: 'serif' });
+  await settings.save({ markdownFont: 'textbook' });
   assert.deepEqual(await new SettingsService(dir).read(), {
     theme: 'dark',
-    markdownFont: 'serif',
+    markdownFont: 'textbook',
     layouts: {},
   });
   // The renderer is loaded from a file URL, so this file is the only durable copy.
@@ -63,7 +64,8 @@ test('a damaged or hostile record becomes the defaults rather than an error', as
 test('the request validator bounds what a renderer may store', () => {
   const save = hostArguments.saveDeviceSettings;
   assert.equal(save.safeParse([{ theme: 'dark' }]).success, true);
-  assert.equal(save.safeParse([{ markdownFont: 'serif' }]).success, true);
+  for (const markdownFont of markdownFonts)
+    assert.equal(save.safeParse([{ markdownFont }]).success, true);
   assert.equal(save.safeParse([{ layouts: { workspace: '{"explorer":30}' } }]).success, true);
   assert.equal(save.safeParse([{ theme: 'neon' }]).success, false);
   assert.equal(save.safeParse([{ markdownFont: 'comic' }]).success, false);

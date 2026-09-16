@@ -7,7 +7,7 @@ import {
   currentMarkdownFont,
   currentTheme,
 } from './device-settings';
-import type { DeviceSettings } from '../domain/types';
+import { markdownFonts, type DeviceSettings } from '../domain/types';
 
 type ThemeChoice = DeviceSettings['theme'];
 type MarkdownFontChoice = DeviceSettings['markdownFont'];
@@ -19,8 +19,11 @@ const labels: Record<ThemeChoice, string> = {
 };
 
 const fontLabels: Record<MarkdownFontChoice, string> = {
+  system: 'システム',
   sans: 'ゴシック',
+  rounded: '丸ゴシック',
   serif: '明朝',
+  textbook: '教科書体',
   mono: '等幅',
 };
 
@@ -77,7 +80,7 @@ export function Appearance({ onError }: { onError: (error: unknown) => void }) {
               }}
             >
               <Menu.GroupLabel className="appearance-menu-label">Markdown フォント</Menu.GroupLabel>
-              {(['sans', 'serif', 'mono'] as const).map((value) => (
+              {markdownFonts.map((value) => (
                 <Menu.RadioItem
                   key={value}
                   value={value}
