@@ -44,7 +44,9 @@ for (const platform of platforms) {
     button.type = 'button';
     button.className = 'button';
     button.disabled = true;
-    button.textContent = '配布準備中';
+    // A slot is empty because nothing is published for it, which is not a promise
+    // that something is on its way.
+    button.textContent = '未公開';
     card.append(button);
   }
   container.append(card);

@@ -1,4 +1,69 @@
-# Checkpoint — Windows 0.1.5 delivery
+# Checkpoint — Apple silicon Mac 0.1.5 delivery
+
+Completed public delivery, 2026-09-16: the owner asked for the Mac build to be
+downloadable. It was not a manifest edit. Every Mac package Forge had produced
+carried no bundle signature at all — zero `_CodeSignature` entries, with Mach-O
+members still identifying themselves as `Electron` — which Gatekeeper rejects as
+a damaged application once a browser download attaches the quarantine attribute.
+Publishing that file would have handed the owner something that cannot be opened
+and offers no way to continue.
+
+Three merged changes precede the release. [PR #18](https://github.com/DeL-TaiseiOzaki/irori/pull/18)
+ad-hoc signs the bundle during packaging, forces `continueOnError` off so a
+signing failure fails the build, and verifies the signature of both the built
+bundle and the copy inside the disk image. [PR #19](https://github.com/DeL-TaiseiOzaki/irori/pull/19)
+replaces the update check's hardcoded Windows x64 target with one published
+installer name per target. [PR #20](https://github.com/DeL-TaiseiOzaki/irori/pull/20)
+removes a `hardenedRuntime: false` setting that never reached codesign — the
+signing library takes per-file options only from an `optionsForFile` callback —
+and asserts the flag the published binary actually carries.
+
+[Native CI 35063963103](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35063963103)
+passed verification and all three package platforms for application source
+`f20b6839107e149ed49d4ffdc125cbbeaec144dc`. [Release v0.1.5-preview.2](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2)
+publishes that run's artifacts without rebuilding or modifying them; only their
+download filenames changed.
+
+The Mac disk image is **285,660,156 bytes (272.4 MiB)** with SHA-256
+`8a674433b44299714ac191758a733f42a7afcfcc362cdf051fa893b0b9b24136`. The Windows installer is **322,282,496 bytes (307.4 MiB)** with
+SHA-256 `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea`. Each digest is identical in four places: the
+`package-smoke.json` CI recorded while testing the relocated package, the local
+copy taken from the CI artifact, GitHub's own uploaded-asset digest, and an
+anonymous `https` download of all 285,660,156 bytes at `2026-09-16T06:43Z`
+(HTTP 200), which also matches the release's `SHA256SUMS.txt`. Only the two
+installers, their checksum file and the two package evidence files are attached.
+
+The Mac package job recorded the same result for the built bundle and for the
+bundle inside the disk image: identifier `io.github.deltaiseiozaki.irori`, an
+ad-hoc signature, the hardened runtime flag, `valid on disk`, `satisfies its
+Designated Requirement`, and `spctl: rejected`. That last line is the expected
+verdict for unnotarized code and is recorded rather than asserted, because it
+describes exactly what a reader meets: an unverified-developer refusal that
+System Settings can clear once. The page, the release notes and both READMEs
+document that step.
+
+Website metadata moved to `v0.1.5-preview.2` in [PR #21](https://github.com/DeL-TaiseiOzaki/irori/pull/21),
+merged as `1f9eec6a4ff1d423cb0351116ca9a35e75962844`, and [Pages 35065906414](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35065906414)
+deployed exactly that revision at `2026-09-16T06:55:40Z`. A fresh browser then loaded the
+public page and observed `v0.1.5 開発プレビュー`, the Windows card linking
+`irori-0.1.5-windows-x64-Setup.exe` at `v0.1.5 · 307.4 MiB`, the Apple silicon
+card linking `irori-0.1.5-macos-arm64.dmg` at `v0.1.5 · 272.4 MiB`, the Intel
+Mac slot still disabled, the first-launch approval text, release evidence
+pointing at `v0.1.5-preview.2`, and no page errors or failed requests.
+
+Both slots point at one release so that the page, the notes and the update check
+describe the same bytes. The Windows installer is a rebuild of unchanged
+application source, so a reader already running 0.1.5 does not need to
+reinstall, and preview iterations of an installed version are not advertised as
+upgrades.
+
+No installed-Mac result is implied: installation, the approval step, Japanese
+input, native CLI accounts, Git operations and Google mounts on the MacBook M5
+Pro remain the owner's device trial. Ask for the displayed version after they
+install. Developer ID signing and notarization, Intel Mac packaging and the
+remaining release gates are unchanged. User KB and device data were not touched.
+
+## Checkpoint — Windows 0.1.5 delivery
 
 Completed public delivery, 2026-09-15: the owner authorized publishing the
 already merged daily-recovery work, whose earlier continuation had deliberately
