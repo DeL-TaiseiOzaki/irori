@@ -20,8 +20,7 @@ const run = promisify(execFile);
 // with no route for the user to continue. Verify the bundle Forge actually produced:
 // a relocated copy does not carry the extended attributes codesign writes for
 // non Mach-O members such as app.asar.
-async function verifyMacSignature() {
-  const bundle = path.join(built, 'irori.app');
+async function verifyMacBundle(bundle: string) {
   await stat(path.join(bundle, 'Contents', '_CodeSignature', 'CodeResources'));
   // codesign reports on stderr; --deep --strict also validates helpers and frameworks.
   const { stderr: verified } = await run('codesign', [
@@ -48,6 +47,33 @@ async function verifyMacSignature() {
     verified: verified.trim().split(/\r?\n/),
     assessment: assessment.trim().split(/\r?\n/),
   };
+}
+
+async function verifyMacSignature() {
+  const application = await verifyMacBundle(path.join(built, 'irori.app'));
+  // The disk image carries the bytes a reader downloads, so the copy inside it is
+  // what Gatekeeper will judge. Verify that copy too, rather than trusting that the
+  // image preserved the seal of the bundle beside it.
+  const images: string[] = [];
+  for await (const filename of glob('out/make/*.dmg', { cwd: project })) images.push(filename);
+  assert.equal(images.length, 1, 'Expected one disk image');
+  const mountPoint = await mkdtemp(path.join(tmpdir(), 'irori-image-'));
+  await run('hdiutil', [
+    'attach',
+    path.join(project, images[0]),
+    '-nobrowse',
+    '-readonly',
+    '-mountpoint',
+    mountPoint,
+  ]);
+  let image;
+  try {
+    image = await verifyMacBundle(path.join(mountPoint, 'irori.app'));
+  } finally {
+    await run('hdiutil', ['detach', mountPoint, '-force']);
+    await rm(mountPoint, { recursive: true, force: true });
+  }
+  return { diskImage: images[0], application, image };
 }
 const temporary = await mkdtemp(path.join(tmpdir(), 'irori packaged 日本語 '));
 const relocated = path.join(temporary, 'application');
