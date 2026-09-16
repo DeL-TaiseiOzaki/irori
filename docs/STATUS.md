@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Two published targets, 2026-09-16: the website manifest describes Windows x64
+and macOS arm64 only. The `macos-x64` field is removed from the schema, the
+manifest, the page and the grid rather than held open at `null`, because Intel
+Mac is out of scope by [ADR 002](decisions/002-release-and-workspace.md). Browser
+fixtures still cover a partially released manifest. Publishing a release is now a
+manually dispatched workflow that validates the named run, its commit, the tag
+and the committed notes, and republishes only the installers a package job
+recorded; it has not been exercised yet.
+
 Mac launch fix, 2026-09-16: the first published Mac build could not start on the
 acceptance device. It cleared Gatekeeper and then aborted in dyld with
 `mapping process and mapped file (non-platform) have different Team IDs` — the
