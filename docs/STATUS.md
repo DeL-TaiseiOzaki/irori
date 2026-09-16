@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Hidden entries are configuration, 2026-09-16: a top-level entry beginning with a
+dot is classified as schema rather than knowledge. A KB is often also an Obsidian
+vault, a Git checkout and another agent tool's vault — claudian creates `.claude/`
+and `.claudian/` in a vault when its plugin loads, whether or not anything is
+saved there — and naming each known agent directory left `.obsidian/`,
+`.claudian/`, `.github/` and `.gitignore` displayed in the knowledge pane as the
+user's notes. Search and note operations already skip hidden path components, so
+the classifier now agrees with the rest of the host. Declared contents roots still
+win, and an ontology declaration must still point inside the knowledge layer, so a
+CSV under a hidden directory is refused. See
+[layered explorer](LAYERED-EXPLORER.md). Verification: production build, 148
+behaviour tests (144 passed, four opt-in native controls skipped) including new
+classification cases, and all thirteen Electron UI suites.
+
 KB-declared skills, 2026-09-16: a knowledge base can carry its own procedures in
 `.agents/skills/<name>/SKILL.md`, and the composer offers them beside the agent
 selector. Choosing one prepends its instructions to the request, naming the

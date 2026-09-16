@@ -93,6 +93,10 @@ irori reads `.agents/skills/` and never creates it. It does not create `.claude/
 directory a user has not asked for. `tests/harnesses.test.ts` holds this as a
 property: the KB's schema-layer entries are identical before and after a turn.
 
+A KB that another tool also writes to is left alone rather than tidied: `.claude/`
+and `.claudian/`, which claudian creates in a vault when its plugin loads, are
+classified as schema and simply displayed there.
+
 That check covers the Pi and OpenCode adapters through real child processes. The
 Claude Code adapter is not covered, because exercising it needs an authorized
 model turn. irori answers each permission request through `canUseTool` and never

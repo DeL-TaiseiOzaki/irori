@@ -248,8 +248,11 @@ test(
         .sort()
         .join(' ');
     const before = await schema();
-    // `.gitignore` is not in the schema list, so registration leaves only `.irori` here.
-    assert.equal(before, '.irori', 'registration writes only its own scope metadata');
+    assert.equal(
+      before,
+      '.gitignore .irori',
+      'registration writes its own scope metadata and ignores contents',
+    );
     for (const agent of ['pi', 'opencode'] as const) {
       const run = await execute(agent, 'ordinary request');
       assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
