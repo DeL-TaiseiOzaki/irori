@@ -10,15 +10,15 @@
 
 **日本語** | [English](README.en.md)
 
-<a href="https://del-taiseiozaki.github.io/irori/"><img src="https://img.shields.io/badge/%E2%AC%87%20%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89-irori%20for%20Windows-c2410c?style=for-the-badge" alt="irori をダウンロード"></a>
+<a href="https://del-taiseiozaki.github.io/irori/"><img src="https://img.shields.io/badge/%E2%AC%87%20%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89-irori%20for%20Windows%20%26%20Mac-c2410c?style=for-the-badge" alt="irori をダウンロード"></a>
 
 [![Release](https://img.shields.io/github/v/release/DeL-TaiseiOzaki/irori?include_prereleases&label=release)](https://github.com/DeL-TaiseiOzaki/irori/releases)
 [![CI](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml/badge.svg)](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#ダウンロード)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#ダウンロード)
 
 [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
-[リリースノート](docs/releases/0.1.5-preview.1.md) ・
+[リリースノート](docs/releases/0.1.5-preview.2.md) ・
 [ドキュメント](#ドキュメント) ・
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -36,18 +36,20 @@
 
 | プラットフォーム | 状態 | 取得先 |
 | --- | --- | --- |
-| **Windows 11 x64** | 検証版 `0.1.5 preview`（署名なし） | [インストーラー .exe（303.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.1/irori-0.1.5-windows-x64-Setup.exe) |
-| macOS（Apple Silicon / Intel） | 配布準備中 | — |
+| **Windows 11 x64** | 検証版 `0.1.5 preview`（配布用署名なし） | [インストーラー .exe（307.4 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-windows-x64-Setup.exe) |
+| **macOS（Apple Silicon）** | 検証版 `0.1.5 preview`（配布用署名なし） | [ディスクイメージ .dmg（272.4 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-macos-arm64.dmg) |
+| macOS（Intel） | 未公開 | — |
 | Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
 
-- SHA-256 `847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491` / 318,439,424 バイト。検証記録は [リリースノート v0.1.5-preview.1](docs/releases/0.1.5-preview.1.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
-- 署名なしのため、Windows が発行元を確認できない旨の警告を表示することがあります。
-- AMD Ryzen・Intel の **x64 向け**です。Windows ARM 版ではありません。
-- Windows 11 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
+- SHA-256 — Windows `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea` / 322,282,496 バイト、macOS `8a674433b44299714ac191758a733f42a7afcfcc362cdf051fa893b0b9b24136` / 285,660,156 バイト。検証記録は [リリースノート v0.1.5-preview.2](docs/releases/0.1.5-preview.2.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- 配布用の署名がないため、Windows は発行元を確認できない旨の警告を表示します。**Mac は初回起動が拒否されます。** 「システム設定 → プライバシーとセキュリティ」で irori のブロック通知の横の「このまま開く」を一度押してください。2 回目からは通常どおり開けます。
+- Windows は AMD Ryzen・Intel の **x64 向け**で、Windows ARM 版ではありません。Mac は **Apple Silicon（M シリーズ）向け**で、Intel Mac 版はありません。
+- Windows 11 / macOS 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
+- アプリの中身は公開済みの 0.1.5 と同じです。すでに Windows 版 0.1.5 を使っている場合、入れ直す必要はありません。
 
 インストール後に必要なもの:
 
-1. [Git for Windows](https://git-scm.com/downloads/win) — ノートの履歴と共有に使います。
+1. Git — ノートの履歴と共有に使います。Windows は [Git for Windows](https://git-scm.com/downloads/win)、Mac は [Git for macOS](https://git-scm.com/downloads/mac)。
 2. 使いたい CLI（`claude` / `codex` / `opencode` / `pi`）を各サービスの手順でインストールし、ログインしておきます。AI の利用には各サービスの利用条件・料金が適用されます。ノート編集だけなら CLI の設定は不要です。
 3. ノートを置く KB フォルダ（新規フォルダ、または既存の Git チェックアウト）。
 
@@ -64,21 +66,21 @@
 2. ノートを開くか **ノートを作成**。ドキュメント表示のまま編集でき、画像はノート隣の `_assets/` に入ります。
 3. **AIに相談** でハーネスを選び、指示を送信。実行中の要求・質問はパネルに表示され、**停止** でプロセスツリーを停止します。次の指示は **送信待ちに追加** で予約でき、会話は再起動後も復元されます（再開は明示操作）。
 4. **ソース管理**（変更と履歴）で差分確認・ステージング・コミット。取得／受信／統合は明示的な確認付きで、自動 stash・hard reset・force push は行いません。
-5. **クラウド接続** で Google アカウントとフォルダを登録（読み取り専用の接続試験）。Windows でのマウントには [WinFsp](https://winfsp.dev/rel/) が必要です。
+5. **クラウド接続** で Google アカウントとフォルダを登録（読み取り専用の接続試験）。Windows でのマウントには [WinFsp](https://winfsp.dev/rel/) が必要です。Mac は macOS の NFS マウントを使うため、追加のインストールは不要です。
 6. 画面下の **ターミナル** で、その KB のフォルダからシェルを起動できます。
 
 CLI 側のルール・設定・スキル・MCP の探索は各プロバイダの責任範囲です。irori が複数チームの指示をまとめて混ぜることはありません。登録は所有境界であり、OS サンドボックスではありません。
 
 ## 現在のステータス
 
-公開中の配布物は **Windows x64 の署名なし検証版 0.1.5 preview** です。完成版リリースではありません。
+公開中の配布物は **Windows x64 と macOS arm64 の、配布用署名がない検証版 0.1.5 preview** です。完成版リリースではありません。
 
 確認待ち・未実装の主な項目:
 
 - Windows 11 / macOS 実機での受け入れ（インストール、IME、CLI 連携、GitHub 同期）
 - 実アカウントでの Google 同意・ネイティブマウント、Drive への書き込み（現在は読み取り専用）
 - OpenCode / Pi の実モデルターン受け入れ（ネイティブ制御テストは通過済み）
-- インストーラー署名、Mac 配布、規模・性能、Markdown 保存範囲の拡大、端末をまたぐ履歴共有
+- 配布用の署名（Windows 署名と Apple の Developer ID 署名・notarization）、規模・性能、Markdown 保存範囲の拡大、端末をまたぐ履歴共有
 
 判定済み・暫定・未着手の区別は [ACCEPTANCE](docs/ACCEPTANCE.md)、現在地は [STATUS](docs/STATUS.md)、配布の証跡は [CHECKPOINT](docs/CHECKPOINT.md) にあります。
 

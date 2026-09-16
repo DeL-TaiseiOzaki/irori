@@ -10,15 +10,15 @@ A desktop IDE/ADE for writing notes and continuing them with local CLI coding ag
 
 [日本語](README.md) | **English**
 
-<a href="https://del-taiseiozaki.github.io/irori/"><img src="https://img.shields.io/badge/%E2%AC%87%20Download-irori%20for%20Windows-c2410c?style=for-the-badge" alt="Download irori"></a>
+<a href="https://del-taiseiozaki.github.io/irori/"><img src="https://img.shields.io/badge/%E2%AC%87%20Download-irori%20for%20Windows%20%26%20Mac-c2410c?style=for-the-badge" alt="Download irori"></a>
 
 [![Release](https://img.shields.io/github/v/release/DeL-TaiseiOzaki/irori?include_prereleases&label=release)](https://github.com/DeL-TaiseiOzaki/irori/releases)
 [![CI](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml/badge.svg)](https://github.com/DeL-TaiseiOzaki/irori/actions/workflows/app.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#download)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#download)
 
 [Download site](https://del-taiseiozaki.github.io/irori/) ·
-[Release notes](docs/releases/0.1.5-preview.1.md) ·
+[Release notes](docs/releases/0.1.5-preview.2.md) ·
 [Documentation](#documentation) ·
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -38,18 +38,20 @@ The distribution entrance is the **[download site](https://del-taiseiozaki.githu
 
 | Platform | Status | Get it |
 | --- | --- | --- |
-| **Windows 11 x64** | Testing preview `0.1.5` (unsigned) | [Installer .exe (303.7 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.1/irori-0.1.5-windows-x64-Setup.exe) |
-| macOS (Apple Silicon / Intel) | Not published yet | — |
+| **Windows 11 x64** | Testing preview `0.1.5` (no distribution signature) | [Installer .exe (307.4 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-windows-x64-Setup.exe) |
+| **macOS (Apple Silicon)** | Testing preview `0.1.5` (no distribution signature) | [Disk image .dmg (272.4 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-macos-arm64.dmg) |
+| macOS (Intel) | Not published | — |
 | Linux | No installer planned | [Run from source](#run-from-source) |
 
-- SHA-256 `847985f585977d596fb20605caa480c1b88b4dbb98745f8a96bf34e4d9a63491`, 318,439,424 bytes. Verification evidence is in the [0.1.5-preview.1 release notes](docs/releases/0.1.5-preview.1.md) and [CHECKPOINT](docs/CHECKPOINT.md).
-- The installer is unsigned, so Windows may show its unknown-publisher warning.
-- Built for **x64** (AMD Ryzen / Intel). This is not a Windows ARM build.
-- Installation, IME and CLI integration on real Windows 11 devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
+- SHA-256 — Windows `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea`, 322,282,496 bytes; macOS `8a674433b44299714ac191758a733f42a7afcfcc362cdf051fa893b0b9b24136`, 285,660,156 bytes. Verification evidence is in the [0.1.5-preview.2 release notes](docs/releases/0.1.5-preview.2.md) and [CHECKPOINT](docs/CHECKPOINT.md).
+- Neither build carries a distribution signature. Windows shows its unknown-publisher warning. **A Mac refuses the first launch**: open System Settings, Privacy & Security, and press the button beside irori's blocked notice once. Later launches behave normally.
+- Windows is built for **x64** (AMD Ryzen / Intel); this is not a Windows ARM build. The Mac build is **Apple Silicon (M series)**; Intel Macs are not published.
+- Installation, IME and CLI integration on real Windows 11 and macOS devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
+- The application is the same 0.1.5 already published. A reader already running 0.1.5 on Windows does not need to reinstall.
 
 After installing you also need:
 
-1. [Git for Windows](https://git-scm.com/downloads/win) — used for note history and sharing.
+1. Git — used for note history and sharing: [Git for Windows](https://git-scm.com/downloads/win) or [Git for macOS](https://git-scm.com/downloads/mac).
 2. Any CLI you want to drive (`claude`, `codex`, `opencode`, `pi`), installed and logged in through its own setup flow. Each service's terms and pricing apply. Note editing works without configuring any CLI.
 3. A KB folder for your notes — a new folder, or an existing Git checkout.
 
@@ -66,21 +68,21 @@ After installing you also need:
 2. Open a note or create one. Editing stays in document view, and pasted images land in `_assets/` next to the note.
 3. Open the assistant panel, pick a harness, and send an instruction. Live requests and questions appear in the panel; stopping cancels the process tree. Queue the next instruction for automatic continuation, and conversations are restored after a restart — resuming is always explicit.
 4. Use source control for diffs, staging and commits. Fetch, pull and merge require explicit confirmation; no automatic stash, hard reset or force push is used.
-5. Connect Google accounts and folders from the cloud section (read-only connection preview). Mounting on Windows needs [WinFsp](https://winfsp.dev/rel/).
+5. Connect Google accounts and folders from the cloud section (read-only connection preview). Mounting on Windows needs [WinFsp](https://winfsp.dev/rel/). A Mac uses macOS's own NFS mount and needs no extra installation.
 6. The terminal at the bottom opens a shell in the current KB folder.
 
 Rules, settings, skills and MCP discovery remain each provider's responsibility. irori never merges instructions across teams. Registration is an ownership boundary, not an OS sandbox.
 
 ## Project status
 
-The only published build is the **unsigned Windows x64 testing preview 0.1.5**. It is not a completed release.
+The published builds are the **Windows x64 and macOS arm64 testing previews 0.1.5**, neither carrying a distribution signature. This is not a completed release.
 
 Still outstanding:
 
 - Acceptance on real Windows 11 / macOS devices (installation, IME, CLI integration, GitHub synchronization)
 - Real Google consent and native mounts on actual accounts, plus Drive uploads (connections are read-only today)
 - Real model-turn acceptance for OpenCode and Pi (native control tests pass)
-- Installer signing, Mac distribution, scale and performance, broader Markdown preservation, cross-device history
+- Distribution signing (Windows signing, and Apple Developer ID signing with notarization), scale and performance, broader Markdown preservation, cross-device history
 
 [ACCEPTANCE](docs/ACCEPTANCE.md) separates verified, provisional and outstanding work; [STATUS](docs/STATUS.md) records the current position and [CHECKPOINT](docs/CHECKPOINT.md) the delivery evidence.
 
