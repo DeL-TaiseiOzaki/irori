@@ -15,14 +15,21 @@ Ad-hoc signing needs no Apple account and no secret, and it produces a real seal
 under irori's own bundle identifier, which moves Gatekeeper's answer from a
 damaged application to an unverified developer that System Settings can override.
 It is not a distribution signature: it carries no identity and no notarization
-ticket. `@electron/osx-sign` takes per-file settings only from an
-`optionsForFile` callback, so its defaults always apply: hardened runtime, with
-Electron's own entitlements for the app and each helper. That combination is
-required for notarization later and is verified working here — the signed
-package launches with node-pty and the bundled rclone — so the package smoke
-asserts the flag rather than assuming it. Forge defaults `continueOnError` to
-true, which would produce a silently unsigned package again, so packaging sets
-it to false.
+ticket, and it must not run under the hardened runtime. The runtime enforces
+library validation, which requires every loaded library to share the main
+executable's Team ID; an ad-hoc signature has none, so macOS 26 refuses to map
+Electron Framework into the process and the app aborts before drawing a window.
+`@electron/osx-sign` enables the runtime by default and takes per-file settings
+only from an `optionsForFile` callback, so packaging disables it there and the
+package smoke asserts the flag is absent. The runtime returns with Developer ID
+signing, where one real Team ID covers every component, and that change needs
+its own device verification. Forge defaults `continueOnError` to true, which
+would produce a silently unsigned package again, so packaging sets it to false.
+
+The Mac package job runs on `macos-26`, matching the acceptance device. It
+previously ran on `macos-15`, which launched a package that aborts at startup on
+macOS 26 — a passing package job on an older runner is not evidence about the
+platform the download is published for.
 
 `test:package` verifies the Mac bundle Forge produced and the copy inside the
 disk image, because the image carries the bytes a reader actually downloads. For
