@@ -51,7 +51,9 @@ jobs:
           - os: windows-2025
             platform: win32
             arch: x64
-          - os: macos-15
+          # The acceptance device runs macOS 26. An older runner accepted a package
+          # that aborts at launch there, so the Mac job matches the shipped target.
+          - os: macos-26
             platform: darwin
             arch: arm64
     runs-on: ${{ matrix.os }}
