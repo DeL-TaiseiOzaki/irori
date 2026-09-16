@@ -29,6 +29,7 @@ export const hostArguments = {
   saveDeviceSettings: z.tuple([
     z.object({
       theme: z.enum(['system', 'light', 'dark']).optional(),
+      markdownFont: z.enum(['sans', 'serif', 'mono']).optional(),
       layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
     }),
   ]),

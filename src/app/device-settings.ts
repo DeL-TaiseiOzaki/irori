@@ -7,7 +7,7 @@ const host = window.irori;
  * between sessions. Preferences therefore live in the host's device record, and
  * this module holds the copy the running window reads from.
  */
-let current: DeviceSettings = { theme: 'system', layouts: {} };
+let current: DeviceSettings = { theme: 'system', markdownFont: 'sans', layouts: {} };
 
 export async function loadDeviceSettings() {
   try {
@@ -22,6 +22,10 @@ export function currentTheme() {
   return current.theme;
 }
 
+export function currentMarkdownFont() {
+  return current.markdownFont;
+}
+
 const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)');
 
 /**
@@ -32,6 +36,11 @@ const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)');
 export function applyTheme(theme: DeviceSettings['theme'] = current.theme) {
   document.documentElement.dataset.theme =
     theme === 'system' ? (systemDark().matches ? 'dark' : 'light') : theme;
+}
+
+/** Applies the reader's type choice only to rendered Markdown through CSS. */
+export function applyMarkdownFont(font: DeviceSettings['markdownFont'] = current.markdownFont) {
+  document.documentElement.dataset.markdownFont = font;
 }
 
 /** Keeps a system choice in step with the desktop while it is the choice. */
@@ -45,11 +54,30 @@ export function watchSystemTheme() {
 }
 
 export async function chooseTheme(theme: DeviceSettings['theme']) {
+  const previous = current.theme;
   applyTheme(theme);
   // The host keeps it for the next launch and tells the operating system, which
   // owns the window chrome and the native dialogs.
-  current = await host.saveDeviceSettings({ theme });
+  try {
+    current = await host.saveDeviceSettings({ theme });
+  } catch (error) {
+    applyTheme(previous);
+    throw error;
+  }
   applyTheme();
+  return current;
+}
+
+export async function chooseMarkdownFont(markdownFont: DeviceSettings['markdownFont']) {
+  const previous = current.markdownFont;
+  applyMarkdownFont(markdownFont);
+  try {
+    current = await host.saveDeviceSettings({ markdownFont });
+  } catch (error) {
+    applyMarkdownFont(previous);
+    throw error;
+  }
+  applyMarkdownFont();
   return current;
 }
 

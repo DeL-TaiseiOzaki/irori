@@ -160,6 +160,7 @@ export interface StartRun {
 }
 export interface DeviceSettings {
   theme: 'system' | 'light' | 'dark';
+  markdownFont: 'sans' | 'serif' | 'mono';
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
 }

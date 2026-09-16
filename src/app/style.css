@@ -90,6 +90,18 @@
   background: var(--paper);
   font-size: 14px;
   font-synthesis: none;
+
+  /* Rendered Markdown has its own reader-controlled face. Each stack remains
+     useful offline and falls back to a matching generic family on every OS. */
+  --markdown-font: 'Noto Sans JP', 'Yu Gothic UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+}
+
+:root[data-markdown-font='serif'] {
+  --markdown-font: 'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+}
+
+:root[data-markdown-font='mono'] {
+  --markdown-font: 'Noto Sans Mono CJK JP', 'BIZ UDGothic', 'SFMono-Regular', Consolas, monospace;
 }
 
 /* The dark palette is a second full set of roles, not an inversion: the
@@ -1414,6 +1426,7 @@ main > header .actions {
 .document-editor .milkdown .ProseMirror {
   padding: 28px clamp(16px, 3vw, 44px);
   min-height: 450px;
+  font-family: var(--markdown-font);
   font-size: 15px;
   line-height: 1.95;
 }
@@ -2384,8 +2397,38 @@ footer > span {
   border-radius: 5px;
   cursor: pointer;
 }
+.appearance-menu-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--rule);
+}
+.appearance-menu-label {
+  padding: 5px 10px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
 .appearance-menu [role='menuitemradio'] > span {
   margin-right: auto;
+}
+.appearance-menu [role='menuitemradio'] > .font-swatch {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 0;
+  color: var(--ember-ink);
+  font-size: 14px;
+  line-height: 1;
+}
+.font-sans {
+  font-family: 'Noto Sans JP', 'Yu Gothic UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+}
+.font-serif {
+  font-family: 'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+}
+.font-mono {
+  font-family: 'Noto Sans Mono CJK JP', 'BIZ UDGothic', 'SFMono-Regular', Consolas, monospace;
 }
 .appearance-menu [role='menuitemradio'] > .ui-icon:first-child {
   color: var(--ember-ink);

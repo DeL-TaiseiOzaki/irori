@@ -11,15 +11,24 @@ async function service() {
   return { dir, settings: new SettingsService(dir) };
 }
 
-test('a device without a record starts on the system theme and no layouts', async () => {
+test('a device without a record starts with the default appearance and no layouts', async () => {
   const { settings } = await service();
-  assert.deepEqual(await settings.read(), { theme: 'system', layouts: {} });
+  assert.deepEqual(await settings.read(), {
+    theme: 'system',
+    markdownFont: 'sans',
+    layouts: {},
+  });
 });
 
 test('a choice is written down and read back after a restart', async () => {
   const { dir, settings } = await service();
   await settings.save({ theme: 'dark' });
-  assert.equal((await new SettingsService(dir).read()).theme, 'dark');
+  await settings.save({ markdownFont: 'serif' });
+  assert.deepEqual(await new SettingsService(dir).read(), {
+    theme: 'dark',
+    markdownFont: 'serif',
+    layouts: {},
+  });
   // The renderer is loaded from a file URL, so this file is the only durable copy.
   assert.match(await readFile(path.join(dir, 'device-settings.json'), 'utf8'), /"theme": "dark"/);
 });
@@ -28,6 +37,7 @@ test('layout records merge instead of replacing each other', async () => {
   const { settings } = await service();
   await settings.save({ layouts: { workspace: '{"explorer":30}' } });
   await settings.save({ layouts: { document: '{"terminal":25}' } });
+  await settings.save({ markdownFont: 'mono' });
   await settings.save({ theme: 'light' });
   const stored = await settings.read();
   assert.deepEqual(stored.layouts, {
@@ -35,12 +45,17 @@ test('layout records merge instead of replacing each other', async () => {
     document: '{"terminal":25}',
   });
   assert.equal(stored.theme, 'light');
+  assert.equal(stored.markdownFont, 'mono');
 });
 
 test('a damaged or hostile record becomes the defaults rather than an error', async () => {
   const { dir, settings } = await service();
   await writeFile(path.join(dir, 'device-settings.json'), '{"theme":"neon","layouts":42}');
-  assert.deepEqual(await settings.read(), { theme: 'system', layouts: {} });
+  assert.deepEqual(await settings.read(), {
+    theme: 'system',
+    markdownFont: 'sans',
+    layouts: {},
+  });
   await settings.save({ theme: 'dark' });
   assert.equal((await settings.read()).theme, 'dark');
 });
@@ -48,8 +63,10 @@ test('a damaged or hostile record becomes the defaults rather than an error', as
 test('the request validator bounds what a renderer may store', () => {
   const save = hostArguments.saveDeviceSettings;
   assert.equal(save.safeParse([{ theme: 'dark' }]).success, true);
+  assert.equal(save.safeParse([{ markdownFont: 'serif' }]).success, true);
   assert.equal(save.safeParse([{ layouts: { workspace: '{"explorer":30}' } }]).success, true);
   assert.equal(save.safeParse([{ theme: 'neon' }]).success, false);
+  assert.equal(save.safeParse([{ markdownFont: 'comic' }]).success, false);
   assert.equal(save.safeParse([{ layouts: { workspace: 'x'.repeat(5000) } }]).success, false);
   assert.equal(save.safeParse([{ layouts: { ['k'.repeat(65)]: '{}' } }]).success, false);
 });
