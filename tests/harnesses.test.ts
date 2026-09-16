@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -8,6 +8,7 @@ import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
 import { SessionStore, sessionKey } from '../src/agents/sessions';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
+import { classify } from '../src/domain/scopes';
 
 const fixtureOptions = {
   skip: process.platform === 'win32' && 'POSIX executable fixture',
@@ -230,5 +231,34 @@ test(
     const refused = await execute('pi', 'sort out yesterday', false, { skill: 'promote' });
     assert.equal(refused.events.at(-1)?.outcome, 'failed');
     assert.ok(refused.events.some((e) => e.type === 'error' && e.text.includes('promote')));
+  },
+);
+
+test(
+  "Running a harness adds no agent configuration to the user's KB",
+  fixtureOptions,
+  async (t) => {
+    const { root, space, execute } = await setup(t);
+    // claudian creates .claude/, .claude/commands, .claude/skills and .claude/agents in
+    // the vault when its plugin loads. irori reads that layer and never writes it: a KB
+    // must look the same after a turn as before one, in its schema layer.
+    const schema = async () =>
+      (await readdir(root))
+        .filter((entry) => classify(space, entry) === 'schema')
+        .sort()
+        .join(' ');
+    const before = await schema();
+    // `.gitignore` is not in the schema list, so registration leaves only `.irori` here.
+    assert.equal(before, '.irori', 'registration writes only its own scope metadata');
+    for (const agent of ['pi', 'opencode'] as const) {
+      const run = await execute(agent, 'ordinary request');
+      assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+      assert.equal(await schema(), before, `${agent} left the schema layer unchanged`);
+    }
+    assert.equal(
+      (await readdir(root)).includes('.claude'),
+      false,
+      'no harness directory appears in the KB',
+    );
   },
 );

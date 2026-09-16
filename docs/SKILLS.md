@@ -86,6 +86,20 @@ Verified locally on 2026-09-16: production build, 147 behaviour tests (143
 passed, four opt-in native controls skipped), and all thirteen Electron UI
 suites. No model inference, Google account or real provider CLI was used.
 
+## What irori does not write
+
+irori reads `.agents/skills/` and never creates it. It does not create `.claude/`,
+`.codex/`, `.opencode/` or `.pi/` in a KB either, and does not pre-create a
+directory a user has not asked for. `tests/harnesses.test.ts` holds this as a
+property: the KB's schema-layer entries are identical before and after a turn.
+
+That check covers the Pi and OpenCode adapters through real child processes. The
+Claude Code adapter is not covered, because exercising it needs an authorized
+model turn. irori answers each permission request through `canUseTool` and never
+persists an allow rule, so it does not ask Claude Code to write
+`.claude/settings.local.json`; whether the CLI writes into a project directory
+for reasons of its own remains unverified here.
+
 ## Remaining
 
 Skills are chosen per turn from a flat list; there is no search, no per-skill
