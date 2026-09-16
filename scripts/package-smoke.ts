@@ -34,6 +34,11 @@ async function verifyMacBundle(bundle: string) {
   const identifier = described.match(/^Identifier=(.+)$/m)?.[1];
   assert.equal(identifier, 'io.github.deltaiseiozaki.irori', 'Packaged bundle identity');
   assert.match(described, /^Signature=adhoc$/m, 'Expected an ad-hoc signature');
+  // @electron/osx-sign always applies hardened runtime and Electron's entitlements
+  // unless an optionsForFile callback overrides them. Notarization will require both,
+  // so fail if a dependency change silently drops them from the published package.
+  const hardenedRuntime = /^CodeDirectory\b.*\bruntime\b/m.test(described);
+  assert(hardenedRuntime, 'Expected the hardened runtime flag');
   // Unnotarized code is rejected by Gatekeeper on purpose; record the verdict as
   // evidence of the state users meet rather than asserting a passing assessment.
   const assessment = await run('spctl', ['--assess', '--type', 'execute', '-vv', bundle]).then(
@@ -43,7 +48,7 @@ async function verifyMacBundle(bundle: string) {
   return {
     identifier,
     adHoc: true,
-    hardenedRuntime: /flags=.*runtime/.test(described),
+    hardenedRuntime,
     verified: verified.trim().split(/\r?\n/),
     assessment: assessment.trim().split(/\r?\n/),
   };
