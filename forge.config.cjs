@@ -9,12 +9,13 @@ module.exports = {
     // leaves the copied Electron binaries carrying Electron's own identifier with no
     // bundle seal. Ad-hoc signing needs no Apple account and leaves the documented
     // "open anyway" route; Developer ID and notarization remain separate release work.
-    // Hardened runtime only matters once notarization exists, and its library
-    // validation is what breaks ad-hoc native modules, so it stays off for now.
+    // @electron/osx-sign reads per-file settings only from an optionsForFile callback,
+    // so its defaults always apply here: hardened runtime, with Electron's own
+    // entitlements for the app and each helper. The package smoke asserts that state
+    // rather than assuming it.
     osxSign: {
       identity: '-',
       identityValidation: false,
-      hardenedRuntime: false,
       // Forge defaults this to true; a silently unsigned Mac package must fail instead.
       continueOnError: false,
     },
