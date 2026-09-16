@@ -7,10 +7,14 @@ happily produce an unsigned package again and the download becomes unopenable
 without failing any job. The Mac signature checks in `scripts/package-smoke.ts`
 run against the built output and the copy inside the disk image, never the
 relocated copy — Node's copy drops the extended attributes codesign writes for
-non Mach-O members. Hardened runtime is on and asserted, not configured:
-`@electron/osx-sign` reads per-file settings only from an `optionsForFile`
-callback, so a top-level `hardenedRuntime` is silently discarded — check the
-published CodeDirectory flags before believing any such setting. Published installer names
+non Mach-O members. Hardened runtime must stay off while the signature is
+ad-hoc: its library validation compares Team IDs, an ad-hoc signature has none,
+and macOS 26 then refuses to load Electron Framework into the app. It is
+disabled through `optionsForFile`, because `@electron/osx-sign` silently
+discards a top-level `hardenedRuntime` — check the published CodeDirectory flags
+before believing any such setting. The Mac package job runs on `macos-26` to
+match the acceptance device; an older runner accepted a build that cannot
+start there. Published installer names
 are part of the update-check contract in `src/host/updates.ts`; renaming a
 release asset silently stops that platform from resolving an update.
 

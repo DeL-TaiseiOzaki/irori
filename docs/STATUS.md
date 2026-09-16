@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Mac launch fix, 2026-09-16: the first published Mac build could not start on the
+acceptance device. It cleared Gatekeeper and then aborted in dyld with
+`mapping process and mapped file (non-platform) have different Team IDs` — the
+hardened runtime's library validation refusing Electron Framework, because an
+ad-hoc signature carries no Team ID for it to match. The runtime is now off,
+set through the `optionsForFile` callback the signing library actually reads,
+and the package smoke asserts the flag is absent instead of present.
+
+The reason CI missed it is the more useful record. The Mac package job ran on
+`macos-15` while the acceptance device runs macOS 26.7, so the job launched the
+package, drove node-pty and bundled rclone, and passed against an operating
+system that does not enforce this. That job now runs on `macos-26`. A package
+check is only evidence about the platform it runs on; treat a passing job on an
+older runner as untested for the target, not as verified.
+
 Mac packaging and update targets, 2026-09-16: the Mac package is signed, so a
 downloaded build can be opened. Forge had no `osxSign`, and `@electron/packager`
 signs only when that option is present, so every Mac package shipped with no
