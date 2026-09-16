@@ -5,6 +5,19 @@ module.exports = {
     executableName: 'irori',
     icon: require('node:path').resolve('assets/irori-icon'),
     appBundleId: 'io.github.deltaiseiozaki.irori',
+    // macOS refuses a downloaded bundle whose signature does not cover it, and Forge
+    // leaves the copied Electron binaries carrying Electron's own identifier with no
+    // bundle seal. Ad-hoc signing needs no Apple account and leaves the documented
+    // "open anyway" route; Developer ID and notarization remain separate release work.
+    // Hardened runtime only matters once notarization exists, and its library
+    // validation is what breaks ad-hoc native modules, so it stays off for now.
+    osxSign: {
+      identity: '-',
+      identityValidation: false,
+      hardenedRuntime: false,
+      // Forge defaults this to true; a silently unsigned Mac package must fail instead.
+      continueOnError: false,
+    },
     prune: true,
     ignore: (filename) => {
       if (!filename) return false;

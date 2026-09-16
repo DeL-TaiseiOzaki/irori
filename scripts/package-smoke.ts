@@ -1,15 +1,80 @@
 import { _electron as electron, expect } from '@playwright/test';
 import { extractFile, listPackage } from '@electron/asar';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { cp, glob, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { ontologyFixture } from '../tests/fixtures/ontology';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
+const run = promisify(execFile);
+
+// macOS enforces the code signature of a downloaded bundle. Forge copies Electron's
+// own ad-hoc binaries, so without explicit signing the shipped bundle carries no seal
+// and the identifier of Electron, which Gatekeeper reports as a damaged application
+// with no route for the user to continue. Verify the bundle Forge actually produced:
+// a relocated copy does not carry the extended attributes codesign writes for
+// non Mach-O members such as app.asar.
+async function verifyMacBundle(bundle: string) {
+  await stat(path.join(bundle, 'Contents', '_CodeSignature', 'CodeResources'));
+  // codesign reports on stderr; --deep --strict also validates helpers and frameworks.
+  const { stderr: verified } = await run('codesign', [
+    '--verify',
+    '--deep',
+    '--strict',
+    '--verbose=2',
+    bundle,
+  ]);
+  const { stderr: described } = await run('codesign', ['--display', '--verbose=2', bundle]);
+  const identifier = described.match(/^Identifier=(.+)$/m)?.[1];
+  assert.equal(identifier, 'io.github.deltaiseiozaki.irori', 'Packaged bundle identity');
+  assert.match(described, /^Signature=adhoc$/m, 'Expected an ad-hoc signature');
+  // Unnotarized code is rejected by Gatekeeper on purpose; record the verdict as
+  // evidence of the state users meet rather than asserting a passing assessment.
+  const assessment = await run('spctl', ['--assess', '--type', 'execute', '-vv', bundle]).then(
+    (result) => result.stderr,
+    (error: { stderr?: string }) => error.stderr ?? String(error),
+  );
+  return {
+    identifier,
+    adHoc: true,
+    hardenedRuntime: /flags=.*runtime/.test(described),
+    verified: verified.trim().split(/\r?\n/),
+    assessment: assessment.trim().split(/\r?\n/),
+  };
+}
+
+async function verifyMacSignature() {
+  const application = await verifyMacBundle(path.join(built, 'irori.app'));
+  // The disk image carries the bytes a reader downloads, so the copy inside it is
+  // what Gatekeeper will judge. Verify that copy too, rather than trusting that the
+  // image preserved the seal of the bundle beside it.
+  const images: string[] = [];
+  for await (const filename of glob('out/make/*.dmg', { cwd: project })) images.push(filename);
+  assert.equal(images.length, 1, 'Expected one disk image');
+  const mountPoint = await mkdtemp(path.join(tmpdir(), 'irori-image-'));
+  await run('hdiutil', [
+    'attach',
+    path.join(project, images[0]),
+    '-nobrowse',
+    '-readonly',
+    '-mountpoint',
+    mountPoint,
+  ]);
+  let image;
+  try {
+    image = await verifyMacBundle(path.join(mountPoint, 'irori.app'));
+  } finally {
+    await run('hdiutil', ['detach', mountPoint, '-force']);
+    await rm(mountPoint, { recursive: true, force: true });
+  }
+  return { diskImage: images[0], application, image };
+}
 const temporary = await mkdtemp(path.join(tmpdir(), 'irori packaged 日本語 '));
 const relocated = path.join(temporary, 'application');
 let application;
@@ -22,6 +87,7 @@ try {
     relocated,
     ...(mac ? ['irori.app', 'Contents', 'Resources'] : ['resources']),
   );
+  const macSignature = mac ? await verifyMacSignature() : null;
   const archive = path.join(resources, 'app.asar');
   const entries = listPackage(archive, { isPack: false }).map((entry) =>
     entry.replaceAll('\\', '/').replace(/^\//, ''),
@@ -480,10 +546,11 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Unsigned relocated Forge package; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
+        macSignature,
         runtime,
         cloudSetup,
         oauthHandoff,
