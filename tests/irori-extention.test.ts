@@ -1,4 +1,4 @@
-// Scenario adaptation from LayeredKB scopes.test.ts at 2a2e7e0.
+// Scenario adaptation from irori-extention scopes.test.ts at 2a2e7e0.
 // Copyright (c) 2026 Taisei Ozaki. MIT; see docs/THIRD_PARTY_NOTICES.md.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ const spaces = [
   scope('team-kb/engineering', 'engineering-id'),
   scope('partner-kb', 'partner-id'),
 ];
-test('LayeredKB regression scenarios keep foreign schema together, and contents outside extension classification', () => {
+test('irori-extention regression scenarios keep foreign schema together, and contents outside extension classification', () => {
   for (const p of [
     'team-kb/engineering/CLAUDE.md',
     'team-kb/engineering/AGENTS.md',

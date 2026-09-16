@@ -1,6 +1,6 @@
 # Layered explorer
 
-Implemented 2026-09-13, following the user's original LayeredKB UI reference (`LayeredKB-vscode-extention/images/image2.png`). The reference repository and image are not modified.
+Implemented 2026-09-13, following the user's original irori-extention UI reference (`irori-extention/images/image2.png`). The reference repository and image are not modified.
 
 The workspace's left navigation now has three rows and five panes:
 
