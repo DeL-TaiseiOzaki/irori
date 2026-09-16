@@ -6,7 +6,9 @@ These decisions supersede unresolved Q01/Q02 and conflicting earlier product pro
 
 ## License and acceptance devices
 
-irori is MIT licensed. Dependency and native-provider terms remain their respective upstream terms. Native acceptance devices are Windows 11 on Ryzen 9 (x64) and a MacBook M5 Pro (arm64). The exact macOS version and tested minimum OS versions still need recording from those devices. Linux is an engineering test platform. Intel Mac downloads stay disabled without separate acceptance evidence.
+irori is MIT licensed. Dependency and native-provider terms remain their respective upstream terms. Native acceptance devices are Windows 11 on Ryzen 9 (x64) and a MacBook M5 Pro (arm64). The exact macOS version and tested minimum OS versions still need recording from those devices. Linux is an engineering test platform.
+
+Intel Macs are out of scope. On 2026-09-16 the owner decided irori will not target them, superseding the earlier position that an Intel download was merely awaiting acceptance evidence. The Mac build is Apple silicon only: there is no Intel package job, no download slot in the website manifest and no acceptance path. Reintroducing one is a new product decision, not a matter of collecting evidence.
 
 ## Q01 — CSV editing and readable ontology graphs
 

@@ -40,12 +40,11 @@ The distribution entrance is the **[download site](https://del-taiseiozaki.githu
 | --- | --- | --- |
 | **Windows 11 x64** | Testing preview `0.1.5` (no distribution signature) | [Installer .exe (307.4 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-windows-x64-Setup.exe) |
 | **macOS (Apple Silicon)** | Testing preview `0.1.5` (no distribution signature) | [Disk image .dmg (270.7 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.3/irori-0.1.5-macos-arm64.dmg) |
-| macOS (Intel) | Not published | — |
 | Linux | No installer planned | [Run from source](#run-from-source) |
 
 - SHA-256 — Windows `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea`, 322,282,496 bytes; macOS `8fe20a9fe5eac6ca644bf7c0d366da1ee9c20c62a9c47df51b64fd39a9ab2fc0`, 283,865,020 bytes. Verification evidence is in the [0.1.5-preview.3 release notes](docs/releases/0.1.5-preview.3.md) and [CHECKPOINT](docs/CHECKPOINT.md).
 - Neither build carries a distribution signature. Windows shows its unknown-publisher warning. **A Mac refuses the first launch**: open System Settings, Privacy & Security, and press the button beside irori's blocked notice once. Later launches behave normally.
-- Windows is built for **x64** (AMD Ryzen / Intel); this is not a Windows ARM build. The Mac build is **Apple Silicon (M series)**; Intel Macs are not published.
+- Windows is built for **x64** (AMD Ryzen / Intel); this is not a Windows ARM build. The Mac build is **Apple Silicon (M series) only**; Intel Macs are not supported.
 - Installation, IME and CLI integration on real Windows 11 and macOS devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
 - The application is the same 0.1.5 already published. A reader already running 0.1.5 on Windows does not need to reinstall.
 

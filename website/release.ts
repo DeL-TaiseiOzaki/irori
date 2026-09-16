@@ -27,7 +27,6 @@ export const releaseSchema = z
     downloads: z.object({
       'windows-x64': artifact.nullable(),
       'macos-arm64': artifact.nullable(),
-      'macos-x64': artifact.nullable(),
     }),
   })
   .refine(

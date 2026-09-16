@@ -243,9 +243,11 @@ h3 {
 }
 .downloads {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   text-align: left;
+  max-width: 720px;
+  margin-inline: auto;
 }
 .download-card {
   background: #f9faf6;

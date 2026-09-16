@@ -13,12 +13,6 @@ const platforms = [
     architecture: 'Apple シリコン（M シリーズ）',
     label: 'MACOS',
   },
-  {
-    id: 'macos-x64',
-    title: 'Mac',
-    architecture: 'Intel プロセッサ',
-    label: 'MACOS',
-  },
 ] as const;
 const container = document.querySelector<HTMLDivElement>('#downloads')!;
 for (const platform of platforms) {

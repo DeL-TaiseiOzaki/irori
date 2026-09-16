@@ -96,16 +96,12 @@ try {
     downloads: {
       'windows-x64': { url: 'https://example.invalid/irori/windows.exe', size: '100 MB' },
       'macos-arm64': { url: 'https://example.invalid/irori/arm64.dmg', size: '101 MB' },
-      'macos-x64': { url: 'https://example.invalid/irori/x64.dmg', size: '102 MB' },
     },
   });
   const fixtures = [
-    {
-      version: null,
-      notes: null,
-      downloads: { 'windows-x64': null, 'macos-arm64': null, 'macos-x64': null },
-    },
-    { ...available, downloads: { ...available.downloads, 'macos-x64': null } },
+    { version: null, notes: null, downloads: { 'windows-x64': null, 'macos-arm64': null } },
+    // One platform published and one still unavailable must render side by side.
+    { ...available, downloads: { ...available.downloads, 'macos-arm64': null } },
     available,
   ];
   for (const [index, fixture] of fixtures.entries()) {
