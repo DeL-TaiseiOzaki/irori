@@ -1,5 +1,44 @@
 # Desktop packaging foundation
 
+macOS signing, 2026-09-16: the Mac bundle is ad-hoc signed while packaging.
+Until now `packagerConfig` set no `osxSign`, and [@electron/packager](https://github.com/electron/packager)
+signs only when that option is present, so every Mac package Forge produced
+shipped with zero `_CodeSignature` entries and Mach-O members that still
+identified themselves as `Electron`. Native CI could launch such a build because
+a locally written file carries no quarantine attribute. A browser download does,
+and [Gatekeeper](https://support.apple.com/guide/security/gatekeeper-and-runtime-protection-sec5599b66df/web)
+reports an unsealed bundle as a damaged application, with no route for the reader
+to continue. That, not the missing Developer ID, is why publishing a Mac download
+was never safe.
+
+Ad-hoc signing needs no Apple account and no secret, and it produces a real seal
+under irori's own bundle identifier, which moves Gatekeeper's answer from a
+damaged application to an unverified developer that System Settings can override.
+It is not a distribution signature: it carries no identity and no notarization
+ticket. `@electron/osx-sign` takes per-file settings only from an
+`optionsForFile` callback, so its defaults always apply: hardened runtime, with
+Electron's own entitlements for the app and each helper. That combination is
+required for notarization later and is verified working here — the signed
+package launches with node-pty and the bundled rclone — so the package smoke
+asserts the flag rather than assuming it. Forge defaults `continueOnError` to
+true, which would produce a silently unsigned package again, so packaging sets
+it to false.
+
+`test:package` verifies the Mac bundle Forge produced and the copy inside the
+disk image, because the image carries the bytes a reader actually downloads. For
+both: the `_CodeSignature` seal exists, `codesign --verify --deep --strict`
+passes over the app, its helpers and its frameworks, the identifier is
+`io.github.deltaiseiozaki.irori`, and the signature is ad-hoc. `spctl`'s verdict
+is recorded rather than asserted — unnotarized code is rejected by design, and
+the evidence should describe the state readers meet. The relocated-launch smoke
+is unchanged and still runs against the signed package. These checks run on the
+built output, not the relocated copy, because Node's copy drops the extended
+attributes codesign writes for non Mach-O members such as `app.asar`.
+
+The uploaded CI artifacts remain unsigned for distribution on every platform. An
+ad-hoc signature is not a signing identity, and Windows and Linux packaging is
+unchanged.
+
 Windows 0.1.4 release: [preview notes](releases/0.1.4-preview.1.md) identify the
 unchanged EXE from [CI 34841807049](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34841807049).
 All three native package jobs pass trusted OS clipboard paste and continuous

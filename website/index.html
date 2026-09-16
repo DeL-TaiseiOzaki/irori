@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="irori は、ノートを書き、CLI エージェントと知識を育てるデスクトップアプリ。Windows 64 ビット向けの検証版をダウンロードできます。"
+      content="irori は、ノートを書き、CLI エージェントと知識を育てるデスクトップアプリ。Windows 64 ビットと Apple シリコン Mac 向けの検証版をダウンロードできます。"
     />
     <meta name="theme-color" content="#f6f5ef" />
     <title>irori — ノートから、次の仕事へ。</title>
@@ -35,7 +35,10 @@
         <a class="button primary" href="#download"
           >ダウンロードについて <span aria-hidden="true">↓</span></a
         >
-        <p class="caption">Windows 64 ビット 検証版を公開中 <span>／</span> Mac は配布準備中</p>
+        <p class="caption">
+          Windows 64 ビット・Apple シリコン Mac 検証版を公開中 <span>／</span> Intel Mac
+          は未公開
+        </p>
         <figure class="app-preview">
           <div class="window-bar">
             <div aria-hidden="true" class="window-dots"><i></i><i></i><i></i></div>
@@ -62,8 +65,8 @@
             <span class="feature-number">01 / WRITE</span>
             <h3>いつものノートが、出発点。</h3>
             <p>
-              見たまま書けるエディタで、ノートを自動保存。画像もそのまま貼り付けて、
-              手元の KB フォルダに残せます。
+              見たまま書けるエディタで、ノートを自動保存。画像もそのまま貼り付けて、 手元の KB
+              フォルダに残せます。
             </p>
           </article>
           <article>
@@ -90,18 +93,18 @@
           <p class="eyebrow">BRING IRORI HOME</p>
           <h2>あなたのパソコンに、irori を。</h2>
           <p class="download-intro" id="release-status" role="status">
-            Windows 向け開発プレビュー — 実機での動作確認用です。
+            Windows・Mac 向け開発プレビュー — 実機での動作確認用です。
           </p>
           <div id="downloads" class="downloads" aria-label="OS 別のダウンロード"></div>
           <noscript
             ><p>
-              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases"
-                >GitHub の配布ページ</a
-              >から Windows 用インストーラーを取得できます。
+              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases">GitHub の配布ページ</a
+              >から Windows 用インストーラーと Mac 用ディスクイメージを取得できます。
             </p></noscript
           >
           <p class="release-note">
-            署名なしの検証版です。Windows 11 実機でのインストール・日本語入力は確認待ちです。<br />
+            配布用の署名がない検証版です。Windows 11・macOS
+            実機でのインストールと日本語入力は確認待ちです。<br />
             まずは新しいフォルダや KB のコピーでお試しください。
             <a id="release-notes" href="https://github.com/DeL-TaiseiOzaki/irori/releases"
               >変更点・検証範囲・SHA-256</a
@@ -113,7 +116,8 @@
               <div>
                 <strong>Git を準備</strong>
                 <p>
-                  <a href="https://git-scm.com/downloads/win">Git for Windows</a> をインストール
+                  Windows は <a href="https://git-scm.com/downloads/win">Git for Windows</a>、Mac は
+                  <a href="https://git-scm.com/downloads/mac">Git for macOS</a> をインストール
                 </p>
               </div>
             </li>
@@ -121,7 +125,7 @@
               <span>2</span>
               <div>
                 <strong>インストール</strong>
-                <p>Windows 用 EXE を開いてアプリを追加</p>
+                <p>Windows は EXE を開く。Mac は DMG を開きアプリケーションへドラッグ</p>
               </div>
             </li>
             <li>
@@ -132,7 +136,20 @@
               </div>
             </li>
           </ol>
-          <p class="caption">AMD Ryzen・Intel の x64 向けです。Windows ARM 用ではありません。</p>
+          <div class="first-launch">
+            <strong>Mac ではじめて開くとき</strong>
+            <p>
+              配布用の署名がないため、初回は開発元を確認できないという理由で開けません。
+              <b>システム設定 → プライバシーとセキュリティ</b> を開き、「セキュリティ」の項目に出る
+              irori のブロック通知の横の <b>「このまま開く」</b>
+              を押してください。2 回目からは通常どおり開けます。表示される文言は macOS
+              のバージョンによって変わります。
+            </p>
+          </div>
+          <p class="caption">
+            Windows は AMD Ryzen・Intel の x64 向けで、Windows ARM 用ではありません。Mac は Apple
+            シリコン（M シリーズ）向けです。
+          </p>
         </div>
       </section>
       <section class="faq wrap">
@@ -168,9 +185,9 @@
           <details>
             <summary>アプリの中でターミナルを使えますか？</summary>
             <p>
-              KB を開き、画面下の「ターミナル」を押すと、その KB のフォルダで起動します。
-              インストール済みの PowerShell・コマンドプロンプト・Git Bash
-              を自動検出し、プロセスを停止してから切り替えられます。
+              KB を開き、画面下の「ターミナル」を押すと、その KB のフォルダで起動します。 Windows は
+              PowerShell・コマンドプロンプト・Git Bash、Mac は zsh・bash
+              などのログインシェルを自動検出し、プロセスを停止してから切り替えられます。
             </p>
           </details>
           <details>
@@ -179,7 +196,8 @@
               ワークスペース左下の Google Drive の「接続」から、アカウントを追加します。 ブラウザで
               Google のアクセス許可を確認し、接続するフォルダを選んでください。 Windows
               でフォルダを開くには <a href="https://winfsp.dev/rel/">WinFsp</a>
-              のインストールが必要です。接続画面にも案内があります。
+              のインストールが必要です。Mac は追加のインストールなしに、macOS の NFS
+              マウントで接続を試せます。接続画面にも案内があります。
             </p>
             <p>
               現在は読み取り専用の接続テスト版です。Google
@@ -192,16 +210,18 @@
             <p>
               ノート編集、Git 操作、CSV
               の表表示・ソース編集、設定済みオントロジーのグラフ表示、内蔵ターミナルを試せます。
-              Google 接続用の設定と rclone を組み込み、アカウント接続を試せる版になりました。
-              Git の一括操作や AI への送信予約、資料の版・成果物の登録にも対応しています。
-              Drive への実送信、端末をまたぐ履歴の共有、Windows 実機での CLI 連携は確認・開発中です。
+              Google 接続用の設定と rclone を組み込み、アカウント接続を試せる版になりました。 Git
+              の一括操作や AI への送信予約、資料の版・成果物の登録にも対応しています。 Drive
+              への実送信、端末をまたぐ履歴の共有、Windows 実機での CLI 連携は確認・開発中です。
             </p>
           </details>
           <details>
             <summary>インストールや動作で困ったら？</summary>
             <p>
-              署名なしのため、Windows
-              が発行元を確認できない旨を表示する場合があります。起動できない場合や不具合は、<a
+              配布用の署名がないため、Windows は発行元を、Mac
+              は開発元を確認できない旨を表示します。Mac
+              の初回起動はシステム設定からの許可が必要です（上の「Mac
+              ではじめて開くとき」を参照）。起動できない場合や不具合は、<a
                 href="https://github.com/DeL-TaiseiOzaki/irori/issues"
                 >GitHub Issues</a
               >へ、アプリのバージョンと表示されたメッセージをお知らせください。ノートの本文や認証情報は載せないでください。

@@ -4,7 +4,7 @@ Current release work, priorities and completion gates are tracked in [RELEASE-PL
 
 The end-user journey is: visit the website, choose a native installer, install irori, open a KB, and complete the selected agent's setup. Building the application from a checkout is a developer workflow, not the intended end-user installation flow.
 
-Forge packaging and an unsigned CI pipeline are now implemented; see [commands, package contents and evidence](PACKAGING.md). The MIT license and Windows 11 x64/MacBook M5 Pro arm64 acceptance devices are confirmed in [ADR 002](decisions/002-release-and-workspace.md). On 2026-09-13 the owner explicitly requested the download website be published so they could try Windows. This authorizes the Windows testing preview below; it does not declare the full service release complete or waive its remaining requirements.
+Forge packaging and an unsigned CI pipeline are now implemented; see [commands, package contents and evidence](PACKAGING.md). The MIT license and Windows 11 x64/MacBook M5 Pro arm64 acceptance devices are confirmed in [ADR 002](decisions/002-release-and-workspace.md). On 2026-09-13 the owner explicitly requested the download website be published so they could try Windows, and on 2026-09-16 they requested that the Mac build be downloadable as well. This authorizes the Windows and Apple silicon Mac testing previews below; it does not declare the full service release complete or waive its remaining requirements.
 
 ## Implemented website
 
@@ -18,7 +18,28 @@ npm run preview:website
 xvfb-run -a npm run test:website
 ```
 
-The Windows x64 slot points to the exact CI-tested EXE in the current preview tag, `v0.1.5-preview.1`. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installer instead of a separately edited tag. Both Mac slots remain unavailable. The page labels the download as unsigned and awaiting Windows 11 device acceptance, links Git setup/support/release evidence and explains the Google connection trial and WinFsp prerequisite. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
+The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. The macOS x64 slot remains unavailable: no Intel Mac is built or tested. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, links Git setup/support/release evidence and explains the Google connection trial, the Windows WinFsp prerequisite and the Mac mount route. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
+
+## Owner-authorized Mac testing preview
+
+Assets: [Mac and Windows testing prerelease 0.1.5](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2), recorded in [0.1.5 preview.2 notes](releases/0.1.5-preview.2.md).
+
+Every earlier Mac package was unopenable after a browser download. Forge sealed
+nothing, so Gatekeeper judged the bundle damaged and offered the reader no way to
+continue; see [packaging](PACKAGING.md). The published disk image is now ad-hoc
+signed, and both the built bundle and the copy inside the image are verified in
+the Mac package job before it launches them. That converts the refusal into the
+ordinary unverified-developer dialog, which the reader clears once through System
+Settings. It is not a Developer ID signature and carries no notarization ticket,
+so that approval step is required and is documented on the page and in the notes.
+
+This preview is Apple silicon only, matching the MacBook M5 Pro acceptance device
+in [ADR 002](decisions/002-release-and-workspace.md). Intel Macs stay disabled:
+nothing builds or tests that architecture, and D01 forbids enabling an untested
+download. Installation, the approval step, Japanese input, native CLI accounts,
+Git operations and Google mounts on a real Mac remain the owner's device trial.
+The application behaviour is the already published 0.1.5; no Windows reinstall is
+required.
 
 ## Owner-authorized Windows testing preview
 
@@ -28,7 +49,7 @@ The current published preview is recorded in [0.1.5 preview notes](releases/0.1.
 
 The original authorization below described the first published preview. [Preview notes](releases/0.1.2-preview.1.md) identify application commit `b51a54b1f9fb36423edf56ed6a1bec961839e165`, successful native CI run `34761095540`, the exact EXE size/hash and outstanding checks. App version `0.1.2` includes the native terminal, bundled rclone and owner-supplied distributor Google configuration. The EXE is renamed to `irori-0.1.2-windows-x64-Setup.exe` without changing its bytes: 316,222,976 bytes, SHA-256 `b3cb5c71cb8311ad9043ad79e31632254ab8169d0b1e7de1412d41979f5012bd`. Only that EXE, its SHA-256 file and package evidence are attached to the prerelease; internal Squirrel feed files and local user/test data are not published. See [CHECKPOINT](CHECKPOINT.md) for current and historical delivery evidence. Real Google consent/refresh/mounts remain unverified.
 
-The exception is limited to the tested Windows preview channel for the owner's trial, including the requested terminal/rclone and Google configuration follow-ups. The owner registered the Google project/client and repository settings; the agent verified metadata and used those settings for the authorized rebuild. This does not authorize inference, unrelated external account/project changes or a Mac release. All normal general-release gates below still apply. Installation, IME, native CLI accounts and actual GitHub synchronization on Windows 11 await the owner's device trial.
+The exception is limited to the tested preview channels for the owner's trial, including the requested terminal/rclone and Google configuration follow-ups. The owner registered the Google project/client and repository settings; the agent verified metadata and used those settings for the authorized rebuild. The Mac channel above was authorized separately on 2026-09-16 and is likewise limited to the tested Apple silicon preview. Neither authorizes inference, unrelated external account/project changes, Intel Mac publication or signing identities. All normal general-release gates below still apply. Installation, IME, native CLI accounts and actual GitHub synchronization on Windows 11 await the owner's device trial.
 
 ## Publish the page
 

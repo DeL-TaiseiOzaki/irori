@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Mac delivery, 2026-09-16: the Mac download is enabled. Read
+[PACKAGING](PACKAGING.md) before touching `forge.config.cjs`: the Mac bundle must
+stay signed, and `osxSign.continueOnError` must stay `false`, or Forge will
+happily produce an unsigned package again and the download becomes unopenable
+without failing any job. The Mac signature checks in `scripts/package-smoke.ts`
+run against the built output and the copy inside the disk image, never the
+relocated copy — Node's copy drops the extended attributes codesign writes for
+non Mach-O members. Hardened runtime is on and asserted, not configured:
+`@electron/osx-sign` reads per-file settings only from an `optionsForFile`
+callback, so a top-level `hardenedRuntime` is silently discarded — check the
+published CodeDirectory flags before believing any such setting. Published installer names
+are part of the update-check contract in `src/host/updates.ts`; renaming a
+release asset silently stops that platform from resolving an update.
+
 Checkpoint, 2026-09-16: the renderer UI arc (PRs #9-#15) is merged and verified
 on `main`; see [the UI checkpoint](CHECKPOINT-UI-2026-09-16.md) for the commit
 and CI identities, what was fixed along the way, and what was deliberately left
