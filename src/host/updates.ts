@@ -5,6 +5,14 @@ const repository = 'https://github.com/DeL-TaiseiOzaki/irori';
 export const officialReleasesEndpoint =
   'https://api.github.com/repos/DeL-TaiseiOzaki/irori/releases?per_page=100';
 const maxResponseBytes = 2 * 1024 * 1024;
+// One published installer name per distributed target. A download URL stays built
+// from the fixed official repository, a validated version and a known asset name,
+// and a target without a published installer is reported rather than guessed.
+const installers: Record<string, (version: string) => string> = {
+  'win32-x64': (version) => `irori-${version}-windows-x64-Setup.exe`,
+  'darwin-arm64': (version) => `irori-${version}-macos-arm64.dmg`,
+};
+const distributedTargets = 'Windows x64 と Apple シリコンの Mac';
 const versionPattern =
   /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-preview\.(0|[1-9]\d*))?$/;
 const releasesSchema = z
@@ -88,12 +96,12 @@ export class UpdateService {
   private async checkPublished(): Promise<UpdateCheck> {
     const currentVersion = this.options.currentVersion;
     this.published = undefined;
-    if (this.options.platform !== 'win32' || this.options.arch !== 'x64') {
+    const installer = installers[`${this.options.platform}-${this.options.arch}`];
+    if (!installer) {
       return {
         status: 'unsupported',
         currentVersion,
-        detail:
-          'この環境向けのインストール版はまだ公開されていません。現在の配布対象は Windows x64 です。',
+        detail: `この環境向けのインストール版はまだ公開されていません。現在の配布対象は ${distributedTargets} です。`,
       };
     }
     const current = version(currentVersion);
@@ -130,7 +138,7 @@ export class UpdateService {
         const tag = release.tag_name;
         const releaseUrl = `${repository}/releases/tag/${tag}`;
         if (release.html_url !== releaseUrl) continue;
-        const assetName = `irori-${parsed.text}-windows-x64-Setup.exe`;
+        const assetName = installer(parsed.text);
         const downloadUrl = `${repository}/releases/download/${tag}/${assetName}`;
         if (
           !release.assets.some(
@@ -154,7 +162,7 @@ export class UpdateService {
           currentVersion,
           reason: 'unavailable',
           detail:
-            'Windows x64 向けの公開インストーラーが見つかりませんでした。時間をおいて再試行してください。',
+            'この環境向けの公開インストーラーが見つかりませんでした。時間をおいて再試行してください。',
         };
       this.published = latest.release;
       // Published preview tags identify delivery iterations; the installed app's

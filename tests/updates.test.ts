@@ -3,22 +3,24 @@ import assert from 'node:assert/strict';
 import { UpdateService, officialReleasesEndpoint } from '../src/host/updates';
 
 const repository = 'https://github.com/DeL-TaiseiOzaki/irori';
+const windowsInstaller = 'windows-x64-Setup.exe';
+const macInstaller = 'macos-arm64.dmg';
+function installer(tag: string, suffix: string) {
+  const name = `irori-${tag.replace(/^v/, '').split('-')[0]}-${suffix}`;
+  return {
+    name,
+    browser_download_url: `${repository}/releases/download/${tag}/${name}`,
+    state: 'uploaded',
+    size: 300000000,
+  };
+}
 function release(tag = 'v0.1.4-preview.1', overrides: Record<string, unknown> = {}) {
-  const core = tag.replace(/^v/, '').split('-')[0];
-  const name = `irori-${core}-windows-x64-Setup.exe`;
   return {
     tag_name: tag,
     html_url: `${repository}/releases/tag/${tag}`,
     draft: false,
     prerelease: tag.includes('-'),
-    assets: [
-      {
-        name,
-        browser_download_url: `${repository}/releases/download/${tag}/${name}`,
-        state: 'uploaded',
-        size: 300000000,
-      },
-    ],
+    assets: [installer(tag, windowsInstaller)],
     ...overrides,
   };
 }
@@ -103,9 +105,8 @@ test('only published Windows x64 installers are considered compatible', async ()
   assert.equal(result.reason, 'unavailable');
 });
 
-test('unsupported platforms do not make a network request or advertise a Windows download', async () => {
+test('targets without a published installer make no request and advertise no download', async () => {
   for (const [platform, arch] of [
-    ['darwin', 'arm64'],
     ['darwin', 'x64'],
     ['linux', 'x64'],
     ['win32', 'arm64'],
@@ -117,6 +118,39 @@ test('unsupported platforms do not make a network request or advertise a Windows
     assert.equal(requests.length, 0);
     await assert.rejects(service.open('download', async () => assert.fail('must not open')));
   }
+});
+
+test('an Apple silicon Mac is offered the published disk image, not the Windows installer', async () => {
+  const tag = 'v0.1.5-preview.2';
+  const published = release(tag, {
+    assets: [installer(tag, windowsInstaller), installer(tag, macInstaller)],
+  });
+  const { service, requests } = fixture([published], { platform: 'darwin', arch: 'arm64' });
+  const result = await service.check();
+  assert.equal(result.status, 'available');
+  assert.equal(result.release?.tag, tag);
+  assert.equal(
+    result.release?.downloadUrl,
+    `${repository}/releases/download/${tag}/irori-0.1.5-${macInstaller}`,
+  );
+  assert.equal(requests.length, 1);
+  const opened: string[] = [];
+  await service.open('download', async (url) => {
+    opened.push(url);
+  });
+  assert.deepEqual(opened, [result.release?.downloadUrl]);
+});
+
+test('a release carrying only the other platform installer is not offered', async () => {
+  const onMac = fixture([release('v0.1.5-preview.1')], { platform: 'darwin', arch: 'arm64' });
+  const macResult = await onMac.service.check();
+  assert.equal(macResult.status, 'error');
+  assert.equal(macResult.reason, 'unavailable');
+  const tag = 'v0.1.5-preview.2';
+  const onWindows = fixture([release(tag, { assets: [installer(tag, macInstaller)] })]);
+  const windowsResult = await onWindows.service.check();
+  assert.equal(windowsResult.status, 'error');
+  assert.equal(windowsResult.reason, 'unavailable');
 });
 
 test('release and download URLs must exactly match the official repository, tag and installer', async () => {
