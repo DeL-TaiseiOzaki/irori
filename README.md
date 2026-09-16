@@ -18,7 +18,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#ダウンロード)
 
 [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
-[リリースノート](docs/releases/0.1.5-preview.2.md) ・
+[リリースノート](docs/releases/0.1.5-preview.3.md) ・
 [ドキュメント](#ドキュメント) ・
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -37,11 +37,11 @@
 | プラットフォーム | 状態 | 取得先 |
 | --- | --- | --- |
 | **Windows 11 x64** | 検証版 `0.1.5 preview`（配布用署名なし） | [インストーラー .exe（307.4 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-windows-x64-Setup.exe) |
-| **macOS（Apple Silicon）** | 検証版 `0.1.5 preview`（配布用署名なし） | [ディスクイメージ .dmg（272.4 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.2/irori-0.1.5-macos-arm64.dmg) |
+| **macOS（Apple Silicon）** | 検証版 `0.1.5 preview`（配布用署名なし） | [ディスクイメージ .dmg（270.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.3/irori-0.1.5-macos-arm64.dmg) |
 | macOS（Intel） | 未公開 | — |
 | Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
 
-- SHA-256 — Windows `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea` / 322,282,496 バイト、macOS `8a674433b44299714ac191758a733f42a7afcfcc362cdf051fa893b0b9b24136` / 285,660,156 バイト。検証記録は [リリースノート v0.1.5-preview.2](docs/releases/0.1.5-preview.2.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- SHA-256 — Windows `8eed9c059628d8461e1a90912172cf3486cabca35569af636166afa2a883ccea` / 322,282,496 バイト、macOS `8fe20a9fe5eac6ca644bf7c0d366da1ee9c20c62a9c47df51b64fd39a9ab2fc0` / 283,865,020 バイト。検証記録は [リリースノート v0.1.5-preview.3](docs/releases/0.1.5-preview.3.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
 - 配布用の署名がないため、Windows は発行元を確認できない旨の警告を表示します。**Mac は初回起動が拒否されます。** 「システム設定 → プライバシーとセキュリティ」で irori のブロック通知の横の「このまま開く」を一度押してください。2 回目からは通常どおり開けます。
 - Windows は AMD Ryzen・Intel の **x64 向け**で、Windows ARM 版ではありません。Mac は **Apple Silicon（M シリーズ）向け**で、Intel Mac 版はありません。
 - Windows 11 / macOS 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。

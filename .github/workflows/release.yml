@@ -1,0 +1,124 @@
+name: Publish desktop prerelease
+
+# Publishing stays explicit: nothing here runs on a push. A maintainer names the
+# verification run whose artifacts are published, so the release always carries
+# bytes that a package job already tested, never a rebuild made for the release.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Verify and package run whose artifacts are published
+        required: true
+      tag:
+        description: Release tag, for example v0.1.5-preview.4
+        required: true
+      platforms:
+        description: Installers to publish
+        required: true
+        default: macos
+        type: choice
+        options: [macos, windows, both]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      # Creating the release and uploading its assets is the only write this needs.
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve the named run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # A release must not be built from a failed, unrelated or rebuilt run.
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")
+          for field in status conclusion head_sha head_branch path; do
+            printf '%s=%s\n' "$field" "$(jq -r ".$field" <<<"$run")"
+          done
+          [ "$(jq -r .status <<<"$run")" = completed ] || { echo "::error::Run is not completed"; exit 1; }
+          [ "$(jq -r .conclusion <<<"$run")" = success ] || { echo "::error::Run did not succeed"; exit 1; }
+          [ "$(jq -r .path <<<"$run")" = .github/workflows/app.yml ] || { echo "::error::Not a verify and package run"; exit 1; }
+          sha=$(jq -r .head_sha <<<"$run")
+          # The published bytes must come from a commit that is actually on main.
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha is not on main"; exit 1; }
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*-preview.[0-9]*) ;;
+            *) echo "::error::Tag must look like v0.0.0-preview.0"; exit 1 ;;
+          esac
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "::error::$TAG already exists"; exit 1; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Collect the tested installers
+        id: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          PLATFORMS: ${{ inputs.platforms }}
+          SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          publish_one() {
+            local platform="$1" pattern="$2" suffix="$3" dir
+            dir="artifact-$platform"
+            gh run download "$RUN_ID" -n "unsigned-irori-$platform-$SHA" -D "$dir"
+            local evidence="$dir/test-results/package-smoke.json"
+            local version
+            version=$(jq -r .runtime.version "$evidence")
+            # Squirrel feed files and the engineering zip are never published.
+            local recorded
+            recorded=$(jq -r --arg p "$pattern" '[.artifacts[] | select(.file | test($p))] | length' "$evidence")
+            [ "$recorded" = 1 ] || { echo "::error::Expected one $platform installer, saw $recorded"; exit 1; }
+            local file size sha256 name
+            file=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .file' "$evidence")
+            size=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .size' "$evidence")
+            sha256=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .sha256' "$evidence")
+            # Match the downloaded bytes against what the package job recorded while
+            # testing that same file, then again after renaming it for the download.
+            [ "$(stat -c%s "$dir/$file")" = "$size" ] || { echo "::error::$file size differs from its package evidence"; exit 1; }
+            echo "$sha256  $dir/$file" | sha256sum -c -
+            name="irori-$version-$suffix"
+            cp "$dir/$file" "staged/$name"
+            echo "$sha256  staged/$name" | sha256sum -c -
+            cp "$evidence" "staged/${platform/win32/windows}-package-evidence.json"
+            printf '%s  %s\n' "$sha256" "$name" >> staged/SHA256SUMS.txt
+            printf '%s: %s bytes, sha256 %s\n' "$name" "$size" "$sha256"
+          }
+          case "$PLATFORMS" in
+            macos|both) publish_one darwin-arm64 '\.dmg$' 'macos-arm64.dmg' ;;
+          esac
+          case "$PLATFORMS" in
+            windows|both) publish_one win32-x64 'Setup\.exe$' 'windows-x64-Setup.exe' ;;
+          esac
+          sort -k2 -o staged/SHA256SUMS.txt staged/SHA256SUMS.txt
+          ls -l staged
+
+      - name: Publish the prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          notes="docs/releases/${TAG#v}.md"
+          # Release notes are reviewed in the repository, not written at publish time.
+          [ -f "$notes" ] || { echo "::error::Missing $notes"; exit 1; }
+          # A preview tag must be a prerelease: the update check skips a tag whose
+          # prerelease flag disagrees with its name.
+          gh release create "$TAG" --target "$SHA" --prerelease --notes-file "$notes" staged/*
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size) \(.state)"'
