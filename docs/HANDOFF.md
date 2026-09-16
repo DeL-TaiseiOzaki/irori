@@ -1,5 +1,10 @@
 # irori continuation handoff
 
+Checkpoint, 2026-09-16: the renderer UI arc (PRs #9-#15) is merged and verified
+on `main`; see [the UI checkpoint](CHECKPOINT-UI-2026-09-16.md) for the commit
+and CI identities, what was fixed along the way, and what was deliberately left
+for its own branch. Source only — the published Windows preview is unchanged.
+
 Device preferences, 2026-09-16: theme and pane sizes live in
 `device-settings.json` through `deviceSettings`/`saveDeviceSettings`, not in the
 renderer. Browser storage is not durable here — the window is a file URL — so do
