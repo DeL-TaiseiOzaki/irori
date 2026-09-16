@@ -9,13 +9,20 @@ module.exports = {
     // leaves the copied Electron binaries carrying Electron's own identifier with no
     // bundle seal. Ad-hoc signing needs no Apple account and leaves the documented
     // "open anyway" route; Developer ID and notarization remain separate release work.
-    // @electron/osx-sign reads per-file settings only from an optionsForFile callback,
-    // so its defaults always apply here: hardened runtime, with Electron's own
-    // entitlements for the app and each helper. The package smoke asserts that state
-    // rather than assuming it.
     osxSign: {
       identity: '-',
       identityValidation: false,
+      // The hardened runtime enforces library validation, which requires every loaded
+      // library to share the main executable's Team ID. An ad-hoc signature has no
+      // Team ID, so macOS 26 refuses to map Electron Framework into the process and
+      // the app aborts before it draws a window:
+      //   "mapping process and mapped file (non-platform) have different Team IDs".
+      // The runtime buys nothing without notarization, so turn it off. It must come
+      // back with Developer ID signing, where one real Team ID covers every component.
+      // @electron/osx-sign reads per-file settings only from this callback; a
+      // top-level hardenedRuntime is discarded. Returning one key keeps its default
+      // entitlements for the app and each helper.
+      optionsForFile: () => ({ hardenedRuntime: false }),
       // Forge defaults this to true; a silently unsigned Mac package must fail instead.
       continueOnError: false,
     },

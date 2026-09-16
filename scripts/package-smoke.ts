@@ -34,11 +34,13 @@ async function verifyMacBundle(bundle: string) {
   const identifier = described.match(/^Identifier=(.+)$/m)?.[1];
   assert.equal(identifier, 'io.github.deltaiseiozaki.irori', 'Packaged bundle identity');
   assert.match(described, /^Signature=adhoc$/m, 'Expected an ad-hoc signature');
-  // @electron/osx-sign always applies hardened runtime and Electron's entitlements
-  // unless an optionsForFile callback overrides them. Notarization will require both,
-  // so fail if a dependency change silently drops them from the published package.
+  // The hardened runtime enforces library validation, which an ad-hoc signature can
+  // never satisfy: it has no Team ID, so macOS refuses to load Electron Framework into
+  // the app and the process aborts at launch. A published 0.1.5 build did exactly that
+  // on macOS 26 while passing every check on the macOS 15 runner, so this flag is
+  // asserted absent rather than left to whatever the signing library defaults to.
   const hardenedRuntime = /^CodeDirectory\b.*\bruntime\b/m.test(described);
-  assert(hardenedRuntime, 'Expected the hardened runtime flag');
+  assert(!hardenedRuntime, 'Ad-hoc signing must not enable the hardened runtime');
   // Unnotarized code is rejected by Gatekeeper on purpose; record the verdict as
   // evidence of the state users meet rather than asserting a passing assessment.
   const assessment = await run('spctl', ['--assess', '--type', 'execute', '-vv', bundle]).then(
