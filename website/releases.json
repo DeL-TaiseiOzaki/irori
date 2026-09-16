@@ -9,7 +9,6 @@
     "macos-arm64": {
       "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.5-preview.3/irori-0.1.5-macos-arm64.dmg",
       "size": "270.7 MiB"
-    },
-    "macos-x64": null
+    }
   }
 }

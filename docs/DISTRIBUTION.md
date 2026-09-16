@@ -18,7 +18,7 @@ npm run preview:website
 xvfb-run -a npm run test:website
 ```
 
-The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. The macOS x64 slot remains unavailable: no Intel Mac is built or tested. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, links Git setup/support/release evidence and explains the Google connection trial, the Windows WinFsp prerequisite and the Mac mount route. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
+The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. There is no Intel Mac slot: that architecture is out of scope by [ADR 002](decisions/002-release-and-workspace.md), so the manifest, the page and its browser tests describe two platforms rather than carrying a permanently empty third. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, links Git setup/support/release evidence and explains the Google connection trial, the Windows WinFsp prerequisite and the Mac mount route. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
 
 ## Owner-authorized Mac testing preview
 
@@ -34,9 +34,8 @@ Settings. It is not a Developer ID signature and carries no notarization ticket,
 so that approval step is required and is documented on the page and in the notes.
 
 This preview is Apple silicon only, matching the MacBook M5 Pro acceptance device
-in [ADR 002](decisions/002-release-and-workspace.md). Intel Macs stay disabled:
-nothing builds or tests that architecture, and D01 forbids enabling an untested
-download. Installation, the approval step, Japanese input, native CLI accounts,
+in [ADR 002](decisions/002-release-and-workspace.md). Intel Macs are not a
+target and the manifest no longer has a slot for them. Installation, the approval step, Japanese input, native CLI accounts,
 Git operations and Google mounts on a real Mac remain the owner's device trial.
 The application behaviour is the already published 0.1.5; no Windows reinstall is
 required.
