@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type DependencyList } from 'react';
 
-// For reads only. Dependencies identify the resource; old requests cannot update a new one.
+// For reads only. Dependencies identify the resource, so old requests cannot update a new one.
+// refresh rereads that same resource without hiding its current data.
 export function useResource<T>(
   load: () => Promise<T>,
   dependencies: DependencyList,
-  { enabled = true, delay = 0, interval = 0 } = {},
+  { enabled = true, delay = 0, interval = 0, refresh = 0 } = {},
 ) {
   const request = useMemo(() => ({ load }), [...dependencies, enabled, delay, interval]);
   const [result, setResult] = useState<{ request?: object; data?: T; error?: string }>({});
@@ -34,7 +35,7 @@ export function useResource<T>(
       live = false;
       clearTimeout(timer);
     };
-  }, [request, enabled, delay, interval]);
+  }, [request, enabled, delay, interval, refresh]);
   const current = enabled && result.request === request ? result : {};
   return {
     data: current.data,

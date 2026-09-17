@@ -250,8 +250,10 @@ function App() {
   const [events, setEvents] = useState<AgentEvent[]>([]),
     [running, setRunning] = useState(false),
     [fresh, setFresh] = useState(false);
-  const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId, running], {
+  const [skillRevision, setSkillRevision] = useState(0);
+  const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId], {
     enabled: !!active,
+    refresh: skillRevision,
   });
   const skills = skillRead.data?.skills ?? [];
   const skillProblems = skillRead.error
@@ -315,6 +317,8 @@ function App() {
       current = false;
     };
   }, [active?.scopeId, agent, historyReload]);
+  // A skill choice belongs to one space, even when another space declares the same name.
+  useEffect(() => setSkill(''), [active?.scopeId]);
   // A skill that disappeared, or a space that does not declare it, must not be sent.
   useEffect(() => {
     if (!skillRead.loading && skill && !skills.some((s) => s.name === skill)) setSkill('');
@@ -411,6 +415,7 @@ function App() {
         });
         if (incoming.type === 'done') {
           setRunning(false);
+          setSkillRevision((value) => value + 1);
           if (incoming.outcome !== 'completed') setQueuePaused(true);
           setRevision((r) => r + 1);
           void reconcile();

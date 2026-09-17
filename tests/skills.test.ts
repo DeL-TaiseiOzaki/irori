@@ -71,6 +71,7 @@ test("The chosen skill precedes the request and is named as this KB's own conten
     'the request stays last',
   );
   assert(composed.includes('.agents/skills/distill/SKILL.md'), 'the source is stated');
+  assert(composed.includes('from .agents/skills/distill/'), 'package-relative paths have a base');
   assert(composed.includes('schema layer'));
   // The run input accepts a skill name and refuses anything that is not one.
   assert.equal(messageInput.parse({ prompt: 'x', skill: 'distill' }).skill, 'distill');
@@ -127,5 +128,18 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
     const aliased = await readSkills(files, space.scopeId);
     assert.match(aliased.problems[0].message, /alias/);
     assert.equal(aliased.skills.length, 3, 'an alias never becomes a skill');
+
+    await symlink(
+      path.join(root, skillsRoot, 'capture'),
+      path.join(root, skillsRoot, 'linked'),
+      'dir',
+    );
+    const linked = await readSkills(files, space.scopeId);
+    assert.deepEqual(
+      linked.problems.map((problem) => problem.directory),
+      ['.agents/skills/broken', '.agents/skills/linked'],
+      'an aliased package directory is reported rather than silently omitted',
+    );
+    assert(linked.problems.every((problem) => /alias/.test(problem.message)));
   }
 });

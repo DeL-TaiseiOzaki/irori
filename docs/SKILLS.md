@@ -40,7 +40,9 @@ With a KB selected, the composer shows a skill selector beside the agent
 selector, defaulting to なし. It appears only when that KB declares at least one
 skill. Choosing one and sending prepends its instructions to the request, states
 that they come from this KB's schema layer at a named path, and leaves the
-user's own words last. The conversation records which skill ran.
+user's own words last. The prompt tells every harness to resolve relative paths
+in those instructions from that skill's package directory. The conversation
+records which skill ran.
 
 A package that cannot be read is named under the composer rather than dropped,
 so a skill that stops appearing has a visible reason. A directory without a
@@ -74,7 +76,8 @@ that disagrees with its directory, UTF-8 byte limits and an empty body; the
 composed prompt ordering; the run input accepting a skill name and refusing a
 path; and listing against a disposable KB — ordering, a directory without
 `SKILL.md`, a malformed package reported as a problem, an unknown name refused,
-and a symlinked `SKILL.md` refused as an alias.
+and a symlinked `SKILL.md` refused as an alias. A symlinked package directory is
+reported instead of silently omitted.
 
 `tests/harnesses.test.ts` runs the Pi protocol fixture and asserts the
 instructions, selected-note context and retained source references reach the

@@ -10,14 +10,13 @@ import {
   type SkillListing,
   type SkillProblem,
 } from '../domain/skills';
-import type { Space } from '../domain/types';
 
 async function readSkill(
   files: FileService,
-  space: Space,
   scopeId: string,
   name: string,
 ): Promise<AgentSkill | undefined> {
+  const space = files.get(scopeId);
   const relative = `${skillsRoot}/${name}/${skillFile}`;
   try {
     if (classify(space, relative) !== 'schema')
@@ -39,11 +38,10 @@ async function readSkill(
  * visible reason.
  */
 export async function readSkills(files: FileService, scopeId: string): Promise<SkillListing> {
-  const space = files.get(scopeId);
   let directories: string[];
   try {
     directories = (await files.entries(scopeId, skillsRoot))
-      .filter((entry) => entry.directory)
+      .filter((entry) => entry.directory || entry.blocked)
       .map((entry) => entry.name)
       .sort((left, right) => left.localeCompare(right));
   } catch (error) {
@@ -55,7 +53,7 @@ export async function readSkills(files: FileService, scopeId: string): Promise<S
   let packages = 0;
   for (const name of directories) {
     try {
-      const skill = await readSkill(files, space, scopeId, name);
+      const skill = await readSkill(files, scopeId, name);
       if (!skill) continue;
       if (++packages > maxSkills) break;
       skills.push(skill);
@@ -81,7 +79,7 @@ export async function requireSkill(
   scopeId: string,
   name: string,
 ): Promise<AgentSkill> {
-  const found = await readSkill(files, files.get(scopeId), scopeId, name);
+  const found = await readSkill(files, scopeId, name);
   if (!found) throw Error(`このスペースに ${name} スキルがありません。`);
   return found;
 }

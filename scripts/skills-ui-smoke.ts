@@ -79,10 +79,22 @@ try {
   await expect(page.getByText('読み込めないスキル')).toContainText('.agents/skills/unreadable');
 
   await picker.selectOption('distill');
+  // A run may add a package. It must appear when the run settles without clearing the choice.
+  await skill(
+    'journal',
+    '---\nname: journal\ndescription: Appends to a dated record.\n---\n\nAppend only.\n',
+  );
   await page.getByLabel('エージェントへの指示').fill('sort out yesterday');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done').last()).toContainText('完了');
   await expect(page.locator('.agent-panel')).toContainText('distill スキルの手順で実行します。');
+  await expect(picker.locator('option')).toContainText([
+    'スキルなし',
+    'distill — Files yesterday into the library.',
+    'journal — Appends to a dated record.',
+    'promote — Opens a promotion pull request.',
+  ]);
+  await expect(picker).toHaveValue('distill');
 
   const sent = (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
     .trim()
