@@ -20,6 +20,8 @@ import type { FileService } from '../host/files';
 import { SessionStore, type SessionBinding } from './sessions';
 import { ConversationStore } from './conversations';
 import { startInput } from '../domain/conversation';
+import { promptWithSkill } from '../domain/skills';
+import { requireSkill } from '../host/skills';
 type Reply = { allow: boolean; answers?: AgentAnswers };
 type Run = {
   id: string;
@@ -259,6 +261,11 @@ export class AgentService {
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
         prompt = `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.\n\n${prompt}`;
+      }
+      if (input.skill) {
+        const skill = await requireSkill(this.files, input.scopeId, input.skill);
+        this.event(run, 'status', `${skill.name} スキルの手順で実行します。`);
+        prompt = promptWithSkill(skill, prompt);
       }
       record = await this.knowledge.begin(run.id, input);
       if (record.sources.length) {

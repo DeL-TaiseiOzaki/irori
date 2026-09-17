@@ -1,5 +1,43 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Hidden entries are configuration, 2026-09-16: a top-level entry beginning with a
+dot is classified as schema rather than knowledge. A KB is often also an Obsidian
+vault, a Git checkout and another agent tool's vault — claudian creates `.claude/`
+and `.claudian/` in a vault when its plugin loads, whether or not anything is
+saved there — and naming each known agent directory left `.obsidian/`,
+`.claudian/`, `.github/` and `.gitignore` displayed in the knowledge pane as the
+user's notes. Search and note operations already skip hidden path components, so
+the classifier now agrees with the rest of the host. Declared contents roots still
+win, and an ontology declaration must still point inside the knowledge layer, so a
+CSV under a hidden directory is refused. See
+[layered explorer](LAYERED-EXPLORER.md). Verification: production build, 148
+behaviour tests (144 passed, four environment-gated skips) including new
+classification cases, and all thirteen Electron UI suites.
+
+KB-declared skills, 2026-09-16: a knowledge base can carry its own procedures in
+`.agents/skills/<name>/SKILL.md`, and the composer offers them beside the agent
+selector. Choosing one prepends its instructions to the request, naming the
+schema-layer path they came from and leaving the user's words last, so the same
+skill reaches whichever of the four harnesses is selected rather than being
+duplicated into one directory per CLI. A package that cannot be read is named
+under the composer instead of disappearing; a package must resolve inside its own
+KB's schema layer and must not be an alias; a run naming a skill the space does
+not declare fails rather than running without it.
+
+irori reads that directory and never creates it, and does not create `.claude/`,
+`.codex/`, `.opencode/` or `.pi/` in a KB. A harness run now has to leave the
+KB's schema-layer entries identical, checked for the Pi and OpenCode adapters
+through real child processes; the Claude Code adapter is not covered, because
+exercising it needs an authorized model turn. Verification: production build,
+**148 behaviour tests (144 passed, four environment-gated skips)**
+including the new `tests/skills.test.ts` and a Pi protocol fixture asserting
+delivery ahead of the request, and all **thirteen Electron UI suites**, where the
+new `scripts/skills-ui-smoke.ts` drives the picker, the unreadable-package notice
+and space isolation. See [SKILLS](SKILLS.md). No installer, website or published
+release changes, and no model inference. This is the irori half of
+`irori-templete` ADR 001 D9; nothing about a user's KB content is assumed beyond
+that directory.
+
 Two published targets, 2026-09-16: the website manifest describes Windows x64
 and macOS arm64 only. The `macos-x64` field is removed from the schema, the
 manifest, the page and the grid rather than held open at `null`, because Intel

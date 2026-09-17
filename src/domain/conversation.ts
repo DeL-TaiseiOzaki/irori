@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { sourceRef } from './knowledge';
+import { skillName } from './skills';
 import { agentIds, type AgentEvent } from './types';
 
 export const messageInput = z.object({
@@ -11,6 +12,7 @@ export const messageInput = z.object({
   notePath: z.string().max(4096).optional(),
   newSession: z.boolean().optional(),
   sources: z.array(sourceRef).max(20).optional(),
+  skill: skillName.optional(),
 });
 export const startInput = messageInput.extend({ scopeId: z.uuid(), agent: z.enum(agentIds) });
 export const queuedMessage = messageInput.extend({ id: z.uuid() });

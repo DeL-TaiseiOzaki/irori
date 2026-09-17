@@ -13,21 +13,12 @@ export function classify(space: Space, relative: string): Layer {
   const p = relative.replaceAll('\\', '/');
   if (space.contents.some((root) => p === root || p.startsWith(root + '/'))) return 'contents';
   const top = p.split('/')[0];
-  if (
-    [
-      'schema',
-      '.irori',
-      '.claude',
-      '.codex',
-      '.opencode',
-      '.pi',
-      '.agents',
-      '.cursor',
-      '.gemini',
-      '.hermes',
-    ].includes(top) ||
-    ['AGENTS.md', 'CLAUDE.md', '.mcp.json', 'opencode.json', 'opencode.jsonc'].includes(p)
-  )
-    return 'schema';
+  // A hidden top-level entry is configuration some tool wrote, not the user's knowledge.
+  // A KB is often also an Obsidian vault and a Git checkout, so `.obsidian`, `.claudian`,
+  // `.github` and `.gitignore` arrive without irori doing anything; naming each agent
+  // directory instead left them displayed as notes. Search and note operations already
+  // skip hidden path components, so this agrees with the rest of the host.
+  if (top.startsWith('.') || top === 'schema') return 'schema';
+  if (['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode.jsonc'].includes(p)) return 'schema';
   return 'Knowledge_Base';
 }

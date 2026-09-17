@@ -4,15 +4,17 @@ Implemented 2026-09-13, following the user's original irori-extention UI referen
 
 The workspace's left navigation now has three rows and five panes:
 
-| Position | Pane | Contents |
-| --- | --- | --- |
-| Top, full width | SCHEMA LAYER | Each selected repository's agent instructions and configuration, grouped by its owning space |
-| Middle, left | MY KNOWLEDGE BASE | Personal spaces' notes and local files |
-| Middle, right | TEAM KNOWLEDGE BASES | Separate team and organization spaces; organization badges remain visible |
-| Bottom, left | MY CONTENTS | Personal spaces' declared contents roots and cloud aliases |
-| Bottom, right | TEAM CONTENTS | Team and organization spaces' declared contents roots and cloud aliases |
+| Position        | Pane                 | Contents                                                                                     |
+| --------------- | -------------------- | -------------------------------------------------------------------------------------------- |
+| Top, full width | SCHEMA LAYER         | Each selected repository's agent instructions and configuration, grouped by its owning space |
+| Middle, left    | MY KNOWLEDGE BASE    | Personal spaces' notes and local files                                                       |
+| Middle, right   | TEAM KNOWLEDGE BASES | Separate team and organization spaces; organization badges remain visible                    |
+| Bottom, left    | MY CONTENTS          | Personal spaces' declared contents roots and cloud aliases                                   |
+| Bottom, right   | TEAM CONTENTS        | Team and organization spaces' declared contents roots and cloud aliases                      |
 
 Each pane scrolls independently and can collapse. Scope groups and directories also collapse. The current document is highlighted by both scope ID and path. Root listings are fetched once per space and shared by its panes; descendants load when expanded. The host's existing layer classification and ownership checks remain authoritative. A nested contents root, including one beneath `schema`, appears only in the contents pane. No recursive mount scan or physical repository reorganization is introduced.
+
+Since 2026-09-16 a hidden top-level entry is schema rather than knowledge. A KB is often also an Obsidian vault, a Git checkout and the vault of another agent tool, so `.obsidian/`, `.github/`, `.gitignore` and, from [claudian](https://github.com/YishenTu/claudian), `.claude/` and `.claudian/` arrive without irori writing anything. Naming each known agent directory left the rest displayed as the user's notes. Search and note operations already skip hidden path components, so the classifier now agrees with them. Declared contents roots still win, and an ontology declaration must still point inside the knowledge layer — a CSV under a hidden directory is refused.
 
 Schema groups preserve per-repository ownership; the displayed instructions are not concatenated, copied or hoisted into a shared native configuration. Selecting a note changes the editor and agent context to its owning space. Unsaved work and running agents retain their existing switching guards. A failed read does not change the active space while leaving another space's document displayed.
 
