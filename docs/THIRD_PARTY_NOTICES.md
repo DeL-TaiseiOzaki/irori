@@ -15,6 +15,7 @@ This preview depends on installed npm packages; exact versions and integrity has
 | Chokidar, cross-spawn, tree-kill, Zod | MIT, package LICENSE files |
 | OpenCode SDK, eventsource-parser | MIT, each package LICENSE; the SDK is loaded in the host on demand |
 | write-file-atomic | ISC, node_modules/write-file-atomic/LICENSE.md; signal-exit retains its ISC license |
+| yaml | ISC, node_modules/yaml/LICENSE; used for standards-compatible skill front matter and has no runtime dependencies |
 | Claude Agent SDK | `SEE LICENSE IN README.md`; node_modules/@anthropic-ai/claude-agent-sdk/README.md and linked provider terms. Do not describe it as MIT. The controller runs the user's separately installed unmodified Claude Code executable. |
 | Node.js development runtime | node_modules/node/node_modules/node-bin-setup and platform binary distribution notices; development dependency, not an independently chosen irori binary-redistribution license |
 | TypeScript, Vite, esbuild, tsx, Playwright and types | Development dependencies; preserve each upstream license when distributing relevant files |

@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   maxSkillBytes,
+  maxSkills,
   parseSkill,
-  parseSkillFrontMatter,
   promptWithSkill,
   skillsRoot,
 } from '../src/domain/skills';
@@ -27,23 +27,23 @@ test('A skill package declares a name matching its directory, a description and 
   assert.equal(skill.instructions, '# Steps\n\n1. Read.');
   assert.equal(skill.path, '.agents/skills/capture/SKILL.md');
 
-  // A BOM, CRLF and quoted values are ordinary authoring, not errors.
+  // A BOM, CRLF, quoted values and ordinary YAML metadata are valid authoring.
   const quoted = parseSkill(
     'journal',
-    '﻿---\r\nname: "journal"\r\ndescription: \'Writes\'\r\n---\r\nBody\r\n',
+    '﻿---\r\nname: "journal"\r\ndescription: >-\r\n  Writes yesterday\'s\r\n  journal.\r\nmetadata:\r\n  owner: user\r\n---\r\nBody\r\n',
   );
-  assert.equal(quoted.description, 'Writes');
+  assert.equal(quoted.description, "Writes yesterday's journal.");
   assert.equal(quoted.instructions, 'Body');
 
   for (const [text, reason] of [
     ['no front matter at all', /front matter/],
-    ['---\ndescription: d\n---\nB', /must declare name/],
-    ['---\nname: capture\n---\nB', /must declare description/],
+    ['---\ndescription: d\n---\nB', /name/],
+    ['---\nname: capture\n---\nB', /description/],
     ['---\nname: other\ndescription: d\n---\nB', /does not match its directory/],
-    ['---\nname: capture\nname: capture\ndescription: d\n---\nB', /repeats name/],
-    ['---\nname: capture\ndescription: d\n  nested:\n    deep: 1\n---\nB', /"key: value"/],
+    ['---\nname: capture\nname: capture\ndescription: d\n---\nB', /unique/i],
+    ['---\nname: capture\ndescription:\n  nested: value\n---\nB', /description/],
     ['---\nname: capture\ndescription: d\n---\n   \n', /no instructions/],
-    [`---\nname: capture\ndescription: ${'d'.repeat(401)}\n---\nB`, /at most 400/],
+    [`---\nname: capture\ndescription: ${'d'.repeat(401)}\n---\nB`, /400/],
   ] as const)
     assert.throws(() => parseSkill('capture', text), reason, text.slice(0, 30));
 
@@ -52,7 +52,15 @@ test('A skill package declares a name matching its directory, a description and 
     () => parseSkill('capture', body('capture', 'd', 'x'.repeat(maxSkillBytes))),
     /at most/,
   );
-  assert.deepEqual(parseSkillFrontMatter('---\n# a comment\n\nname: a\n---\nB'), { name: 'a' });
+  assert.throws(
+    () => parseSkill('capture', body('capture', 'd', 'あ'.repeat(Math.ceil(maxSkillBytes / 3)))),
+    /bytes/,
+    'the package limit is measured as UTF-8 bytes, not JavaScript characters',
+  );
+  assert.equal(
+    parseSkill('capture', '---\n# a comment\nname: capture\ndescription: d\n---\nB').name,
+    'capture',
+  );
 });
 
 test("The chosen skill precedes the request and is named as this KB's own content", () => {
@@ -63,6 +71,7 @@ test("The chosen skill precedes the request and is named as this KB's own conten
     'the request stays last',
   );
   assert(composed.includes('.agents/skills/distill/SKILL.md'), 'the source is stated');
+  assert(composed.includes('from .agents/skills/distill/'), 'package-relative paths have a base');
   assert(composed.includes('schema layer'));
   // The run input accepts a skill name and refuses anything that is not one.
   assert.equal(messageInput.parse({ prompt: 'x', skill: 'distill' }).skill, 'distill');
@@ -90,12 +99,15 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
   await pkg('capture', body('capture'));
   await pkg('empty');
   await pkg('broken', '---\nname: mismatch\ndescription: d\n---\nB');
+  for (let index = 0; index < maxSkills; index++)
+    await pkg(`a-empty-${String(index).padStart(2, '0')}`);
+  await pkg('z-last', body('z-last'));
 
   const listing = await readSkills(files, space.scopeId);
   assert.deepEqual(
     listing.skills.map((skill) => skill.name),
-    ['capture', 'promote'],
-    'sorted, and a directory without SKILL.md is not a skill',
+    ['capture', 'promote', 'z-last'],
+    'sorted, and directories without SKILL.md do not consume the package limit',
   );
   assert.deepEqual(
     listing.problems.map((problem) => problem.directory),
@@ -115,6 +127,19 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
     );
     const aliased = await readSkills(files, space.scopeId);
     assert.match(aliased.problems[0].message, /alias/);
-    assert.equal(aliased.skills.length, 2, 'an alias never becomes a skill');
+    assert.equal(aliased.skills.length, 3, 'an alias never becomes a skill');
+
+    await symlink(
+      path.join(root, skillsRoot, 'capture'),
+      path.join(root, skillsRoot, 'linked'),
+      'dir',
+    );
+    const linked = await readSkills(files, space.scopeId);
+    assert.deepEqual(
+      linked.problems.map((problem) => problem.directory),
+      ['.agents/skills/broken', '.agents/skills/linked'],
+      'an aliased package directory is reported rather than silently omitted',
+    );
+    assert(linked.problems.every((problem) => /alias/.test(problem.message)));
   }
 });

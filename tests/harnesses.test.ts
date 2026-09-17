@@ -208,14 +208,18 @@ test(
   'A chosen skill reaches the harness ahead of the request, and an undeclared one stops the run',
   fixtureOptions,
   async (t) => {
-    const { root, calls, execute } = await setup(t);
+    const { root, space, calls, execute } = await setup(t);
     await mkdir(path.join(root, '.agents', 'skills', 'distill'), { recursive: true });
     await writeFile(
       path.join(root, '.agents', 'skills', 'distill', 'SKILL.md'),
       '---\nname: distill\ndescription: Files yesterday.\n---\n\nOnly ever append.\n',
     );
 
-    const run = await execute('pi', 'sort out yesterday', false, { skill: 'distill' });
+    const run = await execute('pi', 'sort out yesterday', false, {
+      skill: 'distill',
+      notePath: 'note.md',
+      sources: [{ scopeId: space.scopeId, path: 'note.md' }],
+    });
     assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
     assert.ok(
       run.events.some((e) => e.type === 'status' && e.text.includes('distill')),
@@ -227,6 +231,11 @@ test(
       sent.indexOf('Only ever append.') < sent.indexOf('sort out yesterday'),
       'the request stays last',
     );
+    assert.ok(
+      sent.indexOf('Explicitly selected source observations') < sent.indexOf('sort out yesterday'),
+      'selected-source context also precedes the user request',
+    );
+    assert.ok(sent.endsWith('sort out yesterday'), 'nothing follows the user request');
 
     const refused = await execute('pi', 'sort out yesterday', false, { skill: 'promote' });
     assert.equal(refused.events.at(-1)?.outcome, 'failed');

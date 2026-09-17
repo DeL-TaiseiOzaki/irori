@@ -257,33 +257,38 @@ export class AgentService {
       this.publish(run, 'status', input.prompt, { role: 'user' });
       if (run.cancelled) return;
       const space = this.files.get(input.scopeId);
-      let prompt = input.prompt;
+      const promptParts: string[] = [];
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
-        prompt = `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.\n\n${prompt}`;
+        promptParts.push(
+          `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.`,
+        );
       }
-      if (input.skill) {
-        const skill = await requireSkill(this.files, input.scopeId, input.skill);
-        this.event(run, 'status', `${skill.name} スキルの手順で実行します。`);
-        prompt = promptWithSkill(skill, prompt);
-      }
+      const selectedSkill = input.skill
+        ? await requireSkill(this.files, input.scopeId, input.skill)
+        : undefined;
+      if (selectedSkill)
+        this.event(run, 'status', `${selectedSkill.name} スキルの手順で実行します。`);
       record = await this.knowledge.begin(run.id, input);
-      if (record.sources.length) {
-        prompt +=
-          '\n\nExplicitly selected source observations (preserve native access permissions):\n' +
-          record.sources
-            .map((source) =>
-              JSON.stringify({
-                scopeId: source.scopeId,
-                path: source.path,
-                sourceId: source.id,
-                sha256: source.hash,
-                snapshot: this.knowledge.blobPath(source.hash),
-              }),
-            )
-            .join('\n') +
-          '\nRetained snapshots are read-only references: never modify them. Read these observed bytes when grounding an artifact; report if access is unavailable.';
-      }
+      if (record.sources.length)
+        promptParts.push(
+          'Explicitly selected source observations (preserve native access permissions):\n' +
+            record.sources
+              .map((source) =>
+                JSON.stringify({
+                  scopeId: source.scopeId,
+                  path: source.path,
+                  sourceId: source.id,
+                  sha256: source.hash,
+                  snapshot: this.knowledge.blobPath(source.hash),
+                }),
+              )
+              .join('\n') +
+            '\nRetained snapshots are read-only references: never modify them. Read these observed bytes when grounding an artifact; report if access is unavailable.',
+        );
+      promptParts.push(input.prompt);
+      let prompt = promptParts.join('\n\n');
+      if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       const binding = this.binding(input.scopeId, input.agent);
       if (input.newSession) await this.sessions.reset(binding);
       const saved = await this.sessions.read(binding);
