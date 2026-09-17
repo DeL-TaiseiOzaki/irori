@@ -98,12 +98,26 @@ A KB that another tool also writes to is left alone rather than tidied: `.claude
 and `.claudian/`, which claudian creates in a vault when its plugin loads, are
 classified as schema and simply displayed there.
 
-That check covers the Pi and OpenCode adapters through real child processes. The
-Claude Code adapter is not covered, because exercising it needs an authorized
-model turn. irori answers each permission request through `canUseTool` and never
-persists an allow rule, so it does not ask Claude Code to write
-`.claude/settings.local.json`; whether the CLI writes into a project directory
-for reasons of its own remains unverified here.
+That check covers the Pi and OpenCode adapters through real child processes,
+without a model. Claude Code needs an authorized model turn, so
+`scripts/real-agents.ts` (`npm run test:agents`) holds the same property there:
+it records every file in the KB's schema layer with its hash before the turn,
+and fails if the turn adds, removes or rewrites one. irori answers each
+permission request through `canUseTool` and never persists an allow rule.
+
+Verified on 2026-09-17 with the owner's authorization, using Claude Code 2.1.273
+on its native account:
+
+- One `real-agents.ts` turn edited its note after one granted permission. The
+  schema layer was identical afterwards, and no `.claude/` directory or settings
+  file appeared in the KB. The CLI keeps its session record under the user's
+  home directory instead.
+- A copy of the merged `irori-templete`, registered as a KB, listed its five
+  skills without problems. One Claude Code turn with `journal` selected followed
+  the skill and the template's daily note. The only change in the KB was the new
+  entry under `Knowledge_Base/journal/`.
+
+Codex has not been run against the new check.
 
 ## Remaining
 

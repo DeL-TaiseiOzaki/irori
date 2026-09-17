@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Claude Code leaves a KB's configuration alone, 2026-09-17: `scripts/real-agents.ts`
+(`npm run test:agents`) now records every file in the KB's schema layer with its
+hash before each turn. It fails when a turn adds, removes or rewrites one of
+those files. With the owner's authorization:
+
+- One real Claude Code turn (CLI 2.1.273, native account) edited its note after
+  one granted permission. The schema layer was identical afterwards, and no
+  `.claude/` directory or settings file appeared.
+- A copy of the merged `irori-templete`, registered as a KB, listed its five
+  skills. A Claude Code turn with `journal` selected changed only one file, a new
+  entry under `Knowledge_Base/journal/`.
+
+Codex was not run against the new check. Verification: production build, format
+check, behaviour tests, and the two authorized turns. See [SKILLS](SKILLS.md).
+
 Hidden entries are configuration, 2026-09-16: a top-level entry beginning with a
 dot is classified as schema rather than knowledge. A KB is often also an Obsidian
 vault, a Git checkout and another agent tool's vault — claudian creates `.claude/`
