@@ -82,9 +82,10 @@ actual picker: option order, the unreadable package notice, delivery to the
 fixture, the recorded status, and that a second space without skills shows no
 picker.
 
-Verified locally on 2026-09-16: production build, 147 behaviour tests (143
-passed, four opt-in native controls skipped), and all thirteen Electron UI
-suites. No model inference, Google account or real provider CLI was used.
+Verified locally on 2026-09-16, and again after rebasing onto main on
+2026-09-17: production build, 148 behaviour tests (144 passed, four
+environment-gated skips), and all thirteen Electron UI suites. No model
+inference, Google account or real provider CLI was used.
 
 ## What irori does not write
 

@@ -11,7 +11,7 @@ the classifier now agrees with the rest of the host. Declared contents roots sti
 win, and an ontology declaration must still point inside the knowledge layer, so a
 CSV under a hidden directory is refused. See
 [layered explorer](LAYERED-EXPLORER.md). Verification: production build, 148
-behaviour tests (144 passed, four opt-in native controls skipped) including new
+behaviour tests (144 passed, four environment-gated skips) including new
 classification cases, and all thirteen Electron UI suites.
 
 KB-declared skills, 2026-09-16: a knowledge base can carry its own procedures in
@@ -29,7 +29,7 @@ irori reads that directory and never creates it, and does not create `.claude/`,
 KB's schema-layer entries identical, checked for the Pi and OpenCode adapters
 through real child processes; the Claude Code adapter is not covered, because
 exercising it needs an authorized model turn. Verification: production build,
-**148 behaviour tests (144 passed, four opt-in native controls skipped)**
+**148 behaviour tests (144 passed, four environment-gated skips)**
 including the new `tests/skills.test.ts` and a Pi protocol fixture asserting
 delivery ahead of the request, and all **thirteen Electron UI suites**, where the
 new `scripts/skills-ui-smoke.ts` drives the picker, the unreadable-package notice
