@@ -14,6 +14,7 @@ import {
   type NoteRef,
   type TrashedNote,
 } from '../domain/note-operations';
+import { defaultNoteDirectory } from '../domain/notes';
 const relative = z
   .string()
   .min(1)
@@ -358,13 +359,21 @@ export class FileService {
       throw Error('未保存の下書きを保存または解決してからノートを整理してください。');
     return { filename, doc, stat };
   }
-  async createNote(id: string, name: string, directory = 'Knowledge_Base/Notes') {
+  async createNote(id: string, name: string, directory = defaultNoteDirectory) {
+    const filename = noteFilename(name);
+    return this.createNoteAt(
+      id,
+      directory ? `${directory}/${filename}` : filename,
+      `# ${filename.slice(0, -3)}\n\n`,
+    );
+  }
+  /** Publishes a new note at a full relative path; an existing file is never replaced. */
+  async createNoteAt(id: string, rel: string, text: string) {
     return this.queue.run(async () => {
-      const filename = noteFilename(name);
-      const rel = directory ? `${directory}/${filename}` : filename;
       const destination = this.noteLocation(id, rel);
-      await this.noteDirectory(id, directory, true);
-      await fs.writeFile(destination, `# ${filename.slice(0, -3)}\n\n`, { flag: 'wx' });
+      const directory = path.posix.dirname(rel);
+      await this.noteDirectory(id, directory === '.' ? '' : directory, true);
+      await fs.writeFile(destination, text, { flag: 'wx' });
       return this.read(id, rel);
     });
   }

@@ -272,6 +272,10 @@ export interface HostAPI {
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
   createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
+  /** Where this KB asks new notes and today's note to go (`.irori/notes.json`), or null. */
+  notesDeclaration(scopeId: string): Promise<import('./notes').NotesDeclaration | null>;
+  /** Opens today's note at the declared path, creating it from the template on first use. */
+  dailyNote(scopeId: string): Promise<Document>;
   openExternal(scopeId: string, path: string): Promise<void>;
   /** Opens an http or https address from agent output in the user's browser. */
   openUrl(url: string): Promise<void>;

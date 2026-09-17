@@ -21,6 +21,7 @@ import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
+import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
@@ -360,9 +361,12 @@ app
       readImage: (...args) => images.read(...args),
       save: (doc) => changeFiles(() => files.save(doc)),
       draft: (doc) => files.draft(doc),
-      createNote: (...args) => {
-        return changeFiles(() => files.createNote(...args));
-      },
+      createNote: (id, name, directory) =>
+        changeFiles(async () =>
+          files.createNote(id, name, directory ?? (await noteDirectory(files, id))),
+        ),
+      notesDeclaration: (id) => readNotesDeclaration(files, id),
+      dailyNote: (id) => changeFiles(() => openDailyNote(files, id)),
       openExternal: async (...args) => {
         const filename = await files.resolve(...args);
         await openFile(filename);

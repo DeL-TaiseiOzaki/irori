@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import type { AgentId, Space } from '../src/domain/types';
+import { dateTokens } from '../src/domain/notes';
 
 // Exercise the actual desktop bridge and disk persistence in disposable KBs.
 // Only provider discovery is stubbed; model starts and update requests are rejected.
@@ -22,6 +23,20 @@ for (const [name, category] of [
   await writeFile(path.join(root, '作業.md'), `# ${name}\n\nDaily fixture note.\n`);
 }
 const root = spaces[0].root;
+// The personal KB declares where today's note goes and the template it starts from.
+await mkdir(path.join(root, '.irori/templates'), { recursive: true });
+await writeFile(path.join(root, '.irori/templates/daily.md'), '# Daily {{date}}\n\n## Log\n');
+await writeFile(
+  path.join(root, '.irori/notes.json'),
+  JSON.stringify({
+    schemaVersion: 1,
+    newNoteDirectory: 'Knowledge_Base/journal',
+    daily: {
+      path: 'Knowledge_Base/journal/{{yyyy}}/{{date}}.md',
+      template: '.irori/templates/daily.md',
+    },
+  }),
+);
 const customDirectory = '日常/下書き';
 const destination = '整理先';
 await mkdir(path.join(root, customDirectory), { recursive: true });
@@ -330,10 +345,34 @@ try {
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.image-errors')).toHaveCount(0);
+
+  // Today's note: created from the declared template on first use, reopened as is afterwards.
+  const today = dateTokens(new Date());
+  const dailyPath = path.join(root, 'Knowledge_Base/journal', today.yyyy, `${today.date}.md`);
+  expect(await exists(dailyPath)).toBe(false);
+  await page.getByRole('button', { name: '今日のノート', exact: true }).click();
+  await expect.poll(() => exists(dailyPath)).toBe(true);
+  await expect(page.locator('.document-location')).toContainText(`${today.date}.md`);
+  await expect(page.locator('.ProseMirror')).toContainText(`Daily ${today.date}`);
+  expect(await readFile(dailyPath, 'utf8')).toBe(`# Daily ${today.date}\n\n## Log\n`);
+  await page.locator('.ProseMirror').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.insertText('今日の記録');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect.poll(() => readFile(dailyPath, 'utf8')).toContain('今日の記録');
+  await page.getByRole('button', { name: '今日のノート', exact: true }).click();
+  await expect(page.locator('.document-location')).toContainText(`${today.date}.md`);
+  await expect(page.locator('.ProseMirror')).toContainText('今日の記録');
+  expect(await readFile(dailyPath, 'utf8')).toContain('# Daily ');
+  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
+  // The team KB declares nothing, so it offers no daily note.
+  await chooseScope(page, spaces[1]);
+  await expect(page.getByRole('button', { name: '今日のノート', exact: true })).toHaveCount(0);
+  await chooseScope(page, spaces[0]);
   expect(errors).toEqual([]);
   await close();
   console.log(
-    'Daily workflow UI smoke passed: composer restart/isolation/empty deletion/write failure and retry, custom note folder, rename, managed-image move, trash/restore, missing-image warning and preserved Markdown.',
+    "Daily workflow UI smoke passed: composer restart/isolation/empty deletion/write failure and retry, custom note folder, rename, managed-image move, trash/restore, missing-image warning, preserved Markdown, and today's note from the declared template.",
   );
 } finally {
   await app?.close();

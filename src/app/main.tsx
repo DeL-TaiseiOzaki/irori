@@ -259,6 +259,12 @@ function App() {
   const skillProblems = skillRead.error
     ? [{ directory: '.agents/skills', message: skillRead.error }]
     : (skillRead.data?.problems ?? []);
+  const notesRead = useResource(() => host.notesDeclaration(active!.scopeId), [active?.scopeId], {
+    enabled: !!active,
+    refresh: revision,
+  });
+  const notesDeclared = notesRead.data ?? null;
+  const defaultNoteDirectory = notesDeclared?.newNoteDirectory ?? 'Knowledge_Base/Notes';
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
@@ -337,6 +343,17 @@ function App() {
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
   const report = (e: unknown) => setError(String(e));
+  function openDaily() {
+    if (!active) return;
+    const scopeId = active.scopeId;
+    void save()
+      .then(async (saved) => {
+        if (!saved) return;
+        load(await host.dailyNote(scopeId));
+        setRevision((value) => value + 1);
+      })
+      .catch(report);
+  }
   function load(next: Document, navigation?: SearchTarget) {
     reconciliation.current++;
     current.current = { doc: next, buffer: next.text, external: undefined };
@@ -858,7 +875,7 @@ function App() {
                       setNoteDirectory(
                         doc?.scopeId === space.scopeId
                           ? doc.path.split('/').slice(0, -1).join('/')
-                          : 'Knowledge_Base/Notes',
+                          : defaultNoteDirectory,
                       );
                       setNewNote(true);
                     }
@@ -866,6 +883,15 @@ function App() {
                 }}
                 onRefresh={() => setRevision((value) => value + 1)}
               />
+              {active && notesDeclared?.daily && (
+                <button
+                  className="workspace-search workspace-daily"
+                  disabled={running || sending || gitBusy || connecting}
+                  onClick={openDaily}
+                >
+                  今日のノート
+                </button>
+              )}
               {active && (
                 <button
                   className="workspace-search workspace-trash"
@@ -1204,11 +1230,20 @@ function App() {
                         <button
                           className="primary"
                           disabled={!active || running || connecting}
-                          onClick={() => setNewNote(true)}
+                          onClick={() => {
+                            setNoteDirectory(defaultNoteDirectory);
+                            setNewNote(true);
+                          }}
                         >
                           <Icon name="plus" />
                           新しいノートを作成
                         </button>
+                        {notesDeclared?.daily && (
+                          <button disabled={!active || running || connecting} onClick={openDaily}>
+                            <Icon name="plus" />
+                            今日のノート
+                          </button>
+                        )}
                         <button onClick={() => setAdd(true)}>
                           <Icon name="folder" />
                           KBフォルダを開く
@@ -1766,7 +1801,7 @@ function App() {
                 value={noteDirectory}
                 onChange={(event) => setNoteDirectory(event.target.value)}
                 maxLength={4096}
-                placeholder="Knowledge_Base/Notes"
+                placeholder={defaultNoteDirectory}
               />
             </label>
             <div className="actions">

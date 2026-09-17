@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Daily notes and a declared note directory, 2026-09-17: a KB may now carry
+`.irori/notes.json`, tracked with the KB, declaring `newNoteDirectory` (offered
+by the new-note dialog instead of `Knowledge_Base/Notes`) and `daily` (a path
+with `{{yyyy}}`, `{{MM}}`, `{{dd}}` or `{{date}}` tokens plus an optional template
+note). **今日のノート** in the KB toolbar and on the welcome screen opens today's
+note, creating it from the template on first use with the tokens filled in; an
+existing note is reopened unchanged. Declared locations must stay in the
+knowledge layer, and a template must be a real file of the KB, never under
+`contents/`. See [DAILY-NOTES](DAILY-NOTES.md). Verification: production build,
+format check, behaviour tests including `tests/notes.test.ts`, and the daily
+workflow UI suite with the new steps. Version 0.1.8 with its notes accompanies
+the change; publication follows the merge.
+
+**Open decision to discuss later, important:** the recommended template
+(`irori-templete`, ADR 002 D8, merged 2026-09-17) no longer ships
+`.irori/ontology.json` or the ontology CSV pair. Its `Knowledge_Base/` is an
+Open Knowledge Format 0.2 bundle whose pages carry `type`, `relations` and
+ordinary links, and the template's `lint --irori-graph` can generate the CSV
+pair for the current graph view. The owner asked that the question of whether
+irori should draw its graph from the bundle itself (frontmatter and links,
+as the OKF visualizer does) rather than from a declared CSV pair be recorded
+here and discussed later. Nothing in irori changes until that discussion.
+
 First release under the sync checks, 2026-09-17:
 [v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.7-preview.1) publishes #33's skill
 changes for Windows x64 and Apple silicon Mac. The pull request check predicted
