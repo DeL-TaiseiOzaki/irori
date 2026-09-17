@@ -23,6 +23,14 @@ irori should draw its graph from the bundle itself (frontmatter and links,
 as the OKF visualizer does) rather than from a declared CSV pair be recorded
 here and discussed later. Nothing in irori changes until that discussion.
 
+Second release under the sync checks, 2026-09-17:
+[v0.1.8-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.8-preview.1) publishes #38's daily
+notes for Windows x64 and Apple silicon Mac from CI 35233045070 through release
+run 35234095227. Anonymous downloads matched `SHA256SUMS.txt`, Pages run
+35235488093 deployed the manifest from #39, and release-sync run 35235628568
+reported `main` in step. The site offered the release 23 minutes after
+the merge, inside the grace period. See [CHECKPOINT](CHECKPOINT.md).
+
 First release under the sync checks, 2026-09-17:
 [v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.7-preview.1) publishes #33's skill
 changes for Windows x64 and Apple silicon Mac. The pull request check predicted
