@@ -10,6 +10,27 @@ import {
   type SkillListing,
   type SkillProblem,
 } from '../domain/skills';
+import type { Space } from '../domain/types';
+
+async function readSkill(
+  files: FileService,
+  space: Space,
+  scopeId: string,
+  name: string,
+): Promise<AgentSkill | undefined> {
+  const relative = `${skillsRoot}/${name}/${skillFile}`;
+  try {
+    if (classify(space, relative) !== 'schema')
+      throw Error('A skill package must stay in the schema layer');
+    const actual = await files.resolve(scopeId, relative);
+    if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
+      throw Error('A skill package must not be an alias');
+    return parseSkill(name, (await files.read(scopeId, relative)).text);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
 
 /**
  * Lists the skill packages a KB declares in `.agents/skills/`. The directory is
@@ -31,25 +52,22 @@ export async function readSkills(files: FileService, scopeId: string): Promise<S
   }
   const skills: AgentSkill[] = [];
   const problems: SkillProblem[] = [];
-  for (const name of directories.slice(0, maxSkills)) {
-    const relative = `${skillsRoot}/${name}/${skillFile}`;
+  let packages = 0;
+  for (const name of directories) {
     try {
-      if (classify(space, relative) !== 'schema')
-        throw Error('A skill package must stay in the schema layer');
-      const actual = await files.resolve(scopeId, relative);
-      if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
-        throw Error('A skill package must not be an alias');
-      skills.push(parseSkill(name, (await files.read(scopeId, relative)).text));
+      const skill = await readSkill(files, space, scopeId, name);
+      if (!skill) continue;
+      if (++packages > maxSkills) break;
+      skills.push(skill);
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') continue;
+      if (++packages > maxSkills) break;
       problems.push({
         directory: `${skillsRoot}/${name}`,
         message: error instanceof Error ? error.message : 'Could not read this skill package',
       });
     }
   }
-  if (directories.length > maxSkills)
+  if (packages > maxSkills)
     problems.push({
       directory: skillsRoot,
       message: `Only the first ${maxSkills} skill packages are listed`,
@@ -63,7 +81,7 @@ export async function requireSkill(
   scopeId: string,
   name: string,
 ): Promise<AgentSkill> {
-  const found = (await readSkills(files, scopeId)).skills.find((skill) => skill.name === name);
+  const found = await readSkill(files, files.get(scopeId), scopeId, name);
   if (!found) throw Error(`このスペースに ${name} スキルがありません。`);
   return found;
 }

@@ -6,7 +6,6 @@ import { UpdateNotice } from './UpdateNotice';
 import { NoteActions, TrashNotes } from './NoteActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { SourceRef } from '../domain/knowledge';
-import type { AgentSkill, SkillProblem } from '../domain/skills';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
@@ -54,6 +53,7 @@ import { GitPanel } from './GitPanel';
 import { LayerExplorer, Tree } from './LayerExplorer';
 import { appIcon, appVersion } from './branding';
 import { Icon } from './Icon';
+import { useResource } from './useResource';
 import { agentIds, agentNames } from '../domain/types';
 const host = window.irori;
 function Request({
@@ -231,8 +231,6 @@ function App() {
   const [searchTarget, setSearchTarget] = useState<SearchTarget>();
   const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
-  const [skills, setSkills] = useState<AgentSkill[]>([]);
-  const [skillProblems, setSkillProblems] = useState<SkillProblem[]>([]);
   const [skill, setSkill] = useState('');
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
@@ -252,6 +250,13 @@ function App() {
   const [events, setEvents] = useState<AgentEvent[]>([]),
     [running, setRunning] = useState(false),
     [fresh, setFresh] = useState(false);
+  const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId, running], {
+    enabled: !!active,
+  });
+  const skills = skillRead.data?.skills ?? [];
+  const skillProblems = skillRead.error
+    ? [{ directory: '.agents/skills', message: skillRead.error }]
+    : (skillRead.data?.problems ?? []);
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
@@ -310,35 +315,10 @@ function App() {
       current = false;
     };
   }, [active?.scopeId, agent, historyReload]);
-  // Skills are files in the KB, so an agent can add one mid-session. Reread when
-  // the space changes and when a run settles, rather than caching for the session.
-  useEffect(() => {
-    if (!active) {
-      setSkills([]);
-      setSkillProblems([]);
-      return;
-    }
-    let current = true;
-    void host
-      .skills(active.scopeId)
-      .then((listing) => {
-        if (!current) return;
-        setSkills(listing.skills);
-        setSkillProblems(listing.problems);
-      })
-      .catch((error) => {
-        if (!current) return;
-        setSkills([]);
-        setSkillProblems([{ directory: '.agents/skills', message: String(error) }]);
-      });
-    return () => {
-      current = false;
-    };
-  }, [active?.scopeId, running]);
   // A skill that disappeared, or a space that does not declare it, must not be sent.
   useEffect(() => {
-    if (skill && !skills.some((s) => s.name === skill)) setSkill('');
-  }, [skill, skills]);
+    if (!skillRead.loading && skill && !skills.some((s) => s.name === skill)) setSkill('');
+  }, [skill, skills, skillRead.loading]);
   const conversation = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
   useEffect(() => {
@@ -1558,7 +1538,7 @@ function App() {
                           <option value="">スキルなし</option>
                           {skills.map((s) => (
                             <option key={s.name} value={s.name} title={s.description}>
-                              {s.name}
+                              {s.name} — {s.description}
                             </option>
                           ))}
                         </select>

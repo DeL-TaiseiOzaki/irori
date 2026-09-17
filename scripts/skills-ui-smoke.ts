@@ -73,8 +73,8 @@ try {
   await expect(picker).toHaveValue('');
   expect(await picker.locator('option').allTextContents()).toEqual([
     'スキルなし',
-    'distill',
-    'promote',
+    'distill — Files yesterday into the library.',
+    'promote — Opens a promotion pull request.',
   ]);
   await expect(page.getByText('読み込めないスキル')).toContainText('.agents/skills/unreadable');
 

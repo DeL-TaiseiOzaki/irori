@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parse as parseYaml } from 'yaml';
 
 /** The runtime-neutral skill package location, shared with Codex and claudian. */
 export const skillsRoot = '.agents/skills';
@@ -22,44 +23,31 @@ export type SkillProblem = { directory: string; message: string };
 export type SkillListing = { skills: AgentSkill[]; problems: SkillProblem[] };
 
 const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
+const skillMetadata = z.looseObject({
+  name: skillName,
+  description: z.string().min(1).max(400),
+});
 
-/**
- * Reads the small scalar front matter a SKILL.md carries. This is deliberately
- * not a YAML parser: a skill declares a name and a description, and anything
- * that needs more structure belongs in the instructions.
- */
-export function parseSkillFrontMatter(text: string): Record<string, string> {
+export function parseSkill(directory: string, text: string): AgentSkill {
+  if (new TextEncoder().encode(text).byteLength > maxSkillBytes)
+    throw Error(`A skill package is at most ${maxSkillBytes} bytes`);
+  const name = skillName.parse(directory);
   const match = frontMatter.exec(text.replace(/^﻿/, ''));
   if (!match)
     throw Error('A skill must begin with --- front matter declaring name and description');
-  const fields: Record<string, string> = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    if (!line.trim() || line.trimStart().startsWith('#')) continue;
-    const field = /^([A-Za-z][A-Za-z0-9_-]*):[ \t]*(.*)$/.exec(line);
-    if (!field)
-      throw Error(`Front matter accepts only "key: value" lines, not ${JSON.stringify(line)}`);
-    const [, key, raw] = field;
-    if (Object.hasOwn(fields, key)) throw Error(`Front matter repeats ${key}`);
-    fields[key] = raw.trim().replace(/^(['"])([\s\S]*)\1$/, '$2');
-  }
-  return fields;
-}
-
-export function parseSkill(directory: string, text: string): AgentSkill {
-  if (text.length > maxSkillBytes)
-    throw Error(`A skill package is at most ${maxSkillBytes} characters`);
-  const name = skillName.parse(directory);
-  const fields = parseSkillFrontMatter(text);
-  const declared = fields.name ?? '';
-  if (!declared) throw Error('Front matter must declare name');
-  if (declared !== name)
-    throw Error(`Front matter name ${JSON.stringify(declared)} does not match its directory`);
-  const description = fields.description ?? '';
-  if (!description) throw Error('Front matter must declare description');
-  if (description.length > 400) throw Error('A description is at most 400 characters');
-  const instructions = (frontMatter.exec(text.replace(/^﻿/, ''))?.[2] ?? '').trim();
+  const metadata = skillMetadata.parse(
+    parseYaml(match[1], { schema: 'failsafe', logLevel: 'error', stringKeys: true }),
+  );
+  if (metadata.name !== name)
+    throw Error(`Front matter name ${JSON.stringify(metadata.name)} does not match its directory`);
+  const instructions = (match[2] ?? '').trim();
   if (!instructions) throw Error('A skill has no instructions below its front matter');
-  return { name, description, instructions, path: `${skillsRoot}/${name}/${skillFile}` };
+  return {
+    name,
+    description: metadata.description,
+    instructions,
+    path: `${skillsRoot}/${name}/${skillFile}`,
+  };
 }
 
 /**
