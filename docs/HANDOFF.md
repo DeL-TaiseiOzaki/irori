@@ -5,8 +5,9 @@ The owner gave standing authorization for agents to publish a preview after an
 authorized merge. That covers the prerelease, the website manifest and Pages
 deployment, and the anonymous download check. Signing identities, notarization,
 a non-preview release and account changes still need their own authorization.
-[v0.1.6-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1) publishes `main` for both
-platforms; see [CHECKPOINT](CHECKPOINT.md) for the order used.
+The latest preview, [v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.7-preview.1),
+publishes `main` for both platforms. See [CHECKPOINT](CHECKPOINT.md) for the
+order used and what the first release under the checks showed.
 
 After merging an app-affecting change, advance the package version and publish,
 or report the drift explicitly. The update check never offers a newer preview of
