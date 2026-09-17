@@ -35,6 +35,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The ancestry check below walks main's history. A depth-1 checkout holds only
+          # main's tip, so any tested commit behind it, which is every commit whose
+          # release notes are committed afterwards, fails as "not a valid commit".
+          fetch-depth: 0
 
       - name: Resolve the named run
         id: source
@@ -95,7 +100,9 @@ jobs:
             name="irori-$version-$suffix"
             cp "$dir/$file" "staged/$name"
             echo "$sha256  staged/$name" | sha256sum -c -
-            cp "$evidence" "staged/${platform/win32/windows}-package-evidence.json"
+            # Earlier releases publish macos- and windows-package-evidence.json; name it
+            # after the download's platform word, not the runner's darwin-arm64.
+            cp "$evidence" "staged/${suffix%%-*}-package-evidence.json"
             printf '%s  %s\n' "$sha256" "$name" >> staged/SHA256SUMS.txt
             printf '%s: %s bytes, sha256 %s\n' "$name" "$size" "$sha256"
           }
@@ -118,7 +125,11 @@ jobs:
           notes="docs/releases/${TAG#v}.md"
           # Release notes are reviewed in the repository, not written at publish time.
           [ -f "$notes" ] || { echo "::error::Missing $notes"; exit 1; }
+          # The notes' first heading is the release title, as on earlier releases;
+          # without it the release would be named after the bare tag.
+          title=$(sed -n '1s/^# //p' "$notes")
+          [ -n "$title" ] || { echo "::error::$notes must start with a '# ' title"; exit 1; }
           # A preview tag must be a prerelease: the update check skips a tag whose
           # prerelease flag disagrees with its name.
-          gh release create "$TAG" --target "$SHA" --prerelease --notes-file "$notes" staged/*
+          gh release create "$TAG" --target "$SHA" --prerelease --title "$title" --notes-file "$notes" staged/*
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size) \(.state)"'

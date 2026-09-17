@@ -20,6 +20,29 @@ xvfb-run -a npm run test:website
 
 The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. There is no Intel Mac slot: that architecture is out of scope by [ADR 002](decisions/002-release-and-workspace.md), so the manifest, the page and its browser tests describe two platforms rather than carrying a permanently empty third. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, links Git setup/support/release evidence and explains the Google connection trial, the Windows WinFsp prerequisite and the Mac mount route. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
 
+## Previews kept in step with main
+
+Assets: [Windows and Mac testing prerelease 0.1.6](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1), recorded in [0.1.6 preview.1 notes](releases/0.1.6-preview.1.md).
+
+On 2026-09-17 the owner asked that `main` and the published preview stay in
+sync, and gave standing authorization for agents to publish a preview after an
+authorized merge. That covers the GitHub prerelease, the website manifest and
+Pages deployment, and the anonymous download check. Signing identities,
+notarization, a non-preview release, a new platform and account changes still
+need their own authorization.
+
+0.1.6 is the catch-up. `main` had moved 16 commits past the published builds,
+including KB-declared skills and the hidden-entry classification, and the
+bundled third-party notice had changed. Both installers come from one CI run of
+the version change. The application version advanced rather than the preview
+number, because the update check never offers a newer preview of the version a
+reader already runs.
+
+`release.yml` had never run before this release and was corrected first. It now
+checks out main's full history: in a depth-1 checkout, the ancestry check could
+not see a tested commit behind main's tip and would have rejected it. It also
+titles the release from the notes' first heading.
+
 ## Owner-authorized Mac testing preview
 
 Assets: [Mac and Windows testing prerelease 0.1.5](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2), recorded in [0.1.5 preview.2 notes](releases/0.1.5-preview.2.md).
