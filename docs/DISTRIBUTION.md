@@ -43,6 +43,43 @@ checks out main's full history: in a depth-1 checkout, the ancestry check could
 not see a tested commit behind main's tip and would have rejected it. It also
 titles the release from the notes' first heading.
 
+### How the rule is held
+
+`scripts/release-policy.ts` decides whether a change ships. Code, dependencies,
+build and packaging configuration, assets, the licence, the bundled third-party
+notice and `app.yml`, which sets the build environment, all count. So does any
+path the script does not list: it names what does not ship, such as other docs,
+tests, the website and test scripts, and treats everything else as shipping.
+
+- **Pull requests.** The **Keep main and the preview in step** workflow
+  (`release-sync.yml`) fails a pull request that changes what ships unless it
+  does three things:
+  - it advances `package.json` beyond the latest published preview's version;
+  - `package-lock.json` carries the same version;
+  - it adds `docs/releases/<version>-preview.1.md`, starting with the `# ` title
+    the release will carry.
+
+  The notes are prose written before the package exists. `release.yml` appends
+  an **Exact package** section when it publishes, listing the source commit, the
+  CI run, and each file's size and SHA-256. Do not type digests into the notes.
+- **After merge.** Publish from `main`'s successful **Verify and package
+  desktop** run: dispatch `release.yml` with that run id,
+  `tag=v<version>-preview.1` and `platforms=both`. Then update
+  `website/releases.json` and dispatch `website.yml`. Do not push to `main` while
+  that run is still going, because `app.yml` cancels an in-progress run on the
+  same ref.
+- **Drift.** The same workflow runs hourly and on demand. It fails when `main`
+  has held a change that ships for more than 60 minutes without a release. It
+  also fails when the latest preview lacks either installer or `SHA256SUMS.txt`,
+  or the download website does not offer it. It never publishes anything.
+
+The READMEs name no version, size or digest. They point to the download website
+and the releases page, so a release does not leave them behind.
+
+Publishing automatically after `main`'s CI succeeds, with a generated website
+manifest, is the planned next step. Until then the steps after merge are an
+agent's or maintainer's job under the authorization above.
+
 ## Owner-authorized Mac testing preview
 
 Assets: [Mac and Windows testing prerelease 0.1.5](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2), recorded in [0.1.5 preview.2 notes](releases/0.1.5-preview.2.md).

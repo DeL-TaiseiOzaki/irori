@@ -25,6 +25,15 @@ branch, then open a pull request targeting `main`. Do not commit or push new
 features directly to `main`; leave the PR open unless merging is authorized.
 This supersedes older handoff wording about direct commit/push authorization.
 
+`main` and the published preview stay in step. A pull request that changes what
+ships, as `scripts/release-policy.ts` decides, advances the version in
+`package.json` and `package-lock.json` past the latest published preview. It also
+adds `docs/releases/<version>-preview.1.md`; CI enforces both. After merging such
+a change, publish it as [DISTRIBUTION](docs/DISTRIBUTION.md) describes, or tell
+the owner why it is not published. The owner has authorized agents to publish
+previews after an authorized merge. Signing identities, notarization, non-preview
+releases and account changes still need separate authorization.
+
 Keep filesystem/process operations behind `src/domain/types.ts`'s `HostAPI`.
 Never expose raw IPC, Node access or shell execution to document content.
 Use disposable KBs for mutation tests. Keep credentials, provider transcripts

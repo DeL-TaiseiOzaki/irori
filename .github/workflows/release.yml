@@ -120,6 +120,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
           SHA: ${{ steps.source.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ inputs.run_id }}
         run: |
           set -euo pipefail
           notes="docs/releases/${TAG#v}.md"
@@ -129,7 +130,18 @@ jobs:
           # without it the release would be named after the bare tag.
           title=$(sed -n '1s/^# //p' "$notes")
           [ -n "$title" ] || { echo "::error::$notes must start with a '# ' title"; exit 1; }
+          # Notes merge with the change, before its package exists, so they cannot quote it.
+          # The exact files are appended from what this run verified instead.
+          {
+            cat "$notes"
+            printf '\n## Exact package\n\n'
+            printf -- '- Application source: `%s`. [CI](%s) verified and packaged exactly that commit; these files are its artifacts, renamed for download and otherwise unchanged.\n' "$SHA" "$RUN_URL"
+            while read -r digest name; do
+              printf -- '- `%s`: %s bytes, SHA-256 `%s`.\n' "$name" "$(stat -c%s "staged/$name")" "$digest"
+            done < staged/SHA256SUMS.txt
+            printf -- '- `SHA256SUMS.txt` and each platform'"'"'s package evidence are attached.\n'
+          } > release-body.md
           # A preview tag must be a prerelease: the update check skips a tag whose
           # prerelease flag disagrees with its name.
-          gh release create "$TAG" --target "$SHA" --prerelease --title "$title" --notes-file "$notes" staged/*
+          gh release create "$TAG" --target "$SHA" --prerelease --title "$title" --notes-file release-body.md staged/*
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size) \(.state)"'

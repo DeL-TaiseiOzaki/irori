@@ -18,7 +18,7 @@ A desktop IDE/ADE for writing notes and continuing them with local CLI coding ag
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#download)
 
 [Download site](https://del-taiseiozaki.github.io/irori/) ·
-[Release notes](docs/releases/0.1.6-preview.1.md) ·
+[Release notes](https://github.com/DeL-TaiseiOzaki/irori/releases) ·
 [Documentation](#documentation) ·
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -38,15 +38,15 @@ The distribution entrance is the **[download site](https://del-taiseiozaki.githu
 
 | Platform | Status | Get it |
 | --- | --- | --- |
-| **Windows 11 x64** | Testing preview `0.1.6` (no distribution signature) | [Installer .exe (307.4 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.6-preview.1/irori-0.1.6-windows-x64-Setup.exe) |
-| **macOS (Apple Silicon)** | Testing preview `0.1.6` (no distribution signature) | [Disk image .dmg (270.7 MiB)](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.6-preview.1/irori-0.1.6-macos-arm64.dmg) |
+| **Windows 11 x64** | Testing preview (no distribution signature) | Installer .exe on the [download site](https://del-taiseiozaki.github.io/irori/) |
+| **macOS (Apple Silicon)** | Testing preview (no distribution signature) | Disk image .dmg on the [download site](https://del-taiseiozaki.github.io/irori/) |
 | Linux | No installer planned | [Run from source](#run-from-source) |
 
-- SHA-256 — Windows `392a1bca2f42ad842ecb36e09979db6080052cc0462e485f757ef28887d096eb`, 322,288,128 bytes; macOS `597403e13c6d837de4871eace4d029177a2f9e3e934b3eeb22fcb4f37f464311`, 283,886,432 bytes. Verification evidence is in the [0.1.6-preview.1 release notes](docs/releases/0.1.6-preview.1.md) and [CHECKPOINT](docs/CHECKPOINT.md).
+- The current version, file sizes and SHA-256 digests are in the latest prerelease's notes and its attached `SHA256SUMS.txt` on the [releases page](https://github.com/DeL-TaiseiOzaki/irori/releases).
 - Neither build carries a distribution signature. Windows shows its unknown-publisher warning. **A Mac refuses the first launch**: open System Settings, Privacy & Security, and press the button beside irori's blocked notice once. Later launches behave normally.
 - Windows is built for **x64** (AMD Ryzen / Intel); this is not a Windows ARM build. The Mac build is **Apple Silicon (M series) only**; Intel Macs are not supported.
 - Installation, IME and CLI integration on real Windows 11 and macOS devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
-- Since 0.1.5, a KB can declare skills that you choose in the composer, and entries such as `.obsidian/` that begin with a dot appear with configuration instead of among your notes. An installed 0.1.5 offers this version through **更新を確認**.
+- An installed build offers a newer version through **更新を確認**. Application changes merged to main are published as a preview promptly, and an automated check flags one left unpublished for more than an hour ([DISTRIBUTION](docs/DISTRIBUTION.md)).
 
 After installing you also need:
 
@@ -74,7 +74,7 @@ Rules, settings, skills and MCP discovery remain each provider's responsibility,
 
 ## Project status
 
-The published builds are the **Windows x64 and macOS arm64 testing previews 0.1.6**, neither carrying a distribution signature. This is not a completed release.
+The published builds are the **Windows x64 and macOS arm64 testing previews**, neither carrying a distribution signature. This is not a completed release.
 
 Still outstanding:
 
