@@ -1,4 +1,32 @@
-# Checkpoint — 0.1.6 and 0.1.7 preview deliveries
+# Checkpoint — 0.1.6, 0.1.7 and 0.1.8 preview deliveries
+
+## 0.1.8, the second release under the sync checks
+
+Session of 2026-09-17, evening. #38 carried version 0.1.8 with its notes and the
+daily-note feature (`.irori/notes.json`, **今日のノート**), and `release-sync.yml`
+reported on the pull request that it would publish as `v0.1.8-preview.1`. The
+owner authorized the merge; it landed on `main` at 14:21Z as `ad4dc18`.
+
+- [Release run 35234095227](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35234095227) published
+  [v0.1.8-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.8-preview.1) at 14:32Z from the
+  artifacts of [CI 35233045070](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35233045070) for `ad4dc18`. The notes
+  held prose only; the workflow appended the **Exact package** section:
+  - Windows installer: 322,445,312 bytes, SHA-256
+    `9bfbb11f437b71b81fd9e581e3e2f9d35413ea58ebaca60f44df5a75f6700bf1`.
+  - Mac disk image: 284,138,177 bytes, SHA-256
+    `558de5fe2c1de4e8b637c3e784cd3749b71342cdc83437140aa633401bf19550`.
+- At 14:34Z, anonymous downloads of both installers and `SHA256SUMS.txt`
+  returned HTTP 200. The byte counts matched, and `sha256sum -c` passed.
+- #39 pointed the manifest at the release. [Pages run 35235488093](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35235488093)
+  deployed it, and the live page's bundle offered `v0.1.8-preview.1` at 14:44Z.
+- [Release-sync run 35235628568](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35235628568), dispatched by hand, reported
+  `main` in step with `v0.1.8-preview.1`, both installers and `SHA256SUMS.txt` on
+  the release, and the release on the live page.
+
+The site offered the release 23 minutes after #38 merged, inside the
+60-minute grace period. The release itself took 11 minutes; the manifest's own
+CI cycle before its merge was the larger part of the rest. Automatic
+publication remains the next engineering step.
 
 ## 0.1.7, the first release under the sync checks
 
