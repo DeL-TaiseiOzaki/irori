@@ -1,4 +1,39 @@
-# Checkpoint — 0.1.6 preview delivery
+# Checkpoint — 0.1.6 and 0.1.7 preview deliveries
+
+## 0.1.7, the first release under the sync checks
+
+Session of 2026-09-17, later the same day. Another session merged #33 at
+05:39Z; it reworked KB skill loading and bundled the `yaml` library. #34 then
+put the sync checks on `main`. #35 carried version 0.1.7 and its notes, and
+`release-sync.yml` reported on that pull request that it would publish as
+`v0.1.7-preview.1`.
+
+- [Release run 35191670664](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35191670664) published
+  [v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.7-preview.1) at 06:52Z from the
+  artifacts of [CI 35190936323](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35190936323) for `e2ed6a7`.
+  The notes held prose only. The workflow appended the **Exact package**
+  section itself, the first live use of that step:
+  - Windows installer: 322,444,288 bytes, SHA-256
+    `a16193eeaec11fd7fb80af577156549217aed3788039167bc5d6a726a514f9e9`.
+  - Mac disk image: 284,134,321 bytes, SHA-256
+    `25de3c44620264dfb52c654442830a479d43b72627c2c56f791bd0216f17bc64`.
+- At 06:53–06:54Z, anonymous downloads of both installers and `SHA256SUMS.txt`
+  returned HTTP 200. The byte counts matched, and `sha256sum -c` passed.
+- #36 pointed the manifest at the release. [Pages run 35192591714](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35192591714)
+  deployed it, and the live page's bundle offered `v0.1.7-preview.1` at 07:04Z.
+- The first run of the drift job on `main`, [release-sync run 35192736067](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35192736067),
+  dispatched by hand, reported `main` in step with `v0.1.7-preview.1`. It found
+  both installers and `SHA256SUMS.txt` on the release and the release on the
+  live page.
+
+Publication came 73 minutes after #33 merged, past the 60-minute grace period.
+The drift check was not yet on `main` when #33 merged. Its hourly schedule had
+not fired by the time the release was out, so nothing flagged the delay.
+Publishing by hand needs two CI cycles, one for the version change and one for
+the manifest, which leaves little margin inside an hour. Automatic publication
+is the remaining step.
+
+## 0.1.6, the catch-up
 
 Session of 2026-09-17. The owner asked that `main` and the published preview
 stay in sync from now on. They chose automatic publication, introduced in stages,

@@ -1,5 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+First release under the sync checks, 2026-09-17:
+[v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.7-preview.1) publishes #33's skill
+changes for Windows x64 and Apple silicon Mac. The pull request check predicted
+the tag, and `release.yml` appended the exact package facts to prose-only notes.
+Anonymous downloads matched `SHA256SUMS.txt`, and the hand-dispatched drift job
+on `main` reported the release and download page in step.
+
+The release came 73 minutes after the change merged, past the one-hour grace
+period, and no check had fired yet to flag it. Automatic publication is next.
+See [CHECKPOINT](CHECKPOINT.md).
+
 Release sync checks, 2026-09-17: `scripts/release-policy.ts` decides whether a
 change reaches the desktop package. It names what does not ship, and any other
 path, including an unclassified one, counts as shipping. `release-sync.yml`
