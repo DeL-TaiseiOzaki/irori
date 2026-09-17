@@ -1,9 +1,91 @@
-# Checkpoint — Mac 0.1.5 delivery
+# Checkpoint — 0.1.6 preview delivery
+
+Session of 2026-09-17. The owner asked that `main` and the published preview
+stay in sync from now on. They chose automatic publication, introduced in stages,
+and gave standing authorization for agents to publish a preview after an
+authorized merge. This checkpoint records the catch-up delivery,
+`v0.1.6-preview.1`, for Windows x64 and Apple silicon Mac. The owner also
+reported that the Mac `v0.1.5-preview.3` launches on their MacBook. They have
+used it only lightly, so the rest of the installed-Mac trial is still open.
+
+## Published
+
+- [v0.1.6-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1), a prerelease
+  targeting `42d6eb72eae446d478bd79989dd81aa890ab7e35`, the 0.1.6 version change
+  (#30). [Release run 35180997636](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35180997636) created it from
+  the artifacts of [CI 35179494206](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35179494206).
+- `irori-0.1.6-windows-x64-Setup.exe`: 322,288,128 bytes, SHA-256
+  `392a1bca2f42ad842ecb36e09979db6080052cc0462e485f757ef28887d096eb`.
+- `irori-0.1.6-macos-arm64.dmg`: 283,886,432 bytes, SHA-256
+  `597403e13c6d837de4871eace4d029177a2f9e3e934b3eeb22fcb4f37f464311`.
+- `SHA256SUMS.txt`, `windows-package-evidence.json` and
+  `macos-package-evidence.json` accompany them. Both evidence files report
+  runtime version `0.1.6`.
+- [Pages run 35181102993](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35181102993) deployed website commit
+  `1dd5b62`. The live page's bundle links only to this release's two installers
+  and its notes.
+- At `2026-09-17T04:15Z`, an anonymous `https` download of each installer and of
+  `SHA256SUMS.txt` returned HTTP 200. The byte counts matched, and
+  `sha256sum -c` passed for both installers.
+
+Before the release PR, the two installers in that CI run were downloaded and
+their sizes and digests matched against each package job's evidence. The notes,
+README rows and manifest were written from those values.
+
+## Keeping main and the preview in step
+
+The package version advanced from 0.1.5 to 0.1.6 instead of publishing a fourth
+0.1.5 preview. `src/host/updates.ts` ranks `0.1.5` above every
+`0.1.5-preview.N`, so an installed 0.1.5 would never have been offered a newer
+0.1.5 preview.
+
+The order used:
+
+1. Merge a version change.
+2. Let `main`'s CI run for that merge finish.
+3. Commit notes, manifest and README rows with that run's exact values.
+4. Dispatch `release.yml` with the run id, then `website.yml`.
+5. Download anonymously and verify.
+
+While step 2 runs, do not push to `main`: `app.yml` cancels an in-progress run on
+the same ref, and the tested artifacts would be lost.
+
+Automation is not implemented yet. Astra (Codex, `gpt-6-astra`) was consulted
+read-only. It recommended release-ready PRs, a release-relevance and drift check,
+then automatic publication after `main`'s CI with a generated website manifest.
+That is the next engineering step.
+
+## release.yml's first run
+
+The workflow had never run; every earlier release was assembled by hand. Three
+defects were found and fixed in #31 before dispatch. Run 35180997636 confirmed
+each fix:
+
+- The depth-1 checkout could not resolve a tested commit behind `main`'s tip.
+  With full history, `42d6eb7` passed the ancestry check behind tip `1dd5b62`.
+- The release had no title. It now takes the notes' first heading.
+- Evidence files were named after runner platforms. They are now
+  `macos-package-evidence.json` and `windows-package-evidence.json`, as on
+  earlier releases.
+
+## Still open
+
+- Installed-device acceptance for 0.1.6 on Windows and the Mac: installation, the
+  update check offering 0.1.6 to an installed 0.1.5, Japanese input, native CLI
+  accounts, Git operations and Google connections.
+- The staged automation above.
+- Developer ID signing and notarization, Google writes, and the other gates in
+  [RELEASE-PLAN](RELEASE-PLAN.md).
+
+User KB and device data were not touched.
+
+## Checkpoint — Mac 0.1.5 delivery
 
 Session of 2026-09-16. The owner asked for the Mac build to be downloadable, and
 later asked for Intel Mac to be removed as a target. Both are done and public.
 **What is not yet known is whether the published build starts on the owner's
-machine.** That single answer is the next thing this work needs.
+machine.** That single answer is the next thing this work needs. *(2026-09-17: the
+owner reported that it launches; see the 0.1.6 checkpoint above.)*
 
 ## What the owner has to do next
 

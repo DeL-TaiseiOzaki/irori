@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Previews kept in step with main, 2026-09-17:
+[v0.1.6-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1) publishes `main` for Windows
+x64 and Apple silicon Mac from the artifacts of CI 35179494206. It went out
+through the first real run of `release.yml` and Pages run 35181102993, and
+anonymous downloads matched `SHA256SUMS.txt`. The package version advanced to
+0.1.6 because the update check never offers a newer preview of an installed
+version.
+
+`release.yml` needed three fixes before that run: a full-history checkout for
+its ancestry check, a release title from the notes, and the established evidence
+file names. The owner gave standing authorization to publish previews after
+authorized merges, and automatic publication is the planned next step. See
+[CHECKPOINT](CHECKPOINT.md).
+
 Claude Code leaves a KB's configuration alone, 2026-09-17: `scripts/real-agents.ts`
 (`npm run test:agents`) now records every file in the KB's schema layer with its
 hash before each turn. It fails when a turn adds, removes or rewrites one of

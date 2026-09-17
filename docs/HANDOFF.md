@@ -1,10 +1,23 @@
 # irori continuation handoff
 
-Resume here, 2026-09-16: the Mac download is public at
-[v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3),
-and nobody has yet confirmed it starts on a Mac. Ask the owner for that result
-before treating Mac delivery as finished, and before starting notarization or
-any further Mac work. The first published Mac build was verified, hashed and
+Resume here, 2026-09-17: `main` and the published preview are to stay in sync.
+The owner gave standing authorization for agents to publish a preview after an
+authorized merge. That covers the prerelease, the website manifest and Pages
+deployment, and the anonymous download check. Signing identities, notarization,
+a non-preview release and account changes still need their own authorization.
+[v0.1.6-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1) publishes `main` for both
+platforms; see [CHECKPOINT](CHECKPOINT.md) for the order used.
+
+After merging an app-affecting change, advance the package version and publish,
+or report the drift explicitly. The update check never offers a newer preview of
+the version a reader already runs. The next engineering step is automating that
+in stages: first a release-relevance and drift check, then automatic publication
+with a generated manifest.
+
+Mac download, 2026-09-16: [v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3)
+was published before anyone had confirmed it starts on a Mac. On 2026-09-17 the
+owner reported that it launches; it has only been used lightly, so installed-Mac
+acceptance is still open. The first published Mac build was verified, hashed and
 deployed, and still could not launch; see [CHECKPOINT](CHECKPOINT.md) for what
 that cost and why CI missed it. Intel Mac is out of scope and its mechanism is
 removed, not disabled.
