@@ -122,6 +122,8 @@ export const hostArguments = {
   save: z.tuple([document]),
   draft: z.tuple([document]),
   createNote: z.tuple([id, z.string().max(120), path.optional()]),
+  notesDeclaration: z.tuple([id]),
+  dailyNote: z.tuple([id]),
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),
   agentSession: z.tuple([id, z.enum(agentIds)]),

@@ -9,6 +9,15 @@ The latest preview, [v0.1.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/
 publishes `main` for both platforms. See [CHECKPOINT](CHECKPOINT.md) for the
 order used and what the first release under the checks showed.
 
+Template and daily notes, 2026-09-17: `irori-templete` `main` is now an OKF 0.2
+bundle maintained by agents (its ADR 002); it ships no ontology files and expects
+the KB to declare where notes go. irori 0.1.8 adds that declaration,
+`.irori/notes.json`, and **今日のノート**; read [DAILY-NOTES](DAILY-NOTES.md)
+before touching note creation. One decision is deliberately open and recorded in
+[STATUS](STATUS.md): whether the graph view should read the bundle (frontmatter
+and links) instead of a declared CSV pair. Do not change the ontology reader
+until the owner has discussed it.
+
 After merging an app-affecting change, advance the package version and publish,
 or report the drift explicitly. The update check never offers a newer preview of
 the version a reader already runs. `release-sync.yml` enforces the version and
