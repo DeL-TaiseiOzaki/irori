@@ -1,5 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Release sync checks, 2026-09-17: `scripts/release-policy.ts` decides whether a
+change reaches the desktop package. It names what does not ship, and any other
+path, including an unclassified one, counts as shipping. `release-sync.yml`
+applies it in two ways:
+
+- A pull request that changes what ships must advance `package.json` and
+  `package-lock.json` beyond the latest published preview and add
+  `docs/releases/<version>-preview.1.md` with a title.
+- On an hourly schedule, the workflow fails when `main` has held such a change
+  unpublished for more than 60 minutes, when the latest preview lacks an
+  installer or `SHA256SUMS.txt`, or when the download website does not offer it.
+
+`release.yml` now appends the exact package facts to the notes it publishes, so
+notes can merge before the package exists. The READMEs no longer name a version,
+size or digest. Verification: production build, format check, behaviour tests
+including the new `tests/release-policy.test.ts`, which runs against disposable
+Git repositories. Separately, the release and website check ran locally against
+the live release and page, with both a passing tag and two failing ones.
+
 Previews kept in step with main, 2026-09-17:
 [v0.1.6-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.6-preview.1) publishes `main` for Windows
 x64 and Apple silicon Mac from the artifacts of CI 35179494206. It went out

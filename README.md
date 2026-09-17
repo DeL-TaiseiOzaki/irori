@@ -18,7 +18,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#ダウンロード)
 
 [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
-[リリースノート](docs/releases/0.1.6-preview.1.md) ・
+[リリースノート](https://github.com/DeL-TaiseiOzaki/irori/releases) ・
 [ドキュメント](#ドキュメント) ・
 [Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
 
@@ -36,15 +36,15 @@
 
 | プラットフォーム | 状態 | 取得先 |
 | --- | --- | --- |
-| **Windows 11 x64** | 検証版 `0.1.6 preview`（配布用署名なし） | [インストーラー .exe（307.4 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.6-preview.1/irori-0.1.6-windows-x64-Setup.exe) |
-| **macOS（Apple Silicon）** | 検証版 `0.1.6 preview`（配布用署名なし） | [ディスクイメージ .dmg（270.7 MiB）](https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.6-preview.1/irori-0.1.6-macos-arm64.dmg) |
+| **Windows 11 x64** | 検証版 preview（配布用署名なし） | [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) の Windows 用インストーラー .exe |
+| **macOS（Apple Silicon）** | 検証版 preview（配布用署名なし） | [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) の Mac 用ディスクイメージ .dmg |
 | Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
 
-- SHA-256 — Windows `392a1bca2f42ad842ecb36e09979db6080052cc0462e485f757ef28887d096eb` / 322,288,128 バイト、macOS `597403e13c6d837de4871eace4d029177a2f9e3e934b3eeb22fcb4f37f464311` / 283,886,432 バイト。検証記録は [リリースノート v0.1.6-preview.1](docs/releases/0.1.6-preview.1.md) と [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- 公開中の版、各ファイルのサイズと SHA-256 は、[リリース一覧](https://github.com/DeL-TaiseiOzaki/irori/releases) の最新プレリリースにあるリリースノートと、添付の `SHA256SUMS.txt` にあります。
 - 配布用の署名がないため、Windows は発行元を確認できない旨の警告を表示します。**Mac は初回起動が拒否されます。** 「システム設定 → プライバシーとセキュリティ」で irori のブロック通知の横の「このまま開く」を一度押してください。2 回目からは通常どおり開けます。
 - Windows は AMD Ryzen・Intel の **x64 向け**で、Windows ARM 版ではありません。Mac は **Apple Silicon（M シリーズ）専用**です。Intel Mac には対応しません。
 - Windows 11 / macOS 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
-- 0.1.5 からの主な変更は、KB が宣言したスキルを作成欄で選べるようになったことと、`.obsidian/` などドットで始まるフォルダをノート一覧ではなくスキーマ側に表示するようになったことです。インストール済みの 0.1.5 では「更新を確認」でこの版が案内されます。
+- インストール済みのアプリでは「更新を確認」で新しい版が案内されます。main に入ったアプリの変更は検証版として速やかに公開し、1 時間を超えて未公開のままなら自動チェックが知らせます（[DISTRIBUTION](docs/DISTRIBUTION.md)）。
 
 インストール後に必要なもの:
 
@@ -72,7 +72,7 @@ CLI 側のルール・設定・スキル・MCP の探索は各プロバイダの
 
 ## 現在のステータス
 
-公開中の配布物は **Windows x64 と macOS arm64 の、配布用署名がない検証版 0.1.6 preview** です。完成版リリースではありません。
+公開中の配布物は **Windows x64 と macOS arm64 の、配布用署名がない検証版（preview）** です。完成版リリースではありません。
 
 確認待ち・未実装の主な項目:
 

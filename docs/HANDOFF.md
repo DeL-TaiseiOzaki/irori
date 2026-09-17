@@ -10,9 +10,11 @@ platforms; see [CHECKPOINT](CHECKPOINT.md) for the order used.
 
 After merging an app-affecting change, advance the package version and publish,
 or report the drift explicitly. The update check never offers a newer preview of
-the version a reader already runs. The next engineering step is automating that
-in stages: first a release-relevance and drift check, then automatic publication
-with a generated manifest.
+the version a reader already runs. `release-sync.yml` enforces the version and
+notes on pull requests, and flags `main` when a shipped change stays unpublished
+for more than an hour; `scripts/release-policy.ts` decides what ships. Automatic
+publication with a generated website manifest is the next step. Until it lands,
+publish by hand as [DISTRIBUTION](DISTRIBUTION.md) describes.
 
 Mac download, 2026-09-16: [v0.1.5-preview.3](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.3)
 was published before anyone had confirmed it starts on a Mac. On 2026-09-17 the
