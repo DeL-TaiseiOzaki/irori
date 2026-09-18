@@ -90,6 +90,41 @@
   background: var(--paper);
   font-size: 14px;
   font-synthesis: none;
+
+  /* Rendered Markdown has its own reader-controlled face. Each stack remains
+     useful offline and falls back to a matching generic family on every OS. */
+  --markdown-font-system: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --markdown-font-sans:
+    'Noto Sans JP', 'Yu Gothic UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  --markdown-font-rounded:
+    'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', 'Kosugi Maru', 'Yu Gothic UI', Meiryo,
+    sans-serif;
+  --markdown-font-serif: 'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+  --markdown-font-textbook:
+    'UD Digi Kyokasho N-R', YuKyokasho, 'Yu Kyokasho', Klee, 'Noto Serif JP', serif;
+  --markdown-font-mono:
+    'Noto Sans Mono CJK JP', 'BIZ UDGothic', 'SFMono-Regular', Consolas, monospace;
+  --markdown-font: var(--markdown-font-sans);
+}
+
+:root[data-markdown-font='system'] {
+  --markdown-font: var(--markdown-font-system);
+}
+
+:root[data-markdown-font='rounded'] {
+  --markdown-font: var(--markdown-font-rounded);
+}
+
+:root[data-markdown-font='serif'] {
+  --markdown-font: var(--markdown-font-serif);
+}
+
+:root[data-markdown-font='textbook'] {
+  --markdown-font: var(--markdown-font-textbook);
+}
+
+:root[data-markdown-font='mono'] {
+  --markdown-font: var(--markdown-font-mono);
 }
 
 /* The dark palette is a second full set of roles, not an inversion: the
@@ -1414,6 +1449,7 @@ main > header .actions {
 .document-editor .milkdown .ProseMirror {
   padding: 28px clamp(16px, 3vw, 44px);
   min-height: 450px;
+  font-family: var(--markdown-font);
   font-size: 15px;
   line-height: 1.95;
 }
@@ -2384,8 +2420,47 @@ footer > span {
   border-radius: 5px;
   cursor: pointer;
 }
+.appearance-menu-divider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--rule);
+}
+.appearance-menu-label {
+  padding: 5px 10px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
 .appearance-menu [role='menuitemradio'] > span {
   margin-right: auto;
+}
+.appearance-menu [role='menuitemradio'] > .font-swatch {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 0;
+  color: var(--ember-ink);
+  font-size: 14px;
+  line-height: 1;
+}
+.font-system {
+  font-family: var(--markdown-font-system);
+}
+.font-sans {
+  font-family: var(--markdown-font-sans);
+}
+.font-rounded {
+  font-family: var(--markdown-font-rounded);
+}
+.font-serif {
+  font-family: var(--markdown-font-serif);
+}
+.font-textbook {
+  font-family: var(--markdown-font-textbook);
+}
+.font-mono {
+  font-family: var(--markdown-font-mono);
 }
 .appearance-menu [role='menuitemradio'] > .ui-icon:first-child {
   color: var(--ember-ink);

@@ -158,8 +158,11 @@ export interface StartRun {
   /** Name of a skill package this KB declares, prepended to the request. */
   skill?: string;
 }
+export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
+export type MarkdownFont = (typeof markdownFonts)[number];
 export interface DeviceSettings {
   theme: 'system' | 'light' | 'dark';
+  markdownFont: MarkdownFont;
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
 }

@@ -91,13 +91,28 @@ try {
   // The reader's own light/dark choice, applied at once and kept for next launch.
   const dark = () => page.evaluate(() => document.documentElement.dataset.theme === 'dark');
   await expect.poll(dark).toBe(false);
-  await page.getByLabel(/表示テーマ/).click();
+  await page.getByLabel(/表示設定/).click();
   await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
   await expect.poll(dark).toBe(true);
-  await page.getByLabel(/表示テーマ/).click();
+  // The rendered note typeface changes without replacing the editor and is
+  // kept in the same device record as the theme and pane sizes.
+  await page.getByLabel(/表示設定/).click();
+  for (const name of ['システム', '丸ゴシック', '教科書体'])
+    await expect(page.getByRole('menuitemradio', { name, exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/irori-font-menu.png', fullPage: true });
+  await page.getByRole('menuitemradio', { name: '教科書体', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.markdownFont))
+    .toBe('textbook');
+  await expect
+    .poll(() =>
+      page.locator('.ProseMirror').evaluate((element) => getComputedStyle(element).fontFamily),
+    )
+    .toContain('UD Digi Kyokasho N-R');
+  await page.getByLabel(/表示設定/).click();
   await page.getByRole('menuitemradio', { name: 'システムに合わせる', exact: true }).click();
   await expect.poll(dark).toBe(false);
-  await page.getByLabel(/表示テーマ/).click();
+  await page.getByLabel(/表示設定/).click();
   await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
   await expect.poll(dark).toBe(true);
   // Pane sizes are the reader's too, and the device record keeps both.
@@ -401,6 +416,9 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       await expect
         .poll(() => window.evaluate(() => document.documentElement.dataset.theme === 'dark'))
         .toBe(true);
+      await expect
+        .poll(() => window.evaluate(() => document.documentElement.dataset.markdownFont))
+        .toBe('textbook');
       await window.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await expect
         .poll(() =>

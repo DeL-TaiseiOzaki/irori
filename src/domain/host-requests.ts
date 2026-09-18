@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds } from './types';
+import { agentIds, markdownFonts } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
@@ -29,6 +29,7 @@ export const hostArguments = {
   saveDeviceSettings: z.tuple([
     z.object({
       theme: z.enum(['system', 'light', 'dark']).optional(),
+      markdownFont: z.enum(markdownFonts).optional(),
       layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
     }),
   ]),

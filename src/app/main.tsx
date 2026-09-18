@@ -10,7 +10,13 @@ import { appendConversationEvent, type QueuedMessage } from '../domain/conversat
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
 import { AgentMarkdown } from './AgentMarkdown';
-import { applyTheme, layoutStorage, loadDeviceSettings, watchSystemTheme } from './device-settings';
+import {
+  applyMarkdownFont,
+  applyTheme,
+  layoutStorage,
+  loadDeviceSettings,
+  watchSystemTheme,
+} from './device-settings';
 import { Appearance } from './Appearance';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { Toggle } from '@base-ui/react/toggle';
@@ -1846,11 +1852,12 @@ function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
     </div>
   );
 }
-// The device record carries the theme and the pane sizes, so it is read before
+// The device record carries the appearance and pane sizes, so it is read before
 // the first render rather than applied over one.
 watchSystemTheme();
 void loadDeviceSettings().finally(() => {
   applyTheme();
+  applyMarkdownFont();
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary FallbackComponent={AppCrash}>
       <App />
