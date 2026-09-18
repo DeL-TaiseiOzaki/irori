@@ -5,9 +5,12 @@ The owner gave standing authorization for agents to publish a preview after an
 authorized merge. That covers the prerelease, the website manifest and Pages
 deployment, and the anonymous download check. Signing identities, notarization,
 a non-preview release and account changes still need their own authorization.
-The latest preview, [v0.1.8-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.8-preview.1),
+The latest preview, [v0.1.9-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.9-preview.1),
 publishes `main` for both platforms. See [CHECKPOINT](CHECKPOINT.md) for the
-order used and what the two releases under the checks showed.
+order used and what the three releases under the checks showed. A branch opened
+before the checks existed carries neither a version nor notes: add both while
+rebasing it, and correct any verification numbers it states, rather than
+discovering it when the pull request fails.
 
 Template and daily notes, 2026-09-17: `irori-templete` `main` is now an OKF 0.2
 bundle maintained by agents (its ADR 002); it ships no ontology files and expects
