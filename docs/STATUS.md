@@ -1,17 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Markdown font preference, 2026-09-16: the existing appearance menu now lets a
+Markdown font preference, 2026-09-18: the existing appearance menu now lets a
 reader choose among six offline system-font stacks for rendered Markdown:
 system, gothic, rounded gothic, mincho, textbook and monospace. Each item previews
 its own type; editor controls, source views and the rest of the application keep
 their established face. The choice applies without remounting the editor and is
 stored in `device-settings.json`, with a gothic default for existing devices and
-validated IPC/storage values. Verification: build/typecheck/format, **141 behaviour
-tests (137 passed, four environment-gated skips)**, and all **twelve Electron UI
-suites**. `ui-smoke` verifies the expanded menu, computed Markdown font immediately
-after selection and the saved choice after two process restarts; the same run
-continues through rich editing, save, undo/redo and image paste. No installer,
-website or published release changes.
+validated IPC/storage values. Which face a stack resolves to is the device's
+answer, not irori's: nothing is downloaded, and every stack ends in a generic
+family. Version 0.1.9 with its notes accompanies the change; publication follows
+the merge. Verification after rebasing onto the release sync checks: production
+build, format check, **156 behaviour tests (152 passed, four environment-gated
+skips)**, and all **thirteen Electron UI suites**. `ui-smoke` verifies the
+expanded menu, the computed Markdown font immediately after selection and the
+saved choice after two process restarts; the same run continues through rich
+editing, save, undo/redo and image paste.
 
 Daily notes and a declared note directory, 2026-09-17: a KB may now carry
 `.irori/notes.json`, tracked with the KB, declaring `newNoteDirectory` (offered
