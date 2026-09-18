@@ -1,4 +1,44 @@
-# Checkpoint — 0.1.6, 0.1.7 and 0.1.8 preview deliveries
+# Checkpoint — 0.1.6 through 0.1.9 preview deliveries
+
+## 0.1.9, a branch that predated the checks
+
+Session of 2026-09-18. #17 had been open since 2026-09-16 and was CONFLICTING:
+it let a reader choose the Markdown typeface, and `main` had moved fourteen
+commits past it. Rebasing onto `e21029e` produced one conflict, in
+`docs/STATUS.md`; every source file merged on its own, including the three both
+sides had edited. The branch also predated `release-sync.yml`, so it carried
+neither a version nor notes for a change that ships. The rebase added version
+0.1.9, `docs/releases/0.1.9-preview.1.md` and the measured numbers — the entry
+had claimed 141 behaviour tests and twelve UI suites, and this tree has 156 and
+thirteen. The owner authorized the merge; it landed at 08:43Z as `83b482e`.
+
+- The first `gh workflow run release.yml` returned HTTP 500 from the dispatch
+  endpoint and created no run. The workflow was active, the inputs matched and
+  the default branch was right; an unchanged retry succeeded. Check the run list
+  before assuming a failed dispatch did nothing.
+- [Release run 35329571029](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35329571029) published
+  [v0.1.9-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.9-preview.1) at 09:27Z from the
+  artifacts of [CI 35325838150](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35325838150) for `83b482e`. The notes
+  held prose only; the workflow appended the **Exact package** section:
+  - Windows installer: 322,445,824 bytes, SHA-256
+    `202fd31e187aa61f6d1983e6af724f5f118e1075cde0bb2db3fd70c6ebda47b8`.
+  - Mac disk image: 284,118,714 bytes, SHA-256
+    `7d29c6550f7e3273cb94ab44dd0570dcef797042be107dda697c92ab647cbb42`.
+- At 09:29Z, anonymous downloads of both installers and `SHA256SUMS.txt`
+  returned HTTP 200. The byte counts matched, and `sha256sum -c` passed.
+- #41 pointed the manifest at the release; both assets round to the sizes the
+  manifest already carried, so only the version, the notes URL and the two
+  download URLs changed. [Pages run 35330584063](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35330584063)
+  deployed it, and the live page's bundle offered `v0.1.9-preview.1` at 09:39Z.
+- [Release-sync run 35330692231](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35330692231), dispatched by hand, reported
+  `main` in step with `v0.1.9-preview.1`.
+
+The site offered the release 56 minutes after #17 merged, inside the 60-minute
+grace period with four minutes to spare, against 0.1.8's 23 minutes and 0.1.7's
+73, which missed it. The manifest's own CI cycle
+is again the larger part: its pull request ran verify and all three package jobs
+for a four-line change to a file that does not ship. Automatic publication
+remains the next engineering step.
 
 ## 0.1.8, the second release under the sync checks
 
