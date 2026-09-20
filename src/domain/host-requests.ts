@@ -114,6 +114,7 @@ export const hostArguments = {
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
   skills: z.tuple([id]),
+  noteAuthorship: z.tuple([id, path, text]),
   saveImage: z.tuple([
     id,
     path,

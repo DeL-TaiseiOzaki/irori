@@ -15,17 +15,19 @@ import { ImageService } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
+import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkspaceCloudStorage } from '../cloud/storage';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
+import { classify } from '../domain/scopes';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
-import type { HostEvent, Space } from '../domain/types';
+import type { AgentId, HostEvent, Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
 let window: BrowserWindow | undefined;
@@ -92,8 +94,35 @@ app
       return cloud.resolve(ref.scopeId, ref.path);
     });
     const outbox = new CloudOutbox(files.dataDir, knowledge);
-    const agents = new AgentService(files, (event) => emit({ type: 'agent', event }), knowledge);
+    const authorship = new AuthorshipStore(files.dataDir);
+    const agents = new AgentService(
+      files,
+      (event) => emit({ type: 'agent', event }),
+      knowledge,
+      authorship,
+    );
     let fileMutations = 0;
+    /**
+     * A write that lands in a space while one of its runs is executing came from
+     * that run: irori launched the process and no other writer is expected. The
+     * knowledge layer only, and Markdown only, because that is what a reader
+     * sees attributed in the editor.
+     */
+    async function observeRunWrites(
+      space: Space,
+      files_: string[],
+      by: { agent: AgentId; runId: string },
+    ) {
+      for (const filename of files_) {
+        const rel = path.relative(space.root, filename).replaceAll('\\', '/');
+        if (!rel.endsWith('.md') || classify(space, rel) !== 'Knowledge_Base') continue;
+        const doc = await files.read(space.scopeId, rel).catch(() => undefined);
+        if (!doc) continue;
+        await authorship
+          .observe({ scopeId: space.scopeId, path: rel }, doc.text, { kind: 'agent', ...by })
+          .catch(() => {});
+      }
+    }
     const git = new GitService(files, () => !agents.anyBusy && !cloud.busy && fileMutations === 0);
     function canStartAgent() {
       if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
@@ -122,9 +151,22 @@ app
           );
         },
       });
-      watcher.on('all', () => {
+      let changed = new Set<string>();
+      let owner: { agent: AgentId; runId: string } | undefined;
+      watcher.on('all', (_event, filename) => {
+        // Whoever owns the space when a batch opens wrote it. The run can finish
+        // before the batch is handled, so it is read here rather than later.
+        if (!changed.size) owner = agents.current(space.scopeId);
+        if (typeof filename === 'string') changed.add(filename);
         clearTimeout(timer);
-        timer = setTimeout(() => emit({ type: 'files', scopeId: space.scopeId }), 150);
+        timer = setTimeout(() => {
+          const written = [...changed];
+          const by = owner;
+          changed = new Set();
+          owner = undefined;
+          if (by) void observeRunWrites(space, written, by);
+          emit({ type: 'files', scopeId: space.scopeId });
+        }, 150);
       });
       watcher.on('error', (error) => console.warn('Watcher error', String(error)));
       watchers.push(watcher);
@@ -359,7 +401,17 @@ app
       read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),
       readImage: (...args) => images.read(...args),
-      save: (doc) => changeFiles(() => files.save(doc)),
+      save: (doc) =>
+        changeFiles(async () => {
+          const saved = await files.save(doc);
+          // The reader's own bytes, named before the watcher reports them back.
+          // The save does not wait on it: the store orders its own reads, so the
+          // editor's next request sees this observation either way.
+          void authorship
+            .observe({ scopeId: saved.scopeId, path: saved.path }, saved.text, { kind: 'human' })
+            .catch(() => {});
+          return saved;
+        }),
       draft: (doc) => files.draft(doc),
       createNote: (id, name, directory) =>
         changeFiles(async () =>
@@ -371,6 +423,7 @@ app
         const filename = await files.resolve(...args);
         await openFile(filename);
       },
+      noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
       agents: () => agents.available(),
       agentSession: (...args) => agents.session(...args),
       agentConversation: (...args) => agents.conversation(...args),

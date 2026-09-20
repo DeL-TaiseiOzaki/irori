@@ -1,5 +1,50 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Which lines an agent wrote, 2026-09-21: irori records who typed each line of a
+note and shows it. Two observations feed the record — `save` in
+`src/host/main.ts` names the reader's lines with bytes it already holds for the
+pre-save hash check, and the file watcher names an agent's, attributing a batch
+of changes to the run that owned the space when that batch opened, because a run
+can finish before the batch is handled. Markdown in the knowledge layer only. A
+line neither observation saw is unattested rather than the reader's, so a note
+that arrived through `git pull` carries no marks.
+
+The record is keyed by the line's own normalised text, not by its position. A
+line range is stale the moment a paragraph is inserted above it, and carrying
+ranges across `rebase`, `squash` and `merge` is the expensive half of every tool
+that does this; content identity removes the problem instead of solving it. A
+line that moves keeps its author, a line that is rewritten becomes the writer's,
+and no diff is computed, so [ADR 004](decisions/004-ui-library-adoption.md)
+stands. Normalisation absorbs the spacing and bullet markers rich editing
+rewrites on save. Lines under three characters once punctuation is removed carry
+no key: a rule or a bare bullet is in every note.
+
+Above the note, a line states how many lines each CLI contributed; source view
+marks an agent's lines in the gutter. With a note selected, the request sent to
+an agent states each writer's line ranges in the bytes it is told to read,
+**as a record and not an instruction** — what an agent may do with the reader's
+lines is the knowledge base's contract, not a sentence irori prepends. Nothing
+is written into the KB: the record sits beside the existing device-local run and
+source observations. `git ai checkpoint known_human` is deliberately not called;
+it would report as the reader's every line no agent hook happened to claim,
+which fails in the one direction that matters. See [AUTHORSHIP](AUTHORSHIP.md).
+
+Verification: production build, format check, **162 behaviour tests (158 passed,
+four environment-gated skips)** including the new `tests/authorship.test.ts`,
+and all **thirteen Electron UI suites**, where `harness-ui-smoke` has a fixture
+append to an open note during a run, restarts the application and reads the
+attribution back. Version 0.1.12 with its notes accompanies the change;
+publication follows the merge.
+
+The record is device-local: it does not reach a collaborator, a second machine
+or an agent running outside irori. Identical lines share one attribution. Any
+write landing in a space during one of its runs is attributed to that run, so
+editing the same checkout elsewhere during a run misattributes those lines. The
+rich editor states a total rather than marking each block, because a Markdown
+block and a ProseMirror node are not guaranteed to correspond one to one. The
+next step, when wanted, is export and import of the Git AI Standard v3 note at
+`refs/notes/ai`, reading first.
+
 Less code reaches the window, 2026-09-21: the packaged front end falls from
 6,946,180 to 3,828,368 bytes and from 183 files to 131, with no feature removed.
 

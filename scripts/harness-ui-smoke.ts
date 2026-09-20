@@ -196,6 +196,10 @@ try {
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
+  // The line the OpenCode fixture appended is attributed to it, and the record
+  // outlives the process that observed it.
+  await page.getByRole('button', { name: 'note', exact: true }).click();
+  await expect(page.locator('.hint.authorship')).toContainText('OpenCode が 1 行');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
