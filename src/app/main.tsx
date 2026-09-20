@@ -1,5 +1,3 @@
-import { KnowledgePanel } from './KnowledgePanel';
-import { SearchPanel } from './SearchPanel';
 import { classify } from '../domain/scopes';
 import { useDraft, flushDrafts } from './useDraft';
 import { UpdateNotice } from './UpdateNotice';
@@ -9,7 +7,6 @@ import type { SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
-import { AgentMarkdown } from './AgentMarkdown';
 import {
   applyMarkdownFont,
   applyTheme,
@@ -27,7 +24,15 @@ import {
   Separator as PaneSeparator,
   useDefaultLayout,
 } from 'react-resizable-panels';
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AgentEvent,
@@ -51,11 +56,63 @@ const OntologyPanel = lazy(() =>
   import('./OntologyPanel').then((module) => ({ default: module.OntologyPanel })),
 );
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
+// Panels only some sessions open. Loading them on first use keeps their code,
+// and the libraries they alone pull in, out of the first paint. Each keeps its
+// own name so the panels below read the same as before.
+const GitPanelView = lazy(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
+function GitPanel(props: ComponentProps<typeof GitPanelView>) {
+  return (
+    <Suspense fallback={null}>
+      <GitPanelView {...props} />
+    </Suspense>
+  );
+}
+const ConnectionsView = lazy(() =>
+  import('./Connections').then((m) => ({ default: m.Connections })),
+);
+function Connections(props: ComponentProps<typeof ConnectionsView>) {
+  return (
+    <Suspense fallback={null}>
+      <ConnectionsView {...props} />
+    </Suspense>
+  );
+}
+const SearchPanelView = lazy(() =>
+  import('./SearchPanel').then((m) => ({ default: m.SearchPanel })),
+);
+function SearchPanel(props: ComponentProps<typeof SearchPanelView>) {
+  return (
+    <Suspense fallback={null}>
+      <SearchPanelView {...props} />
+    </Suspense>
+  );
+}
+const KnowledgePanelView = lazy(() =>
+  import('./KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })),
+);
+function KnowledgePanel(props: ComponentProps<typeof KnowledgePanelView>) {
+  return (
+    <Suspense fallback={null}>
+      <KnowledgePanelView {...props} />
+    </Suspense>
+  );
+}
+// A reply is Markdown, but its renderer is the heaviest thing a session that
+// never opens the assistant would otherwise load. The reply's own text is the
+// fallback, so nothing disappears while that code arrives.
+const RenderedMarkdown = lazy(() =>
+  import('./AgentMarkdown').then((m) => ({ default: m.AgentMarkdown })),
+);
+function AgentMarkdown({ text }: { text: string }) {
+  return (
+    <Suspense fallback={<span>{text}</span>}>
+      <RenderedMarkdown text={text} />
+    </Suspense>
+  );
+}
 import type { EditorHandle } from '../editor/Editor';
 import './style.css';
 import { Startup, RegisterSpace } from './Startup';
-import { Connections } from './Connections';
-import { GitPanel } from './GitPanel';
 import { LayerExplorer, Tree } from './LayerExplorer';
 import { appIcon, appVersion } from './branding';
 import { Icon } from './Icon';

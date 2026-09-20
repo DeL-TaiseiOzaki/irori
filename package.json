@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -33,6 +33,7 @@
     "@base-ui/react": "1.8.0",
     "@codemirror/lang-markdown": "6.5.2",
     "@codemirror/language": "6.12.4",
+    "@codemirror/language-data": "6.5.2",
     "@codemirror/state": "6.7.4",
     "@codemirror/view": "6.43.11",
     "@dagrejs/dagre": "3.1.1",

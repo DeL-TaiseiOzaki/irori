@@ -1,15 +1,48 @@
 import path from 'node:path';
+import { z } from 'zod';
+import { parse as parseYaml } from 'yaml';
 import type { FileService } from './files';
 import { classify } from '../domain/scopes';
 import {
+  maxSkillBytes,
   maxSkills,
-  parseSkill,
   skillFile,
+  skillName,
   skillsRoot,
   type AgentSkill,
   type SkillListing,
   type SkillProblem,
 } from '../domain/skills';
+
+const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
+const skillMetadata = z.looseObject({
+  name: skillName,
+  description: z.string().min(1).max(400),
+});
+
+/** Reads one package. YAML stays on this side of the boundary; the renderer
+ * only ever needs the name rule and the prompt shape. */
+export function parseSkill(directory: string, text: string): AgentSkill {
+  if (new TextEncoder().encode(text).byteLength > maxSkillBytes)
+    throw Error(`A skill package is at most ${maxSkillBytes} bytes`);
+  const name = skillName.parse(directory);
+  const match = frontMatter.exec(text.replace(/^﻿/, ''));
+  if (!match)
+    throw Error('A skill must begin with --- front matter declaring name and description');
+  const metadata = skillMetadata.parse(
+    parseYaml(match[1], { schema: 'failsafe', logLevel: 'error', stringKeys: true }),
+  );
+  if (metadata.name !== name)
+    throw Error(`Front matter name ${JSON.stringify(metadata.name)} does not match its directory`);
+  const instructions = (match[2] ?? '').trim();
+  if (!instructions) throw Error('A skill has no instructions below its front matter');
+  return {
+    name,
+    description: metadata.description,
+    instructions,
+    path: `${skillsRoot}/${name}/${skillFile}`,
+  };
+}
 
 async function readSkill(
   files: FileService,

@@ -63,7 +63,9 @@ try {
     .poll(() =>
       page.locator('.brand-icon').evaluate((image) => (image as HTMLImageElement).naturalWidth),
     )
-    .toBe(1254);
+    // The renderer carries a 256px mark; the full-resolution file stays for the
+    // window, the dock and the installers.
+    .toBe(256);
   const startupMs = Date.now() - launchStart;
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   const registration = page.getByRole('dialog', { name: 'スペース登録' });

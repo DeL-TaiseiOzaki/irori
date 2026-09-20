@@ -1,5 +1,47 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Less code reaches the window, 2026-09-21: the packaged front end falls from
+6,946,180 to 3,828,368 bytes and from 183 files to 131, with no feature removed.
+
+The largest single item was a maths engine the product never offered. Crepe's
+entry point is one flattened bundle whose top-level imports pull KaTeX and its
+fifty-nine font files in regardless of `features: { Latex: false }`, because
+that flag is read at runtime, after bundling. `src/editor/Editor.tsx` now
+composes `CrepeBuilder` with the nine features the editor uses and imports each
+feature's stylesheet, which removes 1.4 MB. What the discarded default
+configuration added is a CodeMirror theme this file already overrides with the
+application's own tokens, so behaviour is unchanged; `@codemirror/language-data`
+becomes a direct dependency because the default config was what supplied it.
+The dead `math` entry in the block menu, hidden since Latex was disabled, is
+gone with it.
+
+Three smaller items follow the same shape — code loaded by every session for a
+minority of them. `AgentMarkdown`, the source-control, connections, search and
+knowledge panels now load on first use, each wrapped so the panels below read
+unchanged; a reply's own text is the fallback while its renderer arrives.
+`parseSkill` moves to `src/host/skills.ts`, which takes `yaml` out of the
+renderer — `src/domain/conversation.ts` needed only the name rule, and the
+parser is called from the host alone. `src/app/branding.ts` points at a new
+256-pixel mark, since the renderer draws it at 40 and 80 pixels while the
+window, dock and installers keep the full-resolution file. About 1.9 kB of
+stylesheet for a Git dialog that became an inline panel, for font classes
+superseded by `data-markdown-font`, and for a `.modal-backdrop` with no base
+rule, is deleted.
+
+What the window loads before anything is opened falls from 818.7 kB to 589.4 kB
+(258.7 to 187.2 compressed); the editor's own code from 1,595.5 kB to 1,253.0 kB
+(519.6 to 414.7 compressed). Verification: production build, format check,
+**157 behaviour tests (153 passed, four environment-gated skips)** and all
+**thirteen Electron UI suites**; `ui-smoke` now expects the 256-pixel mark.
+Version 0.1.11 with its notes accompanies the change; publication follows the
+merge.
+
+The installer is not smaller in proportion: the front end is about one percent
+of the package, and the agent SDK's platform binaries dominate it. Memory in use
+was not compared against the earlier build. Code blocks still carry every
+language CodeMirror ships, which is the next measurable item and a product
+question rather than a mechanical one.
+
 One run per knowledge base, 2026-09-21: a run now belongs to a space rather than
 to the application. `AgentService` holds `Map<scopeId, Run>` instead of one
 `active` run, so two spaces work at the same time while a second agent in one
