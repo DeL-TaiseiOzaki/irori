@@ -10,10 +10,17 @@ CLI.
 ## Where skills live
 
 `.agents/skills/<name>/SKILL.md`, in the KB's schema layer. The directory is the
-provider-neutral location Codex already reads as repository-scope skills and the
-one [claudian](https://github.com/YishenTu/claudian) uses for its vault store, so
-a KB that declares skills there works in irori and outside it without a second
-copy. irori does not write into it, generate per-runtime stubs, or change a
+provider-neutral location Codex reads as repository-scope skills and that Pi
+searches natively beside `~/.agents/skills/`, following the Agent Skills
+convention, so a KB that declares skills there works in irori and outside it
+without a second copy.
+
+Corrected 2026-09-21: this paragraph previously said claudian used the same
+directory as its vault store. It does not — it reads `.claude/skills` and
+`.claude/commands` (`src/providers/claude/storage/SkillStorage.ts`,
+`SlashCommandStorage.ts` at version 2.3.1), and `.agents` appears nowhere in its
+source. The directory is still the right one, on the evidence above, but a KB's
+skills are not visible to claudian without a second copy there. irori does not write into it, generate per-runtime stubs, or change a
 native CLI's own skill configuration.
 
 A package declares YAML front matter and instructions, following the skill shape
