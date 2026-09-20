@@ -3,15 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {
-  maxSkillBytes,
-  maxSkills,
-  parseSkill,
-  promptWithSkill,
-  skillsRoot,
-} from '../src/domain/skills';
+import { maxSkillBytes, maxSkills, promptWithSkill, skillsRoot } from '../src/domain/skills';
 import { FileService } from '../src/host/files';
-import { readSkills, requireSkill } from '../src/host/skills';
+import { parseSkill, readSkills, requireSkill } from '../src/host/skills';
 import { messageInput } from '../src/domain/conversation';
 
 const body = (

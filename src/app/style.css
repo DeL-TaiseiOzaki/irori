@@ -259,61 +259,6 @@ main > footer {
   flex-shrink: 0;
 }
 
-/* Repository ownership stays visible while reviewing or publishing changes. */
-.git-dialog {
-  color: var(--ink);
-  background: var(--paper);
-  width: min(1220px, calc(100vw - 48px));
-  height: min(860px, calc(100vh - 48px));
-  max-width: none;
-  max-height: none;
-  padding: 0;
-  border: 1px solid var(--rule);
-  border-radius: 12px;
-  box-shadow: var(--shadow-modal);
-  overflow: hidden;
-}
-.git-dialog[open] {
-  display: flex;
-  flex-direction: column;
-}
-.git-dialog::backdrop {
-  background: var(--backdrop);
-}
-.git-dialog-heading {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 14px 20px;
-  background: var(--nav);
-  color: var(--nav-text-strong);
-}
-.git-dialog-heading > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.git-dialog-heading > div .ui-icon {
-  color: var(--ember-on-nav);
-}
-.git-dialog-heading > label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  font-size: 12px;
-}
-.git-dialog-heading select {
-  max-width: 280px;
-  padding: 6px 10px;
-  color: var(--ink);
-}
-.git-dialog-heading > button {
-  padding: 6px;
-  color: var(--nav-text-strong);
-  background: var(--nav-raised);
-  border-color: var(--nav-rule);
-}
 .git-repository-bar {
   display: flex;
   flex-wrap: wrap;
@@ -640,10 +585,6 @@ main > footer {
   gap: 8px;
 }
 @media (max-width: 1100px) {
-  .git-dialog {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-  }
   .git-review {
     grid-template-columns: 250px minmax(0, 1fr);
   }
@@ -652,9 +593,6 @@ main > footer {
   }
   .git-repository-bar {
     font-size: 12px;
-  }
-  .git-dialog-heading select {
-    max-width: 200px;
   }
 }
 * {
@@ -2068,9 +2006,6 @@ footer > span {
   .layer-heading h2 {
     font-size: 10px;
   }
-  .modal-backdrop {
-    padding: 12px;
-  }
   .modal {
     padding: 22px;
   }
@@ -2443,24 +2378,6 @@ footer > span {
   color: var(--ember-ink);
   font-size: 14px;
   line-height: 1;
-}
-.font-system {
-  font-family: var(--markdown-font-system);
-}
-.font-sans {
-  font-family: var(--markdown-font-sans);
-}
-.font-rounded {
-  font-family: var(--markdown-font-rounded);
-}
-.font-serif {
-  font-family: var(--markdown-font-serif);
-}
-.font-textbook {
-  font-family: var(--markdown-font-textbook);
-}
-.font-mono {
-  font-family: var(--markdown-font-mono);
 }
 .appearance-menu [role='menuitemradio'] > .ui-icon:first-child {
   color: var(--ember-ink);

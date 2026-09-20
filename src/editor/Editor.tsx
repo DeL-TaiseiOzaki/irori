@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, useImperativeHandle, type Ref } from 'react';
-import { Crepe } from '@milkdown/crepe';
+import { CrepeBuilder } from '@milkdown/crepe/builder';
+import { blockEdit } from '@milkdown/crepe/feature/block-edit';
+import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
+import { cursor } from '@milkdown/crepe/feature/cursor';
+import { imageBlock } from '@milkdown/crepe/feature/image-block';
+import { linkTooltip } from '@milkdown/crepe/feature/link-tooltip';
+import { listItem } from '@milkdown/crepe/feature/list-item';
+import { placeholder } from '@milkdown/crepe/feature/placeholder';
+import { table } from '@milkdown/crepe/feature/table';
+import { toolbar as toolbarFeature } from '@milkdown/crepe/feature/toolbar';
+import { languages } from '@codemirror/language-data';
 import { serializerCtx, editorViewCtx, remarkCtx } from '@milkdown/kit/core';
 import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
@@ -11,7 +21,23 @@ import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
-import '@milkdown/crepe/theme/common/style.css';
+// Crepe's own entry point and its combined stylesheet are flattened bundles that
+// import KaTeX and its fonts unconditionally, so `features: { Latex: false }` —
+// a runtime flag read after bundling — never removed them. Composing the builder
+// from the features this editor uses, and importing each feature's stylesheet,
+// keeps the behaviour and leaves the maths engine out. What the removed default
+// configuration added is a CodeMirror theme this file already overrides.
+import '@milkdown/crepe/theme/common/prosemirror.css';
+import '@milkdown/crepe/theme/common/reset.css';
+import '@milkdown/crepe/theme/common/block-edit.css';
+import '@milkdown/crepe/theme/common/code-mirror.css';
+import '@milkdown/crepe/theme/common/cursor.css';
+import '@milkdown/crepe/theme/common/image-block.css';
+import '@milkdown/crepe/theme/common/link-tooltip.css';
+import '@milkdown/crepe/theme/common/list-item.css';
+import '@milkdown/crepe/theme/common/placeholder.css';
+import '@milkdown/crepe/theme/common/toolbar.css';
+import '@milkdown/crepe/theme/common/table.css';
 import '@milkdown/crepe/theme/frame.css';
 // CodeMirror ships a light-only default theme. Expressing the source editor in
 // design tokens instead lets one definition follow the document theme, so the
@@ -58,14 +84,15 @@ const sourceHighlight = HighlightStyle.define([
 // Crepe's editor chrome ships English copy. The product is Japanese, so the
 // strings come from its own configuration rather than from new components.
 const japaneseEditorChrome = {
-  [Crepe.Feature.Placeholder]: { text: '本文を入力…' },
-  [Crepe.Feature.LinkTooltip]: {
+  placeholder: { text: '本文を入力…' },
+  linkTooltip: {
     inputPlaceholder: 'リンク先を貼り付け…',
     editButton: '編集',
     removeButton: '削除',
     confirmButton: '確定',
   },
-  [Crepe.Feature.CodeMirror]: {
+  codeMirror: {
+    languages,
     // Code blocks inside the note are CodeMirror as well; share the token theme.
     theme: [sourceTheme, syntaxHighlighting(sourceHighlight)],
     searchPlaceholder: '言語を検索…',
@@ -73,7 +100,7 @@ const japaneseEditorChrome = {
     copyText: 'コピー',
     previewLabel: 'プレビュー',
   },
-  [Crepe.Feature.BlockEdit]: {
+  blockEdit: {
     textGroup: {
       label: 'テキスト',
       text: { label: '本文' },
@@ -97,7 +124,6 @@ const japaneseEditorChrome = {
       image: { label: '画像' },
       codeBlock: { label: 'コード' },
       table: { label: '表' },
-      math: { label: '数式' },
     },
   },
 } as const;
@@ -201,44 +227,45 @@ export function Editor({
       element.addEventListener(event, markEdited, true);
     element.addEventListener('keydown', keyboard, true);
     element.addEventListener('pointerdown', toolbar, true);
-    const crepe = new Crepe({
-      root: element,
-      defaultValue: encoding.body,
-      features: { [Crepe.Feature.Latex]: false },
-      featureConfigs: {
-        ...japaneseEditorChrome,
-        [Crepe.Feature.ImageBlock]: {
-          onUpload: async (file) => {
-            try {
-              if (readOnly || !onUpload) throw Error('このノートは読み取り専用です。');
-              markEdited();
-              return await onUpload(file);
-            } catch (error) {
-              onError?.(error);
-              return '';
-            }
-          },
-          proxyDomURL: async (url) => {
-            if (!url) return '';
-            try {
-              return (await resolveImage?.(url)) ?? '';
-            } catch {
-              if (!dead)
-                setImageErrors((errors) =>
-                  errors.includes(url) ? errors : [...errors, url].slice(0, 10),
-                );
-              return '';
-            }
-          },
-          blockUploadButton: '画像を選択',
-          inlineUploadButton: '画像を選択',
-          blockUploadPlaceholderText: '画像の相対パス',
-          inlineUploadPlaceholderText: '画像の相対パス',
-          blockCaptionPlaceholderText: 'キャプション',
-          blockConfirmButton: '追加',
+    const crepe = new CrepeBuilder({ root: element, defaultValue: encoding.body })
+      .addFeature(cursor)
+      .addFeature(listItem)
+      .addFeature(toolbarFeature)
+      .addFeature(table)
+      .addFeature(placeholder, japaneseEditorChrome.placeholder)
+      .addFeature(linkTooltip, japaneseEditorChrome.linkTooltip)
+      .addFeature(codeMirror, japaneseEditorChrome.codeMirror)
+      .addFeature(blockEdit, japaneseEditorChrome.blockEdit)
+      .addFeature(imageBlock, {
+        onUpload: async (file) => {
+          try {
+            if (readOnly || !onUpload) throw Error('このノートは読み取り専用です。');
+            markEdited();
+            return await onUpload(file);
+          } catch (error) {
+            onError?.(error);
+            return '';
+          }
         },
-      },
-    });
+        proxyDomURL: async (url) => {
+          if (!url) return '';
+          try {
+            return (await resolveImage?.(url)) ?? '';
+          } catch {
+            if (!dead)
+              setImageErrors((errors) =>
+                errors.includes(url) ? errors : [...errors, url].slice(0, 10),
+              );
+            return '';
+          }
+        },
+        blockUploadButton: '画像を選択',
+        inlineUploadButton: '画像を選択',
+        blockUploadPlaceholderText: '画像の相対パス',
+        inlineUploadPlaceholderText: '画像の相対パス',
+        blockCaptionPlaceholderText: 'キャプション',
+        blockConfirmButton: '追加',
+      });
     crepe.editor
       .use(literalBlock)
       .use(preserveBlocks)
