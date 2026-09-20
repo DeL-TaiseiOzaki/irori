@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Fourth release under the sync checks, 2026-09-21:
+[v0.1.12-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.12-preview.1)
+publishes #43's per-space runs, #44's lighter package and #45's authorship
+record for Windows x64 and Apple silicon Mac, from CI 35544793813 at `08900b0`
+through release run 35545248675. Anonymous downloads — no credentials, straight
+from the release URL — returned 319,919,104 and 281,574,107 bytes whose SHA-256
+matched `SHA256SUMS.txt` and GitHub's own asset digests. Pages run 35545797228
+deployed the manifest from #47, and the site's bundle names both installers and
+the tag. The release came 11 minutes after the first shipped merge and the page
+23 minutes after it, inside the one-hour grace period.
+
+The version advanced from 0.1.9 to 0.1.12 in one release. 0.1.10 and 0.1.11
+have committed notes but no package of their own: each pull request had to
+advance the version past the published preview to satisfy `release-sync.yml`,
+and publishing the intermediate ones would offer a reader two upgrades to reach
+the same code. The three sets of notes describe what this one package contains.
+
 Which lines an agent wrote, 2026-09-21: irori records who typed each line of a
 note and shows it. Two observations feed the record — `save` in
 `src/host/main.ts` names the reader's lines with bytes it already holds for the
