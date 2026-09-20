@@ -1,5 +1,6 @@
 import { KnowledgeStore } from '../knowledge/store';
-import type { RunRecord } from '../domain/knowledge';
+import { AuthorshipStore } from '../knowledge/authorship';
+import { authorshipSummary, type RunRecord } from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
@@ -55,6 +56,7 @@ export class AgentService {
     private knowledge = new KnowledgeStore(files.dataDir, (ref) =>
       files.resolve(ref.scopeId, ref.path),
     ),
+    private authorship = new AuthorshipStore(files.dataDir),
   ) {
     this.sessions = new SessionStore(files.dataDir);
     // An unwritable history is a whole-device fault, so every run stops.
@@ -73,6 +75,11 @@ export class AgentService {
   }
   runningScopes() {
     return [...this.runs.keys()];
+  }
+  /** The run a space is executing, for observations that have to name it. */
+  current(scopeId: string) {
+    const run = this.runs.get(scopeId);
+    return run ? { agent: run.binding.agent, runId: run.id } : undefined;
   }
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.files.get(scopeId).root };
@@ -279,6 +286,14 @@ export class AgentService {
         promptParts.push(
           `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.`,
         );
+        // Line numbers are those of the saved bytes the agent is told to read.
+        const note = { scopeId: input.scopeId, path: input.notePath };
+        const summary = await this.files
+          .read(input.scopeId, input.notePath)
+          .then((doc) => this.authorship.view(note, doc.text))
+          .then(authorshipSummary)
+          .catch(() => undefined);
+        if (summary) promptParts.push(summary);
       }
       const selectedSkill = input.skill
         ? await requireSkill(this.files, input.scopeId, input.skill)

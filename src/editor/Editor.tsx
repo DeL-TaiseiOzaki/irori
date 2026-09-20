@@ -15,7 +15,8 @@ import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
-import { EditorView } from '@codemirror/view';
+import type { NoteAuthorship } from '../domain/knowledge';
+import { EditorView, GutterMarker, gutter } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
@@ -128,6 +129,19 @@ const japaneseEditorChrome = {
   },
 } as const;
 
+/**
+ * A line an agent wrote carries a mark in the source gutter. The reader's own
+ * lines and lines nothing was observed about carry none: the absence of a mark
+ * is not a claim, and marking every line would say nothing.
+ */
+class AgentLine extends GutterMarker {
+  elementClass = 'cm-authored-agent';
+  toDOM() {
+    return document.createTextNode('');
+  }
+}
+const agentLine = new AgentLine();
+
 export interface EditorHandle {
   getText(): string;
 }
@@ -142,6 +156,7 @@ export function Editor({
   readOnly = false,
   searchTarget,
   onSearchResult,
+  authorship,
 }: {
   text: string;
   mode: 'rich' | 'source';
@@ -153,16 +168,24 @@ export function Editor({
   readOnly?: boolean;
   searchTarget?: SearchTarget;
   onSearchResult?: (found: boolean) => void;
+  authorship?: NoteAuthorship;
 }) {
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const navigation = useRef({ searchTarget, onSearchResult });
   navigation.current = { searchTarget, onSearchResult };
+  const authored = useRef(authorship);
+  authored.current = authorship;
+  const source = useRef<EditorView | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const change = useRef(onChange);
   change.current = onChange;
   const initial = useRef(text);
   const snapshot = useRef(() => initial.current);
   useImperativeHandle(ref, () => ({ getText: () => snapshot.current() }), []);
+  // The gutter reads the record through a ref, so a new one only needs a repaint.
+  useEffect(() => {
+    source.current?.dispatch({});
+  }, [authorship]);
   useEffect(() => {
     if (!root.current) return;
     let dead = false;
@@ -179,6 +202,14 @@ export function Editor({
             EditorState.lineSeparator.of(initial.current.includes('\r\n') ? '\r\n' : '\n'),
             Prec.high(syntaxHighlighting(sourceHighlight)),
             sourceTheme,
+            gutter({
+              class: 'cm-authorship',
+              lineMarker: (view, line) =>
+                authored.current?.lines[view.state.doc.lineAt(line.from).number - 1]?.kind ===
+                'agent'
+                  ? agentLine
+                  : null,
+            }),
             basicSetup,
             markdown(),
             EditorView.lineWrapping,
@@ -188,6 +219,7 @@ export function Editor({
           ],
         }),
       });
+      source.current = view;
       snapshot.current = () => view.state.sliceDoc();
       if (navigation.current.searchTarget) {
         // CodeMirror positions count a line separator as one character, even
@@ -202,7 +234,10 @@ export function Editor({
         }
         navigation.current.onSearchResult?.(!!match);
       }
-      return () => view.destroy();
+      return () => {
+        source.current = null;
+        view.destroy();
+      };
     }
     // Give each asynchronous Crepe lifecycle its own root (including React cleanup).
     const element = document.createElement('div');

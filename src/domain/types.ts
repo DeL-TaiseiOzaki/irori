@@ -268,6 +268,12 @@ export interface HostAPI {
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
+  /** Who typed each line of this text, resolved against the record on this device. */
+  noteAuthorship(
+    scopeId: string,
+    path: string,
+    text: string,
+  ): Promise<import('./knowledge').NoteAuthorship>;
   /** Skill packages this KB declares in `.agents/skills/`. */
   skills(scopeId: string): Promise<import('./skills').SkillListing>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;

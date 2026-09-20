@@ -1411,6 +1411,19 @@ main > header .actions {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
+/* A line an agent wrote is marked at the edge of the source view. A line the
+   reader typed, and a line nothing was observed about, carry no mark: an absent
+   mark is not a claim, and marking every line would say nothing. */
+.cm-authorship {
+  width: 3px;
+  padding: 0;
+}
+.cm-authorship .cm-gutterElement.cm-authored-agent {
+  background: var(--ember);
+}
+.hint.authorship {
+  margin: 0 0 8px;
+}
 .cm-gutters {
   background: var(--surface-sunken) !important;
   border-right: 0 !important;

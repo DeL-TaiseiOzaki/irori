@@ -3,7 +3,7 @@ import { useDraft, flushDrafts } from './useDraft';
 import { UpdateNotice } from './UpdateNotice';
 import { NoteActions, TrashNotes } from './NoteActions';
 import type { SearchTarget } from '../editor/search-navigation';
-import type { SourceRef } from '../domain/knowledge';
+import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { Popover } from '@base-ui/react/popover';
@@ -314,6 +314,7 @@ function App() {
     [runningScopes, setRunningScopes] = useState<string[]>([]),
     [fresh, setFresh] = useState(false);
   const [skillRevision, setSkillRevision] = useState(0);
+  const [authorship, setAuthorship] = useState<NoteAuthorship>();
   const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId], {
     enabled: !!active,
     refresh: skillRevision,
@@ -410,6 +411,26 @@ function App() {
     if (followConversation.current && conversation.current)
       conversation.current.scrollTop = conversation.current.scrollHeight;
   }, [events, panel]);
+  // Who typed which line of the open note. A cloud file is read-only and has no
+  // record; a failure here leaves the note unmarked rather than unopenable.
+  useEffect(() => {
+    if (!doc || doc.workspaceId) return setAuthorship(undefined);
+    let current = true;
+    const { scopeId, path, text } = doc;
+    void host
+      .noteAuthorship(scopeId, path, text)
+      .then((value) => current && setAuthorship(value))
+      .catch(() => current && setAuthorship(undefined));
+    return () => {
+      current = false;
+    };
+  }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
+  const authoredLines = useMemo(() => {
+    const counts = new Map<AgentId, number>();
+    for (const line of authorship?.lines ?? [])
+      if (line?.kind === 'agent') counts.set(line.agent, (counts.get(line.agent) ?? 0) + 1);
+    return [...counts];
+  }, [authorship]);
   const editor = useRef<EditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
@@ -1075,6 +1096,13 @@ function App() {
                 {status}
               </p>
             )}
+            {authoredLines.length > 0 && (
+              <p className="hint authorship" role="status">
+                {authoredLines.map(([id, count]) => `${agentNames[id]} が ${count} 行`).join('、')}
+                を記述しました。
+                {mode === 'source' ? '左端の印が該当行です。' : 'ソース表示で行ごとに示します。'}
+              </p>
+            )}
             {error && (
               <div className="error" role="alert">
                 {error}
@@ -1272,6 +1300,7 @@ function App() {
                               onChange={setBuffer}
                               onError={report}
                               searchTarget={searchTarget}
+                              authorship={authorship}
                               onSearchResult={(found) =>
                                 setSearchNotice(
                                   found
