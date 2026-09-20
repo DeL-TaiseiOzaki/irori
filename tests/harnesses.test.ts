@@ -75,7 +75,7 @@ async function setup(t: any) {
       await service.cancel();
     }
     await done;
-    assert.equal(service.busy, false);
+    assert.equal(service.busy(space.scopeId), false);
     return { events, service };
   };
   return { root, space, files, calls, execute };

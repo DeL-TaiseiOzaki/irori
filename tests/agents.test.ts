@@ -90,6 +90,44 @@ test('A cancelled startup releases the mutation lock without launching a provide
   service.start(input);
   assert.throws(() => service.start(input), /already running/);
   await service.cancel();
-  assert.equal(service.busy, false);
+  assert.equal(service.busy(s.scopeId), false);
   assert.equal(outcome, 'cancelled');
+});
+test('Each space runs its own agent; a second run in the same space is refused', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori parallel runs '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const roots = [path.join(base, 'personal'), path.join(base, 'team')];
+  for (const root of roots) await mkdir(root);
+  const personal = await files.register(roots[0], 'Personal', 'personal');
+  const team = await files.register(roots[1], 'Team', 'team');
+  const outcomes = new Map<string, string>();
+  const service = new AgentService(files, (e) => {
+    if (e.type === 'done' && e.scopeId) outcomes.set(e.scopeId, e.outcome!);
+  });
+  const instruction = { agent: 'codex' as const, prompt: 'Do nothing' };
+  service.start({ ...instruction, scopeId: personal.scopeId });
+  service.start({ ...instruction, scopeId: team.scopeId });
+  assert.deepEqual(
+    service.runningScopes().sort(),
+    [personal.scopeId, team.scopeId].sort(),
+    'both spaces run at once',
+  );
+  assert.throws(
+    () => service.start({ ...instruction, agent: 'claude', scopeId: personal.scopeId }),
+    /already running/,
+    'a space that is running refuses a second agent',
+  );
+  // Cancel synchronously, before either run reaches a provider launch.
+  const stopPersonal = service.cancel(personal.scopeId);
+  assert.equal(service.busy(team.scopeId), true, 'one cancellation leaves the other space running');
+  const stopTeam = service.cancel(team.scopeId);
+  await Promise.all([stopPersonal, stopTeam]);
+  assert.equal(service.anyBusy, false);
+  assert.deepEqual(
+    [outcomes.get(personal.scopeId), outcomes.get(team.scopeId)],
+    ['cancelled', 'cancelled'],
+    'each run reports its own outcome',
+  );
 });

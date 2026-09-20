@@ -254,7 +254,7 @@ function App() {
     [agent, setAgent] = useState<AgentId>('codex'),
     [infos, setInfos] = useState<AgentInfo[]>([]);
   const [events, setEvents] = useState<AgentEvent[]>([]),
-    [running, setRunning] = useState(false),
+    [runningScopes, setRunningScopes] = useState<string[]>([]),
     [fresh, setFresh] = useState(false);
   const [skillRevision, setSkillRevision] = useState(0);
   const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId], {
@@ -296,6 +296,18 @@ function App() {
   function updateEvents(update: (events: AgentEvent[]) => AgentEvent[]) {
     setEvents(update);
   }
+  // A run belongs to one space. Every space's run is tracked so the explorer can
+  // mark them, while the panel's controls follow the selected space alone.
+  function markRunning(scopeId: string, value: boolean) {
+    setRunningScopes((all) =>
+      value
+        ? all.includes(scopeId)
+          ? all
+          : [...all, scopeId]
+        : all.filter((id) => id !== scopeId),
+    );
+  }
+  const running = !!active && runningScopes.includes(active.scopeId);
   useEffect(() => {
     let current = true;
     conversationKey.current = `${active?.scopeId ?? ''}:${agent}`;
@@ -317,7 +329,7 @@ function App() {
           if (revision !== eventRevision.current) continue;
           setEvents(value.events);
           setQueued(value.queued);
-          setRunning(!!value.activeRunId);
+          markRunning(active.scopeId, !!value.activeRunId);
           setHistoryTruncated(value.truncated);
           setConversationReady(true);
           return;
@@ -429,6 +441,7 @@ function App() {
         void reconcile();
       } else if (event.type === 'agent') {
         const incoming = event.event;
+        if (incoming.scopeId) markRunning(incoming.scopeId, incoming.type !== 'done');
         if (conversationKey.current !== `${incoming.scopeId}:${incoming.agent}`) return;
         eventRevision.current++;
         updateEvents((all) => {
@@ -437,7 +450,6 @@ function App() {
           return [...next.slice(0, -1), { ...last, text: last.text.slice(-200000) }];
         });
         if (incoming.type === 'done') {
-          setRunning(false);
           setSkillRevision((value) => value + 1);
           if (incoming.outcome !== 'completed') setQueuePaused(true);
           setRevision((r) => r + 1);
@@ -519,7 +531,7 @@ function App() {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
     if (!(await save())) return false;
-    if (running || queued.length || connecting) return false;
+    if (sending || queued.length || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
       setActive(space);
       setDoc(undefined);
@@ -538,8 +550,8 @@ function App() {
         return false;
       }
       if (!(await save())) return false;
-      if ((running || sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
-        setError('実行を停止してからスペースを切り替えてください。');
+      if ((sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
+        setError('送信待ちを完了してからスペースを切り替えてください。');
         return false;
       }
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
@@ -561,7 +573,7 @@ function App() {
   ) {
     setError('');
     followConversation.current = true;
-    setRunning(true);
+    markRunning(active!.scopeId, true);
     await host.start({
       scopeId: active!.scopeId,
       agent,
@@ -612,7 +624,7 @@ function App() {
         );
       setFresh(false);
     } catch (e) {
-      if (!running) setRunning(false);
+      if (!running) markRunning(active!.scopeId, false);
       report(e);
     } finally {
       submitting.current = false;
@@ -640,12 +652,12 @@ function App() {
         return;
       }
       try {
-        setRunning(true);
+        markRunning(active!.scopeId, true);
         followConversation.current = true;
         await host.startQueuedMessage(active!.scopeId, agent, next.id);
         setQueued((all) => all.filter((item) => item.id !== next.id));
       } catch (error) {
-        setRunning(false);
+        markRunning(active!.scopeId, false);
         setQueuePaused(true);
         report(error);
       }
@@ -1612,7 +1624,7 @@ function App() {
                         <button
                           onClick={() => {
                             setQueuePaused(true);
-                            void host.cancel().catch(report);
+                            void host.cancel(active!.scopeId).catch(report);
                           }}
                         >
                           停止

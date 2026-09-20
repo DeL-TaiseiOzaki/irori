@@ -134,7 +134,7 @@ export const hostArguments = {
   startQueuedMessage: z.tuple([id, z.enum(agentIds), id]),
   resetAgentSession: z.tuple([id, z.enum(agentIds)]),
   start: z.tuple([startInput]),
-  cancel: z.tuple([]),
+  cancel: z.union([z.tuple([]), z.tuple([id])]),
   respond: z.tuple([
     id,
     z.boolean(),

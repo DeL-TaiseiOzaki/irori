@@ -42,11 +42,13 @@ type Run = {
   close: () => void;
 };
 export class AgentService {
-  private active?: Run;
+  // One run per space. Two spaces are separate checkouts, so their runs never
+  // touch the same bytes; two runs in one space would.
+  private runs = new Map<string, Run>();
   private sessions: SessionStore;
   private conversations: ConversationStore;
-  private resetting = false;
-  private requests = new Map<string, (reply: Reply) => void>();
+  private resetting = new Set<string>();
+  private requests = new Map<string, { run: Run; reply: (reply: Reply) => void }>();
   constructor(
     private files: FileService,
     private emit: (event: AgentEvent) => void,
@@ -55,16 +57,22 @@ export class AgentService {
     ),
   ) {
     this.sessions = new SessionStore(files.dataDir);
+    // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, () => {
-      const run = this.active;
-      if (run) {
+      for (const run of [...this.runs.values()]) {
         this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
-        void this.cancel();
+        void this.cancel(run.binding.scopeId);
       }
     });
   }
-  get busy() {
-    return !!this.active || this.resetting;
+  busy(scopeId: string) {
+    return this.runs.has(scopeId) || this.resetting.has(scopeId);
+  }
+  get anyBusy() {
+    return this.runs.size > 0 || this.resetting.size > 0;
+  }
+  runningScopes() {
+    return [...this.runs.keys()];
   }
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.files.get(scopeId).root };
@@ -78,13 +86,9 @@ export class AgentService {
   queueMessage(input: StartRun) {
     input = startInput.parse(input);
     if (input.newSession) throw Error('新しい会話は送信待ちを完了してから開始してください。');
-    if (
-      this.resetting ||
-      (this.active &&
-        (this.active.binding.scopeId !== input.scopeId ||
-          this.active.binding.agent !== input.agent))
-    )
-      throw Error('実行中のスペース・CLIに指示を追加してください。');
+    const run = this.runs.get(input.scopeId);
+    if (this.resetting.has(input.scopeId) || (run && run.binding.agent !== input.agent))
+      throw Error('このスペースで実行中のCLIに指示を追加してください。');
     return this.conversations.enqueue(this.binding(input.scopeId, input.agent), input);
   }
   removeQueued(scopeId: string, agent: AgentId, id: string) {
@@ -96,26 +100,26 @@ export class AgentService {
     if (!next || next.id !== id) throw Error('送信待ちの順序が変わりました。');
     canStart();
     const runId = this.start({ ...next, scopeId, agent }, id);
-    await this.active!.accepted;
+    await this.runs.get(scopeId)!.accepted;
     return runId;
   }
   async startAccepted(input: StartRun) {
     const id = this.start(input);
-    await this.active!.accepted;
+    await this.runs.get(input.scopeId)!.accepted;
     return id;
   }
   flush() {
     return this.conversations.flush();
   }
   async resetSession(scopeId: string, agent: AgentId) {
-    if (this.busy) throw Error('実行を停止してから会話の継続をリセットしてください。');
-    this.resetting = true;
+    if (this.busy(scopeId)) throw Error('実行を停止してから会話の継続をリセットしてください。');
+    this.resetting.add(scopeId);
     try {
       if ((await this.conversation(scopeId, agent)).queued.length)
         throw Error('送信待ちを完了または取り消してから会話をリセットしてください。');
       await this.sessions.reset(this.binding(scopeId, agent));
     } finally {
-      this.resetting = false;
+      this.resetting.delete(scopeId);
     }
   }
   async available(): Promise<AgentInfo[]> {
@@ -147,8 +151,9 @@ export class AgentService {
     );
   }
   start(input: StartRun, queuedId?: string): string {
-    if (this.busy) throw Error('An agent is already running. Stop it before starting another.');
     input = startInput.parse(input);
+    if (this.busy(input.scopeId))
+      throw Error('This space is already running an agent. Stop it before starting another.');
     if (!input.prompt.trim() || input.prompt.length > 32000)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.files.get(input.scopeId);
@@ -176,7 +181,7 @@ export class AgentService {
       closed,
       close,
     };
-    this.active = run;
+    this.runs.set(input.scopeId, run);
     // Let the IPC caller bind the returned run id before first events arrive.
     setTimeout(() => void this.execute(run, input), 0);
     return run.id;
@@ -186,7 +191,7 @@ export class AgentService {
     if (run.recorded)
       void this.conversations.event(run.binding, event).catch(() => {
         this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
-        void this.cancel();
+        void this.cancel(run.binding.scopeId);
       });
   }
   private publish(
@@ -210,7 +215,7 @@ export class AgentService {
     if (run.cancelled) return Promise.resolve({ allow: false });
     const requestId = randomUUID();
     return new Promise((resolve) => {
-      this.requests.set(requestId, resolve);
+      this.requests.set(requestId, { run, reply: resolve });
       this.event(run, questions ? 'question' : 'permission', text, {
         requestId,
         details: JSON.stringify(details, null, 2).slice(0, 24000),
@@ -219,18 +224,29 @@ export class AgentService {
     });
   }
   respond(id: string, allow: boolean, answers?: AgentAnswers) {
-    const resolve = this.requests.get(id);
-    if (!resolve) throw Error('This request has already ended');
+    const pending = this.requests.get(id);
+    if (!pending) throw Error('This request has already ended');
     this.requests.delete(id);
-    resolve({ allow, answers });
+    pending.reply({ allow, answers });
   }
-  async cancel() {
-    const run = this.active;
+  /** Denies and forgets every request one run is waiting on, leaving other runs' requests alone. */
+  private denyRequests(run: Run) {
+    for (const [id, pending] of [...this.requests]) {
+      if (pending.run !== run) continue;
+      this.requests.delete(id);
+      pending.reply({ allow: false });
+    }
+  }
+  async cancel(scopeId?: string) {
+    if (scopeId === undefined) {
+      await Promise.all(this.runningScopes().map((id) => this.cancel(id)));
+      return;
+    }
+    const run = this.runs.get(scopeId);
     if (!run) return;
     run.cancelled = true;
     run.abort.abort();
-    for (const reply of this.requests.values()) reply({ allow: false });
-    this.requests.clear();
+    this.denyRequests(run);
     if (run.rpc && run.threadId && run.turnId)
       run.rpc.send({
         id: 0,
@@ -244,7 +260,7 @@ export class AgentService {
   private async execute(run: Run, input: StartRun) {
     const timer = setTimeout(() => {
       this.event(run, 'error', '実行時間の上限（10分）に達しました。');
-      void this.cancel();
+      void this.cancel(run.binding.scopeId);
     }, 600000);
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
@@ -330,8 +346,7 @@ export class AgentService {
       }
     } finally {
       clearTimeout(timer);
-      for (const reply of this.requests.values()) reply({ allow: false });
-      this.requests.clear();
+      this.denyRequests(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       if (run.cancelled) outcome = 'cancelled';
@@ -359,7 +374,7 @@ export class AgentService {
             '実行は終了しましたが、会話履歴を保存できませんでした。変更内容を確認してください。';
         }
       }
-      this.active = undefined;
+      if (this.runs.get(run.binding.scopeId) === run) this.runs.delete(run.binding.scopeId);
       this.publish(run, 'done', done.text, { outcome: done.outcome });
       run.close();
     }

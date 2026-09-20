@@ -299,7 +299,8 @@ export interface HostAPI {
   startQueuedMessage(scopeId: string, agent: AgentId, id: string): Promise<string>;
   resetAgentSession(scopeId: string, agent: AgentId): Promise<void>;
   start(input: StartRun): Promise<string>;
-  cancel(): Promise<void>;
+  /** Stops the run in one space, or every run when no space is named. */
+  cancel(scopeId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;
   onEvent(callback: (event: HostEvent) => void): () => void;
 }

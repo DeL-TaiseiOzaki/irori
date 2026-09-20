@@ -94,7 +94,7 @@ app
     const outbox = new CloudOutbox(files.dataDir, knowledge);
     const agents = new AgentService(files, (event) => emit({ type: 'agent', event }), knowledge);
     let fileMutations = 0;
-    const git = new GitService(files, () => !agents.busy && !cloud.busy && fileMutations === 0);
+    const git = new GitService(files, () => !agents.anyBusy && !cloud.busy && fileMutations === 0);
     function canStartAgent() {
       if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
       if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
@@ -169,7 +169,7 @@ app
       }
     }
     function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
-      if (agents.busy || git.busy)
+      if (agents.busy(scopeId) || git.busy)
         throw Error('実行を停止してからクラウド接続を変更してください。');
       return changed(scopeId, operation);
     }
@@ -195,7 +195,7 @@ app
       moveNote: (ref, destination) =>
         changeFiles(() =>
           changed(ref.scopeId, async () => {
-            if (agents.busy || cloud.busy)
+            if (agents.busy(ref.scopeId) || cloud.busy)
               throw Error('実行と接続の準備が終わってからノートを整理してください。');
             const source = await knowledge.capture(ref);
             if (source.hash !== ref.hash)
@@ -217,7 +217,7 @@ app
       trashNote: (ref) =>
         changeFiles(() =>
           changed(ref.scopeId, async () => {
-            if (agents.busy || cloud.busy)
+            if (agents.busy(ref.scopeId) || cloud.busy)
               throw Error('実行と接続の準備が終わってからノートを整理してください。');
             return files.trashNote(ref);
           }),
@@ -226,7 +226,7 @@ app
       restoreNote: (id, trashId) =>
         changeFiles(() =>
           changed(id, async () => {
-            if (agents.busy || cloud.busy)
+            if (agents.busy(id) || cloud.busy)
               throw Error('実行と接続の準備が終わってから復元してください。');
             return files.restoreNote(id, trashId);
           }),
@@ -307,7 +307,7 @@ app
       workspaces: () => workspaces.list(),
       saveWorkspace: (...args) => workspaces.save(...args),
       removeWorkspace: async (id) => {
-        if (cloud.busy || agents.busy || git.busy)
+        if (cloud.busy || agents.anyBusy || git.busy)
           throw Error('操作の完了後に登録を削除してください。');
         await cloud.removeWorkspace(id, () => workspaces.remove(id));
       },
@@ -325,7 +325,7 @@ app
       addCloudAccount: (name) => cloud.addAccount(name),
       cancelCloudAccount: (id) => cloud.cancelAccount(id),
       removeCloudAccount: (id) => {
-        if (agents.busy || git.busy)
+        if (agents.anyBusy || git.busy)
           throw Error('実行を停止してからアカウントを登録解除してください。');
         return cloud.removeAccount(id);
       },
@@ -347,7 +347,7 @@ app
         return choice.canceled ? null : choice.filePaths[0];
       },
       register: async (root, name, category) => {
-        if (agents.busy || cloud.busy || git.busy)
+        if (agents.anyBusy || cloud.busy || git.busy)
           throw Error('Stop ongoing operations before registering a space');
         const inspection = await inspectRepository(root);
         if (inspection.kind === 'unavailable') throw Error(inspection.detail);
@@ -385,7 +385,7 @@ app
         canStartAgent();
         return agents.startAccepted(input);
       },
-      cancel: () => agents.cancel(),
+      cancel: (scopeId) => agents.cancel(scopeId),
       respond: (...args) => agents.respond(...args),
     } satisfies HostHandlers;
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {
@@ -426,7 +426,7 @@ app
             return;
           }
         }
-        if (agents.busy || terminals.busy) {
+        if (agents.anyBusy || terminals.busy) {
           const answer = await dialog.showMessageBox(window!, {
             message: '実行中のエージェント・ターミナルを停止して閉じますか？',
             buttons: ['戻る', '停止して閉じる'],
