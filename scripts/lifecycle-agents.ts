@@ -97,7 +97,7 @@ for (const agent of ['codex', 'claude'] as AgentId[]) {
     phase,
     outcome: cancelled.outcome,
     elapsedMs: Date.now() - start,
-    busy: service.busy,
+    busy: service.anyBusy,
   });
 }
 await mkdir('test-results', { recursive: true });

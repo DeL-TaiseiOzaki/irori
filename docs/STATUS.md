@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+One run per knowledge base, 2026-09-21: a run now belongs to a space rather than
+to the application. `AgentService` holds `Map<scopeId, Run>` instead of one
+`active` run, so two spaces work at the same time while a second agent in one
+space is still refused. Pending permission and question requests are held against
+their own run, so cancelling one space no longer denies another space's waiting
+requests — the previous `requests.clear()` did. The host's exclusions are split
+accordingly: organising a note, restoring one and changing a space's cloud
+connection consult `busy(scopeId)`, while registering a space, removing an
+account, cloning and the close prompt consult `anyBusy`. `HostAPI.cancel` takes
+an optional scope, and the renderer derives `running` from a `runningScopes`
+list rather than holding a separate flag, which also lets the explorer switch
+spaces during a run.
+
+Verification: production build, format check, **157 behaviour tests (153 passed,
+four environment-gated skips)** including a new `tests/agents.test.ts` case that
+starts runs in two registered spaces, refuses a second agent in one of them and
+cancels them one at a time, and all **thirteen Electron UI suites**. No provider
+is launched by that test and no model inference was requested. Version 0.1.10
+with its notes accompanies the change; publication follows the merge.
+
+Two real CLI processes at once are not exercised against live accounts, and the
+memory cost of simultaneous native agents is not measured. The conversation panel
+still shows one space, so a queue left in another space waits until that space is
+selected again.
+
 Markdown font preference, 2026-09-18: the existing appearance menu now lets a
 reader choose among six offline system-font stacks for rendered Markdown:
 system, gothic, rounded gothic, mincho, textbook and monospace. Each item previews

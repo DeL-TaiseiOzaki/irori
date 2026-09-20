@@ -119,7 +119,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
       service.start({ ...input, newSession });
       await assert.rejects(service.resetSession(space.scopeId, 'codex'), /停止/);
       await completed;
-      assert.equal(service.busy, false);
+      assert.equal(service.busy(space.scopeId), false);
       return { service, events };
     }
     assert.equal((await run()).events.at(-1)?.outcome, 'completed');
