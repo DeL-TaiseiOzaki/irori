@@ -47,12 +47,12 @@ looks for exactly these.
 
 **リンク元** in the note's toolbar lists the other notes in the same knowledge
 base whose links lead to the open one, each with its path, line and the text
-around the link; choosing one opens it through the ordinary open path. It is the
-reverse of following a link, and it answers with the same resolution: a line
-counts when one of its links, resolved against the note that carries it by
-`resolveNoteLink`, names the open note's path. So `../wiki/x.md`, `./x.md#見出し`,
-`<x y.md>`, `x%20y.md` and the editor's own `file\(1\).md` all count, while an
-absolute path, a `..` above the KB or another scheme does not.
+around the link; choosing one opens it at that link, through the ordinary open
+path. It is the reverse of following a link, and it answers with the same
+resolution: a line counts when one of its links, resolved against the note that
+carries it by `resolveNoteLink`, names the open note's path. So `../wiki/x.md`,
+`./x.md#見出し`, `<x y.md>`, `x%20y.md` and the editor's own `file\(1\).md` all
+count, while an absolute path, a `..` above the KB or another scheme does not.
 
 What counts is what a Markdown reader sees as a link: inline links, images and
 reference definitions. A link inside a code span or a fenced code block is text —
@@ -60,32 +60,56 @@ a note that explains how to write a link is not linking. Paths compare in NFC,
 because a Mac may store a Japanese file name decomposed while the link is
 written composed.
 
+Whether a link in another case counts is the disk's decision, as it is when the
+link is followed. The host looks the open note up under its name in the other
+case, through the same `resolve`; where that reaches the same file — same device,
+same inode — the volume folds case, and `[x](Note.md)` counts for `note.md` as
+following it would open it. On a case-sensitive volume it does not, as following
+it would fail. The platform is not consulted: a Mac volume may be either, and so
+may a mounted drive.
+
+Opening a hit lands on the link. Each hit carries the link's label as written and
+its column, found by pairing the line's brackets in one pass, and the editor
+selects that text the way it selects a search result's match — with the column
+choosing the link over earlier identical text on the line. Where the label is not
+on screen as written — a formatted or escaped label, an image's alt text, a
+reference definition, an empty label, a label that also appears in a code block,
+or a file changed since the list was made — the note still opens and the notice
+says the link could not be identified safely and names the line to look at.
+
+The list keeps itself current while it is open: the host's file-change event for
+that KB starts another scan, an older answer is dropped, and what is shown stays
+until the newer one arrives. The scan reads and writes nothing, so it raises no
+event of its own.
+
 The reading is linear in a line's length, and has to be: it runs in the main
 process, so a stalled pattern freezes the window. A first version found fences
 with a lookahead and code spans with a lazy backreference, and on two crafted
 lines it took four minutes. Fences are now one anchored match, code spans are
-paired in one pass over the backtick runs, and a test holds both lines to under
-a second.
+paired in one pass over the backtick runs, brackets are paired in one pass as
+well, and a test holds the crafted lines to under a second.
 
 There is no index. Asking scans the knowledge layer with the machinery of
 [KB text search](KB-SEARCH.md) — the same layer, the same exclusions, the same
 per-file reading guards and the same limits — reading Markdown only, and says
 when a limit or an unreadable file left the answer incomplete. The scan runs when
-asked rather than whenever a note opens, because without an index it costs a
-read of every note. The note itself is not listed, and nothing is written.
+the list is opened and when the KB changes rather than whenever a note opens,
+because without an index it costs a read of every note. The note itself is not
+listed — under either case where the disk folds it — and nothing is written.
 
 ## Not built here
 
 Source view does not follow links; the gesture works in the rich editor. A
 heading is not scrolled to. A missing page is not offered for creation. Links
 into `contents/` and into another registered KB are refused rather than routed,
-and no link is rewritten when a note moves. A backlink opens the note that
-carries it at the top rather than at the link; the list states the line.
+and no link is rewritten when a note moves. A formatted label is not selected;
+the notice names its line. The case probe reads the note's own folder, so a KB
+spanning volumes of both kinds answers for the folder the open note is in. A
+change the watcher does not report — it follows six folder levels, and some
+volumes report nothing — reaches the list when it is opened again.
 Frontmatter keys — OKF `relations` and `sources` — are not read as links, since
 whether irori reads the bundle's own graph is the open decision in
 [STATUS](STATUS.md).
-A link whose case differs from the file's name is not listed, even on a
-case-insensitive disk where following it works.
 
 ## Verification
 
@@ -98,8 +122,13 @@ open, and carries unsaved text through a link by saving it first — and it
 checks that a plain click opens nothing.
 
 For backlinks, the same test file covers each way a destination is written,
-code spans and fenced code, NFC comparison, linear time on crafted lines, the
-layer exclusions, the note's own link, an incomplete scan and the validated
-request. The UI suite lists the note
-linking to a page, opens it from the list, and shows the answer for a note
+code spans and fenced code, NFC comparison, the label a hit carries and the
+links that have none, the folded comparison beside the disk probe — asserting
+whichever answer the fixture's own disk gives — linear time on crafted lines,
+the layer exclusions, the note's own link, an incomplete scan and the validated
+request. `tests/search-navigation.test.ts` covers the column
+choosing the link over earlier identical text. The UI suite lists the note
+linking to a page, sees a note written while the list is open join it with
+nothing pressed, opens a formatted-label hit with the notice naming its line,
+opens a plain one with its label selected, and shows the answer for a note
 nothing links to.

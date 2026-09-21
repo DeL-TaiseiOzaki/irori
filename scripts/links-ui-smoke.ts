@@ -68,7 +68,8 @@ try {
   await page.getByRole('button', { name: 'topic', exact: true }).click();
   await expect(editor).toContainText('追記');
 
-  // The reverse: which notes point at the one being read, and going to one of them.
+  // The reverse: which notes point at the one being read, kept current while the
+  // list is open, and going to one of them lands on its link.
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
   const backlinksButton = page.getByRole('button', { name: 'リンク元', exact: true });
@@ -78,9 +79,32 @@ try {
   const backlink = backlinks.getByRole('button', { name: /wiki\/deep\.md/ });
   await expect(backlink).toContainText('3 行目');
   await expect(backlink).toContainText('[上の階層へ](../arrival.md)');
+
+  // A note written while the list is open joins it with nothing pressed.
+  await writeFile(path.join(root, 'late.md'), '# 遅れて書いたページ\n\n[**到着点**](arrival.md)\n');
+  await expect(backlinks).toContainText('2 件のリンク');
+  const late = backlinks.getByRole('button', { name: /late\.md/ });
+  await expect(late).toContainText('3 行目');
+
+  // A formatted label is not on screen as written: the note opens and the notice says so.
+  await late.click();
+  await expect(backlinks).toBeHidden();
+  await expect(editor).toContainText('遅れて書いたページ');
+  await expect(notice).toHaveText(
+    'リンクを安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。3 行目を確認してください。',
+  );
+
+  // A plain label is selected in the note that carries it.
+  await page.getByRole('button', { name: 'arrival', exact: true }).click();
+  await expect(editor).toContainText('到着点');
+  await backlinksButton.click();
   await backlink.click();
   await expect(backlinks).toBeHidden();
   await expect(editor).toContainText('深いページ');
+  await expect(notice).toHaveText('3 行目のリンクを選択しました。');
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+    .toBe('上の階層へ');
 
   // A note nothing points at says so.
   await page.getByRole('button', { name: 'topic', exact: true }).click();
@@ -92,7 +116,7 @@ try {
 
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Link UI smoke passed: relative links followed down, up and to a missing page, and back.',
+    'Link UI smoke passed: relative links followed down, up and to a missing page, and back to the link from a list that keeps itself current.',
   );
 } finally {
   await app.close();

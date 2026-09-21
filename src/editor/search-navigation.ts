@@ -4,6 +4,8 @@ export interface SearchTarget {
   query: string;
   line: number;
   preview: string;
+  /** Where the query stands on the line, when the caller knows; a link's label rather than the first same text. */
+  column?: number;
 }
 export interface SourceNode {
   type: string;
@@ -24,7 +26,8 @@ export function sourceMatch(text: string, target: SearchTarget) {
   const lines = text.split('\n');
   const line = lines[target.line - 1];
   if (line === undefined) return null;
-  const column = occurrences(line, target.query)[0];
+  const columns = occurrences(line, target.query);
+  const column = columns.find((at) => at === target.column) ?? columns[0];
   if (column === undefined) return null;
   // A stale result must not silently jump to an unrelated line after external edits.
   const preview = target.preview.replace(/^…|…$/g, '');

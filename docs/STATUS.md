@@ -1,5 +1,53 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Backlinks land on the link, follow the disk's case and keep themselves current,
+2026-09-21: the three limits the previous section recorded are closed. Choosing
+a note from **リンク元** now opens it at the link. Each hit carries the link's
+label as written and its column, found by pairing the line's brackets in one
+pass in `linksTo`, and the editor selects that text through the search
+navigation that already existed: `SearchTarget` gained an optional `column`, so
+the link is chosen over earlier identical text on its line rather than the first
+occurrence. Where the label is not on screen as written — a formatted or escaped
+label, an image, a reference definition, an empty label, a label also inside a
+code block, a file changed since — the note still opens and the notice says the
+link could not be identified safely and names the line; search's own notices are
+unchanged. The label rides on the matcher's existing `RegExpExecArray` contract
+as a named group, so `scan` and `KnowledgeSearch` keep their shapes and a text
+search hit is exactly what it was.
+
+A link differing from the file's name only in case counts where the disk folds
+case, as following it does there. `foldsCase` in `src/host/links.ts` asks the
+disk rather than the platform: it looks the open note up under its name in the
+other case through the same `resolve`, and the same device and inode is the same
+file. `samePath` then compares in one case as well as NFC, both for the links
+and for leaving the note itself out when it was reached through a link in the
+other case.
+
+The list follows the KB while it is open. The host's `files` event for that KB
+starts another scan, an older answer is dropped, and what is shown stays until
+the newer one arrives; the scan reads and writes nothing, so it raises no event
+of its own. もう一度調べる and the update notice are gone with that.
+
+Verification: production build, format check, **176 behaviour tests (172 passed,
+four environment-gated skips)** with three new ones — the label a hit names and
+the links that have none, the folded comparison beside the probe (asserting the
+case-sensitive branch on this container and the other on a folding disk), and
+the column preference — and all **fourteen Electron UI suites**, where
+`links-ui-smoke` now sees a note written while the list is open join it with
+nothing pressed, opens a formatted-label hit with the notice naming line 3, and
+opens a plain one with `上の階層へ` selected. Version 0.1.16 with its notes
+accompanies the change; publication follows the merge. Bracket
+pairing on crafted lines: 2M `[` before a link 97 ms, 200k links before the
+match 293 ms, 2M `](b.md)` with no `[` 2 ms. Breaking the image rule, the
+bracket pairing, the case folding, the probe, the column preference or the
+event subscription each fails a test.
+
+The case probe reads the note's own folder; a KB spanning volumes of both kinds
+answers for the folder the open note is in. The watcher follows six folder
+levels and some volumes report nothing, so such a change reaches the list when
+it is opened again. A formatted label is named, not selected. The index remains
+the next step for search and backlinks alike.
+
 The notes that link here, 2026-09-21: **リンク元** in the note's toolbar lists
 the other notes in the same knowledge base whose links lead to the open one,
 with the line and the text around each link, and opens the one chosen through

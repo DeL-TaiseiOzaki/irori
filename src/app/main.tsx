@@ -286,6 +286,13 @@ function SessionControls({
     </div>
   );
 }
+/** A backlink points at a link on the line, a search hit at matching text; the notice says which. */
+type Navigation = SearchTarget & { link?: boolean };
+function navigationNotice(target: Navigation, found: boolean) {
+  const what = target.link ? 'リンク' : '一致箇所';
+  if (found) return `${target.line} 行目の${what}を選択しました。`;
+  return `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'}`;
+}
 function App() {
   const [creatingNote, setCreatingNote] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
@@ -302,7 +309,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [backlinks, setBacklinks] = useState<{ scopeId: string; path: string }>();
   const [trashOpen, setTrashOpen] = useState(false);
-  const [searchTarget, setSearchTarget] = useState<SearchTarget>();
+  const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [skill, setSkill] = useState('');
@@ -487,7 +494,7 @@ function App() {
       report(error);
     }
   }
-  function load(next: Document, navigation?: SearchTarget) {
+  function load(next: Document, navigation?: Navigation) {
     reconciliation.current++;
     current.current = { doc: next, buffer: next.text, external: undefined };
     setSearchTarget(navigation);
@@ -656,7 +663,7 @@ function App() {
     }
     return true;
   }
-  async function open(space: Space, entry: Entry, navigation?: SearchTarget) {
+  async function open(space: Space, entry: Entry, navigation?: Navigation) {
     if (gitBusy) return false;
     try {
       if (!(await composer.flush())) return false;
@@ -1346,13 +1353,10 @@ function App() {
                               searchTarget={searchTarget}
                               authorship={authorship}
                               onFollowLink={(href) => void followLink(href)}
-                              onSearchResult={(found) =>
-                                setSearchNotice(
-                                  found
-                                    ? `${searchTarget?.line} 行目の一致箇所を選択しました。`
-                                    : '一致箇所を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。再検索して確認してください。',
-                                )
-                              }
+                              onSearchResult={(found) => {
+                                if (searchTarget)
+                                  setSearchNotice(navigationNotice(searchTarget, found));
+                              }}
                               onUpload={async (file) =>
                                 host.saveImage(
                                   doc.scopeId,
@@ -1835,13 +1839,25 @@ function App() {
             const space = spaces.find((item) => item.scopeId === backlinks.scopeId);
             const opened =
               space &&
-              (await open(space, {
-                path: hit.path,
-                name: hit.path.split('/').at(-1)!,
-                directory: false,
-                note: true,
-                layer: 'Knowledge_Base',
-              }));
+              (await open(
+                space,
+                {
+                  path: hit.path,
+                  name: hit.path.split('/').at(-1)!,
+                  directory: false,
+                  note: true,
+                  layer: 'Knowledge_Base',
+                },
+                // No label — an image, a reference definition — still opens the note
+                // and says so, since the line is known but the link is not selectable.
+                {
+                  query: hit.label ?? '',
+                  line: hit.line,
+                  preview: hit.preview,
+                  column: hit.column,
+                  link: true,
+                },
+              ));
             if (!opened)
               throw Error(
                 'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
