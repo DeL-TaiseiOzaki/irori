@@ -1,5 +1,43 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The package stopped carrying executables it never runs, 2026-09-21: the Linux
+x64 application directory falls from 994,253,996 to 500,345,370 bytes and its
+archive from 548,291,885 to 115,044,075, with no feature removed.
+
+Most of it was a second copy of Claude Code. `@anthropic-ai/claude-agent-sdk`
+declares one optional dependency per platform, each a complete executable of
+about 220 MB, and npm installs whichever ones match the build machine — on Linux
+the glibc and musl builds together, 433,217,072 bytes. The SDK resolves them
+only when `pathToClaudeCodeExecutable` is unset, and `src/agents/service.ts`
+always passes the reader's own installed `claude`, so nothing in irori ever
+opened the bundled copy; a packaged application cannot spawn a file inside
+`app.asar` in any case. The rest is node-pty's prebuilds for other platforms:
+only `build/Release` or `prebuilds/<platform>-<arch>` can load, and the two
+Windows ones alone are 58 MB. Both are removed in `packageAfterPrune`, after the
+production dependency walk has seen the tree npm installed.
+
+irori therefore redistributes no Claude Code executable, which is not MIT
+licensed; what it still redistributes is rclone and node-pty's native code for
+the target platform. See [PACKAGING](PACKAGING.md) and
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md).
+
+Verification: production build, format check, **162 behaviour tests (158 passed,
+four environment-gated skips)** and the Linux packaged smoke, which now asserts
+that no `claude-agent-sdk-<platform>` entry and no prebuild for another platform
+is in the archive, records the archived and unpacked weight in
+`package-smoke.json` and prints it into the job log. That run also drives the
+real terminal inside the packaged application, which is what shows the remaining
+node-pty binary is the loadable one — it matters most on Windows, the one
+platform that loads a prebuild instead of a rebuilt binary. Version 0.1.13 with
+its notes accompanies the change; publication follows the merge.
+
+Windows and macOS figures are not measured here; each comes from its own package
+job. This is delivery weight, not memory in use. The next measurable item is the
+renderer packages Forge copies because they are production dependencies although
+Vite has already bundled them into `dist/`, about 50 MB: dropping them means
+generating the notices their licences require, since the bundle does not carry
+each package's LICENSE file.
+
 Fourth release under the sync checks, 2026-09-21:
 [v0.1.12-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.12-preview.1)
 publishes #43's per-space runs, #44's lighter package and #45's authorship

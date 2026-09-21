@@ -143,6 +143,24 @@ try {
       !entries.includes(`node_modules/${name}/package.json`),
       `Development dependency shipped: ${name}`,
     );
+  // No executable the application never runs, and none for another platform: the Agent
+  // SDK's own Claude Code binary and node-pty's foreign prebuilds (docs/PACKAGING.md).
+  assert.deepEqual(
+    entries.filter((entry) => /^node_modules\/@anthropic-ai\/claude-agent-sdk-/.test(entry)),
+    [],
+    "The Agent SDK's bundled Claude Code binary is packaged",
+  );
+  const prebuilds = new Set(
+    entries.flatMap((entry) => {
+      const match = /^node_modules\/node-pty\/prebuilds\/([^/]+)/.exec(entry);
+      return match ? [match[1]] : [];
+    }),
+  );
+  assert.deepEqual(
+    [...prebuilds].filter((name) => name !== `${process.platform}-${process.arch}`),
+    [],
+    'node-pty prebuilds for another platform are packaged',
+  );
 
   const inventory = entries
     .filter((entry) => entry.startsWith('node_modules/') && entry.endsWith('/package.json'))
@@ -152,6 +170,13 @@ try {
         ? [{ name: data.name, version: data.version, license: data.license ?? null }]
         : [];
     });
+  // What the application itself weighs on this platform, apart from Electron's own files.
+  let unpacked = 0;
+  for await (const file of glob('**/*', { cwd: `${archive}.unpacked` })) {
+    const info = await stat(path.join(`${archive}.unpacked`, file));
+    if (info.isFile()) unpacked += info.size;
+  }
+  const weight = { asar: (await stat(archive)).size, unpacked };
   const env = { ...process.env, IRORI_DATA_DIR: path.join(temporary, 'device') } as Record<
     string,
     string
@@ -561,6 +586,7 @@ try {
         runtime,
         cloudSetup,
         oauthHandoff,
+        weight,
         inventory,
         artifacts,
       },
@@ -569,7 +595,8 @@ try {
     ) + '\n',
   );
   console.log(
-    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, CSV graph and normal shutdown.`,
+    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, CSV graph and normal shutdown. ` +
+      `The application weighs ${weight.asar} bytes archived and ${weight.unpacked} unpacked.`,
   );
 } catch (error) {
   // Preserve the actual failure if Windows briefly retains an executable handle during cleanup.

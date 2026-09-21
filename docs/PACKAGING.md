@@ -1,5 +1,43 @@
 # Desktop packaging foundation
 
+Executables the package never runs, 2026-09-21: packaging removes two sets of
+binaries that npm installs on the build machine and irori cannot use. The Linux
+x64 `app.asar` falls from 548,291,885 to 115,044,075 bytes, the unpacked
+directory beside it from 150,232,996 to 89,572,180, and the whole application
+directory from 994,253,996 to 500,345,370 bytes. No feature is removed.
+
+The larger set is the Agent SDK's own copy of Claude Code.
+`@anthropic-ai/claude-agent-sdk` declares one optional dependency per platform,
+each a complete executable of about 220 MB, and npm installs whichever ones
+match the machine — on Linux both the glibc and musl builds, 433,217,072 bytes
+together. The SDK resolves them only when `pathToClaudeCodeExecutable` is unset,
+and `src/agents/service.ts` always passes the reader's own installed `claude`,
+so irori never opens the bundled copy; a packaged application could not spawn a
+file inside `app.asar` in any case. Removing it also means irori redistributes
+no Claude Code executable, which is not MIT licensed — see
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md).
+
+The smaller set is node-pty's prebuilds for other platforms. node-pty resolves
+`build/Release` first and then `prebuilds/<platform>-<arch>`, so only the
+target's own entry can ever load, and the two Windows ones alone are 58 MB that
+travelled in every Mac and Linux package. macOS and Linux rebuild node-pty from
+source and keep no prebuild; the Windows package keeps `win32-x64`, which is
+what the documented Windows configuration uses instead of a second MSVC build.
+
+Both removals run in `packageAfterPrune`, after the production dependency walk
+has seen the tree npm installed, and `test:package` asserts both: no
+`claude-agent-sdk-<platform>` entry and no prebuild for another platform may
+appear in the archive. The same run drives the real terminal inside the packaged
+application on every platform, which is what shows the remaining node-pty binary
+is the loadable one. `package-smoke.json` now records the archived and unpacked
+weight, and the smoke prints it, so each platform's figure is in its own job log.
+
+What remains is mostly reachable code plus the bundled rclone (85.4 MB). The
+next measurable item is the renderer packages that Forge copies because they are
+production dependencies although Vite has already bundled them into `dist/`,
+about 50 MB; dropping them means generating the notices their licences require,
+since the bundle no longer carries each package's LICENSE file.
+
 macOS signing, 2026-09-16: the Mac bundle is ad-hoc signed while packaging.
 Until now `packagerConfig` set no `osxSign`, and [@electron/packager](https://github.com/electron/packager)
 signs only when that option is present, so every Mac package Forge produced

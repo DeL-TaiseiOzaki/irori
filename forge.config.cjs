@@ -44,6 +44,29 @@ module.exports = {
       const { prepareRclone } = await import('./scripts/prepare-rclone.mjs');
       await prepareRclone(platform, arch, require('node:path').join(buildPath, 'vendor', 'rclone'));
     },
+    // Two dependencies carry a complete executable for every platform they support, and
+    // npm installs whichever ones match the build machine. Runs after pruning, so the
+    // production dependency walk still sees the tree npm installed.
+    packageAfterPrune: async (_config, buildPath, _electronVersion, platform, arch) => {
+      const fs = require('node:fs/promises');
+      const path = require('node:path');
+      const modules = path.join(buildPath, 'node_modules');
+      // The Agent SDK bundles Claude Code itself, around 220 MB per platform. irori
+      // never reaches for it: src/agents/service.ts passes the reader's own installed
+      // `claude` as pathToClaudeCodeExecutable, which is the only case where the SDK
+      // does not resolve its bundled copy — and a packaged app could not spawn a file
+      // inside app.asar anyway.
+      const sdk = path.join(modules, '@anthropic-ai');
+      for (const name of await fs.readdir(sdk))
+        if (name.startsWith('claude-agent-sdk-'))
+          await fs.rm(path.join(sdk, name), { recursive: true });
+      // node-pty resolves build/Release first and then prebuilds/<platform>-<arch>, so
+      // every other prebuild is unreachable; the Windows pair alone is 58 MB.
+      const prebuilds = path.join(modules, 'node-pty', 'prebuilds');
+      for (const name of await fs.readdir(prebuilds))
+        if (name !== `${platform}-${arch}`)
+          await fs.rm(path.join(prebuilds, name), { recursive: true });
+    },
   },
   makers: [
     {
