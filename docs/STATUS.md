@@ -1,5 +1,78 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A device-local index for search and backlinks, 2026-09-21: a request to
+**KB内を検索** or **リンク元** no longer reads every file. `SearchService` keeps
+one SQLite database per knowledge base under the application's data directory,
+through Electron's built-in `node:sqlite` (SQLite 3.53.4, no native dependency
+to build), holding each eligible file's text with the size and modification
+time it was read at, and an FTS5 trigram index over that text. The 2026-09-21
+measurement shaped it: `trigram` narrows a query of three or more characters to
+candidate files, and a shorter query — the ordinary two-character Japanese
+word — is matched over the stored text of every checked file, as the backlink
+reading is. `src/host/search-index.ts` owns the database; `src/host/search.ts`
+keeps the walk, the guards and the per-line matcher.
+
+The walk stays. A request lists the layer as before and stats each eligible
+file; an unchanged file is taken from the index, a changed, added or renamed one
+is read through the existing guards, and a removed one is forgotten once the
+walk reaches the end. So an answer never comes from stale text and does not
+depend on the watcher, and the hits come from the same per-line matcher over the
+same text in the same order — previews, line numbers, `iu` case folding and the
+200-hit cut-off are unchanged. FTS5 folds case with Unicode 6.1 tables, 899
+pairs short of what the JS matcher accepts (Georgian Mtavruli, Cherokee, later
+IPA letters), so each non-ASCII letter of a query is written in every case it
+takes; a check over every cased code point found no miss. The database is a
+cache: a file that is not one, one from another schema version or one whose
+damage a query meets is deleted and rebuilt, nothing is written inside the KB,
+and each write is a synchronous transaction of at most 64 files or 1 MiB never
+held across an await, so a superseded request cannot hold the lock against its
+successor. Such a batch holds the main process for about 80 ms, and a single
+2 MiB file about 200 ms, while files are being indexed; the window keeps
+painting, as it is a separate process.
+
+Measured on disposable fixtures outside the repository, 2,000 and 15,118 mixed
+Japanese/English notes (5.7 MB and 42.8 MB of text): the previous implementation
+read every file in 471 ms and, with its limits raised, in 4.8–6.1 s (backlinks
+7.6–9.4 s; at its 2,000-file limit the larger fixture was always incomplete).
+The index builds in 768 ms, and in 7.2 s over two requests; a repeat request
+then takes 74–77 ms and 508–540 ms (a two-character query with no match,
+matched over every text: 149 ms and 1.1 s; backlinks: 244 ms and 1.7 s), and
+88 ms and 823 ms after ten files changed. The databases are 9.1 MB and 69.4 MB.
+The file and entry limits rise from 2,000 and 10,000 to 50,000 and 100,000,
+because a checked file now costs a stat (about 36 µs, listing included) rather
+than a read; the 32 MiB limit now bounds what one request reads into the index.
+See [KB-SEARCH](KB-SEARCH.md).
+
+Verification: production build, format check, **193 behaviour tests (189
+passed, four environment-gated skips)** including six new ones in
+`tests/search-index.test.ts` — a repeat request reads no file and writes
+nothing in the KB, freshness across modify/add/delete/rename and a same-size
+later-mtime edit, one- and two-character Japanese queries, case parity beyond
+ASCII, a corrupt or mismatched database rebuilt, and backlinks from indexed
+text — and all **fourteen Electron UI suites** against the built application,
+where every search in the search and links suites goes through the index, which
+is what shows `node:sqlite` loading in Electron's main process (`scripts/build-host.mjs` keeps it an external require). The packaged
+application was not exercised locally — in a worktree whose `node_modules` is a
+symlink, packaging operates on the shared tree — so the package smoke, which
+now runs one search inside the packaged application, is left to the CI package
+jobs on the pull request. Ignoring the
+modification time, dropping the case expansion, narrowing short queries, keeping
+a damaged database, keeping stale rows, re-reading every file or placing the
+index inside the KB each fails a test; those tests count the files a request
+reads through the scan's own reader. The budget test in `tests/search.test.ts`
+now starts each budget from a cold index, since the byte budget counts what is
+read into it. Version 0.1.18 with its notes accompanies the change; publication
+follows the merge.
+
+What is not done: search and backlinks still run when asked, not on every open,
+and the first request on a large knowledge base reports incomplete until the
+build finishes (two requests at 15,118 notes). A change that keeps a file's size
+within the filesystem's modification-time resolution of the previous write is
+not seen until the next change. Backlinks are matched over every note's stored
+text, since a link's encodings defeat an exact narrower lookup, so at 15,118
+notes they cost 1.7 s. This is the "Indexed search" item of the handoff's next
+work.
+
 Links follow a note when it moves, 2026-09-21: **名前・場所** now keeps relative
 Markdown links correct across a rename or a move. Before the move, the dialog
 counts what will change — 「参照元 2 件のノートにある 3 件のリンク」 — and

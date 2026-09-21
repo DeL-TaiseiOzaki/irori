@@ -311,6 +311,7 @@ try {
     const space = await window.irori.register(root, '配布検証', 'personal');
     const note = await window.irori.read(space.scopeId, 'note.md');
     await window.irori.save({ ...note, text: '# Packaged edit 日本語\n' });
+    const found = await window.irori.search(space.scopeId, '日本語');
     const created = await window.irori.createNote(space.scopeId, '復元対象', 'Tools');
     const moved = await window.irori.moveNote(created, 'Tools/名前変更.md', true);
     if (moved.hash !== created.hash || moved.notice)
@@ -326,9 +327,14 @@ try {
       { text: 'Packaged conflict draft', baseVersion: 'a'.repeat(64) },
       null,
     );
-    return { scopeId: space.scopeId, trashed, composer, conflict };
+    return { scopeId: space.scopeId, trashed, composer, conflict, search: found.hits };
   }, root);
   assert.equal(await readFile(path.join(root, 'note.md'), 'utf8'), '# Packaged edit 日本語\n');
+  // node:sqlite loads in the packaged main process; the index lands beside the device data.
+  assert.deepEqual(recovery.search, [
+    { path: 'note.md', line: 1, preview: '# Packaged edit 日本語' },
+  ]);
+  await stat(path.join(temporary, 'device', 'search-index', `${recovery.scopeId}.sqlite`));
   await mkdir(path.join(root, 'ontology'));
   await writeFile(
     path.join(root, '.irori/ontology.json'),

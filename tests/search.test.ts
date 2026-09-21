@@ -119,6 +119,8 @@ test('Search reports partial results when result, file, entry, byte or time budg
     bytes: 14,
     milliseconds: 0,
   })) {
+    // Each budget starts from a cold index: bytes counts what a request reads into it.
+    await rm(path.join(files.dataDir, 'search-index'), { recursive: true, force: true });
     const result = await new SearchService(files, { ...searchLimits, [name]: value }).search(
       space.scopeId,
       'needle',
