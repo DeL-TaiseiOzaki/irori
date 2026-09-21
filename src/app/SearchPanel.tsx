@@ -250,36 +250,35 @@ export function BacklinksPanel({
 }) {
   const [result, setResult] = useState<KnowledgeSearch>();
   const [opening, setOpening] = useState(false);
-  const [changed, setChanged] = useState(false);
   const [error, setError] = useState('');
   const request = useRef(0);
   const finding = !result && !error;
 
-  async function find() {
-    const id = ++request.current;
-    setResult(undefined);
-    setError('');
-    setChanged(false);
-    try {
-      const value = await host.backlinks(scopeId, path);
-      if (request.current === id) setResult(value);
-    } catch (error) {
-      if (request.current === id) setError(String(error));
-    }
-  }
   useEffect(() => {
+    // The list follows the KB: a change starts another look, the older answer is
+    // dropped, and what is shown stays up until the newer one arrives.
+    async function find() {
+      const id = ++request.current;
+      try {
+        const value = await host.backlinks(scopeId, path);
+        if (request.current !== id) return;
+        setResult(value);
+        setError('');
+      } catch (error) {
+        if (request.current !== id) return;
+        setResult(undefined);
+        setError(String(error));
+      }
+    }
     void find();
+    const stop = host.onEvent((event) => {
+      if (event.type === 'files' && event.scopeId === scopeId) void find();
+    });
     return () => {
+      stop();
       request.current++;
     };
-  }, []);
-  useEffect(
-    () =>
-      host.onEvent((event) => {
-        if (event.type === 'files' && event.scopeId === scopeId) setChanged(true);
-      }),
-    [scopeId],
-  );
+  }, [scopeId, path]);
 
   async function open(hit: SearchHit) {
     if (opening) return;
@@ -303,14 +302,9 @@ export function BacklinksPanel({
     >
       <div className="search-heading">
         <h2>リンク元</h2>
-        <div className="actions">
-          <button onClick={() => void find()} disabled={finding || opening}>
-            もう一度調べる
-          </button>
-          <button onClick={onClose} disabled={opening}>
-            閉じる
-          </button>
-        </div>
+        <button onClick={onClose} disabled={opening}>
+          閉じる
+        </button>
       </div>
       <p className="muted">{path} にリンクしている、この KB のノートです。</p>
       {error && (
@@ -331,11 +325,6 @@ export function BacklinksPanel({
           {result.incomplete && (
             <p className="search-notice">
               確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。
-            </p>
-          )}
-          {changed && (
-            <p className="search-notice">
-              KB のファイルが更新されました。最新の内容は「もう一度調べる」で確認できます。
             </p>
           )}
           {!result.hits.length && (

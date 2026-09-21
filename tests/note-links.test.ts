@@ -1,12 +1,12 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
-import { resolveLink } from '../src/host/links';
+import { foldsCase, resolveLink } from '../src/host/links';
 import { SearchService, searchLimits } from '../src/host/search';
-import { linksTo, resolveNoteLink } from '../src/domain/note-links';
+import { linksTo, resolveNoteLink, samePath } from '../src/domain/note-links';
 import type { KnowledgeSearch } from '../src/domain/search';
 import { dispatchHost, type HostHandlers } from '../src/domain/host-requests';
 
@@ -182,8 +182,8 @@ test('The renderer reaches link resolution only through the validated request', 
   );
 });
 
-function linkingLines(from: string, target: string, text: string) {
-  const match = linksTo(from, target);
+function linkingLines(from: string, target: string, text: string, foldCase = false) {
+  const match = linksTo(from, target, foldCase);
   return text.split('\n').flatMap((line, index) => (match(line) ? [index + 1] : []));
 }
 
@@ -227,6 +227,64 @@ test('A backlink is found however the editor or an agent wrote the destination',
   );
 });
 
+test('A hit names the label a reader sees, or nothing where no visible text is the link', () => {
+  const match = linksTo('wiki/topic.md', 'wiki/target.md');
+  const label = (line: string) => {
+    const found = match(line);
+    assert.ok(found, line);
+    assert.equal(found.input, line);
+    return found.groups && [found.groups.label, found.index, found[0]];
+  };
+  assert.deepEqual(label('- see [the page](target.md) now'), [
+    'the page',
+    7,
+    'the page](target.md',
+  ]);
+  assert.deepEqual(label('[a [b] c](target.md)'), ['a [b] c', 1, 'a [b] c](target.md']);
+  assert.deepEqual(label('[x](other.md) and [y](./target.md#h)'), ['y', 19, 'y](./target.md#h']);
+  assert.deepEqual(label('\\![not an image](target.md)'), [
+    'not an image',
+    3,
+    'not an image](target.md',
+  ]);
+  assert.deepEqual(label('[](target.md)'), ['', 1, '](target.md']);
+  // Formatting and code stay as written; the editor decides whether that text is on screen.
+  assert.deepEqual(label('[see `x`](target.md)'), ['see `x`', 1, 'see `x`](target.md']);
+  for (const line of [
+    '![alt](target.md)',
+    '[ref]: target.md',
+    'stray ](target.md)',
+    '\\\\![after a literal backslash](target.md)',
+  ])
+    assert.equal(label(line), undefined, line);
+});
+
+test('A link in another case counts only where the disk folds case, as following it does', async (t) => {
+  assert.equal(samePath('wiki/Note.md', 'wiki/note.md'), false);
+  assert.equal(samePath('wiki/Note.md', 'wiki/note.md', true), true);
+  assert.deepEqual(linkingLines('index.md', 'wiki/note.md', '[a](wiki/NOTE.md)'), []);
+  assert.deepEqual(linkingLines('index.md', 'wiki/note.md', '[a](wiki/NOTE.md)', true), [1]);
+
+  const { root, files, space, write } = await fixture(t);
+  await write('wiki/note.md', '[myself](Note.md)\n');
+  await write('index.md', '[a](wiki/Note.md)\n[b](wiki/note.md)\n');
+  // Whether this disk folds case is observed the same way here and in the host.
+  const aliases = await readFile(path.join(root, 'wiki/NOTE.MD'))
+    .then(() => true)
+    .catch(() => false);
+  assert.equal(await foldsCase(files, space.scopeId, 'wiki/note.md'), aliases);
+  assert.equal(await foldsCase(files, space.scopeId, 'wiki/missing.md'), false);
+  const search = new SearchService(files);
+  const lines = async (target: string) =>
+    (await search.backlinks(space.scopeId, target)).hits.map((hit) => `${hit.path}:${hit.line}`);
+  assert.deepEqual(
+    await lines('wiki/note.md'),
+    aliases ? ['index.md:1', 'index.md:2'] : ['index.md:2'],
+  );
+  // A note reached through a link in the other case is still itself, not a linking note.
+  if (aliases) assert.deepEqual(await lines('wiki/Note.md'), ['index.md:1', 'index.md:2']);
+});
+
 test('A crafted line is read in linear time, since the scan blocks the main process', () => {
   const match = linksTo('a.md', 'b.md');
   const runs = Array.from({ length: 2000 }, (_, i) => '`'.repeat(2000 - i)).join(' x ');
@@ -234,6 +292,10 @@ test('A crafted line is read in linear time, since the scan blocks the main proc
   // Each took many seconds with a backtracking pattern.
   assert.equal(match('`'.repeat(100_000) + 'a`'), null);
   assert.ok(match(`${runs} [b](b.md)`));
+  // Pairing the label's brackets is one pass, not one per bracket or per link.
+  assert.ok(match('['.repeat(100_000) + '](b.md)'));
+  assert.ok(match('[x](x.md) '.repeat(20_000) + '[b](b.md)'));
+  assert.ok(match('](b.md)'.repeat(20_000)));
   assert.ok(performance.now() - start < 1000);
 });
 
@@ -258,18 +320,27 @@ test('Backlinks come from the other notes of the knowledge layer', async (t) => 
   assert.equal(result.query, 'wiki/target.md');
   assert.equal(result.incomplete, false);
   assert.deepEqual(
-    result.hits
-      .map(({ path, line, preview }) => ({ path, line, preview }))
-      .sort((a, b) => a.path.localeCompare(b.path)),
+    result.hits.sort((a, b) => a.path.localeCompare(b.path)),
     [
-      { path: 'index.md', line: 3, preview: '- [対象のページ](wiki/target.md)' },
+      {
+        path: 'index.md',
+        line: 3,
+        preview: '- [対象のページ](wiki/target.md)',
+        label: '対象のページ',
+        column: 3,
+      },
       {
         path: 'journal/2026/09-21.md',
         line: 1,
         preview: '今日は [対象](../../wiki/target.md) を読んだ。',
+        label: '対象',
+        column: 5,
       },
     ],
   );
+  // A text search hit is as it was: nothing names its visible text or its column.
+  const searched = await new SearchService(files).search(space.scopeId, '対象のページ');
+  assert.deepEqual(Object.keys(searched.hits[0]), ['path', 'line', 'preview']);
   const stopped = await new SearchService(files, { ...searchLimits, milliseconds: 0 }).backlinks(
     space.scopeId,
     'wiki/target.md',

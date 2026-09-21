@@ -99,12 +99,45 @@ function withoutCode(line: string) {
 }
 
 /**
+ * Whether two KB paths name the same file. They compare in NFC, since a Mac may
+ * store a Japanese name decomposed while a link is written composed, and in one
+ * case where the disk reaches a file through either — the host observes that.
+ */
+export function samePath(a: string, b: string, foldCase = false) {
+  const [x, y] = [a, b].map((p) =>
+    foldCase ? p.normalize('NFC').toLowerCase() : p.normalize('NFC'),
+  );
+  return x === y;
+}
+
+/**
+ * The match moved onto the link's label, so a hit can carry the text a reader
+ * sees and where it starts. Brackets pair in one pass — a backtracking pattern
+ * would not be linear on a crafted line. An image, a reference definition and a
+ * `]` with no `[` have no visible label, and the plain destination match stands.
+ */
+function labelled(line: string, plain: string, found: RegExpExecArray) {
+  if (found[1] === undefined && found[2] === undefined) return found;
+  const opens: number[] = [];
+  let escaped = -1;
+  for (let i = 0; i < found.index; i++)
+    if (plain[i] === '\\') escaped = ++i;
+    else if (plain[i] === '[') opens.push(i);
+    else if (plain[i] === ']') opens.pop();
+  const open = opens.pop();
+  if (open === undefined || (plain[open - 1] === '!' && escaped !== open - 1)) return found;
+  return Object.assign([line.slice(open + 1, found.index + found[0].length)] as [string], {
+    index: open + 1,
+    input: line,
+    groups: { label: line.slice(open + 1, found.index) },
+  });
+}
+
+/**
  * Reads one note line by line and answers where a line links to `target`, as a
  * Markdown reader would see it: code spans and fenced code are text, not links.
- * Paths compare in NFC, since a Mac may store a Japanese name decomposed.
  */
-export function linksTo(from: string, target: string) {
-  const wanted = target.normalize('NFC');
+export function linksTo(from: string, target: string, foldCase = false) {
   let fence = '';
   return (line: string) => {
     const [, marker = '', info = ''] = /^\s*(`{3,}|~{3,})(.*)/.exec(line) ?? [];
@@ -117,13 +150,15 @@ export function linksTo(from: string, target: string) {
       fence = marker;
       return null;
     }
-    for (const found of withoutCode(line).matchAll(destination)) {
+    const plain = withoutCode(line);
+    for (const found of plain.matchAll(destination)) {
       const href = (found[1] ?? found[2] ?? found[3] ?? found[4]).replace(
         /\\([!-/:-@[-`{-~])/g,
         '$1',
       );
       const link = resolveNoteLink(from, href);
-      if (link.kind === 'internal' && link.path.normalize('NFC') === wanted) return found;
+      if (link.kind === 'internal' && samePath(link.path, target, foldCase))
+        return labelled(line, plain, found);
     }
     return null;
   };

@@ -103,6 +103,22 @@ test('equal occurrence counts cannot turn a hidden destination match into unrela
     { from: 1, to: 7 },
   );
 });
+test('a column picks the link over earlier same text, and the first stands in when it is gone', () => {
+  const source = 'note before [note](note.md)';
+  const target = { query: 'note', line: 1, preview: source };
+  assert.deepEqual(sourceMatch(source, { ...target, column: 13 }), { from: 13, to: 17 });
+  assert.deepEqual(sourceMatch(source, target), { from: 0, to: 4 });
+  assert.deepEqual(sourceMatch(source, { ...target, column: 5 }), { from: 0, to: 4 });
+  assert.deepEqual(
+    richMatch(
+      schema.node('doc', null, p('note before note')),
+      source,
+      { ...target, column: 13 },
+      ast(source, ['note before ', 'note']),
+    ),
+    { from: 13, to: 17 },
+  );
+});
 test('CRLF source navigation uses CodeMirror offsets without rewriting file encoding', () => {
   const source = 'first\r\n\r\nneedle\r\n';
   const state = EditorState.create({

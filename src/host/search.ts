@@ -1,10 +1,11 @@
 import { lstat, open } from 'node:fs/promises';
 import path from 'node:path';
-import { linksTo } from '../domain/note-links';
+import { linksTo, samePath } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import { searchQuery, type KnowledgeSearch } from '../domain/search';
 import type { Space } from '../domain/types';
 import { FileService, textFilePattern } from './files';
+import { foldsCase } from './links';
 
 export const searchLimits = {
   files: 2000,
@@ -39,8 +40,9 @@ export class SearchService {
 
   /** Lines of the other Markdown notes in this KB whose links resolve to `target`. */
   async backlinks(scopeId: string, target: string): Promise<KnowledgeSearch> {
+    const foldCase = await foldsCase(this.files, scopeId, target);
     return this.scan(scopeId, target, /\.md$/i, (from) =>
-      from === target ? () => null : linksTo(from, target),
+      samePath(from, target, foldCase) ? () => null : linksTo(from, target, foldCase),
     );
   }
 
@@ -157,10 +159,12 @@ export class SearchService {
           if (!found) continue;
           const start = Math.max(0, found.index - 60);
           const end = Math.min(lines[line].length, found.index + found[0].length + 120);
+          const label = found.groups?.label;
           result.hits.push({
             path: entry.path,
             line: line + 1,
             preview: `${start ? '…' : ''}${lines[line].slice(start, end)}${end < lines[line].length ? '…' : ''}`,
+            ...(label !== undefined && { label, column: found.index }),
           });
           if (result.hits.length >= this.limits.hits) {
             result.incomplete = true;

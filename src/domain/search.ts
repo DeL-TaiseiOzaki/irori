@@ -11,6 +11,9 @@ export interface SearchHit {
   path: string;
   line: number;
   preview: string;
+  /** A link's visible text as written and where it starts on the line; text search has neither. */
+  label?: string;
+  column?: number;
 }
 
 export interface KnowledgeSearch {
