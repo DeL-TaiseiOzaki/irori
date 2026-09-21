@@ -1,5 +1,42 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Notes follow their own links, 2026-09-21: Ctrl/Cmd + click on a link in the rich
+editor opens what it points at. A knowledge base is written as pages that point
+at each other, and the recommended template writes those pointers as ordinary
+relative Markdown links, because a page's identity there is its path in the
+bundle (`irori-templete` ADR 002 D3) — there are no wiki links to resolve. Until
+now irori displayed such a link and did nothing with it, so reading a knowledge
+base meant finding every next page in the explorer.
+
+A plain click still places the cursor: in an editor, clicking a link is how you
+edit its text. Following one goes through the ordinary open path, so the note
+being edited is saved with its usual conflict handling first, and a running
+agent or a pending instruction still refuses a space change.
+
+`src/domain/note-links.ts` resolves the target against the note that carries it,
+as a Markdown reader would — `../decisions/x.md`, `./x.md`, a heading after `#`,
+percent-encoded names — and `src/host/links.ts` answers what is there through
+the same `resolve` every other file operation uses. A page that has not been
+written yet is reported as missing while the note stays open, which is an
+ordinary state in a knowledge base rather than a failure. An absolute path, a
+`..` above the KB, a scheme other than http or https, a folder, a symlink
+leaving the space, a path inside another registered KB and anything under
+`contents/` are each refused. See [NOTE-LINKS](NOTE-LINKS.md).
+
+Verification: production build, format check, **168 behaviour tests (164 passed,
+four environment-gated skips)** including the new `tests/note-links.test.ts`,
+and all **fourteen Electron UI suites**, where the new `links-ui-smoke` follows
+a link down into a folder and back out of it, reports a missing page, carries
+unsaved text through a link by saving it first, and checks that a plain click
+opens nothing. Version 0.1.14 with its notes accompanies the change; publication
+follows the merge.
+
+Source view does not follow links; the gesture is the rich editor's. There is no
+backlink list — R03 and R08 both name backlinks as open, and finding them needs
+a scan or an index rather than this resolution. A heading is not scrolled to, a
+missing page is not offered for creation, and no link is rewritten when a note
+moves.
+
 The package stopped carrying executables it never runs, 2026-09-21: the Linux
 x64 application directory falls from 994,253,996 to 500,345,370 bytes and its
 archive from 548,291,885 to 115,044,075, with no feature removed.

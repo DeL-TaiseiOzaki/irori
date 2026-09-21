@@ -157,6 +157,7 @@ export function Editor({
   searchTarget,
   onSearchResult,
   authorship,
+  onFollowLink,
 }: {
   text: string;
   mode: 'rich' | 'source';
@@ -169,6 +170,7 @@ export function Editor({
   searchTarget?: SearchTarget;
   onSearchResult?: (found: boolean) => void;
   authorship?: NoteAuthorship;
+  onFollowLink?: (href: string) => void;
 }) {
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const navigation = useRef({ searchTarget, onSearchResult });
@@ -179,6 +181,8 @@ export function Editor({
   const root = useRef<HTMLDivElement>(null);
   const change = useRef(onChange);
   change.current = onChange;
+  const follow = useRef(onFollowLink);
+  follow.current = onFollowLink;
   const initial = useRef(text);
   const snapshot = useRef(() => initial.current);
   useImperativeHandle(ref, () => ({ getText: () => snapshot.current() }), []);
@@ -258,6 +262,18 @@ export function Editor({
     const toolbar = (event: PointerEvent) => {
       if ((event.target as Element).closest('button,[role=menuitem]')) markEdited();
     };
+    // A plain click in an editor puts the cursor in the link's text, so following it
+    // takes the modifier a code editor uses for the same gesture. The knowledge base's
+    // pages link to each other by relative path, and the host resolves what is there.
+    const followLink = (event: MouseEvent) => {
+      if (event.button !== 0 || !(event.metaKey || event.ctrlKey) || !follow.current) return;
+      const anchor = (event.target as Element | null)?.closest?.('a[href]');
+      if (!anchor) return;
+      event.preventDefault();
+      event.stopPropagation();
+      follow.current(anchor.getAttribute('href') ?? '');
+    };
+    element.addEventListener('click', followLink, true);
     for (const event of ['beforeinput', 'paste', 'drop'])
       element.addEventListener(event, markEdited, true);
     element.addEventListener('keydown', keyboard, true);

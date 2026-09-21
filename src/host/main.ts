@@ -8,6 +8,7 @@ import { webAddress } from '../domain/links';
 import { FileService } from './files';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
+import { resolveLink } from './links';
 import { DraftService } from './drafts';
 import { UpdateService } from './updates';
 import { version as appVersion } from '../../package.json';
@@ -274,6 +275,7 @@ app
           }),
         ),
       search: (...args) => search.search(...args),
+      resolveLink: (...args) => resolveLink(files, ...args),
       knowledgeHistory: (id) => {
         files.get(id);
         return knowledge.history(id);

@@ -8,6 +8,7 @@ import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
 import { externalUrl } from './links';
+import { linkHref } from './note-links';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -38,6 +39,7 @@ export const hostArguments = {
   trashedNotes: z.tuple([id]),
   restoreNote: z.tuple([id, id]),
   search: z.tuple([id, searchQuery]),
+  resolveLink: z.tuple([id, path, linkHref]),
   knowledgeHistory: z.tuple([id]),
   restoreSource: z.tuple([sourceVersion]),
   sourceText: z.tuple([sourceVersion]),
