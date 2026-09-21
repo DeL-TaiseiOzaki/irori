@@ -240,6 +240,21 @@ test(
     const refused = await execute('pi', 'sort out yesterday', false, { skill: 'promote' });
     assert.equal(refused.events.at(-1)?.outcome, 'failed');
     assert.ok(refused.events.some((e) => e.type === 'error' && e.text.includes('promote')));
+
+    // A retired name fails with the reason the KB wrote down, not as an unknown skill.
+    await mkdir(path.join(root, '.agents', 'skills', 'old'), { recursive: true });
+    await writeFile(
+      path.join(root, '.agents', 'skills', 'old', 'RETIRED.md'),
+      '---\nretired: 2026-09-21\nreason: Folded into distill.\nreplacement: distill\n---\n',
+    );
+    const retired = await execute('pi', 'sort out yesterday', false, { skill: 'old' });
+    assert.equal(retired.events.at(-1)?.outcome, 'failed');
+    assert.ok(
+      retired.events.some(
+        (e) =>
+          e.type === 'error' && e.text.includes('退役') && e.text.includes('Folded into distill'),
+      ),
+    );
   },
 );
 

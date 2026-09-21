@@ -6,6 +6,8 @@ import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
+import { SkillPicker } from './SkillPicker';
+import { retirementNotice } from '../domain/skills';
 import { Popover } from '@base-ui/react/popover';
 import {
   applyMarkdownFont,
@@ -338,6 +340,7 @@ function App() {
     refresh: skillRevision,
   });
   const skills = skillRead.data?.skills ?? [];
+  const skillsRetired = skillRead.data?.retired ?? [];
   const skillProblems = skillRead.error
     ? [{ directory: '.agents/skills', message: skillRead.error }]
     : (skillRead.data?.problems ?? []);
@@ -1715,26 +1718,22 @@ function App() {
                       読み込めないスキル: {skillProblems.map((p) => p.directory).join('、')}
                     </small>
                   )}
+                  {skillsRetired.map((s) => (
+                    <small key={s.name} className="muted" role="status">
+                      {retirementNotice(s)}
+                    </small>
+                  ))}
                   <div className="composer-actions">
                     <div className="composer-selects">
-                      {skills.length > 0 && (
-                        <select
-                          aria-label="スキル"
-                          className="composer-skill"
+                      {active && (skills.length > 0 || skillsRetired.length > 0) && (
+                        <SkillPicker
+                          key={active.scopeId}
+                          scopeId={active.scopeId}
+                          skills={skills}
                           value={skill}
-                          title={
-                            skills.find((s) => s.name === skill)?.description ?? 'スキルを使わない'
-                          }
+                          onChange={setSkill}
                           disabled={sending || gitBusy}
-                          onChange={(e) => setSkill(e.target.value)}
-                        >
-                          <option value="">スキルなし</option>
-                          {skills.map((s) => (
-                            <option key={s.name} value={s.name} title={s.description}>
-                              {s.name} — {s.description}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       )}
                       <select
                         aria-label="エージェント"

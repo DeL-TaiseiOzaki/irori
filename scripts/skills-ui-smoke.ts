@@ -1,5 +1,5 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,16 +15,19 @@ const files = new FileService(path.join(base, 'device'));
 await files.init();
 const root = path.join(base, 'KB skills');
 const plain = path.join(base, 'KB plain');
+// A disposable home stands in for the user's, so the reach view reads nothing real.
+const home = path.join(base, 'home');
 await mkdir(root);
 await mkdir(plain);
+await mkdir(home);
 const space = await files.register(root, 'スキル検証', 'personal');
 await files.register(plain, '素のKB', 'personal');
 await writeFile(path.join(root, 'note.md'), '# Skill fixture\n');
 await writeFile(path.join(plain, 'note.md'), '# No skills here\n');
 
-const skill = async (name: string, text: string) => {
-  await mkdir(path.join(root, '.agents', 'skills', name), { recursive: true });
-  await writeFile(path.join(root, '.agents', 'skills', name, 'SKILL.md'), text);
+const skill = async (name: string, text: string, at = path.join(root, '.agents', 'skills')) => {
+  await mkdir(path.join(at, name), { recursive: true });
+  await writeFile(path.join(at, name, 'SKILL.md'), text);
 };
 await skill(
   'distill',
@@ -32,10 +35,31 @@ await skill(
 );
 await skill(
   'promote',
-  '---\nname: promote\ndescription: Opens a promotion pull request.\n---\n\nCopy, never move.\n',
+  '---\nname: promote\ndescription: Opens a promotion pull request.\nmetadata:\n  roles: maintainer\n---\n\nCopy, never move.\n',
+);
+await skill(
+  'review',
+  '---\nname: review\ndescription: Reads a draft closely.\nmetadata:\n  roles: editor\n---\n\nRead twice.\n',
 );
 // A package that cannot be read must be reported, not silently dropped.
 await skill('unreadable', '---\nname: mismatched\ndescription: d\n---\n\nBody\n');
+// A retired skill keeps its name and the reason, and nothing a CLI would load.
+await mkdir(path.join(root, '.agents', 'skills', 'old'));
+await writeFile(
+  path.join(root, '.agents', 'skills', 'old', 'RETIRED.md'),
+  '---\nretired: 2026-09-21\nreason: Folded into distill.\nreplacement: distill\n---\n',
+);
+// Personal copies: one shadows a declared skill in Claude Code, one keeps a retired name alive.
+await skill(
+  'distill',
+  '---\nname: distill\ndescription: Personal copy.\n---\n\nMine.\n',
+  path.join(home, '.claude', 'skills'),
+);
+await skill(
+  'old',
+  '---\nname: old\ndescription: Stale copy.\n---\n\nStale.\n',
+  path.join(home, '.agents', 'skills'),
+);
 
 const bin = path.join(base, 'bin');
 await mkdir(bin);
@@ -47,6 +71,7 @@ await writeFile(
 const env = {
   ...process.env,
   PATH: bin + path.delimiter + process.env.PATH,
+  HOME: home,
   IRORI_DATA_DIR: files.dataDir,
 } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
@@ -75,8 +100,47 @@ try {
     'スキルなし',
     'distill — Files yesterday into the library.',
     'promote — Opens a promotion pull request.',
+    'review — Reads a draft closely.',
   ]);
   await expect(page.getByText('読み込めないスキル')).toContainText('.agents/skills/unreadable');
+  await expect(page.getByText('old スキルは 2026-09-21 に退役しました')).toContainText(
+    'Folded into distill.（代わりに distill）',
+  );
+
+  // The reader's role narrows the picker on this device; unscoped skills stay.
+  const role = page.getByLabel('役割', { exact: true });
+  await expect(role).toHaveValue('');
+  await expect(page.getByLabel('プロジェクト', { exact: true })).toHaveCount(0);
+  await role.selectOption('editor');
+  expect(await picker.locator('option').allTextContents()).toEqual([
+    'スキルなし',
+    'distill — Files yesterday into the library.',
+    'review — Reads a draft closely.',
+  ]);
+  await expect
+    .poll(() => readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8').catch(() => ''))
+    .toContain('"role": "editor"');
+  // The choice stays on the device: the KB's skill directory gains nothing.
+  expect((await readdir(path.join(root, '.agents', 'skills'))).sort()).toEqual([
+    'distill',
+    'old',
+    'promote',
+    'review',
+    'unreadable',
+  ]);
+  await role.selectOption('');
+  await expect(picker.locator('option')).toHaveCount(4);
+
+  // The reach view names home-relative directories only, never the machine path.
+  await page.getByRole('button', { name: '到達確認' }).click();
+  const reach = page.getByRole('dialog', { name: 'スキルの到達' });
+  await expect(reach).toContainText('Claude Code');
+  await expect(reach).toContainText('読まない。同名が ~/.claude/skills にあり、そちらだけを読む');
+  await expect(reach).toContainText('退役した名前が ~/.agents/skills に残っている');
+  await expect(reach).toContainText('信頼済みなら読む');
+  expect(await reach.textContent()).not.toContain(home);
+  await reach.getByRole('button', { name: '閉じる' }).click();
+  await expect(reach).toHaveCount(0);
 
   await picker.selectOption('distill');
   // A run may add a package. It must appear when the run settles without clearing the choice.
@@ -93,6 +157,7 @@ try {
     'distill — Files yesterday into the library.',
     'journal — Appends to a dated record.',
     'promote — Opens a promotion pull request.',
+    'review — Reads a draft closely.',
   ]);
   await expect(picker).toHaveValue('distill');
 
@@ -110,6 +175,7 @@ try {
   await knowledge.getByRole('button', { name: '素のKB', exact: true }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveCount(0);
   await expect(page.getByText('読み込めないスキル')).toHaveCount(0);
+  await expect(page.getByText('退役しました')).toHaveCount(0);
   await knowledge.getByRole('button', { name: 'スキル検証', exact: true }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveValue('');
 } catch (error) {

@@ -26,7 +26,7 @@ import { classify } from '../domain/scopes';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
-import { readSkills } from './skills';
+import { readSkillReach, readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
 import type { AgentId, HostEvent, Space } from '../domain/types';
@@ -362,6 +362,7 @@ app
       cloudSetup: () => cloud.setup(),
       ontology: (id) => readOntology(files, id),
       skills: (id) => readSkills(files, id),
+      skillReach: (id) => readSkillReach(files, id),
       workspaceCloud: (id) => cloud.workspaceRoot(id),
       cloudEntries: (...args) => cloud.entries(...args),
       cloudRead: (...args) => cloud.read(...args),
