@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Fifth release under the sync checks, 2026-09-21:
+[v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
+publishes #49's lighter package and #50's link following for Windows x64 and
+Apple silicon Mac, from CI 35549385547 at `17c7aab` through release run
+35549863218. The Windows installer is 215,796,224 bytes where 0.1.12's was
+319,919,104, and the Mac disk image 182,424,344 where it was 281,574,107 — a
+third less to download, with no feature removed. Anonymous downloads — no
+credentials, straight from the release URL — returned those exact byte counts
+and their SHA-256 matched `SHA256SUMS.txt`. Pages run 35550372058 deployed the
+manifest from #51, and the deployed bundle names both installers, the tag and
+the sizes.
+
+The release came 16 minutes after the first shipped merge and the download page
+25 minutes after it, inside the one-hour grace period. 0.1.13 has committed
+notes but no package of its own: #49 had to advance past the published preview
+to satisfy `release-sync.yml`, and #50 advanced again before either was
+published, so one package carries both. The hourly drift run at 01:17:04Z failed
+by 25 seconds — it read the download page while Pages was still deploying the
+new manifest — and the dispatched run at 01:18:12Z reported `main` in step.
+Publishing the website before the hour, or dispatching a re-check after the
+deployment, avoids that false alarm.
+
 Notes follow their own links, 2026-09-21: Ctrl/Cmd + click on a link in the rich
 editor opens what it points at. A knowledge base is written as pages that point
 at each other, and the recommended template writes those pointers as ordinary
