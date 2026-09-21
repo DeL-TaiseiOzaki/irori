@@ -31,9 +31,10 @@ stay on disk. The staged list and message are the review; **コミット** creat
 the local commit directly. It does not push.
 
 **履歴** paginates local commits, with first-parent commit diffs. **その他 → Fetch**
-fetches the selected remote branch without updating notes. Counts describe the
-locally observed remote-tracking history, not a continuous online observation.
-**Pull** fetches and accepts only a fast-forward into a clean working tree.
+fetches the selected remote branch without touching the working tree. Counts
+describe the locally observed remote-tracking history, not a continuous online
+observation. **Pull** fetches and accepts only a fast-forward into a clean
+working tree.
 **その他 → 履歴を統合** explicitly starts Git's normal merge without an automatic
 merge commit. Conflicts show base/ours/theirs and a manual result field. Resolving
 a supported text conflict saves the result, stages that path, and retains the
@@ -48,6 +49,34 @@ mirror/multiple-push-URL remotes. Native rejection retains local commits and
 index/worktree changes. GitHub remotes offer an explicit **GitHub を開く** action
 under **その他**; irori does not create pull requests or bypass branch protections.
 
+### Authorship notes
+
+Since 2026-09-21 a commit made here carries the
+[Git AI Standard v3](https://github.com/git-ai-project/git-ai/blob/main/specs/git_ai_standard_v3.0.0.md)
+note for the lines an agent wrote, under `refs/notes/ai`, and the sync actions
+carry that ref the way git-ai does — see [AUTHORSHIP](AUTHORSHIP.md) for what
+the note says and how it is read. Fetch, Pull and 履歴を統合 run a second fetch
+of `+refs/notes/ai:refs/notes/ai-remote/<remote>` after the branch fetch; a
+remote without the ref leaves nothing to merge, and git reports that the same
+way as a transport failure, so that fetch's failure is not shown. The tracking
+ref is merged into the local `refs/notes/ai` with `git notes merge -s ours`
+(copied when there is no local ref), so a note both sides wrote keeps this
+device's version and a note only the remote changed arrives as written. Push
+sends `refs/notes/ai:refs/notes/ai` after the branch, with the same flags and
+never forced; a rejected notes push leaves the branch pushed and says so in the
+result, and a Fetch merges what the remote has so the next Push lands. The push
+confirmation states that the notes ref goes along when it exists.
+
+A note is attached to one commit SHA. GitHub's squash and rebase merge buttons
+create new commits on the base branch, which carry no note; the notes stay on
+the branch's own commits, unreachable from `main`'s history once the branch is
+deleted. git-ai answers this with a GitHub Actions workflow (`git ai ci`) that
+rewrites the attribution onto the merge commit at merge time; irori has no
+equivalent, so a knowledge base merged that way keeps its attributions only in
+the merge commits of a plain merge or in irori's own device records. `git notes
+merge` can also refuse when another tool left a notes merge unfinished in the
+repository; the result names it and the branch operation is unaffected.
+
 **スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization and then returns to the existing inspected registration flow. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
 
 ## Boundaries and recovery
@@ -57,6 +86,7 @@ under **その他**; irori does not create pull requests or bypass branch protec
 - Review tokens detect observed HEAD/index/remote changes and changed selected file bytes before staging or resolving. An outdated commit or push review is rejected. Unsaved conflict text blocks navigation and remains in the sheet after a stale-resolution rejection so the user can review the new versions and retry.
 - Contents and nested registered scopes are excluded from working-tree scans and history diffs. A separate index inspection surfaces already staged foreign paths and blocks their commit; users can unstage them. Symlink/directory/submodule staging is refused. Incoming edits to contents, nested ownership or the active scope declaration are refused before merge. Scope declaration reconciliation needs a separate future implementation.
 - No hard reset, worktree restore, implicit stash, forced push or automatic conflict choice is used. Index-only removal is explicit, including removing an initial staged file whose working bytes have changed. Existing hooks may reject an operation; their raw output and credential-bearing transport diagnostics are not returned to the renderer.
+- The authorship note is written after `git commit` returns, through `git fast-import` with the current `refs/notes/ai` tip as its parent, which git refuses to move unless the new tip contains that one; a note another process attached in between is kept and the commit result says the note was not written. An existing note on the commit is merged, never replaced; one irori cannot read is left alone.
 
 These checks coordinate this application instance, not arbitrary external Git clients or hostile concurrent filesystem writers. There remains a narrow check-to-operation race; native Git's own index/ref locks and conflict checks still apply. Hooks and native configuration belong to the user's repository trust model. Rebase/cherry-pick continuation, merge abort, branch creation/switching, remote editing, automatic fetch, and binary/large-file conflict editing are outside this slice. Uncommitted resolution typing survives refresh/rejection in the live sheet but is not a persistent crash-recovery draft. Text review/resolution is bounded at 2 MiB; Git output and change lists also have limits.
 

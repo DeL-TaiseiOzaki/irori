@@ -4,7 +4,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AuthorshipStore, lineKey } from '../src/knowledge/authorship';
-import { authorshipSummary, type LineAuthor } from '../src/domain/knowledge';
+import {
+  authorshipSummary,
+  type LineAuthor,
+  type NoteAuthorship,
+  type NotedAuthor,
+} from '../src/domain/knowledge';
 
 const ref = { scopeId: '11111111-2222-3333-4444-555555555555', path: 'Knowledge_Base/note.md' };
 const human: LineAuthor = { kind: 'human' };
@@ -13,8 +18,16 @@ const claude: LineAuthor = {
   agent: 'claude',
   runId: '99999999-8888-4777-a666-555555555555',
 };
-const kinds = (view: { lines: (LineAuthor | null)[] }) =>
-  view.lines.map((line) => (line ? (line.kind === 'agent' ? line.agent : line.kind) : null));
+const kinds = (view: NoteAuthorship) =>
+  view.lines.map((line) =>
+    line
+      ? line.kind === 'agent'
+        ? line.agent
+        : line.kind === 'noted'
+          ? `noted:${line.tool}`
+          : line.kind
+      : null,
+  );
 
 async function store(t: { after: (fn: () => unknown) => void }) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori authorship '));
@@ -109,13 +122,37 @@ test('An unobserved line is unattested rather than guessed', async (t) => {
   );
 });
 
+test("The repository's note fills in what this device did not see and yields to what it saw an agent write", async (t) => {
+  const { store: authorship } = await store(t);
+  const cursor: NotedAuthor = { kind: 'noted', tool: 'cursor' };
+  await authorship.observe(ref, 'Written by the agent here.\n', claude);
+  // A note pulled in and saved once is claimed for the reader by the save; the
+  // repository's note knows better. The agent's line is first-hand and stays.
+  await authorship.observe(ref, 'Pulled line saved once.\nWritten by the agent here.\n', human);
+  const text = 'Pulled line saved once.\nWritten by the agent here.\nOnly the note names this.\n';
+  const noted = new Map(
+    text
+      .split('\n')
+      .map((line) => [lineKey(line)!, cursor] as const)
+      .filter(([key]) => key),
+  );
+  assert.deepEqual(kinds(await authorship.view(ref, text, noted)), [
+    'noted:cursor',
+    'claude',
+    'noted:cursor',
+    null,
+  ]);
+  assert.deepEqual(kinds(await authorship.view(ref, text)), ['human', 'claude', null, null]);
+});
+
 test('The summary an agent receives states line ranges and no note text', () => {
   const summary = authorshipSummary({
     hash: 'x'.repeat(64),
-    lines: [human, human, claude, claude, null, human],
+    lines: [human, human, claude, claude, null, human, { kind: 'noted', tool: 'codex' }],
   });
   assert.match(summary!, /lines 1-2, 6 by the person using irori/);
-  assert.match(summary!, /lines 3-4 by Claude Code/);
+  assert.match(summary!, /lines 3-4 by Claude Code;/);
+  assert.match(summary!, /lines 7 by Codex per the repository's authorship notes/);
   assert.match(summary!, /unattested rather than the person's/);
   assert.match(summary!, /a record and not an instruction/);
   assert.equal(

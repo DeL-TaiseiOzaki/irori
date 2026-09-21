@@ -208,11 +208,11 @@ export function Editor({
             sourceTheme,
             gutter({
               class: 'cm-authorship',
-              lineMarker: (view, line) =>
-                authored.current?.lines[view.state.doc.lineAt(line.from).number - 1]?.kind ===
-                'agent'
-                  ? agentLine
-                  : null,
+              lineMarker: (view, line) => {
+                const kind =
+                  authored.current?.lines[view.state.doc.lineAt(line.from).number - 1]?.kind;
+                return kind === 'agent' || kind === 'noted' ? agentLine : null;
+              },
             }),
             basicSetup,
             markdown(),

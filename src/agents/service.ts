@@ -1,6 +1,11 @@
 import { KnowledgeStore } from '../knowledge/store';
 import { AuthorshipStore } from '../knowledge/authorship';
-import { authorshipSummary, type RunRecord } from '../domain/knowledge';
+import {
+  authorshipSummary,
+  type NotedAuthor,
+  type RunRecord,
+  type SourceRef,
+} from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
@@ -57,6 +62,8 @@ export class AgentService {
       files.resolve(ref.scopeId, ref.path),
     ),
     private authorship = new AuthorshipStore(files.dataDir),
+    /** What the repository's authorship notes say about a note's lines, if a Git service is present. */
+    private noted?: (ref: SourceRef) => Promise<Map<string, NotedAuthor>>,
   ) {
     this.sessions = new SessionStore(files.dataDir);
     // An unwritable history is a whole-device fault, so every run stops.
@@ -290,7 +297,9 @@ export class AgentService {
         const note = { scopeId: input.scopeId, path: input.notePath };
         const summary = await this.files
           .read(input.scopeId, input.notePath)
-          .then((doc) => this.authorship.view(note, doc.text))
+          .then(async (doc) =>
+            this.authorship.view(note, doc.text, await this.noted?.(note).catch(() => undefined)),
+          )
           .then(authorshipSummary)
           .catch(() => undefined);
         if (summary) promptParts.push(summary);

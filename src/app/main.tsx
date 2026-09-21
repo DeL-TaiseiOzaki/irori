@@ -3,7 +3,7 @@ import { useDraft, flushDrafts } from './useDraft';
 import { UpdateNotice } from './UpdateNotice';
 import { NoteActions, TrashNotes } from './NoteActions';
 import type { SearchTarget } from '../editor/search-navigation';
-import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
+import { writerName, type NoteAuthorship, type SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
@@ -447,11 +447,14 @@ function App() {
     };
   }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
   const authoredLines = useMemo(() => {
-    const counts = new Map<AgentId, number>();
-    for (const line of authorship?.lines ?? [])
-      if (line?.kind === 'agent') counts.set(line.agent, (counts.get(line.agent) ?? 0) + 1);
+    const counts = new Map<string, number>();
+    for (const line of authorship?.lines ?? []) {
+      const name = line && writerName(line);
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
     return [...counts];
   }, [authorship]);
+  const notedLines = authorship?.lines.some((line) => line?.kind === 'noted');
   const editor = useRef<EditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
@@ -1145,8 +1148,9 @@ function App() {
             )}
             {authoredLines.length > 0 && (
               <p className="hint authorship" role="status">
-                {authoredLines.map(([id, count]) => `${agentNames[id]} が ${count} 行`).join('、')}
+                {authoredLines.map(([name, count]) => `${name} が ${count} 行`).join('、')}
                 を記述しました。
+                {notedLines && '一部はリポジトリの作者情報ノート（refs/notes/ai）の記録です。'}
                 {mode === 'source' ? '左端の印が該当行です。' : 'ソース表示で行ごとに示します。'}
               </p>
             )}

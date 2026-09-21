@@ -9,6 +9,7 @@ import {
   type AuthorshipRecord,
   type LineAuthor,
   type NoteAuthorship,
+  type NotedAuthor,
   type SourceRef,
 } from '../domain/knowledge';
 
@@ -81,18 +82,24 @@ export class AuthorshipStore {
     });
   }
   /**
-   * Resolves the record against the text as it stands now. It joins the same
-   * queue as `observe`, so a caller that starts an observation without waiting
-   * for it still reads the answer that includes it.
+   * Resolves the record against the text as it stands now, with what the
+   * repository's authorship notes say about the same lines, keyed alike. It
+   * joins the same queue as `observe`, so a caller that starts an observation
+   * without waiting for it still reads the answer that includes it.
    */
-  view(ref: SourceRef, text: string): Promise<NoteAuthorship> {
+  view(ref: SourceRef, text: string, noted?: Map<string, NotedAuthor>): Promise<NoteAuthorship> {
     return this.queue.run(async () => {
       const record = await this.read(ref);
       return {
         hash: hash(text),
         lines: text.split('\n').map((line) => {
           const key = lineKey(line);
-          return key ? (record.lines[key]?.by ?? null) : null;
+          if (!key) return null;
+          const seen = record.lines[key]?.by;
+          // This device launching the run is first-hand and a note is the
+          // committed record; a save claims whatever it had not seen before,
+          // including lines that arrived by pull, so it yields to both.
+          return seen?.kind === 'agent' ? seen : (noted?.get(key) ?? seen ?? null);
         }),
       };
     });

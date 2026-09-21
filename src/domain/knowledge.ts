@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, agentNames } from './types';
+import { agentIds, agentNames, type AgentId } from './types';
 const sourcePath = z
   .string()
   .min(1)
@@ -77,13 +77,23 @@ export const authorshipRecord = z.object({
   lines: z.record(z.string(), z.object({ by: lineAuthor, at: z.iso.datetime() })),
 });
 export type AuthorshipRecord = z.infer<typeof authorshipRecord>;
+/**
+ * A writer the repository's authorship note (`refs/notes/ai`) names for a
+ * committed line, as distinct from one this device observed. `tool` is the
+ * note's own name for the CLI; it is irori's agent id when irori wrote it.
+ */
+export interface NotedAuthor {
+  kind: 'noted';
+  tool: string;
+}
 /** One entry per line of the text as it stands now; null where nothing was observed. */
 export interface NoteAuthorship {
   hash: string;
-  lines: (LineAuthor | null)[];
+  lines: (LineAuthor | NotedAuthor | null)[];
 }
 
-const consecutive = (lines: number[]) => {
+/** `1-3, 7`: sorted 1-indexed line numbers as ranges, with the given separator. */
+export function lineRanges(lines: number[], separator = ', ') {
   const out: string[] = [];
   for (let i = 0; i < lines.length;) {
     let last = i;
@@ -91,27 +101,41 @@ const consecutive = (lines: number[]) => {
     out.push(last === i ? `${lines[i]}` : `${lines[i]}-${lines[last]}`);
     i = last + 1;
   }
-  return out.join(', ');
-};
+  return out.join(separator);
+}
+
+/** The CLI's display name; undefined for the person, whose lines carry no mark. */
+export function writerName(line: LineAuthor | NotedAuthor): string | undefined {
+  if (line.kind === 'human') return;
+  if (line.kind === 'agent') return agentNames[line.agent];
+  return (agentIds as readonly string[]).includes(line.tool)
+    ? agentNames[line.tool as AgentId]
+    : line.tool;
+}
 
 /**
  * States who typed which lines, for an agent about to work on the note. It is a
- * record of what this device observed, not an instruction: what an agent may do
- * with the person's lines belongs to the knowledge base's own contract, not to
- * a sentence irori prepends.
+ * record of what this device observed and what the repository's notes carry, not
+ * an instruction: what an agent may do with the person's lines belongs to the
+ * knowledge base's own contract, not to a sentence irori prepends.
  */
 export function authorshipSummary(view: NoteAuthorship, limit = 2048): string | undefined {
   const groups = new Map<string, number[]>();
   view.lines.forEach((line, index) => {
     if (!line) return;
-    const who = line.kind === 'human' ? 'the person using irori' : agentNames[line.agent];
+    const who =
+      line.kind === 'human'
+        ? 'the person using irori'
+        : line.kind === 'agent'
+          ? writerName(line)!
+          : `${writerName(line)} per the repository's authorship notes`;
     groups.set(who, [...(groups.get(who) ?? []), index + 1]);
   });
   if (!groups.size) return undefined;
   const stated = [...groups]
-    .map(([who, lines]) => `lines ${consecutive(lines)} by ${who}`)
+    .map(([who, lines]) => `lines ${lineRanges(lines)} by ${who}`)
     .join('; ');
-  return `Observed authorship of that note on this device, as a record and not an instruction: ${stated}. Any line not named is unattested rather than the person's.`.slice(
+  return `Observed authorship of that note, on this device and in the repository's authorship notes, as a record and not an instruction: ${stated}. Any line not named is unattested rather than the person's.`.slice(
     0,
     limit,
   );

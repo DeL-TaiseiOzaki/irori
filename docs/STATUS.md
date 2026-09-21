@@ -1,5 +1,77 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The record travels with the repository, 2026-09-21: the device-local record of
+who typed which line (#45) now reaches other devices and other tools as the
+**Git AI Standard v3 note at `refs/notes/ai`**, and irori reads such a note
+whoever wrote it. `src/git/notes.ts` speaks the format — attestation lines, the
+`---` divider, JSON metadata — as the spec at git-ai commit `e2411d9` states it
+and as git-ai's own reader and writer at `0670e7e` behave; `GitService` reads,
+writes and carries it. No git-ai binary is involved and nothing touches the
+working tree.
+
+Reading comes first. For the open note, the notes on the newest fifty commits
+that touched the file are read at those commits — a note's line numbers are
+exact only there — and each attested line becomes the content key the device
+record already uses, so a line that has moved keeps its writer and a rewritten
+one carries no claim. Session and legacy keys resolve to the tool the metadata
+names; a key the metadata lacks is skipped as git-ai skips it; an `h_` human
+key changes nothing, because irori marks nothing for a person's lines and does
+not relay another tool's human claim as the reader's. Per line the answer is:
+what this device saw a run write, then what the note says, then what this
+device saw the reader save — a save claims whatever it had not seen, pulled
+lines included — then unattested. The hint above the note says when part of the
+count comes from the repository's notes, source view marks those lines, and the
+agent's summary lists them `per the repository's authorship notes`.
+
+At commit through the Git panel, irori attaches a note naming only the lines
+the record attributes to an agent run, in the committed Markdown of the
+knowledge layer: `s_<session>::t_<trace>` per run and file with the session id
+`SHA-256("<agent>:<run id>")[0..14]` as the standard derives it, and a
+`sessions` map whose `agent_id` carries the CLI, irori's run id and `"unknown"`
+as the model — git-ai's parser requires the field and its Claude preset writes
+that word when it cannot tell. The reader's lines are never attested; a commit
+with no agent line gets no note. A note git-ai's hook already attached keeps
+every entry and field, irori's entries following its own; one irori cannot read
+is left alone and the commit result says so. The write is a `git fast-import`
+with the current tip as parent, as git-ai writes, which git refuses to apply
+over a tip it does not contain — so a note another process writes in between is
+kept, and the commit reports its note as not written. Fetch, Pull and 履歴を統合
+also fetch `refs/notes/ai` into git-ai's tracking ref
+`refs/notes/ai-remote/<remote>` and merge it with `git notes merge -s ours`;
+Push sends the ref after the branch, never forced, and reports a rejection that
+a Fetch then settles. See [AUTHORSHIP](AUTHORSHIP.md) and [GIT](GIT.md), which
+also records that GitHub's squash and rebase merges make commits without notes
+and that git-ai answers that with its `git ai ci` workflow, which irori lacks.
+
+Verification: production build, format check, **203 behaviour tests (199
+passed, four environment-gated skips)** with five new ones in
+`tests/git-notes.test.ts` — round trip through a fresh device, a hand-written
+note in the spec's own layout with quoted path, legacy, human and unknown keys,
+a hook-written note merged and an unreadable one left, fetch/push/ours-merge
+against a bare remote and a peer clone, and the format's linear-time reading —
+plus the precedence rule in `tests/authorship.test.ts`, and all **fourteen
+Electron UI suites**; `git-ui-smoke` now seeds a note and checks the hint, the
+absence of a note after a human-only commit, and the ref reaching the remote on
+Push. Ranges arrive in other people's notes, so overlapping ones are merged
+before they are expanded: 1,300 overlapping spans over a million-line file
+yield the million lines once, inside the format test's one-second bound. The
+git-ai CLI 1.7.5, installed into a disposable prefix, read an irori-written
+note: `git-ai blame` attributed the agent's lines to the CLI and
+`git-ai stats` counted them as AI additions. Twelve mutation checks each fail a test: the precedence order,
+attesting the reader's lines, replacing or mishandling an existing note, the
+session id derivation, path quoting, fetch or push without the ref, `-s
+theirs`, an unknown session kept, a note read against HEAD, and the model
+sentinel. Version 0.1.20 with its notes accompanies the change; publication
+follows the merge.
+
+Open: the model is unknown to irori; a merge commit gets no note; only the
+file's newest fifty noted commits are read, at the cost of a `git log` and one
+`git cat-file` per noted commit whenever the saved bytes change, which the
+planned index would absorb; a squash-merged branch's notes are unreachable
+from `main`. Whether irori should write `h_` entries for lines it saw the
+reader save is the owner's call and is deliberately not done: the save
+observation is weaker than the standard's "explicitly observed being typed".
+
 Skills that say who they are for, why they left, and how far they reach,
 2026-09-21: three techniques borrowed from teamai-cli after the
 [reassessment](../../irori-extention/docs/research/teamai-cli-evaluation.md)

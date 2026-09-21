@@ -102,6 +102,7 @@ app
       (event) => emit({ type: 'agent', event }),
       knowledge,
       authorship,
+      (ref) => git.noted(ref.scopeId, ref.path),
     );
     let fileMutations = 0;
     /**
@@ -125,7 +126,11 @@ app
           .catch(() => {});
       }
     }
-    const git = new GitService(files, () => !agents.anyBusy && !cloud.busy && fileMutations === 0);
+    const git = new GitService(
+      files,
+      () => !agents.anyBusy && !cloud.busy && fileMutations === 0,
+      authorship,
+    );
     function canStartAgent() {
       if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
       if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
@@ -430,7 +435,13 @@ app
         const filename = await files.resolve(...args);
         await openFile(filename);
       },
-      noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
+      // A space that is not a Git root has no notes, which reads as none.
+      noteAuthorship: async (id, p, text) =>
+        authorship.view(
+          { scopeId: id, path: p },
+          text,
+          await git.noted(id, p).catch(() => undefined),
+        ),
       agents: () => agents.available(),
       agentSession: (...args) => agents.session(...args),
       agentConversation: (...args) => agents.conversation(...args),
