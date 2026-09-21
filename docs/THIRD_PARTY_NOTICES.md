@@ -4,7 +4,7 @@ This preview depends on installed npm packages; exact versions and integrity has
 
 | Reuse | License/notice location |
 |---|---|
-| xterm.js and FitAddon, node-pty, default-shell, which | MIT, each package LICENSE; node-pty ConPTY assets retain upstream notices |
+| xterm.js and FitAddon, node-pty, default-shell, which | MIT, each package LICENSE; node-pty ConPTY assets retain upstream notices. Only the target platform's prebuild is packaged; the others cannot be loaded there |
 | rclone 1.75.1 | MIT, assets/rclone-LICENSE.txt; also shipped with the binary in vendor/rclone/LICENSE.txt |
 | fflate | MIT, development-only ZIP extraction; package LICENSE |
 | React / React DOM | MIT, each package's LICENSE |
@@ -16,7 +16,7 @@ This preview depends on installed npm packages; exact versions and integrity has
 | OpenCode SDK, eventsource-parser | MIT, each package LICENSE; the SDK is loaded in the host on demand |
 | write-file-atomic | ISC, node_modules/write-file-atomic/LICENSE.md; signal-exit retains its ISC license |
 | yaml | ISC, node_modules/yaml/LICENSE; used for standards-compatible skill front matter and has no runtime dependencies |
-| Claude Agent SDK | `SEE LICENSE IN README.md`; node_modules/@anthropic-ai/claude-agent-sdk/README.md and linked provider terms. Do not describe it as MIT. The controller runs the user's separately installed unmodified Claude Code executable. |
+| Claude Agent SDK | `SEE LICENSE IN README.md`; node_modules/@anthropic-ai/claude-agent-sdk/README.md and linked provider terms. Do not describe it as MIT. The controller runs the user's separately installed unmodified Claude Code executable. The SDK's optional `claude-agent-sdk-<platform>` packages, each carrying a complete Claude Code binary under Anthropic's own terms, are removed while packaging: irori never resolves them, so no Claude Code executable is redistributed. |
 | Node.js development runtime | node_modules/node/node_modules/node-bin-setup and platform binary distribution notices; development dependency, not an independently chosen irori binary-redistribution license |
 | TypeScript, Vite, esbuild, tsx, Playwright and types | Development dependencies; preserve each upstream license when distributing relevant files |
 
@@ -48,4 +48,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies, including optional Claude SDK native binary packages. Native-binary redistribution review, signing and provider-distribution review remain release gates.
+irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies and asserts that no Claude SDK native binary package is among them. The binaries irori still redistributes are rclone and node-pty's native code for the target platform. Native-binary redistribution review, signing and provider-distribution review remain release gates.

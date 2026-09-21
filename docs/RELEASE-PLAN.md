@@ -1,5 +1,13 @@
 # Release readiness and remaining work
 
+Packaged dependency review, 2026-09-21: part of D08's notice row is now settled
+rather than deferred. The Agent SDK's bundled Claude Code executable, which is
+not MIT licensed and which irori never ran, is removed while packaging, and
+`test:package` asserts its absence on every platform. The binaries irori still
+redistributes are rclone and node-pty's native code for the target platform. The
+signing row is unaffected: Developer ID and notarization remain required. See
+[PACKAGING](PACKAGING.md) and [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md).
+
 Publication scope update, 2026-09-16: the owner asked for the Mac build to be
 downloadable. The authorized route is an Apple silicon testing prerelease
 alongside the existing Windows one, published together from a single CI run.
