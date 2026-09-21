@@ -1,5 +1,41 @@
 # irori continuation handoff
 
+Resume here, 2026-09-21: `main` is `96d0823` and
+[v0.1.12-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.12-preview.1)
+publishes it for both platforms, with the download page in step. Give the next
+session [HANDOFF-PROMPT](HANDOFF-PROMPT.md); it is current and this paragraph
+only adds what a resuming agent would otherwise have to rediscover.
+
+That session merged five pull requests. #43 made agent runs per knowledge base
+instead of per application. #44 removed 3.1 MB of unreachable code from the
+package, chiefly KaTeX, which `features: { Latex: false }` never removed
+because the flag is read after bundling. #45 records which lines an agent wrote,
+keyed by the line's text rather than its position — read
+[AUTHORSHIP](AUTHORSHIP.md) before extending it, especially for why irori does
+not call `git ai checkpoint known_human`. #46 is
+[ADR 005](decisions/005-host-and-references.md): irori is not built on orca,
+and the four product directions the owner stated are recorded with their honest
+current state.
+
+Three things are easy to get wrong next time:
+
+- **Stacked pull requests do not retarget themselves here.** #44 and #45 were
+  opened against their parents. GitHub moves a PR to `main` only when its base
+  branch is deleted, and these were not, so each had to be retargeted with
+  `gh pr edit <n> --base main` before merging — merging as they were would have
+  landed them on the parent branch instead of `main`.
+- **A gap in published versions is deliberate.** 0.1.10 and 0.1.11 have notes
+  but no package. Each PR had to advance the version to pass `release-sync.yml`;
+  publishing the intermediate ones would make a reader upgrade twice to reach
+  the same code.
+- **`release.yml` dispatch worked** in this session with the owner's explicit
+  instruction to merge, contrary to an earlier note that it is always refused.
+
+Two decisions are the owner's and are not settled: what "taking in extensions"
+is to mean, and whether the graph is drawn from the OKF bundle or the declared
+CSV pair. The workspace root outside the three repositories is also under no
+version control, which the owner has not yet been asked about.
+
 Resume here, 2026-09-17: `main` and the published preview are to stay in sync.
 The owner gave standing authorization for agents to publish a preview after an
 authorized merge. That covers the prerelease, the website manifest and Pages
@@ -218,18 +254,26 @@ Respond in Japanese. Write code, identifiers, technical documents and commit mes
 
 ## Public delivery and exact identities
 
-| Item               | Verified value                                                                                        |
-| ------------------ | ----------------------------------------------------------------------------------------------------- |
-| Download site      | https://del-taiseiozaki.github.io/irori/                                                              |
-| Release            | `v0.1.2-preview.1`, public unsigned Windows x64 prerelease                                            |
-| Application commit | `b51a54b1f9fb36423edf56ed6a1bec961839e165`                                                            |
-| Native CI          | [34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), all jobs successful |
-| Website commit     | `94bc9ce3caa9bc71ef5b6a3975283ddb8f14b7c5`                                                            |
-| Pages deployment   | [34761649567](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761649567), successful          |
-| Installer          | `irori-0.1.2-windows-x64-Setup.exe`, 316,222,976 bytes (301.6 MiB)                                    |
-| SHA-256            | `b3cb5c71cb8311ad9043ad79e31632254ab8169d0b1e7de1412d41979f5012bd`                                    |
+| Item               | Verified value                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| Download site      | https://del-taiseiozaki.github.io/irori/                                                               |
+| Release            | `v0.1.12-preview.1`, unsigned Windows x64 and Apple silicon Mac prerelease                             |
+| Application commit | `08900b05ee5ff5dcc82fd211e25e40e065ca8d04`                                                             |
+| Native CI          | [35544793813](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35544793813), all jobs successful  |
+| Release run        | [35545248675](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35545248675), successful           |
+| Website commit     | `96d082352f94cea6fc4be3cb0c0756be8179bded` (#47)                                                       |
+| Pages deployment   | [35545797228](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35545797228), successful           |
+| Windows installer  | `irori-0.1.12-windows-x64-Setup.exe`, 319,919,104 bytes (305.1 MiB)                                    |
+| Windows SHA-256    | `b516f7ecac2dc1e54b97a06e627dca3e97a3db8b24a0dd84832c3e1c4a143fd1`                                     |
+| Mac disk image     | `irori-0.1.12-macos-arm64.dmg`, 281,574,107 bytes (268.5 MiB)                                          |
+| Mac SHA-256        | `ca86e0956dadaae621503fad51b659d9a3f018ee3f7a2f274e3528e389276259`                                     |
 
-The unchanged Windows CI EXE was renamed and published with `SHA256SUMS.txt` and `windows-package-evidence.json`. At 14:07 UTC on 2026-09-13, a fresh unauthenticated browser checked the live desktop/mobile page and downloaded all bytes with the same hash as CI and GitHub's asset digest. Both Mac download slots remain disabled. [Release notes](releases/0.1.2-preview.1.md) describe the trial. Continue from current `main`; the release commit identifies the binary, not the latest documentation.
+On 2026-09-21 both installers were fetched without credentials straight from the
+release URLs; both returned HTTP 200 with the byte counts and SHA-256 above,
+matching `SHA256SUMS.txt` and GitHub's own asset digests. The deployed site's
+bundle names both installers and the tag. Continue from current `main`; the
+release commit identifies the binary, not the latest documentation. Earlier
+identities are in [CHECKPOINT](CHECKPOINT.md) and the release notes.
 
 Versions `0.1.0` and `0.1.1` have no compiled Google client configuration and cannot acquire the new settings automatically. The owner previously demonstrated that 0.1.0 reached the Windows workspace/cloud dialog after a SmartScreen unknown-publisher prompt. That is historical startup evidence, not 0.1.2 installation/upgrade/IME or Google acceptance. Signing remains open.
 
