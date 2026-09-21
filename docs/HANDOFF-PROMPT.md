@@ -1,13 +1,14 @@
 # irori — Continuation prompt
 
-Updated 2026-09-21, after five pull requests merged in one session. Give this
-file to the next agent, or copy its contents into a new session. Inspect current
-files and Git state before acting; later work takes precedence over this file.
+Updated 2026-09-21, after nine pull requests merged in one day and
+v0.1.14-preview.1 published. Give this file to the next agent, or copy its
+contents into a new session. Inspect current files and Git state before acting;
+later work takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which was `96d0823` with
-0.1.12 published when this was written. Choose a bounded next change with
+Take over **irori** development from current `main`, which was `ae6b0f9` with
+0.1.14 published and the download page in step when this was written. Choose a bounded next change with
 executable acceptance checks and carry it through implementation and
 verification. Make independent progress while device and account evidence is
 pending.
@@ -46,8 +47,22 @@ them and why irori is not built on orca.
 
 ## What landed on 2026-09-21
 
-Five PRs, all with build, 162 behaviour tests, thirteen Electron UI suites and
-three platform package jobs passing:
+Nine PRs. The first five were verified with 162 behaviour tests and thirteen
+Electron UI suites; the last four with 168 tests and fourteen suites, all with
+build, format check and three platform package jobs passing:
+
+- **#49 — the package stopped carrying executables irori never runs**, version
+  0.1.13. The Agent SDK bundles a complete Claude Code binary per platform,
+  about 220 MB, which the SDK resolves only when `pathToClaudeCodeExecutable` is
+  unset — and `src/agents/service.ts` always passes the reader's own installed
+  `claude`. node-pty's prebuilds for other platforms are unreachable for the
+  same kind of reason. Both are removed in `packageAfterPrune`, and
+  `test:package` asserts their absence and records each platform's weight. See
+  [PACKAGING](PACKAGING.md).
+- **#50 — notes follow their own links**, version 0.1.14. Ctrl/Cmd + click
+  follows a relative Markdown link, which is what the recommended template
+  writes; a plain click still places the cursor. See [NOTE-LINKS](NOTE-LINKS.md).
+- **#48 and #51** — the 0.1.12 delivery record, this file, and the download page.
 
 - **#43 — one agent per knowledge base.** `AgentService` keeps
   `Map<scopeId, Run>`; a second agent in the same space is still refused, a
@@ -70,24 +85,28 @@ three platform package jobs passing:
 
 ## Delivery state
 
-`main` is `96d0823`, version **0.1.12**, published as
-[v0.1.12-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.12-preview.1)
-with the download page in step. 0.1.10 and 0.1.11 have committed notes but no
-package of their own: each PR had to advance the version past the published
-preview to satisfy `release-sync.yml`, and publishing the intermediate ones
-would offer a reader two upgrades to reach the same code. Read
+`main` is `ae6b0f9`, version **0.1.14**, published as
+[v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
+with the download page in step. The Windows installer is 215,796,224 bytes and
+the Mac disk image 182,424,344, against 319,919,104 and 281,574,107 at 0.1.12.
+0.1.10, 0.1.11 and 0.1.13 have committed notes but no package of their own: each
+PR had to advance the version past the published preview to satisfy
+`release-sync.yml`, and publishing every intermediate one would make a reader
+upgrade twice to reach the same code. Read
 [DISTRIBUTION](DISTRIBUTION.md) §"How the rule is held" before the next
 release.
 `release-sync.yml` fails hourly while `main` holds a shipped change for more
 than sixty minutes without a release, so an unpublished merge is visible rather
 than silent.
 
-Two pull requests wait for the owner's own merge instruction: **#48**, which is
-this file and the delivery record, and **#49**, version 0.1.13, which stops the
-package carrying executables irori never runs. #49 is stacked on #48 because
-both add a section at the top of `docs/STATUS.md`; merge #48 first and GitHub
-retargets #49 at `main` itself. #49 reaches the desktop package, so publishing
-`v0.1.13-preview.1` is part of finishing it.
+Nothing is waiting to be merged. Two things about that flow are worth carrying
+forward. Every change of substance adds a section at the top of
+`docs/STATUS.md`, so two branches cut from `main` conflict there whichever order
+they merge; stack the later one on the earlier and retarget it at `main` when
+the first merges. And the hourly drift check reads the live download page, so a
+scheduled run that lands between the release and the Pages deployment fails by
+seconds — publish the website before the hour, or dispatch a re-check after the
+deployment finishes.
 
 ## Next work, in the order the evidence supports
 
@@ -97,13 +116,12 @@ retargets #49 at `main` itself. #49 reaches the desktop package, so publishing
    largest gap between irori and its own recommended template, and the owner
    asked for the decision to be discussed rather than taken. `src/host/ontology.ts`,
    `src/domain/ontology.ts`, `src/app/OntologyPanel.tsx`.
-2. **Indexed search and link resolution.** Closes part of R03/R08, whose open
-   column names backlinks twice. `src/host/search.ts`, `src/app/SearchPanel.tsx`.
-   Two things were measured on 2026-09-21 and correct this item. The links the
-   recommended template actually writes are **relative Markdown links**, not
-   `[[wiki links]]`: `irori-templete`'s ADR 002 D3 fixes identity as the path and
-   links as relative, and the repository contains no `[[` at all. And
-   `node:sqlite` is present in Electron 44 with FTS5 (SQLite 3.53.4), but its
+2. **Backlinks and indexed search.** Following a link is done (#50); the reverse
+   is not. R03 and R08 both name backlinks as open, and finding them needs a
+   scan of the knowledge layer — `SearchService`'s bounded walk is the machinery
+   to reuse — or an index. `src/host/search.ts`, `src/host/links.ts`,
+   `src/app/SearchPanel.tsx`. One measurement from 2026-09-21 constrains the
+   index: `node:sqlite` is present in Electron 44 with FTS5 (SQLite 3.53.4), but its
    tokenizers decide whether Japanese works: with `unicode61` a sentence without
    spaces is one token, so a query inside it never matches, and `trigram`, which
    does match inside, returns nothing for a query shorter than three characters.
