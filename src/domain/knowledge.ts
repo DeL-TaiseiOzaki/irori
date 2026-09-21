@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, agentNames } from './types';
+import { agentIds } from './types';
 const sourcePath = z
   .string()
   .min(1)
@@ -63,24 +63,22 @@ export const pendingWrite = z.object({
 export type PendingWrite = z.infer<typeof pendingWrite>;
 
 /**
- * Who typed a line. A line is identified by its own normalised text rather than
- * by its position, so inserting a paragraph above it, moving it, or rewriting
- * the history that carries it never invalidates the record.
+ * The lines the person wrote or revised, each with when irori saw it, and
+ * nothing else: a line an agent wrote, or one that arrived by pull, carries no
+ * mark. A line is identified by its own normalised text rather than by its
+ * position, so inserting a paragraph above it, moving it, or rewriting the
+ * history that carries it never invalidates the record, and a line rewritten
+ * afterwards is a different line.
  */
-export const lineAuthor = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('human') }),
-  z.object({ kind: z.literal('agent'), agent: z.enum(agentIds), runId: z.uuid() }),
-]);
-export type LineAuthor = z.infer<typeof lineAuthor>;
 export const authorshipRecord = z.object({
-  schemaVersion: z.literal(1),
-  lines: z.record(z.string(), z.object({ by: lineAuthor, at: z.iso.datetime() })),
+  schemaVersion: z.literal(2),
+  lines: z.record(z.string(), z.iso.datetime()),
 });
 export type AuthorshipRecord = z.infer<typeof authorshipRecord>;
-/** One entry per line of the text as it stands now; null where nothing was observed. */
+/** One entry per line of the text as it stands now: whether the person wrote or revised it. */
 export interface NoteAuthorship {
   hash: string;
-  lines: (LineAuthor | null)[];
+  lines: boolean[];
 }
 
 const consecutive = (lines: number[]) => {
@@ -95,23 +93,15 @@ const consecutive = (lines: number[]) => {
 };
 
 /**
- * States who typed which lines, for an agent about to work on the note. It is a
- * record of what this device observed, not an instruction: what an agent may do
- * with the person's lines belongs to the knowledge base's own contract, not to
- * a sentence irori prepends.
+ * Names the lines of the note the person wrote or revised, for an agent the
+ * person asked to be told. It is a record of what this device observed, not an
+ * instruction: what an agent may do with the person's lines belongs to the
+ * knowledge base's own contract, not to a sentence irori prepends.
  */
-export function authorshipSummary(view: NoteAuthorship, limit = 2048): string | undefined {
-  const groups = new Map<string, number[]>();
-  view.lines.forEach((line, index) => {
-    if (!line) return;
-    const who = line.kind === 'human' ? 'the person using irori' : agentNames[line.agent];
-    groups.set(who, [...(groups.get(who) ?? []), index + 1]);
-  });
-  if (!groups.size) return undefined;
-  const stated = [...groups]
-    .map(([who, lines]) => `lines ${consecutive(lines)} by ${who}`)
-    .join('; ');
-  return `Observed authorship of that note on this device, as a record and not an instruction: ${stated}. Any line not named is unattested rather than the person's.`.slice(
+export function personLinesSummary(view: NoteAuthorship, limit = 2048): string | undefined {
+  const lines = view.lines.flatMap((mine, index) => (mine ? [index + 1] : []));
+  if (!lines.length) return undefined;
+  return `The person using irori wrote or revised lines ${consecutive(lines)} of that note, as observed on this device; a record, not an instruction. A line not named is unattested, not necessarily an agent's.`.slice(
     0,
     limit,
   );

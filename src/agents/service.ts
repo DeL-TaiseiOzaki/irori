@@ -1,6 +1,6 @@
 import { KnowledgeStore } from '../knowledge/store';
-import { AuthorshipStore } from '../knowledge/authorship';
-import { authorshipSummary, type RunRecord } from '../domain/knowledge';
+import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
+import { personLinesSummary, type RunRecord } from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
@@ -75,11 +75,6 @@ export class AgentService {
   }
   runningScopes() {
     return [...this.runs.keys()];
-  }
-  /** The run a space is executing, for observations that have to name it. */
-  current(scopeId: string) {
-    const run = this.runs.get(scopeId);
-    return run ? { agent: run.binding.agent, runId: run.id } : undefined;
   }
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.files.get(scopeId).root };
@@ -286,13 +281,16 @@ export class AgentService {
         promptParts.push(
           `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.`,
         );
-        // Line numbers are those of the saved bytes the agent is told to read.
+        // Only when the person asked: which lines are theirs is not needed on every
+        // turn. Line numbers are those of the saved bytes the agent is told to read.
         const note = { scopeId: input.scopeId, path: input.notePath };
-        const summary = await this.files
-          .read(input.scopeId, input.notePath)
-          .then((doc) => this.authorship.view(note, doc.text))
-          .then(authorshipSummary)
-          .catch(() => undefined);
+        const summary = input.personLines
+          ? await this.files
+              .read(input.scopeId, input.notePath)
+              .then((doc) => this.authorship.view(note, doc.text))
+              .then(personLinesSummary)
+              .catch(() => undefined)
+          : undefined;
         if (summary) promptParts.push(summary);
       }
       const selectedSkill = input.skill
@@ -547,6 +545,37 @@ export class AgentService {
         permissionMode: 'default',
         includePartialMessages: true,
         resume: session,
+        // Told when it matters rather than on every turn: before an edit would
+        // change lines the person wrote or revised, Claude Code hears which.
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: 'Edit|MultiEdit|Write',
+              hooks: [
+                async (input) => {
+                  const context =
+                    input.hook_event_name === 'PreToolUse'
+                      ? await personLinesNotice(
+                          this.files,
+                          this.authorship,
+                          binding.scopeId,
+                          input.tool_name,
+                          input.tool_input,
+                        ).catch(() => undefined)
+                      : undefined;
+                  return context
+                    ? {
+                        hookSpecificOutput: {
+                          hookEventName: 'PreToolUse',
+                          additionalContext: context,
+                        },
+                      }
+                    : {};
+                },
+              ],
+            },
+          ],
+        },
         abortController: run.abort,
         spawnClaudeCodeProcess: (options) => {
           const child = launch(options.command, options.args, options.cwd ?? cwd, options.env);

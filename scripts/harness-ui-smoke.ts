@@ -190,17 +190,30 @@ try {
     await settings().click();
   }
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain('Fixture OpenCode edit');
+  // The person's line from earlier in the conversation is counted and the line
+  // the OpenCode fixture appended is not; a line the person types and saves is.
+  await page.getByRole('button', { name: 'note', exact: true }).click();
+  const editor = page.locator('.ProseMirror');
+  await expect(editor).toContainText('Fixture OpenCode edit');
+  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 1 行');
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('自分で書いた一文です。');
+  await page.getByRole('button', { name: '保存 •', exact: true }).click();
+  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 2 行');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
   await app.close();
   app = await launch();
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-  // The line the OpenCode fixture appended is attributed to it, and the record
-  // outlives the process that observed it.
+  // The record outlives the process that observed it, and a note with such lines
+  // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await expect(page.locator('.hint.authorship')).toContainText('OpenCode が 1 行');
+  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 2 行');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await expect(page.getByLabel('自分の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');

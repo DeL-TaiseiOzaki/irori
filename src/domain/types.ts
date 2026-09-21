@@ -157,6 +157,8 @@ export interface StartRun {
   sources?: import('./knowledge').SourceRef[];
   /** Name of a skill package this KB declares, prepended to the request. */
   skill?: string;
+  /** Tell the agent which lines of the note the person wrote or revised. */
+  personLines?: boolean;
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];

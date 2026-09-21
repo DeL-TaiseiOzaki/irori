@@ -315,6 +315,7 @@ function App() {
   const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [skill, setSkill] = useState('');
+  const [personLines, setPersonLines] = useState(false);
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
@@ -446,12 +447,9 @@ function App() {
       current = false;
     };
   }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
-  const authoredLines = useMemo(() => {
-    const counts = new Map<AgentId, number>();
-    for (const line of authorship?.lines ?? [])
-      if (line?.kind === 'agent') counts.set(line.agent, (counts.get(line.agent) ?? 0) + 1);
-    return [...counts];
-  }, [authorship]);
+  const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
+  // Offered only for a note of the active space that has such lines to name.
+  const personLinesOffered = personLineCount > 0 && !!active && doc?.scopeId === active.scopeId;
   const editor = useRef<EditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
@@ -707,6 +705,7 @@ function App() {
       newSession,
       sources: selectedSources,
       skill: skill || undefined,
+      personLines: (personLines && personLinesOffered) || undefined,
     });
   }
   async function start() {
@@ -737,6 +736,7 @@ function App() {
             notePath,
             sources,
             skill: skill || undefined,
+            personLines: (personLines && personLinesOffered) || undefined,
           }),
         );
       } else {
@@ -1143,10 +1143,9 @@ function App() {
                 {status}
               </p>
             )}
-            {authoredLines.length > 0 && (
+            {personLineCount > 0 && (
               <p className="hint authorship" role="status">
-                {authoredLines.map(([id, count]) => `${agentNames[id]} が ${count} 行`).join('、')}
-                を記述しました。
+                あなたが書いた・直した行: {personLineCount} 行。
                 {mode === 'source' ? '左端の印が該当行です。' : 'ソース表示で行ごとに示します。'}
               </p>
             )}
@@ -1725,6 +1724,20 @@ function App() {
                   ))}
                   <div className="composer-actions">
                     <div className="composer-selects">
+                      {personLinesOffered && (
+                        <label
+                          className="composer-toggle"
+                          title="開いているノートで、あなたが書いた・直した行をエージェントに伝えます"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={personLines}
+                            disabled={sending || gitBusy}
+                            onChange={(e) => setPersonLines(e.target.checked)}
+                          />
+                          自分の行を伝える
+                        </label>
+                      )}
                       {active && (skills.length > 0 || skillsRetired.length > 0) && (
                         <SkillPicker
                           key={active.scopeId}

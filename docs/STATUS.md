@@ -1,5 +1,53 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The person's lines, 2026-09-21: the authorship record keeps one mark per line —
+the person wrote or revised it, or not — and nothing about an agent's lines.
+The owner set the goal: which lines are the person's matters most, because an
+agent working with the person needs them to understand what the person meant;
+and a person who changes part of a line does so to make the whole sentence say
+what they mean, so a line with any of their change is theirs. Sub-line tracking
+was considered and judged more than the goal needs, and no existing tool records
+it anyway — git-ai collapses its internal character ranges to one author per
+line and drops the person's lines, and every other tool surveyed is line-level
+or closed. See [ADR 006](decisions/006-person-lines.md) and
+[the survey](research/2026-09-21-authorship-provenance.md).
+
+A save now marks only the lines it introduced: the host reads the bytes it
+replaces and marks the lines the old text did not carry, so a line that arrived
+by pull, from another editor or from an agent is never claimed for the person,
+as the 0.1.12 record did at the person's first save. Records from before 0.1.20
+are not read. The watcher no longer attributes a batch of changes to the run
+that owned the space, and `AgentService.current` goes with it. The note states
+how many lines are the person's and source view marks them.
+
+An agent is told when it matters. Before Claude Code's `Edit`, `MultiEdit` or
+`Write` changes one of the person's lines, the Agent SDK's `PreToolUse` hook
+adds which lines, quoted, as `additionalContext`; `editedText` applies the tool's
+input as the tool would, and nothing is guessed when it does not recognise one.
+Any agent is given the person's line ranges only when the person ticks
+自分の行を伝える, which appears when the open note has such lines and starts
+unticked — every request carried them before. Both are stated as a record, not
+an instruction. When sharing is wanted, the record maps to the Git AI Standard's
+`h_` entries alone, which the owner chose; #59, which wrote agent entries and no
+`h_`, is closed.
+
+Verification: production build, format check, **199 behaviour tests (195
+passed, four environment-gated skips)** — six in `tests/authorship.test.ts`,
+rewritten for the new record, and one in `tests/harnesses.test.ts` showing the
+Pi fixture's request carries the person's lines only when asked — and the
+Electron UI suites, where `harness-ui-smoke` shows the OpenCode fixture's
+appended line uncounted, a typed and saved line counted, the count surviving a
+restart and the tickbox starting unticked. Letting a save claim lines the file
+already carried, taking a replacement string as a pattern, naming unchanged
+lines in the notice, or adding the summary to every request each fails a test.
+Version 0.1.20 with its notes accompanies the change; publication follows the
+merge.
+
+Not done: Codex, OpenCode and Pi are not told at edit time; the hook's effect on a
+real Claude Code turn was not observed, since real model runs need separate
+authorisation. Which words inside a line are the person's is not kept, pasted
+text counts as the person's, and the record stays on the device.
+
 Skills that say who they are for, why they left, and how far they reach,
 2026-09-21: three techniques borrowed from teamai-cli after the
 [reassessment](../../irori-extention/docs/research/teamai-cli-evaluation.md)
