@@ -82,6 +82,13 @@ release.
 than sixty minutes without a release, so an unpublished merge is visible rather
 than silent.
 
+Two pull requests wait for the owner's own merge instruction: **#48**, which is
+this file and the delivery record, and **#49**, version 0.1.13, which stops the
+package carrying executables irori never runs. #49 is stacked on #48 because
+both add a section at the top of `docs/STATUS.md`; merge #48 first and GitHub
+retargets #49 at `main` itself. #49 reaches the desktop package, so publishing
+`v0.1.13-preview.1` is part of finishing it.
+
 ## Next work, in the order the evidence supports
 
 1. **OKF-native graph.** `irori-templete` became an Open Knowledge Format 0.2
@@ -90,18 +97,31 @@ than silent.
    largest gap between irori and its own recommended template, and the owner
    asked for the decision to be discussed rather than taken. `src/host/ontology.ts`,
    `src/domain/ontology.ts`, `src/app/OntologyPanel.tsx`.
-2. **Indexed search and link resolution.** `node:sqlite` with FTS5 needs no
-   native dependency on Node 24, and `[[wiki link]]` resolution returning
-   `resolved | missing | ambiguous` is the shape the graph question needs
-   anyway. Closes part of R03/R08. `src/host/search.ts`, `src/app/SearchPanel.tsx`.
+2. **Indexed search and link resolution.** Closes part of R03/R08, whose open
+   column names backlinks twice. `src/host/search.ts`, `src/app/SearchPanel.tsx`.
+   Two things were measured on 2026-09-21 and correct this item. The links the
+   recommended template actually writes are **relative Markdown links**, not
+   `[[wiki links]]`: `irori-templete`'s ADR 002 D3 fixes identity as the path and
+   links as relative, and the repository contains no `[[` at all. And
+   `node:sqlite` is present in Electron 44 with FTS5 (SQLite 3.53.4), but its
+   tokenizers decide whether Japanese works: with `unicode61` a sentence without
+   spaces is one token, so a query inside it never matches, and `trigram`, which
+   does match inside, returns nothing for a query shorter than three characters.
+   A Japanese two-character query is ordinary, so an index needs trigram plus a
+   `LIKE` path over the indexed text for shorter ones — still far cheaper than
+   reading every file, which is what `SearchService` does today.
 3. **D04 — writable cloud delivery.** Extend `src/cloud/outbox.ts` with an
    explicit writable capability, re-consent and exact account binding; preserve
    staged bytes across failure and restart and observe remote completion.
    Changing a scope or a `readOnly` flag alone does not complete it.
-4. **The installer's real weight.** The packaged asar is about 517 MB, of which
-   the agent SDK's platform binaries are roughly 433 MB — the renderer bundle is
-   about one percent. Check whether Windows and Mac packages carry Linux
-   binaries. `docs/THIRD_PARTY_NOTICES.md` constrains what may be dropped.
+4. **The installer's real weight.** Done in #49, which removes the Agent SDK's
+   bundled Claude Code binary and node-pty's foreign prebuilds: the Linux
+   application directory falls from 994,253,996 to 500,345,370 bytes. No package
+   carried another platform's binary; each carried one of its own, and Linux two.
+   What is left to measure is the renderer packages Forge copies although Vite
+   has already bundled them into `dist/`, about 50 MB, which needs the notices
+   their licences require to be generated, since the bundle carries no LICENSE
+   files. See [PACKAGING](PACKAGING.md).
 5. **Authorship, second step.** Export and import of the Git AI Standard v3 note
    at `refs/notes/ai`, reading before writing, which makes the record portable
    without depending on the `git ai` binary.
