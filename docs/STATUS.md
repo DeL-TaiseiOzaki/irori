@@ -1,5 +1,55 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Skills that say who they are for, why they left, and how far they reach,
+2026-09-21: three techniques borrowed from teamai-cli after the
+[reassessment](../../irori-extention/docs/research/teamai-cli-evaluation.md)
+declined the tool itself. A skill's front matter may name `roles` and
+`projects` under `metadata`, and the composer gains **役割** and
+**プロジェクト** selectors that narrow the picker to the reader's own choice,
+kept per KB in the device record and never in the KB; a skill naming neither
+shows for everyone, and a reader who chose nothing sees everything. A KB
+retires a skill by replacing `SKILL.md` with `RETIRED.md` — date, reason,
+optional replacement, and deliberately no `name` or `description`, so no CLI
+discovers it — and irori names the retirement under the composer, fails a run
+(selected or queued) that names it with that reason, and flags a personal copy
+that keeps the name alive. **到達確認** opens a reach view: for each declared
+or retired name, whether Codex, Claude Code, OpenCode and Pi would find it
+natively when launched in the KB, which user-scope directories hold a
+same-named skill, and who wins — teamai's R7 lesson, where a personal skill
+silently shadows the project's. The per-harness table cites each CLI's
+documentation or source with its version (Codex 0.155.1, Claude Code 2.1.278,
+OpenCode 1.18.30, Pi 0.86.1 documentation); the host reads only
+`<dir>/<name>/SKILL.md` under the home directory for the five directories
+those rows name and returns home-relative names. See [SKILLS](SKILLS.md).
+
+irori writes none of it: markers come from the KB's own contract or the user,
+the audience choice lives in `device-settings.json`, and the schema-layer
+property in `tests/harnesses.test.ts` is unchanged. The new UI is in
+`SkillPicker.tsx` and `SkillReach.tsx`; `main.tsx` only mounts the picker and
+prints the retirement notices.
+
+Verification: production build, format check, **197 behaviour tests (193
+passed, four environment-gated skips)** — four new: roles and projects, the
+retirement marker, the retired listing with the reach check against a
+disposable home, and the per-KB audience record — the harness fixture refusing
+a retired name with the KB's reason, and all **fourteen Electron UI suites**,
+where `skills-ui-smoke` drives the role selector, the retirement notice and the
+reach view under a disposable `HOME`, asserting that no machine path is shown
+and that the KB's skill directory gains nothing. Each of seven mutations fails a test:
+narrowing when no role is chosen, accepting a marker with `description`,
+treating a retired name as unknown, counting a directory without `SKILL.md` as
+a personal copy, retiring a package that keeps both files, the list bound, and
+replacing rather than merging the per-KB audience record. `test:agents` and
+`test:lifecycle` were not run; no model inference was used. Version 0.1.19 with
+its notes accompanies the change; publication follows the merge.
+
+Limits: the reach table describes documented versions and is not a probe of
+the installed CLI; enterprise and admin scopes, `.claude/skills` or
+`.codex/skills` inside the KB, a relocated `CODEX_HOME` and Pi's trust state
+are not examined. A marker's `replacement` is not checked to exist. One role
+and one project per KB per device. The matching `irori-templete` convention is
+proposed with the change, not yet written into the template.
+
 A device-local index for search and backlinks, 2026-09-21: a request to
 **KB内を検索** or **リンク元** no longer reads every file. `SearchService` keeps
 one SQLite database per knowledge base under the application's data directory,

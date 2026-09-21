@@ -9,6 +9,7 @@ import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
 import { externalUrl } from './links';
 import { linkHref } from './note-links';
+import { skillAudience } from './skills';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -32,6 +33,7 @@ export const hostArguments = {
       theme: z.enum(['system', 'light', 'dark']).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
+      skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
     }),
   ]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
@@ -118,6 +120,7 @@ export const hostArguments = {
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
   skills: z.tuple([id]),
+  skillReach: z.tuple([id]),
   noteAuthorship: z.tuple([id, path, text]),
   saveImage: z.tuple([
     id,

@@ -1,0 +1,19 @@
+.skill-reach {
+  width: 860px;
+}
+.skill-reach table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+.skill-reach th,
+.skill-reach td {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.skill-reach th[scope='row'] {
+  white-space: nowrap;
+}

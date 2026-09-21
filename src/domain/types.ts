@@ -165,6 +165,8 @@ export interface DeviceSettings {
   markdownFont: MarkdownFont;
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
+  /** The reader's role and project per KB, which narrows that KB's skill picker. */
+  skillAudiences: Record<string, import('./skills').SkillAudience>;
 }
 
 export interface HostAPI {
@@ -289,8 +291,10 @@ export interface HostAPI {
     path: string,
     text: string,
   ): Promise<import('./knowledge').NoteAuthorship>;
-  /** Skill packages this KB declares in `.agents/skills/`. */
+  /** Skill packages this KB declares in `.agents/skills/`, and the ones it retired. */
   skills(scopeId: string): Promise<import('./skills').SkillListing>;
+  /** Which user-scope skill directories hold a same-named skill, per declared name. */
+  skillReach(scopeId: string): Promise<import('./skill-reach').SkillReach>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
   readImage(scopeId: string, note: string, url: string): Promise<string>;
   save(doc: Document): Promise<Document>;

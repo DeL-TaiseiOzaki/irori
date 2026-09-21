@@ -1,4 +1,5 @@
 import type { DeviceSettings } from '../domain/types';
+import type { SkillAudience } from '../domain/skills';
 
 const host = window.irori;
 
@@ -7,7 +8,12 @@ const host = window.irori;
  * between sessions. Preferences therefore live in the host's device record, and
  * this module holds the copy the running window reads from.
  */
-let current: DeviceSettings = { theme: 'system', markdownFont: 'sans', layouts: {} };
+let current: DeviceSettings = {
+  theme: 'system',
+  markdownFont: 'sans',
+  layouts: {},
+  skillAudiences: {},
+};
 
 export async function loadDeviceSettings() {
   try {
@@ -78,6 +84,16 @@ export async function chooseMarkdownFont(markdownFont: DeviceSettings['markdownF
     throw error;
   }
   applyMarkdownFont();
+  return current;
+}
+
+/** The reader's role and project for one KB; a KB without a choice is not narrowed. */
+export function currentSkillAudience(scopeId: string): SkillAudience {
+  return current.skillAudiences[scopeId] ?? {};
+}
+
+export async function chooseSkillAudience(scopeId: string, audience: SkillAudience) {
+  current = await host.saveDeviceSettings({ skillAudiences: { [scopeId]: audience } });
   return current;
 }
 

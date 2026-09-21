@@ -3,12 +3,14 @@ import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
 import { markdownFonts, type DeviceSettings } from '../domain/types';
+import { skillAudience } from '../domain/skills';
 
 const settings = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
   markdownFont: z.enum(markdownFonts).default('sans'),
   // The pane library owns this format; it is stored as written and bounded.
   layouts: z.record(z.string().max(64), z.string().max(4096)).default({}),
+  skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
 });
 
 /**
@@ -35,6 +37,7 @@ export class SettingsService {
         theme: patch.theme ?? current.theme,
         markdownFont: patch.markdownFont ?? current.markdownFont,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
+        skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
       });
       await writeLocalJson(this.file, next);
       return next;
