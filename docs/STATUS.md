@@ -31,8 +31,18 @@ node-pty binary is the loadable one — it matters most on Windows, the one
 platform that loads a prebuild instead of a rebuilt binary. Version 0.1.13 with
 its notes accompanies the change; publication follows the merge.
 
-Windows and macOS figures are not measured here; each comes from its own package
-job. This is delivery weight, not memory in use. The next measurable item is the
+All three platforms were measured by their own package jobs in CI
+[35546734885](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35546734885),
+which now print the weight: 115,044,452 bytes archived and 89,418,890 unpacked on
+linux/x64, 115,157,019 and 121,209,642 on win32/x64, 115,058,909 and 92,590,649 on
+darwin/arm64. Each run's uploaded artifact holds two compressed copies of the
+application — the installer and a zip or nupkg — and falls from 384,736,007 to
+178,491,380 bytes on Linux, 638,848,363 to 430,525,885 on Windows and 565,979,157
+to 366,045,824 on the Mac. That also answers what the packages carried: not
+another platform's binary, but one of their own, since npm installs an optional
+dependency only where its `os` and `cpu` match.
+
+This is delivery weight, not memory in use. The next measurable item is the
 renderer packages Forge copies because they are production dependencies although
 Vite has already bundled them into `dist/`, about 50 MB: dropping them means
 generating the notices their licences require, since the bundle does not carry

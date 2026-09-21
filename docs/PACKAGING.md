@@ -4,7 +4,13 @@ Executables the package never runs, 2026-09-21: packaging removes two sets of
 binaries that npm installs on the build machine and irori cannot use. The Linux
 x64 `app.asar` falls from 548,291,885 to 115,044,075 bytes, the unpacked
 directory beside it from 150,232,996 to 89,572,180, and the whole application
-directory from 994,253,996 to 500,345,370 bytes. No feature is removed.
+directory from 994,253,996 to 500,345,370 bytes. No feature is removed. Each
+platform is now the same weight: the package jobs report 115,044,452 bytes
+archived and 89,418,890 unpacked on linux/x64, 115,157,019 and 121,209,642 on
+win32/x64 — which keeps its ConPTY prebuild — and 115,058,909 and 92,590,649 on
+darwin/arm64. No package carried another platform's binary before this change:
+npm installs an optional dependency only where its `os` and `cpu` match, so each
+carried one of its own, and Linux two.
 
 The larger set is the Agent SDK's own copy of Claude Code.
 `@anthropic-ai/claude-agent-sdk` declares one optional dependency per platform,
