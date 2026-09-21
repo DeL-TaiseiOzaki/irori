@@ -1,5 +1,35 @@
 # irori continuation handoff
 
+Resume here, 2026-09-21 (evening, after the 0.1.19 delivery): `main` is `60eea4e`
+and [v0.1.19-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.19-preview.1)
+publishes it for both platforms, with the download page in step. **#61 (0.1.20)
+is open** and is the first thing to check: publish it once the owner merges it.
+Give the next session [HANDOFF-PROMPT](HANDOFF-PROMPT.md); it is current.
+
+The session built backlinks (#53), their follow-ups (#55), link rewriting on
+move (#56), a device-local search index (#57) and the skill reach check,
+retirement markers and scopes (#58), most of it through Fable agents in separate
+worktrees whose results the lead re-verified on the stacked base. The owner then
+settled authorship: **the person's lines, one mark per line**, told to Claude
+Code at edit time and to any agent on request, and shared later as Git AI
+Standard `h_` entries alone — [ADR 006](decisions/006-person-lines.md), built in
+#61; #59 closed. The workspace root became the private repository
+`irori-workspace`.
+
+Three things are easy to get wrong next time:
+
+- **Never package from a worktree whose `node_modules` is a symlink.** Forge
+  works on the shared tree: it emptied `node_modules/.bin`, rebuilt node-pty for
+  Electron and deleted the other platforms' prebuilds and the Agent SDK's
+  platform packages. `npm rebuild --ignore-scripts` and `npm pack` of the locked
+  versions repaired it. CI's package jobs cover packaging.
+- **A backgrounded Fable agent does not survive a session restart**, and after
+  one it is reachable by its agent id, not its name. Check its worktree before
+  assuming progress.
+- **Host-side scans must stay linear in line length.** A lookahead with `.*` or a
+  lazy backreference took minutes on a crafted line in the main process; a test
+  in `tests/note-links.test.ts` holds crafted lines under a second.
+
 Resume here, 2026-09-21 (after the 0.1.14 delivery): `main` is `ae6b0f9` and
 [v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
 publishes it for both platforms, with the download page in step. Give the next
