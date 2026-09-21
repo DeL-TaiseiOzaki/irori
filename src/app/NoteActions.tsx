@@ -1,9 +1,27 @@
 import { useEffect, useState } from 'react';
 import type { Document } from '../domain/types';
 import { noteFilename, type TrashedNote } from '../domain/note-operations';
+import type { LinkUpdate } from '../domain/note-links';
 import { Dialog } from './Dialog';
 
 const host = window.irori;
+
+/** What the move did to links, for the status line. */
+function linkNotice(update: LinkUpdate) {
+  const done = [
+    update.self ? `このノート内 ${update.self} 件` : '',
+    update.notes ? `参照元 ${update.notes} 件のノートの ${update.links} 件` : '',
+  ].filter(Boolean);
+  return [
+    done.length
+      ? `${done.join('と')}のリンクを更新しました。`
+      : '更新が必要なリンクはありませんでした。',
+    update.skipped.length ? `更新できなかったノート: ${update.skipped.join('、')}。` : '',
+    update.incomplete
+      ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
+      : '',
+  ].join('');
+}
 
 export function NoteActions({
   doc,
@@ -21,6 +39,26 @@ export function NoteActions({
   const [directory, setDirectory] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [links, setLinks] = useState(true);
+  const [referring, setReferring] = useState<
+    Pick<LinkUpdate, 'notes' | 'links' | 'incomplete'> | { error: string }
+  >();
+  useEffect(() => {
+    if (action !== 'move') return;
+    let current = true;
+    setReferring(undefined);
+    host.referringLinks(doc.scopeId, doc.path).then(
+      (value) => {
+        if (current) setReferring(value);
+      },
+      (error) => {
+        if (current) setReferring({ error: String(error) });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [action, doc.scopeId, doc.path]);
   const close = () => setAction(undefined);
   function open(next: 'move' | 'trash') {
     const parts = doc.path.split('/');
@@ -44,8 +82,13 @@ export function NoteActions({
       } else {
         const filename = noteFilename(name);
         const destination = directory ? `${directory}/${filename}` : filename;
-        const moved = await host.moveNote(saved, destination);
-        onChanged(moved, moved.notice);
+        const moved = await host.moveNote(saved, destination, links);
+        onChanged(
+          moved,
+          `${moved.notice ?? 'ノートの場所を変更しました。'}${
+            moved.links ? linkNotice(moved.links) : links ? '' : 'リンクは更新していません。'
+          }`,
+        );
       }
       close();
     } catch (error) {
@@ -97,9 +140,32 @@ export function NoteActions({
                 <p className="hint">
                   同じスペース内の既存フォルダを指定します。空欄はスペース直下です。
                 </p>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={links}
+                    disabled={busy}
+                    onChange={(event) => setLinks(event.target.checked)}
+                  />{' '}
+                  リンクも更新する
+                </label>
                 <p className="hint">
-                  参照元のリンクは更新しません。相対リンクを含むノートは同じフォルダで名前を変更してください。irori
-                  で貼り付けた画像は移動先にも保持します。
+                  {!links
+                    ? '参照元のリンクは更新しません。相対リンクを含むノートは同じフォルダで名前を変更してください。'
+                    : !referring
+                      ? '参照元のリンクを調べています…'
+                      : 'error' in referring
+                        ? `参照元のリンクを確認できませんでした: ${referring.error}`
+                        : `${
+                            referring.notes
+                              ? `参照元 ${referring.notes} 件のノートにある ${referring.links} 件のリンクと、`
+                              : 'このノートを参照するリンクはありません。'
+                          }このノート内の相対リンクを移動先に合わせて更新します。${
+                            referring.incomplete
+                              ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
+                              : ''
+                          }`}{' '}
+                  irori で貼り付けた画像は移動先にも保持します。
                 </p>
               </>
             ) : (

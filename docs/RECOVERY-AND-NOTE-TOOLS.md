@@ -51,11 +51,16 @@ agent execution and Git operations prevent organization mutations.
 
 Moving preserves note bytes. Content-addressed `_assets/image-HASH.ext` images
 created by irori are verified and copied before source removal; existing asset
-bytes must agree. Other relative outgoing links and unsupported link dialects
-conservatively block cross-folder moves. Incoming links are not rewritten,
-including when renaming. Source identity is captured and reconnected after a
+bytes must agree. Source identity is captured and reconnected after a
 successful move; a reconnection failure reports the completed physical move
-and the remaining record-reconnection action separately.
+and the remaining record-reconnection action separately. With **リンクも更新する**,
+on by default, the note's own relative links and the links of the other notes
+that led to it are then rewritten by hash-checked saves, and the status line
+reports how many links in how many notes changed and what was skipped; see
+[NOTE-LINKS](NOTE-LINKS.md). With it off, other relative outgoing links and
+unsupported link dialects conservatively block cross-folder moves and incoming
+links are not rewritten, as before. Wiki links and HTML references block a
+folder change either way.
 
 **削除** retains exact text in device-local recovery storage before removing
 the single selected note. **削除したノートを復元** restores it exclusively to its
@@ -93,6 +98,7 @@ feedback, search selection and update UI states without model inference.
 Final combined checks and PR evidence are recorded in [STATUS](STATUS.md).
 
 Historical session browsing, full transcript archives, Git branch/rebase/abort
-controls, cross-KB/cloud search, backlink rewriting, arbitrary relative-asset
-relocation, automatic updating/signing, Windows installed-device IME/upgrade
-acceptance and the general external-writer race remain separate work.
+controls, cross-KB/cloud search, rewriting of wiki or HTML references,
+arbitrary relative-asset relocation, automatic updating/signing, Windows
+installed-device IME/upgrade acceptance and the general external-writer race
+remain separate work.

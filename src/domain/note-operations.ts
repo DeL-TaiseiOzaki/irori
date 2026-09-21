@@ -27,26 +27,34 @@ export function noteFilename(name: string) {
 
 const managedImage = /^_assets\/image-[a-f0-9]{64}\.(?:png|jpeg|gif|webp)$/;
 
-/** Keep bytes stable: move only understood outgoing links, copying managed assets. */
-export function imagesForNoteMove(text: string): string[] {
+/**
+ * The managed images to copy beside a note that changes folder. Wiki embeds and
+ * HTML need dialect-aware relocation, so they refuse the move; a literal code
+ * example may trigger that guard too. Other relative links refuse it as well
+ * unless they are being rewritten for the new location.
+ */
+export function imagesForNoteMove(text: string, rewriting = false): string[] {
   const images = new Set<string>();
   const reject = () => {
     throw Error(
-      '相対リンクを含むノートは別フォルダに移動できません。同じフォルダで名前を変更してください。',
+      rewriting
+        ? 'Wiki リンクや HTML を含むノートは別フォルダに移動できません。同じフォルダで名前を変更してください。'
+        : '相対リンクを含むノートは、リンクを更新せずに別フォルダへ移動できません。「リンクも更新する」を有効にするか、同じフォルダで名前を変更してください。',
     );
   };
-  // Wiki embeds, HTML and reference links need dialect-aware relocation. A literal
-  // code example may also trigger this conservative guard; never rewrite its bytes.
-  if (/\[\[|\b(?:src|href)\s*=|^\s{0,3}\[[^\]]+\]:|\]\s*\[/im.test(text)) reject();
+  if (/\[\[|\b(?:src|href)\s*=/i.test(text)) reject();
+  if (!rewriting && /^\s{0,3}\[[^\]]+\]:|\]\s*\[/m.test(text)) reject();
   for (const match of text.matchAll(/\]\(/g)) {
     const destination = /^(?:<([^<>]+)>|([^\s()]+))(?:\s+["'][^\n]*?["'])?\s*\)/.exec(
       text.slice(match.index + 2),
     );
-    if (!destination) reject();
-    const url = destination![1] ?? destination![2];
-    if (/^(?:https?:|mailto:|#)/i.test(url)) continue;
+    const url = destination?.[1] ?? destination?.[2];
+    if (url === undefined || /^(?:https?:|mailto:|#)/i.test(url)) {
+      if (url === undefined && !rewriting) reject();
+      continue;
+    }
     if (managedImage.test(url)) images.add(url);
-    else reject();
+    else if (!rewriting) reject();
   }
   return [...images];
 }

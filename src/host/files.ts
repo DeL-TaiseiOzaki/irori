@@ -377,14 +377,15 @@ export class FileService {
       return this.read(id, rel);
     });
   }
-  async moveNote(ref: NoteRef, destinationPath: string): Promise<Document> {
+  /** Moves the note's bytes as they are; `rewriting` says its links will be rewritten after. */
+  async moveNote(ref: NoteRef, destinationPath: string, rewriting = false): Promise<Document> {
     return this.queue.run(async () => {
       const source = await this.existingNote(ref);
       const destination = this.noteLocation(ref.scopeId, destinationPath);
       if (ref.path === destinationPath) return source.doc;
       const from = path.posix.dirname(ref.path);
       const to = path.posix.dirname(destinationPath);
-      const assets = from === to ? [] : imagesForNoteMove(source.doc.text);
+      const assets = from === to ? [] : imagesForNoteMove(source.doc.text, rewriting);
       await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
       // Exclusive publication must reject existing files, directories and aliases.
       if (

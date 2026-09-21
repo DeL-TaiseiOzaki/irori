@@ -97,19 +97,69 @@ the list is opened and when the KB changes rather than whenever a note opens,
 because without an index it costs a read of every note. The note itself is not
 listed — under either case where the disk folds it — and nothing is written.
 
+## When a note moves
+
+**名前・場所** keeps links correct across a rename or a move inside the
+knowledge layer. Before anything moves, the dialog states what will change —
+「参照元 2 件のノートにある 3 件のリンク」 — from the same scan that lists
+backlinks; the count is exact, since each referring note is read and its links
+counted, not its matching lines. **リンクも更新する** is on by default. With it
+off, the move preserves every byte as before, and a note with relative links
+still refuses a folder change, as before.
+
+With it on, the move itself is unchanged — bytes copied and hash-checked,
+managed images copied beside the note, the source record rebound — and only
+then are links rewritten, each as an ordinary hash-checked save:
+
+- the moved note's own links, so they still lead where they did from the new
+  folder, including links to itself; a managed image copied beside it keeps its
+  text;
+- every other Markdown note of the knowledge layer whose link resolved to the
+  old path, so that it resolves to the new one.
+
+What counts as a link is what the backlink list counts: inline links, images
+and reference definitions, read by `resolveNoteLink` outside code spans and
+fenced code, compared in NFC. Only the destination changes. The link text, the
+title, the `#fragment`, CRLF line endings, a BOM and frontmatter stay as they
+were, and the author's form is kept: `<…>` stays `<…>`, a percent-encoded
+destination stays encoded, a new path with a space is written in `<…>`, one
+with parentheses with the editor's own `\(` `\)`, and `#` or `%` in a name is
+percent-encoded because a reader splits at the one and decodes the other. A
+destination that already resolves right — `./sibling.md` after a rename in the
+same folder — is left untouched, so moving a note back restores the links by
+the same mechanism. The rewrite is pure text work in `src/domain/note-links.ts`
+(`rewriteLinks`, `linkCount`), linear in a line's length like the backlink
+reading; `src/host/relink.ts` does the reading and writing.
+
+A write is the editor's own save: atomic, fsynced, and refused when the file's
+hash changed since it was read. A note changed meanwhile, holding unsaved text,
+or unreadable is skipped and named in the status line rather than overwritten,
+and the move stands. The status states what happened —
+「このノート内 2 件と参照元 2 件のノートの 3 件のリンクを更新しました。」 — and,
+when the scan hit a limit, that not every referring note could be checked. The
+rewrite runs under the move's guards: refused during an agent run or cloud
+work, serialized with the other file mutations. Trash and restore rewrite
+nothing.
+
 ## Not built here
 
 Source view does not follow links; the gesture works in the rich editor. A
 heading is not scrolled to. A missing page is not offered for creation. Links
-into `contents/` and into another registered KB are refused rather than routed,
-and no link is rewritten when a note moves. A formatted label is not selected;
-the notice names its line. The case probe reads the note's own folder, so a KB
-spanning volumes of both kinds answers for the folder the open note is in. A
-change the watcher does not report — it follows six folder levels, and some
-volumes report nothing — reaches the list when it is opened again.
-Frontmatter keys — OKF `relations` and `sources` — are not read as links, since
-whether irori reads the bundle's own graph is the open decision in
-[STATUS](STATUS.md).
+into `contents/` and into another registered KB are refused rather than routed.
+A formatted label is not selected; the notice names its line. The case probe
+reads the note's own folder, so a KB spanning volumes of both kinds answers for
+the folder the open note is in. A change the watcher does not report — it
+follows six folder levels, and some volumes report nothing — reaches the list
+when it is opened again. Frontmatter keys — OKF `relations` and `sources` — are
+not read as links and are not rewritten, since whether irori reads the bundle's
+own graph is the open decision in [STATUS](STATUS.md). A link whose case
+differs from the file's name is listed where the disk folds case, but it is not
+rewritten when the note moves. Wiki links `[[…]]` and HTML `src=` / `href=` are
+not rewritten, so a note holding one still refuses a folder change. The count
+shown before a move covers the other notes; the note's own links are stated, not
+counted, and a referring note holding unsaved text is counted there but skipped
+by the move. A note linking from another registered KB is outside the scan, and
+the rewrite reads every note of the layer as the scan does, within its limits.
 
 ## Verification
 
@@ -132,3 +182,12 @@ linking to a page, sees a note written while the list is open join it with
 nothing pressed, opens a formatted-label hit with the notice naming its line,
 opens a plain one with its label selected, and shows the answer for a note
 nothing links to.
+
+For moves, `tests/move-links.test.ts` covers each destination form and the
+form chosen for a new path, code and every other byte left alone, the moved
+note's own links to siblings, parents and itself, several referring notes in
+nested folders with the layer exclusions and a move back, a referring note
+edited meanwhile or holding unsaved text, a declined update, the guard on wiki
+and HTML references, linear time and the validated requests. The UI suite
+renames a page and moves one into a folder, reads the dialog's count and the
+status line, and follows the rewritten links both ways.
