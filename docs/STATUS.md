@@ -1,5 +1,58 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The notes that link here, 2026-09-21: **リンク元** in the note's toolbar lists
+the other notes in the same knowledge base whose links lead to the open one,
+with the line and the text around each link, and opens the one chosen through
+the ordinary open path. #50 made a link something to follow; this is the other
+direction, which R03 and R08 both named as open.
+
+A line counts when one of its links resolves to the open note through the same
+`resolveNoteLink` that following uses, so `../wiki/x.md`, `./x.md#見出し`,
+`<x y.md>`, a percent-encoded name and the editor's own `file\(1\).md` all
+count. Inline links, images and reference definitions are read; a link inside a
+code span or a fenced code block is text, not a link. Paths compare in NFC,
+because a Mac may store a Japanese name decomposed while the link is written
+composed.
+
+There is no index. `SearchService`'s bounded walk now takes a per-file line
+matcher, so text search and the backlink scan share one layer definition, one
+set of reading guards and one set of limits; the scan reads Markdown only,
+leaves out the note itself, writes nothing, and reports an incomplete answer as
+search does. It runs when asked rather than on every open, because without an
+index it reads every note. See [NOTE-LINKS](NOTE-LINKS.md).
+
+The graph is untouched. Frontmatter `relations` and `sources` are not read as
+links and the ontology panel still draws from the declared CSV pair; whether
+irori reads the bundle's own graph remains the open decision recorded below.
+If that is decided, `linksTo` in `src/domain/note-links.ts` is what the body
+links of such a graph would use.
+
+The reading is linear in a line's length. It runs in the main process, and the
+first version's patterns backtracked — a lookahead for fences and a lazy
+backreference for code spans took 236 seconds over two crafted lines, which would
+have frozen the window. Fences are now one anchored match and code spans are
+paired in one pass; the same lines take 10 ms, and a test holds them under a
+second.
+
+Verification: production build, format check, **173 behaviour tests (169 passed,
+four environment-gated skips)** including five new ones in
+`tests/note-links.test.ts`, and all **fourteen Electron UI suites**, where
+`links-ui-smoke` now lists the note linking to a page, opens it from the list,
+and shows the answer for a note nothing links to. In the last full run
+`git-ui-smoke` hit its known intermittent `未解決 0 件` timeout; alone it passed,
+and the eight suites after it passed in order. Breaking the fence opening or
+closing, the info-string rule, the code-span pairing, the NFC comparison or the
+escape handling each fails a test. Version 0.1.15 with its notes accompanies the
+change; publication follows the merge.
+
+A note chosen from the list opens at its top rather than at the link; the list
+states the line. A link whose case differs from the file's name is not listed,
+even on a case-insensitive disk where following it works. The list is not kept
+current while it is open, and no link is rewritten when a note moves. The index
+is the next step for both search and backlinks: `node:sqlite` with FTS5 trigram,
+plus a `LIKE` path for queries under three characters, per the 2026-09-21
+measurement.
+
 Fifth release under the sync checks, 2026-09-21:
 [v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
 publishes #49's lighter package and #50's link following for Windows x64 and

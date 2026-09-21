@@ -275,6 +275,7 @@ app
           }),
         ),
       search: (...args) => search.search(...args),
+      backlinks: (...args) => search.backlinks(...args),
       resolveLink: (...args) => resolveLink(files, ...args),
       knowledgeHistory: (id) => {
         files.get(id);

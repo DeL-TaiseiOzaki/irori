@@ -70,3 +70,61 @@ export function resolveNoteLink(from: string, href: string): LinkTarget {
   if (/[/]\s*$/.test(target)) return reject('フォルダーへのリンクは開けません。');
   return { kind: 'internal', path: segments.join('/') };
 }
+
+// The destination after `](` of an inline link or image — `<…>`, or a run without
+// spaces holding escapes and balanced parentheses, as the editor writes
+// `file\(1\).md` — or of a reference definition `[id]: …` opening a line.
+const destination =
+  /\]\(\s*(?:<((?:[^<>\n\\]|\\.)*)>|((?:[^\s()\\]|\\.|\([^\s()]*\))+))|^ {0,3}\[[^\]]+\]:\s*(?:<([^<>\n]*)>|(\S+))/g;
+
+/**
+ * The line with its code spans blanked in place: a backtick run opens one and the
+ * next run of the same length closes it. Pairing from a precomputed next run keeps
+ * this linear, which a backtracking pattern is not on a crafted line.
+ */
+function withoutCode(line: string) {
+  const parts = line.split(/(`+)/);
+  const next: number[] = [];
+  const seen = new Map<number, number>();
+  for (let i = parts.length - 2; i > 0; i -= 2) {
+    next[i] = seen.get(parts[i].length) ?? 0;
+    seen.set(parts[i].length, i);
+  }
+  for (let i = 1; i < parts.length; i += 2)
+    if (next[i]) {
+      for (let j = i; j <= next[i]; j++) parts[j] = ' '.repeat(parts[j].length);
+      i = next[i];
+    }
+  return parts.join('');
+}
+
+/**
+ * Reads one note line by line and answers where a line links to `target`, as a
+ * Markdown reader would see it: code spans and fenced code are text, not links.
+ * Paths compare in NFC, since a Mac may store a Japanese name decomposed.
+ */
+export function linksTo(from: string, target: string) {
+  const wanted = target.normalize('NFC');
+  let fence = '';
+  return (line: string) => {
+    const [, marker = '', info = ''] = /^\s*(`{3,}|~{3,})(.*)/.exec(line) ?? [];
+    if (fence) {
+      if (marker.startsWith(fence) && !info.trim()) fence = '';
+      return null;
+    }
+    // A backtick run whose info string holds a backtick is inline code, not a fence.
+    if (marker && !(marker[0] === '`' && info.includes('`'))) {
+      fence = marker;
+      return null;
+    }
+    for (const found of withoutCode(line).matchAll(destination)) {
+      const href = (found[1] ?? found[2] ?? found[3] ?? found[4]).replace(
+        /\\([!-/:-@[-`{-~])/g,
+        '$1',
+      );
+      const link = resolveNoteLink(from, href);
+      if (link.kind === 'internal' && link.path.normalize('NFC') === wanted) return found;
+    }
+    return null;
+  };
+}

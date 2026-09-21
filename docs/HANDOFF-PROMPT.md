@@ -116,12 +116,16 @@ deployment finishes.
    largest gap between irori and its own recommended template, and the owner
    asked for the decision to be discussed rather than taken. `src/host/ontology.ts`,
    `src/domain/ontology.ts`, `src/app/OntologyPanel.tsx`.
-2. **Backlinks and indexed search.** Following a link is done (#50); the reverse
-   is not. R03 and R08 both name backlinks as open, and finding them needs a
-   scan of the knowledge layer — `SearchService`'s bounded walk is the machinery
-   to reuse — or an index. `src/host/search.ts`, `src/host/links.ts`,
-   `src/app/SearchPanel.tsx`. One measurement from 2026-09-21 constrains the
-   index: `node:sqlite` is present in Electron 44 with FTS5 (SQLite 3.53.4), but its
+2. **Indexed search.** Backlinks are done in 0.1.15 as an on-demand scan
+   (**リンク元**, see [NOTE-LINKS](NOTE-LINKS.md)): `SearchService`'s bounded
+   walk takes a per-file line matcher, and `linksTo` in
+   `src/domain/note-links.ts` reads links as a Markdown reader would, in linear
+   time — it runs in the main process, where a first backtracking version took
+   minutes over a crafted line. Search and backlinks both read every file when
+   asked; an index is what would make them cheap enough to run on every open.
+   `src/host/search.ts`, `src/app/SearchPanel.tsx`. One measurement from
+   2026-09-21 constrains the index: `node:sqlite` is present in Electron 44 with
+   FTS5 (SQLite 3.53.4), but its
    tokenizers decide whether Japanese works: with `unicode61` a sentence without
    spaces is one token, so a query inside it never matches, and `trigram`, which
    does match inside, returns nothing for a query shorter than three characters.
