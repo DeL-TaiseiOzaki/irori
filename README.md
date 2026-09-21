@@ -148,7 +148,7 @@ PowerShell では `$env:IRORI_UI_REAL_AGENTS="1"` を設定してからデスク
 | 日々の編集と記録 | [DAILY-WORKFLOW](docs/DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](docs/EDITING-AND-RECORDS.md) / [RECOVERY-AND-NOTE-TOOLS](docs/RECOVERY-AND-NOTE-TOOLS.md) |
 | エージェントと会話 | [HARNESSES](docs/HARNESSES.md) / [CONVERSATIONS](docs/CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](docs/WORKSPACE-CONNECTIONS.md) |
 | Git とクラウド | [GIT](docs/GIT.md) / [CLOUD-SETUP](docs/CLOUD-SETUP.md) / [WORKSPACE-DRIVE](docs/WORKSPACE-DRIVE.md) / [DISTRIBUTOR-GOOGLE](docs/DISTRIBUTOR-GOOGLE.md) |
-| 画面と知識の表示 | [UI-DESIGN](docs/UI-DESIGN.md) / [LAYERED-EXPLORER](docs/LAYERED-EXPLORER.md) / [ONTOLOGY](docs/ONTOLOGY.md) / [KB-SEARCH](docs/KB-SEARCH.md) / [KNOWLEDGE-NAVIGATION](docs/KNOWLEDGE-NAVIGATION.md) / [TERMINAL](docs/TERMINAL.md) |
+| 画面と知識の表示 | [UI-DESIGN](docs/UI-DESIGN.md) / [LAYERED-EXPLORER](docs/LAYERED-EXPLORER.md) / [ONTOLOGY](docs/ONTOLOGY.md) / [KB-SEARCH](docs/KB-SEARCH.md) / [NOTE-LINKS](docs/NOTE-LINKS.md) / [KNOWLEDGE-NAVIGATION](docs/KNOWLEDGE-NAVIGATION.md) / [TERMINAL](docs/TERMINAL.md) |
 | 開発環境 | [VM-PREVIEW](docs/VM-PREVIEW.md) / [互換性マトリクス](docs/compatibility/MATRIX.md) / [計測](docs/measurements/2026-09-12.md) |
 
 開発を引き継ぐ場合は [HANDOFF](docs/HANDOFF.md) と [継続プロンプト](docs/HANDOFF-PROMPT.md) から始めてください。コントリビューターの取り決めは [AGENTS.md](AGENTS.md) にあります。

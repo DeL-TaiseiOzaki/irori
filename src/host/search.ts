@@ -1,5 +1,6 @@
 import { lstat, open } from 'node:fs/promises';
 import path from 'node:path';
+import { linksTo } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import { searchQuery, type KnowledgeSearch } from '../domain/search';
 import type { Space } from '../domain/types';
@@ -31,6 +32,24 @@ export class SearchService {
 
   async search(scopeId: string, input: string): Promise<KnowledgeSearch> {
     const query = searchQuery.parse(input);
+    // Escaping makes the query a literal string, including regex punctuation.
+    const match = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu');
+    return this.scan(scopeId, query, textFilePattern, () => (line) => match.exec(line));
+  }
+
+  /** Lines of the other Markdown notes in this KB whose links resolve to `target`. */
+  async backlinks(scopeId: string, target: string): Promise<KnowledgeSearch> {
+    return this.scan(scopeId, target, /\.md$/i, (from) =>
+      from === target ? () => null : linksTo(from, target),
+    );
+  }
+
+  private async scan(
+    scopeId: string,
+    query: string,
+    include: RegExp,
+    matcher: (path: string) => (line: string) => RegExpExecArray | null,
+  ): Promise<KnowledgeSearch> {
     const space = this.files.get(scopeId);
     const generation = ++this.generation;
     const deadline = performance.now() + this.limits.milliseconds;
@@ -42,8 +61,6 @@ export class SearchService {
       skippedFiles: 0,
       incomplete: false,
     };
-    // Escaping makes the query a literal string, including regex punctuation.
-    const match = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu');
     const directories = [''];
     let visited = 0;
     let bytes = 0;
@@ -78,7 +95,7 @@ export class SearchService {
           directories.push(entry.path);
           continue;
         }
-        if (!textFilePattern.test(entry.path)) continue;
+        if (!include.test(entry.path)) continue;
         if (result.scannedFiles >= this.limits.files) {
           result.incomplete = true;
           break scan;
@@ -133,9 +150,10 @@ export class SearchService {
         if (!current()) break scan;
         result.scannedFiles++;
         const lines = text.split(/\r\n|\n|\r/);
+        const match = matcher(entry.path);
         for (let line = 0; line < lines.length; line++) {
           if (!current()) break scan;
-          const found = match.exec(lines[line]);
+          const found = match(lines[line]);
           if (!found) continue;
           const start = Math.max(0, found.index - 60);
           const end = Math.min(lines[line].length, found.index + found[0].length + 120);

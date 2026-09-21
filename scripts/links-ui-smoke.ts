@@ -68,8 +68,32 @@ try {
   await page.getByRole('button', { name: 'topic', exact: true }).click();
   await expect(editor).toContainText('追記');
 
+  // The reverse: which notes point at the one being read, and going to one of them.
+  await page.getByRole('button', { name: 'arrival', exact: true }).click();
+  await expect(editor).toContainText('到着点');
+  const backlinksButton = page.getByRole('button', { name: 'リンク元', exact: true });
+  const backlinks = page.getByRole('dialog', { name: 'リンク元', exact: true });
+  await backlinksButton.click();
+  await expect(backlinks).toContainText('1 件のリンク');
+  const backlink = backlinks.getByRole('button', { name: /wiki\/deep\.md/ });
+  await expect(backlink).toContainText('3 行目');
+  await expect(backlink).toContainText('[上の階層へ](../arrival.md)');
+  await backlink.click();
+  await expect(backlinks).toBeHidden();
+  await expect(editor).toContainText('深いページ');
+
+  // A note nothing points at says so.
+  await page.getByRole('button', { name: 'topic', exact: true }).click();
+  await expect(editor).toContainText('出発点');
+  await backlinksButton.click();
+  await expect(backlinks).toContainText('このノートへのリンクはありません。');
+  await backlinks.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(backlinks).toBeHidden();
+
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
-  console.log('Link UI smoke passed: relative links followed down, up and to a missing page.');
+  console.log(
+    'Link UI smoke passed: relative links followed down, up and to a missing page, and back.',
+  );
 } finally {
   await app.close();
   await rm(base, { recursive: true, force: true });

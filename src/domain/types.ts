@@ -186,6 +186,8 @@ export interface HostAPI {
   trashedNotes(scopeId: string): Promise<import('./note-operations').TrashedNote[]>;
   restoreNote(scopeId: string, trashId: string): Promise<Document & { notice?: string }>;
   search(scopeId: string, query: string): Promise<import('./search').KnowledgeSearch>;
+  /** The lines of other notes in this KB whose links resolve to `path`. */
+  backlinks(scopeId: string, path: string): Promise<import('./search').KnowledgeSearch>;
   /** Where a link written in the note at `from` points, and whether it is there. */
   resolveLink(
     scopeId: string,

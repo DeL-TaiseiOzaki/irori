@@ -5,7 +5,9 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { resolveLink } from '../src/host/links';
-import { resolveNoteLink } from '../src/domain/note-links';
+import { SearchService, searchLimits } from '../src/host/search';
+import { linksTo, resolveNoteLink } from '../src/domain/note-links';
+import type { KnowledgeSearch } from '../src/domain/search';
 import { dispatchHost, type HostHandlers } from '../src/domain/host-requests';
 
 async function fixture(t: TestContext) {
@@ -178,4 +180,118 @@ test('The renderer reaches link resolution only through the validated request', 
   await assert.rejects(async () =>
     dispatchHost(handlers, 'resolveLink', [space.scopeId, 'topic.md', '']),
   );
+});
+
+function linkingLines(from: string, target: string, text: string) {
+  const match = linksTo(from, target);
+  return text.split('\n').flatMap((line, index) => (match(line) ? [index + 1] : []));
+}
+
+test('A backlink is a Markdown link that resolves to the note, as a reader sees it', () => {
+  const text = [
+    '[plain](target.md)',
+    '[heading and title](./target.md#見出し "title")',
+    '[elsewhere](other.md) then [second](<target.md>)',
+    '[from the root](../wiki/target.md)',
+    '[ref]: target.md',
+    '`[code span](target.md)`',
+    '````md',
+    '[fenced](target.md)',
+    '```',
+    '[still fenced](target.md)',
+    '````',
+    '~~~',
+    '[tilde fenced](target.md)',
+    '~~~',
+    '```inline``` [after inline code](target.md)',
+    '[web](https://example.com/wiki/target.md)',
+    '[above the KB](../../target.md)',
+    '[anchor](#target.md)',
+    '[prefix](target.md.bak)',
+  ].join('\n');
+  assert.deepEqual(linkingLines('wiki/topic.md', 'wiki/target.md', text), [1, 2, 3, 4, 5, 15]);
+});
+
+test('A backlink is found however the editor or an agent wrote the destination', () => {
+  const target = 'wiki/会議 メモ (1).md';
+  for (const href of [
+    '<会議 メモ (1).md>',
+    '%E4%BC%9A%E8%AD%B0%20%E3%83%A1%E3%83%A2%20(1).md',
+    '会議%20メモ%20\\(1\\).md',
+  ])
+    assert.deepEqual(linkingLines('wiki/index.md', target, `- [会議](${href})`), [1], href);
+  // A Mac can store a Japanese name decomposed while the link is written composed.
+  assert.deepEqual(
+    linkingLines('index.md', 'ガイド.md'.normalize('NFD'), '[手引き](ガイド.md)'),
+    [1],
+  );
+});
+
+test('A crafted line is read in linear time, since the scan blocks the main process', () => {
+  const match = linksTo('a.md', 'b.md');
+  const runs = Array.from({ length: 2000 }, (_, i) => '`'.repeat(2000 - i)).join(' x ');
+  const start = performance.now();
+  // Each took many seconds with a backtracking pattern.
+  assert.equal(match('`'.repeat(100_000) + 'a`'), null);
+  assert.ok(match(`${runs} [b](b.md)`));
+  assert.ok(performance.now() - start < 1000);
+});
+
+test('Backlinks come from the other notes of the knowledge layer', async (t) => {
+  const { files, space, write } = await fixture(t);
+  await write('wiki/target.md', '# 対象\n\n[自分](target.md)\n');
+  await write('index.md', '# 目次\n\n- [対象のページ](wiki/target.md)\n');
+  await write('journal/2026/09-21.md', '今日は [対象](../../wiki/target.md) を読んだ。\n');
+  await write('wiki/unrelated.md', '[別のページ](other.md)\n');
+  for (const relative of [
+    'notes.txt',
+    'AGENTS.md',
+    'schema/rules.md',
+    '.hidden/note.md',
+    'contents/report.md',
+  ])
+    await write(
+      relative,
+      `[対象](${path.posix.relative(path.posix.dirname(relative), 'wiki/target.md')})\n`,
+    );
+  const result = await new SearchService(files).backlinks(space.scopeId, 'wiki/target.md');
+  assert.equal(result.query, 'wiki/target.md');
+  assert.equal(result.incomplete, false);
+  assert.deepEqual(
+    result.hits
+      .map(({ path, line, preview }) => ({ path, line, preview }))
+      .sort((a, b) => a.path.localeCompare(b.path)),
+    [
+      { path: 'index.md', line: 3, preview: '- [対象のページ](wiki/target.md)' },
+      {
+        path: 'journal/2026/09-21.md',
+        line: 1,
+        preview: '今日は [対象](../../wiki/target.md) を読んだ。',
+      },
+    ],
+  );
+  const stopped = await new SearchService(files, { ...searchLimits, milliseconds: 0 }).backlinks(
+    space.scopeId,
+    'wiki/target.md',
+  );
+  assert.equal(stopped.incomplete, true);
+});
+
+test('The renderer reaches backlinks only through the validated request', async (t) => {
+  const { files, space, write } = await fixture(t);
+  await write('a.md', '[b](b.md)\n');
+  const search = new SearchService(files);
+  const handlers = {
+    backlinks: (scopeId: string, target: string) => search.backlinks(scopeId, target),
+  } as unknown as HostHandlers;
+  const result = (await dispatchHost(handlers, 'backlinks', [
+    space.scopeId,
+    'b.md',
+  ])) as KnowledgeSearch;
+  assert.deepEqual(
+    result.hits.map((hit) => hit.path),
+    ['a.md'],
+  );
+  for (const args of [['not-a-uuid', 'b.md'], [space.scopeId, 7], [space.scopeId]])
+    await assert.rejects(async () => dispatchHost(handlers, 'backlinks', args));
 });

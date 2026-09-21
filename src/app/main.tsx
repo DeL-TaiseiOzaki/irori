@@ -87,6 +87,16 @@ function SearchPanel(props: ComponentProps<typeof SearchPanelView>) {
     </Suspense>
   );
 }
+const BacklinksPanelView = lazy(() =>
+  import('./SearchPanel').then((m) => ({ default: m.BacklinksPanel })),
+);
+function BacklinksPanel(props: ComponentProps<typeof BacklinksPanelView>) {
+  return (
+    <Suspense fallback={null}>
+      <BacklinksPanelView {...props} />
+    </Suspense>
+  );
+}
 const KnowledgePanelView = lazy(() =>
   import('./KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })),
 );
@@ -290,6 +300,7 @@ function App() {
   const [gitDetailTarget, setGitDetailTarget] = useState<HTMLDivElement | null>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [backlinks, setBacklinks] = useState<{ scopeId: string; path: string }>();
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<SearchTarget>();
   const [searchNotice, setSearchNotice] = useState('');
@@ -1264,6 +1275,13 @@ function App() {
                               資料と成果物
                             </button>
                           )}
+                          {!doc.workspaceId && (
+                            <button
+                              onClick={() => setBacklinks({ scopeId: doc.scopeId, path: doc.path })}
+                            >
+                              リンク元
+                            </button>
+                          )}
                         </div>
                         <div className="actions">
                           {/\.csv$/i.test(doc.path) && (
@@ -1808,6 +1826,29 @@ function App() {
             setSearchOpen(false);
           }}
           onClose={() => setSearchOpen(false)}
+        />
+      )}
+      {backlinks && (
+        <BacklinksPanel
+          {...backlinks}
+          onOpen={async (hit) => {
+            const space = spaces.find((item) => item.scopeId === backlinks.scopeId);
+            const opened =
+              space &&
+              (await open(space, {
+                path: hit.path,
+                name: hit.path.split('/').at(-1)!,
+                directory: false,
+                note: true,
+                layer: 'Knowledge_Base',
+              }));
+            if (!opened)
+              throw Error(
+                'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+              );
+            setBacklinks(undefined);
+          }}
+          onClose={() => setBacklinks(undefined)}
         />
       )}
       {knowledgeOpen && active && (

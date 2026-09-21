@@ -39,6 +39,7 @@ export const hostArguments = {
   trashedNotes: z.tuple([id]),
   restoreNote: z.tuple([id, id]),
   search: z.tuple([id, searchQuery]),
+  backlinks: z.tuple([id, path]),
   resolveLink: z.tuple([id, path, linkHref]),
   knowledgeHistory: z.tuple([id]),
   restoreSource: z.tuple([sourceVersion]),

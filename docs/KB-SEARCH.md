@@ -36,6 +36,10 @@ also applies per directory. A limit, unreadable descendant directory or skipped
 eligible file marks the result incomplete. Root access failures remain errors;
 an incomplete empty result is never presented as proof of no matches.
 
+The [backlink list](NOTE-LINKS.md#which-notes-link-here) walks the same layer
+with the same guards and limits, reading Markdown only, so a change here changes
+both.
+
 Queries run on form submission. Editing the query, changing the selected KB or
 closing the dialog invalidates older responses. A newer host search supersedes
 an older one between operations. Closing alone discards its eventual response;

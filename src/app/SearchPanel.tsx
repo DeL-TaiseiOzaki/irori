@@ -202,20 +202,150 @@ export function SearchPanel({
                 : '一致する本文はありません。'}
             </p>
           )}
-          <ul className="search-results">
-            {result.hits.map((hit) => (
-              <li key={`${hit.path}:${hit.line}`}>
-                <button disabled={opening || !member} onClick={() => void open(hit)}>
-                  <span className="search-result-location">
-                    <Icon name="file" />
-                    <strong>{hit.path}</strong>
-                    <small>{hit.line} 行目</small>
-                  </span>
-                  <span className="search-result-preview">{hit.preview}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <Hits hits={result.hits} disabled={opening || !member} onOpen={open} />
+        </section>
+      )}
+    </Dialog>
+  );
+}
+
+function Hits({
+  hits,
+  disabled,
+  onOpen,
+}: {
+  hits: SearchHit[];
+  disabled: boolean;
+  onOpen: (hit: SearchHit) => Promise<void>;
+}) {
+  return (
+    <ul className="search-results">
+      {hits.map((hit) => (
+        <li key={`${hit.path}:${hit.line}`}>
+          <button disabled={disabled} onClick={() => void onOpen(hit)}>
+            <span className="search-result-location">
+              <Icon name="file" />
+              <strong>{hit.path}</strong>
+              <small>{hit.line} 行目</small>
+            </span>
+            <span className="search-result-preview">{hit.preview}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The notes in one KB whose links lead to the note being read. */
+export function BacklinksPanel({
+  scopeId,
+  path,
+  onOpen,
+  onClose,
+}: {
+  scopeId: string;
+  path: string;
+  onOpen: (hit: SearchHit) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [result, setResult] = useState<KnowledgeSearch>();
+  const [opening, setOpening] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const [error, setError] = useState('');
+  const request = useRef(0);
+  const finding = !result && !error;
+
+  async function find() {
+    const id = ++request.current;
+    setResult(undefined);
+    setError('');
+    setChanged(false);
+    try {
+      const value = await host.backlinks(scopeId, path);
+      if (request.current === id) setResult(value);
+    } catch (error) {
+      if (request.current === id) setError(String(error));
+    }
+  }
+  useEffect(() => {
+    void find();
+    return () => {
+      request.current++;
+    };
+  }, []);
+  useEffect(
+    () =>
+      host.onEvent((event) => {
+        if (event.type === 'files' && event.scopeId === scopeId) setChanged(true);
+      }),
+    [scopeId],
+  );
+
+  async function open(hit: SearchHit) {
+    if (opening) return;
+    setOpening(true);
+    setError('');
+    try {
+      await onOpen(hit);
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <Dialog
+      label="リンク元"
+      className="modal-dialog search-dialog"
+      busy={opening}
+      onClose={onClose}
+    >
+      <div className="search-heading">
+        <h2>リンク元</h2>
+        <div className="actions">
+          <button onClick={() => void find()} disabled={finding || opening}>
+            もう一度調べる
+          </button>
+          <button onClick={onClose} disabled={opening}>
+            閉じる
+          </button>
+        </div>
+      </div>
+      <p className="muted">{path} にリンクしている、この KB のノートです。</p>
+      {error && (
+        <p className="search-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div role="status" aria-live="polite">
+        {finding && <p>リンク元を調べています…</p>}
+        {result && (
+          <p>
+            {result.hits.length} 件のリンク · {result.scannedFiles} ノートを確認
+          </p>
+        )}
+      </div>
+      {result && (
+        <section aria-label="リンク元の一覧">
+          {result.incomplete && (
+            <p className="search-notice">
+              確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。
+            </p>
+          )}
+          {changed && (
+            <p className="search-notice">
+              KB のファイルが更新されました。最新の内容は「もう一度調べる」で確認できます。
+            </p>
+          )}
+          {!result.hits.length && (
+            <p>
+              {result.incomplete
+                ? '確認できた範囲に、このノートへのリンクはありません。'
+                : 'このノートへのリンクはありません。'}
+            </p>
+          )}
+          <Hits hits={result.hits} disabled={opening} onOpen={open} />
         </section>
       )}
     </Dialog>
