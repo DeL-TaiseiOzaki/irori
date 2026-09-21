@@ -89,13 +89,17 @@ lines it took four minutes. Fences are now one anchored match, code spans are
 paired in one pass over the backtick runs, brackets are paired in one pass as
 well, and a test holds the crafted lines to under a second.
 
-There is no index. Asking scans the knowledge layer with the machinery of
-[KB text search](KB-SEARCH.md) — the same layer, the same exclusions, the same
-per-file reading guards and the same limits — reading Markdown only, and says
-when a limit or an unreadable file left the answer incomplete. The scan runs when
-the list is opened and when the KB changes rather than whenever a note opens,
-because without an index it costs a read of every note. The note itself is not
-listed — under either case where the disk folds it — and nothing is written.
+Asking uses the machinery of [KB text search](KB-SEARCH.md) — the same layer,
+the same exclusions, the same per-file reading guards and the same limits — over
+Markdown only, and says when a limit or an unreadable file left the answer
+incomplete. That machinery keeps a device-local index: a request stats every
+note and re-reads only those added or changed since they were indexed, and the
+link reading above runs over the stored text of the rest. It still reads every
+note's stored text rather than a narrowed set, because a link can be written in
+too many encodings for a narrower lookup to stay exact, and it runs when the
+list is opened and when the KB changes rather than whenever a note opens. The
+note itself is not listed — under either case where the disk folds it — and
+nothing is written inside the knowledge base.
 
 ## When a note moves
 

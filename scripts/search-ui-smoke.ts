@@ -140,7 +140,8 @@ try {
   await expect(results.locator('li')).toHaveCount(1);
   await expect(results).toContainText('Literal a.*b example.');
 
-  // Real files exercise incomplete search and refresh notices without a persistent index.
+  // Real files exercise incomplete search and refresh notices; the index records the
+  // oversized file as unreadable and the walk reports it on every request.
   await writeFile(path.join(root, 'oversized.txt'), 'x'.repeat(3 * 1024 * 1024));
   await expect(results).toContainText('KB のファイルが更新されました');
   await query.fill('not-present');
