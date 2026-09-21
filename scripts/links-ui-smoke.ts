@@ -1,5 +1,5 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
@@ -114,9 +114,49 @@ try {
   await backlinks.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(backlinks).toBeHidden();
 
+  // Renaming a page rewrites the links that led to it; the dialog says what will change.
+  await page.getByRole('button', { name: 'arrival', exact: true }).click();
+  await expect(editor).toContainText('到着点');
+  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  const move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
+  await expect(move).toContainText('参照元 2 件のノートにある 2 件のリンク');
+  await move.getByLabel('ノート名', { exact: true }).fill('到着');
+  await move.getByRole('button', { name: '変更する', exact: true }).click();
+  await expect(move).toHaveCount(0);
+  const status = page.locator('.doc-toolbar');
+  await expect(status).toContainText('参照元 2 件のノートの 2 件のリンクを更新しました。');
+  expect(await readFile(path.join(root, 'wiki', 'deep.md'), 'utf8')).toBe(
+    '# 深いページ\n\n[上の階層へ](../到着.md)\n',
+  );
+  expect(await readFile(path.join(root, 'late.md'), 'utf8')).toBe(
+    '# 遅れて書いたページ\n\n[**到着点**](到着.md)\n',
+  );
+  await backlinksButton.click();
+  await expect(backlinks).toContainText('[上の階層へ](../到着.md)');
+  await backlinks.getByRole('button', { name: /wiki\/deep\.md/ }).click();
+  await expect(editor).toContainText('深いページ');
+  await editor.getByRole('link', { name: '上の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
+  await expect(editor).toContainText('到着点');
+  await expect(page.locator('.document-location')).toContainText('到着.md');
+
+  // Moving a page into a folder rewrites its own links so they still lead where they did.
+  await page.getByRole('button', { name: 'topic', exact: true }).click();
+  await expect(editor).toContainText('出発点');
+  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  await expect(move).toContainText('このノートを参照するリンクはありません。');
+  await move.getByLabel('移動先フォルダ', { exact: true }).fill('wiki');
+  await move.getByRole('button', { name: '変更する', exact: true }).click();
+  await expect(move).toHaveCount(0);
+  await expect(status).toContainText('このノート内 2 件のリンクを更新しました。');
+  const movedTopic = await readFile(path.join(root, 'wiki', 'topic.md'), 'utf8');
+  expect(movedTopic).toContain('[下の階層へ](deep.md)');
+  expect(movedTopic).toContain('](../planned.md)');
+  await editor.getByRole('link', { name: '下の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
+  await expect(editor).toContainText('深いページ');
+
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Link UI smoke passed: relative links followed down, up and to a missing page, and back to the link from a list that keeps itself current.',
+    'Link UI smoke passed: relative links followed down, up and to a missing page, and back to the link from a list that keeps itself current; links rewritten by a rename and a move.',
   );
 } finally {
   await app.close();

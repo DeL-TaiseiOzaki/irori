@@ -312,7 +312,7 @@ try {
     const note = await window.irori.read(space.scopeId, 'note.md');
     await window.irori.save({ ...note, text: '# Packaged edit 日本語\n' });
     const created = await window.irori.createNote(space.scopeId, '復元対象', 'Tools');
-    const moved = await window.irori.moveNote(created, 'Tools/名前変更.md');
+    const moved = await window.irori.moveNote(created, 'Tools/名前変更.md', true);
     if (moved.hash !== created.hash || moved.notice)
       throw Error('Packaged move did not preserve source identity');
     const trashed = await window.irori.trashNote(moved);

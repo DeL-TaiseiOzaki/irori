@@ -9,6 +9,7 @@ import { FileService } from './files';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
+import { referringLinks, relink } from './relink';
 import { DraftService } from './drafts';
 import { UpdateService } from './updates';
 import { version as appVersion } from '../../package.json';
@@ -235,7 +236,7 @@ app
       draftWrite: (...args) => drafts.write(...args),
       checkForUpdates: () => updates.check(),
       openUpdatePage: (target) => updates.open(target, (url) => shell.openExternal(url)),
-      moveNote: (ref, destination) =>
+      moveNote: (ref, destination, links) =>
         changeFiles(() =>
           changed(ref.scopeId, async () => {
             if (agents.busy(ref.scopeId) || cloud.busy)
@@ -243,18 +244,19 @@ app
             const source = await knowledge.capture(ref);
             if (source.hash !== ref.hash)
               throw Error('ノートが変更されています。開き直して確認してください。');
-            const next = await files.moveNote(ref, destination);
+            const next = await files.moveNote(ref, destination, links);
             if (next.path === ref.path) return next;
-            try {
-              await knowledge.rebind(source, { scopeId: next.scopeId, path: next.path });
-              return next;
-            } catch {
-              return {
-                ...next,
-                notice:
+            // The record is rebound to the bytes as moved, before any link is rewritten.
+            const notice = await knowledge
+              .rebind(source, { scopeId: next.scopeId, path: next.path })
+              .then(
+                () => undefined,
+                () =>
                   'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
-              };
-            }
+              );
+            if (!links) return { ...next, notice };
+            const update = await relink(files, search, next, ref.path);
+            return { ...update.doc, notice, links: update.links };
           }),
         ),
       trashNote: (ref) =>
@@ -276,6 +278,7 @@ app
         ),
       search: (...args) => search.search(...args),
       backlinks: (...args) => search.backlinks(...args),
+      referringLinks: (...args) => referringLinks(files, search, ...args),
       resolveLink: (...args) => resolveLink(files, ...args),
       knowledgeHistory: (id) => {
         files.get(id);

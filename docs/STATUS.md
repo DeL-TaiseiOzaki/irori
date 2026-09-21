@@ -1,5 +1,61 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Links follow a note when it moves, 2026-09-21: **名前・場所** now keeps relative
+Markdown links correct across a rename or a move. Before the move, the dialog
+counts what will change — 「参照元 2 件のノートにある 3 件のリンク」 — and
+**リンクも更新する**, on by default, is the way to decline. After it, the status
+line says what happened — 「このノート内 2 件と参照元 2 件のノートの 3 件のリンクを
+更新しました。」 — names the notes it could not update, and says whether the scan
+reached everything. A knowledge base is pages pointing at each other by
+relative path, so until now every rename left the notes that led to the moved
+one pointing at nothing, and a note with relative links refused to change
+folder at all.
+
+The move itself is unchanged: bytes copied and hash-checked, managed images
+copied beside the note, the source record rebound to the bytes as moved — which
+is why the rewrite comes after the rebind rather than inside the move. Then each
+note is an ordinary hash-checked save: first the moved note, whose own links are
+rewritten so they still lead where they did from the new folder, including links
+to itself, while its copied images keep their text; then every Markdown note of
+the knowledge layer whose link resolved to the old path, found by the backlink
+scan. `rewriteLinks` and `linkCount` in `src/domain/note-links.ts` are pure text
+work sharing the destination pattern, the fence and code-span reading and the
+NFC comparison of the backlink list; `src/host/relink.ts` reads and writes. Only
+the destination changes: the author's `<…>`, percent-encoding, fragment and
+title stay, CRLF and a BOM survive, a new path with a space is bracketed,
+parentheses are escaped as the editor does, and a destination that already
+resolves right is left alone — so moving a note back restores the links by the
+same mechanism. A note changed meanwhile, holding unsaved text, or unreadable is
+skipped and named rather than overwritten, and the move stands. Trash and
+restore rewrite nothing. See [NOTE-LINKS](NOTE-LINKS.md).
+
+The option controls all rewriting: with it off, the move preserves every byte
+and the conservative guard on cross-folder moves remains, now naming the
+option. Wiki links and HTML `src`/`href` are not rewritten and refuse a folder
+change either way. Reference definitions and reference-style links, which used
+to block a folder change, are rewritten like any other link.
+
+Verification: production build, format check, **187 behaviour tests (183
+passed, four environment-gated skips)** including the eleven new ones in
+`tests/move-links.test.ts`, and all **fourteen Electron UI suites**:
+`links-ui-smoke` renames a page two notes link to and moves another into a
+folder, reads the dialog's count and the status line, checks the rewritten
+bytes and follows the rewritten links both ways; `daily-workflow-ui-smoke`
+still moves a note with a pasted image byte for byte.
+Breaking the fence reading, the code-span blanking, the NFC comparison, the
+percent-encoded form, the parent steps of a relative path, the wiki/HTML guard
+or the unsaved-text guard each fails a test, and replacing the stale hash with a
+re-read overwrites a racing edit, which its test catches. Version 0.1.17 with
+its notes accompanies the change; publication follows the merge.
+
+The count shown before a move covers the other notes; the note's own links are
+stated, not counted, and a referring note holding unsaved text is counted there
+but skipped by the move. The rewrite reads every note of the layer as the scan
+does, within the same limits, and says so when it hit one; the index remains the
+next step for search, backlinks and this. A link whose case differs from the
+file's name, a link from another registered KB, and frontmatter
+`relations`/`sources` are not rewritten.
+
 Backlinks land on the link, follow the disk's case and keep themselves current,
 2026-09-21: the three limits the previous section recorded are closed. Choosing
 a note from **リンク元** now opens it at the link. Each hit carries the link's

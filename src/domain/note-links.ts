@@ -163,3 +163,125 @@ export function linksTo(from: string, target: string, foldCase = false) {
     return null;
   };
 }
+
+/** What a move did to links: in the moved note and in the other notes that led to it. */
+export interface LinkUpdate {
+  /** Links rewritten in the moved note. */
+  self: number;
+  /** Other notes rewritten, and the links rewritten in them. */
+  notes: number;
+  links: number;
+  /** Notes left alone: changed meanwhile, holding unsaved text, or unreadable. */
+  skipped: string[];
+  /** The scan for linking notes hit a limit, so some may not have been found. */
+  incomplete: boolean;
+}
+
+const unescaped = (written: string) => written.replace(/\\([!-/:-@[-`{-~])/g, '$1');
+
+// The same destinations, with offsets, so one can be replaced in place.
+const destinations = new RegExp(destination.source, 'gd');
+
+/**
+ * Each destination in `text` as `linksTo` reads it — outside fenced code and
+ * code spans — with its offsets, so that nothing else is touched.
+ */
+function* noteDestinations(text: string) {
+  let fence = '';
+  let offset = 0;
+  for (const [index, part] of text.split(/(\r\n|\n|\r)/).entries()) {
+    const start = offset;
+    offset += part.length;
+    if (index % 2) continue;
+    const [, marker = '', info = ''] = /^\s*(`{3,}|~{3,})(.*)/.exec(part) ?? [];
+    if (fence) {
+      if (marker.startsWith(fence) && !info.trim()) fence = '';
+      continue;
+    }
+    if (marker && !(marker[0] === '`' && info.includes('`'))) {
+      fence = marker;
+      continue;
+    }
+    for (const found of withoutCode(part).matchAll(destinations)) {
+      const group = [1, 2, 3, 4].find((group) => found[group] !== undefined)!;
+      const [from, to] = found.indices![group]!;
+      yield {
+        start: start + from,
+        end: start + to,
+        written: found[group],
+        angled: group % 2 === 1,
+      };
+    }
+  }
+}
+
+/** How many links in `text`, read at `from`, resolve to `target`. */
+export function linkCount(text: string, from: string, target: string) {
+  const wanted = target.normalize('NFC');
+  let count = 0;
+  for (const { written } of noteDestinations(text)) {
+    const link = resolveNoteLink(from, unescaped(written));
+    if (link.kind === 'internal' && link.path.normalize('NFC') === wanted) count++;
+  }
+  return count;
+}
+
+/** `to` relative to the folder of `at`, on the knowledge base's own `/` paths. */
+function relativeTo(at: string, to: string) {
+  const base = at.split('/').slice(0, -1);
+  const target = to.split('/');
+  let shared = 0;
+  while (shared < base.length && base[shared] === target[shared]) shared++;
+  return [...base.slice(shared).map(() => '..'), ...target.slice(shared)].join('/');
+}
+
+/**
+ * A destination in the author's form: percent-encoded when they encoded, inside
+ * their `<…>` when they wrote one (the brackets stay in place) or in new ones
+ * when the path needs them, else bare with the editor's own `\(` `\)` escapes.
+ * `#` and `%` in the path are encoded because the reader splits at the one and
+ * decodes the other.
+ */
+function destinationText(path: string, fragment: string, written: string, angled: boolean) {
+  if (!angled && /%[0-9a-f]{2}/i.test(written))
+    return path.split('/').map(encodeURIComponent).join('/') + fragment;
+  let literal = path.replace(/[%#<>]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  // A first segment with a colon would read as a scheme.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(literal)) literal = `./${literal}`;
+  literal += fragment;
+  if (angled) return literal;
+  if (/\s/.test(literal)) return `<${literal}>`;
+  return literal.replace(/[()]/g, '\\$&');
+}
+
+/**
+ * `text` as read at `from`, with each link to a path that `moved` relocates
+ * rewritten so that it resolves to the new path once the text is at `at`. Only
+ * the destination changes — the fragment, the title and the author's form stay —
+ * and a destination that already resolves right is left as it is.
+ */
+export function rewriteLinks(
+  text: string,
+  from: string,
+  at: string,
+  moved: (path: string) => string | undefined,
+) {
+  let out = '';
+  let cursor = 0;
+  let links = 0;
+  for (const { start, end, written, angled } of noteDestinations(text)) {
+    const href = unescaped(written).trim();
+    const link = resolveNoteLink(from, href);
+    if (link.kind !== 'internal') continue;
+    const next = moved(link.path.normalize('NFC'));
+    if (next === undefined) continue;
+    const now = resolveNoteLink(at, href);
+    if (now.kind === 'internal' && now.path.normalize('NFC') === next.normalize('NFC')) continue;
+    const fragment = href.includes('#') ? href.slice(href.indexOf('#')) : '';
+    out +=
+      text.slice(cursor, start) + destinationText(relativeTo(at, next), fragment, written, angled);
+    cursor = end;
+    links++;
+  }
+  return { text: out + text.slice(cursor), links };
+}

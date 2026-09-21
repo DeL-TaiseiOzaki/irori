@@ -176,10 +176,17 @@ export interface HostAPI {
   ): Promise<import('./drafts').DraftRecord>;
   checkForUpdates(): Promise<import('./updates').UpdateCheck>;
   openUpdatePage(target: import('./updates').UpdateTarget): Promise<void>;
+  /** Moves a note; with `links`, rewrites its own links and those leading to it. */
   moveNote(
     ref: import('./note-operations').NoteRef,
     destination: string,
-  ): Promise<Document & { notice?: string }>;
+    links: boolean,
+  ): Promise<Document & { notice?: string; links?: import('./note-links').LinkUpdate }>;
+  /** How many links, in how many other notes, lead to `path` and would be rewritten by a move. */
+  referringLinks(
+    scopeId: string,
+    path: string,
+  ): Promise<Pick<import('./note-links').LinkUpdate, 'notes' | 'links' | 'incomplete'>>;
   trashNote(
     ref: import('./note-operations').NoteRef,
   ): Promise<import('./note-operations').TrashedNote>;
