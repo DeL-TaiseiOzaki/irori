@@ -450,6 +450,32 @@ function App() {
       })
       .catch(report);
   }
+  async function followLink(href: string) {
+    const from = current.current.doc;
+    const space = spaces.find((item) => item.scopeId === from?.scopeId);
+    if (!from || !space) return;
+    setSearchNotice('');
+    try {
+      const target = await host.resolveLink(space.scopeId, from.path, href);
+      if (target.kind === 'external') await host.openUrl(target.url);
+      else if (target.kind === 'file')
+        await open(space, {
+          path: target.path,
+          name: target.path.split('/').at(-1)!,
+          directory: false,
+          note: target.note,
+          layer: classify(space, target.path),
+        });
+      // The note stays open, so the answer belongs beside it rather than in the
+      // status line the window shows only when nothing is open.
+      else if (target.kind === 'missing')
+        setSearchNotice(`リンク先のファイルがまだありません: ${target.path}`);
+      else if (target.kind === 'anchor') setSearchNotice('このノート内の見出しへのリンクです。');
+      else setSearchNotice(target.reason);
+    } catch (error) {
+      report(error);
+    }
+  }
   function load(next: Document, navigation?: SearchTarget) {
     reconciliation.current++;
     current.current = { doc: next, buffer: next.text, external: undefined };
@@ -1301,6 +1327,7 @@ function App() {
                               onError={report}
                               searchTarget={searchTarget}
                               authorship={authorship}
+                              onFollowLink={(href) => void followLink(href)}
                               onSearchResult={(found) =>
                                 setSearchNotice(
                                   found

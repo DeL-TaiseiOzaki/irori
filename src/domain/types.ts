@@ -186,6 +186,12 @@ export interface HostAPI {
   trashedNotes(scopeId: string): Promise<import('./note-operations').TrashedNote[]>;
   restoreNote(scopeId: string, trashId: string): Promise<Document & { notice?: string }>;
   search(scopeId: string, query: string): Promise<import('./search').KnowledgeSearch>;
+  /** Where a link written in the note at `from` points, and whether it is there. */
+  resolveLink(
+    scopeId: string,
+    from: string,
+    href: string,
+  ): Promise<import('./note-links').ResolvedLink>;
   knowledgeHistory(scopeId: string): Promise<import('./knowledge').KnowledgeHistory>;
   restoreSource(source: import('./knowledge').SourceVersion): Promise<void>;
   sourceText(source: import('./knowledge').SourceVersion): Promise<string>;
