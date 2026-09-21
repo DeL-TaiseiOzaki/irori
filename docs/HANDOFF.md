@@ -1,5 +1,46 @@
 # irori continuation handoff
 
+Resume here, 2026-09-21 (after the 0.1.14 delivery): `main` is `ae6b0f9` and
+[v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
+publishes it for both platforms, with the download page in step. Give the next
+session [HANDOFF-PROMPT](HANDOFF-PROMPT.md); it is current. The download is a
+third smaller than 0.1.12: 215,796,224 bytes on Windows against 319,919,104,
+and 182,424,344 on the Mac against 281,574,107.
+
+That session merged four more pull requests. #49 stopped the package carrying
+executables irori never runs — the Agent SDK's own ~220 MB Claude Code binary,
+which the SDK resolves only when `pathToClaudeCodeExecutable` is unset while
+`src/agents/service.ts` always passes the reader's installed `claude`, and
+node-pty's prebuilds for other platforms. #50 made notes follow their own links
+with Ctrl/Cmd + click. #51 pointed the download page at the new release and #52
+records the delivery.
+
+Four things are worth knowing before the next change:
+
+- **The handoff's own premise about links was wrong.** It said `[[wiki link]]`
+  resolution; the recommended template writes **relative Markdown links**, since
+  a page's identity there is its path (`irori-templete` ADR 002 D3), and that
+  repository contains no `[[` at all. #50 implements the relative form. See
+  [NOTE-LINKS](NOTE-LINKS.md).
+- **An index for search has a Japanese constraint.** `node:sqlite` with FTS5 is
+  available in Electron 44 (SQLite 3.53.4), but `unicode61` makes a Japanese
+  sentence one token, so a query inside it never matches, and `trigram` returns
+  nothing for a query shorter than three characters. Two-character queries are
+  ordinary in Japanese, so an index needs trigram plus a `LIKE` path for short
+  ones. Measured, not assumed.
+- **Every substantial change adds a section at the top of `docs/STATUS.md`**, so
+  two branches cut from `main` conflict there whichever order they merge. Stack
+  the later one on the earlier (`gh pr edit <n> --base <branch>`) and retarget
+  it at `main` when the first merges; GitHub does not retarget by itself here.
+- **The hourly drift check reads the live download page.** The scheduled run at
+  01:17:04Z failed by 25 seconds because Pages was still deploying the new
+  manifest; the dispatched run at 01:18:12Z reported `main` in step. Publish the
+  website before the hour, or dispatch `release-sync.yml` after the deployment.
+
+`gh workflow run release.yml` was allowed again, with the owner's explicit
+instruction to merge. A `for` loop polling `gh run view` on that release run was
+refused by the CLI's own classifier; single `gh run view` calls work.
+
 Resume here, 2026-09-21: `main` is `96d0823` and
 [v0.1.12-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.12-preview.1)
 publishes it for both platforms, with the download page in step. Give the next
