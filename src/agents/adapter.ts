@@ -5,6 +5,9 @@ export interface NativeContext {
   cwd: string;
   prompt: string;
   session?: string;
+  /** The environment and extra arguments the CLI starts with; its own defaults when absent. */
+  env?: NodeJS.ProcessEnv;
+  args?: string[];
   signal: AbortSignal;
   child(child: ChildProcess): void;
   event(type: AgentEvent['type'], text: string, extra?: Partial<AgentEvent>): void;

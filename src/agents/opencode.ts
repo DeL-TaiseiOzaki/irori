@@ -19,10 +19,10 @@ export class OpenCodeServer {
     private cwd: string,
     signal: AbortSignal,
     executable = 'opencode',
+    env = agentEnv(),
   ) {
     this.signal = AbortSignal.any([signal, this.lifetime.signal]);
     this.signal.throwIfAborted();
-    const env = agentEnv();
     env.OPENCODE_SERVER_USERNAME = 'irori';
     env.OPENCODE_SERVER_PASSWORD = this.password;
     this.child = launch(executable, ['serve', '--hostname=127.0.0.1', '--port=0'], cwd, env);
@@ -128,7 +128,7 @@ export class OpenCodeServer {
 }
 
 export async function runOpenCode(ctx: NativeContext) {
-  const server = new OpenCodeServer(ctx.cwd, ctx.signal);
+  const server = new OpenCodeServer(ctx.cwd, ctx.signal, 'opencode', ctx.env);
   ctx.child(server.child);
   let stream: Promise<void> | undefined;
   let failure: Error | undefined;
