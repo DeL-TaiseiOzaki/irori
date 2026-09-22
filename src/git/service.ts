@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { FileService, hash } from '../host/files';
 import { githubRepository } from '../host/workspaces';
 import { classify, owner, within } from '../domain/scopes';
+import { lineRanges } from '../domain/knowledge';
+import { lineKey, type AuthorshipStore } from '../knowledge/authorship';
 import type { Space } from '../domain/types';
 import type {
   CloneRepository,
@@ -16,6 +18,17 @@ import type {
   GitSyncAction,
 } from '../domain/git';
 import { GitError, GitProcess } from './process';
+import {
+  formatNote,
+  humanId,
+  isHuman,
+  notesRef,
+  parseNote,
+  rangeLines,
+  schemaVersion,
+  type Note,
+  type NoteFile,
+} from './notes';
 
 const literal = (name: string) => `:(top,literal)${name}`;
 const oidPattern = /^[a-f0-9]{40,64}$/;
@@ -34,6 +47,7 @@ export class GitService {
   constructor(
     private files: FileService,
     private canMutate: () => boolean = () => true,
+    private authorship?: Pick<AuthorshipStore, 'view'>,
   ) {}
   get busy() {
     return this.pending > 0;
@@ -123,6 +137,164 @@ export class GitService {
   }
   private async config(s: Space, key: string) {
     return this.optional(s, ['config', '--get', key]);
+  }
+  private async blob(s: Space, name: string) {
+    try {
+      return await this.git(s, ['cat-file', 'blob', name]);
+    } catch (error) {
+      if (error instanceof GitError && error.code === 128) return;
+      throw error;
+    }
+  }
+  private ref(s: Space, name: string) {
+    return this.optional(s, ['rev-parse', '--verify', '-q', name]);
+  }
+  /**
+   * The lines of this note that the repository's authorship notes name as a
+   * person's, keyed by line text like the device record so that a line stays
+   * the person's wherever it has moved since. A note names lines by number in
+   * the file as that commit had it, so each noted commit's version is read.
+   */
+  async noted(id: string, p: string): Promise<Set<string>> {
+    const s = await this.root(id);
+    this.validateName(p);
+    const found = new Set<string>();
+    const records = (
+      await this.optional(s, [
+        'log',
+        '-z',
+        '--no-notes',
+        `--notes=${notesRef}`,
+        '--format=%H%x00%N',
+        '--max-count=50',
+        'HEAD',
+        '--',
+        literal(p),
+      ])
+    ).split('\0');
+    for (let i = 0; i + 1 < records.length; i += 2) {
+      const oid = records[i],
+        note = parseNote(records[i + 1]);
+      if (!oidPattern.test(oid) || !note) continue;
+      const entries = note.files
+        .filter((f) => f.path === p)
+        .flatMap((f) => f.entries)
+        .filter((entry) => isHuman(entry.key));
+      if (!entries.length) continue;
+      const lines = ((await this.blob(s, `${oid}:${p}`)) ?? '').split('\n');
+      for (const entry of entries)
+        for (const n of rangeLines(entry.ranges, lines.length)) {
+          const key = lineKey(lines[n - 1]);
+          if (key) found.add(key);
+        }
+    }
+    return found;
+  }
+  /**
+   * Attaches the standard's note to a commit irori just made, naming as the
+   * committer's (`h_`) the lines this device saw the person write or revise.
+   * Nothing else is claimed: an agent's line and one that arrived by pull stay
+   * unattested. A note another tool already attached keeps every entry it had,
+   * with irori's after them, and the write is refused rather than forced when
+   * the notes ref has moved in between.
+   */
+  private async attest(s: Space, oid: string): Promise<string | undefined> {
+    if (!this.authorship) return;
+    const changed = (
+      await this.git(s, [
+        'diff-tree',
+        '--root',
+        '--no-commit-id',
+        '-r',
+        '--name-only',
+        '-z',
+        '--no-renames',
+        '--diff-filter=AM',
+        oid,
+      ])
+    )
+      .split('\0')
+      .filter((p) => p.endsWith('.md') && !p.includes('\n') && classify(s, p) === 'Knowledge_Base');
+    const identity = (await this.git(s, ['log', '-1', '--format=%cn <%ce>', oid])).trim(),
+      key = humanId(identity),
+      files: NoteFile[] = [];
+    for (const p of changed) {
+      const text = await this.blob(s, `${oid}:${p}`);
+      if (text === undefined) continue;
+      const view = await this.authorship.view({ scopeId: s.scopeId, path: p }, text);
+      const lines = view.lines.flatMap((mine, index) => (mine ? [index + 1] : []));
+      if (lines.length) files.push({ path: p, entries: [{ key, ranges: lineRanges(lines, ',') }] });
+    }
+    if (!files.length) return;
+    const tip = await this.ref(s, notesRef),
+      existing = await this.optional(s, ['notes', `--ref=${notesRef}`, 'show', oid]),
+      humans = { [key]: { author: identity } };
+    let note: Note = {
+      files,
+      metadata: { schema_version: schemaVersion, base_commit_sha: oid, prompts: {}, humans },
+    };
+    if (existing) {
+      const theirs = parseNote(existing);
+      if (!theirs)
+        return '既存の作者情報ノート（refs/notes/ai）を読めないため、この commit には追記しませんでした。';
+      for (const file of files) {
+        const own = theirs.files.find((f) => f.path === file.path);
+        // git-ai reads a file's entries last first, so the person's come last.
+        if (own) own.entries = [...own.entries.filter((e) => e.key !== key), ...file.entries];
+        else theirs.files.push(file);
+      }
+      const known = theirs.metadata.humans;
+      theirs.metadata.humans = {
+        ...(known && typeof known === 'object' && !Array.isArray(known) ? known : {}),
+        ...humans,
+      };
+      theirs.metadata.prompts ??= {};
+      note = theirs;
+    }
+    const content = formatNote(note),
+      message = 'Authorship note from irori';
+    try {
+      // fast-import is how git-ai writes notes too, and it refuses to move the
+      // ref unless the new tip contains the current one.
+      await this.git(s, ['fast-import', '--quiet', '--done'], {
+        input:
+          `commit ${notesRef}\ncommitter irori <irori@local> ${Math.floor(Date.now() / 1000)} +0000\n` +
+          `data ${Buffer.byteLength(message)}\n${message}\n` +
+          (tip ? `from ${tip}\n` : '') +
+          `N inline ${oid}\ndata ${Buffer.byteLength(content)}\n${content}\ndone\n`,
+      });
+    } catch {
+      return '作者情報ノート（refs/notes/ai）を書き込めませんでした。別のツールが更新中の可能性があります。';
+    }
+  }
+  /**
+   * Notes travel the way git-ai carries them: fetched into the tracking ref it
+   * uses, then merged keeping this side's version of any note both changed, so
+   * the two tools agree about a repository they share.
+   */
+  private async fetchNotes(s: Space, remoteName: string): Promise<string | undefined> {
+    const tracking = `refs/notes/ai-remote/${remoteName.replace(/[^\w-]/g, '_')}`;
+    try {
+      await this.git(
+        s,
+        ['fetch', '--no-tags', '--no-recurse-submodules', remoteName, `+${notesRef}:${tracking}`],
+        { network: true },
+      );
+    } catch {
+      // The remote carries no notes, which git reports the same way as a
+      // transport failure; the branch fetch just succeeded, so nothing is lost.
+      return;
+    }
+    if (!(await this.ref(s, tracking))) return;
+    if (!(await this.ref(s, notesRef))) {
+      await this.git(s, ['update-ref', notesRef, tracking]);
+      return;
+    }
+    try {
+      await this.git(s, ['notes', `--ref=${notesRef}`, 'merge', '-s', 'ours', '--quiet', tracking]);
+    } catch {
+      return '受信した作者情報ノート（refs/notes/ai）を統合できませんでした。';
+    }
   }
   private async gitDirectory(s: Space) {
     // Git resolves linked worktrees and separate administrative directories.
@@ -417,7 +589,12 @@ export class GitService {
         throw Error('commit 対象を選択してください。');
       for (const c of staged) if (c.blocked) throw Error(`${c.path}: ${c.blocked}`);
       await this.git(s, ['commit', '--file=-'], { input: message.trim() + '\n' });
-      return this.snapshot(s);
+      // The commit stands whatever happens to its note.
+      const notice = await this.attest(s, await this.ref(s, 'HEAD')).catch(
+        () => '作者情報ノート（refs/notes/ai）を書き込めませんでした。',
+      );
+      const status = await this.snapshot(s);
+      return notice ? { ...status, notice } : status;
     });
   }
   async history(id: string, offset = 0): Promise<GitHistory> {
@@ -490,6 +667,7 @@ export class GitService {
         remote = this.requireRemote(state);
       if (state.operation !== 'none' && action !== 'fetch')
         throw Error('進行中の Git 操作を完了してから同期してください。');
+      let notice: string | undefined;
       if (action === 'push') {
         const urls = (await this.git(s, ['remote', 'get-url', '--push', '--all', remote.name]))
           .trimEnd()
@@ -513,6 +691,28 @@ export class GitService {
           ],
           { network: true },
         );
+        // The notes follow the branch, never forced: a rejection means another
+        // device's notes are not merged here yet, which Fetch does.
+        if (await this.ref(s, notesRef))
+          try {
+            await this.git(
+              s,
+              [
+                '-c',
+                'push.followTags=false',
+                'push',
+                '--porcelain',
+                '--no-force',
+                '--no-recurse-submodules',
+                remote.name,
+                `${notesRef}:${notesRef}`,
+              ],
+              { network: true },
+            );
+          } catch {
+            notice =
+              '作者情報ノート（refs/notes/ai）は送信されませんでした。Fetch で受信・統合してから再度 Push してください。';
+          }
       } else {
         if (action !== 'fetch' && state.changes.length)
           throw Error(
@@ -532,6 +732,7 @@ export class GitService {
           { network: true },
         );
         this.fetched.set(id, new Date().toISOString());
+        notice = await this.fetchNotes(s, remote.name);
         if (action !== 'fetch') {
           const now = await this.snapshot(s);
           if (
@@ -567,7 +768,8 @@ export class GitService {
           }
         }
       }
-      return this.snapshot(s);
+      const status = await this.snapshot(s);
+      return notice ? { ...status, notice } : status;
     });
   }
   async conflict(id: string, p: string): Promise<GitConflict> {

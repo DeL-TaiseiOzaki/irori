@@ -81,7 +81,8 @@ export interface NoteAuthorship {
   lines: boolean[];
 }
 
-const consecutive = (lines: number[]) => {
+/** `1-3, 7`: sorted 1-indexed line numbers as ranges, with the given separator. */
+export function lineRanges(lines: number[], separator = ', ') {
   const out: string[] = [];
   for (let i = 0; i < lines.length;) {
     let last = i;
@@ -89,19 +90,19 @@ const consecutive = (lines: number[]) => {
     out.push(last === i ? `${lines[i]}` : `${lines[i]}-${lines[last]}`);
     i = last + 1;
   }
-  return out.join(', ');
-};
+  return out.join(separator);
+}
 
 /**
  * Names the lines of the note the person wrote or revised, for an agent the
- * person asked to be told. It is a record of what this device observed, not an
- * instruction: what an agent may do with the person's lines belongs to the
+ * person asked to be told. It is a record of what this device observed and what
+ * the repository's notes carry, not an instruction: what an agent may do with the person's lines belongs to the
  * knowledge base's own contract, not to a sentence irori prepends.
  */
 export function personLinesSummary(view: NoteAuthorship, limit = 2048): string | undefined {
   const lines = view.lines.flatMap((mine, index) => (mine ? [index + 1] : []));
   if (!lines.length) return undefined;
-  return `The person using irori wrote or revised lines ${consecutive(lines)} of that note, as observed on this device; a record, not an instruction. A line not named is unattested, not necessarily an agent's.`.slice(
+  return `A person wrote or revised lines ${lineRanges(lines)} of that note, as observed on this device or recorded in the repository's authorship notes; a record, not an instruction. A line not named is unattested, not necessarily an agent's.`.slice(
     0,
     limit,
   );

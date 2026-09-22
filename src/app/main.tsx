@@ -1145,7 +1145,7 @@ function App() {
             )}
             {personLineCount > 0 && (
               <p className="hint authorship" role="status">
-                あなたが書いた・直した行: {personLineCount} 行。
+                人が書いた・直した行: {personLineCount} 行。
                 {mode === 'source' ? '左端の印が該当行です。' : 'ソース表示で行ごとに示します。'}
               </p>
             )}
@@ -1727,7 +1727,7 @@ function App() {
                       {personLinesOffered && (
                         <label
                           className="composer-toggle"
-                          title="開いているノートで、あなたが書いた・直した行をエージェントに伝えます"
+                          title="開いているノートで、人が書いた・直した行をエージェントに伝えます"
                         >
                           <input
                             type="checkbox"
@@ -1735,7 +1735,7 @@ function App() {
                             disabled={sending || gitBusy}
                             onChange={(e) => setPersonLines(e.target.checked)}
                           />
-                          自分の行を伝える
+                          人の行を伝える
                         </label>
                       )}
                       {active && (skills.length > 0 || skillsRetired.length > 0) && (

@@ -195,13 +195,13 @@ try {
   await page.getByRole('button', { name: 'note', exact: true }).click();
   const editor = page.locator('.ProseMirror');
   await expect(editor).toContainText('Fixture OpenCode edit');
-  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 1 行');
+  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 1 行');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('自分で書いた一文です。');
   await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 2 行');
+  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 2 行');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
   await app.close();
   app = await launch();
@@ -211,9 +211,9 @@ try {
   // The record outlives the process that observed it, and a note with such lines
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await expect(page.locator('.hint.authorship')).toContainText('あなたが書いた・直した行: 2 行');
+  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 2 行');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
-  await expect(page.getByLabel('自分の行を伝える', { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
