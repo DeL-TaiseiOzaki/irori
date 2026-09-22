@@ -103,7 +103,10 @@ dispatch `release-sync.yml` after the deploy.
   commit shows the same graph on every device. A device-local index was
   rejected because the visible structure could differ between devices. A
   declared `.irori/ontology.json` still wins, for tables people maintain.
-  Freshness is checked by regenerating in memory, not by a hash column.
+  Freshness is checked by regenerating in memory, not by a hash column. The
+  graph draws `relations` only: body links stay reachable through リンク元 and
+  search (confirmed the same day); revisit only if a real knowledge base shows
+  the typed graph too sparse.
 - **EvoAgent is agent generation, not an ontology method.** What was absorbed is
   the shape of its loop, as the template's vocabulary review: one proposal at a
   time with the whole vocabulary in view, a distinctness and evidence check
@@ -116,17 +119,13 @@ dispatch `release-sync.yml` after the deploy.
 
 1. **The merge flow above**, publishing each shipped version as it lands
    (release, website manifest PR, Pages, download check, drift re-check).
-2. **Body links in the graph** — the index draws `relations` only; body links
-   are reachable through リンク元. Drawing them too would make most pages nodes
-   and bring large knowledge bases to the reader's 2,000-entity limit, so it is
-   the owner's call before it is built.
-3. **D04 — writable cloud delivery**: extend `src/cloud/outbox.ts` with an
+2. **D04 — writable cloud delivery**: extend `src/cloud/outbox.ts` with an
    explicit writable capability, re-consent and exact account binding, preserving
    staged bytes across failure and restart.
-4. **Evidence for the template's vocabulary review in use** — the dry runs in the
+3. **Evidence for the template's vocabulary review in use** — the dry runs in the
    research note are the only evidence; a real knowledge base over some weeks is
    the next.
-5. **Device acceptance** (D03/D05, D07–D10) stays open.
+4. **Device acceptance** (D03/D05, D07–D10) stays open.
 
 Two decisions belong to the owner, not to an agent: what "taking in extensions"
 means, and how far code editing and execution go.
