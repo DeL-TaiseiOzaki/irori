@@ -170,6 +170,8 @@ export type MarkdownFont = (typeof markdownFonts)[number];
 export interface DeviceSettings {
   theme: 'system' | 'light' | 'dark';
   markdownFont: MarkdownFont;
+  /** Show code assistance in source editors and Markdown code blocks. */
+  editorAssistance: boolean;
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
   /** The reader's role and project per KB, which narrows that KB's skill picker. */

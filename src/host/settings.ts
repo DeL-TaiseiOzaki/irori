@@ -8,6 +8,7 @@ import { skillAudience } from '../domain/skills';
 const settings = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
   markdownFont: z.enum(markdownFonts).default('sans'),
+  editorAssistance: z.boolean().default(true),
   // The pane library owns this format; it is stored as written and bounded.
   layouts: z.record(z.string().max(64), z.string().max(4096)).default({}),
   skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
@@ -36,6 +37,7 @@ export class SettingsService {
       const next = settings.parse({
         theme: patch.theme ?? current.theme,
         markdownFont: patch.markdownFont ?? current.markdownFont,
+        editorAssistance: patch.editorAssistance ?? current.editorAssistance,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
       });

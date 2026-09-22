@@ -11,6 +11,7 @@ const host = window.irori;
 let current: DeviceSettings = {
   theme: 'system',
   markdownFont: 'sans',
+  editorAssistance: true,
   layouts: {},
   skillAudiences: {},
 };
@@ -30,6 +31,15 @@ export function currentTheme() {
 
 export function currentMarkdownFont() {
   return current.markdownFont;
+}
+
+export function currentEditorAssistance() {
+  return current.editorAssistance;
+}
+
+export async function chooseEditorAssistance(editorAssistance: boolean) {
+  current = await host.saveDeviceSettings({ editorAssistance });
+  return current;
 }
 
 const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)');

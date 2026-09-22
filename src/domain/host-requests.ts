@@ -33,6 +33,7 @@ export const hostArguments = {
     z.object({
       theme: z.enum(['system', 'light', 'dark']).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
+      editorAssistance: z.boolean().optional(),
       layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
     }),
