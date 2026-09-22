@@ -1,10 +1,11 @@
 import type { ChildProcess } from 'node:child_process';
-import type { AgentEvent, AgentAnswers, Question } from '../domain/types';
+import type { AgentAccess, AgentEvent, AgentAnswers, Question } from '../domain/types';
 
 export interface NativeContext {
   cwd: string;
   prompt: string;
   session?: string;
+  access?: AgentAccess;
   /** The environment and extra arguments the CLI starts with; its own defaults when absent. */
   env?: NodeJS.ProcessEnv;
   args?: string[];

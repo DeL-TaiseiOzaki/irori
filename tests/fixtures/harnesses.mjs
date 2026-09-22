@@ -213,6 +213,12 @@ export function run(kind) {
         res.writeHead(404);
         return res.end('{}');
       }
+      if (req.method === 'POST')
+        session.permission = fs.existsSync('ignore-access') ? undefined : body?.permission;
+      return res.end(JSON.stringify(session));
+    }
+    if (route === '/session/' + sessionID && req.method === 'PATCH') {
+      session.permission = fs.existsSync('ignore-access') ? undefined : body.permission;
       return res.end(JSON.stringify(session));
     }
     if (route === '/session/' + sessionID + '/message') {

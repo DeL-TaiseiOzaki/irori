@@ -3,8 +3,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { writeLocalJson } from '../host/local-json';
 import { z } from 'zod';
-import type { AgentId, AgentSession } from '../domain/types';
-import { agentIds } from '../domain/types';
+import type { AgentAccess, AgentId, AgentSession } from '../domain/types';
+import { agentIds, agentAccessModes } from '../domain/types';
 
 export type SessionBinding = { scopeId: string; agent: AgentId; root: string };
 export function sessionKey(binding: SessionBinding) {
@@ -19,6 +19,7 @@ const record = z
     agent: z.enum(agentIds),
     root: z.string().min(1),
     handle: z.string().min(1).max(4096),
+    access: z.enum(agentAccessModes).default('default'),
     updatedAt: z.iso.datetime(),
   })
   .strict();
@@ -53,16 +54,19 @@ export class SessionStore {
   async status(binding: SessionBinding): Promise<AgentSession> {
     try {
       const saved = await this.read(binding);
-      return saved ? { state: 'saved', updatedAt: saved.updatedAt } : { state: 'empty' };
+      return saved
+        ? { state: 'saved', updatedAt: saved.updatedAt, access: saved.access }
+        : { state: 'empty' };
     } catch (error) {
       return { state: 'unavailable', detail: (error as Error).message };
     }
   }
-  async save(binding: SessionBinding, handle: string) {
+  async save(binding: SessionBinding, handle: string, access: AgentAccess = 'default') {
     const value = record.parse({
       ...binding,
       schemaVersion: 1,
       handle,
+      access,
       updatedAt: new Date().toISOString(),
     });
     await writeLocalJson(this.filename(binding), value);

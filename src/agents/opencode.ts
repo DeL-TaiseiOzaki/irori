@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
 import { createParser } from 'eventsource-parser';
 import { boundedResponse } from '../host/http';
-import type { OpencodeClient, Event } from '@opencode-ai/sdk/v2/client';
+import type { OpencodeClient, Event, PermissionRuleset } from '@opencode-ai/sdk/v2/client';
 import { agentEnv, launch } from './process';
 import type { NativeContext } from './adapter';
 
@@ -200,15 +200,33 @@ export async function runOpenCode(ctx: NativeContext) {
   }
   try {
     await server.start();
-    const session = ctx.session
+    const permission: PermissionRuleset | undefined =
+      ctx.access === 'full-access'
+        ? [{ permission: '*', pattern: '*', action: 'allow' }]
+        : undefined;
+    let session = ctx.session
       ? await data(server.client.session.get({ sessionID: ctx.session }))
-      : await data(server.client.session.create());
+      : await data(server.client.session.create(permission ? { permission } : undefined));
     if (
       typeof session.id !== 'string' ||
       (ctx.session && session.id !== ctx.session) ||
       (await fs.realpath(session.directory)) !== ctx.cwd
     )
       throw Error('OpenCode session does not belong to this checkout');
+    if (permission) {
+      const confirmed = () => {
+        const last = session.permission?.at(-1);
+        return last?.permission === '*' && last.pattern === '*' && last.action === 'allow';
+      };
+      // Native updates append rules; the last matching rule wins. Do not add
+      // the same wildcard on every resumed turn.
+      if (ctx.session && !confirmed())
+        session = await data(server.client.session.update({ sessionID: session.id, permission }));
+      if (!confirmed())
+        throw Error(
+          'OpenCodeが選択したアクセス設定を確認できません。更新またはCLIの設定を選んでください。',
+        );
+    }
     sessionId = session.id;
     related.add(sessionId);
     await ctx.saveSession(sessionId);

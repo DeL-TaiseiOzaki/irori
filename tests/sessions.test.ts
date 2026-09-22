@@ -7,7 +7,7 @@ import path from 'node:path';
 import { SessionStore } from '../src/agents/sessions';
 import { AgentService } from '../src/agents/service';
 import { FileService } from '../src/host/files';
-import type { AgentEvent } from '../src/domain/types';
+import type { AgentAccess, AgentEvent } from '../src/domain/types';
 
 test('Session handles survive restart and remain isolated by scope, provider and checkout', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori sessions '));
@@ -28,7 +28,11 @@ test('Session handles survive restart and remain isolated by scope, provider and
   await restarted.reset(binding);
   assert.equal((await new SessionStore(base).status(binding)).state, 'empty');
   assert.equal((await restarted.read(claude))?.handle, 'native-session-two');
-  assert.deepEqual(Object.keys(await restarted.status(claude)).sort(), ['state', 'updatedAt']);
+  assert.deepEqual(Object.keys(await restarted.status(claude)).sort(), [
+    'access',
+    'state',
+    'updatedAt',
+  ]);
 });
 
 test('Malformed or mismatched session records fail closed and can be explicitly reset', async (t) => {
@@ -43,9 +47,18 @@ test('Malformed or mismatched session records fail closed and can be explicitly 
     (await readdir(path.join(base, 'agent-sessions')))[0],
   );
   const original = JSON.parse(await readFile(filename, 'utf8'));
+  const legacy = { ...original };
+  delete legacy.access;
+  await writeFile(filename, JSON.stringify(legacy));
+  assert.equal(
+    (await store.read(binding))?.access,
+    'default',
+    'legacy handles retain the standard policy',
+  );
   for (const bytes of [
     '{broken',
     JSON.stringify({ ...original, root: 'another-checkout' }),
+    JSON.stringify({ ...original, access: 'unsupported' }),
     'x'.repeat(32769),
   ]) {
     await writeFile(filename, bytes);
@@ -106,7 +119,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
       agent: 'codex' as const,
       prompt: 'Protocol fixture only',
     };
-    async function run(newSession = false) {
+    async function run(newSession = false, access: AgentAccess = 'default') {
       const events: AgentEvent[] = [];
       let done!: () => void;
       const completed = new Promise<void>((resolve) => {
@@ -116,7 +129,7 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
         events.push(event);
         if (event.type === 'done') done();
       });
-      service.start({ ...input, newSession });
+      service.start({ ...input, newSession, access });
       await assert.rejects(service.resetSession(space.scopeId, 'codex'), /停止/);
       await completed;
       assert.equal(service.busy(space.scopeId), false);
@@ -136,6 +149,29 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
       calls.find((m) => m.method === 'thread/resume').params.threadId,
       'fixture-native-handle',
     );
+    assert.equal((await run(false, 'full-access')).events.at(-1)?.outcome, 'completed');
+    const full = await run(false, 'full-access');
+    assert.equal(full.events.at(-1)?.outcome, 'completed');
+    assert.equal((await full.service.session(space.scopeId, 'codex')).access, 'full-access');
+    const standard = await run();
+    assert.ok(standard.events.some((e) => e.text.includes('アクセス設定が変わったため')));
+    calls = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assert.deepEqual(
+      calls
+        .filter((m) => m.method.startsWith('thread/'))
+        .map((m) => [m.method, m.params.sandbox, m.params.approvalPolicy]),
+      [
+        ['thread/start', 'workspace-write', 'on-request'],
+        ['thread/resume', 'workspace-write', 'on-request'],
+        ['thread/start', 'danger-full-access', 'never'],
+        ['thread/resume', 'danger-full-access', 'never'],
+        ['thread/start', 'workspace-write', 'on-request'],
+      ],
+      'policy changes cannot reuse native sessions containing different approvals',
+    );
     await writeFile(path.join(root, 'fail-resume'), '');
     const failed = await run();
     assert.equal(failed.events.at(-1)?.outcome, 'failed');
@@ -145,8 +181,8 @@ require('node:readline').createInterface({input:process.stdin}).on('line', line 
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-    assert.equal(calls.filter((m) => m.method === 'thread/start').length, 1);
-    assert.equal(calls.filter((m) => m.method === 'turn/start').length, 2);
+    assert.equal(calls.filter((m) => m.method === 'thread/start').length, 3);
+    assert.equal(calls.filter((m) => m.method === 'turn/start').length, 5);
     assert.equal((await run(true)).events.at(-1)?.outcome, 'completed');
     await failed.service.resetSession(space.scopeId, 'codex');
     assert.equal((await failed.service.session(space.scopeId, 'codex')).state, 'empty');

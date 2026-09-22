@@ -1,5 +1,22 @@
 # irori — Continuation prompt
 
+Current development, 2026-09-23: the owner approved PR #73 and real native
+model trials. **0.1.26 is published**; PR #74 updates its download manifest.
+The new **0.1.27** work is on `feat/user-access-policy`, unmerged and unpublished.
+Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
+[real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md) and
+[VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md).
+
+The owner chose user-selectable write permission, ordinary CLI capabilities,
+and VS Code extension compatibility. These are no longer pending product
+questions. Native permission selection and device outbox recovery are implemented
+on the branch; Google writable transport and the compatible workbench integration
+remain next work. A working VS Code API probe ran on isolated VSCodium; it did
+not add an extension host to irori. Model authorization is present for native
+acceptance using existing accounts, but it does not authorize account changes
+or silently enabling experimental provider features. New feature merges still
+need authorization. Earlier contrary delivery/decision statements are historical.
+
 Current delivery, 2026-09-23: PR #73 is merged at `aa0bbfe` and
 [v0.1.26-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.26-preview.1)
 is published for Windows x64 and Mac arm64. The owner explicitly approved

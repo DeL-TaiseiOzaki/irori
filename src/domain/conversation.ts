@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { sourceRef } from './knowledge';
 import { skillName } from './skills';
-import { agentIds, type AgentEvent } from './types';
+import { agentIds, agentAccessModes, type AgentEvent } from './types';
 
 export const messageInput = z.object({
   prompt: z
@@ -11,6 +11,7 @@ export const messageInput = z.object({
     .refine((value) => !!value.trim()),
   notePath: z.string().max(4096).optional(),
   newSession: z.boolean().optional(),
+  access: z.enum(agentAccessModes).optional(),
   sources: z.array(sourceRef).max(20).optional(),
   skill: skillName.optional(),
   /** Tell the agent which lines of the note the person wrote or revised. */

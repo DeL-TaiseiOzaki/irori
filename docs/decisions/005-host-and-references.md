@@ -99,7 +99,14 @@ irori does not do the thing yet, the entry says so.
    implemented.* irori has no plugin or extension mechanism, and does not act as
    an MCP client itself (the agent CLIs own their MCP configuration).
 
-## Open branches, not decided here
+## Follow-up decisions
+
+On 2026-09-23 the owner selected **VS Code extension compatibility** and
+clarified that **ordinary native CLI agent capabilities** are the execution
+requirement. [ADR 009](009-agent-access-and-extension-compatibility.md) owns
+those decisions and user-controlled access. Editor conveniences remain a
+separate implementation question. The alternatives below record the earlier
+open questions, not decisions still awaiting the owner.
 
 - **What "taking in extensions" means.** Running VS Code extensions or Obsidian
   plugins as they are would require an extension host and the corresponding API

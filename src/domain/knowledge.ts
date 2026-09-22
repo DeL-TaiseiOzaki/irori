@@ -64,6 +64,10 @@ export const pendingWrite = z.object({
   detail: z.string().optional(),
 });
 export type PendingWrite = z.infer<typeof pendingWrite>;
+export interface CloudWriteRecovery {
+  entries: PendingWrite[];
+  unreadable: number;
+}
 
 /**
  * The lines the person wrote or revised, each with when irori saw it, and

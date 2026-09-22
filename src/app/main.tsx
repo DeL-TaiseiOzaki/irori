@@ -5,6 +5,7 @@ import { NoteActions, TrashNotes } from './NoteActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
+import { agentAccessOptions, agentAccessLabel, agentAccessDetail } from '../domain/agent-access';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
 import { retirementNotice } from '../domain/skills';
@@ -17,6 +18,7 @@ import {
   watchSystemTheme,
 } from './device-settings';
 import { Appearance } from './Appearance';
+import { CloudRecovery } from './CloudRecovery';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
@@ -38,6 +40,7 @@ import React, {
 import { createRoot } from 'react-dom/client';
 import type {
   AgentEvent,
+  AgentAccess,
   AgentAnswers,
   AgentId,
   AgentInfo,
@@ -226,12 +229,14 @@ function Request({
 function SessionControls({
   scopeId,
   agent,
+  access,
   running,
   onReset,
   onError,
 }: {
   scopeId: string;
   agent: AgentId;
+  access: AgentAccess;
   running: boolean;
   onReset: () => void;
   onError: (error: unknown) => void;
@@ -270,7 +275,9 @@ function SessionControls({
         {!session
           ? '会話の状態を確認中…'
           : session.state === 'saved'
-            ? '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。'
+            ? (session.access ?? 'default') === access
+              ? '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。'
+              : 'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。'
             : session.state === 'empty'
               ? '次の実行で新しい会話を始めます。'
               : session.detail}
@@ -316,6 +323,7 @@ function App() {
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [skill, setSkill] = useState('');
   const [personLines, setPersonLines] = useState(false);
+  const [accessSelection, setAccessSelection] = useState<{ owner: string; value: AgentAccess }>();
   const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
@@ -331,6 +339,9 @@ function App() {
     [panel, setPanel] = useState(false),
     [agent, setAgent] = useState<AgentId>('codex'),
     [infos, setInfos] = useState<AgentInfo[]>([]);
+  const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
+  const access = accessSelection?.owner === accessOwner ? accessSelection.value : 'default';
+  useEffect(() => setAccessSelection(undefined), [workspace?.id, active?.scopeId, agent]);
   const [events, setEvents] = useState<AgentEvent[]>([]),
     [runningScopes, setRunningScopes] = useState<string[]>([]),
     [fresh, setFresh] = useState(false);
@@ -700,6 +711,7 @@ function App() {
     await host.start({
       scopeId: active!.scopeId,
       agent,
+      access,
       prompt: message,
       notePath,
       newSession,
@@ -732,6 +744,7 @@ function App() {
           await host.queueAgentMessage({
             scopeId: active.scopeId,
             agent,
+            access,
             prompt: message,
             notePath,
             sources,
@@ -913,6 +926,7 @@ function App() {
               <Appearance onError={report} />
             </div>
             <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
+            <CloudRecovery />
             <button
               className="workspace-switch"
               disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
@@ -1510,6 +1524,7 @@ function App() {
                                 key={`${active.scopeId}:${agent}`}
                                 scopeId={active.scopeId}
                                 agent={agent}
+                                access={access}
                                 running={
                                   running || sending || queued.length > 0 || !conversationReady
                                 }
@@ -1618,6 +1633,7 @@ function App() {
                     {queued.map((item) => (
                       <div key={item.id}>
                         <span>{item.prompt}</span>
+                        <small>{agentAccessLabel(agent, item.access)}</small>
                         <button
                           disabled={sending}
                           aria-label={`送信待ち ${item.id} を削除`}
@@ -1770,6 +1786,24 @@ function App() {
                           </option>
                         ))}
                       </select>
+                      <select
+                        aria-label="エージェントのアクセス"
+                        aria-describedby="agent-access-detail"
+                        value={access}
+                        disabled={sending || gitBusy || agentAccessOptions(agent).length === 1}
+                        onChange={(e) =>
+                          setAccessSelection({
+                            owner: accessOwner,
+                            value: e.target.value as AgentAccess,
+                          })
+                        }
+                      >
+                        {agentAccessOptions(agent).map((value) => (
+                          <option key={value} value={value}>
+                            {agentAccessLabel(agent, value)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="actions">
                       {running && (
@@ -1802,6 +1836,10 @@ function App() {
                       </button>
                     </div>
                   </div>
+                  <small id="agent-access-detail" className="muted" role="status">
+                    {agentAccessDetail(agent, access)} 次に送る指示に適用します。 iroriのGoogle
+                    Drive接続は読み取り専用です。
+                  </small>
                 </div>
               </aside>
             </Pane>

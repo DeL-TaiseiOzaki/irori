@@ -44,6 +44,21 @@ test('Accepted instructions retain their note and multiple sources across restar
   if (process.platform !== 'win32') assert.equal((await stat(filename)).mode & 0o777, 0o600);
   await restarted.remove(binding, saved.queued[0].id);
   assert.deepEqual((await new ConversationStore(dataDir).read(binding)).queued, []);
+  const codex = { ...binding, agent: 'codex' as const };
+  await store.enqueue(codex, { ...input, agent: 'codex', access: 'full-access' });
+  const resumed = await new ConversationStore(dataDir).read(codex);
+  assert.equal(
+    resumed.queued[0].access,
+    'full-access',
+    'an accepted queued policy survives restart',
+  );
+  await store.enqueue(codex, { ...input, agent: 'codex' });
+  const pending = await new ConversationStore(dataDir).read(codex);
+  assert.equal(
+    pending.queued[1].access,
+    undefined,
+    'legacy/default messages never inherit a previous elevation',
+  );
 });
 
 test('A persisted start is never replayed after interruption and restored requests cannot be answered', async (t) => {

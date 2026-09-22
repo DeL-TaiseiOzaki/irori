@@ -39,6 +39,18 @@ test(
       cwd,
     );
     assert.equal((await data(server.client.session.get({ sessionID: session.id }))).id, session.id);
+    const permission = [{ permission: '*', pattern: '*', action: 'allow' as const }];
+    const full = await data(server.client.session.create({ permission }));
+    assert.deepEqual(full.permission, permission);
+    assert.deepEqual(
+      (await data(server.client.session.update({ sessionID: session.id, permission }))).permission,
+      permission,
+    );
+    assert.deepEqual(
+      (await data(server.client.session.get({ sessionID: full.id }))).permission,
+      permission,
+    );
+    await data(server.client.session.delete({ sessionID: full.id }));
     let connected = false;
     const [events] = await server.events((event) => {
       if (event.type === 'server.connected') connected = true;

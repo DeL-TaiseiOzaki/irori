@@ -22,6 +22,7 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
+  recoverableCloudWrites: z.tuple([]),
   draftRead: z.tuple([draftKey]),
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),

@@ -2,8 +2,9 @@
 
 irori is the independent Electron / React / TypeScript desktop IDE/ADE. It owns
 note editing, knowledge and Drive connections, and execution of local CLI
-agents. irori-extention offers irori capabilities in VS Code; `irori-templete` is the
-recommended main-KB repository template under development. Keep each
+agents. `irori-extention` ended development on 2026-09-18 and remains a readable
+design reference; new VS Code compatibility work belongs in irori.
+`irori-templete` is the recommended main-KB repository template under development. Keep each
 repository's changes and Git history separate.
 
 Within `KB_design`, follow the [workspace contract](../AGENTS.md); shared agent

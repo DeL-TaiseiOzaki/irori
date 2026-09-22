@@ -1,0 +1,5 @@
+{
+  "name": "irori Probe Light",
+  "colors": { "editor.background": "#ffffff", "editor.foreground": "#111111" },
+  "tokenColors": []
+}

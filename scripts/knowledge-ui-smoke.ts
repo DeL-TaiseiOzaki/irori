@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
+import { CloudOutbox } from '../src/cloud/outbox';
 
 // Real disposable files and persisted records; no provider/model process is started.
 const base = await mkdtemp(path.join(tmpdir(), 'irori records UI '));
@@ -20,6 +21,18 @@ await writeFile(path.join(root, '資料.md'), '# Earlier source\n');
 await writeFile(path.join(root, 'editing.md'), '# Editing\n');
 await writeFile(path.join(otherRoot, 'reference.md'), '# Separate reference\n');
 const store = new KnowledgeStore(files.dataDir, (ref) => files.resolve(ref.scopeId, ref.path));
+// Neither this owner nor its connection is registered: ordinary connection UI cannot reach it.
+await writeFile(path.join(root, 'orphaned.md'), 'Retained before connection removal');
+await new CloudOutbox(files.dataDir, store).prepare(
+  {
+    ownerId: randomUUID(),
+    mountId: randomUUID(),
+    folderId: 'removed-folder',
+    accountId: randomUUID(),
+  },
+  { scopeId: space.scopeId, path: 'orphaned.md' },
+);
+await rm(path.join(root, 'orphaned.md'));
 const first = await store.begin(randomUUID(), {
   scopeId: space.scopeId,
   agent: 'codex',
@@ -58,6 +71,21 @@ const errors: string[] = [];
 try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
+  await page.getByRole('button', { name: '端末の送信準備を復元', exact: true }).click();
+  const recovery = page.getByRole('dialog', { name: '端末の送信準備', exact: true });
+  await expect(recovery).toContainText('orphaned.md');
+  const recoveredPath = path.join(base, 'recovered.md');
+  await app.evaluate(({ dialog }, filePath) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+  }, recoveredPath);
+  await recovery.getByRole('button', { name: '別ファイルに復元', exact: true }).click();
+  await expect
+    .poll(() => readFile(recoveredPath, 'utf8'))
+    .toBe('Retained before connection removal');
+  await recovery.getByRole('button', { name: '別ファイルに復元', exact: true }).click();
+  await expect(recovery.getByRole('alert')).toContainText('上書きできません');
+  expect(await readFile(recoveredPath, 'utf8')).toBe('Retained before connection removal');
+  await recovery.getByRole('button', { name: '閉じる', exact: true }).click();
   // Keep the other scope outside this workspace until after the guarded navigation test.
   await page.getByRole('checkbox', { name: /記録のKB/ }).check();
   await page.getByLabel('ワークスペース名').fill('Record workspace');

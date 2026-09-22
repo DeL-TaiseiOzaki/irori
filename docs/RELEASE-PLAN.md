@@ -1,5 +1,16 @@
 # Release readiness and remaining work
 
+Owner follow-up, 2026-09-23: PR #73 and preview 0.1.26 are published, followed
+by the download manifest in PR #74. The unmerged 0.1.27 branch adds access
+selection and orphaned-preparation recovery. [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)
+records user-controlled access, ordinary CLI capabilities and VS Code extension
+compatibility; [real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md)
+and [the executed compatibility probe](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md)
+advance their evidence. Writable Google transport/re-consent, compatible
+workbench integration, native device/signing acceptance and portable provenance
+are still required. Earlier open-product-choice and no-model-evidence wording
+below is historical.
+
 Current reconciliation, 2026-09-22: [AUDIT-2026-09-22](AUDIT-2026-09-22.md)
 and [ACCEPTANCE](ACCEPTANCE.md) distinguish implemented functions from outstanding
 acceptance. The recovery branch prepares 0.1.26 with note/reference preservation,

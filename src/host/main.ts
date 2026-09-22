@@ -299,6 +299,7 @@ app
         await cloud.declarations(id);
         return outbox.list(id);
       },
+      recoverableCloudWrites: () => outbox.recovery(),
       prepareCloudWrite: async (id, mountId, source) => {
         return outbox.prepare(await cloud.writeTarget(id, mountId), source);
       },

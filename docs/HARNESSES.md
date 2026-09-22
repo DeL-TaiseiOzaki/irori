@@ -8,6 +8,27 @@ Date: 2026-09-13. Codex, Claude Code, OpenCode and Pi are selectable in the ordi
 
 ## Native configuration and lifecycle
 
+Access follow-up, 2026-09-23: the composer offers native/default behavior and
+explicit full access for Codex, Claude Code and OpenCode. Pi uses native
+settings only. Codex maps these choices to `on-request / workspace-write` and
+`never / danger-full-access`; Claude maps them to `default` and
+`bypassPermissions` with its explicit bypass opt-in. OpenCode full access sets
+and verifies the session's final wildcard allow rule; ordinary configuration
+is preserved in default mode. Standard Codex workspace writes do not each ask
+for approval. Supported native question requests remain interactive; Codex's
+default-mode limitation is recorded in the real-model report. See the
+[access decision](decisions/009-agent-access-and-extension-compatibility.md).
+Full-access native mappings have protocol/SDK coverage and an actual OpenCode
+server roundtrip; the [real-model trials](REAL-AGENT-ACCEPTANCE-2026-09-23.md)
+used the standard mode on the 0.1.26 baseline.
+
+The selected access mode travels with queued instructions and the native
+session record. A mode change starts a new native session while retaining the
+display history. Workspace, KB or CLI changes and app restart reset the
+composer's selection to default; an existing full-access session is not silently
+resumed with that label. Google OAuth and mounts remain read-only independently
+of native agent access.
+
 Install and configure the desired native CLI on the desktop's PATH. irori also searches the existing standard local binary locations. Authentication, model defaults, rules, skills and extensions remain with that CLI. The app displays detection/version status and uses the selected scope's canonical checkout as its working directory. It does not concatenate other spaces' rules. `.opencode/`, `.pi/`, `.agents/` and root `opencode.json`/`opencode.jsonc` are classified as schema; contents ownership still overrides classification.
 
 | Adapter | Native transport | Interaction and persistence |
@@ -17,7 +38,7 @@ Install and configure the desired native CLI on the desktop's PATH. irori also s
 | OpenCode | `opencode serve` on a private authenticated loopback port | SSE text/tools, native permission replies and single/multiple-choice questions; native session ID |
 | Pi | `pi --mode rpc` with LF-delimited JSON | Text/tools, native extension dialogs, native session file; requires Pi 0.85+ for settled-run handling |
 
-The OpenCode child gets a random server password and fixed loopback binding. The renderer receives neither credentials nor a generic HTTP/command API. The host subscribes before prompting, validates the session's checkout, filters conversation events by session, and accepts permission/question requests only for that session or verified descendants. Approval replies apply once; irori does not grant permanent permission or change native allow/ask/deny rules. Response completion is reconciled with streamed text; an interrupted event stream fails the run. See the official [server protocol](https://opencode.ai/docs/server/) and [permission semantics](https://opencode.ai/docs/permissions/).
+The OpenCode child gets a random server password and fixed loopback binding. The renderer receives neither credentials nor a generic HTTP/command API. The host subscribes before prompting, validates the session's checkout, filters conversation events by session, and accepts permission/question requests only for that session or verified descendants. Ordinary approval replies apply once; choosing full access explicitly changes that native session's permission rules as described above. Response completion is reconciled with streamed text; an interrupted event stream fails the run. See the official [server protocol](https://opencode.ai/docs/server/) and [permission semantics](https://opencode.ai/docs/permissions/).
 
 Pi retains its own tool and project-trust behavior. Standard Pi tool execution does not have permission popups; extension `confirm`, `select`, `input` and `editor` requests are bridged to the panel, and unsupported extension UI requests are reported/cancelled. The panel states the native permission distinction. irori does not pass `--approve` or change trust settings to load project extensions. Project resources therefore depend on Pi's native trust configuration. Custom terminal widgets and the complete interactive Pi interface are not reproduced. See the official [Pi README](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) and [RPC protocol](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/rpc.md).
 

@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
   AgentEvent,
+  AgentAccess,
   AgentId,
   AgentInfo,
   AgentAnswers,
@@ -12,6 +13,7 @@ import type {
   StartRun,
 } from '../domain/types';
 import { agentIds, agentNames } from '../domain/types';
+import { agentAccessDetail, agentAccessLabel, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { personLinesBridge } from './person-lines';
@@ -28,6 +30,7 @@ type Reply = { allow: boolean; answers?: AgentAnswers };
 type Run = {
   id: string;
   binding: SessionBinding;
+  access: AgentAccess;
   queuedId?: string;
   recorded?: boolean;
   accepted: Promise<void>;
@@ -89,6 +92,7 @@ export class AgentService {
   }
   queueMessage(input: StartRun) {
     input = startInput.parse(input);
+    requireAgentAccess(input.agent, input.access);
     if (input.newSession) throw Error('新しい会話は送信待ちを完了してから開始してください。');
     const run = this.runs.get(input.scopeId);
     if (this.resetting.has(input.scopeId) || (run && run.binding.agent !== input.agent))
@@ -156,6 +160,7 @@ export class AgentService {
   }
   start(input: StartRun, queuedId?: string): string {
     input = startInput.parse(input);
+    const access = requireAgentAccess(input.agent, input.access);
     if (this.busy(input.scopeId))
       throw Error('This space is already running an agent. Stop it before starting another.');
     if (!input.prompt.trim() || input.prompt.length > 32000)
@@ -176,6 +181,7 @@ export class AgentService {
     const run: Run = {
       id: randomUUID(),
       binding: this.binding(input.scopeId, input.agent),
+      access,
       queuedId,
       accepted,
       accept,
@@ -322,11 +328,25 @@ export class AgentService {
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       const binding = this.binding(input.scopeId, input.agent);
       if (input.newSession) await this.sessions.reset(binding);
-      const saved = await this.sessions.read(binding);
+      const previous = await this.sessions.read(binding);
+      // Native sessions can retain approvals. A policy change starts a fresh
+      // native conversation, while irori's display history remains available.
+      const saved = previous?.access === run.access ? previous : undefined;
+      if (previous && !saved)
+        this.event(
+          run,
+          'status',
+          'アクセス設定が変わったため、新しい会話で実行します。表示履歴は残ります。',
+        );
       resuming = !!saved;
       if (run.cancelled) return;
       if (saved) this.event(run, 'status', '保存済みの会話を引き継ぎます。');
       this.event(run, 'status', `${agentNames[input.agent]} を ${space.name} で実行中`);
+      this.event(
+        run,
+        'status',
+        `${agentAccessLabel(input.agent, run.access)}: ${agentAccessDetail(input.agent, run.access)}`,
+      );
       if (input.agent === 'codex')
         await this.codex(run, space.root, prompt, binding, saved?.handle);
       else if (input.agent === 'claude')
@@ -345,6 +365,7 @@ export class AgentService {
           cwd: space.root,
           prompt,
           session: saved?.handle,
+          access: run.access,
           env: bridge.env,
           args: bridge.args,
           signal: run.abort.signal,
@@ -353,7 +374,7 @@ export class AgentService {
           },
           event: (type, text, extra) => this.event(run, type, text, extra),
           ask: (text, details, questions) => this.ask(run, text, details, questions),
-          saveSession: (handle) => this.sessions.save(binding, handle),
+          saveSession: (handle) => this.sessions.save(binding, handle, run.access),
         };
         if (input.agent === 'pi') await runPi(context);
         else await runOpenCode(context);
@@ -475,17 +496,16 @@ export class AgentService {
     rpc.send({ method: 'initialized', params: {} });
     const params = {
       cwd,
-      approvalPolicy: 'on-request',
+      approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
       approvalsReviewer: 'user',
-      sandbox: 'workspace-write',
+      sandbox: run.access === 'full-access' ? 'danger-full-access' : 'workspace-write',
     };
     const thread = await rpc.request(
       session ? 'thread/resume' : 'thread/start',
       session ? { ...params, threadId: session } : params,
     );
     run.threadId = thread.thread.id;
-    await this.sessions.save(binding, thread.thread.id);
-    this.event(run, 'status', 'Codex: ワークスペース書き込み・必要時に許可を確認');
+    await this.sessions.save(binding, thread.thread.id, run.access);
     if (run.cancelled) return;
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
@@ -556,7 +576,8 @@ export class AgentService {
         env: agentEnv(),
         settingSources: ['user', 'project', 'local'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
-        permissionMode: 'default',
+        permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
+        allowDangerouslySkipPermissions: run.access === 'full-access',
         includePartialMessages: true,
         resume: session,
         // Told when it matters rather than on every turn: before an edit would
@@ -634,7 +655,7 @@ export class AgentService {
       for await (const msg of response) {
         if (run.cancelled) break;
         if (msg.type === 'system' && msg.subtype === 'init')
-          await this.sessions.save(binding, msg.session_id);
+          await this.sessions.save(binding, msg.session_id, run.access);
         if (msg.type === 'stream_event') {
           const event = msg.event;
           if (event.type === 'message_start') streamed = false;
