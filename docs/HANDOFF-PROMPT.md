@@ -1,23 +1,26 @@
 # irori — Continuation prompt
 
-Updated 2026-09-21, after nine pull requests merged in one day and
-v0.1.14-preview.1 published. Give this file to the next agent, or copy its
-contents into a new session. Inspect current files and Git state before acting;
-later work takes precedence over this file.
+Updated 2026-09-21 (evening), after v0.1.19-preview.1 was published and #61
+opened. Give this file to the next agent, or copy its contents into a new
+session. Inspect current files and Git state before acting; later work takes
+precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which was `ae6b0f9` with
-0.1.14 published and the download page in step when this was written. Choose a bounded next change with
-executable acceptance checks and carry it through implementation and
-verification. Make independent progress while device and account evidence is
-pending.
+Take over **irori** development from current `main`, which was `60eea4e` with
+0.1.19 published and the download page in step when this was written. First
+check **#61** (0.1.20, open): if the owner has merged it, publish v0.1.20;
+otherwise leave it for them. Then choose a bounded next change with executable
+acceptance checks and carry it through implementation and verification. Make
+independent progress while device and account evidence is pending.
 
 Work in the independent `irori/` repository inside the `KB_design/` workspace.
-`KB_design/` is itself not a Git repository, and its shared agent configuration
-at the root is under no version control at all — worth raising with the owner
-before changing it. `irori-extention` ended development on 2026-09-18 and is
-kept as the readable record of how the layer model was worked out;
+The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
+`.agents/`, `scripts/`, research and initial specifications — are versioned as
+the private repository **`irori-workspace`** since 2026-09-21; it ignores the
+three product repositories and `references/`, and its changes follow the same
+branch and pull request rule. `irori-extention` ended development on 2026-09-18
+and is kept as the readable record of how the layer model was worked out;
 `irori-templete` is the recommended main-KB repository template.
 
 Respond to the user in Japanese. Write code, identifiers, technical documents
@@ -31,132 +34,111 @@ owner's own words. New user directions override this file.
 
 The [contributor contract](../AGENTS.md), then [STATUS](STATUS.md), which is
 newest-first and carries the verification evidence for everything below. Then
-select for the task: [ADR 005](decisions/005-host-and-references.md) for the
-product directions and what was decided about the reference codebases,
+select for the task: [ADR 006](decisions/006-person-lines.md) (on #61's branch
+until it merges) for the authorship decision,
+[ADR 005](decisions/005-host-and-references.md) for the product directions,
 [ADR 002](decisions/002-release-and-workspace.md) for confirmed product scope,
 [ACCEPTANCE](ACCEPTANCE.md) for the requirement matrix,
 [DISTRIBUTION](DISTRIBUTION.md) for the publish rule, and the per-area note
-matching the change — [AUTHORSHIP](AUTHORSHIP.md), [SKILLS](SKILLS.md),
-[HARNESSES](HARNESSES.md), [GIT](GIT.md), [KB-SEARCH](KB-SEARCH.md),
-[ONTOLOGY](ONTOLOGY.md), [CLOUD-SETUP](CLOUD-SETUP.md) and the rest.
+matching the change — [NOTE-LINKS](NOTE-LINKS.md), [KB-SEARCH](KB-SEARCH.md),
+[SKILLS](SKILLS.md), [AUTHORSHIP](AUTHORSHIP.md), [HARNESSES](HARNESSES.md),
+[GIT](GIT.md), [ONTOLOGY](ONTOLOGY.md), [CLOUD-SETUP](CLOUD-SETUP.md) and the
+rest.
 
 `references/` in the workspace parent holds **orca**, **claudian** and **VS
-Code**, placed there by the owner on 2026-09-20 as reading material. Nothing in
-it is imported, vendored or built. ADR 005 records what was taken from reading
-them and why irori is not built on orca.
+Code** as reading material. Nothing in it is imported, vendored or built.
 
-## What landed on 2026-09-21
+## What landed on 2026-09-21 (second half)
 
-Nine PRs. The first five were verified with 162 behaviour tests and thirteen
-Electron UI suites; the last four with 168 tests and fourteen suites, all with
-build, format check and three platform package jobs passing:
+Each change was implemented by a Fable agent in its own worktree, then rebuilt,
+re-tested and mutation-checked by the lead on its stacked base, with all
+fourteen Electron UI suites and the three platform package jobs passing:
 
-- **#49 — the package stopped carrying executables irori never runs**, version
-  0.1.13. The Agent SDK bundles a complete Claude Code binary per platform,
-  about 220 MB, which the SDK resolves only when `pathToClaudeCodeExecutable` is
-  unset — and `src/agents/service.ts` always passes the reader's own installed
-  `claude`. node-pty's prebuilds for other platforms are unreachable for the
-  same kind of reason. Both are removed in `packageAfterPrune`, and
-  `test:package` asserts their absence and records each platform's weight. See
-  [PACKAGING](PACKAGING.md).
-- **#50 — notes follow their own links**, version 0.1.14. Ctrl/Cmd + click
-  follows a relative Markdown link, which is what the recommended template
-  writes; a plain click still places the cursor. See [NOTE-LINKS](NOTE-LINKS.md).
-- **#48 and #51** — the 0.1.12 delivery record, this file, and the download page.
-
-- **#43 — one agent per knowledge base.** `AgentService` keeps
-  `Map<scopeId, Run>`; a second agent in the same space is still refused, a
-  cancellation stops one run, and the host's exclusions split into
-  `busy(scopeId)` and `anyBusy`. `HostAPI.cancel(scopeId?)`.
-- **#44 — the package stopped carrying unreachable code.** `dist/` fell from
-  6,946,180 to 3,828,368 bytes. The largest item was KaTeX and its fonts, which
-  `features: { Latex: false }` never removed because that flag is read after
-  bundling; `Editor.tsx` composes `CrepeBuilder` from explicit features instead.
-  `AgentMarkdown` and four panels load on first use, `yaml` left the renderer
-  with `parseSkill`, and the renderer draws a 256-pixel mark.
-- **#45 — which lines an agent wrote.** Keyed by the line's own normalised text,
-  not its position, so nothing drifts and no diff is computed. See
-  [AUTHORSHIP](AUTHORSHIP.md) for what is deliberately not built, in particular
-  why irori does not call `git ai checkpoint known_human`.
-- **#46 — ADR 005**, plus a correction: `SKILLS.md` had justified
-  `.agents/skills/` partly by claiming claudian uses it. It does not; Codex and
-  Pi do, which is the better justification.
-- **irori-extention #21** — teamai-cli reassessed and still not adopted.
+- **#53 (0.1.15) — リンク元**, the notes that link to the open one, on demand
+  over `SearchService`'s walk. `linksTo` reads links as a Markdown reader would
+  and in linear time: the first version's regexes took 236 s over two crafted
+  lines, which in the main process freezes the window.
+- **#55 (0.1.16)** — a backlink opens at its link (label and column through the
+  search navigation), case follows what the disk does (`foldsCase` observes it),
+  and the list refreshes itself on file events.
+- **#56 (0.1.17)** — 名前・場所 rewrites relative links in other notes and in the
+  moved note (`rewriteLinks`, `src/host/relink.ts`), hash-checked, skipping and
+  naming a note changed meanwhile; リンクも更新する is on by default.
+- **#57 (0.1.18)** — a device-local `node:sqlite` FTS5 trigram index
+  (`src/host/search-index.ts`) behind search and backlinks: a request stats every
+  file and reads only changed ones, 1–2 character queries match over stored
+  text, and non-ASCII case is expanded because FTS5 folds with Unicode 6.1. A
+  15,118-note KB answers in about 0.5 s instead of 5–9 s. Limits rose to 50,000
+  files; a 1 MiB write batch holds the main process about 80 ms.
+- **#58 (0.1.19)** — skills: a reach check per harness (`src/domain/skill-reach.ts`
+  with sourced versions), `RETIRED.md` markers that no CLI discovers, and
+  `metadata.roles/projects` with a device-local picker narrowing.
+- **#59 closed** — git-ai notes with agent (`s_`) entries only; superseded by the
+  owner's decision below.
+- **#61 (0.1.20, open)** — the authorship record keeps only **the person's
+  lines**: a save marks lines absent from the bytes it replaces; Claude Code is
+  told before an `Edit`/`MultiEdit`/`Write` would change one (Agent SDK
+  `PreToolUse` `additionalContext`); any agent gets them only when the person
+  ticks 自分の行を伝える. ADR 006 and
+  `docs/research/2026-09-21-authorship-provenance.md` carry the reasoning.
 
 ## Delivery state
 
-`main` is `ae6b0f9`, version **0.1.14**, published as
-[v0.1.14-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.14-preview.1)
-with the download page in step. The Windows installer is 215,796,224 bytes and
-the Mac disk image 182,424,344, against 319,919,104 and 281,574,107 at 0.1.12.
-0.1.10, 0.1.11 and 0.1.13 have committed notes but no package of their own: each
-PR had to advance the version past the published preview to satisfy
-`release-sync.yml`, and publishing every intermediate one would make a reader
-upgrade twice to reach the same code. Read
-[DISTRIBUTION](DISTRIBUTION.md) §"How the rule is held" before the next
-release.
-`release-sync.yml` fails hourly while `main` holds a shipped change for more
-than sixty minutes without a release, so an unpublished merge is visible rather
-than silent.
+`main` is `60eea4e`, version **0.1.19**, published as
+[v0.1.19-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.19-preview.1)
+from CI 35587392974 through release run 35588153507, with the download page
+deployed (Pages 35588281118, #60) and the drift re-check 35588385140 in step.
+Anonymous downloads were 215,806,464 bytes (Windows) and 182,440,647 (Mac) with
+`SHA256SUMS.txt` matching. 0.1.16–0.1.18 have notes but no package of their own;
+one release carries #55–#58. v0.1.15-preview.1 (release run 35578021397) was the
+earlier release the same day.
 
-Nothing is waiting to be merged. Two things about that flow are worth carrying
-forward. Every change of substance adds a section at the top of
-`docs/STATUS.md`, so two branches cut from `main` conflict there whichever order
-they merge; stack the later one on the earlier and retarget it at `main` when
-the first merges. And the hourly drift check reads the live download page, so a
-scheduled run that lands between the release and the Pages deployment fails by
-seconds — publish the website before the hour, or dispatch a re-check after the
-deployment finishes.
+**#61 is the only open pull request.** Its version 0.1.20 is ahead of the
+published preview; after it merges, publish from `main`'s CI run for the merge
+commit as [DISTRIBUTION](DISTRIBUTION.md) describes. Two facts about the flow:
+every substantial change adds a section at the top of `docs/STATUS.md`, so
+branches cut from `main` conflict there — stack the later one and retarget it
+with `gh pr edit <n> --base main` after the first merges, since GitHub does not
+retarget here; and a drift run that lands between the release and the Pages
+deployment fails by seconds — dispatch `release-sync.yml` after the deploy.
+
+## Owner decisions from this session
+
+- **Authorship is about the person's lines, one mark per line.** The owner
+  wants an agent to be able to see which lines carry the person's intent; a
+  line with any of the person's change is the person's. Sub-line tracking was
+  judged more than needed. The agent needs this only some of the time — hence
+  the edit-time hook and the unticked-by-default tickbox.
+- **Sharing, when wanted, is Git AI Standard `h_` entries only.** Pre-irori
+  material is kept apart at folder level, so an agent's line and a line of
+  unknown origin need not be told apart. The closed branch `feat/git-ai-notes`
+  holds reusable parts: the notes format, the fast-import write that never
+  clobbers another writer, the tracking-ref sync, and a bounded `rangeLines`.
+- **The teamai-inspired skill ideas** were all approved and are in 0.1.19; the
+  matching `irori-templete` conventions (`RETIRED.md`, `metadata.roles/projects`)
+  are proposed in `docs/SKILLS.md`, not yet written into the template.
 
 ## Next work, in the order the evidence supports
 
-1. **OKF-native graph.** `irori-templete` became an Open Knowledge Format 0.2
-   bundle on 2026-09-17 — pages carry `type`, `relations` and ordinary links —
-   while irori still draws its graph from a declared CSV pair. This is the
-   largest gap between irori and its own recommended template, and the owner
-   asked for the decision to be discussed rather than taken. `src/host/ontology.ts`,
-   `src/domain/ontology.ts`, `src/app/OntologyPanel.tsx`.
-2. **Indexed search.** Backlinks are done in 0.1.15 as an on-demand scan
-   (**リンク元**, see [NOTE-LINKS](NOTE-LINKS.md)): `SearchService`'s bounded
-   walk takes a per-file line matcher, and `linksTo` in
-   `src/domain/note-links.ts` reads links as a Markdown reader would, in linear
-   time — it runs in the main process, where a first backtracking version took
-   minutes over a crafted line. Search and backlinks both read every file when
-   asked; an index is what would make them cheap enough to run on every open.
-   `src/host/search.ts`, `src/app/SearchPanel.tsx`. One measurement from
-   2026-09-21 constrains the index: `node:sqlite` is present in Electron 44 with
-   FTS5 (SQLite 3.53.4), but its
-   tokenizers decide whether Japanese works: with `unicode61` a sentence without
-   spaces is one token, so a query inside it never matches, and `trigram`, which
-   does match inside, returns nothing for a query shorter than three characters.
-   A Japanese two-character query is ordinary, so an index needs trigram plus a
-   `LIKE` path over the indexed text for shorter ones — still far cheaper than
-   reading every file, which is what `SearchService` does today.
-3. **D04 — writable cloud delivery.** Extend `src/cloud/outbox.ts` with an
-   explicit writable capability, re-consent and exact account binding; preserve
-   staged bytes across failure and restart and observe remote completion.
-   Changing a scope or a `readOnly` flag alone does not complete it.
-4. **The installer's real weight.** Done in #49, which removes the Agent SDK's
-   bundled Claude Code binary and node-pty's foreign prebuilds: the Linux
-   application directory falls from 994,253,996 to 500,345,370 bytes. No package
-   carried another platform's binary; each carried one of its own, and Linux two.
-   What is left to measure is the renderer packages Forge copies although Vite
-   has already bundled them into `dist/`, about 50 MB, which needs the notices
-   their licences require to be generated, since the bundle carries no LICENSE
-   files. See [PACKAGING](PACKAGING.md).
-5. **Authorship, second step.** Export and import of the Git AI Standard v3 note
-   at `refs/notes/ai`, reading before writing, which makes the record portable
-   without depending on the `git ai` binary.
-6. **Device acceptance** (D03/D05, D07–D10) stays open: real Windows/Mac
-   installs, Japanese IME, live Google consent and mounts, signing and
-   notarization. Reproduce and prioritise any failure the owner reports.
+1. **Publish 0.1.20 when #61 merges** (release, website manifest PR, Pages,
+   download check, drift re-check).
+2. **`h_` sharing of the person's lines**: at commit, write the lines the record
+   marks as `h_` entries under `refs/notes/ai`, keyed by the committer identity;
+   read `h_` entries back as the person's lines; carry the ref on fetch and push.
+   Reuse `feat/git-ai-notes`. Decide with the owner whether Push should carry
+   the ref by default.
+3. **Tell Codex, OpenCode and Pi at edit time**, as Claude Code is told, where
+   each harness offers a comparable hook; which do is open.
+4. **Template conventions** in `irori-templete`: `RETIRED.md` and
+   `metadata.roles/projects` in the skills contract, as `docs/SKILLS.md` proposes.
+5. **OKF-native graph** — still the owner's decision to discuss; the largest gap
+   between irori and its own template.
+6. **D04 — writable cloud delivery**, and the ~50 MB of renderer packages Forge
+   copies although Vite bundled them (needs generated licence notices).
+7. **Device acceptance** (D03/D05, D07–D10) stays open.
 
-Two decisions belong to the owner, not to an agent: **what "taking in
-extensions" means** (running VS Code or Obsidian extensions needs an extension
-host, which orca itself did not build; irori's own capability-gated plugins are
-a much smaller thing that runs nobody else's extension), and **how far code
-editing and execution go** — note that orca deliberately switched Monaco's
-diagnostics off and tells users to run checkers in a terminal.
+Two decisions belong to the owner, not to an agent: what "taking in extensions"
+means, and how far code editing and execution go.
 
 ## Authorization and protected state
 
@@ -199,6 +181,12 @@ npm run build:website && xvfb-run -a npm run test:website
 ```
 
 `npm run setup:cloud` fetches the ignored local rclone tool if it is missing.
+**Never run `npm run package`, `make` or `test:package` in a worktree whose
+`node_modules` is a symlink to this checkout's**: Forge then works on the shared
+tree, empties `node_modules/.bin`, rebuilds node-pty for Electron and deletes
+other platforms' prebuilds and the Agent SDK's platform packages. It happened on
+2026-09-21 and was repaired with `npm rebuild --ignore-scripts` and `npm pack`
+of the locked versions. Leave packaging to CI in such a worktree.
 `git-ui-smoke` is timing-sensitive under load in this container and has failed
 intermittently on `未解決 0 件`; rerun it alone before treating that as a
 regression. Never run `npm test` alongside `npm run test:ui`. See
