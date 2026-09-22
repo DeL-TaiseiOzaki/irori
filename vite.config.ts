@@ -1,2 +1,7 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ base: './', build: { outDir: 'dist' } });
+import { thirdPartyNotices } from './scripts/third-party-notices';
+export default defineConfig({
+  base: './',
+  build: { outDir: 'dist' },
+  plugins: [thirdPartyNotices()],
+});
