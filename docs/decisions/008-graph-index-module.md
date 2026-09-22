@@ -81,7 +81,11 @@ event-loop turns longer than 32 ms.
 
 - Committing `Knowledge_Base/ontology/` is the person's step, and a stale module
   shows as counts in the panel until it is updated.
-- The graph shows typed relations only. Body links stay navigable through
-  **リンク元**; drawing them is a later option.
+- The graph shows typed relations only, which the owner confirmed the same day:
+  body links stay navigable through **リンク元** and search, and would make
+  most pages nodes and bring large knowledge bases to the reader's limits. The
+  template already asks for `relations` only where the kind matters to a
+  reader or to the graph. Revisit if a real knowledge base shows the typed
+  graph too sparse.
 - The template's `lint --irori-graph` checks the module against the pages and
   reports differences; it no longer writes the pair.
