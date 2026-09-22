@@ -95,7 +95,10 @@ app
       return cloud.resolve(ref.scopeId, ref.path);
     });
     const outbox = new CloudOutbox(files.dataDir, knowledge);
-    const authorship = new AuthorshipStore(files.dataDir);
+    // The notes are read through the Git service declared below, once a note is open.
+    const authorship = new AuthorshipStore(files.dataDir, (ref) =>
+      git.noted(ref.scopeId, ref.path),
+    );
     const agents = new AgentService(
       files,
       (event) => emit({ type: 'agent', event }),
@@ -103,7 +106,11 @@ app
       authorship,
     );
     let fileMutations = 0;
-    const git = new GitService(files, () => !agents.anyBusy && !cloud.busy && fileMutations === 0);
+    const git = new GitService(
+      files,
+      () => !agents.anyBusy && !cloud.busy && fileMutations === 0,
+      authorship,
+    );
     function canStartAgent() {
       if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
       if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');

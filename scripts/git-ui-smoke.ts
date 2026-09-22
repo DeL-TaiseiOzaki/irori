@@ -151,6 +151,20 @@ git(base, 'init', '--bare', '--initial-branch=main', remote);
 git(root, 'remote', 'add', 'origin', remote);
 git(root, 'push', '-u', 'origin', 'main');
 git(base, 'clone', remote, peer);
+// The repository carries a Git AI Standard note naming README's third line as a collaborator's.
+const initial = git(root, 'rev-parse', 'HEAD');
+execFileSync('git', ['notes', '--ref=ai', 'add', '-F', '-', initial], {
+  cwd: root,
+  input:
+    'README.md\n  h_0123456789abcd 3\n---\n' +
+    JSON.stringify({
+      schema_version: 'authorship/3.0.0',
+      base_commit_sha: initial,
+      prompts: {},
+      humans: { h_0123456789abcd: { author: 'Collaborator <c@example.invalid>' } },
+    }),
+  stdio: ['pipe', 'pipe', 'pipe'],
+});
 // URL rewriting is confined to this disposable test config. The product runs real Git clone.
 const seed = path.join(base, 'seed'),
   cloneRemote = path.join(base, 'catalog.git');
@@ -197,6 +211,7 @@ try {
     .locator('.layer-pane.my-kb')
     .getByRole('button', { name: 'README', exact: true })
     .click();
+  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 1 行');
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
@@ -259,6 +274,9 @@ try {
   await expect(panel.getByRole('status')).toContainText('この端末の履歴に commit');
   expect(git(root, 'show', 'HEAD:README.md')).toContain('UI saved 日本語');
   expect(git(root, 'show', 'HEAD:extra.md')).toBe('# Extra staged note');
+  // The line typed here is named as the committer's in the commit's own note.
+  expect(git(root, 'notes', '--ref=ai', 'list').split('\n').filter(Boolean)).toHaveLength(2);
+  expect(git(root, 'notes', '--ref=ai', 'show', 'HEAD')).toMatch(/^README\.md\n  h_[0-9a-f]{14} /);
   expect(await readFile(path.join(root, 'extra.md'), 'utf8')).toBe('# Extra after staging');
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
@@ -282,6 +300,7 @@ try {
   await panel.getByRole('button', { name: 'Push を実行', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('リモートへの送信が完了');
   expect(git(remote, 'show', 'main:README.md')).toContain('UI saved 日本語');
+  expect(git(remote, 'rev-parse', 'refs/notes/ai')).toBe(git(root, 'rev-parse', 'refs/notes/ai'));
 
   git(peer, 'pull', '--ff-only');
   await writeFile(path.join(peer, 'README.md'), '# Peer 日本語\n');
@@ -465,6 +484,7 @@ try {
           'editor refresh after source control closes',
           '1024px sidebar bounds',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
+          "a collaborator's h_ line in refs/notes/ai counts for the open note, a commit names the lines typed here as the committer's, and Push carries the ref",
         ],
         errors,
       },

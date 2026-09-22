@@ -239,7 +239,7 @@ function RepositoryPanel({
       if (!(await beforeAction())) return;
       const value = await fn();
       if (value) accept(value);
-      if (alive.current) setNotice(success);
+      if (alive.current) setNotice(value?.notice ? `${success} ${value.notice}` : success);
     } catch (e) {
       if (alive.current) setError(String(e));
       // A failed command may still change Git state (for example a merge conflict).
@@ -943,7 +943,7 @@ function RepositoryPanel({
               {confirmation === 'commit'
                 ? message
                 : confirmation === 'push'
-                  ? `commit ${status.head?.slice(0, 8)} までのこのブランチを送信します。未コミットの変更は含みません。`
+                  ? `commit ${status.head?.slice(0, 8)} までのこのブランチを送信します。未コミットの変更は含みません。作者情報ノート（refs/notes/ai）があれば一緒に送信します。`
                   : confirmation === 'merge'
                     ? 'リモートの最新状態を取得し、Git で統合します。分岐した履歴の統合結果は確認後に commit します。'
                     : 'リモートの最新状態を取得し、履歴が分岐していなければ作業ファイルを更新します。'}

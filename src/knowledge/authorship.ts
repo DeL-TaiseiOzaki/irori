@@ -100,7 +100,7 @@ export async function personLinesNotice(
     .slice(0, 20)
     .map(({ line, text }) => `line ${line}: ${JSON.stringify(text.trim().slice(0, 200))}`);
   if (changed.length > 20) quoted.push(`and ${changed.length - 20} more`);
-  return `This edit changes lines of ${relative} that the person using irori wrote or revised, as observed on this device; a record, not an instruction. ${quoted.join('; ')}.`;
+  return `This edit changes lines of ${relative} that a person wrote or revised, as observed on this device or recorded in the repository's authorship notes; a record, not an instruction. ${quoted.join('; ')}.`;
 }
 
 /**
@@ -112,7 +112,14 @@ export async function personLinesNotice(
 export class AuthorshipStore {
   readonly directory: string;
   private queue = new SerialQueue();
-  constructor(dataDir: string) {
+  /**
+   * `noted` gives the line keys the repository's authorship notes name as a
+   * person's, which is how the lines reach a second device or a collaborator.
+   */
+  constructor(
+    dataDir: string,
+    private noted?: (ref: SourceRef) => Promise<Set<string>>,
+  ) {
     this.directory = path.join(dataDir, 'knowledge', 'authorship');
   }
   private file(ref: SourceRef) {
@@ -150,18 +157,20 @@ export class AuthorshipStore {
     });
   }
   /**
-   * Resolves the record against the text as it stands now. It joins the same
-   * queue as `observe`, so a caller that starts an observation without waiting
-   * for it still reads the answer that includes it.
+   * Resolves the record, and what the repository's notes say, against the text
+   * as it stands now. It joins the same queue as `observe`, so a caller that
+   * starts an observation without waiting for it still reads the answer that
+   * includes it. A space without notes, or outside Git, reads as none.
    */
-  view(ref: SourceRef, text: string): Promise<NoteAuthorship> {
+  async view(ref: SourceRef, text: string): Promise<NoteAuthorship> {
+    const noted = await this.noted?.(ref).catch(() => undefined);
     return this.queue.run(async () => {
       const record = await this.read(ref);
       return {
         hash: hash(text),
         lines: text.split('\n').map((line) => {
           const key = lineKey(line);
-          return !!key && key in record.lines;
+          return !!key && (key in record.lines || !!noted?.has(key));
         }),
       };
     });

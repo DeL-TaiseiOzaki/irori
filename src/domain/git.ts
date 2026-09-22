@@ -25,6 +25,8 @@ export interface GitStatus {
   changes: GitChange[];
   version: string;
   fetchedAt?: string;
+  /** What a completed operation could not also do, such as carry the authorship notes. */
+  notice?: string;
 }
 export interface GitDiff {
   path: string;

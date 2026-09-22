@@ -1,5 +1,38 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The person's lines travel with commits, 2026-09-22: a commit made in the Git
+panel attaches a Git AI Standard v3 note under `refs/notes/ai` naming, for each
+knowledge-layer Markdown file it adds or modifies, the committed file's person
+lines as one `h_` entry — `h_` plus SHA-256 of the committer's `Name <email>`,
+first 14 hex digits, with `metadata.humans` naming that identity. Only `h_` is
+written, as the owner decided for 0.1.20; an agent's lines stay unattested.
+`GitService.noted` reads the `h_` entries of the last 50 noted commits touching
+a file, maps each named line of that commit's version to its line key, and
+`AuthorshipStore.view` joins them with the device record, so the count, the
+source-view marks, the summary and Claude Code's edit notice all include a
+collaborator's or another device's lines. The note plumbing — `src/git/notes.ts`,
+fast-import with the notes tip as parent, merge into an existing note, fetch
+into `refs/notes/ai-remote/<remote>` then `git notes merge -s ours`, push never
+forced — is #59's, which is closed; its agent (`s_`) writing and reading are
+removed. Push carries the notes by default, as #59 did, because sharing is the
+point of this change; the confirmation says so. The UI says
+人が書いた・直した行 and 人の行を伝える instead of あなたが書いた・直した行 and
+自分の行を伝える, since a line may now be a collaborator's.
+
+Verification: production build, format check, **204 behaviour tests (200
+passed, four environment-gated skips)** — four in `tests/git-notes.test.ts`
+rewritten for `h_`: the note's exact attestation and metadata and none for an
+agent-only commit; a device without a record reading a moved line back; `s_` and
+legacy keys ignored and malformed notes skipped; a post-commit hook's note
+merged with the person's entry last; Fetch, Pull, a refused Push and the merge
+that follows — and the fourteen-suite Electron run, where `git-ui-smoke` shows a
+seeded collaborator `h_` line counted, the commit naming the typed line under
+the committer's key, and Push carrying the ref.
+
+Not done: a commit made outside irori carries no note, and squash or rebase
+merges on GitHub drop them. A collaborator's lines and this person's are not
+told apart. Codex, OpenCode and Pi are still told only through the tickbox.
+
 The person's lines, 2026-09-21: the authorship record keeps one mark per line —
 the person wrote or revised it, or not — and nothing about an agent's lines.
 The owner set the goal: which lines are the person's matters most, because an
