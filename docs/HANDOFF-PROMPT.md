@@ -1,5 +1,12 @@
 # irori — Continuation prompt
 
+Current delivery, 2026-09-23: PR #73 is merged at `aa0bbfe` and
+[v0.1.26-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.26-preview.1)
+is published for Windows x64 and Mac arm64. The owner explicitly approved
+real native CLI model acceptance on this date. Later work and decisions belong
+in the newest STATUS entry; the earlier waiting-for-merge and model-approval
+statements below describe their dated checkpoints.
+
 Continuation update, 2026-09-22: the owner requested implementation of the audit
 findings and immediately actionable backlog. `fix/audit-recovery` prepares
 **0.1.26** from main `9c92f39`; it remains unmerged/unpublished. Read
