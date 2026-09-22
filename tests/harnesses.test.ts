@@ -284,6 +284,44 @@ test(
 );
 
 test(
+  "Before a file tool would change the person's lines, Pi and OpenCode hear which, once",
+  fixtureOptions,
+  async (t) => {
+    const { root, space, files, calls, execute } = await setup(t);
+    const text = '# Fixture\n\nAn agent paragraph.\nMy own sentence.\n';
+    await writeFile(path.join(root, 'note.md'), text);
+    await new AuthorshipStore(files.dataDir).observe(
+      { scopeId: space.scopeId, path: 'note.md' },
+      text,
+      '# Fixture\n\nAn agent paragraph.\n',
+    );
+    const hooks = async (agent: AgentId, prompt: string) => {
+      const before = (await calls().catch(() => [])).length;
+      const run = await execute(agent, prompt);
+      assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+      return (await calls())
+        .slice(before)
+        .filter((call: any) => call.type === 'hook')
+        .map((call: any) => call.reason as string | undefined);
+    };
+    for (const agent of ['pi', 'opencode'] as const) {
+      const [held, again] = await hooks(agent, 'rewrite line 4');
+      assert.match(held!, /line 4: "My own sentence\."/, `${agent} hears which line`);
+      assert.match(held!, /a record, not an instruction/);
+      assert.match(held!, /the same call again runs it/);
+      assert.equal(again, undefined, `${agent}: the same call again runs`);
+      assert.deepEqual(await hooks(agent, 'rewrite line 3'), [undefined, undefined], agent);
+    }
+    // The script each CLI loads is irori's own, outside the KB.
+    assert.ok(!(await readdir(root)).some((entry) => entry.includes('person-lines')));
+    assert.deepEqual((await readdir(path.join(files.dataDir, 'agents'))).sort(), [
+      'person-lines-opencode.js',
+      'person-lines-pi.js',
+    ]);
+  },
+);
+
+test(
   "Running a harness adds no agent configuration to the user's KB",
   fixtureOptions,
   async (t) => {

@@ -55,10 +55,25 @@ mark is not a claim that an agent wrote them.
 
 An agent is told only when it matters:
 
-- **Claude Code, before an edit.** When an `Edit`, `MultiEdit` or `Write` would
-  change one of the person's lines, irori's `PreToolUse` hook in the Agent SDK
-  adds, as `additionalContext`, which lines and their text. An edit that leaves
-  them alone adds nothing.
+- **Before an edit, through the CLI's own hook.** When a file tool would change
+  one of the person's lines, the agent hears which lines and their text. An
+  edit that leaves them alone hears nothing.
+  - _Claude Code_: irori's `PreToolUse` hook in the Agent SDK adds it as
+    `additionalContext` to `Edit`, `MultiEdit` and `Write`; the call runs.
+  - _Pi_ and _OpenCode_: neither protocol gives a hook a word to the model
+    other than stopping the call with a reason it reads (Pi's `tool_call`
+    handler returns `{ block, reason }`; an OpenCode `tool.execute.before` hook
+    throws, and the message is the tool's error text). So irori's script holds
+    an `edit` or `write` once, with the notice, and the same call again runs.
+    The script is loaded from irori's data directory, never the KB — Pi's `-e`
+    flag, OpenCode's `plugin` list in `OPENCODE_CONFIG_CONTENT` — and asks irori
+    over a loopback URL only that process knows (`src/agents/person-lines.ts`).
+  - _Codex_: nothing at edit time. Its hooks are read only from `~/.codex` or
+    the project's `.codex`, each definition trusted by the person first, and
+    irori writes neither; under `workspace-write` with `on-request` a patch
+    inside the checkout is applied without an approval request, and an
+    approval decision carries no reason. `turn/steer` could tell the model after
+    the patch has been applied, which is not this notice.
 - **Any agent, when the person asks.** With a note open that has such lines, the
   composer offers 人の行を伝える, off by default. Ticked, the request names the
   person's line ranges in the bytes the agent is told to read.
@@ -129,7 +144,9 @@ The device record reaches another machine or a collaborator only through a
 commit made in irori and pushed; a commit made in another client carries no
 note, and GitHub's squash and rebase merge buttons create commits without the
 branch's notes. Any `h_` key counts, so a collaborator's lines and this person's
-are not told apart. Only Claude Code
-is told at edit time; Codex, OpenCode and Pi get the person's lines only
-through the tickbox. How Claude Code's model uses the hook's context was not
-exercised with a real model turn here.
+are not told apart. Codex is not told at edit time; it gets the person's lines
+only through the tickbox. Pi matches an edit's `oldText` loosely, so an edit
+that only that looseness lets through is not seen. How each model uses the
+notice, and Pi's and OpenCode's loading of irori's script, were not exercised
+with a real CLI or model turn here: the checks drive the script through
+protocol fixtures.

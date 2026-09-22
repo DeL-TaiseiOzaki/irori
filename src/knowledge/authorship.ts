@@ -38,26 +38,34 @@ export function lineKey(line: string): string | null {
   return createHash('sha256').update(normalised).digest('hex').slice(0, 16);
 }
 
+/** The file a file tool names: `file_path` for Claude Code, `filePath` for OpenCode, `path` for Pi. */
+export function editedPath(input: unknown): string | undefined {
+  const { file_path, filePath, path: file } = (input ?? {}) as Record<string, unknown>;
+  return [file_path, filePath, file].find((value): value is string => typeof value === 'string');
+}
+
 /**
- * The text a Claude Code file tool would leave in a note, or undefined for an
- * input this does not recognise, since nothing is guessed. An `old_string`
- * that is not in the text is an edit the tool itself will refuse.
+ * The text a file tool would leave in a note, or undefined for an input this
+ * does not recognise, since nothing is guessed: Claude Code's Write, Edit and
+ * MultiEdit, OpenCode's write and edit, Pi's write and edit. An old string that
+ * is not in the text is an edit the tool itself will refuse. Pi matches its
+ * `oldText` loosely, so an edit only Pi would apply is one this does not see.
  */
 export function editedText(tool: string, input: unknown, current: string): string | undefined {
   const value = (input ?? {}) as Record<string, unknown>;
   const replace = (text: string | undefined, edit: unknown) => {
-    const {
-      old_string: from,
-      new_string: to,
-      replace_all: all,
-    } = (edit ?? {}) as Record<string, unknown>;
+    const e = (edit ?? {}) as Record<string, unknown>;
+    const from = e.old_string ?? e.oldString ?? e.oldText;
+    const to = e.new_string ?? e.newString ?? e.newText;
+    const all = e.replace_all ?? e.replaceAll;
     if (text === undefined || typeof from !== 'string' || typeof to !== 'string') return;
     if (!from || !text.includes(from)) return;
     return all === true ? text.split(from).join(to) : text.replace(from, () => to);
   };
-  if (tool === 'Write') return typeof value.content === 'string' ? value.content : undefined;
-  if (tool === 'Edit') return replace(current, value);
-  if (tool === 'MultiEdit' && Array.isArray(value.edits))
+  const name = tool.toLowerCase();
+  if (name === 'write') return typeof value.content === 'string' ? value.content : undefined;
+  if (name === 'edit' && !Array.isArray(value.edits)) return replace(current, value);
+  if ((name === 'edit' || name === 'multiedit') && Array.isArray(value.edits))
     return value.edits.reduce<string | undefined>((text, edit) => replace(text, edit), current);
 }
 
@@ -83,8 +91,8 @@ export async function personLinesNotice(
   tool: string,
   input: unknown,
 ): Promise<string | undefined> {
-  const file = (input as { file_path?: unknown } | undefined)?.file_path;
-  if (typeof file !== 'string') return;
+  const file = editedPath(input);
+  if (file === undefined) return;
   const space = files.get(scopeId);
   const absolute = path.resolve(space.root, file);
   if (!within(space.root, absolute)) return;

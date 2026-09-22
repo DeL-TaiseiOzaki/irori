@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import readline from 'node:readline';
+import { pathToFileURL } from 'node:url';
 export function run(kind) {
   if (process.argv.includes('--version')) {
     console.log(kind === 'pi' ? '0.85.1 fixture' : '1.18.30 fixture');
@@ -10,6 +11,48 @@ export function run(kind) {
   }
   const log = (value) =>
     fs.appendFileSync('fixture-requests.jsonl', JSON.stringify({ kind, ...value }) + '\n');
+  // What the real CLI does with the script irori hands it: load it and run its
+  // hook for an edit of note.md, here the same edit twice, with no model.
+  async function hooks(message) {
+    const line = message.includes('line 4') ? 'My own sentence.' : 'An agent paragraph.';
+    const file =
+      kind === 'pi'
+        ? process.argv[process.argv.indexOf('-e') + 1]
+        : JSON.parse(process.env.OPENCODE_CONFIG_CONTENT).plugin.at(-1);
+    const script = await import(pathToFileURL(file).href);
+    const handlers = [];
+    if (kind === 'pi') script.default({ on: (type, handler) => handlers.push(handler) });
+    else handlers.push((await script.IroriPersonLines({}))['tool.execute.before']);
+    const results = [];
+    for (let n = 0; n < 2; n++) {
+      const [call, args] =
+        kind === 'pi'
+          ? [
+              {
+                toolName: 'edit',
+                toolCallId: `call-${n}`,
+                input: { path: 'note.md', edits: [{ oldText: line, newText: 'Rewritten.' }] },
+              },
+            ]
+          : [
+              { tool: 'edit', sessionID: 'ses_fixture', callID: `call-${n}` },
+              {
+                args: {
+                  filePath: path.resolve('note.md'),
+                  oldString: line,
+                  newString: 'Rewritten.',
+                },
+              },
+            ];
+      results.push(
+        await handlers[0](call, args).then(
+          (result) => ({ reason: result?.reason }),
+          (error) => ({ reason: error.message }),
+        ),
+      );
+    }
+    for (const result of results) log({ type: 'hook', ...result });
+  }
   if (kind === 'pi') {
     const session = process.argv.includes('--session')
       ? process.argv[process.argv.indexOf('--session') + 1]
@@ -71,6 +114,7 @@ export function run(kind) {
         send({ type: 'response', id: message.id, command: 'prompt', success: true });
         send({ type: 'tool_execution_start', toolName: 'read', args: { path: 'note.md' } });
         if (message.message.includes('hold')) return;
+        if (message.message.includes('rewrite')) return void hooks(message.message).then(complete);
         if (message.message.includes('dialog')) {
           waiting = 'confirm';
           send({
@@ -183,6 +227,7 @@ export function run(kind) {
         );
       pending = res;
       if (text.includes('hold')) return;
+      if (text.includes('rewrite')) return void hooks(text).then(finish);
       if (text.includes('dialog'))
         emit('permission.asked', {
           id: 'permission',

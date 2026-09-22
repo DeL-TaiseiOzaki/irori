@@ -14,6 +14,7 @@ import type {
 import { agentIds, agentNames } from '../domain/types';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
+import { personLinesBridge } from './person-lines';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
@@ -39,6 +40,7 @@ type Run = {
   threadId?: string;
   turnId?: string;
   finish?: () => void;
+  bridge?: () => void;
   closed: Promise<void>;
   close: () => void;
 };
@@ -330,10 +332,21 @@ export class AgentService {
       else if (input.agent === 'claude')
         await this.claude(run, space.root, prompt, binding, saved?.handle);
       else {
+        // The same word Claude Code gets from its hook, through each CLI's own
+        // hook: which of the person's lines a file tool call would change.
+        const bridge = await personLinesBridge(
+          this.files.dataDir,
+          input.agent,
+          (tool, edit) => personLinesNotice(this.files, this.authorship, input.scopeId, tool, edit),
+          agentEnv(),
+        );
+        run.bridge = bridge.close;
         const context: NativeContext = {
           cwd: space.root,
           prompt,
           session: saved?.handle,
+          env: bridge.env,
+          args: bridge.args,
           signal: run.abort.signal,
           child: (child) => {
             run.child = child;
@@ -361,6 +374,7 @@ export class AgentService {
       clearTimeout(timer);
       this.denyRequests(run);
       if (run.child) await killTree(run.child).catch(() => {});
+      run.bridge?.();
       run.rpc?.fail(Error('Run finished'));
       if (run.cancelled) outcome = 'cancelled';
       if (record)
