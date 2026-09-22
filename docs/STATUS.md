@@ -29,6 +29,9 @@ removing the observed test hang without weakening the cancellation assertions.
 Disposable local rclone copy/checksum checks passed. Changed-document relative
 links and `git diff --check` pass. No real model turn, Google account/mount,
 installed Windows/Mac trial, package build or publication was performed locally.
+The first remote CI attempt exposed missing author identity in the new clone
+fixture's notes setup. Its disposable repository now declares its own fixture
+identity and disables signing, independent of global Git configuration.
 
 Remaining: writable capability/re-consent/verified transport, orphaned outbox
 recovery UI, portable source/run/artifact provenance, native device/model

@@ -170,6 +170,9 @@ const seed = path.join(base, 'seed'),
   cloneRemote = path.join(base, 'catalog.git');
 await mkdir(seed);
 git(seed, 'init', '-b', 'main');
+git(seed, 'config', 'user.name', 'UI fixture');
+git(seed, 'config', 'user.email', 'fixture@example.invalid');
+git(seed, 'config', 'commit.gpgsign', 'false');
 await writeFile(path.join(seed, 'README.md'), '# Catalog\n');
 git(seed, 'add', '.');
 git(seed, 'commit', '-m', 'Catalog initial');
