@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-23: PRs #75 (0.1.27) and #76 (0.1.28) are merged, and
+**0.1.28 is published** as
+[v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1)
+from main's CI run `35758758467` (source `e8b6d5d`): Windows x64 198,609,408
+bytes and Mac arm64 166,285,874 bytes. 0.1.27 was not published on its own;
+the 0.1.28 notes cover both. PR #77 added the notes and download manifest, the
+download website serves 0.1.28, both installers match `SHA256SUMS.txt` when
+downloaded anonymously, and the drift check passes. The entries below describe
+the branches before merge.
+
 Editor assistance, 2026-09-23: **0.1.28** is prepared on
 `feat/editor-assistance-toggle`, stacked on the unmerged 0.1.27 branch
 `feat/user-access-policy`. The owner asked for editor conveniences to be shown

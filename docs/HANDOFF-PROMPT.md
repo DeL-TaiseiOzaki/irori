@@ -1,8 +1,10 @@
 # irori — Continuation prompt
 
-Current development, 2026-09-23: the owner approved PR #73 and real native
-model trials. **0.1.26 is published**; PR #74 updates its download manifest.
-The new **0.1.27** work is on `feat/user-access-policy`, unmerged and unpublished.
+Current development, 2026-09-23: **0.1.28 is published** as
+[v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1).
+It carries the 0.1.27 access-policy work (PR #75) and the 0.1.28 code-assistance
+toggle (PR #76); 0.1.27 was not published on its own. PR #77 added the notes and
+download manifest, and main is `b5d086c`.
 Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
 [real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md) and
 [VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md).
@@ -10,7 +12,7 @@ Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-ex
 The owner chose user-selectable write permission, ordinary CLI capabilities,
 and VS Code extension compatibility. These are no longer pending product
 questions. Native permission selection and device outbox recovery are implemented
-on the branch; Google writable transport and the compatible workbench integration
+on main; Google writable transport and the compatible workbench integration
 remain next work. A working VS Code API probe ran on isolated VSCodium; it did
 not add an extension host to irori. Model authorization is present for native
 acceptance using existing accounts, but it does not authorize account changes
