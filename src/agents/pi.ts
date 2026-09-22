@@ -66,8 +66,9 @@ export async function runPi(ctx: NativeContext) {
   ctx.signal.throwIfAborted();
   const child = launch(
     'pi',
-    ['--mode', 'rpc', ...(ctx.session ? ['--session', ctx.session] : [])],
+    ['--mode', 'rpc', ...(ctx.args ?? []), ...(ctx.session ? ['--session', ctx.session] : [])],
     ctx.cwd,
+    ctx.env,
   );
   ctx.child(child);
   let finish!: () => void;

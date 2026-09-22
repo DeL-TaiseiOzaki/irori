@@ -17,8 +17,44 @@ focused UI additions exercise keyboard selection, repeated activation, disabled
 submit, live reduced motion and light/dark rendering. The first behavior run
 stalled in the existing concurrent-search test; its isolated run and the full
 rerun passed. No provider inference, installed Windows/Mac trial or local package
-build was performed. Version 0.1.22 and its release notes accompany this change;
-publication follows an authorized merge.
+build was performed. Version 0.1.24 and its release notes accompany this change
+(0.1.23 is #67's); publication follows an authorized merge.
+After merging the 0.1.22 `main` into this branch (renumbered from 0.1.22, which
+had been published meanwhile): production build, format check, 205 behaviour
+tests (201 passed, four environment-gated skips) and all fourteen Electron UI
+suites pass.
+
+Pi and OpenCode hear about the person's lines before an edit, 2026-09-22.
+Neither protocol lets a hook add context and let the call run: Pi's extension
+`tool_call` handler can return `{ block, reason }`, and an OpenCode plugin's
+`tool.execute.before` can throw, whose message the model reads as the tool's
+error. So `src/agents/person-lines.ts` writes one small script per CLI to
+`<dataDir>/agents/` (never the KB), loaded with Pi's `-e` and through
+`plugin` in `OPENCODE_CONFIG_CONTENT`, and starts a per-run loopback listener
+with a random token; the script posts each `edit`/`write` and irori answers with
+`personLinesNotice`. A notice holds that exact call once and the identical call
+then runs; no notice, or irori unreachable, means no hold. `editedPath` and
+`editedText` now read OpenCode's (`filePath`, `oldString`/`newString`,
+`replaceAll`) and Pi's (`path`, `edits[]` of `oldText`/`newText`) inputs.
+Codex is not told at edit time: its hooks load only from `~/.codex` or the
+project's `.codex` after the person trusts each definition, irori writes
+neither, and under `workspace-write` with `on-request` a patch inside the
+checkout reaches irori as no approval request (whose decision carries no reason
+anyway). `turn/steer` could only tell it afterwards. Investigated and
+implemented by a delegated agent; the lead reviewed the diff and integrated it.
+
+Verification: production build, format check, **205 behaviour tests (201
+passed, four environment-gated skips)**, including one driving irori's actual
+Pi and OpenCode scripts through the protocol fixtures — a person's line held
+once with its text quoted, then run; an agent's line not held; both scripts in
+the data directory and nothing in the KB — and the Electron UI suites. Real Pi
+0.85.1 loaded the script with `--mode rpc -e` and no extension error; a real
+OpenCode 1.18.30 `serve` listed the plugin path in `/config`, but its lazy
+plugin import was not observed. No model turn was run.
+
+Not done: how Pi's and OpenCode's models treat a held call is unobserved. Pi
+matches `oldText` loosely, so an edit only that looseness applies is not seen.
+Codex has no edit-time notice.
 
 The person's lines travel with commits, 2026-09-22: a commit made in the Git
 panel attaches a Git AI Standard v3 note under `refs/notes/ai` naming, for each

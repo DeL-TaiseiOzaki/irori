@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AuthorshipStore,
+  editedPath,
   editedText,
   lineKey,
   personLinesChanged,
@@ -137,6 +138,24 @@ test("A file tool's edit is applied as the tool would, and nothing is guessed", 
     'uno\ntwo\ntwo\n',
   );
   assert.equal(editedText('Write', { content: 'all new\n' }, text), 'all new\n');
+  // OpenCode's and Pi's tools, under their own names and argument names.
+  assert.equal(
+    editedText(
+      'edit',
+      { filePath: 'x', oldString: 'two', newString: 'TWO', replaceAll: true },
+      text,
+    ),
+    'one\nTWO\nTWO\n',
+  );
+  assert.equal(
+    editedText('edit', { path: 'x', edits: [{ oldText: 'one', newText: 'uno' }] }, text),
+    'uno\ntwo\ntwo\n',
+  );
+  assert.equal(editedText('write', { path: 'x', content: 'all new\n' }, text), 'all new\n');
+  assert.equal(editedPath({ file_path: 'a' }), 'a');
+  assert.equal(editedPath({ filePath: 'b' }), 'b');
+  assert.equal(editedPath({ path: 'c' }), 'c');
+  assert.equal(editedPath({ path: 1 }), undefined);
   for (const [tool, input] of [
     ['Edit', { old_string: 'absent', new_string: 'x' }],
     ['Edit', { old_string: '', new_string: 'x' }],
