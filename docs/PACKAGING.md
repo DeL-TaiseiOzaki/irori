@@ -1,5 +1,65 @@
 # Desktop packaging foundation
 
+Packages the application never loads, 2026-09-22: packaging keeps under
+`node_modules` only what the host bundle requires and what those packages
+depend on, and the build writes the notices for what Vite bundled. The Linux
+x64 `app.asar` falls from 115,078,717 to 21,902,040 bytes and the whole
+application directory from 500,379,979 to 407,203,302; the unpacked directory
+beside the archive, node-pty and rclone, is unchanged at 89,396,019; measured
+on 0.1.19's code, and 21,919,228 and 407,220,490 rebased on 0.1.22. The
+packaged dependency inventory goes from 300 packages to 25. No feature is
+removed; Windows and Mac packaging drops the same files, and their figures
+belong to their own CI jobs.
+
+The kept set is read, not maintained. `scripts/build-host.mjs` builds the host
+with esbuild's `packages: 'external'`, so every package the host loads appears
+in `dist-host/main.cjs` or `preload.cjs` as `require("name")` or
+`import("name")`. `packageAfterPrune` in `forge.config.cjs` reads those two
+files, takes each bare specifier's package — fourteen: the Agent SDK, the
+OpenCode SDK, chokidar, cross-spawn, default-shell, electron-squirrel-startup,
+eventsource-parser, node-pty, papaparse, tree-kill, which, write-file-atomic,
+yaml and zod — and walks their `dependencies` and `optionalDependencies`
+through the copied tree with Node's resolution, nearest `node_modules` first,
+so cross-spawn's nested `which@2` stays beside the top-level `which@5`.
+Everything else under `node_modules` is removed: 271 top-level packages that
+only the renderer's dependency tree reaches — React and React DOM,
+lucide-react, Base UI, Milkdown, CodeMirror and Lezer, xterm, React Flow and
+dagre, the remark and ProseMirror families — together with what npm installed
+as their dependencies but nothing imports (Vue and its compiler, Babel's
+parser and types, PostCSS, lodash's types), and npm's `.bin` links, hidden
+`.package-lock.json` and Vite's `.vite-temp`, which the copy filter had let
+through. Zod and papaparse are used on both sides and stay. Nothing resolved by
+path at run time is touched: node-pty's binary, the Agent SDK's files and
+OpenCode's `dist/v2/client.js` sit inside kept directories, and `vendor/rclone`
+is outside `node_modules`. The renderer's packages are not moved to
+`devDependencies`: that would restate the same classification by hand, and
+`npm audit --omit=dev` would then stop reporting on code that runs in the
+application.
+
+The notices are generated, not listed. `scripts/third-party-notices.ts` is a
+Vite plugin that, in `generateBundle`, takes Rollup's module graph, maps each
+module under a `node_modules` directory to its package, and emits
+`dist/third-party-notices.txt` — 210 entries of name, version, the `license`
+field and the text of the package's LICENSE, LICENCE, NOTICE or COPYING files,
+282,864 bytes, shipped inside `app.asar` beside the bundle. The graph rather
+than the chunks' rendered modules, because a package whose modules only
+re-export another's, such as `@milkdown/kit`, is in no chunk yet is what the
+source imports; the first draft read the chunks and the package smoke failed on
+`@milkdown/kit@7.22.1`. An in-memory build with sourcemaps attributes rendered
+code to 202 packages, every one of them named; the other eight are such
+barrels or fully tree-shaken modules. `docs/THIRD_PARTY_NOTICES.md` still
+describes what ships and how.
+
+`test:package` derives the same host set from the archived bundles and
+asserts that each of those dependencies is packaged, that every other
+production dependency is not, and that the notices file is present and names
+each of the latter at its installed version, beside the existing checks. The
+new assertions were seen to fail on the 0.1.19 package (no notices file), on a
+build with the removal disabled (`@base-ui/react` packaged) and on a build
+whose plugin withheld `react` (`react@19.3.0` missing), and the same run drives
+the packaged application through its editor, graph, terminal and both SDK
+imports, which is what shows the kept set is the loadable one.
+
 Executables the package never runs, 2026-09-21: packaging removes two sets of
 binaries that npm installs on the build machine and irori cannot use. The Linux
 x64 `app.asar` falls from 548,291,885 to 115,044,075 bytes, the unpacked
@@ -38,11 +98,13 @@ application on every platform, which is what shows the remaining node-pty binary
 is the loadable one. `package-smoke.json` now records the archived and unpacked
 weight, and the smoke prints it, so each platform's figure is in its own job log.
 
-What remains is mostly reachable code plus the bundled rclone (85.4 MB). The
-next measurable item is the renderer packages that Forge copies because they are
-production dependencies although Vite has already bundled them into `dist/`,
-about 50 MB; dropping them means generating the notices their licences require,
-since the bundle no longer carries each package's LICENSE file.
+What remains is reachable code plus the bundled rclone (85.4 MB). Since
+2026-09-22 the archive holds the renderer bundle (4.1 MB), the host bundle and
+the fourteen packages it loads with their dependencies (zod 6.1 MB and the
+Agent SDK 5.1 MB are the largest) — the renderer packages that Forge used to
+copy are gone, and the licences their bundling requires ship as
+`dist/third-party-notices.txt`. The unpacked directory is rclone and node-pty's
+binary, and the rest of the application directory is Electron's own runtime.
 
 macOS signing, 2026-09-16: the Mac bundle is ad-hoc signed while packaging.
 Until now `packagerConfig` set no `osxSign`, and [@electron/packager](https://github.com/electron/packager)
@@ -121,7 +183,7 @@ Linux needs the system `zip` command and a display; headless tests use `xvfb-run
 
 [Electron Forge](https://www.electronforge.io/core-concepts/build-lifecycle) 7.11.2 owns copying, runtime dependency pruning, ASAR, native rebuild and makers. [Squirrel.Windows](https://www.electronforge.io/config/makers/squirrel.windows) produces the Windows EXE; its normal install/update/remove startup events use `electron-squirrel-startup`. [DMG](https://www.electronforge.io/config/makers/dmg) produces the Mac disk image on macOS. ZIP is included for Mac and Linux engineering use. There is no custom installer engine, publisher, updater or signing fallback.
 
-The allowlist includes `dist`, `dist-host`, assets, production `node_modules`, package metadata, irori's MIT license and third-party notices. Source maps, source/test directories, `.local`, KBs, device data, credentials, logs and website output are excluded. Upstream package notices and Electron/Chromium licenses remain. Claude SDK optional native binary packages are included by npm's production dependency tree even though irori selects the user's separately installed executable; their redistribution review remains D08 work.
+The allowlist includes `dist` (with the generated `third-party-notices.txt`), `dist-host`, assets, the `node_modules` the host loads, package metadata, irori's MIT license and third-party notices. Source maps, source/test directories, `.local`, KBs, device data, credentials, logs and website output are excluded. Upstream package notices and Electron/Chromium licenses remain. The Claude SDK's optional native binary packages and the renderer's bundled packages are removed while packaging, as the dated sections above describe.
 
 `test:package` copies the complete Forge output into a temporary Japanese/space-containing path outside the checkout, clears Node module overrides, and launches its own Electron binary with a separate cwd/device directory. It verifies ASAR contents, absence of build tooling, actual SDK imports (including the ESM OpenCode client), startup, typed host note registration/save and normal shutdown. It does not launch a model, authenticate a cloud account, or execute an installer. Playwright supplies only test control; developer Node/npm is not used by the application's host.
 

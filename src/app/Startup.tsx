@@ -1,6 +1,6 @@
 import { Dialog } from './Dialog';
-import { Toggle } from '@base-ui/react/toggle';
-import { ToggleGroup } from '@base-ui/react/toggle-group';
+import { MagnetTabs } from './obsidian/MagnetTabs';
+import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
 import { appIcon, appVersion } from './branding';
@@ -57,21 +57,16 @@ export function RegisterSpace({
       >
         <h2>リポジトリ・KBフォルダを登録</h2>
         {!folder && (
-          <ToggleGroup
+          <MagnetTabs
             className="git-registration-mode"
-            aria-label="リポジトリの取得方法"
-            value={[cloneMode ? 'clone' : 'folder']}
-            onValueChange={(next) => {
-              if (next[0]) setCloneMode(next[0] === 'clone');
-            }}
-          >
-            <Toggle type="button" value="folder" disabled={busy}>
-              既存のフォルダ
-            </Toggle>
-            <Toggle type="button" value="clone" disabled={busy}>
-              GitHub から取得
-            </Toggle>
-          </ToggleGroup>
+            label="リポジトリの取得方法"
+            value={cloneMode ? 'clone' : 'folder'}
+            onValueChange={(next) => setCloneMode(next === 'clone')}
+            options={[
+              { value: 'folder', label: '既存のフォルダ', disabled: busy },
+              { value: 'clone', label: 'GitHub から取得', disabled: busy },
+            ]}
+          />
         )}
         {cloneMode && !folder ? (
           <>
@@ -79,6 +74,10 @@ export function RegisterSpace({
               GitHub リポジトリ URL
               <input
                 aria-label="GitHub リポジトリ URL"
+                // Set native autofocus before showModal; React's autoFocus runs while hidden.
+                ref={(input) => {
+                  if (input) input.autofocus = true;
+                }}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://github.com/team/knowledge.git"
@@ -132,6 +131,10 @@ export function RegisterSpace({
             <div className="actions">
               <input
                 aria-label="KBフォルダ"
+                // Set native autofocus before showModal; React's autoFocus runs while hidden.
+                ref={(input) => {
+                  if (input) input.autofocus = true;
+                }}
                 value={folder}
                 disabled={busy}
                 required
@@ -226,12 +229,12 @@ export function RegisterSpace({
           <button type="button" disabled={busy} onClick={onCancel}>
             キャンセル
           </button>
-          <button
-            className="primary"
+          <ArrowFillButton
+            type="submit"
             disabled={busy || (!(cloneMode && !folder) && (!info || info.kind === 'unavailable'))}
           >
             {cloneMode && !folder ? 'リポジトリを取得' : '登録して開く'}
-          </button>
+          </ArrowFillButton>
         </div>
       </form>
     </Dialog>
@@ -457,7 +460,7 @@ export function Startup({
               disabled={busy}
               onChange={(e) => setName(e.target.value)}
             />
-            <button className="primary" disabled={busy}>
+            <ArrowFillButton type="submit" disabled={busy}>
               {editing
                 ? spaces.some((space) => selected.includes(space.scopeId))
                   ? '変更を保存して開く'
@@ -465,7 +468,7 @@ export function Startup({
                 : selected.length
                   ? '選択したスペースを開く'
                   : 'ワークスペースを作成'}
-            </button>
+            </ArrowFillButton>
             {editing && (
               <button
                 type="button"

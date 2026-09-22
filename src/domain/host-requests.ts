@@ -119,6 +119,8 @@ export const hostArguments = {
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
+  graphIndexStatus: z.tuple([id]),
+  updateGraphIndex: z.tuple([id]),
   skills: z.tuple([id]),
   skillReach: z.tuple([id]),
   noteAuthorship: z.tuple([id, path, text]),
