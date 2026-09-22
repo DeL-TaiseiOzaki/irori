@@ -1,5 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Preview publication, 2026-09-23: the owner authorized PR #73, merged at
+`aa0bbfe5d60bb83fc307091f3259c91660d1f249`. **0.1.26 is published** for Windows
+x64 and Mac arm64 through [release run 35749374357](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35749374357),
+using the installers tested by [main CI 35748469575](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35748469575).
+The earlier unmerged/unpublished statements below are historical. The website
+manifest now targets this release; Pages deployment is the publication step.
+No new signing identity or general-release channel is involved.
+
 Recovery audit follow-up, 2026-09-22: **0.1.26** is prepared on
 `fix/audit-recovery`, from main `9c92f39`. The published preview remains 0.1.25;
 this change is awaiting pull-request review and an authorized merge.
