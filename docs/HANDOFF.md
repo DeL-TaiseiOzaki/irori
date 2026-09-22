@@ -4,7 +4,8 @@ Current development, 2026-09-23: **0.1.28 is published** as
 [v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1).
 It carries the 0.1.27 access-policy work (PR #75) and the 0.1.28 code-assistance
 toggle (PR #76); 0.1.27 was not published on its own. PR #77 added the notes and
-download manifest, and main is `b5d086c`.
+download manifest, PR #78 the records, and main is `95fbc12`.
+[HANDOFF-PROMPT](HANDOFF-PROMPT.md) carries the current next work.
 Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
 [real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md) and
 [VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md).

@@ -1,53 +1,17 @@
 # irori — Continuation prompt
 
-Current development, 2026-09-23: **0.1.28 is published** as
-[v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1).
-It carries the 0.1.27 access-policy work (PR #75) and the 0.1.28 code-assistance
-toggle (PR #76); 0.1.27 was not published on its own. PR #77 added the notes and
-download manifest, and main is `b5d086c`.
-Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
-[real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md) and
-[VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md).
-
-The owner chose user-selectable write permission, ordinary CLI capabilities,
-and VS Code extension compatibility. These are no longer pending product
-questions. Native permission selection and device outbox recovery are implemented
-on main; Google writable transport and the compatible workbench integration
-remain next work. A working VS Code API probe ran on isolated VSCodium; it did
-not add an extension host to irori. Model authorization is present for native
-acceptance using existing accounts, but it does not authorize account changes
-or silently enabling experimental provider features. New feature merges still
-need authorization. Earlier contrary delivery/decision statements are historical.
-
-Current delivery, 2026-09-23: PR #73 is merged at `aa0bbfe` and
-[v0.1.26-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.26-preview.1)
-is published for Windows x64 and Mac arm64. The owner explicitly approved
-real native CLI model acceptance on this date. Later work and decisions belong
-in the newest STATUS entry; the earlier waiting-for-merge and model-approval
-statements below describe their dated checkpoints.
-
-Continuation update, 2026-09-22: the owner requested implementation of the audit
-findings and immediately actionable backlog. `fix/audit-recovery` prepares
-**0.1.26** from main `9c92f39`; it remains unmerged/unpublished. Read
-[AUDIT-2026-09-22](AUDIT-2026-09-22.md) and the latest STATUS entry for its
-fixes, verification and remaining work. D04 preparation now binds the exact
-account/shared drive, but writable capability, re-consent and real transport
-acceptance remain open. The delivery and landed-work descriptions below are
-the published 0.1.25 baseline, not instructions to repeat completed work.
-
-Updated 2026-09-22 (night), after v0.1.25-preview.1 was published with
-everything that was open merged, and the graph index decision taken. Give this file to the next agent, or copy its
-contents into a new session. Inspect current files and Git state before acting;
-later work takes precedence over this file.
+Updated 2026-09-23 (morning), after v0.1.28-preview.1 was published and the
+records merged. Give this file to the next agent, or copy its contents into a
+new session. Inspect current files and Git state before acting; later work
+takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which was `b984804` with
-0.1.25 published and the download page in step when this was written. Nothing
-is waiting to be merged. Choose a bounded next change
-with executable acceptance checks and carry it through implementation and
-verification. Make independent progress while device and account evidence is
-pending.
+Take over **irori** development from current `main`, which was `95fbc12` with
+**0.1.28** published and the download page in step when this was written.
+Nothing is waiting to be merged. Choose a bounded next change with executable
+acceptance checks and carry it through implementation and verification. Make
+independent progress while device and account evidence is pending.
 
 Work in the independent `irori/` repository inside the `KB_design/` workspace.
 The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
@@ -69,112 +33,136 @@ owner's own words. New user directions override this file.
 
 The [contributor contract](../AGENTS.md), then [STATUS](STATUS.md), which is
 newest-first and carries the verification evidence for everything below. Then
-select for the task: [ADR 006](decisions/006-person-lines.md) for authorship,
-[ADR 007](decisions/007-obsidian-ui.md) for the ObsidianUI controls,
-[ADR 008](decisions/008-graph-index-module.md) for the graph index module, [ADR 005](decisions/005-host-and-references.md)
-for the product directions, [ADR 002](decisions/002-release-and-workspace.md)
-for confirmed product scope, [ACCEPTANCE](ACCEPTANCE.md) for the requirement
-matrix, [DISTRIBUTION](DISTRIBUTION.md) for the publish rule, and the per-area
-note matching the change — [ONTOLOGY](ONTOLOGY.md), [PACKAGING](PACKAGING.md),
+select for the task: [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)
+for agent access, Drive write policy and VS Code extension compatibility,
+[AUDIT-2026-09-22](AUDIT-2026-09-22.md) for the open-work table,
+[real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md),
+[VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md),
+[EDITOR-ASSISTANCE](EDITOR-ASSISTANCE.md), [ADR 006](decisions/006-person-lines.md)
+for authorship, [ADR 007](decisions/007-obsidian-ui.md) for the ObsidianUI
+controls, [ADR 008](decisions/008-graph-index-module.md) for the graph index
+module, [ADR 005](decisions/005-host-and-references.md) for the product
+directions, [ADR 002](decisions/002-release-and-workspace.md) for confirmed
+product scope, [ACCEPTANCE](ACCEPTANCE.md) for the requirement matrix,
+[DISTRIBUTION](DISTRIBUTION.md) for the publish rule, and the per-area note
+matching the change — [ONTOLOGY](ONTOLOGY.md), [PACKAGING](PACKAGING.md),
 [AUTHORSHIP](AUTHORSHIP.md), [HARNESSES](HARNESSES.md), [GIT](GIT.md),
 [NOTE-LINKS](NOTE-LINKS.md), [KB-SEARCH](KB-SEARCH.md), [SKILLS](SKILLS.md),
 [CLOUD-SETUP](CLOUD-SETUP.md) and the rest.
 
 `references/` in the workspace parent holds **orca**, **claudian**, **VS Code**
-and, since 2026-09-22, **evoagent** (arXiv 2406.14228 and its code) as reading
-material. Nothing in it is imported, vendored or built. What was taken from
-EvoAgent is in the workspace's `_research/ontology-evolution-2026-09-22/`.
+and **evoagent** (arXiv 2406.14228 and its code) as reading material. Nothing
+in it is imported, vendored or built. What was taken from EvoAgent is in the
+workspace's `_research/ontology-evolution-2026-09-22/`.
 
-## What landed on 2026-09-22
+## What landed on 2026-09-23
 
-- **#61 (0.1.20)** — the authorship record keeps only the person's lines, one
-  mark per line; Claude Code is told before an edit would change one (Agent SDK
-  `PreToolUse`), any agent only when the person ticks 人の行を伝える.
-- **#63 (0.1.21)** — the person's lines travel with commits as Git AI Standard
-  `h_` entries under `refs/notes/ai`, read back from the last 50 noted commits;
-  Push carries the notes by default and says so.
-- **#64 (0.1.22)** — Pi and OpenCode hear about the person's lines before an
-  edit through scripts irori writes to its data directory (never the KB); Codex
-  is not told at edit time, since its hooks load only from definitions the
-  person trusts.
-- **#67 (0.1.23)** — the package keeps only what the host loads; `app.asar`
-  about 115 MB → 21.9 MB; licence notices generated from the bundle into
-  `dist/third-party-notices.txt`.
-- **#69 (0.1.24)** — the graph index the KB carries (ADR 008).
-- **#66 (0.1.25)** — ObsidianUI Magnet Tabs and Arrow Fill Button (ADR 007).
-  Opened by a VS Code Codex session that had switched the shared checkout to
-  its branch; renumbered twice (0.1.22 → 0.1.24 → 0.1.25) as the others merged.
-- **#62, #65, #68, #71, #72** — the records, the 0.1.22 and 0.1.25 notes and the
-  download page.
-- irori-templete **#7** (`RETIRED.md`, `metadata.roles/projects`), **#9**
-  (vocabulary only through reviewed proposals), **#10** (one index heading per
-  type) and **#8** (`lint --irori-graph` checks irori's module);
-  irori-workspace **#2** (the EvoAgent reading and the graph decision).
+- **#73 (0.1.26)** — the recovery audit's fixes: note moves keep references and
+  person lines, graph index regeneration survives broken or oversized modules,
+  a vanished mount no longer blocks closing, and new Drive preparations bind
+  the exact account and shared drive.
+- **#75 (0.1.27)** — the composer offers each native CLI's real access modes
+  (native/default or explicit full access for Codex, Claude and OpenCode; Pi
+  native only). Queued instructions keep their mode; changing mode starts a
+  fresh native session. Retained Drive preparations can be restored as new
+  local files after their workspace or connection is removed. The real native
+  trials and the lifecycle script's stricter gate checks came with it.
+- **#76 (0.1.28)** — **コード支援 ON / OFF** in the document toolbar switches
+  syntax coloring, line numbers, folding, bracket assistance and completions
+  together, in source files and Markdown code blocks. A device setting, default
+  on; switching keeps text, selection and Undo, and writes nothing to the note.
+  A VS Code Codex session left it uncommitted; a Claude session finished it and
+  fixed two timing faults in its UI suite.
+- **#74, #77, #78** — the 0.1.26 and 0.1.28 notes, download manifests and records.
 
 ## Delivery state
 
-`main` is `b984804`, version **0.1.25**, published as
-[v0.1.25-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.25-preview.1)
-through release run 35723813665 (from main run 35723062728), with the download
-page deployed (Pages 35724596462, #72) and the drift re-check 35724815238 in
-step. The downloads are 198,603,264 bytes (Windows) and 166,261,903 (Mac),
-down from 215,808,512 and 182,467,091 at 0.1.22 — #67's work. Earlier the same
-day v0.1.22-preview.1 carried #61, #63 and #64. 0.1.20, 0.1.21, 0.1.23 and 0.1.24
-have notes but no package of their own; the published notes of 0.1.22 and
-0.1.25 summarise them.
+`main` is `95fbc12`, version **0.1.28**, published as
+[v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1)
+through release run 35761285128 from main run 35758758467 (source `e8b6d5d`).
+The downloads are 198,609,408 bytes (Windows x64) and 166,285,874 (Mac arm64).
+The download page was deployed (Pages 35761430928), both installers matched
+`SHA256SUMS.txt` when downloaded anonymously, and the drift check 35761753190
+passed. 0.1.27 has notes but no package of its own; the 0.1.28 notes cover it.
+0.1.26 was published earlier the same day (release run 35749374357).
+
+The 0.1.28 branch passed the production build, formatting, 235 tests (228
+passed, seven environment-gated skips: no local rclone, OpenCode or Pi binary,
+and a case-sensitive filesystem) and all fifteen Electron UI suites.
 
 Every branch adds to the top of `docs/STATUS.md` and advances the version, so
 parallel branches conflict there; the one merged second takes the next free
 version and rewrites its notes. GitHub does not retarget a stacked pull request
-here. Several sessions, including Codex in VS Code, work in this repository at
-once: work in a worktree, and leave the shared checkout on `main`. ## Owner decisions from 2026-09-22
+here (`gh pr edit <n> --base main`). Several sessions, including Codex in VS
+Code, work in this repository at once: work in a worktree under
+`KB_design/.local/worktrees/`, and leave the shared checkout on `main`. The
+worktrees left there by the 2026-09-23 branches are all merged and clean.
 
-- **The graph index is a module the knowledge base carries** (ADR 008).
-  The pages are the source of truth; irori generates `Knowledge_Base/ontology/`
-  deterministically from their `type`, `title` and `relations` when the person
-  asks, as CSV node and edge tables, and the person commits it, so the same
-  commit shows the same graph on every device. A device-local index was
-  rejected because the visible structure could differ between devices. A
-  declared `.irori/ontology.json` still wins, for tables people maintain.
-  Freshness is checked by regenerating in memory, not by a hash column. The
-  graph draws `relations` only: body links stay reachable through リンク元 and
-  search (confirmed the same day); revisit only if a real knowledge base shows
-  the typed graph too sparse.
-- **EvoAgent is agent generation, not an ontology method.** What was absorbed is
-  the shape of its loop, as the template's vocabulary review: one proposal at a
-  time with the whole vocabulary in view, a distinctness and evidence check
-  before the person sees it, and the person deciding each. Its code's fail-open
-  check and forgotten rejections were deliberately inverted.
-- Earlier decisions stand: authorship is about the person's lines, one mark per
-  line; sharing is `h_` entries only.
+## Owner decisions in force
+
+- **Access (ADR 009).** People choose whether writes are allowed. Native agent
+  execution exposes each provider's actual modes, keeps native approvals by
+  default and needs an explicit choice for full access. Drive write policy is a
+  separate per-connection choice — read-only, approval before delivery, or
+  delivery without each approval — and native full access grants none of it.
+  Existing connections stay read-only until the writable capability, re-consent,
+  delivery checks and interruption recovery exist; do not show a write selector
+  that cannot enforce its mode.
+- **Capabilities.** The requirement is what an ordinary native CLI agent can do,
+  including its file and command tools, through irori. Syntax coloring,
+  completion, diagnostics and run buttons are separate conveniences, shown or
+  hidden by one button; they are never a reason to restrict the agent.
+- **Extensions.** The target is VS Code extension compatibility, not an
+  irori-specific plugin API. The research recommends a pinned Code-OSS desktop
+  workbench; the owner has not approved replacing the current shell.
+- **Graph index (ADR 008).** A module the knowledge base carries,
+  `Knowledge_Base/ontology/`, generated deterministically by irori from pages'
+  `type`, `title` and `relations` as CSV node and edge tables, committed by the
+  person. The graph draws `relations` only; body links stay reachable through
+  リンク元 and search.
+- **Authorship (ADR 006).** Only the person's lines are recorded, one mark per
+  line; sharing is Git AI Standard `h_` entries only. Codex is not told at edit
+  time.
 
 ## Next work, in the order the evidence supports
 
-1. **Real-model checks of the person's lines**, once the owner authorizes a
-   model run: whether Claude Code acts on the `PreToolUse` context, and whether
-   Pi's and OpenCode's models retry a held edit. Only fixtures exercised them.
-2. **D04 — writable cloud delivery**: new preparations now retain exact account
-   and shared-drive bindings on the recovery branch. Continue with an explicit
-   writable capability, re-consent and the verified transport; preserve staged
-   bytes across failure and restart. An orphaned preparation still needs a UI
-   recovery route after its workspace/connection is removed.
-3. **Evidence for the template's vocabulary review in use** — the dry runs in the
-   research note are the only evidence; a real knowledge base over some weeks is
-   the next.
-4. **Device acceptance** (D03/D05, D07–D10) stays open.
-
-Two decisions belong to the owner, not to an agent: what "taking in extensions"
-means, and how far code editing and execution go.
+1. **D04 — writable Drive delivery.** Add the explicit writable capability and
+   re-consent, the per-connection write policy of ADR 009, and connect a
+   verified account and shared drive to the transport. Test independently
+   confirmed remote bytes and interruption/restart recovery with local rclone
+   first; real Google acceptance needs the owner's device and account.
+2. **VS Code compatibility, next bounded slice** (the research note's §"Next
+   bounded slice"): package the probe as a VSIX and install, disable and
+   re-enable it through the chosen host, with unchanged licence-checked theme and
+   language-server samples; then one irori bridge that opens a disposable KB in
+   a rich Markdown editor and shows an extension's edit without overwriting
+   unsaved work. How much of the current shell to keep is the owner's decision.
+3. **Codex structured questions.** The native default mode has no
+   `request_user_input` (`default_mode_request_user_input` is under development
+   and off). Find a supported plan-mode route and its UI; do not enable an
+   experimental feature or change the native default.
+4. **Pi and OpenCode real-model acceptance**, once the owner sets up their native
+   accounts. Neither has a configured model here; do not log in, copy
+   credentials or change model defaults.
+5. **Device acceptance** (D03/D05, D07–D10): Windows/Mac consent, mount and
+   reconnect, installed-device IME (including the code-assistance switch),
+   performance, credential storage, signing, upgrade and rollback.
+6. **D06 provenance** and **evidence for the template's vocabulary review in
+   use** over some weeks on a real knowledge base.
 
 ## Authorization and protected state
 
 - Development, verification, feature-branch commit/push and PR creation are
-  authorized and need no further asking. Merging needs the owner's own words.
+  authorized and need no further asking. Merging needs the owner's own words
+  in the current session; words from an earlier session do not carry over.
   Publishing a preview after an authorized merge is covered by standing
   authorization; signing identities, notarization, a non-preview release, a new
   platform and account changes are not.
-- Real provider model tests need explicit agent-execution authorization. Do not
-  run `test:agents`, `test:lifecycle` or `IRORI_UI_REAL_AGENTS=1` without it,
+- Real provider model tests need explicit agent-execution authorization. On
+  2026-09-23 the owner authorized native acceptance with existing accounts
+  (ADR 009); it covers no login, account or model-default change. Confirm it
+  still stands before consuming allowances. Do not run `test:agents`,
+  `test:lifecycle` or `IRORI_UI_REAL_AGENTS=1` without it,
   and do not bypass native authentication to make a test pass. Protocol
   fixtures are not model-turn acceptance.
 - Distributor Google configuration is already in repository secrets
