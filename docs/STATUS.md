@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+ObsidianUI controls, 2026-09-22: **Magnet Tabs** now marks the selected workspace
+view, Git view and folder/clone registration mode with a moving indicator and
+hover background. **Arrow Fill Button** serves the registration and workspace
+submit actions and the welcome screen's new-note action. Both are adaptations of
+the official MIT source in `src/app/obsidian/`, using irori's light/dark tokens;
+Motion 13.4.0 is the only new direct dependency. Base UI keeps the toggle groups'
+keyboard behavior and busy guards, and reduced motion updates live. Registration
+now gives its input native initial focus, fixing an existing dialog/ToggleGroup
+initialization race that consumed the first arrow press. See
+[ADR 007](decisions/007-obsidian-ui.md) for sources, scope and update policy.
+
+Verification: production build, format check, **204 behavior tests (197 passed,
+seven environment-gated skips)** and all **fourteen Electron UI suites**. The
+focused UI additions exercise keyboard selection, repeated activation, disabled
+submit, live reduced motion and light/dark rendering. The first behavior run
+stalled in the existing concurrent-search test; its isolated run and the full
+rerun passed. No provider inference, installed Windows/Mac trial or local package
+build was performed on the branch. Version 0.1.25 and its release notes
+accompany this change: it was renumbered twice while 0.1.22, then #67's 0.1.23
+and #69's 0.1.24, merged first. After merging `main` with all three:
+production build, format check, 209 behaviour tests (205 passed, four
+environment-gated skips) and all fourteen Electron UI suites
+pass.
+
 The graph index the knowledge base carries, 2026-09-22: the owner settled the
 decision left open on 2026-09-17 — the pages of an Open Knowledge Format bundle
 are the source of truth, and the graph is a module the knowledge base carries in

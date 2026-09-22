@@ -300,12 +300,7 @@ main > footer {
   display: flex;
   gap: 6px;
 }
-.git-tabs button[aria-pressed='true'],
-.git-registration-mode button[aria-pressed='true'] {
-  background: var(--ember-pressed);
-  border-color: var(--ember-border);
-}
-.git-tabs span {
+.git-tabs .git-tab-count {
   color: var(--muted);
   margin-left: 8px;
 }
@@ -930,6 +925,8 @@ textarea {
   min-height: 0;
 }
 .workspace-views {
+  --magnet-highlight: var(--nav-raised);
+  --magnet-marker: var(--ember-on-nav);
   display: flex;
   gap: 4px;
   padding: 0 14px 14px;
@@ -944,10 +941,6 @@ textarea {
   font-size: 12px;
   background: transparent;
   border-color: transparent;
-}
-.workspace-views button[aria-pressed='true'] {
-  background: var(--nav-raised);
-  border-color: var(--nav-border);
 }
 .workspace-views button[aria-pressed='true'] .ui-icon {
   color: var(--ember-on-nav);

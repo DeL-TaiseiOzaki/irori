@@ -18,8 +18,8 @@ import {
 } from './device-settings';
 import { Appearance } from './Appearance';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
-import { Toggle } from '@base-ui/react/toggle';
-import { ToggleGroup } from '@base-ui/react/toggle-group';
+import { MagnetTabs } from './obsidian/MagnetTabs';
+import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import {
   Group as PaneGroup,
   Panel as Pane,
@@ -933,13 +933,11 @@ function App() {
               </span>
               <Icon name="chevron" className="rotated" size={13} />
             </button>
-            <ToggleGroup
+            <MagnetTabs
               className="workspace-views"
-              aria-label="ワークスペースの表示"
-              value={[gitOpen ? 'source-control' : 'notes']}
-              onValueChange={(next) => {
-                const selected = next[0];
-                if (!selected) return;
+              label="ワークスペースの表示"
+              value={gitOpen ? 'source-control' : 'notes'}
+              onValueChange={(selected) => {
                 if (selected === 'notes') {
                   setGitOpen(false);
                   setGitReview(false);
@@ -949,19 +947,28 @@ function App() {
                   });
                 }
               }}
-            >
-              <Toggle value="notes" disabled={gitBusy}>
-                <Icon name="folder" /> ノート
-              </Toggle>
-              <Toggle
-                value="source-control"
-                disabled={
-                  !active || running || sending || queued.length > 0 || connecting || gitBusy
-                }
-              >
-                <Icon name="branch" /> ソース管理
-              </Toggle>
-            </ToggleGroup>
+              options={[
+                {
+                  value: 'notes',
+                  label: (
+                    <>
+                      <Icon name="folder" /> ノート
+                    </>
+                  ),
+                  disabled: gitBusy,
+                },
+                {
+                  value: 'source-control',
+                  label: (
+                    <>
+                      <Icon name="branch" /> ソース管理
+                    </>
+                  ),
+                  disabled:
+                    !active || running || sending || queued.length > 0 || connecting || gitBusy,
+                },
+              ]}
+            />
             {gitOpen && active && (
               <GitPanel
                 spaces={spaces.filter((s) => workspace?.scopeIds.includes(s.scopeId))}
@@ -1382,17 +1389,15 @@ function App() {
                         新しいノートを作ったり、AIと一緒に整理することもできます。
                       </p>
                       <div className="welcome-actions">
-                        <button
-                          className="primary"
+                        <ArrowFillButton
                           disabled={!active || running || connecting}
                           onClick={() => {
                             setNoteDirectory(defaultNoteDirectory);
                             setNewNote(true);
                           }}
                         >
-                          <Icon name="plus" />
                           新しいノートを作成
-                        </button>
+                        </ArrowFillButton>
                         {notesDeclared?.daily && (
                           <button disabled={!active || running || connecting} onClick={openDaily}>
                             <Icon name="plus" />
