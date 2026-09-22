@@ -61,6 +61,13 @@ try {
   );
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
+    await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toHaveValue('default');
+    if (agent === 'pi') {
+      await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
+      await expect(page.locator('#agent-access-detail')).toContainText(
+        '承認ダイアログがありません',
+      );
+    }
     await settings().click();
     await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
     await page.keyboard.press('Escape');
@@ -236,6 +243,36 @@ try {
     await page.getByRole('link', { name: '危険', exact: true }).getAttribute('href'),
   ).not.toMatch(/javascript/i);
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
+  await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
+  const access = page.getByLabel('エージェントのアクセス', { exact: true });
+  await access.selectOption('full-access');
+  await expect(page.locator('#agent-access-detail')).toContainText(
+    'Google Drive接続は読み取り専用',
+  );
+  let doneCount = await page.locator('.message.done').count();
+  await page.getByLabel('エージェントへの指示').fill('access fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.done')).toHaveCount(++doneCount);
+  expect(
+    (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
+  ).toBe('full-access');
+  await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+  await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
+  await expect(access).toHaveValue('default');
+  await settings().click();
+  await expect(
+    page.getByText(
+      'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await settings().click();
+  await page.getByLabel('エージェントへの指示').fill('standard again');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.done')).toHaveCount(++doneCount);
+  expect(
+    (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
+  ).toBe('default');
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();
@@ -254,6 +291,7 @@ try {
         evidence: 'Explicit protocol fixtures; no native model inference',
         checks: [
           'Pi/OpenCode panel selection',
+          'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',
           'new conversation intent and cancellation preserve the composer',
           'native-shaped denial and question responses',

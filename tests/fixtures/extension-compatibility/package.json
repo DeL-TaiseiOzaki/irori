@@ -1,0 +1,46 @@
+{
+  "name": "compatibility-probe",
+  "displayName": "irori compatibility probe",
+  "publisher": "irori",
+  "version": "0.0.1",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./extension.cjs",
+  "activationEvents": [
+    "onCommand:iroriCompatibility.run"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "iroriCompatibility.run",
+        "title": "Run irori compatibility probe"
+      }
+    ],
+    "configuration": {
+      "title": "irori compatibility probe",
+      "properties": {
+        "iroriCompatibility.probe": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "irori-probe",
+        "extensions": [
+          ".iroriprobe"
+        ]
+      }
+    ],
+    "themes": [
+      {
+        "label": "irori Probe Light",
+        "uiTheme": "vs",
+        "path": "./theme.json"
+      }
+    ]
+  }
+}

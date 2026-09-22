@@ -1,5 +1,7 @@
 export const agentIds = ['codex', 'claude', 'opencode', 'pi'] as const;
 export type AgentId = (typeof agentIds)[number];
+export const agentAccessModes = ['default', 'full-access'] as const;
+export type AgentAccess = (typeof agentAccessModes)[number];
 export const agentNames: Record<AgentId, string> = {
   codex: 'Codex',
   claude: 'Claude Code',
@@ -63,6 +65,7 @@ export interface AgentInfo {
 }
 export interface AgentSession {
   state: 'empty' | 'saved' | 'unavailable';
+  access?: AgentAccess;
   updatedAt?: string;
   detail?: string;
 }
@@ -151,6 +154,8 @@ export type HostEvent =
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
+  /** Native permission policy for this instruction; omitted inputs keep the standard policy. */
+  access?: AgentAccess;
   prompt: string;
   notePath?: string;
   newSession?: boolean;
@@ -172,6 +177,7 @@ export interface DeviceSettings {
 }
 
 export interface HostAPI {
+  recoverableCloudWrites(): Promise<import('./knowledge').CloudWriteRecovery>;
   draftRead(key: import('./drafts').DraftKey): Promise<import('./drafts').DraftRecord | null>;
   draftWrite(
     key: import('./drafts').DraftKey,

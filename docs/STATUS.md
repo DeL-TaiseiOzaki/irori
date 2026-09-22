@@ -1,5 +1,43 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Owner follow-up, 2026-09-23: **0.1.26 is published** from PR #73; main is
+`7726a93` after the download-manifest PR #74. **0.1.27** is prepared on
+`feat/user-access-policy`, pending review and a new merge authorization.
+
+The owner selected user-controlled write access, ordinary native CLI
+capabilities and VS Code extension compatibility; [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)
+records the resolved decisions. The composer now offers truthful native/default
+and full-access modes for Codex/Claude/OpenCode, with Pi native-only. Queued
+instructions keep their mode and a change starts a fresh native session without
+losing display history. The device recovery screen restores staged cloud bytes
+after the connection/workspace is removed, without overwriting existing files.
+Google OAuth/mounts remain read-only; their separate user-selected write policy
+still needs writable transport, re-consent and provider acceptance.
+
+[Real native trials](REAL-AGENT-ACCEPTANCE-2026-09-23.md) on 0.1.26 confirm
+Codex/Claude actual note edits, schema invariance, explicit denial, active
+cancellation and continuity after recreating host services/native processes.
+Claude questions and person-line context also passed. Codex default-mode
+structured questions remain unavailable; Pi/OpenCode lack configured models.
+The lifecycle script now fails for missing gate events instead of passing a
+zero-question/zero-approval run. Full-access mode has SDK/protocol coverage
+and an actual OpenCode permission roundtrip, not new real-model acceptance.
+
+The [VS Code compatibility probe](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md)
+passed seven actual extension-host checks in isolated official VSCodium
+1.135.06055 (API 1.135.0): edit/save, language services, configuration/storage,
+theme contribution, Node child, terminal and webview messages. This demonstrates
+a compatible foundation; irori integration, VSIX installation and actual
+third-party extension acceptance remain open. Code-OSS workbench integration
+is the recommendation, not a completed host migration.
+
+Verification: production build, formatting, **232 tests (228 passed, four
+environment-gated skips)** including local rclone, and **all fourteen Electron
+UI suites** pass. New coverage includes SDK/native access mapping, queue/session
+mode isolation, the mode selector and orphaned-byte restoration. Relative links
+and diff checks pass. Device trials, signed distribution and general-release
+acceptance remain open. The historical entries below retain their dated scope.
+
 Preview publication, 2026-09-23: the owner authorized PR #73, merged at
 `aa0bbfe5d60bb83fc307091f3259c91660d1f249`. **0.1.26 is published** for Windows
 x64 and Mac arm64 through [release run 35749374357](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35749374357),

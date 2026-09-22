@@ -7,6 +7,7 @@ import { appIcon, appVersion } from './branding';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { UpdateNotice } from './UpdateNotice';
+import { CloudRecovery } from './CloudRecovery';
 const host = window.irori;
 export function RegisterSpace({
   onRegistered,
@@ -300,6 +301,7 @@ export function Startup({
           irori<span className="preview">{appVersion} Preview</span>
         </div>
         <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
+        <CloudRecovery />
         <div className="intro-content">
           <h2>
             手元のノートと、

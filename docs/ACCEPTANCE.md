@@ -1,5 +1,15 @@
 # Acceptance matrix and implementation backlog
 
+Owner follow-up, 2026-09-23: 0.1.26 is published. The 0.1.27 branch adds native
+access selection and recovery of preparations after removing their connection
+or workspace. [Real native trials](REAL-AGENT-ACCEPTANCE-2026-09-23.md) establish
+Codex/Claude editing, denial, cancellation and persisted native continuity;
+Codex default-mode questions and Pi/OpenCode configured-model trials remain
+open. [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)
+settles the owner's access, CLI-capability and VS Code compatibility directions.
+An isolated VSCodium API probe passes; production extension integration is not
+implemented. Native device/cloud and broader provenance gates remain open.
+
 Current reconciliation, 2026-09-22: 0.1.25 is published; the 0.1.26 recovery
 branch addresses the findings in [the audit](AUDIT-2026-09-22.md). Local indexed
 search, source-line navigation with explicit rich-text limits, note moves,

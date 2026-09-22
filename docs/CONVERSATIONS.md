@@ -1,5 +1,13 @@
 # Conversation history and pending instructions
 
+Access follow-up, 2026-09-23: pending instructions retain their selected native
+access mode. A change from the saved session's mode starts a fresh native
+conversation and retains the displayed history; the panel explains this before
+sending. Old records without an access field mean native/default mode.
+See [HARNESSES](HARNESSES.md) for the per-provider mapping and
+[actual continuity trials](REAL-AGENT-ACCEPTANCE-2026-09-23.md) for the distinct
+real-model evidence. An application restart still leaves pending work paused.
+
 Source continuation after Windows preview 0.1.3, 2026-09-14. The published installer is unchanged until a separately verified preview is published.
 
 ## User behavior

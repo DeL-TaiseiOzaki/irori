@@ -174,6 +174,34 @@ test('Unavailable and corrupt source locations never become a matching path or a
     /重複/,
   );
 });
+test('Device recovery retains orphaned preparations and isolates invalid metadata', async (t) => {
+  const { files, root, note, store } = await fixture(t);
+  const target = {
+    ownerId: randomUUID(),
+    mountId: randomUUID(),
+    folderId: 'gone-folder',
+    accountId: randomUUID(),
+  };
+  const outbox = new CloudOutbox(files.dataDir, store);
+  assert.deepEqual(await outbox.recovery(), { entries: [], unreadable: 0 });
+  const prepared = await outbox.prepare(target, note);
+  const directory = path.join(files.dataDir, 'cloud-outbox', target.ownerId);
+  await writeFile(path.join(directory, `${randomUUID()}.json`), '{');
+  await writeFile(path.join(directory, `${randomUUID()}.json`), JSON.stringify(prepared));
+  await rm(root, { recursive: true });
+  const restarted = new CloudOutbox(
+    files.dataDir,
+    new KnowledgeStore(files.dataDir, async () => {
+      throw Error('Owner is no longer registered');
+    }),
+  );
+  const recovered = await restarted.recovery();
+  assert.deepEqual(recovered.entries, [prepared]);
+  assert.equal(recovered.unreadable, 2);
+  assert.equal(await store.sourceText(recovered.entries[0].source), note.text);
+  assert.deepEqual(hostArguments.recoverableCloudWrites.parse([]), []);
+  assert.throws(() => hostArguments.recoverableCloudWrites.parse([target.ownerId]));
+});
 test('Outbox retains unsent bytes across restart, uncertain completion and remote conflicts', async (t) => {
   const { files, note, store } = await fixture(t);
   const target = {

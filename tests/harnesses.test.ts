@@ -139,6 +139,36 @@ for (const agent of ['pi', 'opencode'] as const) {
   );
 }
 test(
+  'OpenCode sends explicit session permissions, renews them on resume and fails before prompting if unconfirmed',
+  fixtureOptions,
+  async (t) => {
+    const { root, calls, execute } = await setup(t);
+    await execute('opencode', 'native default');
+    for (const prompt of ['full first', 'full continued']) {
+      const result = await execute('opencode', prompt, false, { access: 'full-access' });
+      assert.equal(result.events.at(-1)?.outcome, 'completed', JSON.stringify(result.events));
+    }
+    await execute('opencode', 'native again');
+    const permission = [{ permission: '*', pattern: '*', action: 'allow' }];
+    const requests = await calls();
+    assert.deepEqual(
+      requests
+        .filter((c: any) => c.route === '/session' && c.method === 'POST')
+        .map((c: any) => c.body?.permission),
+      [undefined, permission, undefined],
+      'changing access uses a fresh session; standard mode does not override native config',
+    );
+    assert.deepEqual(requests.find((c: any) => c.method === 'PATCH').body.permission, permission);
+    await writeFile(path.join(root, 'ignore-access'), 'fixture');
+    const failed = await execute('opencode', 'must not reach provider', false, {
+      access: 'full-access',
+    });
+    assert.equal(failed.events.at(-1)?.outcome, 'failed');
+    assert.ok(failed.events.some((e) => e.type === 'error' && e.text.includes('アクセス設定')));
+    assert.equal((await calls()).filter((c: any) => c.route.endsWith('/message')).length, 4);
+  },
+);
+test(
   'Pi extension-only commands complete without pretending to run a model',
   fixtureOptions,
   async (t) => {

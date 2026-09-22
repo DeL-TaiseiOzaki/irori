@@ -41,6 +41,14 @@ These records are device-local. They are not portable shared KB identity metadat
 
 ## D04: durable preparation and bounded delivery engine
 
+Recovery follow-up, 2026-09-23: **端末の送信準備を復元** is available at startup
+and in the workspace sidebar, independently of current owner/account
+registration. It lists retained preparations across this device, isolates
+unreadable records, and restores their verified bytes into a new local file.
+Existing files are never overwritten. A removed connection is not recreated
+and the retained version is not sent automatically. Writable Google delivery
+and its user-selected permission policy remain separate implementation work.
+
 **Drive への送信準備** retains the selected local file version and exact owner/attachment/folder, device account and optional shared-drive identity in a separate device-local outbox. New preparation requires a locally registered, authenticated account binding, but works independently of a mounted destination and never creates a fallback directory under `contents`. The UI labels the current Google connection read-only and does not claim that preparing a file has uploaded it. Pending bytes and their restore action remain available after restart.
 
 The delivery service has pending/uploading/confirmed/failed states. Before any remote operation, it compares the retained destination with the supplied current owner, attachment, folder, account and shared-drive identity. Rebinding does not silently redirect prepared bytes. Older records without an account remain readable and restorable, but delivery refuses to infer an account for them; the retained version must be restored and explicitly prepared again. The service verifies retained local bytes, observes the destination, rejects a different existing version, delegates copying to rclone, then downloads/hashes the destination before recording confirmation. Retrying an uncertain copy recognizes already matching bytes without another upload. Errors keep both the record and retained bytes. Tests cover failure after remote copy, restart in uploading state, destination conflicts, account/drive rebinding and legacy restore access; an actual rclone local-backend test exercises copy/stat/downloaded SHA-256. See [rclone RC copy/stat/hash operations](https://rclone.org/rc/).

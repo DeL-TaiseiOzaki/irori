@@ -48,6 +48,41 @@ export class CloudOutbox {
       .map((value) => pendingWrite.parse(value))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
+  /** Device recovery remains reachable after the owning workspace or connection is removed. */
+  async recovery(): Promise<import('../domain/knowledge').CloudWriteRecovery> {
+    const entries: PendingWrite[] = [];
+    let unreadable = 0;
+    const owners = await fs
+      .readdir(this.directory, { withFileTypes: true })
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+        return [];
+      });
+    for (const owner of owners) {
+      if (!owner.isDirectory() || !z.uuid().safeParse(owner.name).success) continue;
+      try {
+        const directory = path.join(this.directory, owner.name);
+        for (const file of await fs.readdir(directory, { withFileTypes: true })) {
+          if (!file.name.endsWith('.json') || !z.uuid().safeParse(file.name.slice(0, -5)).success)
+            continue;
+          try {
+            if (!file.isFile()) throw Error('Recovery metadata must be a regular file');
+            const record = pendingWrite.parse(
+              await readLocalJson(path.join(directory, file.name), null),
+            );
+            if (record.ownerId !== owner.name || `${record.id}.json` !== file.name)
+              throw Error('Recovery identity does not match its container');
+            entries.push(record);
+          } catch {
+            unreadable++;
+          }
+        }
+      } catch {
+        unreadable++;
+      }
+    }
+    return { entries: entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt)), unreadable };
+  }
   prepare(target: WriteTarget, ref: SourceRef) {
     return this.queue.run(async () => {
       const destination = writeTarget.parse(target);
