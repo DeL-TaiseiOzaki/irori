@@ -154,9 +154,14 @@ A formatted label is not selected; the notice names its line. The case probe
 reads the note's own folder, so a KB spanning volumes of both kinds answers for
 the folder the open note is in. A change the watcher does not report — it
 follows six folder levels, and some volumes report nothing — reaches the list
-when it is opened again. Frontmatter keys — OKF `relations` and `sources` — are
-not read as links and are not rewritten, since whether irori reads the bundle's
-own graph is the open decision in [STATUS](STATUS.md). A link whose case
+when it is opened again. Move previews and updates now include OKF
+`relations[].target` and `sources[].resource` strings. `Knowledge_Base/` and
+`contents/` source paths are repository-rooted; other page references are
+relative to their note. Only the scalar spans change, keeping comments,
+unrelated fields, BOM and line endings. Malformed YAML, aliases and multiline
+reference scalars are not rewritten: incoming scans report incomplete coverage,
+and unsupported outgoing metadata refuses a folder move. The ordinary backlink
+list still shows Markdown body links. A link whose case
 differs from the file's name is listed where the disk folds case, but it is not
 rewritten when the note moves. Wiki links `[[…]]` and HTML `src=` / `href=` are
 not rewritten, so a note holding one still refuses a folder change. The count

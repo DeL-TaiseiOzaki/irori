@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { FileService } from './files';
 import { classify } from '../domain/scopes';
-import type { Document } from '../domain/types';
+import type { Document, Entry } from '../domain/types';
 import { ontologyDeclaration, ontologyGraph, type OntologyView } from '../domain/ontology';
 import { graphIndexDeclaration, graphIndexFiles } from '../domain/graph-index';
 
@@ -38,6 +38,37 @@ export async function readDeclaration(files: FileService, scopeId: string) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
+}
+
+/** Resolve a module's portable NFC note paths to this checkout's actual spelling. */
+function moduleNoteResolver(files: FileService, scopeId: string) {
+  const directories = new Map<string, Promise<Map<string, Entry[]>>>();
+  return async (relative: string) => {
+    let directory = '';
+    for (const segment of relative.split('/')) {
+      let entries = directories.get(directory);
+      if (!entries) {
+        entries = files.entries(scopeId, directory).then((children) => {
+          const names = new Map<string, Entry[]>();
+          for (const entry of children) {
+            const name = entry.name.normalize('NFC');
+            const matches = names.get(name);
+            if (matches) matches.push(entry);
+            else names.set(name, [entry]);
+          }
+          return names;
+        });
+        directories.set(directory, entries);
+      }
+      const matches = (await entries).get(segment.normalize('NFC')) ?? [];
+      if (!matches.length) return relative; // Keep a genuinely missing note as a link.
+      if (matches.length > 1) throw Error('グラフのノート名が Unicode 正規化後に重複しています。');
+      const entry = matches[0];
+      if (entry.blocked) throw Error('Ontology note paths must not be aliases or blocked entries');
+      directory = entry.path;
+    }
+    return directory;
+  };
 }
 
 /**
@@ -77,18 +108,25 @@ export async function readOntology(
     documents = relations ? [entities, relations] : [entities];
   }
   const graph = ontologyGraph(declaration, documents[0].text, documents[1]?.text);
+  const resolveNote =
+    source === 'module' ? moduleNoteResolver(files, scopeId) : async (p: string) => p;
+  const notePaths = new Map<string, string>();
   // Keep missing notes as links; reject aliases and foreign owners without opening their bytes.
   await Promise.all(
     [...new Set(graph.entities.flatMap((entity) => (entity.note ? [entity.note] : [])))].map(
       async (relative) => {
         try {
-          await knowledgePath(files, scopeId, relative);
+          const actual = await resolveNote(relative);
+          await knowledgePath(files, scopeId, actual);
+          notePaths.set(relative, actual);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         }
       },
     ),
   );
+  for (const entity of graph.entities)
+    if (entity.note) entity.note = notePaths.get(entity.note) ?? entity.note;
   return {
     scopeId,
     source,

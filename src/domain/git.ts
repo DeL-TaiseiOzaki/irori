@@ -59,3 +59,7 @@ export interface CloneRepository {
   parent: string;
   name: string;
 }
+export interface CloneResult {
+  path: string;
+  notice?: string;
+}

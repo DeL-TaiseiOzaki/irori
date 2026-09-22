@@ -24,6 +24,7 @@ export function RegisterSpace({
     [cloneName, setCloneName] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  const [cloneNotice, setCloneNotice] = useState('');
   const repository = useResource(() => host.repositories(folder), [folder], {
     enabled: !!folder,
     delay: 250,
@@ -36,7 +37,8 @@ export function RegisterSpace({
     try {
       if (cloneMode && !folder) {
         const result = await host.gitClone({ url, parent, name: cloneName });
-        setFolder(result);
+        setFolder(result.path);
+        setCloneNotice(result.notice ?? '');
         if (!name) setName(cloneName);
       } else onRegistered(await host.register(folder, name, category));
     } catch (e) {
@@ -161,6 +163,7 @@ export function RegisterSpace({
           </label>
         )}
         <div className="repository-preview" aria-live="polite">
+          {cloneNotice && <p role="alert">{cloneNotice}</p>}
           {folder && !info
             ? 'フォルダを確認しています…'
             : info && (

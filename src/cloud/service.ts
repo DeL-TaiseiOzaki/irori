@@ -11,6 +11,7 @@ import { owner, within } from '../domain/scopes';
 import { readLocalJson, writeLocalJson } from '../host/local-json';
 import { readTextDocument } from '../host/files';
 import type { CloudStorage } from './storage';
+import type { WriteTarget } from './outbox';
 import type {
   AddCloudAttachment,
   CloudAttachment,
@@ -212,6 +213,23 @@ export class CloudService {
       return;
     return binding;
   }
+  writeTarget(scopeId: string, mountId: string): Promise<WriteTarget> {
+    return this.mutate(async () => {
+      const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
+      if (!record) throw Error('送信先の接続が見つかりません。');
+      const binding = await this.binding(scopeId, mountId);
+      const account = (await this.accounts.list()).find((item) => item.id === binding?.accountId);
+      if (!binding || account?.state !== 'ready')
+        throw Error('送信準備にはログイン済みアカウントを紐づけてください。');
+      return {
+        ownerId: scopeId,
+        mountId,
+        folderId: record.folderId,
+        accountId: binding.accountId,
+        driveId: record.driveId,
+      };
+    });
+  }
   async connections(scopeId: string): Promise<CloudConnection[]> {
     const records = await this.declarations(scopeId);
     const accounts = await this.accounts.list();
@@ -219,14 +237,17 @@ export class CloudService {
       records.map(async (record) => {
         const binding = await this.binding(scopeId, record.mountId);
         const key = this.key(scopeId, record.mountId);
-        if (this.mounted.has(key)) {
+        const mounted = this.mounted.get(key);
+        if (mounted) {
           try {
-            await this.assertMounted(this.mounted.get(key)!);
+            await this.assertMounted(mounted);
+            if (this.mounted.get(key) === mounted) this.states.set(key, { state: 'mounted' });
           } catch {
-            this.states.set(key, {
-              state: 'error',
-              detail: '接続が失われました。再接続してください。',
-            });
+            if (this.mounted.get(key) === mounted)
+              this.states.set(key, {
+                state: 'error',
+                detail: '接続が失われました。再接続してください。',
+              });
           }
         }
         return {
@@ -439,6 +460,7 @@ export class CloudService {
       if (this.mounted.has(key)) {
         try {
           await this.assertMounted(this.mounted.get(key)!);
+          this.states.set(key, { state: 'mounted' });
           return;
         } catch {
           this.mounted.delete(key);
@@ -536,15 +558,31 @@ export class CloudService {
     const key = this.key(scopeId, mountId);
     const mounted = this.mounted.get(key);
     if (mounted) {
-      await this.rpc.call('mount/unmount', { mountPoint: mounted.target });
+      let unmountFailed = false;
+      try {
+        await this.rpc.call('mount/unmount', { mountPoint: mounted.target });
+      } catch (error) {
+        const result = await this.rpc.call('mount/listmounts').catch(() => {
+          throw error;
+        });
+        const listed = z
+          .array(z.object({ MountPoint: z.string().min(1), Fs: z.string().min(1) }))
+          .safeParse(result?.mountPoints);
+        if (!listed.success || listed.data.some((item) => item.MountPoint === mounted.target))
+          throw error;
+        // A crashed mount process can disappear before unmount is requested. Only
+        // accept that result when the filesystem below independently confirms it.
+        unmountFailed = true;
+      }
       const remaining = await fs.lstat(mounted.target).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
         return undefined;
       });
       if (
         remaining &&
-        !remaining.isSymbolicLink() &&
-        remaining.dev !== (await fs.stat(path.dirname(mounted.target))).dev
+        ((remaining.isSymbolicLink() && unmountFailed) ||
+          (!remaining.isSymbolicLink() &&
+            remaining.dev !== (await fs.stat(path.dirname(mounted.target))).dev))
       )
         throw Error('マウントの解除を確認できません。もう一度接続を解除してください。');
       const binding = await this.binding(scopeId, mountId);

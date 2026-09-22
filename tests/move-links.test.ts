@@ -3,15 +3,153 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { FileService } from '../src/host/files';
+import { FileService, textFileByteLimit } from '../src/host/files';
 import { SearchService, searchLimits } from '../src/host/search';
 import { referringLinks, relink } from '../src/host/relink';
 import { linkCount, rewriteLinks } from '../src/domain/note-links';
 import { imagesForNoteMove } from '../src/domain/note-operations';
 import { dispatchHost, type HostHandlers } from '../src/domain/host-requests';
 import type { Document } from '../src/domain/types';
+import { GraphIndexService } from '../src/host/graph-index';
+import { AuthorshipStore } from '../src/knowledge/authorship';
+import { rewriteNoteReferences } from '../src/host/note-references';
 
 const moved = (map: Record<string, string>) => (p: string) => map[p];
+
+test('A reference rewrite that would exceed the reader limit skips the note without changing it', async (t) => {
+  const { files, search, id, write, read } = await fixture(t);
+  const prefix = '---\nrelations: [{ rel: uses, target: b.md }]\n---\n';
+  const original = prefix + 'x'.repeat(textFileByteLimit - prefix.length - 10);
+  await write('a.md', original);
+  await write('b.md', 'B\n');
+  const destination = 'b'.repeat(80) + '.md';
+  const next = await files.moveNote(await files.read(id, 'b.md'), destination, true);
+  const result = await relink(files, search, next, 'b.md');
+  assert.deepEqual(result.links, {
+    self: 0,
+    notes: 0,
+    links: 0,
+    skipped: ['a.md'],
+    incomplete: false,
+  });
+  assert((await read('a.md')) === original, 'A skipped rewrite keeps the original bytes');
+  assert((await files.read(id, 'a.md')).text === original, 'The original note remains readable');
+  assert.equal((await files.read(id, 'a.md')).draft, undefined);
+});
+
+test('Renaming keeps OKF relations and source references without rewriting other frontmatter', async (t) => {
+  const { files, search, id, write, read } = await fixture(t);
+  const original =
+    '\ufeff---\r\ntype: concept\r\ntitle: A\r\nrelations:\r\n  - { rel: uses, target: "b.md" } # keep\r\nsources:\r\n  - resource: \'b.md\'\r\n  - resource: Knowledge_Base/wiki/b.md\r\ndescription: "[example](b.md)"\r\n---\r\n\r\n[b](b.md)\r\n';
+  await write('Knowledge_Base/wiki/a.md', original);
+  await write('Knowledge_Base/wiki/b.md', '---\ntype: concept\ntitle: B\n---\n');
+  const graph = new GraphIndexService(files, search);
+  await graph.update(id);
+  assert.deepEqual(await referringLinks(files, search, id, 'Knowledge_Base/wiki/b.md'), {
+    notes: 1,
+    links: 4,
+    incomplete: false,
+  });
+  const next = await files.moveNote(
+    await files.read(id, 'Knowledge_Base/wiki/b.md'),
+    'Knowledge_Base/wiki/c.md',
+    true,
+  );
+  const result = await relink(files, search, next, 'Knowledge_Base/wiki/b.md');
+  assert.equal(result.links.links, 4);
+  assert.equal(
+    await read('Knowledge_Base/wiki/a.md'),
+    original
+      .replace('target: "b.md"', 'target: "c.md"')
+      .replace("resource: 'b.md'", "resource: 'c.md'")
+      .replace('resource: Knowledge_Base/wiki/b.md', 'resource: Knowledge_Base/wiki/c.md')
+      .replace('[b](b.md)', '[b](c.md)'),
+  );
+  const status = await graph.update(id);
+  assert.equal(status.entities.rows, 2);
+  assert.equal(status.relations.rows, 1);
+  assert.equal(status.excluded, 0);
+});
+
+test('Moving a page rebases its own OKF references and refuses an unrepaired folder move', async (t) => {
+  const { root, files, search, id, write, read } = await fixture(t);
+  const original =
+    '---\nrelations: [{ rel: uses, target: sibling.md }]\nsources: [{ resource: ../source.md }, { resource: contents/drive/source.pdf }]\n---\nBody\n';
+  await write('Knowledge_Base/wiki/a.md', original);
+  await mkdir(path.join(root, 'Knowledge_Base/archive'));
+  const before = await files.read(id, 'Knowledge_Base/wiki/a.md');
+  await assert.rejects(
+    files.moveNote(before, 'Knowledge_Base/archive/a.md', false),
+    /リンクも更新する/,
+  );
+  const next = await files.moveNote(before, 'Knowledge_Base/archive/a.md', true);
+  const result = await relink(files, search, next, before.path);
+  assert.equal(result.links.self, 1);
+  assert.equal(
+    await read(next.path),
+    original.replace('target: sibling.md', 'target: ../wiki/sibling.md'),
+  );
+});
+
+test('Rewriting metadata retains the person marks on changed reference lines', async (t) => {
+  const { files, search, id, write, read } = await fixture(t);
+  const authorship = new AuthorshipStore(files.dataDir);
+  const original = '---\nrelations: [{ rel: uses, target: b.md }]\n---\nAgent prose\n';
+  await write('a.md', original);
+  await write('b.md', 'B\n');
+  const ref = { scopeId: id, path: 'a.md' };
+  await authorship.observe(ref, original, '---\n---\nAgent prose\n');
+  const next = await files.moveNote(await files.read(id, 'b.md'), 'c.md', true);
+  await relink(files, search, next, 'b.md', (before, after) =>
+    authorship.carry(before, after, before.text, after.text),
+  );
+  const updated = await read('a.md');
+  assert.ok(updated.includes('target: c.md'));
+  assert.deepEqual((await authorship.view(ref, updated)).lines, [false, true, false, false, false]);
+});
+
+test('Metadata rewrites quote new punctuation and keep URLs, fragments and unknown fields', () => {
+  const original =
+    '---\nrelations: [{ rel: uses, target: "b.md#heading" }, { rel: uses, target: "https://example.com/b.md" }]\nsources: [{ resource: b.md }]\ncustom: b.md\n---\nBody\n';
+  const result = rewriteNoteReferences(
+    original,
+    'a.md',
+    'a.md',
+    moved({ 'b.md': 'notes/new,#1%.md' }),
+  );
+  assert.equal(result.links, 2);
+  assert.equal(
+    result.text,
+    original
+      .replace('"b.md#heading"', '"notes/new,%231%25.md#heading"')
+      .replace('resource: b.md', 'resource: "notes/new,%231%25.md"'),
+  );
+  assert.deepEqual(rewriteNoteReferences(original, 'a.md', 'a.md', moved({})), {
+    text: original,
+    links: 0,
+  });
+});
+
+test('Invalid and aliased metadata stays unchanged and makes the move scan incomplete', async (t) => {
+  const { files, search, id, write, read } = await fixture(t);
+  const invalid = '---\nrelations: [\n---\n[b](b.md)\n';
+  const alias = '---\ntarget: &ref b.md\nrelations: [{rel: uses, target: *ref}]\n---\n';
+  await write('invalid.md', invalid);
+  await write('alias.md', alias);
+  await write('good.md', '---\nrelations: [{rel: uses, target: b.md}]\n---\n');
+  await write('b.md', 'B\n');
+  assert.deepEqual(await referringLinks(files, search, id, 'b.md'), {
+    notes: 1,
+    links: 1,
+    incomplete: true,
+  });
+  const next = await files.moveNote(await files.read(id, 'b.md'), 'c.md', true);
+  const result = await relink(files, search, next, 'b.md');
+  assert.equal(result.links.incomplete, true);
+  assert.equal(result.links.links, 1);
+  assert.equal(await read('invalid.md'), invalid);
+  assert.equal(await read('alias.md'), alias);
+});
 
 test('A link to the moved note is rewritten in the form its author used', () => {
   // wiki/target.md moves to archive/deep/target.md; the link is in wiki/index.md.

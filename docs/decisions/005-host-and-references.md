@@ -84,12 +84,11 @@ irori does not do the thing yet, the entry says so.
 
 1. **A light, Notion-like Markdown editor.** Implemented (Crepe with a
    CodeMirror source mode), and materially lighter as of 0.1.11.
-2. **Native to the Open Knowledge Format.** *Not implemented.* `irori-templete`
-   became an OKF 0.2 bundle on 2026-09-17, whose pages carry `type`, `relations`
-   and ordinary links, while irori still draws its graph from a declared CSV
-   pair. Whether irori should read the bundle directly is the open decision
-   already recorded in [STATUS](../STATUS.md); it is now also the largest gap
-   between irori and its own recommended template.
+2. **Native to the Open Knowledge Format.** The graph question was settled on
+   2026-09-22 by [ADR 008](008-graph-index-module.md), implemented in 0.1.24.
+   irori generates a Git-tracked CSV module from the bundle's pages and typed
+   relations on request; an explicit CSV declaration still wins. Broader
+   portable source/run/artifact provenance remains incomplete.
 3. **Code editing and execution, as an IDE offers them.** *Partial.* The source
    view is CodeMirror with Markdown highlighting only, and execution means the
    native terminal. Language support, diagnostics and running a project are not
@@ -108,9 +107,7 @@ irori does not do the thing yet, the entry says so.
   gated plugins is a much smaller thing that would not run anyone else's
   existing extension. These are different products and the choice has not been
   made.
-- **Whether the graph is drawn from the OKF bundle or from the declared CSV
-  pair.** Recorded in STATUS on 2026-09-17 at the owner's request and still
-  awaiting that discussion.
+- **Graph source: resolved.** ADR 008 now owns the decision described above.
 - **How far code editing goes.** See direction 3.
 
 ## Consequences

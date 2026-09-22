@@ -1,5 +1,14 @@
 # irori — Continuation prompt
 
+Continuation update, 2026-09-22: the owner requested implementation of the audit
+findings and immediately actionable backlog. `fix/audit-recovery` prepares
+**0.1.26** from main `9c92f39`; it remains unmerged/unpublished. Read
+[AUDIT-2026-09-22](AUDIT-2026-09-22.md) and the latest STATUS entry for its
+fixes, verification and remaining work. D04 preparation now binds the exact
+account/shared drive, but writable capability, re-consent and real transport
+acceptance remain open. The delivery and landed-work descriptions below are
+the published 0.1.25 baseline, not instructions to repeat completed work.
+
 Updated 2026-09-22 (night), after v0.1.25-preview.1 was published with
 everything that was open merged, and the graph index decision taken. Give this file to the next agent, or copy its
 contents into a new session. Inspect current files and Git state before acting;
@@ -118,9 +127,11 @@ once: work in a worktree, and leave the shared checkout on `main`. ## Owner deci
 1. **Real-model checks of the person's lines**, once the owner authorizes a
    model run: whether Claude Code acts on the `PreToolUse` context, and whether
    Pi's and OpenCode's models retry a held edit. Only fixtures exercised them.
-2. **D04 — writable cloud delivery**: extend `src/cloud/outbox.ts` with an
-   explicit writable capability, re-consent and exact account binding, preserving
-   staged bytes across failure and restart.
+2. **D04 — writable cloud delivery**: new preparations now retain exact account
+   and shared-drive bindings on the recovery branch. Continue with an explicit
+   writable capability, re-consent and the verified transport; preserve staged
+   bytes across failure and restart. An orphaned preparation still needs a UI
+   recovery route after its workspace/connection is removed.
 3. **Evidence for the template's vocabulary review in use** — the dry runs in the
    research note are the only evidence; a real knowledge base over some weeks is
    the next.

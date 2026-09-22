@@ -1,5 +1,14 @@
 # Release readiness and remaining work
 
+Current reconciliation, 2026-09-22: [AUDIT-2026-09-22](AUDIT-2026-09-22.md)
+and [ACCEPTANCE](ACCEPTANCE.md) distinguish implemented functions from outstanding
+acceptance. The recovery branch prepares 0.1.26 with note/reference preservation,
+graph and Drive recovery and exact account binding for staged writes. Google is
+still read-only. Native device/model evidence and release identities remain
+open; the Electron host and graph source are settled by ADR 005 and ADR 008.
+The dated plans below retain historical sequencing and are not a request to
+reimplement search, moves, backlinks, terminal or graph generation.
+
 Packaged dependency review, 2026-09-21: part of D08's notice row is now settled
 rather than deferred. The Agent SDK's bundled Claude Code executable, which is
 not MIT licensed and which irori never ran, is removed while packaging, and

@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { linkCount, rewriteLinks, type LinkUpdate } from '../domain/note-links';
+import type { LinkUpdate } from '../domain/note-links';
+import { noteReferenceCount, rewriteNoteReferences } from './note-references';
 import { imagesForNoteMove } from '../domain/note-operations';
 import type { Document } from '../domain/types';
 import type { FileService } from './files';
@@ -8,7 +9,7 @@ import type { SearchService } from './search';
 /** The other notes whose links lead to `target`, as the backlink scan finds them. */
 async function linking(search: SearchService, scopeId: string, target: string) {
   try {
-    const found = await search.backlinks(scopeId, target);
+    const found = await search.references(scopeId, target);
     return { paths: [...new Set(found.hits.map((hit) => hit.path))], incomplete: found.incomplete };
   } catch {
     return { paths: [], incomplete: true };
@@ -27,7 +28,7 @@ export async function referringLinks(
   for (const note of found.paths) {
     let links = 0;
     try {
-      links = linkCount((await files.read(scopeId, note)).text, note, target);
+      links = noteReferenceCount((await files.read(scopeId, note)).text, note, target);
     } catch {
       result.incomplete = true;
     }
@@ -50,6 +51,7 @@ export async function relink(
   search: SearchService,
   doc: Document,
   previous: string,
+  onSaved?: (before: Document, after: Document) => Promise<void>,
 ): Promise<{ doc: Document; links: LinkUpdate }> {
   const from = path.posix.dirname(previous);
   const to = path.posix.dirname(doc.path);
@@ -64,9 +66,11 @@ export async function relink(
   const result: LinkUpdate = { self: 0, notes: 0, links: 0, skipped: [], incomplete: false };
   const write = async (note: Document, at: string, moved: (path: string) => string | undefined) => {
     if (note.draft && note.draft.text !== note.text) throw Error('Unsaved text');
-    const rewritten = rewriteLinks(note.text, at, note.path, moved);
+    const rewritten = rewriteNoteReferences(note.text, at, note.path, moved);
     if (!rewritten.links) return { doc: note, links: 0 };
-    return { doc: await files.save({ ...note, text: rewritten.text }), links: rewritten.links };
+    const saved = await files.save({ ...note, text: rewritten.text });
+    await onSaved?.(note, saved);
+    return { doc: saved, links: rewritten.links };
   };
   try {
     const own = await write(doc, previous, (p) => (p === wanted ? doc.path : (beside.get(p) ?? p)));

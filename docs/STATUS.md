@@ -1,5 +1,41 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Recovery audit follow-up, 2026-09-22: **0.1.26** is prepared on
+`fix/audit-recovery`, from main `9c92f39`. The published preview remains 0.1.25;
+this change is awaiting pull-request review and an authorized merge.
+[AUDIT-2026-09-22](AUDIT-2026-09-22.md) records each finding, the implemented
+response and the outstanding acceptance work.
+
+Application note moves carry the person's line marks and update OKF relation
+and source references alongside Markdown links, preserving unrelated YAML,
+comments, BOM and line endings. Shared authorship follows Git-detected renames,
+and a new clone receives the notes immediately or displays a partial-failure
+notice while preserving the checkout. Graph outputs are checked before any
+write; damaged/oversized generated modules can be regenerated through the UI,
+and NFC graph links resolve decomposed local names. Normal note saves now also
+reject oversized or NUL-containing text before touching the file or draft.
+Healthy cloud connections clear transient errors; shutdown handles an already
+absent mount only after independent verification. D04 advances by retaining and
+checking the exact account/shared-drive identity of every new preparation.
+Google permissions and mounts remain read-only, with no delivery IPC exposed.
+
+Verification: production build, formatting, **229 behavior tests (225 passed,
+four environment-gated skips)** and **all fourteen Electron UI suites** pass.
+New tests failed before their repairs; integrated UI checks cover initial-clone
+notes, person marks and OKF references after rename, broken/oversized graph
+regeneration, declared-CSV protection and decomposed-name navigation. The
+concurrent-search fixture now waits for its first request to reach the gate,
+removing the observed test hang without weakening the cancellation assertions.
+Disposable local rclone copy/checksum checks passed. Changed-document relative
+links and `git diff --check` pass. No real model turn, Google account/mount,
+installed Windows/Mac trial, package build or publication was performed locally.
+
+Remaining: writable capability/re-consent/verified transport, orphaned outbox
+recovery UI, portable source/run/artifact provenance, native device/model
+acceptance and long-term template evidence. Unsupported YAML aliases/multiline
+references are reported rather than guessed; graph files are not a multi-file
+transaction. Older entries below retain their milestone-specific evidence.
+
 ObsidianUI controls, 2026-09-22: **Magnet Tabs** now marks the selected workspace
 view, Git view and folder/clone registration mode with a moving indicator and
 hover background. **Arrow Fill Button** serves the registration and workspace

@@ -53,6 +53,9 @@ export const pendingWrite = z.object({
   ownerId: z.uuid(),
   mountId: z.uuid(),
   folderId: z.string().min(1),
+  // Older preparations remain readable/restorable, but cannot be delivered unbound.
+  accountId: z.uuid().optional(),
+  driveId: z.string().min(1).optional(),
   name: z.string().min(1).max(240),
   source: sourceVersion,
   createdAt: z.iso.datetime(),

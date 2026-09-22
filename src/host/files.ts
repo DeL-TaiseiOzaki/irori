@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { rewriteNoteReferences } from './note-references';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
@@ -33,13 +34,14 @@ const declaration = z.object({
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 export const textFilePattern = /\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i;
+export const textFileByteLimit = 2 * 1024 * 1024;
 export async function readTextDocument(
   filename: string,
   scopeId: string,
   rel: string,
 ): Promise<Document> {
   if (!textFilePattern.test(rel)) throw Error('Use the external application for this file format');
-  if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
+  if ((await fs.stat(filename)).size > textFileByteLimit)
     throw Error('The text editor supports files up to 2 MiB');
   const bytes = await fs.readFile(filename);
   const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -272,6 +274,9 @@ export class FileService {
   }
   async save(doc: Document): Promise<Document> {
     return this.queue.run(async () => {
+      if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
+        throw Error('The text editor supports files up to 2 MiB');
+      if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
       if (classify(this.get(doc.scopeId), doc.path) === 'contents')
         throw Error('このクラウド接続は読み取り専用です。');
       await this.writeDraft(doc);
@@ -385,6 +390,9 @@ export class FileService {
    */
   async writeGenerated(id: string, rel: string, text: string, expected: string | null) {
     return this.queue.run(async () => {
+      if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
+        throw Error('The text editor supports files up to 2 MiB');
+      if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
       const space = this.get(id);
       relative.parse(rel);
       if (
@@ -402,6 +410,31 @@ export class FileService {
       });
       if (existing && (!existing.isFile() || existing.isSymbolicLink()))
         throw Error('生成先が通常のファイルではありません。');
+      // A previous version may have generated an oversized file. Hash it without
+      // loading its bytes into memory, retaining the ordinary replacement guard.
+      const currentHash = async () => {
+        const digest = createHash('sha256');
+        const file = await fs.open(filename, 'r');
+        try {
+          const before = await file.stat();
+          if (!before.isFile()) throw Error('生成先が通常のファイルではありません。');
+          let size = 0;
+          for await (const chunk of file.createReadStream({ autoClose: false, end: before.size })) {
+            digest.update(chunk);
+            size += chunk.length;
+          }
+          const after = await file.stat();
+          if (
+            size !== before.size ||
+            after.size !== before.size ||
+            after.mtimeMs !== before.mtimeMs
+          )
+            throw Error('CONFLICT: 生成先のファイルが変更されています。');
+        } finally {
+          await file.close();
+        }
+        return digest.digest('hex');
+      };
       if (expected === null) {
         if (existing) throw Error('CONFLICT: 生成先にファイルが作られています。');
         const created = await fs.open(filename, 'wx');
@@ -412,7 +445,7 @@ export class FileService {
           await created.close();
         }
       } else {
-        if (!existing || hash(await fs.readFile(filename)) !== expected)
+        if (!existing || (await currentHash()) !== expected)
           throw Error('CONFLICT: 生成先のファイルが変更されています。');
         const temp = path.join(parent, `.irori-save-${randomUUID()}.tmp`);
         try {
@@ -423,7 +456,7 @@ export class FileService {
           } finally {
             await pending.close();
           }
-          if (hash(await fs.readFile(filename)) !== expected)
+          if ((await currentHash()) !== expected)
             throw Error('CONFLICT: 生成先のファイルが変更されています。');
           await fs.rename(temp, filename);
         } finally {
@@ -442,6 +475,24 @@ export class FileService {
       const from = path.posix.dirname(ref.path);
       const to = path.posix.dirname(destinationPath);
       const assets = from === to ? [] : imagesForNoteMove(source.doc.text, rewriting);
+      if (from !== to) {
+        const copied = new Map(
+          assets.map((asset) => [
+            path.posix.join(from, asset).normalize('NFC'),
+            path.posix.join(to, asset),
+          ]),
+        );
+        const references = rewriteNoteReferences(
+          source.doc.text,
+          ref.path,
+          destinationPath,
+          (p) => copied.get(p) ?? p,
+        );
+        if (!rewriting && references.links)
+          throw Error(
+            '相対参照を含むノートを移動するには「リンクも更新する」を有効にしてください。',
+          );
+      }
       await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
       // Exclusive publication must reject existing files, directories and aliases.
       if (

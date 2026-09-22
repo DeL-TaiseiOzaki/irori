@@ -20,7 +20,7 @@ Repeated moves follow the current ID binding even when invoked from an older his
 
 ## Remaining D06 work
 
-Identities and records remain device-local and indexed by scope; this is not portable shared KB identity/provenance or provider-native document identity. There is no automatic rename detection, in-app file move, merging of already registered IDs, reconnection across KBs, or proof that matching bytes came from a physical move rather than a copy after deletion. A file replaced at the same still-bound path continues that path's existing ID. Full-text search, note backlinks/properties, cross-device sharing, retained-history pagination/management and real generated-artifact/PPTX acceptance remain open. No note frontmatter is rewritten or private record exported into Git.
+Identities and records remain device-local and indexed by scope; this is not portable shared KB identity/provenance or provider-native document identity. Application note moves reconnect the source ID. There is no automatic external rename detection, merging of already registered IDs, reconnection across KBs, or proof that matching bytes came from a physical move rather than a copy after deletion. A file replaced at the same still-bound path continues that path's existing ID. Local indexed text search and Markdown backlinks are implemented. Properties, cross-device provenance sharing, retained-history pagination/management and real generated-artifact/PPTX acceptance remain open. No note frontmatter is rewritten or private record exported into Git.
 
 ## Verification
 

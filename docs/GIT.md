@@ -56,10 +56,12 @@ Since 0.1.21 a commit made here carries the
 note naming, as `h_` entries, the lines a person wrote or revised, under
 `refs/notes/ai`, and the sync actions carry that ref the way git-ai does — see
 [AUTHORSHIP](AUTHORSHIP.md) for what the note says and how it is read.
-Fetch, Pull and 履歴を統合 run a second fetch
-of `+refs/notes/ai:refs/notes/ai-remote/<remote>` after the branch fetch; a
-remote without the ref leaves nothing to merge, and git reports that the same
-way as a transport failure, so that fetch's failure is not shown. The tracking
+GitHub から取得, Fetch, Pull and 履歴を統合 discover `refs/notes/ai` with
+`ls-remote --refs` after receiving the branch, then fetch
+`+refs/notes/ai:refs/notes/ai-remote/<remote>` when it exists. A remote without
+the ref is an ordinary success. A discovery or notes-fetch failure leaves the
+received checkout intact and reports that the person's lines could not be
+received; the person can retry with Fetch. The tracking
 ref is merged into the local `refs/notes/ai` with `git notes merge -s ours`
 (copied when there is no local ref), so a note both sides wrote keeps this
 device's version and a note only the remote changed arrives as written. Push
@@ -78,7 +80,7 @@ the merge commits of a plain merge or in irori's own device records. `git notes
 merge` can also refuse when another tool left a notes merge unfinished in the
 repository; the result names it and the branch operation is unaffected.
 
-**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization and then returns to the existing inspected registration flow. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
+**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
 
 ## Boundaries and recovery
 

@@ -288,8 +288,11 @@ export function OntologyPanel({
   const status = useResource(
     () => window.irori.graphIndexStatus(space.scopeId),
     [space.scopeId, revision, refresh],
-    { enabled: module },
+    { enabled: module || !!error },
   );
+  // An unreadable generated table must still be replaceable from its pages.
+  // The host's independent declaration check keeps declared CSV pairs protected.
+  const repairModule = !!error && !!status.data && !status.data.declared;
   async function generate() {
     setBusy(true);
     setFailure('');
@@ -319,7 +322,7 @@ export function OntologyPanel({
             : 'CSV の保存内容を表示します。構築・整理は CLI エージェントと協調して進められます。'}
         </p>
         <button onClick={onConfigure}>構築・表示設定をエージェントに相談</button>
-        {module && (
+        {(module || repairModule) && (
           <div className="graph-index">
             <p className="muted" role="status">
               {status.loading
@@ -330,7 +333,7 @@ export function OntologyPanel({
             </p>
             <div className="actions">
               <button disabled={busy} onClick={generate}>
-                グラフ索引を更新
+                {repairModule ? 'ページからグラフ索引を再生成' : 'グラフ索引を更新'}
               </button>
             </div>
           </div>

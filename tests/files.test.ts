@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, symlink, rm, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { FileService } from '../src/host/files';
+import { FileService, textFileByteLimit } from '../src/host/files';
 import { classify, owner } from '../src/domain/scopes';
 import type { Space } from '../src/domain/types';
 async function fixture(t: any) {
@@ -126,6 +126,35 @@ test('Save rejects a replaced symlink, and note creation does not follow an esca
   const other = await add(base, files, 'other');
   await symlink(base, path.join(other.root, 'Knowledge_Base'), 'dir');
   await assert.rejects(files.createNote(other.scopeId, 'escape'), /alias/);
+});
+
+test('Save rejects unreadable text before changing bytes or an existing draft', async (t) => {
+  const { base, files } = await fixture(t);
+  const space = await add(base, files, 'text limits');
+  const note = await files.createNote(space.scopeId, 'retained');
+  await files.draft({ ...note, text: 'Existing recoverable draft' });
+  const oversized = '資'.repeat(Math.floor(textFileByteLimit / 3) + 1);
+  assert(oversized.length < textFileByteLimit, 'The limit counts UTF-8 bytes, not characters');
+  for (const [text, error] of [
+    [oversized, /2 MiB/],
+    ['Binary\0text', /Binary/],
+  ] as const) {
+    await assert.rejects(files.save({ ...note, text }), error);
+    assert(
+      (await readFile(path.join(space.root, note.path), 'utf8')) === note.text,
+      'Rejected save keeps the original bytes',
+    );
+    assert.equal(
+      (await files.read(space.scopeId, note.path)).draft?.text,
+      'Existing recoverable draft',
+    );
+  }
+  const boundary =
+    '資'.repeat(Math.floor(textFileByteLimit / 3)) + 'x'.repeat(textFileByteLimit % 3);
+  assert.equal(Buffer.byteLength(boundary), textFileByteLimit);
+  const saved = await files.save({ ...note, text: boundary });
+  assert(saved.text === boundary, 'An exact-limit UTF-8 file remains readable');
+  assert.equal(saved.draft, undefined);
 });
 
 test('Queued recovery writes cannot replace the final shutdown snapshot with an older draft', async (t) => {

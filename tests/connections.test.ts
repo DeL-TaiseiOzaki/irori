@@ -21,6 +21,8 @@ import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
 import { CloudAccounts } from '../src/cloud/accounts';
 import { WorkspaceCloudStorage } from '../src/cloud/storage';
+import { CloudOutbox } from '../src/cloud/outbox';
+import { KnowledgeStore } from '../src/knowledge/store';
 import type { RcloneAPI } from '../src/cloud/rclone';
 
 class FixtureRclone implements RcloneAPI {
@@ -65,6 +67,204 @@ async function fixture(t: any) {
   files.cloud = cloud;
   return { base, files, space, accountId, secondAccountId, rpc, cloud };
 }
+
+async function mountedFixture(t: any) {
+  const value = await fixture(t);
+  const { cloud, space, accountId, rpc } = value;
+  const connection = await cloud.add({
+    scopeId: space.scopeId,
+    accountId,
+    folder: { id: 'folder-one', parentId: 'root', name: 'Source' },
+    contentsRoot: 'contents',
+    name: 'Mounted fixture',
+  });
+  const target = path.join(space.root, 'contents', connection.name);
+  await mkdir(target, { recursive: true });
+  const info = await stat(target);
+  const key = `${space.scopeId}:${connection.mountId}`;
+  // Model a previously verified mount; ordinary test directories are never mounted.
+  cloud['mounted'].set(key, {
+    attachment: connection,
+    target,
+    device: info.dev,
+    inode: info.ino,
+    filesystem: 'fixture:',
+  });
+  cloud['states'].set(key, { state: 'mounted' });
+  const original = rpc.call.bind(rpc);
+  const state = {
+    mounts: [{ MountPoint: target, Fs: 'fixture:' }],
+    listingFails: false,
+    malformedListing: false,
+    unmountFails: false,
+    closed: false,
+  };
+  rpc.call = async (method, params) => {
+    if (method === 'mount/listmounts') {
+      if (state.listingFails) throw Error('Mount listing unavailable');
+      if (state.malformedListing) return {};
+      return { mountPoints: state.mounts };
+    }
+    if (method === 'mount/unmount' && state.unmountFails) throw Error('Unmount failed');
+    return original(method, params);
+  };
+  rpc.close = async () => {
+    state.closed = true;
+  };
+  return { ...value, connection, target, state };
+}
+
+test('A recovered mount clears its transient error on refresh and explicit reconnect', async (t) => {
+  const { cloud, space, connection, rpc, state } = await mountedFixture(t);
+  for (const recover of [
+    () => cloud.connections(space.scopeId),
+    () => cloud.connect(space.scopeId, connection.mountId),
+  ]) {
+    state.listingFails = true;
+    assert.equal((await cloud.connections(space.scopeId))[0].state, 'error');
+    state.listingFails = false;
+    await recover();
+    assert.deepEqual(cloud['states'].get(`${space.scopeId}:${connection.mountId}`), {
+      state: 'mounted',
+    });
+    assert.equal((await cloud.rootEntries(space.scopeId, 'contents'))![0].blocked, undefined);
+  }
+  assert(!rpc.calls.some((item) => item.method === 'mount/mount'));
+});
+
+test('Closing after a disappeared mount succeeds when its service and filesystem agree', async (t) => {
+  for (const removeTarget of [false, true]) {
+    const { cloud, target, state } = await mountedFixture(t);
+    if (removeTarget) await rmdir(target);
+    else await writeFile(path.join(target, 'keep.txt'), 'Preserve replacement local bytes');
+    state.mounts = [];
+    state.unmountFails = true;
+    await cloud.close();
+    assert.equal(state.closed, true);
+    if (!removeTarget)
+      assert.equal(
+        await readFile(path.join(target, 'keep.txt'), 'utf8'),
+        'Preserve replacement local bytes',
+      );
+  }
+});
+
+test('An in-flight mount refresh cannot undo an explicit disconnect', async (t) => {
+  const { cloud, space, connection, rpc, state } = await mountedFixture(t);
+  let finishListing!: (value: unknown) => void;
+  let startedListing!: () => void;
+  const started = new Promise<void>((resolve) => {
+    startedListing = resolve;
+  });
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) => {
+    if (method === 'mount/listmounts') {
+      startedListing();
+      return new Promise((resolve) => {
+        finishListing = resolve;
+      });
+    }
+    return original(method, params);
+  };
+  const refresh = cloud.connections(space.scopeId);
+  await started;
+  await cloud.disconnect(space.scopeId, connection.mountId);
+  finishListing({ mountPoints: state.mounts });
+  assert.equal((await refresh)[0].state, 'disconnected');
+});
+
+test('Unmount failures remain visible when mount absence cannot be verified', async (t) => {
+  for (const stateChange of [
+    'still-listed',
+    'listing-fails',
+    'malformed-list',
+    'foreign-mount',
+    'alias',
+  ] as const) {
+    const { cloud, space, connection, target, base, state } = await mountedFixture(t);
+    state.unmountFails = true;
+    if (stateChange === 'listing-fails') state.listingFails = true;
+    if (stateChange === 'malformed-list') state.malformedListing = true;
+    if (stateChange === 'foreign-mount') state.mounts[0].Fs = 'another-remote:';
+    if (stateChange === 'alias') {
+      state.mounts = [];
+      await rmdir(target);
+      await symlink(base, target, 'dir');
+    }
+    await assert.rejects(cloud.disconnect(space.scopeId, connection.mountId));
+    await assert.rejects(cloud.close());
+    assert.equal(state.closed, false);
+    assert.equal(cloud['mounted'].size, 1);
+  }
+});
+
+test('Preparation retains the bound account and drive and rejects delivery after rebinding', async (t) => {
+  const { cloud, files, space, accountId, secondAccountId, rpc } = await fixture(t);
+  const connection = await cloud.add({
+    scopeId: space.scopeId,
+    accountId,
+    folder: { id: 'folder-one', parentId: 'root', driveId: 'shared-drive', name: 'Source' },
+    contentsRoot: 'contents',
+    name: 'Destination',
+  });
+  const callsBeforePreparation = rpc.calls.length;
+  const target = await cloud.writeTarget(space.scopeId, connection.mountId);
+  assert.deepEqual(target, {
+    ownerId: space.scopeId,
+    mountId: connection.mountId,
+    folderId: 'folder-one',
+    accountId,
+    driveId: 'shared-drive',
+  });
+  assert.equal(
+    rpc.calls.length,
+    callsBeforePreparation,
+    'Preparation does not contact Google or mount',
+  );
+  const note = await files.createNote(space.scopeId, 'Retained');
+  const knowledge = new KnowledgeStore(files.dataDir, (ref) =>
+    files.resolve(ref.scopeId, ref.path),
+  );
+  const outbox = new CloudOutbox(files.dataDir, knowledge);
+  const prepared = await outbox.prepare(target, note);
+  const remote = {
+    observe: async () => {
+      throw Error('Delivery must stop before observing the remote');
+    },
+    copy: async () => {
+      throw Error('Delivery must stop before copying');
+    },
+  };
+  await cloud.bind(space.scopeId, connection.mountId, secondAccountId);
+  await assert.rejects(
+    outbox.deliver(
+      space.scopeId,
+      prepared.id,
+      await cloud.writeTarget(space.scopeId, connection.mountId),
+      remote,
+    ),
+    /識別情報/,
+  );
+  await cloud.bind(space.scopeId, connection.mountId, accountId);
+  const declarationFile = path.join(space.root, '.irori/cloud-mounts.json');
+  const [record] = await cloud.declarations(space.scopeId);
+  await writeFile(declarationFile, JSON.stringify([{ ...record, driveId: 'another-drive' }]));
+  await assert.rejects(
+    outbox.deliver(
+      space.scopeId,
+      prepared.id,
+      await cloud.writeTarget(space.scopeId, connection.mountId),
+      remote,
+    ),
+    /識別情報/,
+  );
+  assert.equal(await knowledge.sourceText(prepared.source), note.text);
+  await rm(
+    path.join(files.dataDir, 'cloud-bindings', `${space.scopeId}-${connection.mountId}.json`),
+  );
+  await assert.rejects(cloud.writeTarget(space.scopeId, connection.mountId), /紐づけ/);
+  assert.equal((await outbox.list(space.scopeId))[0].accountId, accountId);
+});
 
 test('workspace Drive connections are independent of KB membership and survive restart without writing KB metadata', async (t) => {
   const { base, files, space, rpc, accountId } = await fixture(t);
