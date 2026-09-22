@@ -24,6 +24,7 @@ import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
+import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkillReach, readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
@@ -55,6 +56,7 @@ app
     // paint is already the reader's, without the renderer having to repaint.
     nativeTheme.themeSource = (await settings.read()).theme;
     const search = new SearchService(files);
+    const graphIndex = new GraphIndexService(files, search);
     const drafts = new DraftService(files);
     const updates = new UpdateService({
       currentVersion: appVersion,
@@ -333,6 +335,15 @@ app
       },
       cloudSetup: () => cloud.setup(),
       ontology: (id) => readOntology(files, id),
+      graphIndexStatus: (id) => graphIndex.status(id),
+      updateGraphIndex: (id) =>
+        changeFiles(() =>
+          changed(id, async () => {
+            if (agents.busy(id) || cloud.busy)
+              throw Error('実行と接続の準備が終わってからグラフ索引を更新してください。');
+            return graphIndex.update(id);
+          }),
+        ),
       skills: (id) => readSkills(files, id),
       skillReach: (id) => readSkillReach(files, id),
       workspaceCloud: (id) => cloud.workspaceRoot(id),

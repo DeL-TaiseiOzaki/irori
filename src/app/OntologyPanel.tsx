@@ -13,6 +13,7 @@ import '@xyflow/react/dist/style.css';
 import { Dialog } from './Dialog';
 import { useResource } from './useResource';
 import { selectSubgraph, type OntologyView } from '../domain/ontology';
+import type { GraphIndexStatus } from '../domain/graph-index';
 import type { Space } from '../domain/types';
 
 function Graph({
@@ -245,6 +246,22 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
   );
 }
 
+/** The freshness line for the graph index the KB carries, as the host reports it. */
+function describeGraphIndex(status: GraphIndexStatus) {
+  const detail = [
+    status.excluded
+      ? `リンク先のページがない・URL などの関係 ${status.excluded} 件は除外しています。`
+      : '',
+    status.unreadable ? `frontmatter を読めないページが ${status.unreadable} 件あります。` : '',
+  ].join('');
+  if (status.current)
+    return `グラフ索引（Knowledge_Base/ontology/）はページと一致しています。${detail}`;
+  return (
+    `グラフ索引（Knowledge_Base/ontology/）はページと一致しません。更新するとエンティティ +${status.entities.added} / −${status.entities.removed}、` +
+    `関係 +${status.relations.added} / −${status.relations.removed}。${detail}`
+  );
+}
+
 export function OntologyPanel({
   space,
   revision,
@@ -259,10 +276,35 @@ export function OntologyPanel({
   onConfigure: () => void;
 }) {
   const [refresh, setRefresh] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [failure, setFailure] = useState('');
   const { data, error, loading } = useResource(
     () => window.irori.ontology(space.scopeId),
     [space.scopeId, revision, refresh],
   );
+  const module = data?.source === 'module';
+  // The graph shows first; the freshness check walks every page and arrives when it does.
+  const status = useResource(
+    () => window.irori.graphIndexStatus(space.scopeId),
+    [space.scopeId, revision, refresh],
+    { enabled: module },
+  );
+  async function generate() {
+    setBusy(true);
+    setFailure('');
+    try {
+      await window.irori.updateGraphIndex(space.scopeId);
+      setNotice(
+        'Knowledge_Base/ontology/ をコミットすると、ほかの端末でも同じグラフが表示されます。',
+      );
+      setRefresh((value) => value + 1);
+    } catch (error) {
+      setFailure(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Dialog label="オントロジー" onClose={onClose}>
       <section className="modal ontology-panel">
@@ -271,8 +313,34 @@ export function OntologyPanel({
           <button onClick={() => setRefresh((value) => value + 1)}>再読み込み</button>
           <button onClick={onClose}>閉じる</button>
         </div>
-        <p>CSV の保存内容を表示します。構築・整理は CLI エージェントと協調して進められます。</p>
+        <p>
+          {module
+            ? 'ページの frontmatter から生成したグラフ索引を表示します。構築・整理は CLI エージェントと協調して進められます。'
+            : 'CSV の保存内容を表示します。構築・整理は CLI エージェントと協調して進められます。'}
+        </p>
         <button onClick={onConfigure}>構築・表示設定をエージェントに相談</button>
+        {module && (
+          <div className="graph-index">
+            <p className="muted" role="status">
+              {status.loading
+                ? 'グラフ索引（Knowledge_Base/ontology/）とページの整合性を確認しています…'
+                : status.error
+                  ? `グラフ索引を確認できません: ${status.error}`
+                  : status.data && describeGraphIndex(status.data)}
+            </p>
+            <div className="actions">
+              <button disabled={busy} onClick={generate}>
+                グラフ索引を更新
+              </button>
+            </div>
+          </div>
+        )}
+        {notice && <p className="hint">{notice}</p>}
+        {failure && (
+          <p role="alert" className="error">
+            {failure}
+          </p>
+        )}
         {error && (
           <p role="alert" className="error">
             {error}
@@ -284,10 +352,15 @@ export function OntologyPanel({
           <OntologyContent key={JSON.stringify(data.revisions)} view={data} onOpen={onOpen} />
         ) : (
           !error && (
-            <p>
-              この KB にはオントロジーの表示設定がありません。CLI エージェントに CSV
-              の作成と表示設定を依頼できます。
-            </p>
+            <div className="graph-index">
+              <p>
+                この KB にはオントロジーの表示設定がありません。ページの
+                frontmatter（type・title・relations）からグラフ索引を作成できます。
+              </p>
+              <button disabled={busy} onClick={generate}>
+                グラフ索引を作成
+              </button>
+            </div>
           )
         )}
       </section>
