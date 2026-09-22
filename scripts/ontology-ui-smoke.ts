@@ -18,6 +18,40 @@ await writeFile(path.join(root, fixture.declaration.entities.path), fixture.enti
 await writeFile(path.join(root, fixture.declaration.relations.path), fixture.relations);
 await writeFile(path.join(root, 'notes/概念.md'), '# 知識をつなぐ\n');
 await writeFile(path.join(root, 'notes/調査.md'), '# 調査のノート\n');
+// A second KB is an OKF bundle with no declaration: its graph index is generated from the pages.
+const bundleRoot = path.join(base, 'Bundle');
+await mkdir(bundleRoot);
+await files.register(bundleRoot, '知識の束', 'personal');
+const pageText = (type: string, title: string, relations: string[] = []) =>
+  `---\ntype: ${type}\ntitle: ${title}\n${
+    relations.length ? `relations:\n${relations.map((entry) => `  - ${entry}`).join('\n')}\n` : ''
+  }---\n\n# ${title}\n`;
+const bundlePage = async (relative: string, text: string) => {
+  await mkdir(path.dirname(path.join(bundleRoot, relative)), { recursive: true });
+  await writeFile(path.join(bundleRoot, relative), text);
+};
+for (const [relative, text] of [
+  ['Knowledge_Base/index.md', '---\nokf_version: "0.2"\n---\n\n# Index\n'],
+  ['Knowledge_Base/wiki/index.md', '# wiki\n'],
+  ['Knowledge_Base/entities/index.md', '# entities\n'],
+  [
+    'Knowledge_Base/entities/サービス.md',
+    pageText('product', 'サービス', ['{ rel: same_as, target: https://example.com/service }']),
+  ],
+  [
+    'Knowledge_Base/wiki/再試行の予算.md',
+    pageText('concept', '再試行の予算', ['{ rel: uses, target: ../entities/サービス.md }']),
+  ],
+  [
+    'Knowledge_Base/wiki/障害対応.md',
+    pageText('synthesis', '障害対応', [
+      '{ rel: refines, target: 再試行の予算.md }',
+      '{ rel: uses, target: ../entities/サービス.md }',
+    ]),
+  ],
+  ['Knowledge_Base/wiki/監視.md', pageText('concept', '監視')],
+])
+  await bundlePage(relative, text);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
@@ -29,6 +63,7 @@ const errors: string[] = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 try {
   await page.getByRole('checkbox', { name: /知識の地図/ }).check();
+  await page.getByRole('checkbox', { name: /知識の束/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
   await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
   let panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
@@ -100,6 +135,49 @@ try {
   await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
   await page.getByRole('button', { name: '構築・表示設定をエージェントに相談' }).click();
   await expect(page.getByLabel('エージェントへの指示')).toHaveValue(/\.irori\/ontology.json/);
+  // The bundle KB: no declaration, so the panel offers to generate the graph index.
+  await page.getByRole('button', { name: '知識の束', exact: true }).first().click();
+  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
+  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await expect(panel).toContainText('グラフ索引を作成できます');
+  await panel.getByRole('button', { name: 'グラフ索引を作成', exact: true }).click();
+  const freshness = panel.getByRole('status').filter({ hasText: 'グラフ索引' });
+  await expect(freshness).toContainText('一致しています');
+  await expect(freshness).toContainText('関係 1 件は除外');
+  await expect(panel).toContainText('Knowledge_Base/ontology/ をコミットすると');
+  await expect(panel.locator('.react-flow__node')).toHaveCount(3);
+  await expect(panel.locator('.react-flow__edge')).toHaveCount(3);
+  const entitiesPath = path.join(bundleRoot, 'Knowledge_Base/ontology/entities.csv');
+  expect(await readFile(entitiesPath, 'utf8')).toBe(
+    'id,label,note,parentId,group\n' +
+      'entities/サービス,サービス,Knowledge_Base/entities/サービス.md,,product\n' +
+      'wiki/再試行の予算,再試行の予算,Knowledge_Base/wiki/再試行の予算.md,,concept\n' +
+      'wiki/障害対応,障害対応,Knowledge_Base/wiki/障害対応.md,,synthesis\n',
+  );
+  expect(await readFile(path.join(bundleRoot, 'Knowledge_Base/ontology/index.md'), 'utf8')).toMatch(
+    /generates/,
+  );
+  // One page's relations change on disk: the panel says what an update would do, then does it.
+  await bundlePage(
+    'Knowledge_Base/wiki/障害対応.md',
+    pageText('synthesis', '障害対応', [
+      '{ rel: refines, target: 再試行の予算.md }',
+      '{ rel: watches, target: 監視.md }',
+    ]),
+  );
+  await expect(freshness).toContainText('一致しません');
+  await expect(freshness).toContainText('エンティティ +1 / −0、関係 +1 / −1');
+  await expect(panel.locator('.react-flow__node')).toHaveCount(3);
+  await panel.getByRole('button', { name: 'グラフ索引を更新', exact: true }).click();
+  await expect(freshness).toContainText('一致しています');
+  await expect(panel.locator('.react-flow__node')).toHaveCount(4);
+  await expect(panel.locator('.react-flow__edge')).toHaveCount(3);
+  expect(await readFile(entitiesPath, 'utf8')).toContain(
+    'wiki/監視,監視,Knowledge_Base/wiki/監視.md,,concept\n',
+  );
+  await panel.locator('.react-flow__node').filter({ hasText: '監視' }).click();
+  await expect(panel.getByRole('button', { name: '関連ノートを開く' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/irori-graph-index.png' });
   expect(errors).toEqual([]);
   // A crashed renderer cannot acknowledge a final draft flush; close the host without hanging.
   const crashed = page.waitForEvent('crash');
@@ -108,7 +186,7 @@ try {
   );
   await crashed;
   console.log(
-    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation and dialog keyboard handling. No provider calls.',
+    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, dialog keyboard handling, and a graph index generated from a bundle, reported stale and updated. No provider calls.',
   );
 } finally {
   await app.close();

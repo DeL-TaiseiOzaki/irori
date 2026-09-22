@@ -49,6 +49,8 @@ export type OntologyEdge = {
 };
 export type OntologyView = {
   scopeId: string;
+  /** A pair `.irori/ontology.json` declares, or the graph index the knowledge base carries. */
+  source: 'declared' | 'module';
   entitiesPath: string;
   relationsPath?: string;
   revisions: { path: string; hash: string }[];

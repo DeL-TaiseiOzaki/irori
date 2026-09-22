@@ -1,5 +1,63 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The graph index the knowledge base carries, 2026-09-22: the owner settled the
+decision left open on 2026-09-17 — the pages of an Open Knowledge Format bundle
+are the source of truth, and the graph is a module the knowledge base carries in
+Git, `Knowledge_Base/ontology/`, that irori generates deterministically on
+request and the person commits, so every device shows the same graph for the
+same commit ([ADR 008](decisions/008-graph-index-module.md)). A declared
+`.irori/ontology.json` still wins and is never generated over.
+`GraphIndexService` (`src/host/graph-index.ts`) walks the bundle through
+search's own walk (`SearchService.walk`, the same layer rules, exclusions and
+limits), reads only each page's leading frontmatter with the host's `yaml`,
+resolves each relation's `target` with `resolveNoteLink`, keeps it when it names
+a page of the bundle, and writes `entities.csv`
+(`id,label,note,parentId,group`), `relations.csv` (`sourceId,relation,targetId`)
+and a fixed `index.md` — NFC paths, code point order, `\n`, no BOM, Papa Parse
+quoting — through `FileService.writeGenerated`, only when the bytes change.
+`readOntology` reads the module with the built-in mapping when no declaration
+exists, and the view says which source it came from. `graphIndexStatus`
+generates in memory and reports whether the tables on disk match and how many
+entity and relation rows an update would add and remove, plus the relations
+left out; the panel shows the graph first and that line when the check returns,
+with **グラフ索引を更新**, or **グラフ索引を作成** when neither a declaration
+nor a module exists. See [ONTOLOGY](ONTOLOGY.md).
+
+Measured on this container with a disposable bundle: 2,000 pages cost 1.15 s
+for a cold status (walk, read and parse), 55 ms warm (stats only, facts
+remembered by size and modification time), 81 ms for the update, and the
+longest gap between event-loop turns during a cold walk was 32 ms; 15,000
+pages cost 7.2 s cold before the 2,000-entity refusal, 0.35 s warm, with a
+9.6 ms longest gap. A folder holding more than 4,000 entries makes the walk
+incomplete, which the check reports as an error rather than an index missing a
+folder.
+
+Verification: production build, format check, **209 behaviour tests (205
+passed, four environment-gated skips)** — `tests/graph-index.test.ts` covers
+identical bytes for reversed input and a reversed second KB, a decomposed file
+name linked composed, every exclusion with its count, the label fallback, a
+title with a comma read back through the reader, a duplicate collapsing, the
+refusal above 10,000 relations with nothing written, freshness after a body
+edit (current) and after a relation edit (the exact counts), the module read
+with and without its relation table, a declaration winning and refusing
+generation, and the guarded writer's boundaries. Mutation check: with the
+relation sort removed, the byte test fails; with NFC normalisation removed,
+three tests fail; restored, all pass. All **fourteen Electron UI suites**
+pass in one run, where the ontology suite generates the index from a bundle,
+sees three nodes, reads the stale counts after a page's relations change on
+disk, updates to four nodes and opens a node's page, with the declared-CSV
+journey unchanged before it. The Linux package and its smoke pass: 21,938,554
+bytes archived and 89,396,019 unpacked, the host set unchanged (`yaml` and
+`papaparse` were already the host's). `test:agents` and `test:lifecycle` were
+not run; no model inference was used. Version 0.1.24 with its notes accompanies
+the change; publication follows the merge.
+
+Not done: a page's ordinary body links are not relations, only the
+`relations` list is; pages kept outside `Knowledge_Base/` are not in the graph;
+the index is generated on request, not on save; and a folder with more than
+4,000 entries stops the check. Implemented by a Fable agent in its own
+worktree and re-verified by the lead.
+
 The package stopped carrying packages the application never loads,
 2026-09-22: the Linux x64 archive falls from 115,078,717 to 21,902,040 bytes
 and the application directory from 500,379,979 to 407,203,302, with no feature
@@ -713,15 +771,14 @@ format check, behaviour tests including `tests/notes.test.ts`, and the daily
 workflow UI suite with the new steps. Version 0.1.8 with its notes accompanies
 the change; publication follows the merge.
 
-**Open decision to discuss later, important:** the recommended template
-(`irori-templete`, ADR 002 D8, merged 2026-09-17) no longer ships
-`.irori/ontology.json` or the ontology CSV pair. Its `Knowledge_Base/` is an
-Open Knowledge Format 0.2 bundle whose pages carry `type`, `relations` and
-ordinary links, and the template's `lint --irori-graph` can generate the CSV
-pair for the current graph view. The owner asked that the question of whether
-irori should draw its graph from the bundle itself (frontmatter and links,
-as the OKF visualizer does) rather than from a declared CSV pair be recorded
-here and discussed later. Nothing in irori changes until that discussion.
+**Decided 2026-09-22 (recorded here on 2026-09-17 as an open decision):** the
+recommended template (`irori-templete`, ADR 002 D8) ships no
+`.irori/ontology.json`; its `Knowledge_Base/` is an Open Knowledge Format 0.2
+bundle whose pages carry `type`, `title` and `relations`. The owner decided that
+the pages are the source of truth and that irori generates a graph index the
+knowledge base carries in Git, `Knowledge_Base/ontology/`, with a declared pair
+still winning — [ADR 008](decisions/008-graph-index-module.md), built in 0.1.24
+(the newest section above).
 
 Third release under the sync checks, 2026-09-18:
 [v0.1.9-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.9-preview.1) publishes #17's Markdown

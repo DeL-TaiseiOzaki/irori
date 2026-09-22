@@ -227,6 +227,65 @@ export class SearchService {
   }
 
   /**
+   * Walks the knowledge layer as the scan does — the same layer rules,
+   * exclusions and entry and file limits — entering the directories `descend`
+   * accepts, and hands each regular file `include` accepts to `visit` with its
+   * stats and a reader under the scan's guards. Says whether a limit or an
+   * unreadable directory cut the walk short.
+   */
+  async walk(
+    scopeId: string,
+    include: (path: string) => boolean,
+    descend: (path: string) => boolean,
+    visit: (file: { path: string; stat: Stats; read: () => Promise<string> }) => Promise<void>,
+  ): Promise<{ incomplete: boolean }> {
+    const space = this.files.get(scopeId);
+    const directories = [''];
+    let visited = 0;
+    let files = 0;
+    let incomplete = false;
+    for (let position = 0; position < directories.length; position++) {
+      const directory = directories[position];
+      let entries;
+      try {
+        entries = await this.files.entries(scopeId, directory);
+      } catch (error) {
+        if (!directory) throw error;
+        incomplete = true;
+        continue;
+      }
+      const pending: Entry[] = [];
+      for (const entry of entries) {
+        if (++visited > this.limits.entries) return { incomplete: true };
+        if (entry.blocked || !searchable(space, entry.path)) continue;
+        if (entry.directory) {
+          if (descend(entry.path)) directories.push(entry.path);
+        } else if (include(entry.path)) pending.push(entry);
+      }
+      const stats = await Promise.all(
+        pending.map((entry) => lstat(path.join(space.root, entry.path)).catch(() => undefined)),
+      );
+      for (const [slot, entry] of pending.entries()) {
+        if (++files > this.limits.files) return { incomplete: true };
+        const stat = stats[slot];
+        if (!stat?.isFile()) {
+          incomplete = true;
+          continue;
+        }
+        await visit({
+          path: entry.path,
+          stat,
+          read: () =>
+            stat.size > this.limits.fileBytes
+              ? Promise.reject(Error('File exceeds the text limit'))
+              : this.read(space, scopeId, entry.path, stat),
+        });
+      }
+    }
+    return { incomplete };
+  }
+
+  /**
    * One regular file's text, read as the scan always has: at most the observed
    * size plus one byte, rejected when it changes underneath, is not UTF-8 or
    * holds a NUL.

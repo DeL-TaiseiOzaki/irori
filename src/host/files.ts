@@ -377,6 +377,62 @@ export class FileService {
       return this.read(id, rel);
     });
   }
+  /**
+   * Publishes a file irori generated in the knowledge layer — the graph index —
+   * atomically: `expected` is the hash of the bytes being replaced, or null when
+   * the file must not exist yet, so a file changed meanwhile is never overwritten.
+   * Missing folders are created; an alias anywhere on the path is refused.
+   */
+  async writeGenerated(id: string, rel: string, text: string, expected: string | null) {
+    return this.queue.run(async () => {
+      const space = this.get(id);
+      relative.parse(rel);
+      if (
+        classify(space, rel) !== 'Knowledge_Base' ||
+        owner(this.spaces, path.join(space.root, rel))?.scopeId !== id ||
+        rel.split('/').some((part) => part.startsWith('.')) ||
+        !textFilePattern.test(rel)
+      )
+        throw Error('生成したファイルはこの KB のナレッジ層にだけ書き込めます。');
+      const directory = path.posix.dirname(rel);
+      const parent = await this.noteDirectory(id, directory === '.' ? '' : directory, true);
+      const filename = path.join(parent, path.posix.basename(rel));
+      const existing = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      if (existing && (!existing.isFile() || existing.isSymbolicLink()))
+        throw Error('生成先が通常のファイルではありません。');
+      if (expected === null) {
+        if (existing) throw Error('CONFLICT: 生成先にファイルが作られています。');
+        const created = await fs.open(filename, 'wx');
+        try {
+          await created.writeFile(text);
+          await created.sync();
+        } finally {
+          await created.close();
+        }
+      } else {
+        if (!existing || hash(await fs.readFile(filename)) !== expected)
+          throw Error('CONFLICT: 生成先のファイルが変更されています。');
+        const temp = path.join(parent, `.irori-save-${randomUUID()}.tmp`);
+        try {
+          const pending = await fs.open(temp, 'wx', existing.mode);
+          try {
+            await pending.writeFile(text);
+            await pending.sync();
+          } finally {
+            await pending.close();
+          }
+          if (hash(await fs.readFile(filename)) !== expected)
+            throw Error('CONFLICT: 生成先のファイルが変更されています。');
+          await fs.rename(temp, filename);
+        } finally {
+          await fs.rm(temp, { force: true });
+        }
+      }
+      return this.read(id, rel);
+    });
+  }
   /** Moves the note's bytes as they are; `rewriting` says its links will be rewritten after. */
   async moveNote(ref: NoteRef, destinationPath: string, rewriting = false): Promise<Document> {
     return this.queue.run(async () => {

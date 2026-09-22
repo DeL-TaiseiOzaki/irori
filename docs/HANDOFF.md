@@ -123,10 +123,11 @@ Template and daily notes, 2026-09-17: `irori-templete` `main` is now an OKF 0.2
 bundle maintained by agents (its ADR 002); it ships no ontology files and expects
 the KB to declare where notes go. irori 0.1.8 adds that declaration,
 `.irori/notes.json`, and **今日のノート**; read [DAILY-NOTES](DAILY-NOTES.md)
-before touching note creation. One decision is deliberately open and recorded in
-[STATUS](STATUS.md): whether the graph view should read the bundle (frontmatter
-and links) instead of a declared CSV pair. Do not change the ontology reader
-until the owner has discussed it.
+before touching note creation. The decision left open then — whether the graph
+view should read the bundle instead of a declared CSV pair — was taken on
+2026-09-22: the pages are the source of truth and irori generates a graph index
+the KB carries in Git ([ADR 008](decisions/008-graph-index-module.md),
+[ONTOLOGY](ONTOLOGY.md)); a declared pair still wins.
 
 After merging an app-affecting change, advance the package version and publish,
 or report the drift explicitly. The update check never offers a newer preview of
