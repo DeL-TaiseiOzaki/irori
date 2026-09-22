@@ -1,16 +1,15 @@
 # irori — Continuation prompt
 
-Updated 2026-09-22 (evening), after v0.1.22-preview.1 was published and the
-graph index decision was taken. Give this file to the next agent, or copy its
+Updated 2026-09-22 (night), after v0.1.25-preview.1 was published with
+everything that was open merged, and the graph index decision taken. Give this file to the next agent, or copy its
 contents into a new session. Inspect current files and Git state before acting;
 later work takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which was `ec9a807` with
-0.1.22 published and the download page in step when this was written. First
-look at the open pull requests below: publish each shipped version the owner
-merges, and keep the stacked ones retargeted. Then choose a bounded next change
+Take over **irori** development from current `main`, which was `b984804` with
+0.1.25 published and the download page in step when this was written. Nothing
+is waiting to be merged. Choose a bounded next change
 with executable acceptance checks and carry it through implementation and
 verification. Make independent progress while device and account evidence is
 pending.
@@ -36,8 +35,8 @@ owner's own words. New user directions override this file.
 The [contributor contract](../AGENTS.md), then [STATUS](STATUS.md), which is
 newest-first and carries the verification evidence for everything below. Then
 select for the task: [ADR 006](decisions/006-person-lines.md) for authorship,
-ADR 007 (ObsidianUI, on #66's branch) and ADR 008 (the graph index module, on
-#69's branch) until they merge, [ADR 005](decisions/005-host-and-references.md)
+[ADR 007](decisions/007-obsidian-ui.md) for the ObsidianUI controls,
+[ADR 008](decisions/008-graph-index-module.md) for the graph index module, [ADR 005](decisions/005-host-and-references.md)
 for the product directions, [ADR 002](decisions/002-release-and-workspace.md)
 for confirmed product scope, [ACCEPTANCE](ACCEPTANCE.md) for the requirement
 matrix, [DISTRIBUTION](DISTRIBUTION.md) for the publish rule, and the per-area
@@ -63,38 +62,37 @@ EvoAgent is in the workspace's `_research/ontology-evolution-2026-09-22/`.
   edit through scripts irori writes to its data directory (never the KB); Codex
   is not told at edit time, since its hooks load only from definitions the
   person trusts.
-- **#62, #65, #68** — the records, the 0.1.22 notes and the download page.
-- irori-templete **#7** — `RETIRED.md` and `metadata.roles/projects` in the
-  template's contract.
+- **#67 (0.1.23)** — the package keeps only what the host loads; `app.asar`
+  about 115 MB → 21.9 MB; licence notices generated from the bundle into
+  `dist/third-party-notices.txt`.
+- **#69 (0.1.24)** — the graph index the KB carries (ADR 008).
+- **#66 (0.1.25)** — ObsidianUI Magnet Tabs and Arrow Fill Button (ADR 007).
+  Opened by a VS Code Codex session that had switched the shared checkout to
+  its branch; renumbered twice (0.1.22 → 0.1.24 → 0.1.25) as the others merged.
+- **#62, #65, #68, #71, #72** — the records, the 0.1.22 and 0.1.25 notes and the
+  download page.
+- irori-templete **#7** (`RETIRED.md`, `metadata.roles/projects`), **#9**
+  (vocabulary only through reviewed proposals), **#10** (one index heading per
+  type) and **#8** (`lint --irori-graph` checks irori's module);
+  irori-workspace **#2** (the EvoAgent reading and the graph decision).
 
 ## Delivery state
 
-`main` is `ec9a807`, version **0.1.22**, published as
-[v0.1.22-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.22-preview.1)
-through release run 35693835842, with the download page deployed (Pages
-35694539530, #68) and the drift re-check 35694723375 in step. The downloads are
-215,808,512 bytes (Windows) and 182,467,091 (Mac). 0.1.20 and 0.1.21 have notes
-but no package of their own; one release carries #61, #63 and #64.
+`main` is `b984804`, version **0.1.25**, published as
+[v0.1.25-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.25-preview.1)
+through release run 35723813665 (from main run 35723062728), with the download
+page deployed (Pages 35724596462, #72) and the drift re-check 35724815238 in
+step. The downloads are 198,603,264 bytes (Windows) and 166,261,903 (Mac),
+down from 215,808,512 and 182,467,091 at 0.1.22 — #67's work. Earlier the same
+day v0.1.22-preview.1 carried #61, #63 and #64. 0.1.20, 0.1.21, 0.1.23 and 0.1.24
+have notes but no package of their own; the published notes of 0.1.22 and
+0.1.25 summarise them.
 
-Open, waiting for the owner:
-
-| PR | Version | What | Note |
-| --- | --- | --- | --- |
-| #67 `perf/renderer-deps` | 0.1.23 | The package keeps only what the host loads; `app.asar` about 115 MB → 21.9 MB on every platform; licence notices generated from the bundle | CI passed on all three platforms |
-| #69 `feat/graph-index` | 0.1.24 | The graph index the KB carries (ADR 008) | stacked on #67: after #67 merges, `gh pr edit 69 --base main` |
-| #66 `feat/obsidian-ui` | 0.1.24 | ObsidianUI tabs and primary actions (ADR 007) | continued by another session with the owner's leave; its version collides with #69 |
-| irori-templete #9 | — | The vocabulary changes only through reviewed proposals (`lint --vocabulary`, ADR 003) | |
-| irori-templete #10 | — | One index heading per type, named in Page types | stacked on #9 |
-| irori-templete #8 | — | `lint --irori-graph` checks the module irori generates | merge after irori #69, whose version it names |
-| irori-workspace #2 | — | The EvoAgent reading and the graph decision | |
-
-Whichever of #66 and #69 merges second takes the next free version and
-rewrites its notes; the same holds for `docs/STATUS.md`, whose top section every
-branch adds to. GitHub does not retarget a stacked pull request here. A drift
-run that lands between a release and its Pages deployment fails by seconds;
-dispatch `release-sync.yml` after the deploy.
-
-## Owner decisions from 2026-09-22
+Every branch adds to the top of `docs/STATUS.md` and advances the version, so
+parallel branches conflict there; the one merged second takes the next free
+version and rewrites its notes. GitHub does not retarget a stacked pull request
+here. Several sessions, including Codex in VS Code, work in this repository at
+once: work in a worktree, and leave the shared checkout on `main`. ## Owner decisions from 2026-09-22
 
 - **The graph index is a module the knowledge base carries** (ADR 008).
   The pages are the source of truth; irori generates `Knowledge_Base/ontology/`
@@ -117,8 +115,9 @@ dispatch `release-sync.yml` after the deploy.
 
 ## Next work, in the order the evidence supports
 
-1. **The merge flow above**, publishing each shipped version as it lands
-   (release, website manifest PR, Pages, download check, drift re-check).
+1. **Real-model checks of the person's lines**, once the owner authorizes a
+   model run: whether Claude Code acts on the `PreToolUse` context, and whether
+   Pi's and OpenCode's models retry a held edit. Only fixtures exercised them.
 2. **D04 — writable cloud delivery**: extend `src/cloud/outbox.ts` with an
    explicit writable capability, re-consent and exact account binding, preserving
    staged bytes across failure and restart.
