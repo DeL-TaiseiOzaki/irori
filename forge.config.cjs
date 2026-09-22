@@ -66,6 +66,45 @@ module.exports = {
       for (const name of await fs.readdir(prebuilds))
         if (name !== `${platform}-${arch}`)
           await fs.rm(path.join(prebuilds, name), { recursive: true });
+      // Vite has bundled the renderer's packages into dist/, so at run time the application
+      // loads from node_modules only what the host bundle requires — esbuild keeps every
+      // package external (scripts/build-host.mjs) — and what those packages depend on. Keep
+      // that closure, resolved as Node would, and remove everything else under node_modules,
+      // npm's .bin links and hidden lockfile included; the bundled packages' licences ship
+      // as dist/third-party-notices.txt.
+      const { isBuiltin } = require('node:module');
+      const kept = new Set();
+      const keep = async (from, name) => {
+        for (let base = from; base.startsWith(buildPath); base = path.dirname(base)) {
+          const dir = path.join(base, 'node_modules', name);
+          const manifest = await fs
+            .readFile(path.join(dir, 'package.json'), 'utf8')
+            .catch(() => null);
+          if (!manifest) continue;
+          if (!kept.has(dir)) {
+            kept.add(dir);
+            const { dependencies, optionalDependencies } = JSON.parse(manifest);
+            for (const child of Object.keys({ ...dependencies, ...optionalDependencies }))
+              await keep(dir, child);
+          }
+          return;
+        }
+      };
+      for (const bundle of ['main.cjs', 'preload.cjs'])
+        for (const [, specifier] of (
+          await fs.readFile(path.join(buildPath, 'dist-host', bundle), 'utf8')
+        ).matchAll(/\b(?:require|import)\("([^"./][^"]*)"\)/g))
+          if (!isBuiltin(specifier) && specifier !== 'electron')
+            await keep(buildPath, specifier.match(/^(@[^/]+\/)?[^/]+/)[0]);
+      for (const entry of await fs.readdir(modules)) {
+        const names = entry.startsWith('@')
+          ? (await fs.readdir(path.join(modules, entry))).map((name) => `${entry}/${name}`)
+          : [entry];
+        const stale = names.filter((name) => !kept.has(path.join(modules, name)));
+        // An emptied scope directory goes with its packages.
+        for (const name of stale.length === names.length ? [entry] : stale)
+          await fs.rm(path.join(modules, name), { recursive: true });
+      }
     },
   },
   makers: [

@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { cp, glob, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -102,6 +103,7 @@ try {
   const packaged = JSON.parse(extractFile(archive, 'package.json').toString());
   for (const entry of [
     'dist/index.html',
+    'dist/third-party-notices.txt',
     'dist-host/main.cjs',
     'dist-host/preload.cjs',
     'assets/irori-icon.png',
@@ -126,11 +128,28 @@ try {
     entries.every((entry) => roots.has(entry.split('/')[0])),
     'Unexpected application data in package',
   );
-  for (const name of Object.keys(packaged.dependencies))
-    assert(
-      entries.includes(`node_modules/${name}/package.json`),
-      `Missing runtime dependency: ${name}`,
-    );
+  // The host bundle keeps every package external, so what it requires is what the application
+  // loads from node_modules. Vite bundled the other dependencies into dist/, packaging drops
+  // their directories (forge.config.cjs), and the generated notices must name each of them.
+  const host = new Set<string>();
+  for (const bundle of ['dist-host/main.cjs', 'dist-host/preload.cjs'])
+    for (const [, specifier] of extractFile(archive, path.normalize(bundle))
+      .toString()
+      .matchAll(/\b(?:require|import)\("([^"./][^"]*)"\)/g))
+      if (!isBuiltin(specifier) && specifier !== 'electron')
+        host.add(specifier.match(/^(@[^/]+\/)?[^/]+/)![0]);
+  const notices = extractFile(archive, path.normalize('dist/third-party-notices.txt')).toString();
+  for (const name of Object.keys(packaged.dependencies)) {
+    const shipped = entries.includes(`node_modules/${name}/package.json`);
+    if (host.has(name)) assert(shipped, `Missing runtime dependency: ${name}`);
+    else {
+      assert(!shipped, `Package the host never loads is packaged: ${name}`);
+      const { version } = JSON.parse(
+        await readFile(path.join(project, 'node_modules', name, 'package.json'), 'utf8'),
+      );
+      assert(notices.includes(`\n${name}@${version} (`), `Notices omit bundled ${name}@${version}`);
+    }
+  }
   for (const name of [
     'electron',
     'node',

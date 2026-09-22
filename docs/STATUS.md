@@ -1,5 +1,60 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The package stopped carrying packages the application never loads,
+2026-09-22: the Linux x64 archive falls from 115,078,717 to 21,902,040 bytes
+and the application directory from 500,379,979 to 407,203,302, with no feature
+removed; the unpacked directory, node-pty and rclone, is unchanged at
+89,396,019. Those figures are 0.1.19's code; rebased on 0.1.22 the archive is
+21,919,228 bytes and the directory 407,220,490.
+
+Forge copied every production dependency although Vite had already bundled
+the renderer's into `dist/`: 271 top-level packages, from React and Milkdown
+to the Vue compiler and Babel parser that nothing imports, plus npm's `.bin`
+links and hidden lockfile. The kept set is now read from the built host rather
+than maintained: `scripts/build-host.mjs` keeps every package external, so
+`dist-host/main.cjs` and `preload.cjs` name what the host loads as
+`require("name")` or `import("name")` — fourteen packages — and
+`packageAfterPrune` walks their `dependencies` and `optionalDependencies`
+with Node's resolution and removes everything else under `node_modules`.
+Twenty-five package directories remain. Zod and papaparse are used on both
+sides and stay. The renderer's packages are not moved to `devDependencies`,
+which would restate the classification by hand and take them out of
+`npm audit --omit=dev`.
+
+Since the bundle no longer carries each package's LICENSE, the build writes
+one: `scripts/third-party-notices.ts`, a Vite plugin, takes Rollup's module
+graph in `generateBundle`, maps each module under `node_modules` to its
+package and emits `dist/third-party-notices.txt` — 210 entries of name,
+version, declared licence and licence-file text, 282,864 bytes inside
+`app.asar`. The graph rather than the chunks' modules, because a package whose
+modules only re-export another's, `@milkdown/kit`, is in no chunk yet is what
+the source imports; the first draft read the chunks and the package smoke
+caught it. See [PACKAGING](PACKAGING.md) and
+[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md).
+
+Verification: production build, format check, **205 behaviour tests (201
+passed, four environment-gated skips)** after rebasing on 0.1.22, all **fourteen Electron UI suites**,
+and the Linux packaged smoke, which now derives the host set from the archived
+bundles and asserts that each of those dependencies is packaged, that every
+other production dependency is not, and that the notices file is present and
+names each of them at its installed version — while still driving the editor,
+graph, terminal and both SDK imports inside the packaged application, which is
+what shows the kept set is the loadable one. The new assertions fail on the
+0.1.19 package (no notices file), on a build with the removal disabled
+(`@base-ui/react` packaged) and on a build whose plugin withheld `react`
+(`react@19.3.0` missing). An in-memory build with sourcemaps attributes
+rendered code to 202 packages, all named; the other eight named are barrels or
+tree-shaken modules. `test:agents` and `test:lifecycle` were not run; no model
+inference was used. Version 0.1.23 with its notes accompanies the change;
+publication follows the merge.
+
+Limits: Windows and Mac packages were not built here; their package jobs drop
+the same files and print their own weights. The kept set follows the two host
+bundles' bare specifiers; a package the host loaded by a computed path outside
+its own directory would escape it, and none does today. The notices name a
+package by its `license` field and licence files as published, without
+verifying either.
+
 Pi and OpenCode hear about the person's lines before an edit, 2026-09-22.
 Neither protocol lets a hook add context and let the call run: Pi's extension
 `tool_call` handler can return `{ block, reason }`, and an OpenCode plugin's
