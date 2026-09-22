@@ -1,95 +1,88 @@
-# Who typed which line
+# The person's lines
 
-Date: 2026-09-21. A note worked on with an agent stops being legible once the
-reader cannot separate their own sentences from the ones that arrived while they
-were looking elsewhere. irori observes both writers already — it saves the
-reader's bytes itself and it launches the agent — so it records what it sees.
+Date: 2026-09-21 (revised for 0.1.20; see [ADR 006](decisions/006-person-lines.md)).
+A note worked on with an agent stops being legible once the person cannot tell
+their own sentences from the ones that arrived while they were looking
+elsewhere — and an agent working with the person needs the same distinction to
+understand what the person meant. irori saves the person's text itself, so it
+records which lines are theirs.
 
 ## What is recorded
 
-A line, keyed by its own normalised text, against whoever first produced it:
-the reader, or a named run of a named CLI. `src/knowledge/authorship.ts` holds
-the store; `src/domain/knowledge.ts` holds the shapes and the summary an agent
-receives.
+One mark per line: the person wrote or revised it, or not. A line that carries
+any of the person's change is their line, since a person who changes part of a
+line does so to make the whole sentence say what they mean. Nothing is recorded
+for other lines; in particular, what an agent wrote carries no mark.
 
-Two observations feed it:
+`src/knowledge/authorship.ts` holds the store, device-local under the data
+directory; `src/domain/knowledge.ts` holds the shapes and the summary an agent
+can be given.
 
-- **A save.** `save` in `src/host/main.ts` attributes the lines the saved text
-  carries that were not seen before to the reader. The bytes are already in hand
-  for the pre-save hash check, so this costs no extra read.
-- **A write during a run.** The file watcher batches changes per space. The run
-  that owns the space when a batch opens is the one that wrote it, read at that
-  moment because the run can finish before the batch is handled. Markdown in the
-  knowledge layer only.
-
-A line neither observation has seen is **unattested**, not the reader's. A note
-that arrived through `git pull`, or was edited in another editor, carries no
-marks rather than being claimed for whoever opened it.
+**A save marks only the lines it introduced.** `save` in `src/host/main.ts` reads
+the bytes the save replaces and marks the lines of the new text the old one did
+not carry. A line the file already had — written by an agent, pulled from a
+remote, typed in another editor — is never claimed for the person. The record
+before 0.1.20 claimed any line it had not seen the first time the person saved,
+pulled lines included, so records from before 0.1.20 are not read.
 
 ## Why the line's text, not its position
 
 A line range is stale the moment the note changes: insert a paragraph above it
-and every number below has moved. Carrying ranges across edits — and across
-`rebase`, `squash` and `merge`, which rewrite the commits that hold them — is
-the expensive half of every tool that does this. Keying on the line's own
-normalised text removes the problem rather than solving it. A line that moves
-keeps its author; a line that is rewritten becomes the writer's, which is what
-the reader means. No diff is computed, so [ADR 004](decisions/004-ui-library-adoption.md)'s
-decision against a diff library stands.
+and every number below has moved. Keying on the line's own normalised text
+removes that problem rather than solving it. A line that moves keeps its mark; a
+line an agent rewrites is a different line and carries none. No diff is
+computed, so [ADR 004](decisions/004-ui-library-adoption.md)'s decision against
+a diff library stands.
 
 The key is normalised because rich editing renormalises spacing and bullet
-markers on save without the reader having touched the line. Lines with fewer
+markers on save without the person having touched the line. Lines with fewer
 than three characters once whitespace, punctuation and symbols are removed carry
-no key at all: a blank line, a rule or a bare bullet appears in every note, and
-attributing one to whoever typed the first of them would be worse than leaving
-it unmarked.
+no key: a blank line, a rule or a bare bullet appears in every note.
 
-## What the reader and the agent see
+## What the person and the agent see
 
-Above the note, a line stating how many lines each CLI contributed. In source
-view, a mark at the left edge of an agent's line. The reader's own lines and
-unattested lines carry nothing, because an absent mark is not a claim.
+Above the note, the number of lines the person wrote or revised; in source view,
+a mark at the left edge of each. Other lines carry nothing, because an absent
+mark is not a claim that an agent wrote them.
 
-With a note selected, the request sent to an agent states the line ranges each
-writer holds in the note's saved bytes — the bytes the same request tells it to
-read. It is stated as a record and not as an instruction. What an agent may do
-with the reader's lines belongs to the knowledge base's own contract, not to a
-sentence irori prepends.
+An agent is told only when it matters:
+
+- **Claude Code, before an edit.** When an `Edit`, `MultiEdit` or `Write` would
+  change one of the person's lines, irori's `PreToolUse` hook in the Agent SDK
+  adds, as `additionalContext`, which lines and their text. An edit that leaves
+  them alone adds nothing.
+- **Any agent, when the person asks.** With a note open that has such lines, the
+  composer offers 自分の行を伝える, off by default. Ticked, the request names the
+  person's line ranges in the bytes the agent is told to read.
+
+Both are stated as a record, not an instruction. What an agent may do with the
+person's lines belongs to the knowledge base's own contract, not to a sentence
+irori prepends.
 
 ## What is deliberately not built
 
 - **Nothing is written into the knowledge base.** No sidecar file, no front
-  matter, no block ids. The record is an observation about the reader's own work
-  on this device, not a fact the repository carries, and it belongs beside the
-  existing run and source records that
-  [EDITING-AND-RECORDS](EDITING-AND-RECORDS.md) already keeps device-local.
-- **No call into `git ai`.** Its `checkpoint known_human` entry point would
-  report as the reader's every line no agent hook happened to claim, which fails
-  in exactly the direction that matters: an agent's line presented as the
-  reader's. Its `checkpoint agent-v1` would have irori synthesise a contract it
-  does not own for four different CLIs.
-- **No carrying of ranges across history rewrites**, because content identity
-  makes it unnecessary.
+  matter, no block ids.
+- **No sub-line record.** Which words inside a line are the person's is not kept;
+  the line is. The survey behind this choice, including why git-ai and the other
+  tools found do not keep it either, is in
+  [research](research/2026-09-21-authorship-provenance.md).
+- **No record of an agent's lines**, and so no distinction between an agent's
+  line and a line of unknown origin. Material that predates irori is kept apart
+  at folder level.
 
 ## Known limits
 
-Two lines with identical text share one attribution. Any write landing in a
-space while one of its runs is executing is attributed to that run, so editing
-the same checkout in another editor during a run misattributes those lines. The
-record does not reach a second machine, a collaborator, or an agent running
-outside irori. Only Markdown in the knowledge layer is tracked. The rich editor
-states a total rather than marking each block, because a Markdown block and a
-ProseMirror node are not guaranteed to correspond one to one; source view marks
-the lines.
+Two lines with identical text share one mark, and a line identical to one the
+file already carried is not marked. Text the person pastes counts as theirs.
+The record does not reach a second machine or a collaborator. Only Claude Code
+is told at edit time; Codex, OpenCode and Pi get the person's lines only
+through the tickbox. How Claude Code's model uses the hook's context was not
+exercised with a real model turn here.
 
 ## The next step, when it is wanted
 
-Export and import of the
-[Git AI Standard v3](https://github.com/git-ai-project/git-ai/blob/main/specs/git_ai_standard_v3.0.0.md)
-note at `refs/notes/ai`, generated from this record and read back from it. That
-is what makes the record portable and what lets git-ai, git-byline and anything
-else that speaks the format read irori's observations — without irori depending
-on a binary, and without writing into the working tree. Reading comes first:
-where a repository already carries the note, irori should show it rather than
-compete with it. Whether `refs/notes/ai` joins what `gitSync` pushes is a
-separate decision, and GitHub's squash and rebase merge buttons drop notes.
+Writing the record to `refs/notes/ai` as Git AI Standard v3 `h_` entries at
+commit, and reading such entries back, which makes it portable and readable by
+git-ai — `h_` only, since that is exactly this record. GitHub's squash and rebase
+merge buttons drop notes.

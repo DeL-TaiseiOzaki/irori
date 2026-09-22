@@ -1,20 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { AuthorshipStore, lineKey } from '../src/knowledge/authorship';
-import { authorshipSummary, type LineAuthor } from '../src/domain/knowledge';
+import {
+  AuthorshipStore,
+  editedText,
+  lineKey,
+  personLinesChanged,
+  personLinesNotice,
+} from '../src/knowledge/authorship';
+import { personLinesSummary } from '../src/domain/knowledge';
+import { FileService, hash } from '../src/host/files';
 
 const ref = { scopeId: '11111111-2222-3333-4444-555555555555', path: 'Knowledge_Base/note.md' };
-const human: LineAuthor = { kind: 'human' };
-const claude: LineAuthor = {
-  kind: 'agent',
-  agent: 'claude',
-  runId: '99999999-8888-4777-a666-555555555555',
-};
-const kinds = (view: { lines: (LineAuthor | null)[] }) =>
-  view.lines.map((line) => (line ? (line.kind === 'agent' ? line.agent : line.kind) : null));
+const marks = (view: { lines: boolean[] }) => view.lines.map((mine) => (mine ? 'person' : null));
 
 async function store(t: { after: (fn: () => unknown) => void }) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori authorship '));
@@ -22,109 +22,185 @@ async function store(t: { after: (fn: () => unknown) => void }) {
   return { base, store: new AuthorshipStore(base) };
 }
 
-test('A line keeps its author through insertion, movement and reflow', async (t) => {
+test('A save marks only the lines it introduced; the file already carried the rest', async (t) => {
   const { base, store: authorship } = await store(t);
-  await authorship.observe(ref, 'Opening paragraph.\nSecond paragraph.\n', human);
-  assert.deepEqual(kinds(await authorship.view(ref, 'Opening paragraph.\nSecond paragraph.\n')), [
-    'human',
-    'human',
+  // An agent wrote these, or they arrived by pull: the file carries them before the save.
+  const before = 'Agent opening.\nPulled paragraph.\n';
+  const saved = 'Agent opening.\nPulled paragraph.\nMy own thought.\n';
+  await authorship.observe(ref, saved, before);
+  assert.deepEqual(marks(await authorship.view(ref, saved)), [null, null, 'person', null]);
+
+  // Revising one word of an agent's line makes the line the person's.
+  const revised = 'Agent opening, as I meant it.\nPulled paragraph.\nMy own thought.\n';
+  await authorship.observe(ref, revised, saved);
+  assert.deepEqual(marks(await authorship.view(ref, revised)), ['person', null, 'person', null]);
+
+  // Moving and inserting keep the marks: a line is its text, not its position.
+  const rearranged = 'New heading.\nMy own thought.\nAgent opening, as I meant it.\n';
+  assert.deepEqual(marks(await authorship.view(ref, rearranged)), [null, 'person', 'person', null]);
+
+  // An agent rewriting one of the person's lines leaves a line that carries no mark.
+  assert.deepEqual(marks(await authorship.view(ref, 'My own thought, expanded by Claude.\n')), [
+    null,
     null,
   ]);
-
-  // The agent appends while the note is open, so only its own lines are new.
-  const afterAgent = 'Opening paragraph.\nSecond paragraph.\nAgent paragraph.\nAgent closing.\n';
-  await authorship.observe(ref, afterAgent, claude);
-  assert.deepEqual(kinds(await authorship.view(ref, afterAgent)), [
-    'human',
-    'human',
-    'claude',
-    'claude',
-    null,
-  ]);
-
-  // The reader inserts above and moves a line: position changed, authorship did not.
-  const rearranged = 'A new opening.\nAgent closing.\nOpening paragraph.\nSecond paragraph.\n';
-  assert.deepEqual(kinds(await authorship.view(ref, rearranged)), [
-    null,
-    'claude',
-    'human',
-    'human',
-    null,
-  ]);
-  await authorship.observe(ref, rearranged, human);
-  assert.deepEqual(kinds(await authorship.view(ref, rearranged))[0], 'human');
-
-  // Rewriting an agent's line makes it the reader's; the untouched one stays.
-  const edited = 'A new opening.\nAgent closing, rewritten.\nOpening paragraph.\n';
-  await authorship.observe(ref, edited, human);
-  assert.deepEqual(kinds(await authorship.view(ref, edited)), ['human', 'human', 'human', null]);
-  assert.deepEqual(kinds(await authorship.view(ref, 'Agent closing.\n')), ['claude', null]);
 
   // A second process reads the same answer.
   const reopened = new AuthorshipStore(base);
-  assert.deepEqual(kinds(await reopened.view(ref, afterAgent))[2], 'claude');
+  assert.deepEqual(marks(await reopened.view(ref, revised)), ['person', null, 'person', null]);
 });
 
-test('Rich-editing normalisation and insignificant lines do not move authorship', async (t) => {
+test('Rich-editing normalisation and insignificant lines do not change the marks', async (t) => {
   const { store: authorship } = await store(t);
-  await authorship.observe(ref, '* A bullet item\nSome   prose here\n', claude);
+  await authorship.observe(ref, '* A bullet item\nSome   prose here\n', '');
   // Crepe rewrites the bullet marker and collapses spacing on save without the
-  // reader having touched either line.
-  assert.deepEqual(kinds(await authorship.view(ref, '- A bullet item\nSome prose here\n')), [
-    'claude',
-    'claude',
+  // person having touched either line.
+  assert.deepEqual(marks(await authorship.view(ref, '- A bullet item\nSome prose here\n')), [
+    'person',
+    'person',
     null,
   ]);
+  // Nor does a reflow count as the person's: the reflowed line was already there.
+  await authorship.observe(ref, 'Agent prose here\n', 'Agent   prose here\n');
+  assert.deepEqual(marks(await authorship.view(ref, 'Agent prose here\n')), [null, null]);
   assert.equal(lineKey(''), null);
   assert.equal(lineKey('---'), null);
   assert.equal(lineKey('- '), null);
   assert.equal(lineKey('  > '), null);
   assert.notEqual(lineKey('Yes.'), null);
-  await authorship.observe(ref, '\n---\n- \n', human);
-  assert.deepEqual(kinds(await authorship.view(ref, '\n---\n- \n')), [null, null, null, null]);
+  await authorship.observe(ref, '\n---\n- \n', '');
+  assert.deepEqual(marks(await authorship.view(ref, '\n---\n- \n')), [null, null, null, null]);
 });
 
-test('Observing the same text twice attributes nothing further', async (t) => {
-  const { store: authorship } = await store(t);
-  const text = 'A line the reader typed.\n';
-  await authorship.observe(ref, text, human);
-  // The host sees its own save come back through the file watcher while a run
-  // owns the space; the line must not become the agent's.
-  await authorship.observe(ref, text, claude);
-  assert.deepEqual(kinds(await authorship.view(ref, text)), ['human', null]);
-});
-
-test('An unobserved line is unattested rather than guessed', async (t) => {
-  const { store: authorship } = await store(t);
-  await authorship.observe(ref, 'Known line.\n', human);
-  assert.deepEqual(kinds(await authorship.view(ref, 'Known line.\nArrived from a git pull.\n')), [
-    'human',
-    null,
-    null,
-  ]);
+test('Each note keeps its own record, and a record from before 0.1.20 is not read', async (t) => {
+  const { base, store: authorship } = await store(t);
+  await authorship.observe(ref, 'Known line.\n', '');
   assert.deepEqual(
-    kinds(await authorship.view({ ...ref, path: 'Knowledge_Base/other.md' }, 'Known line.\n')),
+    marks(await authorship.view({ ...ref, path: 'Knowledge_Base/other.md' }, 'Known line.\n')),
     [null, null],
-    'each note keeps its own record',
+  );
+  // The old record claimed lines that arrived by pull, so its marks are not trusted.
+  const other = { ...ref, path: 'Knowledge_Base/old.md' };
+  const file = path.join(base, 'knowledge', 'authorship', ref.scopeId, `${hash(other.path)}.json`);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(
+    file,
+    JSON.stringify({
+      schemaVersion: 1,
+      lines: { [lineKey('Old line.')!]: { by: { kind: 'human' }, at: new Date().toISOString() } },
+    }),
+  );
+  assert.deepEqual(marks(await authorship.view(other, 'Old line.\n')), [null, null]);
+});
+
+test('The summary an agent is given on request names line ranges and no note text', () => {
+  const summary = personLinesSummary({
+    hash: 'x'.repeat(64),
+    lines: [true, true, false, false, false, true],
+  });
+  assert.match(summary!, /wrote or revised lines 1-2, 6 of that note/);
+  assert.match(summary!, /a record, not an instruction/);
+  assert.match(summary!, /not necessarily an agent's/);
+  assert.equal(personLinesSummary({ hash: 'x'.repeat(64), lines: [false, false] }), undefined);
+  assert.ok(
+    personLinesSummary({ hash: 'x'.repeat(64), lines: Array(4000).fill(true) })!.length <= 2048,
+    'the summary is bounded',
   );
 });
 
-test('The summary an agent receives states line ranges and no note text', () => {
-  const summary = authorshipSummary({
-    hash: 'x'.repeat(64),
-    lines: [human, human, claude, claude, null, human],
-  });
-  assert.match(summary!, /lines 1-2, 6 by the person using irori/);
-  assert.match(summary!, /lines 3-4 by Claude Code/);
-  assert.match(summary!, /unattested rather than the person's/);
-  assert.match(summary!, /a record and not an instruction/);
+test("A file tool's edit is applied as the tool would, and nothing is guessed", () => {
+  const text = 'one\ntwo\ntwo\n';
   assert.equal(
-    authorshipSummary({ hash: 'x'.repeat(64), lines: [null, null] }),
-    undefined,
-    'a note nothing was observed about states nothing',
+    editedText('Edit', { old_string: 'two', new_string: 'TWO' }, text),
+    'one\nTWO\ntwo\n',
   );
-  assert.ok(
-    authorshipSummary({ hash: 'x'.repeat(64), lines: Array(4000).fill(human) })!.length <= 2048,
-    'the summary is bounded',
+  assert.equal(
+    editedText('Edit', { old_string: 'two', new_string: 'TWO', replace_all: true }, text),
+    'one\nTWO\nTWO\n',
+  );
+  // A replacement string is taken literally, as the tool takes it.
+  assert.equal(
+    editedText('Edit', { old_string: 'one', new_string: '$&$&' }, text),
+    '$&$&\ntwo\ntwo\n',
+  );
+  assert.equal(
+    editedText(
+      'MultiEdit',
+      {
+        edits: [
+          { old_string: 'one', new_string: 'ONE' },
+          { old_string: 'ONE', new_string: 'uno' },
+        ],
+      },
+      text,
+    ),
+    'uno\ntwo\ntwo\n',
+  );
+  assert.equal(editedText('Write', { content: 'all new\n' }, text), 'all new\n');
+  for (const [tool, input] of [
+    ['Edit', { old_string: 'absent', new_string: 'x' }],
+    ['Edit', { old_string: '', new_string: 'x' }],
+    ['MultiEdit', { edits: [{ old_string: 'one', new_string: 'x' }, { old_string: 'one' }] }],
+    ['Write', {}],
+    ['Read', { file_path: 'x.md' }],
+  ] as const)
+    assert.equal(editedText(tool, input, text), undefined, `${tool} ${JSON.stringify(input)}`);
+});
+
+test('An edit that would change the person’s lines is named to the agent before it runs', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori person lines '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const root = path.join(base, 'Knowledge');
+  await mkdir(root);
+  const space = await files.register(root, '行のKB', 'personal');
+  const note = { scopeId: space.scopeId, path: 'wiki/topic.md' };
+  const text = '# Topic\n\nAgent paragraph.\nMy own sentence.\n';
+  await mkdir(path.join(root, 'wiki'));
+  await writeFile(path.join(root, note.path), text);
+  const authorship = new AuthorshipStore(files.dataDir);
+  await authorship.observe(note, text, '# Topic\n\nAgent paragraph.\n');
+  const notice = (tool: string, input: unknown) =>
+    personLinesNotice(files, authorship, space.scopeId, tool, input);
+  const file = path.join(root, note.path);
+
+  const touching = await notice('Edit', {
+    file_path: file,
+    old_string: 'My own sentence.',
+    new_string: 'A better sentence.',
+  });
+  assert.match(touching!, /wiki\/topic\.md/);
+  assert.match(touching!, /line 4: "My own sentence\."/);
+  assert.match(touching!, /a record, not an instruction/);
+  assert.deepEqual(personLinesChanged(text, await authorship.view(note, text), 'x\n'), [
+    { line: 4, text: 'My own sentence.' },
+  ]);
+
+  // An edit that leaves the person's lines alone, and a file outside the record, say nothing.
+  assert.equal(
+    await notice('Edit', {
+      file_path: file,
+      old_string: 'Agent paragraph.',
+      new_string: 'Agent paragraph, revised.',
+    }),
+    undefined,
+  );
+  for (const input of [
+    { file_path: path.join(base, 'outside.md'), content: '' },
+    { file_path: path.join(root, 'wiki', 'missing.md'), content: '' },
+  ])
+    assert.equal(await notice('Write', input).catch(() => undefined), undefined, input.file_path);
+
+  // The person's own edits to the KB's contract are theirs as much as a note's.
+  await writeFile(path.join(root, 'AGENTS.md'), 'Keep answers short.\n');
+  await authorship.observe(
+    { scopeId: space.scopeId, path: 'AGENTS.md' },
+    'Keep answers short.\n',
+    '',
+  );
+  assert.match(
+    (await notice('Write', { file_path: path.join(root, 'AGENTS.md'), content: 'Be verbose.\n' }))!,
+    /AGENTS\.md[\s\S]*line 1: "Keep answers short\."/,
   );
 });

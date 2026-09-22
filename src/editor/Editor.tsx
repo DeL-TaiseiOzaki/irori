@@ -130,17 +130,17 @@ const japaneseEditorChrome = {
 } as const;
 
 /**
- * A line an agent wrote carries a mark in the source gutter. The reader's own
- * lines and lines nothing was observed about carry none: the absence of a mark
- * is not a claim, and marking every line would say nothing.
+ * A line the person wrote or revised carries a mark in the source gutter. Other
+ * lines carry none: the absence of a mark is not a claim that an agent wrote
+ * them, and marking every line would say nothing.
  */
-class AgentLine extends GutterMarker {
-  elementClass = 'cm-authored-agent';
+class PersonLine extends GutterMarker {
+  elementClass = 'cm-authored-person';
   toDOM() {
     return document.createTextNode('');
   }
 }
-const agentLine = new AgentLine();
+const personLine = new PersonLine();
 
 export interface EditorHandle {
   getText(): string;
@@ -209,9 +209,8 @@ export function Editor({
             gutter({
               class: 'cm-authorship',
               lineMarker: (view, line) =>
-                authored.current?.lines[view.state.doc.lineAt(line.from).number - 1]?.kind ===
-                'agent'
-                  ? agentLine
+                authored.current?.lines[view.state.doc.lineAt(line.from).number - 1]
+                  ? personLine
                   : null,
             }),
             basicSetup,

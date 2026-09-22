@@ -13,6 +13,8 @@ export const messageInput = z.object({
   newSession: z.boolean().optional(),
   sources: z.array(sourceRef).max(20).optional(),
   skill: skillName.optional(),
+  /** Tell the agent which lines of the note the person wrote or revised. */
+  personLines: z.boolean().optional(),
 });
 export const startInput = messageInput.extend({ scopeId: z.uuid(), agent: z.enum(agentIds) });
 export const queuedMessage = messageInput.extend({ id: z.uuid() });

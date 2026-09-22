@@ -9,6 +9,7 @@ import { AgentService } from '../src/agents/service';
 import { SessionStore, sessionKey } from '../src/agents/sessions';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 import { classify } from '../src/domain/scopes';
+import { AuthorshipStore } from '../src/knowledge/authorship';
 
 const fixtureOptions = {
   skip: process.platform === 'win32' && 'POSIX executable fixture',
@@ -255,6 +256,30 @@ test(
           e.type === 'error' && e.text.includes('退役') && e.text.includes('Folded into distill'),
       ),
     );
+  },
+);
+
+test(
+  "The person's lines reach the request only when the person asks",
+  fixtureOptions,
+  async (t) => {
+    const { root, space, files, calls, execute } = await setup(t);
+    const text = '# Fixture\n\nAn agent paragraph.\nMy own sentence.\n';
+    await writeFile(path.join(root, 'note.md'), text);
+    await new AuthorshipStore(files.dataDir).observe(
+      { scopeId: space.scopeId, path: 'note.md' },
+      text,
+      '# Fixture\n\nAn agent paragraph.\n',
+    );
+    const sent = async (extra: Partial<StartRun>) => {
+      const run = await execute('pi', 'tidy the note', false, { notePath: 'note.md', ...extra });
+      assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+      return (await calls()).filter((call: any) => call.type === 'prompt').at(-1).message as string;
+    };
+    assert.ok(!(await sent({})).includes('wrote or revised'), 'not on every turn');
+    const asked = await sent({ personLines: true });
+    assert.ok(asked.includes('wrote or revised lines 4 of that note'), asked);
+    assert.ok(asked.endsWith('tidy the note'), 'the request stays last');
   },
 );
 
