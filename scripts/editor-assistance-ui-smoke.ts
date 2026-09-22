@@ -38,6 +38,10 @@ async function launch() {
   });
   const page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
+  // Wrap the handler only after the first load, or the reload below aborts it.
+  await expect(
+    page.getByRole('heading', { name: 'ワークスペースを選択', exact: true }),
+  ).toBeVisible();
   await app.evaluate(({ ipcMain }) => {
     type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
     const original = (
@@ -105,9 +109,10 @@ async function clickToggle(page: Page, enabled: boolean) {
   await toggle(page).click();
   await assistance(page, enabled);
 }
-async function selection(content: Locator) {
+async function expectSelection(content: Locator, expected: string) {
+  // CodeMirror restores the DOM selection from its state shortly after focus returns.
   await content.focus();
-  return content.evaluate(() => window.getSelection()?.toString());
+  await expect.poll(() => content.evaluate(() => window.getSelection()?.toString())).toBe(expected);
 }
 async function writesStayAt(before: Observation) {
   // The editor autosaves after one second. A display-only change must not
@@ -134,13 +139,13 @@ try {
   await page.keyboard.press('ControlOrMeta+Home');
   await page.keyboard.press('Shift+ArrowRight');
   await page.keyboard.press('Shift+ArrowRight');
-  const selected = await selection(content);
-  expect(selected).toBe('fu');
+  const selected = 'fu';
+  await expectSelection(content, selected);
   const cleanWrites = await observation();
   await clickToggle(page, false);
-  expect(await selection(content)).toBe(selected);
+  await expectSelection(content, selected);
   await clickToggle(page, true);
-  expect(await selection(content)).toBe(selected);
+  await expectSelection(content, selected);
   await expect(source).toHaveAttribute('data-fixture-identity', 'source-original');
   await writesStayAt(cleanWrites);
   expect(await readFile(path.join(root, 'example.js'), 'utf8')).toBe(script);
@@ -155,12 +160,12 @@ try {
   await expect(page.locator('.error[role="alert"]')).toContainText('Fixture note save held');
   await expect(page.locator('.doc-toolbar')).toContainText('保存待ち');
   await page.keyboard.press('Shift+Home');
-  expect(await selection(content)).toBe(added);
+  await expectSelection(content, added);
   const dirtyWrites = await observation();
   for (const enabled of [false, true, false, true]) {
     await clickToggle(page, enabled);
     await expect(content).toContainText(added);
-    expect(await selection(content)).toBe(added);
+    await expectSelection(content, added);
     await expect(source).toHaveAttribute('data-fixture-identity', 'source-original');
   }
   await writesStayAt(dirtyWrites);

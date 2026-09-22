@@ -35,7 +35,9 @@ irori. Editor syntax coloring, completion, diagnostics and run buttons are
 separate conveniences. They must not be used as a reason to restrict the
 agent's capabilities or as evidence of CLI parity. Native permissions and
 capability-specific acceptance still apply. Provider limitations must be shown
-as limitations, not silently replaced by text or simulated success.
+as limitations, not silently replaced by text or simulated success. The owner
+then asked for those conveniences to be shown or hidden together with one
+button; [EDITOR-ASSISTANCE](../EDITOR-ASSISTANCE.md) records that display switch.
 
 The extension target is **VS Code extension compatibility**. An irori-specific
 plugin API is not a substitute. This resolves ADR 005's open question about

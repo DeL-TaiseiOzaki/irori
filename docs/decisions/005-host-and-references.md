@@ -90,8 +90,9 @@ irori does not do the thing yet, the entry says so.
    relations on request; an explicit CSV declaration still wins. Broader
    portable source/run/artifact provenance remains incomplete.
 3. **Code editing and execution, as an IDE offers them.** *Partial.* The source
-   view is CodeMirror with Markdown highlighting only, and execution means the
-   native terminal. Language support, diagnostics and running a project are not
+   view is CodeMirror; since 0.1.28 it picks a language from the filename and its
+   conveniences switch on and off together ([EDITOR-ASSISTANCE](../EDITOR-ASSISTANCE.md)).
+   Execution means the native terminal. Diagnostics and running a project are not
    there. Note that orca reached the opposite conclusion here — it switched
    Monaco's diagnostics off and tells users to run checkers in a terminal pane —
    so how far irori goes is a product decision, not a matter of catching up.
