@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useImperativeHandle, type Ref } from 'reac
 import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { blockEdit } from '@milkdown/crepe/feature/block-edit';
 import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
+import { codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { cursor } from '@milkdown/crepe/feature/cursor';
 import { imageBlock } from '@milkdown/crepe/feature/image-block';
 import { linkTooltip } from '@milkdown/crepe/feature/link-tooltip';
@@ -16,12 +17,12 @@ import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import type { NoteAuthorship } from '../domain/knowledge';
-import { EditorView, GutterMarker, gutter } from '@codemirror/view';
-import { EditorState, Prec } from '@codemirror/state';
-import { markdown } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { EditorView, GutterMarker, gutter, ViewPlugin } from '@codemirror/view';
+import { EditorState, Compartment } from '@codemirror/state';
+import { HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
+import { assistanceExtensions, editingCore, languageForFilename } from './assistance';
 // Crepe's own entry point and its combined stylesheet are flattened bundles that
 // import KaTeX and its fonts unconditionally, so `features: { Latex: false }` —
 // a runtime flag read after bundling — never removed them. Composing the builder
@@ -80,6 +81,14 @@ const sourceHighlight = HighlightStyle.define([
   { tag: tags.quote, color: 'var(--muted)' },
   { tag: [tags.processingInstruction, tags.punctuation, tags.meta], color: 'var(--ink-faint)' },
   { tag: tags.list, color: 'var(--ember-ink)' },
+  { tag: tags.comment, color: 'var(--muted)', fontStyle: 'italic' },
+  { tag: tags.keyword, color: 'var(--ember-ink)', fontWeight: '600' },
+  { tag: tags.string, color: 'var(--added)' },
+  { tag: [tags.number, tags.bool, tags.null], color: 'var(--ember-ink)' },
+  { tag: tags.typeName, color: 'var(--danger)' },
+  { tag: tags.function(tags.variableName), color: 'var(--ink)', fontWeight: '600' },
+  { tag: tags.attributeName, color: 'var(--ember-ink)' },
+  { tag: tags.invalid, textDecoration: 'underline wavy var(--danger)' },
 ]);
 
 // Crepe's editor chrome ships English copy. The product is Japanese, so the
@@ -95,7 +104,7 @@ const japaneseEditorChrome = {
   codeMirror: {
     languages,
     // Code blocks inside the note are CodeMirror as well; share the token theme.
-    theme: [sourceTheme, syntaxHighlighting(sourceHighlight)],
+    theme: sourceTheme,
     searchPlaceholder: '言語を検索…',
     noResultText: '該当する言語がありません',
     copyText: 'コピー',
@@ -154,6 +163,8 @@ export function Editor({
   onError,
   ref,
   readOnly = false,
+  assistance = true,
+  filename,
   searchTarget,
   onSearchResult,
   authorship,
@@ -167,6 +178,8 @@ export function Editor({
   onError?: (error: unknown) => void;
   ref?: Ref<EditorHandle>;
   readOnly?: boolean;
+  assistance?: boolean;
+  filename?: string;
   searchTarget?: SearchTarget;
   onSearchResult?: (found: boolean) => void;
   authorship?: NoteAuthorship;
@@ -178,6 +191,11 @@ export function Editor({
   const authored = useRef(authorship);
   authored.current = authorship;
   const source = useRef<EditorView | null>(null);
+  const assistanceConfig = useRef(new Compartment());
+  const languageConfig = useRef(new Compartment());
+  const assistanceEnabled = useRef(assistance);
+  assistanceEnabled.current = assistance;
+  const codeBlocks = useRef(new Set<EditorView>());
   const root = useRef<HTMLDivElement>(null);
   const change = useRef(onChange);
   change.current = onChange;
@@ -204,7 +222,6 @@ export function Editor({
             EditorState.readOnly.of(readOnly),
             EditorView.editable.of(!readOnly),
             EditorState.lineSeparator.of(initial.current.includes('\r\n') ? '\r\n' : '\n'),
-            Prec.high(syntaxHighlighting(sourceHighlight)),
             sourceTheme,
             gutter({
               class: 'cm-authorship',
@@ -213,8 +230,11 @@ export function Editor({
                   ? personLine
                   : null,
             }),
-            basicSetup,
-            markdown(),
+            editingCore,
+            assistanceConfig.current.of(
+              assistanceExtensions(assistanceEnabled.current, sourceHighlight),
+            ),
+            languageConfig.current.of([]),
             EditorView.lineWrapping,
             EditorView.updateListener.of((update) => {
               if (update.docChanged) change.current(update.state.sliceDoc());
@@ -317,6 +337,35 @@ export function Editor({
         blockConfirmButton: '追加',
       });
     crepe.editor
+      .config((ctx) => {
+        ctx.update(codeBlockConfig.key, (config) => ({
+          ...config,
+          // Crepe installs basicSetup unconditionally. Move that bundle into a
+          // compartment while retaining its own block keymap and theme.
+          extensions: [
+            ...config.extensions.filter((extension) => extension !== basicSetup),
+            editingCore,
+            assistanceConfig.current.of(
+              assistanceExtensions(assistanceEnabled.current, sourceHighlight),
+            ),
+            ViewPlugin.define((view) => {
+              if (!dead) codeBlocks.current.add(view);
+              // Milkdown creates fenced editors lazily. The preference may have
+              // changed after this configuration was created but before the block
+              // entered the viewport. Dispatch only after its construction ends.
+              queueMicrotask(() => {
+                if (!dead && codeBlocks.current.has(view))
+                  view.dispatch({
+                    effects: assistanceConfig.current.reconfigure(
+                      assistanceExtensions(assistanceEnabled.current, sourceHighlight),
+                    ),
+                  });
+              });
+              return { destroy: () => codeBlocks.current.delete(view) };
+            }),
+          ],
+        }));
+      })
       .use(literalBlock)
       .use(preserveBlocks)
       .use(
@@ -371,6 +420,7 @@ export function Editor({
       });
     return () => {
       dead = true;
+      codeBlocks.current.clear();
       const wasReady = ready;
       ready = false;
       element.remove();
@@ -381,6 +431,34 @@ export function Editor({
       if (wasReady) void crepe.destroy();
     };
   }, [mode, readOnly]);
+  useEffect(() => {
+    const views = source.current ? [source.current] : [...codeBlocks.current];
+    for (const view of views)
+      view.dispatch({
+        effects: [
+          assistanceConfig.current.reconfigure(assistanceExtensions(assistance, sourceHighlight)),
+          view.scrollSnapshot(),
+        ],
+      });
+  }, [assistance]);
+  useEffect(() => {
+    const view = source.current;
+    if (!view) return;
+    let current = true;
+    void languageForFilename(filename)
+      .then((language) => {
+        if (current && source.current === view)
+          view.dispatch({
+            effects: [languageConfig.current.reconfigure(language), view.scrollSnapshot()],
+          });
+      })
+      .catch((error) => {
+        if (current) onError?.(error);
+      });
+    return () => {
+      current = false;
+    };
+  }, [filename, mode, readOnly]);
   return (
     <>
       {imageErrors.length > 0 && (
@@ -397,7 +475,12 @@ export function Editor({
           </ul>
         </div>
       )}
-      <div className={`document-editor ${mode}`} ref={root} data-testid="document-editor" />
+      <div
+        className={`document-editor ${mode}`}
+        ref={root}
+        data-testid="document-editor"
+        data-editor-assistance={assistance ? 'on' : 'off'}
+      />
     </>
   );
 }

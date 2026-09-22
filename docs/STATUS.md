@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Editor assistance, 2026-09-23: **0.1.28** is prepared on
+`feat/editor-assistance-toggle`, stacked on the unmerged 0.1.27 branch
+`feat/user-access-policy`. The owner asked for editor conveniences to be shown
+or hidden with one button. **コード支援 ON / OFF** in the document toolbar
+switches syntax coloring, line numbers, folding, bracket assistance and
+completions together in source files and Markdown code blocks, as
+[EDITOR-ASSISTANCE](EDITOR-ASSISTANCE.md) describes. Source files now pick a
+language from the filename. The choice is a device setting that survives a
+restart and reverts on a failed write. Switching keeps the same editor, text,
+selection and Undo history, and writes nothing to the note. Diagnostics and
+project run buttons are still not implemented.
+
+Verification: production build, formatting, **235 tests (228 passed, seven
+environment-gated skips: no local rclone, OpenCode or Pi binary, and a
+case-sensitive filesystem)** and **all fifteen Electron UI suites**, including
+the new editor-assistance suite, pass on the stacked branch.
+
 Owner follow-up, 2026-09-23: **0.1.26 is published** from PR #73; main is
 `7726a93` after the download-manifest PR #74. **0.1.27** is prepared on
 `feat/user-access-policy`, pending review and a new merge authorization.

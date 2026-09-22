@@ -13,6 +13,8 @@ import { Popover } from '@base-ui/react/popover';
 import {
   applyMarkdownFont,
   applyTheme,
+  chooseEditorAssistance,
+  currentEditorAssistance,
   layoutStorage,
   loadDeviceSettings,
   watchSystemTheme,
@@ -303,6 +305,8 @@ function navigationNotice(target: Navigation, found: boolean) {
   return `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'}`;
 }
 function App() {
+  const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
+  const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
@@ -1338,6 +1342,29 @@ function App() {
                               ソース
                             </button>
                           )}
+                          {mode !== 'table' && (
+                            <button
+                              className={editorAssistance ? 'selected' : ''}
+                              aria-label="コード支援"
+                              aria-pressed={editorAssistance}
+                              title="色分け・行番号・折りたたみ・補完などの表示をまとめて切り替えます"
+                              disabled={savingAssistance}
+                              onClick={() => {
+                                const previous = editorAssistance;
+                                const next = !previous;
+                                setEditorAssistance(next);
+                                setSavingAssistance(true);
+                                void chooseEditorAssistance(next)
+                                  .catch((error) => {
+                                    setEditorAssistance(previous);
+                                    report(error);
+                                  })
+                                  .finally(() => setSavingAssistance(false));
+                              }}
+                            >
+                              コード支援 {editorAssistance ? 'ON' : 'OFF'}
+                            </button>
+                          )}
                         </div>
                       </div>
                       {doc.draft && doc.draft.text !== doc.text && (
@@ -1370,6 +1397,8 @@ function App() {
                               key={editorKey}
                               text={buffer}
                               mode={mode}
+                              filename={doc.path}
+                              assistance={editorAssistance}
                               readOnly={doc.readOnly}
                               onChange={setBuffer}
                               onError={report}

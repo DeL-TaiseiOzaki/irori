@@ -7,7 +7,13 @@ import { SettingsService } from '../src/host/settings';
 import { hostArguments } from '../src/domain/host-requests';
 import { markdownFonts } from '../src/domain/types';
 
-const defaults = { theme: 'system', markdownFont: 'sans', layouts: {}, skillAudiences: {} };
+const defaults = {
+  theme: 'system',
+  markdownFont: 'sans',
+  editorAssistance: true,
+  layouts: {},
+  skillAudiences: {},
+};
 
 async function service() {
   const dir = await mkdtemp(path.join(tmpdir(), 'irori settings '));
@@ -47,6 +53,20 @@ test('layout records merge instead of replacing each other', async () => {
   assert.equal(stored.markdownFont, 'mono');
 });
 
+test('editor assistance survives restart and unrelated preference writes, with compatible defaults', async () => {
+  const { dir, settings } = await service();
+  await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ theme: 'dark' }));
+  assert.equal((await settings.read()).editorAssistance, true);
+  await settings.save({ editorAssistance: false });
+  await settings.save({ markdownFont: 'mono', layouts: { workspace: 'kept' } });
+  const restarted = await new SettingsService(dir).read();
+  assert.equal(restarted.editorAssistance, false);
+  assert.equal(restarted.theme, 'dark');
+  assert.equal(restarted.layouts.workspace, 'kept');
+  await settings.save({ editorAssistance: true });
+  assert.equal((await new SettingsService(dir).read()).editorAssistance, true);
+});
+
 test("the reader's role and project are kept per KB on the device, not in the KB", async () => {
   const { dir, settings } = await service();
   await settings.save({ skillAudiences: { 'kb-1': { role: 'editor', project: 'thesis' } } });
@@ -69,6 +89,8 @@ test('a damaged or hostile record becomes the defaults rather than an error', as
 test('the request validator bounds what a renderer may store', () => {
   const save = hostArguments.saveDeviceSettings;
   assert.equal(save.safeParse([{ theme: 'dark' }]).success, true);
+  assert.equal(save.safeParse([{ editorAssistance: false }]).success, true);
+  assert.equal(save.safeParse([{ editorAssistance: 'false' }]).success, false);
   for (const markdownFont of markdownFonts)
     assert.equal(save.safeParse([{ markdownFont }]).success, true);
   assert.equal(save.safeParse([{ layouts: { workspace: '{"explorer":30}' } }]).success, true);
