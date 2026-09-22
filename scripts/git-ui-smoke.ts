@@ -215,7 +215,14 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  await page.getByRole('button', { name: 'ソース管理', exact: true }).click();
+  const notesView = page.getByRole('button', { name: 'ノート', exact: true });
+  const gitView = page.getByRole('button', { name: 'ソース管理', exact: true });
+  await notesView.focus();
+  await expect(notesView).toHaveAttribute('tabindex', '0');
+  await page.keyboard.press('ArrowRight');
+  await expect(gitView).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(gitView).toHaveAttribute('aria-pressed', 'true');
   let sidebar = page.getByRole('complementary', { name: 'ソース管理' });
   let panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(sidebar).toBeVisible();
@@ -280,7 +287,14 @@ try {
   expect(await readFile(path.join(root, 'extra.md'), 'utf8')).toBe('# Extra after staging');
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
-  await panel.getByRole('button', { name: '履歴', exact: true }).click();
+  const changesView = panel.getByRole('button', { name: /^変更 \d+$/ });
+  const historyView = panel.getByRole('button', { name: '履歴', exact: true });
+  await changesView.focus();
+  await expect(changesView).toHaveAttribute('tabindex', '0');
+  await page.keyboard.press('ArrowRight');
+  await expect(historyView).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(historyView).toHaveAttribute('aria-pressed', 'true');
   await panel.locator('.git-history-item').filter({ hasText: 'UI note update' }).click();
   // Refreshing (or any file event) while the commit diff is in flight must not
   // discard the patch and leave the loading text on screen.

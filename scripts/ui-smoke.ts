@@ -67,10 +67,56 @@ try {
     // window, the dock and the installers.
     .toBe(256);
   const startupMs = Date.now() - launchStart;
+  const createWorkspace = page.getByRole('button', { name: 'ワークスペースを作成', exact: true });
+  await createWorkspace.hover();
+  await expect(createWorkspace.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
+    'clip-path',
+    'inset(0px round 999px)',
+  );
+  await page.screenshot({ path: 'test-results/obsidian-startup.png', fullPage: true });
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   const registration = page.getByRole('dialog', { name: 'スペース登録' });
   await expect(registration).toBeVisible();
   await expect.poll(() => registration.evaluate((element) => element.matches(':modal'))).toBe(true);
+  await expect(registration.getByLabel('KBフォルダ', { exact: true })).toBeFocused();
+  // Obsidian's moving indicators keep Base UI's keyboard and pressed-value contract.
+  const folderMode = registration.getByRole('button', { name: '既存のフォルダ', exact: true });
+  const cloneMode = registration.getByRole('button', { name: 'GitHub から取得', exact: true });
+  await expect(registration.getByRole('button', { name: '登録して開く' })).toBeDisabled();
+  await folderMode.focus();
+  await expect(folderMode).toHaveAttribute('tabindex', '0');
+  await page.keyboard.press('ArrowRight');
+  await expect(cloneMode).toBeFocused();
+  await expect(folderMode).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Enter');
+  await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(registration.getByLabel('GitHub リポジトリ URL')).toBeVisible();
+  await cloneMode.focus();
+  await page.keyboard.press('Enter');
+  await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
+  // The OS setting takes effect while the dialog is already mounted.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(registration.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
+    'transition-duration',
+    '0s',
+  );
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Space');
+  await expect(folderMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(registration.getByLabel('KBフォルダ', { exact: true })).toBeVisible();
+  const transforms = await folderMode
+    .locator('.obsidian-magnet-marker')
+    .evaluate(async (marker) => {
+      const samples: string[] = [];
+      for (let frame = 0; frame < 8; frame++) {
+        await new Promise(requestAnimationFrame);
+        samples.push(getComputedStyle(marker).transform);
+      }
+      return samples;
+    });
+  expect(transforms.every((transform) => transform === 'none')).toBe(true);
+  await page.screenshot({ path: 'test-results/obsidian-registration.png', fullPage: true });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   for (let i = 0; i < 12; i++) {
     await page.keyboard.press('Tab');
     await expect
@@ -87,6 +133,17 @@ try {
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
+  await expect(page.getByRole('button', { name: '新しいノートを作成', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/obsidian-workspace-light.png', fullPage: true });
+  await page.getByLabel(/表示設定/).click();
+  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  await page.screenshot({
+    path: 'test-results/obsidian-workspace-dark.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.getByLabel(/表示設定/).click();
+  await page.getByRole('menuitemradio', { name: 'ライト', exact: true }).click();
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('顧客インタビュー');
   await expect(page.locator('.ProseMirror table.children')).toBeVisible();
@@ -364,6 +421,7 @@ try {
     processTreeSamples: samples,
     checks: [
       'folder registration',
+      'Obsidian controls: keyboard switching, selected-value retention, native initial focus, disabled submit, live reduced motion and light/dark themes',
       'rich Markdown table',
       'rich Japanese edit/save',
       'no-op bytes',

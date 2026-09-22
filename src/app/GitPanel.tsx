@@ -3,8 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
 import { Menu } from '@base-ui/react/menu';
-import { Toggle } from '@base-ui/react/toggle';
-import { ToggleGroup } from '@base-ui/react/toggle-group';
+import { MagnetTabs } from './obsidian/MagnetTabs';
 import { Icon } from './Icon';
 import { useDraft } from './useDraft';
 import './git-panel.css';
@@ -474,24 +473,27 @@ function RepositoryPanel({
       )}
       <div className="git-toolbar" ref={menuHost}>
         {/* One pressed view at a time, with the group's own roving focus. */}
-        <ToggleGroup
+        <MagnetTabs
           className="git-tabs"
-          aria-label="Git の表示"
-          value={[tab]}
-          onValueChange={(next) => {
-            const selected = next[0];
-            if (!selected || selected === tab) return;
-            setTab(selected as typeof tab);
+          label="Git の表示"
+          value={tab}
+          onValueChange={(selected) => {
+            setTab(selected);
             if (selected === 'history') void perform(() => loadHistory());
           }}
-        >
-          <Toggle value="changes" disabled={busy || conflictDirty || draftBlocked}>
-            変更 <span>{status.changes.length}</span>
-          </Toggle>
-          <Toggle value="history" disabled={busy || conflictDirty || draftBlocked}>
-            履歴
-          </Toggle>
-        </ToggleGroup>
+          options={[
+            {
+              value: 'changes',
+              label: (
+                <>
+                  変更 <span className="git-tab-count">{status.changes.length}</span>
+                </>
+              ),
+              disabled: busy || conflictDirty || draftBlocked,
+            },
+            { value: 'history', label: '履歴', disabled: busy || conflictDirty || draftBlocked },
+          ]}
+        />
         <div className="actions">
           <button
             disabled={busy || conflictDirty || draftBlocked}

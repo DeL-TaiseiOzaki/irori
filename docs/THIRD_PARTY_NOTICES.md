@@ -8,6 +8,8 @@ This preview depends on installed npm packages; exact versions and integrity has
 | rclone 1.75.1 | MIT, assets/rclone-LICENSE.txt; also shipped with the binary in vendor/rclone/LICENSE.txt |
 | fflate | MIT, development-only ZIP extraction; package LICENSE |
 | React / React DOM | MIT, each package's LICENSE |
+| Motion (`motion`, `framer-motion`, `motion-dom`, `motion-utils`) | MIT, each package's LICENSE; used for ObsidianUI tab indicators |
+| ObsidianUI Magnet Tabs and Arrow Fill Button | Adapted source in `src/app/obsidian/`; full MIT notice below |
 | Electron | MIT, node_modules/electron/LICENSE; binary distribution LICENSE and LICENSES.chromium.html |
 | Milkdown Crepe and Milkdown packages | MIT, package LICENSE files; ProseMirror/remark dependencies retain their own notices |
 | CodeMirror packages | MIT, package LICENSE files |
@@ -49,3 +51,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies and asserts that no Claude SDK native binary package is among them. The binaries irori still redistributes are rclone and node-pty's native code for the target platform. Native-binary redistribution review, signing and provider-distribution review remain release gates.
+
+## ObsidianUI MIT notice (adapted renderer components)
+
+Magnet Tabs and Arrow Fill Button were retrieved from the official
+[Magnet Tabs registry](https://www.obsidianui.dev/r/magnet-tabs.json) and
+[Arrow Fill Button registry](https://www.obsidianui.dev/r/arrow-fill-button.json)
+on 2026-09-22. Upstream repository:
+[ObsidianUI at 21d9198](https://gitlab.com/Atharvsinh-codez/ObsidianUI/-/tree/21d9198d14fd663f809cbea9fe124efc9576c003).
+The adaptations preserve the visual mechanisms and use irori's tokens,
+Base UI keyboard behavior and native button semantics. See
+[ADR 007](decisions/007-obsidian-ui.md).
+
+MIT License
+
+Copyright (c) 2026 ObsidianUI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

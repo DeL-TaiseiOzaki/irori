@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+ObsidianUI controls, 2026-09-22: **Magnet Tabs** now marks the selected workspace
+view, Git view and folder/clone registration mode with a moving indicator and
+hover background. **Arrow Fill Button** serves the registration and workspace
+submit actions and the welcome screen's new-note action. Both are adaptations of
+the official MIT source in `src/app/obsidian/`, using irori's light/dark tokens;
+Motion 13.4.0 is the only new direct dependency. Base UI keeps the toggle groups'
+keyboard behavior and busy guards, and reduced motion updates live. Registration
+now gives its input native initial focus, fixing an existing dialog/ToggleGroup
+initialization race that consumed the first arrow press. See
+[ADR 007](decisions/007-obsidian-ui.md) for sources, scope and update policy.
+
+Verification: production build, format check, **204 behavior tests (197 passed,
+seven environment-gated skips)** and all **fourteen Electron UI suites**. The
+focused UI additions exercise keyboard selection, repeated activation, disabled
+submit, live reduced motion and light/dark rendering. The first behavior run
+stalled in the existing concurrent-search test; its isolated run and the full
+rerun passed. No provider inference, installed Windows/Mac trial or local package
+build was performed. Version 0.1.22 and its release notes accompany this change;
+publication follows an authorized merge.
+
 The person's lines travel with commits, 2026-09-22: a commit made in the Git
 panel attaches a Git AI Standard v3 note under `refs/notes/ai` naming, for each
 knowledge-layer Markdown file it adds or modifies, the committed file's person

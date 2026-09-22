@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -51,6 +51,7 @@
     "electron-squirrel-startup": "1.0.1",
     "eventsource-parser": "4.1.0",
     "lucide-react": "1.46.0",
+    "motion": "13.4.0",
     "node-pty": "1.1.0",
     "papaparse": "5.7.0",
     "react": "19.3.0",
