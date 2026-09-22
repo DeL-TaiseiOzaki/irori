@@ -94,6 +94,34 @@ test('Each note keeps its own record, and a record from before 0.1.20 is not rea
   assert.deepEqual(marks(await authorship.view(other, 'Old line.\n')), [null, null]);
 });
 
+test('A note move and its link rewrites carry only the existing person marks, including shared marks', async (t) => {
+  const { base } = await store(t);
+  const shared = '[Shared thought](peer.md)';
+  const local = '[My thought](peer.md)';
+  const unknown = '[Unattested thought](peer.md)';
+  const before = `${shared}\n${local}\n${unknown}\n`;
+  const moved = { ...ref, path: 'Knowledge_Base/moved/note.md' };
+  const authorship = new AuthorshipStore(base, async (at) =>
+    at.path === ref.path ? new Set([lineKey(shared)!]) : new Set(),
+  );
+  await authorship.observe(ref, before, `${shared}\n${unknown}\n`);
+  await authorship.carry(ref, moved, before);
+  assert.deepEqual(marks(await authorship.view(moved, before)), ['person', 'person', null, null]);
+
+  // A path rewrite is an application transformation, not a person's new prose.
+  const rewritten = before.replaceAll('(peer.md)', '(../peer.md)');
+  await authorship.carry(moved, moved, before, rewritten);
+  const reopened = new AuthorshipStore(base);
+  assert.deepEqual(marks(await reopened.view(moved, rewritten)), ['person', 'person', null, null]);
+  assert.deepEqual(
+    personLinesChanged(rewritten, await reopened.view(moved, rewritten), `${unknown}\n`).map(
+      (line) => line.line,
+    ),
+    [1, 2],
+  );
+  await assert.rejects(authorship.carry(moved, moved, rewritten, rewritten + 'Another line.\n'));
+});
+
 test('The summary an agent is given on request names line ranges and no note text', () => {
   const summary = personLinesSummary({
     hash: 'x'.repeat(64),

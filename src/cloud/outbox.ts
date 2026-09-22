@@ -8,11 +8,10 @@ import { readLocalJson, writeLocalJson } from '../host/local-json';
 import { SerialQueue } from '../host/serial-queue';
 import type { RcloneAPI } from './rclone';
 
-export interface WriteTarget {
-  ownerId: string;
-  mountId: string;
-  folderId: string;
-}
+const writeTarget = pendingWrite
+  .pick({ ownerId: true, mountId: true, folderId: true, accountId: true, driveId: true })
+  .required({ accountId: true });
+export type WriteTarget = z.infer<typeof writeTarget>;
 export interface Delivery {
   observe(name: string): Promise<{ hash: string; size: number } | null>;
   copy(filename: string, name: string): Promise<void>;
@@ -51,9 +50,10 @@ export class CloudOutbox {
   }
   prepare(target: WriteTarget, ref: SourceRef) {
     return this.queue.run(async () => {
+      const destination = writeTarget.parse(target);
       const source = await this.knowledge.capture(ref);
       const record = pendingWrite.parse({
-        ...target,
+        ...destination,
         id: randomUUID(),
         name: path.posix.basename(ref.path),
         source,
@@ -64,16 +64,25 @@ export class CloudOutbox {
       return record;
     });
   }
-  // The read-only Google host does not expose this operation. A writable capability and
-  // exact attachment/account binding must be supplied before integrating native delivery.
+  // The read-only Google host does not expose this operation. Native delivery still
+  // needs a writable capability bound to the current account and attachment.
   deliver(ownerId: string, id: string, target: WriteTarget, remote: Delivery) {
     return this.queue.run(async () => {
+      const destination = writeTarget.parse(target);
       const filename = this.filename(ownerId, id);
       let record = pendingWrite.parse(await readLocalJson(filename, null));
+      if (!record.accountId)
+        throw Error(
+          '送信準備にアカウント情報がありません。保持版を復元し、送信先を確認して準備し直してください。',
+        );
       if (
-        record.ownerId !== target.ownerId ||
-        record.mountId !== target.mountId ||
-        record.folderId !== target.folderId
+        record.id !== id ||
+        record.ownerId !== ownerId ||
+        record.ownerId !== destination.ownerId ||
+        record.mountId !== destination.mountId ||
+        record.folderId !== destination.folderId ||
+        record.accountId !== destination.accountId ||
+        record.driveId !== destination.driveId
       )
         throw Error('送信先の識別情報が変わっています。');
       if (record.state === 'confirmed') return record;

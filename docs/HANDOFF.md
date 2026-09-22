@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Current continuation, 2026-09-22: main is `9c92f39`, with **0.1.25** published.
+The owner's follow-up audit and implementation are on `fix/audit-recovery`,
+prepared as **0.1.26**; they need pull-request review and an authorized merge.
+Read [the audit and remaining work](AUDIT-2026-09-22.md), current
+[STATUS](STATUS.md), and [HANDOFF-PROMPT](HANDOFF-PROMPT.md) before the historical
+entries below. Note/reference and authorship preservation, graph regeneration,
+Drive recovery, initial clone notes and exact cloud-preparation binding have
+been addressed in that branch. Real device/model acceptance and the remainder
+of writable cloud delivery remain open. No new installer has been published.
+
+## Historical continuation records
+
 Resume here, 2026-09-21 (evening, after the 0.1.19 delivery): `main` is `60eea4e`
 and [v0.1.19-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.19-preview.1)
 publishes it for both platforms, with the download page in step. **#61 (0.1.20)

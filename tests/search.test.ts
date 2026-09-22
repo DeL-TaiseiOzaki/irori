@@ -151,36 +151,51 @@ test('Unavailable descendants mark a search incomplete while root failures remai
   await assert.rejects(new SearchService(files).search(space.scopeId, 'needle'));
 });
 
-test('A later search supersedes an earlier request and external changes are searched afresh', async (t) => {
-  const { files, space, write } = await fixture(t);
-  await write('note.md', 'old phrase');
-  const entries = files.entries.bind(files);
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let pause = true;
-  files.entries = async (id, directory) => {
-    if (pause) {
-      pause = false;
-      await gate;
+test(
+  'A later search supersedes an earlier request and external changes are searched afresh',
+  { timeout: 10000 },
+  async (t) => {
+    const { files, space, write } = await fixture(t);
+    await write('note.md', 'old phrase');
+    const entries = files.entries.bind(files);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let pause = true;
+    let paused!: () => void;
+    const started = new Promise<void>((resolve) => {
+      paused = resolve;
+    });
+    files.entries = async (id, directory) => {
+      if (pause) {
+        pause = false;
+        paused();
+        await gate;
+      }
+      return entries(id, directory);
+    };
+    const service = new SearchService(files);
+    const old = service.search(space.scopeId, 'old');
+    const rejected = assert.rejects(old, /新しい検索/);
+    // Wait for the first search to reach the gate; otherwise the second can take
+    // it while the first is still opening SQLite, leaving both tests waiting.
+    await started;
+    await write('note.md', 'new phrase');
+    try {
+      assert.equal((await service.search(space.scopeId, 'new')).hits.length, 1);
+    } finally {
+      release();
     }
-    return entries(id, directory);
-  };
-  const service = new SearchService(files);
-  const old = service.search(space.scopeId, 'old');
-  const rejected = assert.rejects(old, /新しい検索/);
-  await write('note.md', 'new phrase');
-  assert.equal((await service.search(space.scopeId, 'new')).hits.length, 1);
-  release();
-  await rejected;
-  await rename(path.join(space.root, 'note.md'), path.join(space.root, 'moved.md'));
-  assert.deepEqual(
-    (await service.search(space.scopeId, 'new')).hits.map((hit) => hit.path),
-    ['moved.md'],
-  );
-  assert.deepEqual((await service.search(space.scopeId, 'old')).hits, []);
-});
+    await rejected;
+    await rename(path.join(space.root, 'note.md'), path.join(space.root, 'moved.md'));
+    assert.deepEqual(
+      (await service.search(space.scopeId, 'new')).hits.map((hit) => hit.path),
+      ['moved.md'],
+    );
+    assert.deepEqual((await service.search(space.scopeId, 'old')).hits, []);
+  },
+);
 
 test('Long matching lines keep the literal match in the preview, and IPC rejects invalid queries', async (t) => {
   const { files, space, write } = await fixture(t);

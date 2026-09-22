@@ -9,6 +9,7 @@ import type { Entry, Space } from '../domain/types';
 import { FileService, textFilePattern } from './files';
 import { foldsCase } from './links';
 import { SearchIndex, trigramQuery } from './search-index';
+import { referencesTo } from './note-references';
 
 export const searchLimits = {
   files: 50000,
@@ -51,6 +52,14 @@ export class SearchService {
     );
   }
 
+  /** Move previews include the OKF relation and source fields as well as body links. */
+  async references(scopeId: string, target: string): Promise<KnowledgeSearch> {
+    const foldCase = await foldsCase(this.files, scopeId, target);
+    return this.scan(scopeId, target, /\.md$/i, (from, text) =>
+      samePath(from, target, foldCase) ? () => null : referencesTo(text, from, target, foldCase),
+    );
+  }
+
   /**
    * Walks the layer to check the index against the files on disk — reading only
    * those added or changed since they were indexed, forgetting those gone — then
@@ -61,7 +70,7 @@ export class SearchService {
     scopeId: string,
     query: string,
     include: RegExp,
-    matcher: (path: string) => (line: string) => RegExpExecArray | null,
+    matcher: (path: string, text: string) => (line: string) => RegExpExecArray | null,
     narrow?: string,
   ): Promise<KnowledgeSearch> {
     const space = this.files.get(scopeId);
@@ -196,7 +205,14 @@ export class SearchService {
         const text = index.text(id);
         if (text === null) continue;
         const lines = text.split(/\r\n|\n|\r/);
-        const match = matcher(file);
+        let match;
+        try {
+          match = matcher(file, text);
+        } catch {
+          result.incomplete = true;
+          result.skippedFiles++;
+          continue;
+        }
         for (let line = 0; line < lines.length; line++) {
           if (!current()) break matching;
           const found = match(lines[line]);

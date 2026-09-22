@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { AuthorshipStore } from '../src/knowledge/authorship';
 
 // Real disposable notes linking to each other by relative path, as the recommended
 // knowledge base writes them. No provider or model process is started.
@@ -11,7 +12,7 @@ const root = path.join(base, 'Knowledge');
 await mkdir(path.join(root, 'wiki'), { recursive: true });
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-await files.register(root, 'リンクのKB', 'personal');
+const space = await files.register(root, 'リンクのKB', 'personal');
 await writeFile(
   path.join(root, 'topic.md'),
   '# 出発点\n\n[下の階層へ](wiki/deep.md)\n\n[まだ無いページ](planned.md)\n',
@@ -21,6 +22,11 @@ await writeFile(
   '# 深いページ\n\n[上の階層へ](../arrival.md)\n',
 );
 await writeFile(path.join(root, 'arrival.md'), '# 到着点\n');
+await new AuthorshipStore(files.dataDir).observe(
+  { scopeId: space.scopeId, path: 'arrival.md' },
+  '# 到着点\n',
+  '',
+);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
@@ -115,16 +121,28 @@ try {
   await expect(backlinks).toBeHidden();
 
   // Renaming a page rewrites the links that led to it; the dialog says what will change.
+  const metadata =
+    '---\nrelations: [{rel: uses, target: arrival.md}]\nsources: [{resource: arrival.md}]\n---\nReference page\n';
+  await writeFile(path.join(root, 'metadata.md'), metadata);
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
   await page.getByRole('button', { name: '名前・場所', exact: true }).click();
   const move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
-  await expect(move).toContainText('参照元 2 件のノートにある 2 件のリンク');
+  await expect(move).toContainText('参照元 3 件のノートにある 4 件のリンク');
   await move.getByLabel('ノート名', { exact: true }).fill('到着');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
   const status = page.locator('.doc-toolbar');
-  await expect(status).toContainText('参照元 2 件のノートの 2 件のリンクを更新しました。');
+  await expect(status).toContainText('参照元 3 件のノートの 4 件のリンクを更新しました。');
+  expect(await readFile(path.join(root, 'metadata.md'), 'utf8')).toBe(
+    metadata.replaceAll('arrival.md', '到着.md'),
+  );
+  expect(
+    await page.evaluate(
+      async (id) => (await window.irori.noteAuthorship(id, '到着.md', '# 到着点\n')).lines,
+      space.scopeId,
+    ),
+  ).toEqual([true, false]);
   expect(await readFile(path.join(root, 'wiki', 'deep.md'), 'utf8')).toBe(
     '# 深いページ\n\n[上の階層へ](../到着.md)\n',
   );

@@ -35,7 +35,7 @@ for (const [relative, text] of [
   ['Knowledge_Base/wiki/index.md', '# wiki\n'],
   ['Knowledge_Base/entities/index.md', '# entities\n'],
   [
-    'Knowledge_Base/entities/サービス.md',
+    'Knowledge_Base/entities/サービス.md'.normalize('NFD'),
     pageText('product', 'サービス', ['{ rel: same_as, target: https://example.com/service }']),
   ],
   [
@@ -126,6 +126,11 @@ try {
     ),
   ).toContain('重複');
   await expect(panel.getByRole('alert')).toContainText('重複');
+  await expect(
+    panel.getByRole('button', {
+      name: /グラフ索引を更新|ページからグラフ索引を再生成|グラフ索引を作成/,
+    }),
+  ).toHaveCount(0);
   await expect(panel.locator('.react-flow__node')).toHaveCount(0);
   await writeFile(path.join(root, fixture.declaration.entities.path), saved);
   await expect(panel.locator('.react-flow__node')).toHaveCount(5);
@@ -175,6 +180,31 @@ try {
   expect(await readFile(entitiesPath, 'utf8')).toContain(
     'wiki/監視,監視,Knowledge_Base/wiki/監視.md,,concept\n',
   );
+  // Invalid generated CSV can be regenerated, while declared CSV above cannot.
+  const relationsPath = path.join(bundleRoot, 'Knowledge_Base/ontology/relations.csv');
+  const correctRelations = await readFile(relationsPath, 'utf8');
+  for (const broken of [
+    'sourceId,relation,targetId\nwiki/障害対応,uses,missing\n',
+    'x'.repeat(2 * 1024 * 1024 + 1),
+  ]) {
+    await writeFile(relationsPath, broken);
+    await expect(panel.getByRole('alert')).toBeVisible();
+    await panel.getByRole('button', { name: 'ページからグラフ索引を再生成', exact: true }).click();
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await expect(freshness).toContainText('一致しています');
+    await expect(panel.locator('.react-flow__node')).toHaveCount(4);
+    expect(await readFile(relationsPath, 'utf8')).toBe(correctRelations);
+  }
+  // The CSV stays portable NFC; opening uses the actual decomposed name on disk.
+  await panel
+    .getByRole('button', {
+      name: 'Knowledge_Base/entities/サービス.md'.normalize('NFD'),
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('.ProseMirror')).toContainText('サービス');
+  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
+  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
   await panel.locator('.react-flow__node').filter({ hasText: '監視' }).click();
   await expect(panel.getByRole('button', { name: '関連ノートを開く' })).toBeVisible();
   await page.screenshot({ path: 'test-results/irori-graph-index.png' });
@@ -186,7 +216,7 @@ try {
   );
   await crashed;
   console.log(
-    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, dialog keyboard handling, and a graph index generated from a bundle, reported stale and updated. No provider calls.',
+    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, dialog keyboard handling, graph index generation/update/repair, declared-pair protection and decomposed note names. No provider calls.',
   );
 } finally {
   await app.close();

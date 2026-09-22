@@ -32,6 +32,13 @@ Standard note in the repository names it with an `h_` key (below). The two are
 joined in `AuthorshipStore.view`, so the note display, the summary and the edit
 notice all read both.
 
+**An application move carries those marks to the new path.** The same operation
+preserves them when it rewrites relative links, both in the moved note and in
+notes that point to it. These rewrites retain the correspondence of lines;
+previously unattested lines are not claimed as the person's. If the record
+cannot be carried, the completed file change is retained and a notice names
+the incomplete recording.
+
 ## Why the line's text, not its position
 
 A line range is stale the moment the note changes: insert a paragraph above it
@@ -113,14 +120,15 @@ is replaced, and irori's entry comes last, which is the entry git-ai reads first
 A note irori cannot parse is left alone and the commit result says so.
 
 Reading: `GitService.noted` reads the notes of the last 50 commits touching the
-file, takes the `h_` entries only — session (`s_`) and legacy prompt keys name
-an agent and are ignored — and turns each named line of that commit's version of
-the file into its line key. A collaborator's or another device's line is thus a
+file, following committed renames with Git's `--follow` and resolving each note
+against its path at that commit. It takes the `h_` entries only — session (`s_`)
+and legacy prompt keys name an agent and are ignored — and turns each named line
+of that commit's version of the file into its line key. A collaborator's or another device's line is thus a
 person's line here wherever it has since moved; a line rewritten since is a
 different line.
 
-Fetch, Pull and 履歴を統合 bring the remote's notes in; Push sends them after
-the branch, never forced. [GIT](GIT.md) §"Authorship notes" has the exact
+GitHub から取得, Fetch, Pull and 履歴を統合 bring the remote's notes in; Push
+sends them after the branch, never forced. [GIT](GIT.md) §"Authorship notes" has the exact
 commands and what happens when either side refuses.
 
 ## What is deliberately not built
@@ -144,8 +152,11 @@ The device record reaches another machine or a collaborator only through a
 commit made in irori and pushed; a commit made in another client carries no
 note, and GitHub's squash and rebase merge buttons create commits without the
 branch's notes. Any `h_` key counts, so a collaborator's lines and this person's
-are not told apart. Codex is not told at edit time; it gets the person's lines
-only through the tickbox. Pi matches an edit's `oldText` loosely, so an edit
+are not told apart. Reading shared records is bounded to 50 file-history commits;
+an external rename that Git's similarity detection cannot identify does not
+recover the old path's marks. Application moves carry their existing marks
+directly and do not depend on that detection. Codex is not told at edit time;
+it gets the person's lines only through the tickbox. Pi matches an edit's `oldText` loosely, so an edit
 that only that looseness lets through is not seen. How each model uses the
 notice, and Pi's and OpenCode's loading of irori's script, were not exercised
 with a real CLI or model turn here: the checks drive the script through

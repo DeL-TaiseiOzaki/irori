@@ -9,6 +9,7 @@ import { lineKey, type AuthorshipStore } from '../knowledge/authorship';
 import type { Space } from '../domain/types';
 import type {
   CloneRepository,
+  CloneResult,
   GitChange,
   GitConflict,
   GitDiff,
@@ -52,7 +53,7 @@ export class GitService {
   get busy() {
     return this.pending > 0;
   }
-  private git(s: Space, args: string[], options?: Parameters<GitProcess['run']>[2]) {
+  private git(s: Pick<Space, 'root'>, args: string[], options?: Parameters<GitProcess['run']>[2]) {
     return this.process.run(s.root, args, options);
   }
   private async root(id: string) {
@@ -127,7 +128,7 @@ export class GitService {
         .map((other) => path.relative(s.root, other.root).replaceAll('\\', '/')),
     ].map((p) => `:(top,exclude,literal)${p}`);
   }
-  private async optional(s: Space, args: string[]) {
+  private async optional(s: Pick<Space, 'root'>, args: string[]) {
     try {
       return (await this.git(s, args)).trimEnd();
     } catch (error) {
@@ -146,7 +147,7 @@ export class GitService {
       throw error;
     }
   }
-  private ref(s: Space, name: string) {
+  private ref(s: Pick<Space, 'root'>, name: string) {
     return this.optional(s, ['rev-parse', '--verify', '-q', name]);
   }
   /**
@@ -163,6 +164,11 @@ export class GitService {
       await this.optional(s, [
         'log',
         '-z',
+        '--follow',
+        '--find-renames',
+        '--name-status',
+        '--no-ext-diff',
+        '--no-textconv',
         '--no-notes',
         `--notes=${notesRef}`,
         '--format=%H%x00%N',
@@ -172,16 +178,29 @@ export class GitService {
         literal(p),
       ])
     ).split('\0');
-    for (let i = 0; i + 1 < records.length; i += 2) {
-      const oid = records[i],
-        note = parseNote(records[i + 1]);
+    let currentPath = p;
+    for (let i = 0; i + 1 < records.length;) {
+      const oid = records[i++],
+        note = parseNote(records[i++]),
+        at = currentPath;
+      // Name-status fields are NUL-delimited too: consume path fields with
+      // their status, so a filename shaped like a commit SHA stays a filename.
+      while (i < records.length && !oidPattern.test(records[i])) {
+        const status = records[i++].trim();
+        if (!status) continue;
+        const previous = records[i++];
+        if (/^[RC]\d+$/.test(status)) {
+          const next = records[i++];
+          if (next === currentPath) currentPath = previous;
+        }
+      }
       if (!oidPattern.test(oid) || !note) continue;
       const entries = note.files
-        .filter((f) => f.path === p)
+        .filter((f) => f.path === at)
         .flatMap((f) => f.entries)
         .filter((entry) => isHuman(entry.key));
       if (!entries.length) continue;
-      const lines = ((await this.blob(s, `${oid}:${p}`)) ?? '').split('\n');
+      const lines = ((await this.blob(s, `${oid}:${at}`)) ?? '').split('\n');
       for (const entry of entries)
         for (const n of rangeLines(entry.ranges, lines.length)) {
           const key = lineKey(lines[n - 1]);
@@ -272,25 +291,32 @@ export class GitService {
    * uses, then merged keeping this side's version of any note both changed, so
    * the two tools agree about a repository they share.
    */
-  private async fetchNotes(s: Space, remoteName: string): Promise<string | undefined> {
+  private async fetchNotes(
+    s: Pick<Space, 'root'>,
+    remoteName: string,
+  ): Promise<string | undefined> {
     const tracking = `refs/notes/ai-remote/${remoteName.replace(/[^\w-]/g, '_')}`;
     try {
+      // Missing notes are normal; a transport failure is not. Discover the
+      // exact ref first, since `fetch` reports both with the same exit code.
+      const advertised = await this.git(s, ['ls-remote', '--refs', remoteName, notesRef], {
+        network: true,
+      });
+      if (!advertised.trim()) return;
       await this.git(
         s,
         ['fetch', '--no-tags', '--no-recurse-submodules', remoteName, `+${notesRef}:${tracking}`],
         { network: true },
       );
     } catch {
-      // The remote carries no notes, which git reports the same way as a
-      // transport failure; the branch fetch just succeeded, so nothing is lost.
-      return;
-    }
-    if (!(await this.ref(s, tracking))) return;
-    if (!(await this.ref(s, notesRef))) {
-      await this.git(s, ['update-ref', notesRef, tracking]);
-      return;
+      return 'リポジトリの取得は完了しましたが、作者情報ノート（refs/notes/ai）を受信できませんでした。ソース管理の Fetch で再試行してください。';
     }
     try {
+      if (!(await this.ref(s, tracking))) return;
+      if (!(await this.ref(s, notesRef))) {
+        await this.git(s, ['update-ref', notesRef, tracking]);
+        return;
+      }
       await this.git(s, ['notes', `--ref=${notesRef}`, 'merge', '-s', 'ours', '--quiet', tracking]);
     } catch {
       return '受信した作者情報ノート（refs/notes/ai）を統合できませんでした。';
@@ -881,7 +907,7 @@ export class GitService {
     if (!repository) throw Error('GitHub のリポジトリ URL を確認できません。');
     return `https://github.com/${repository}`;
   }
-  async clone(input: CloneRepository) {
+  async clone(input: CloneRepository): Promise<CloneResult> {
     if (!this.canMutate() || this.busy) throw Error('実行中の処理の完了後に取得してください。');
     const repository = githubRepository(input.url);
     if (
@@ -928,7 +954,16 @@ export class GitService {
       try {
         await this.process.run(
           parent,
-          ['clone', '--no-recurse-submodules', '--no-hardlinks', '--', input.url, destination],
+          [
+            'clone',
+            '--origin',
+            'origin',
+            '--no-recurse-submodules',
+            '--no-hardlinks',
+            '--',
+            input.url,
+            destination,
+          ],
           { network: true },
         );
       } catch (error) {
@@ -936,7 +971,8 @@ export class GitService {
           `${(error as Error).message} 取得途中のフォルダが残っている場合は保持しています。再試行時は別のフォルダ名を選択してください。`,
         );
       }
-      return destination;
+      const notice = await this.fetchNotes({ root: destination }, 'origin');
+      return { path: destination, notice };
     } finally {
       this.pending--;
     }

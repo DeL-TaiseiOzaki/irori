@@ -170,10 +170,27 @@ const seed = path.join(base, 'seed'),
   cloneRemote = path.join(base, 'catalog.git');
 await mkdir(seed);
 git(seed, 'init', '-b', 'main');
+git(seed, 'config', 'user.name', 'UI fixture');
+git(seed, 'config', 'user.email', 'fixture@example.invalid');
+git(seed, 'config', 'commit.gpgsign', 'false');
 await writeFile(path.join(seed, 'README.md'), '# Catalog\n');
 git(seed, 'add', '.');
 git(seed, 'commit', '-m', 'Catalog initial');
+const catalogCommit = git(seed, 'rev-parse', 'HEAD');
+execFileSync('git', ['notes', '--ref=ai', 'add', '-F', '-', catalogCommit], {
+  cwd: seed,
+  input:
+    'README.md\n  h_0123456789abcd 1\n---\n' +
+    JSON.stringify({
+      schema_version: 'authorship/3.0.0',
+      base_commit_sha: catalogCommit,
+      prompts: {},
+      humans: { h_0123456789abcd: { author: 'Collaborator <c@example.invalid>' } },
+    }),
+  stdio: ['pipe', 'pipe', 'pipe'],
+});
 git(base, 'clone', '--bare', seed, cloneRemote);
+git(seed, 'push', cloneRemote, 'refs/notes/ai:refs/notes/ai');
 const globalConfig = path.join(base, 'gitconfig');
 git(
   base,
@@ -470,6 +487,9 @@ try {
     path.join(base, '取得した KB'),
   );
   expect(await readFile(path.join(base, '取得した KB/README.md'), 'utf8')).toBe('# Catalog\n');
+  expect(git(path.join(base, '取得した KB'), 'notes', '--ref=ai', 'show', 'HEAD')).toContain(
+    'h_0123456789abcd 1',
+  );
   await page.getByRole('button', { name: '登録して開く', exact: true }).click();
   await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
   expect(JSON.parse(await readFile(path.join(files.dataDir, 'spaces.json'), 'utf8'))).toHaveLength(

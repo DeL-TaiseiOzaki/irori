@@ -7,6 +7,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { GitService } from '../src/git/service';
+import { GitProcess } from '../src/git/process';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { formatNote, humanId, parseNote, rangeLines } from '../src/git/notes';
 import { personLinesSummary, type NoteAuthorship } from '../src/domain/knowledge';
@@ -179,6 +180,104 @@ test("A note in the standard's own format is read by content: human keys, quoted
     [4],
   );
   assert.equal((await service.noted(id, ref.path)).size, 1);
+});
+
+test("A fresh device follows a committed rename to the person's earlier note, without claiming another file", async (t) => {
+  const f = await fixture(t);
+  const { root, id, service, elsewhere, ref } = f;
+  const text = await edits(f);
+  await commit(service, id, [ref.path], 'Person lines before rename');
+  git(root, 'mv', ref.path, 'renamed note.md');
+  git(root, 'commit', '-m', 'Rename in another client');
+  assert.deepEqual(
+    marked(await elsewhere.view({ scopeId: id, path: 'renamed note.md' }, text)),
+    [6],
+  );
+  // The next irori commit must carry the mark under the new path for sharing.
+  await writeFile(path.join(root, 'renamed note.md'), text + 'Another agent line.\n');
+  await commit(service, id, ['renamed note.md'], 'Edit after rename');
+  assert.deepEqual(parseNote(git(root, 'notes', '--ref=ai', 'show', 'HEAD'))!.files, [
+    { path: 'renamed note.md', entries: [{ key: person, ranges: '6' }] },
+  ]);
+  assert.deepEqual(marked(await elsewhere.view({ scopeId: id, path: 'other.md' }, text)), []);
+});
+
+test('Clone imports shared person marks immediately and reports a notes-only failure without losing the checkout', async (t) => {
+  const f = await fixture(t);
+  const { root, base, service, ref, id } = f;
+  const text = await edits(f);
+  await commit(service, id, [ref.path], 'Shared person lines');
+  const remote = path.join(base, 'remote.git');
+  git(base, 'init', '--bare', '--initial-branch=main', remote);
+  git(root, 'remote', 'add', 'origin', remote);
+  git(root, 'push', '-u', 'origin', 'main', 'refs/notes/ai:refs/notes/ai');
+  const config = path.join(base, 'fixture.gitconfig');
+  git(
+    base,
+    'config',
+    '--file',
+    config,
+    `url.${remote}.insteadOf`,
+    'https://github.com/fixture/notes.git',
+  );
+  git(base, 'config', '--file', config, 'clone.defaultRemoteName', 'custom-default');
+  const original = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = config;
+  t.after(() => {
+    if (original === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = original;
+  });
+  const input = { url: 'https://github.com/fixture/notes.git', parent: base, name: 'clone' };
+  const result = await service.clone(input);
+  assert.equal(result.notice, undefined);
+  const cloneFiles = new FileService(path.join(base, 'clone-device'));
+  await cloneFiles.init();
+  const clone = await cloneFiles.register(result.path, 'Clone', 'personal');
+  const cloneService = new GitService(cloneFiles);
+  t.after(() => cloneService.close());
+  const cloneStore = new AuthorshipStore(cloneFiles.dataDir, (at) =>
+    cloneService.noted(at.scopeId, at.path),
+  );
+  assert.deepEqual(marked(await cloneStore.view({ ...ref, scopeId: clone.scopeId }, text)), [6]);
+
+  const run = GitProcess.prototype.run;
+  const failedPath = path.join(base, 'notes-failed');
+  let discoveryUnavailable = false;
+  t.mock.method(
+    GitProcess.prototype,
+    'run',
+    function (this: GitProcess, ...[cwd, args, options]: Parameters<GitProcess['run']>) {
+      if (
+        (cwd === failedPath && args[0] === 'fetch') ||
+        (discoveryUnavailable && cwd === result.path && args[0] === 'ls-remote')
+      )
+        return Promise.reject(Error('https://synthetic-secret@invalid/notes-fetch'));
+      return run.call(this, cwd, args, options);
+    },
+  );
+  const partial = await service.clone({ ...input, name: 'notes-failed' });
+  assert.equal(partial.path, failedPath);
+  assert.match(partial.notice!, /作者情報|Fetch/);
+  assert.doesNotMatch(partial.notice!, /synthetic-secret/);
+  assert.equal(await readFile(path.join(partial.path, ref.path), 'utf8'), text);
+  assert.equal(git(partial.path, 'rev-parse', 'HEAD'), git(root, 'rev-parse', 'HEAD'));
+
+  // Ordinary Fetch has the same partial-success boundary, including discovery failures.
+  discoveryUnavailable = true;
+  const fetched = await cloneService.sync(
+    clone.scopeId,
+    'fetch',
+    (await cloneService.status(clone.scopeId)).version,
+  );
+  assert.match(fetched.notice!, /作者情報|Fetch/);
+  assert.doesNotMatch(fetched.notice!, /synthetic-secret/);
+  assert.deepEqual(marked(await cloneStore.view({ ...ref, scopeId: clone.scopeId }, text)), [6]);
+
+  // A remote that has never carried notes is a complete, ordinary clone.
+  git(remote, 'update-ref', '-d', 'refs/notes/ai');
+  const withoutNotes = await service.clone({ ...input, name: 'without-notes' });
+  assert.equal(withoutNotes.notice, undefined);
+  assert.equal(git(withoutNotes.path, 'for-each-ref', '--format=%(refname)', 'refs/notes/'), '');
 });
 
 test("A note another tool attached to the commit keeps every entry it had, with the person's last; one irori cannot read is left alone", async (t) => {

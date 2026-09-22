@@ -221,15 +221,33 @@ app
             const next = await files.moveNote(ref, destination, links);
             if (next.path === ref.path) return next;
             // The record is rebound to the bytes as moved, before any link is rewritten.
-            const notice = await knowledge
+            let notice = await knowledge
               .rebind(source, { scopeId: next.scopeId, path: next.path })
               .then(
                 () => undefined,
                 () =>
                   'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
               );
+            try {
+              await authorship.carry(ref, next, next.text);
+            } catch {
+              notice = [notice, 'ノートは移動しましたが、人の行の記録を引き継げませんでした。']
+                .filter(Boolean)
+                .join(' ');
+            }
             if (!links) return { ...next, notice };
-            const update = await relink(files, search, next, ref.path);
+            const update = await relink(files, search, next, ref.path, async (before, after) => {
+              try {
+                await authorship.carry(before, after, before.text, after.text);
+              } catch {
+                notice = [
+                  notice,
+                  `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+              }
+            });
             return { ...update.doc, notice, links: update.links };
           }),
         ),
@@ -282,9 +300,7 @@ app
         return outbox.list(id);
       },
       prepareCloudWrite: async (id, mountId, source) => {
-        const target = (await cloud.declarations(id)).find((item) => item.mountId === mountId);
-        if (!target) throw Error('送信先の接続が見つかりません。');
-        return outbox.prepare({ ownerId: id, mountId, folderId: target.folderId }, source);
+        return outbox.prepare(await cloud.writeTarget(id, mountId), source);
       },
       // Validation runs at the boundary; the host checks the address again
       // rather than trusting that it did.

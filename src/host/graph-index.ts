@@ -1,4 +1,6 @@
 import { setImmediate } from 'node:timers/promises';
+import { open } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
 import {
   buildGraphIndex,
@@ -19,8 +21,8 @@ import {
   type GraphIndexUpdate,
   type PageFacts,
 } from '../domain/graph-index';
-import type { FileService } from './files';
-import { knowledgeFile, readDeclaration } from './ontology';
+import { textFileByteLimit, type FileService } from './files';
+import { knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
 
 /** A page's facts at the size and modification time they were read. */
@@ -68,9 +70,13 @@ export class GraphIndexService {
       );
     const built = await this.build(scopeId);
     const written: string[] = [];
-    for (const key of ['entities', 'relations', 'index'] as const) {
+    const keys = ['entities', 'relations', 'index'] as const;
+    const previous = await Promise.all(
+      keys.map((key) => moduleFile(this.files, scopeId, graphIndexFiles[key])),
+    );
+    for (const [index, key] of keys.entries()) {
       const relative = graphIndexFiles[key];
-      const existing = await knowledgeFile(this.files, scopeId, relative);
+      const existing = previous[index];
       if (existing?.text === built.texts[key]) continue;
       await this.files.writeGenerated(scopeId, relative, built.texts[key], existing?.hash ?? null);
       written.push(relative);
@@ -81,7 +87,7 @@ export class GraphIndexService {
   private async compare(scopeId: string, built: Built): Promise<GraphIndexStatus> {
     const [entities, relations] = await Promise.all(
       [graphIndexFiles.entities, graphIndexFiles.relations].map((relative) =>
-        knowledgeFile(this.files, scopeId, relative),
+        moduleFile(this.files, scopeId, relative),
       ),
     );
     return {
@@ -136,7 +142,64 @@ export class GraphIndexService {
       throw Error(
         `グラフ索引は ${graphIndexLimits.entities.toLocaleString('en-US')} エンティティ・${graphIndexLimits.relations.toLocaleString('en-US')} 関係までです（今は ${tables.entities.length.toLocaleString('en-US')} エンティティ・${tables.relations.length.toLocaleString('en-US')} 関係）。書き込まずに終了しました。`,
       );
-    return { tables, texts: renderGraphIndex(tables), pages: pages.length, unreadable };
+    const texts = renderGraphIndex(tables);
+    // Validate every output before publishing the first: long paths repeated in
+    // edge rows can exceed the byte limit even when both row counts fit.
+    for (const [key, text] of Object.entries(texts)) {
+      if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
+        throw Error(
+          `${graphIndexFiles[key as keyof typeof texts]} が 2 MiB を超えるため、グラフ索引は書き込まれませんでした。`,
+        );
+      if (text.includes('\0'))
+        throw Error('生成するグラフ索引に NUL があるため、書き込まれませんでした。');
+    }
+    return { tables, texts, pages: pages.length, unreadable };
+  }
+}
+
+/**
+ * A generated file may be unreadable as text after a bad merge or an older
+ * generator. Keep its guarded byte hash so an explicit regeneration can repair
+ * it; retain text only within the ordinary reader's limit.
+ */
+async function moduleFile(files: FileService, scopeId: string, relative: string) {
+  try {
+    await knowledgePath(files, scopeId, relative);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+  const filename = await files.resolve(scopeId, relative);
+  const file = await open(filename, 'r');
+  try {
+    const before = await file.stat();
+    if (!before.isFile()) throw Error('生成先が通常のファイルではありません。');
+    const digest = createHash('sha256');
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of file.createReadStream({ autoClose: false, end: before.size })) {
+      digest.update(chunk);
+      size += chunk.length;
+      if (size <= textFileByteLimit) chunks.push(chunk);
+      else chunks.length = 0;
+    }
+    const after = await file.stat();
+    if (size !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
+      throw Error('CONFLICT: グラフ索引の読み取り中にファイルが変更されました。');
+    await knowledgePath(files, scopeId, relative);
+    let text: string | undefined;
+    if (size <= textFileByteLimit)
+      try {
+        text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+          Buffer.concat(chunks),
+        );
+        if (text.includes('\0')) text = undefined;
+      } catch {
+        /* Regeneration can replace invalid UTF-8 too. */
+      }
+    return { hash: digest.digest('hex'), text };
+  } finally {
+    await file.close();
   }
 }
 

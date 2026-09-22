@@ -176,7 +176,13 @@ test('Unavailable and corrupt source locations never become a matching path or a
 });
 test('Outbox retains unsent bytes across restart, uncertain completion and remote conflicts', async (t) => {
   const { files, note, store } = await fixture(t);
-  const target = { ownerId: randomUUID(), mountId: randomUUID(), folderId: 'fixture-folder' };
+  const target = {
+    ownerId: randomUUID(),
+    mountId: randomUUID(),
+    folderId: 'fixture-folder',
+    accountId: randomUUID(),
+    driveId: 'fixture-drive',
+  };
   const outbox = new CloudOutbox(files.dataDir, store);
   const pending = await outbox.prepare(target, note);
   await files.save({ ...note, text: 'Changed after preparation' });
@@ -196,6 +202,8 @@ test('Outbox retains unsent bytes across restart, uncertain completion and remot
   );
   const restarted = new CloudOutbox(files.dataDir, store);
   assert.equal((await restarted.list(target.ownerId))[0].state, 'failed');
+  assert.equal((await restarted.list(target.ownerId))[0].accountId, target.accountId);
+  assert.equal((await restarted.list(target.ownerId))[0].driveId, target.driveId);
   assert.equal(await store.sourceText(pending.source), note.text);
   assert.equal(
     (await restarted.deliver(target.ownerId, pending.id, target, transport)).state,
@@ -229,6 +237,41 @@ test('Outbox retains unsent bytes across restart, uncertain completion and remot
     'confirmed',
   );
 });
+test('Legacy unbound preparations retain restore access and cannot acquire a delivery account implicitly', async (t) => {
+  const { files, note, store } = await fixture(t);
+  const target = {
+    ownerId: randomUUID(),
+    mountId: randomUUID(),
+    folderId: 'fixture-folder',
+    accountId: randomUUID(),
+  };
+  const outbox = new CloudOutbox(files.dataDir, store);
+  const prepared = await outbox.prepare(target, note);
+  const filename = path.join(files.dataDir, 'cloud-outbox', target.ownerId, `${prepared.id}.json`);
+  const { accountId: _account, ...legacy } = prepared;
+  await writeFile(filename, JSON.stringify(legacy));
+  await files.save({ ...note, text: 'A newer version after legacy preparation' });
+  const restarted = new CloudOutbox(files.dataDir, store);
+  const [retained] = await restarted.list(target.ownerId);
+  assert.equal(retained.accountId, undefined);
+  assert.equal(await store.sourceText(retained.source), note.text);
+  let remoteCalls = 0;
+  const remote = {
+    observe: async () => {
+      remoteCalls++;
+      return null;
+    },
+    copy: async () => {
+      remoteCalls++;
+    },
+  };
+  await assert.rejects(
+    restarted.deliver(target.ownerId, retained.id, target, remote),
+    /アカウント情報/,
+  );
+  assert.equal(remoteCalls, 0);
+  assert.deepEqual(JSON.parse(await readFile(filename, 'utf8')), legacy);
+});
 test(
   'Actual rclone copies retained bytes and confirms a downloaded hash on disposable local destinations',
   { skip: !process.env.IRORI_TEST_RCLONE_PATH },
@@ -242,6 +285,7 @@ test(
       ownerId: randomUUID(),
       mountId: randomUUID(),
       folderId: 'local-engineering-fixture',
+      accountId: randomUUID(),
     };
     const outbox = new CloudOutbox(files.dataDir, store);
     const pending = await outbox.prepare(target, note);

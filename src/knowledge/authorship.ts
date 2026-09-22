@@ -165,6 +165,28 @@ export class AuthorshipStore {
     });
   }
   /**
+   * Carries existing marks through an application move or a line-preserving
+   * link rewrite. These transformations change paths, not who wrote the prose;
+   * they must never claim an unattested line as a new human edit. Call only
+   * after the file operation succeeds, with its exact before/after bytes.
+   */
+  async carry(from: SourceRef, to: SourceRef, before: string, after = before) {
+    const lines = after.split('\n');
+    if (from.scopeId !== to.scopeId || lines.length !== before.split('\n').length)
+      throw Error('作者情報を移すには同じスペース内で行の対応が保たれている必要があります。');
+    const view = await this.view(from, before);
+    return this.queue.run(async () => {
+      const record: AuthorshipRecord =
+        from.path === to.path ? await this.read(to) : { schemaVersion: 2, lines: {} };
+      const at = new Date().toISOString();
+      lines.forEach((line, index) => {
+        const key = lineKey(line);
+        if (key && view.lines[index]) record.lines[key] ??= at;
+      });
+      await writeLocalJson(this.file(to), bounded(record, after));
+    });
+  }
+  /**
    * Resolves the record, and what the repository's notes say, against the text
    * as it stands now. It joins the same queue as `observe`, so a caller that
    * starts an observation without waiting for it still reads the answer that

@@ -256,7 +256,7 @@ export interface HostAPI {
     text: string | null,
     version: string,
   ): Promise<GitStatus>;
-  gitClone(input: CloneRepository): Promise<string>;
+  gitClone(input: CloneRepository): Promise<import('./git').CloneResult>;
   gitOpenRepository(scopeId: string): Promise<void>;
   repositories(root: string): Promise<RepositoryInfo>;
   workspaces(): Promise<WorkspaceProfile[]>;
