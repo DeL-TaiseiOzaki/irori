@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+Current delivery, 2026-09-23: PR #73 is merged at `aa0bbfe` and
+[v0.1.26-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.26-preview.1)
+is published for Windows x64 and Mac arm64. The owner explicitly approved
+real native CLI model acceptance on this date. Later work and decisions belong
+in the newest STATUS entry; the earlier waiting-for-merge and model-approval
+statements below describe their dated checkpoints.
+
 Current continuation, 2026-09-22: main is `9c92f39`, with **0.1.25** published.
 The owner's follow-up audit and implementation are on `fix/audit-recovery`,
 prepared as **0.1.26**; they need pull-request review and an authorized merge.
