@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-23 (night): PR #84 is merged and **0.1.30 is published** as
+[v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1)
+by release run `35851726103` from main's CI run `35850884875` (source
+`2814b93`): Windows 198,617,600 bytes, Mac 166,267,685 bytes and
+`irori-0.1.30-full.nupkg` 197,977,634 bytes. The release was published from a
+draft, and the public list read with the app's headers named its six files on
+the third check, a minute after publication. Install 0.1.30 rather than 0.1.29
+by hand; it is the first version that finds a release the list shows without
+files.
+
 Release list fallback, 2026-09-23: **0.1.30** is prepared on
 `fix/release-asset-fallback`, with the owner's go-ahead. After 0.1.29 was
 published, GitHub's release list served it without files for over half an hour,
