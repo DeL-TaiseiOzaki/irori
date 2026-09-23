@@ -31,14 +31,18 @@ instruction, without removing or rewriting the Markdown link. Alerts are
 deduplicated and bounded. Check the file, connection and supported format,
 then reopen the note. No arbitrary remote-image loading is enabled.
 
-Startup and the workspace expose **更新を確認**. Only a click queries the fixed
-official release endpoint. Windows x64 stable/preview assets are validated,
-with bounded bytes and a request deadline. The UI distinguishes available,
-current, unsupported and failed checks. Opening the verified release page or
-installer link requires a second explicit action. No background check,
-download, installation, account token or renderer-supplied URL is involved.
-Delivery iterations sharing a core version do not count as a new application
-version; releases containing changed application bytes must increment it.
+Startup and the workspace expose **更新を確認**, which queries the fixed
+official release endpoint. Windows x64 and Mac arm64 stable/preview assets are
+validated, with bounded bytes and a request deadline. The UI distinguishes
+available, current, unsupported and failed checks. Opening the verified release
+page or installer link requires a second explicit action. No account token or
+renderer-supplied URL is involved. Delivery iterations sharing a core version do
+not count as a new application version; releases containing changed application
+bytes must increment it.
+
+Until 0.1.28 only that click checked, and nothing was downloaded or installed.
+From 0.1.29 an installed irori also checks by itself and applies a newer version
+with one button; see [UPDATES](UPDATES.md).
 
 ## Organize notes without overwriting files
 

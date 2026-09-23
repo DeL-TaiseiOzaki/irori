@@ -150,7 +150,8 @@ export type TerminalEvent =
 export type HostEvent =
   | { type: 'files'; scopeId: string }
   | { type: 'agent'; event: AgentEvent }
-  | { type: 'terminal'; event: TerminalEvent };
+  | { type: 'terminal'; event: TerminalEvent }
+  | { type: 'update'; state: import('./updates').UpdateState };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -188,6 +189,13 @@ export interface HostAPI {
   ): Promise<import('./drafts').DraftRecord>;
   checkForUpdates(): Promise<import('./updates').UpdateCheck>;
   openUpdatePage(target: import('./updates').UpdateTarget): Promise<void>;
+  /** The latest check and the progress of applying an update. Makes no request. */
+  updateState(): Promise<import('./updates').UpdateState>;
+  /** Downloads, verifies and stages the version the latest check offered; false when cancelled or failed. */
+  installUpdate(): Promise<boolean>;
+  cancelUpdate(): Promise<void>;
+  /** Closes irori as the window would and starts the staged version; false when the person stays. */
+  restartToUpdate(): Promise<boolean>;
   /** Moves a note; with `links`, rewrites its own links and those leading to it. */
   moveNote(
     ref: import('./note-operations').NoteRef,

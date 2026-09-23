@@ -36,7 +36,9 @@ export function CloudRecovery() {
   }
   return (
     <>
-      <button onClick={() => void load()}>端末の送信準備を復元</button>
+      <button className="cloud-recovery-trigger" onClick={() => void load()}>
+        端末の送信準備を復元
+      </button>
       {open && (
         <Dialog label="端末の送信準備" busy={busy} onClose={() => setOpen(false)}>
           <header className="actions">

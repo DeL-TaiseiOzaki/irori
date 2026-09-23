@@ -77,6 +77,10 @@ jobs:
         run: xvfb-run -a npm run test:package
       - if: runner.os != 'Linux'
         run: npm run test:package
+      # The in-app update, applied to an installed copy with the platform's own tools:
+      # Squirrel's Update.exe on Windows; hdiutil, ditto, codesign and open on the Mac.
+      - if: runner.os != 'Linux'
+        run: npm run test:update-package
       # Short-lived engineering artifacts, never GitHub Releases or website downloads.
       - uses: actions/upload-artifact@v7
         with:

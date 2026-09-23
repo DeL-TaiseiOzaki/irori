@@ -208,6 +208,8 @@ try {
   // A packaged build must not use a development machine's OAuth environment.
   env.IRORI_GOOGLE_CLIENT_ID = 'synthetic-development-client';
   env.IRORI_GOOGLE_CLIENT_SECRET = 'synthetic-development-secret';
+  // An installed irori checks for updates by itself; this run must not reach GitHub.
+  env.IRORI_AUTOMATIC_UPDATE_CHECKS = '0';
   const launchPackaged = () =>
     electron.launch({
       executablePath: path.join(
@@ -246,6 +248,11 @@ try {
   await page.evaluate(() => {
     window.location.hash = 'packaged-smoke';
   });
+  // The packaged preload carries the update operations; with automatic checks off, nothing
+  // has been requested and nothing is being applied.
+  const updateState = await page.evaluate(() => window.irori.updateState());
+  assert.deepEqual(updateState.install, { phase: 'idle' });
+  assert.equal(updateState.check, undefined);
   const cloudSetup = await page.evaluate(() => window.irori.cloudSetup());
   assert.equal(cloudSetup.oauthConfigured, process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1');
   assert.equal(cloudSetup.available, true, cloudSetup.detail);

@@ -12,6 +12,7 @@ import { resolveLink } from './links';
 import { referringLinks, relink } from './relink';
 import { DraftService } from './drafts';
 import { UpdateService } from './updates';
+import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
 import { ImageService } from './images';
 import { KnowledgeStore } from '../knowledge/store';
@@ -58,14 +59,19 @@ app
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
     const drafts = new DraftService(files);
+    const emit = (event: HostEvent) => {
+      if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
+    };
     const updates = new UpdateService({
       currentVersion: appVersion,
       platform: process.platform,
       arch: process.arch,
+      installer: app.isPackaged ? platformInstaller(process.platform, process.execPath) : undefined,
+      directory: path.join(app.getPath('userData'), 'updates'),
+      onState: (state) => emit({ type: 'update', state }),
     });
-    const emit = (event: HostEvent) => {
-      if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
-    };
+    // This process is the version an earlier update switched to, or one that never finished.
+    void updates.cleanup().catch((error) => console.warn('Update cleanup failed', String(error)));
     const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
     const cloud = new CloudService(
@@ -210,6 +216,16 @@ app
       draftWrite: (...args) => drafts.write(...args),
       checkForUpdates: () => updates.check(),
       openUpdatePage: (target) => updates.open(target, (url) => shell.openExternal(url)),
+      updateState: () => updates.state(),
+      installUpdate: () => updates.install(),
+      cancelUpdate: () => updates.cancel(),
+      restartToUpdate: async () => {
+        // The same shutdown as closing the window; the switch happens once it is agreed.
+        if (!(await stop(() => updates.restart()))) return false;
+        closing = true;
+        window?.close();
+        return true;
+      },
       moveNote: (ref, destination, links) =>
         changeFiles(() =>
           changed(ref.scopeId, async () => {
@@ -464,68 +480,86 @@ app
         return { ok: false, error: String(error) };
       }
     });
+    // One shutdown at a time, whether the window is closing or an update restarts irori.
+    let stopping: Promise<boolean> | undefined;
+    function stop(restart?: () => Promise<void>) {
+      stopping ??= shutDown(restart).finally(() => {
+        stopping = undefined;
+      });
+      return stopping;
+    }
+    // Stops what the window owns before it closes. `restart` switches to a prepared update
+    // once the person has agreed and every draft is safe; if it fails, the window stays open.
+    async function shutDown(restart?: () => Promise<void>) {
+      if (git.busy) {
+        await dialog.showMessageBox(window!, {
+          message: `Git 操作が実行中です。完了後に${restart ? '再起動してください' : 'ウィンドウを閉じてください'}。`,
+          buttons: ['戻る'],
+        });
+        return false;
+      }
+      // The renderer persists drafts continuously; give it an explicit final opportunity.
+      try {
+        if (!window?.webContents.isCrashed())
+          await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
+      } catch (error) {
+        if (!window?.webContents.isCrashed()) {
+          await dialog.showMessageBox(window!, {
+            type: 'error',
+            message: `下書きを保存できませんでした。${restart ? '再起動せず、' : ''}ウィンドウを開いたままにします。`,
+            detail: String(error),
+          });
+          return false;
+        }
+      }
+      if (agents.anyBusy || terminals.busy) {
+        const answer = await dialog.showMessageBox(window!, {
+          message: `実行中のエージェント・ターミナルを停止して${restart ? '再起動' : '閉じ'}ますか？`,
+          buttons: ['戻る', restart ? '停止して再起動' : '停止して閉じる'],
+          cancelId: 0,
+        });
+        if (answer.response !== 1) return false;
+      }
+      await agents.cancel();
+      try {
+        await drafts.idle();
+        await agents.flush();
+      } catch {
+        await dialog.showMessageBox(window!, {
+          type: 'error',
+          message: '会話履歴を保存できませんでした。再試行してください。',
+        });
+        return false;
+      }
+      await restart?.();
+      await terminals.closeAll();
+      await git.close();
+      try {
+        await cloud.close();
+      } catch (error) {
+        await dialog.showMessageBox(window!, {
+          type: 'error',
+          message: 'クラウド接続を終了できませんでした。再試行してください。',
+          detail: String(error),
+        });
+        return false;
+      }
+      await Promise.all(watchers.map((w) => w.close()));
+      return true;
+    }
     window.on('close', (event) => {
       if (closing) return;
       event.preventDefault();
-      void (async () => {
-        if (git.busy) {
-          await dialog.showMessageBox(window!, {
-            message: 'Git 操作が実行中です。完了後にウィンドウを閉じてください。',
-            buttons: ['戻る'],
-          });
-          return;
-        }
-        // The renderer persists drafts continuously; give it an explicit final opportunity.
-        try {
-          if (!window?.webContents.isCrashed())
-            await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
-        } catch (error) {
-          if (!window?.webContents.isCrashed()) {
-            await dialog.showMessageBox(window!, {
-              type: 'error',
-              message: '下書きを保存できませんでした。ウィンドウを開いたままにします。',
-              detail: String(error),
-            });
-            return;
-          }
-        }
-        if (agents.anyBusy || terminals.busy) {
-          const answer = await dialog.showMessageBox(window!, {
-            message: '実行中のエージェント・ターミナルを停止して閉じますか？',
-            buttons: ['戻る', '停止して閉じる'],
-            cancelId: 0,
-          });
-          if (answer.response !== 1) return;
-        }
-        await agents.cancel();
-        try {
-          await drafts.idle();
-          await agents.flush();
-        } catch {
-          await dialog.showMessageBox(window!, {
-            type: 'error',
-            message: '会話履歴を保存できませんでした。再試行してください。',
-          });
-          return;
-        }
-        await terminals.closeAll();
-        await git.close();
-        try {
-          await cloud.close();
-        } catch (error) {
-          await dialog.showMessageBox(window!, {
-            type: 'error',
-            message: 'クラウド接続を終了できませんでした。再試行してください。',
-            detail: String(error),
-          });
-          return;
-        }
-        await Promise.all(watchers.map((w) => w.close()));
+      void stop().then((done) => {
+        if (!done) return;
         closing = true;
         window?.close();
-      })();
+      });
     });
     await window.loadFile(entry);
+    // An installed irori looks for a newer published version by itself; a development run and
+    // the package smoke (IRORI_AUTOMATIC_UPDATE_CHECKS=0) only check when asked.
+    if (app.isPackaged && process.env.IRORI_AUTOMATIC_UPDATE_CHECKS !== '0') updates.watch();
   })
   .catch((error) => {
     console.error(error);

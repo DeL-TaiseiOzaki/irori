@@ -80,6 +80,21 @@ Publishing automatically after `main`'s CI succeeds, with a generated website
 manifest, is the planned next step. Until then the steps after merge are an
 agent's or maintainer's job under the authorization above.
 
+## In-app updates
+
+From 0.1.29 an installed irori finds a newer preview by itself and applies it
+with **更新して再起動**; [UPDATES](UPDATES.md) and [ADR 010](decisions/010-in-app-updates.md)
+describe it. Publishing therefore carries one more file. `release.yml` attaches
+Squirrel's full package, `irori-<version>-full.nupkg`, from the same Windows
+package job as the Setup.exe, checks it against that job's evidence and lists it
+in `SHA256SUMS.txt`. Squirrel's `RELEASES` file and the engineering zip are still
+not published. The drift check requires the package for 0.1.29 and later. The
+Mac applies the disk image already published. The steps after merge are
+unchanged.
+
+An installation older than 0.1.29 cannot update itself; its next version has to
+be installed once from the website.
+
 ## Owner-authorized Mac testing preview
 
 Assets: [Mac and Windows testing prerelease 0.1.5](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.5-preview.2), recorded in [0.1.5 preview.2 notes](releases/0.1.5-preview.2.md).
@@ -130,4 +145,4 @@ Before promoting a platform to general release, complete:
 - First-run agent detection, install/login guidance and error recovery. The current development app still requires users to install and sign in to the native CLI separately.
 - Distribution license selection and third-party notices.
 
-The owner authorized this preview publication explicitly. Signing identities, developer/provider accounts and additional release channels still require their own setup and acceptance. Automatic application updates remain a separate future feature. Website design and hosting do not commit the application to Electron; its provisional host assessment remains in ADR 001.
+The owner authorized this preview publication explicitly. Signing identities, developer/provider accounts and additional release channels still require their own setup and acceptance. In-app updates are described above and trust the same HTTPS download and `SHA256SUMS.txt` as the website. Website design and hosting do not commit the application to Electron; its provisional host assessment remains in ADR 001.

@@ -1003,6 +1003,21 @@ textarea {
 .workspace-switch > .ui-icon:first-child {
   color: var(--ember-on-nav);
 }
+/* The startup intro and the sidebar are both on the dark navigation surface in either
+   theme, so the recovery trigger takes the navigation colors, not the page's surface. */
+.cloud-recovery-trigger {
+  background: var(--nav-raised);
+  border-color: var(--nav-border);
+  color: inherit;
+  font-size: 13px;
+}
+.cloud-recovery-trigger:hover {
+  background: var(--nav-hover);
+  border-color: var(--nav-border-hover);
+}
+.sidebar .cloud-recovery-trigger {
+  margin: 0 14px 12px;
+}
 .workspace-search {
   display: flex;
   align-items: center;

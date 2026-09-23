@@ -25,21 +25,44 @@ try {
     stdin: {
       contents: `import { createRoot } from 'react-dom/client';
 import { UpdateNotice } from './src/app/UpdateNotice';
-window.updateFixture = { calls: 0, opened: [], status: 'available' };
-const fixture = window.updateFixture;
-createRoot(document.getElementById('app')).render(<UpdateNotice
-  check={async () => {
-    fixture.calls++;
-    await new Promise(resolve => setTimeout(resolve, 60));
-    return { status: fixture.status, currentVersion: '0.1.3',
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const fixture = window.updateFixture = {
+  checks: 0, stateCalls: 0, installs: 0, cancels: 0, restarts: 0, opened: [],
+  status: 'current', restart: false, listeners: new Set(), state: { install: { phase: 'idle' } },
+  emit(state) {
+    fixture.state = state;
+    for (const listener of fixture.listeners) listener({ type: 'update', state });
+  },
+};
+const release = { version: '0.1.4', tag: 'v0.1.4-preview.1', releaseUrl: '', downloadUrl: '' };
+createRoot(document.getElementById('app')).render(<UpdateNotice host={{
+  checkForUpdates: async () => {
+    fixture.checks++;
+    await delay(60);
+    return { status: fixture.status, currentVersion: '0.1.3', release,
       detail: { available: '0.1.4 を利用できます。', current: 'このアプリより新しい公開版はありません。',
         unsupported: 'この環境向けのインストール版はまだ公開されていません。',
         error: '更新情報に接続できませんでした。' }[fixture.status],
-      release: { version: '0.1.4', tag: 'v0.1.4-preview.1' }
+      ...(fixture.status === 'available' && { install: { available: true } }),
     };
-  }}
-  open={async target => { fixture.opened.push(target); }}
-/>);`,
+  },
+  openUpdatePage: async (target) => { fixture.opened.push(target); },
+  updateState: async () => { fixture.stateCalls++; return fixture.state; },
+  installUpdate: () => {
+    fixture.installs++;
+    return new Promise((resolve) => { fixture.finishInstall = resolve; });
+  },
+  cancelUpdate: async () => { fixture.cancels++; },
+  restartToUpdate: async () => {
+    fixture.restarts++;
+    if (fixture.restart === 'refused') throw new Error('Error: macOS が irori の置き換えを許可しませんでした。');
+    return fixture.restart;
+  },
+  onEvent: (listener) => {
+    fixture.listeners.add(listener);
+    return () => fixture.listeners.delete(listener);
+  },
+}} />);`,
       resolveDir: process.cwd(),
       loader: 'tsx',
     },
@@ -79,38 +102,145 @@ app.on('window-all-closed', () => app.quit());`,
   const page = await app.firstWindow();
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const check = page.getByRole('button', { name: '更新を確認', exact: true });
-  await expect(check).toBeVisible();
+  type Fixture = {
+    checks: number;
+    stateCalls: number;
+    installs: number;
+    cancels: number;
+    restarts: number;
+    opened: string[];
+    status: string;
+    restart: boolean | 'refused';
+    emit(state: unknown): void;
+    finishInstall?: (ready: boolean) => void;
+  };
   const state = () =>
-    page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            updateFixture: { calls: number; opened: string[]; status: string };
-          }
-        ).updateFixture,
-    );
-  assert.equal((await state()).calls, 0, 'mount must not check for updates');
-  await check.click();
-  await expect(page.getByRole('button', { name: '確認中…' })).toBeDisabled();
+    page.evaluate(() => {
+      const { listeners: _listeners, ...rest } = (
+        window as unknown as { updateFixture: Fixture & { listeners: unknown } }
+      ).updateFixture;
+      return rest as Fixture;
+    });
+  const emit = (value: unknown) =>
+    page.evaluate((next) => {
+      (window as unknown as { updateFixture: Fixture }).updateFixture.emit(next);
+    }, value);
+  const set = (values: Partial<Pick<Fixture, 'status' | 'restart'>>) =>
+    page.evaluate((next) => {
+      Object.assign((window as unknown as { updateFixture: Fixture }).updateFixture, next);
+    }, values);
+  const release = { version: '0.1.4', tag: 'v0.1.4-preview.1', releaseUrl: '', downloadUrl: '' };
+  const available = {
+    status: 'available',
+    currentVersion: '0.1.3',
+    detail: '0.1.4 を利用できます。',
+    release,
+    install: { available: true },
+  };
+  const check = page.getByRole('button', { name: '更新を確認', exact: true });
+  const update = page.getByRole('button', { name: '更新して再起動', exact: true });
+  const installer = page.getByRole('button', { name: 'インストーラーを取得', exact: true });
+  await expect(check).toBeVisible();
+  await expect.poll(async () => (await state()).stateCalls).toBe(1);
+  assert.equal((await state()).checks, 0, 'mount reads the host state and requests nothing');
+  await expect(page.getByRole('status')).toHaveCount(0);
+
+  // A version irori found by itself is offered without a click.
+  await emit({ check: available, install: { phase: 'idle' } });
   await expect(page.getByRole('status')).toContainText('0.1.4 を利用できます');
-  await page.getByRole('button', { name: '変更点を見る' }).click();
-  await page.getByRole('button', { name: 'インストーラーを取得' }).click();
-  assert.deepEqual((await state()).opened, ['release', 'download']);
-  assert.equal((await state()).calls, 1);
-  for (const status of ['current', 'unsupported', 'error']) {
-    await page.evaluate((value) => {
-      (window as unknown as { updateFixture: { status: string } }).updateFixture.status = value;
-    }, status);
+  await expect(page.getByRole('status')).toContainText('使用中 0.1.3 → 公開版 0.1.4');
+  await expect(update).toBeVisible();
+  await expect(installer).toHaveCount(0);
+  assert.equal((await state()).checks, 0);
+
+  // One button: download with progress and a way out, preparation, then the restart.
+  await update.click();
+  await expect.poll(async () => (await state()).installs).toBe(1);
+  await expect(check).toBeDisabled();
+  await emit({
+    check: available,
+    install: { phase: 'downloading', version: '0.1.4', received: 52428800, total: 209715200 },
+  });
+  await expect(page.getByRole('status')).toContainText('0.1.4 をダウンロードしています');
+  await expect(page.getByRole('progressbar', { name: 'ダウンロードの進み具合' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('25% · 50.0 / 200.0 MB');
+  await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await expect.poll(async () => (await state()).cancels).toBe(1);
+  await emit({ check: available, install: { phase: 'preparing', version: '0.1.4' } });
+  await expect(page.getByRole('status')).toContainText('0.1.4 を確認して準備しています');
+  await expect(page.getByRole('button', { name: 'キャンセル', exact: true })).toHaveCount(0);
+  // The person keeps a running agent: the restart is declined and offered again.
+  await emit({ check: available, install: { phase: 'ready', version: '0.1.4' } });
+  await page.evaluate(() =>
+    (window as unknown as { updateFixture: Fixture }).updateFixture.finishInstall?.(true),
+  );
+  await expect.poll(async () => (await state()).restarts).toBe(1);
+  const restart = page.getByRole('button', { name: '再起動して更新', exact: true });
+  await expect(restart).toBeEnabled();
+  await expect(page.getByRole('status')).toContainText('0.1.4 に更新する準備ができました');
+  await restart.click();
+  await expect.poll(async () => (await state()).restarts).toBe(2);
+  // A refused switch is reported in the host's own words.
+  await set({ restart: 'refused' });
+  await restart.click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'macOS が irori の置き換えを許可しませんでした。',
+  );
+  assert.equal((await state()).installs, 1, 'a prepared update is not downloaded again');
+
+  // A failed update keeps both the retry and the installer.
+  await emit({
+    check: available,
+    install: {
+      phase: 'failed',
+      version: '0.1.4',
+      detail: 'ダウンロードした更新ファイルが公開版と一致しませんでした。',
+    },
+  });
+  await expect(page.locator('.update-notice-result[role="alert"]')).toContainText(
+    '更新できませんでした。ダウンロードした更新ファイルが公開版と一致しませんでした。',
+  );
+  await expect(page.getByRole('button', { name: 'もう一度更新', exact: true })).toBeVisible();
+  await installer.click();
+  await expect.poll(async () => (await state()).opened).toEqual(['download']);
+
+  // An installation that cannot replace itself says why and keeps the browser route.
+  await emit({
+    check: {
+      ...available,
+      install: {
+        available: false,
+        detail:
+          'この起動方法のアプリはアプリ内で更新できません。インストーラーを取得してください。',
+      },
+    },
+    install: { phase: 'idle' },
+  });
+  await expect(page.getByRole('status')).toContainText(
+    'この起動方法のアプリはアプリ内で更新できません',
+  );
+  await expect(update).toHaveCount(0);
+  await page.getByRole('button', { name: '変更点を見る', exact: true }).click();
+  await installer.click();
+  await expect
+    .poll(async () => (await state()).opened)
+    .toEqual(['download', 'release', 'download']);
+
+  // The person's own check still answers every outcome.
+  await emit({ install: { phase: 'idle' } });
+  for (const status of ['current', 'unsupported', 'error', 'available']) {
+    await set({ status });
     await check.click();
+    await expect(page.getByRole('button', { name: '確認中…' })).toBeDisabled();
     await expect(check).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'インストーラーを取得' })).toHaveCount(0);
     await expect(page.getByRole(status === 'error' ? 'alert' : 'status')).toBeVisible();
+    await expect(update).toHaveCount(status === 'available' ? 1 : 0);
+    await expect(installer).toHaveCount(0);
   }
-  assert.equal((await state()).calls, 4);
+  assert.equal((await state()).checks, 4);
   assert.deepEqual(errors, []);
   console.log(
-    'Update UI smoke passed: manual check only, available/current/unsupported/offline, explicit browser actions.',
+    'Update UI smoke passed: automatic offer, one-button download/prepare/restart with cancel, declined and refused restarts, failure and browser fallbacks, manual checks.',
   );
 } finally {
   await app?.close();

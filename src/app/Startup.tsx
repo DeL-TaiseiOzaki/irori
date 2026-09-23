@@ -300,7 +300,7 @@ export function Startup({
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
           irori<span className="preview">{appVersion} Preview</span>
         </div>
-        <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
+        <UpdateNotice host={host} />
         <CloudRecovery />
         <div className="intro-content">
           <h2>

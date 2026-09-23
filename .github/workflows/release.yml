@@ -78,6 +78,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p staged
+          # Copy the one file the package job recorded for a pattern, checked against that
+          # record before and after renaming it for the download.
+          stage() {
+            local dir="$1" pattern="$2" name="$3" evidence="$1/test-results/package-smoke.json"
+            local recorded
+            recorded=$(jq -r --arg p "$pattern" '[.artifacts[] | select(.file | test($p))] | length' "$evidence")
+            [ "$recorded" = 1 ] || { echo "::error::Expected one file matching $pattern in $dir, saw $recorded"; exit 1; }
+            local file size sha256
+            file=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .file' "$evidence")
+            size=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .size' "$evidence")
+            sha256=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .sha256' "$evidence")
+            [ "$(stat -c%s "$dir/$file")" = "$size" ] || { echo "::error::$file size differs from its package evidence"; exit 1; }
+            echo "$sha256  $dir/$file" | sha256sum -c -
+            cp "$dir/$file" "staged/$name"
+            echo "$sha256  staged/$name" | sha256sum -c -
+            printf '%s  %s\n' "$sha256" "$name" >> staged/SHA256SUMS.txt
+            printf '%s: %s bytes, sha256 %s\n' "$name" "$size" "$sha256"
+          }
           publish_one() {
             local platform="$1" pattern="$2" suffix="$3" dir
             dir="artifact-$platform"
@@ -85,26 +103,15 @@ jobs:
             local evidence="$dir/test-results/package-smoke.json"
             local version
             version=$(jq -r .runtime.version "$evidence")
-            # Squirrel feed files and the engineering zip are never published.
-            local recorded
-            recorded=$(jq -r --arg p "$pattern" '[.artifacts[] | select(.file | test($p))] | length' "$evidence")
-            [ "$recorded" = 1 ] || { echo "::error::Expected one $platform installer, saw $recorded"; exit 1; }
-            local file size sha256 name
-            file=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .file' "$evidence")
-            size=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .size' "$evidence")
-            sha256=$(jq -r --arg p "$pattern" '.artifacts[] | select(.file | test($p)) | .sha256' "$evidence")
-            # Match the downloaded bytes against what the package job recorded while
-            # testing that same file, then again after renaming it for the download.
-            [ "$(stat -c%s "$dir/$file")" = "$size" ] || { echo "::error::$file size differs from its package evidence"; exit 1; }
-            echo "$sha256  $dir/$file" | sha256sum -c -
-            name="irori-$version-$suffix"
-            cp "$dir/$file" "staged/$name"
-            echo "$sha256  staged/$name" | sha256sum -c -
+            # The engineering zip and Squirrel's RELEASES file are never published.
+            stage "$dir" "$pattern" "irori-$version-$suffix"
+            # An installed irori applies Squirrel's full package itself (docs/decisions/010).
+            if [ "$platform" = win32-x64 ]; then
+              stage "$dir" '-full\.nupkg$' "irori-$version-full.nupkg"
+            fi
             # Earlier releases publish macos- and windows-package-evidence.json; name it
             # after the download's platform word, not the runner's darwin-arm64.
             cp "$evidence" "staged/${suffix%%-*}-package-evidence.json"
-            printf '%s  %s\n' "$sha256" "$name" >> staged/SHA256SUMS.txt
-            printf '%s: %s bytes, sha256 %s\n' "$name" "$size" "$sha256"
           }
           case "$PLATFORMS" in
             macos|both) publish_one darwin-arm64 '\.dmg$' 'macos-arm64.dmg' ;;
