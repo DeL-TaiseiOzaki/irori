@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-23 (evening): PRs #79 (handoff), #80 (0.1.29) and #81 are
+merged, and **0.1.29 is published** as
+[v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1)
+by release run `35845216421` from main's CI run `35843823360` (source
+`93951b9`). Its Windows job first failed in the new update smoke: renaming the
+freshly installed folder returned `EPERM` before any update ran. It passed on its
+second attempt, and #81 now waits for such locks. The release carries Windows
+198,619,136 bytes, Mac 166,268,652 bytes, `irori-0.1.29-full.nupkg` 197,978,744
+bytes, `SHA256SUMS.txt` and both evidence files. PR #82 pointed the download
+manifest at it and Pages run `35845928596` deployed it. The site bundle offers
+the tag, and all three files match `SHA256SUMS.txt` when downloaded anonymously.
+
+GitHub then served stale asset lists for the new release. Fetching the release
+by id listed all six files as uploaded from 09:50:10 UTC, and downloads worked.
+The release list, the by-tag lookup and the release page's asset fragment
+returned no files, or all but the Setup.exe, for a quarter of an hour, and
+alternated between stale and current answers afterwards. An installed irori
+reads that list, so it offers 0.1.29 only once GitHub serves the current one;
+two drift runs (`35846151308`, `35846225239`) failed on the same stale answer
+while reporting main in step. A whitespace-only edit of the release body and a
+same-value `prerelease` update did not clear it; re-uploading `SHA256SUMS.txt`
+was refused because the name exists, and nothing changed.
+
 In-app updates, 2026-09-23: **0.1.29** is prepared on `feat/in-app-update`. The
 owner asked for an installed irori to update itself with one button, like the
 Codex and Claude desktop applications, without downloading or reinstalling it by
