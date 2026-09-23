@@ -13,7 +13,10 @@ version checks, because Squirrel.Mac cannot accept an ad-hoc signature.
 Releases now also publish `irori-<version>-full.nupkg`, and the drift check
 requires it from 0.1.29. [UPDATES](UPDATES.md) and
 [ADR 010](decisions/010-in-app-updates.md) describe the design and its trust
-limits. Versions up to 0.1.28 still need one manual install of 0.1.29.
+limits. Versions up to 0.1.28 still need one manual install of 0.1.29. The same
+version also gives **端末の送信準備を復元** the navigation colors: on the startup
+screen and in the sidebar it was a white button with pale text in the light
+theme.
 
 Verification: production build, formatting, **251 tests (244 passed, seven
 environment-gated skips)** and **all fifteen Electron UI suites**, including the
