@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Release list fallback, 2026-09-23: **0.1.30** is prepared on
+`fix/release-asset-fallback`, with the owner's go-ahead. After 0.1.29 was
+published, GitHub's release list served it without files for over half an hour,
+so an installed irori could not be offered it. The update check now reads a
+newer release's own `/releases/<id>/assets` when the list names no files (at
+most three per check, never for the installed or older releases). `release.yml`
+publishes from a draft 30 seconds after every file is uploaded and then reports
+whether the public list, read with the app's headers, names the files; the drift
+check reads each release's own assets. Verification: build, formatting and
+`npm test`; the new test fails without the lookup. The drift lookup was run by
+hand against 0.1.29 and found all four required files.
+
 Delivery, 2026-09-23 (evening): PRs #79 (handoff), #80 (0.1.29) and #81 are
 merged, and **0.1.29 is published** as
 [v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1)

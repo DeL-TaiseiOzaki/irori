@@ -39,26 +39,33 @@ const targets: Record<
 const distributedTargets = 'Windows x64 と Apple シリコンの Mac';
 const versionPattern =
   /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-preview\.(0|[1-9]\d*))?$/;
+const assetsSchema = z
+  .array(
+    z.object({
+      name: z.string().max(200),
+      browser_download_url: z.string().max(1000),
+      state: z.string().max(30),
+      size: z.number().int().positive(),
+    }),
+  )
+  .max(100);
 const releasesSchema = z
   .array(
     z.object({
+      id: z.number().int().positive().optional(),
       tag_name: z.string().max(100),
       html_url: z.string().max(500),
       draft: z.boolean(),
       prerelease: z.boolean(),
-      assets: z
-        .array(
-          z.object({
-            name: z.string().max(200),
-            browser_download_url: z.string().max(1000),
-            state: z.string().max(30),
-            size: z.number().int().positive(),
-          }),
-        )
-        .max(100),
+      assets: assetsSchema,
     }),
   )
   .max(100);
+// GitHub's release list has served a newly published release with an empty file list for
+// longer than half an hour, while the release's own assets endpoint listed every file.
+const releaseAssetsEndpoint = (id: number) =>
+  `https://api.github.com/repos/DeL-TaiseiOzaki/irori/releases/${id}/assets?per_page=100`;
+const maxAssetLookups = 3;
 
 function version(value: string) {
   const match = versionPattern.exec(value);
@@ -285,7 +292,7 @@ export class UpdateService {
       const releases = await withDeadline(
         this.options.timeoutMs ?? 10000,
         '更新の確認がタイムアウトしました。接続を確認して再試行してください。',
-        (signal) => this.readReleases(signal),
+        (signal) => this.readReleases(signal, current),
       );
       const candidates: (Published & { parsed: NonNullable<ReturnType<typeof version>> })[] = [];
       for (const release of releases) {
@@ -369,8 +376,25 @@ export class UpdateService {
     return detail ? { available: false, detail } : { available: true };
   }
 
-  private async readReleases(signal: AbortSignal) {
-    const response = await (this.options.fetch ?? fetch)(officialReleasesEndpoint, {
+  private async readReleases(
+    signal: AbortSignal,
+    current: NonNullable<ReturnType<typeof version>>,
+  ) {
+    const releases = await this.readJson(officialReleasesEndpoint, signal, releasesSchema);
+    // A newer release listed without files is read again from its own assets endpoint; an
+    // older one could never be offered, so it costs no request.
+    let lookups = 0;
+    for (const release of releases) {
+      const parsed = version(release.tag_name);
+      if (release.assets.length || release.draft || !release.id || !parsed) continue;
+      if (compare(parsed, current) <= 0 || lookups++ >= maxAssetLookups) continue;
+      release.assets = await this.readJson(releaseAssetsEndpoint(release.id), signal, assetsSchema);
+    }
+    return releases;
+  }
+
+  private async readJson<T>(url: string, signal: AbortSignal, schema: z.ZodType<T>) {
+    const response = await (this.options.fetch ?? fetch)(url, {
       signal,
       redirect: 'error',
       credentials: 'omit',
@@ -393,7 +417,7 @@ export class UpdateService {
     } catch {
       throw invalid();
     }
-    const result = releasesSchema.safeParse(data);
+    const result = schema.safeParse(data);
     if (!result.success) throw invalid();
     return result.data;
   }

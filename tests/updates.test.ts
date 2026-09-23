@@ -621,3 +621,55 @@ test('a server that keeps sending past the published size is stopped, not read t
   assert.equal(staged.length, 0);
   assert(pulled < publishedBytes.length * 2, `read ${pulled} bytes`);
 });
+
+test('a newer release listed without files is read again from its own assets endpoint', async () => {
+  const tag = 'v0.1.4-preview.1';
+  const complete = fullWindowsRelease(tag);
+  const assetsUrl = (id: number) =>
+    `https://api.github.com/repos/DeL-TaiseiOzaki/irori/releases/${id}/assets?per_page=100`;
+  const requests: { url: string; init?: RequestInit }[] = [];
+  const listed = [
+    { ...complete, id: 44, assets: [] },
+    { ...release('v0.1.3-preview.1'), id: 43, assets: [] },
+    { ...release('v0.1.2-preview.1'), id: 42, assets: [] },
+  ];
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    requests.push({ url, init });
+    if (url === officialReleasesEndpoint) return Response.json(listed);
+    if (url === assetsUrl(44)) return Response.json(complete.assets);
+    return new Response('', { status: 404 });
+  }) as typeof globalThis.fetch;
+  const { service } = await installation({ fetch });
+  const result = await service.check();
+  assert.equal(result.status, 'available');
+  assert.equal(result.release?.tag, tag);
+  assert.deepEqual(result.install, { available: true });
+  // Only the release that could be offered is looked up; the installed and older ones are not.
+  assert.deepEqual(
+    requests.map((request) => request.url),
+    [officialReleasesEndpoint, assetsUrl(44)],
+  );
+  assert.equal(requests[1].init?.redirect, 'error');
+  assert.equal(requests[1].init?.credentials, 'omit');
+
+  // At most three lookups per check, and a list without ids is taken as it is.
+  const many = Array.from({ length: 6 }, (_value, index) => ({
+    ...release(`v0.2.${index}-preview.1`),
+    id: 100 + index,
+    assets: [],
+  }));
+  let lookups = 0;
+  const bounded = await installation({
+    fetch: (async (input: string | URL | Request) => {
+      if (String(input) === officialReleasesEndpoint) return Response.json(many);
+      lookups++;
+      return Response.json([]);
+    }) as typeof globalThis.fetch,
+  });
+  assert.equal((await bounded.service.check()).reason, 'unavailable');
+  assert.equal(lookups, 3);
+  const anonymous = fixture([release('v0.2.0', { assets: [] })]);
+  await anonymous.service.check();
+  assert.equal(anonymous.requests.length, 1);
+});
