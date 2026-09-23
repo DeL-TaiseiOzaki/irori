@@ -57,7 +57,10 @@ jobs:
           set -euo pipefail
           version=${TAG#v}
           version=${version%%-*}
-          assets=$(gh release view "$TAG" --json assets --jq '.assets[] | select(.state == "uploaded") | .name')
+          # The release's own assets endpoint; GitHub's release list and tag lookup have served
+          # a new release without its files for over half an hour.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)
+          assets=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$id/assets?per_page=100" --jq '.[] | select(.state == "uploaded") | .name')
           required=("irori-$version-windows-x64-Setup.exe" "irori-$version-macos-arm64.dmg" SHA256SUMS.txt)
           # From 0.1.29 an installed irori updates itself on Windows from Squirrel's full package.
           if [ "$(printf '%s\n' 0.1.29 "$version" | sort -V | head -n 1)" = 0.1.29 ]; then

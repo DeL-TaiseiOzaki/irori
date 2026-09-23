@@ -149,6 +149,31 @@ jobs:
             printf -- '- `SHA256SUMS.txt` and each platform'"'"'s package evidence are attached.\n'
           } > release-body.md
           # A preview tag must be a prerelease: the update check skips a tag whose
-          # prerelease flag disagrees with its name.
-          gh release create "$TAG" --target "$SHA" --prerelease --title "$title" --notes-file release-body.md staged/*
+          # prerelease flag disagrees with its name. The release stays a draft until every
+          # file is uploaded: v0.1.29 was published one second after its last upload, and
+          # GitHub's release list then served it without files for over half an hour.
+          gh release create "$TAG" --draft --target "$SHA" --prerelease --title "$title" --notes-file release-body.md staged/*
+          expected=$(ls staged | wc -l)
+          uploaded=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.state == "uploaded")] | length')
+          [ "$uploaded" = "$expected" ] || { echo "::error::$uploaded of $expected files uploaded; $TAG stays a draft"; exit 1; }
+          sleep 30
+          gh release edit "$TAG" --draft=false --prerelease
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size) \(.state)"'
+
+      - name: Check what an installed irori sees
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -uo pipefail
+          # The public list, read as the update check reads it. Releases from 0.1.30 fall back
+          # to each release's own assets endpoint, so a stale list delays only older builds.
+          for attempt in $(seq 1 10); do
+            listed=$(curl -fsS "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' \
+              | jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag) | .assets[]] | length') || listed=unknown
+            echo "attempt $attempt: the public list names $listed files for $TAG"
+            [ "$listed" != unknown ] && [ "$listed" -gt 0 ] && exit 0
+            sleep 30
+          done
+          echo "::warning::GitHub's public release list does not name $TAG's files yet; installed builds before 0.1.30 will not be offered it until it does"
+

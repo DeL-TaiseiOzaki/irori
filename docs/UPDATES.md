@@ -49,6 +49,12 @@ for the restart. It never supplies a URL or a path.
   sending past that size is cut off, and a download that receives nothing for
   60 seconds is abandoned. The folder is removed after staging or failure and
   again at the next start.
+- **A lagging release list.** From 0.1.30, a release newer than the installed
+  one that the public list names without files is read again from
+  `/releases/<id>/assets`, at most three per check. After 0.1.29 was published
+  the list served it without files for over half an hour while that endpoint
+  listed every file. `release.yml` also keeps a release a draft until all files
+  are uploaded and publishes it 30 seconds later.
 - **Windows.** irori writes a `RELEASES` file naming the package with its SHA-1
   and size, which Squirrel checks again, and runs `Update.exe --update` on that
   folder. Squirrel installs the new version beside the running one; irori
