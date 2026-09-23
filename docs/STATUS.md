@@ -21,9 +21,15 @@ rewritten update suite, pass. Mutating the checksum comparison, the HTTPS rule,
 the streaming size bound, the download removal, the Squirrel result check, the
 Mac identifier check or either rollback makes a test fail. The Windows and Mac
 package jobs gain `test:update-package`, which applies the build's own update
-file with the real platform tools; its first results come from this branch's
-CI. The first real update between two published versions, and macOS App
-Management's response to it, need the owner's devices.
+file with the real platform tools. In [CI 35839263045](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/35839263045)
+Squirrel's `Update.exe` applied 0.1.29 over an installation made to look like
+0.0.1 in 11.3 seconds, and `--processStartAndWait` started
+`app-0.1.29\irori.exe` after its parent exited. On macOS 26 the disk image was
+staged, verified and swapped into a temporary Applications folder in 5.8
+seconds, and Launch Services opened the new bundle and the previous one was
+removed. The first real update between two published versions, and macOS App
+Management's response to it on an approved installation, need the owner's
+devices.
 
 Delivery, 2026-09-23: PRs #75 (0.1.27) and #76 (0.1.28) are merged, and
 **0.1.28 is published** as
