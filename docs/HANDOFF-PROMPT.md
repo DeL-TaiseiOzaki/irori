@@ -1,14 +1,14 @@
 # irori — Continuation prompt
 
-Updated 2026-09-23 (morning), after v0.1.28-preview.1 was published and the
+Updated 2026-09-23 (evening), after v0.1.29-preview.1 was published and the
 records merged. Give this file to the next agent, or copy its contents into a
 new session. Inspect current files and Git state before acting; later work
 takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which was `95fbc12` with
-**0.1.28** published and the download page in step when this was written.
+Take over **irori** development from current `main`, which had **0.1.29**
+published and the download page in step when this was written.
 Nothing is waiting to be merged. Choose a bounded next change with executable
 acceptance checks and carry it through implementation and verification. Make
 independent progress while device and account evidence is pending.
@@ -74,21 +74,42 @@ workspace's `_research/ontology-evolution-2026-09-22/`.
   A VS Code Codex session left it uncommitted; a Claude session finished it and
   fixed two timing faults in its UI suite.
 - **#74, #77, #78** — the 0.1.26 and 0.1.28 notes, download manifests and records.
+- **#79** — this handoff, rewritten on the 0.1.28 basis.
+- **#80 (0.1.29)** — in-app updates with one button ([ADR 010](decisions/010-in-app-updates.md),
+  [UPDATES](UPDATES.md)). An installed irori checks by itself 10 seconds after
+  start and hourly; **更新して再起動** downloads over HTTPS, verifies size and
+  `SHA256SUMS.txt`, and restarts through the window's shutdown. Windows applies
+  Squirrel's `irori-<version>-full.nupkg` with the installed `Update.exe`; the Mac
+  swaps in the bundle from the published disk image after `codesign`, identifier
+  and version checks. Releases now publish the `.nupkg`, and the drift check
+  requires it from 0.1.29. The same PR fixed the light-theme
+  **端末の送信準備を復元** button.
+- **#81** — the Windows update smoke waits for file locks; **#82** — the 0.1.29
+  download manifest.
 
 ## Delivery state
 
-`main` is `95fbc12`, version **0.1.28**, published as
-[v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1)
-through release run 35761285128 from main run 35758758467 (source `e8b6d5d`).
-The downloads are 198,609,408 bytes (Windows x64) and 166,285,874 (Mac arm64).
-The download page was deployed (Pages 35761430928), both installers matched
-`SHA256SUMS.txt` when downloaded anonymously, and the drift check 35761753190
-passed. 0.1.27 has notes but no package of its own; the 0.1.28 notes cover it.
-0.1.26 was published earlier the same day (release run 35749374357).
+Version **0.1.29** is published as
+[v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1)
+through release run 35845216421 from main run 35843823360 (source `93951b9`).
+The downloads are 198,619,136 bytes (Windows x64) and 166,268,652 (Mac arm64),
+plus the 197,978,744-byte `irori-0.1.29-full.nupkg`. The download page was
+deployed (Pages 35845928596) and all three files matched `SHA256SUMS.txt` when
+downloaded anonymously. Right after publication GitHub's release list served
+stale asset lists; STATUS records what was observed. Confirm that the release
+list, with the app's `Accept` and `X-GitHub-Api-Version` headers, names all six
+files and that a `release-sync.yml` drift run passes.
 
-The 0.1.28 branch passed the production build, formatting, 235 tests (228
+An installed 0.1.28 or earlier cannot update itself: the owner installs 0.1.29
+once by hand. The first real in-app update, 0.1.29 to the next published
+version, is device evidence still owed on Windows 11 and macOS 26, including
+the Mac's App Management response to the bundle swap.
+
+The 0.1.29 branch passed the production build, formatting, 251 tests (244
 passed, seven environment-gated skips: no local rclone, OpenCode or Pi binary,
-and a case-sensitive filesystem) and all fifteen Electron UI suites.
+and a case-sensitive filesystem) and all fifteen Electron UI suites. Its CI ran
+the new `test:update-package` on real Windows and macOS runners. 0.1.28 was
+published earlier the same day (release run 35761285128).
 
 Every branch adds to the top of `docs/STATUS.md` and advances the version, so
 parallel branches conflict there; the one merged second takes the next free

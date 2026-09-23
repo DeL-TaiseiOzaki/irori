@@ -1,10 +1,19 @@
 # irori continuation handoff
 
-Current development, 2026-09-23: **0.1.28 is published** as
+Current development, 2026-09-23 (evening): **0.1.29 is published** as
+[v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1).
+It adds in-app updates with one button (PR #80, [ADR 010](decisions/010-in-app-updates.md),
+[UPDATES](UPDATES.md)); PR #81 steadied their Windows smoke and PR #82 pointed the
+download page at it. An installed 0.1.28 or earlier has to install 0.1.29 once by
+hand; the first real in-app update is 0.1.29 to the next version, on the owner's
+Windows 11 and macOS 26 devices. See STATUS for GitHub's stale release listing
+right after publication.
+
+Earlier, 2026-09-23: **0.1.28 was published** as
 [v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1).
 It carries the 0.1.27 access-policy work (PR #75) and the 0.1.28 code-assistance
 toggle (PR #76); 0.1.27 was not published on its own. PR #77 added the notes and
-download manifest, PR #78 the records, and main is `95fbc12`.
+download manifest, PR #78 the records, and main was `95fbc12`.
 [HANDOFF-PROMPT](HANDOFF-PROMPT.md) carries the current next work.
 Read the newest [STATUS](STATUS.md), [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
 [real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md) and
