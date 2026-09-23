@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+In-app updates, 2026-09-23: **0.1.29** is prepared on `feat/in-app-update`. The
+owner asked for an installed irori to update itself with one button, like the
+Codex and Claude desktop applications, without downloading or reinstalling it by
+hand. An installed irori now checks the public releases 10 seconds after it
+starts and hourly, shows a newer version without a click, and
+**更新して再起動** downloads it, verifies its size and `SHA256SUMS.txt` digest
+over HTTPS, stages it and restarts through the window's own shutdown. Windows
+applies Squirrel's full package with the installed `Update.exe`; the Mac swaps
+in the bundle from the published disk image after `codesign`, identifier and
+version checks, because Squirrel.Mac cannot accept an ad-hoc signature.
+Releases now also publish `irori-<version>-full.nupkg`, and the drift check
+requires it from 0.1.29. [UPDATES](UPDATES.md) and
+[ADR 010](decisions/010-in-app-updates.md) describe the design and its trust
+limits. Versions up to 0.1.28 still need one manual install of 0.1.29.
+
+Verification: production build, formatting, **251 tests (244 passed, seven
+environment-gated skips)** and **all fifteen Electron UI suites**, including the
+rewritten update suite, pass. Mutating the checksum comparison, the HTTPS rule,
+the streaming size bound, the download removal, the Squirrel result check, the
+Mac identifier check or either rollback makes a test fail. The Windows and Mac
+package jobs gain `test:update-package`, which applies the build's own update
+file with the real platform tools; its first results come from this branch's
+CI. The first real update between two published versions, and macOS App
+Management's response to it, need the owner's devices.
+
 Delivery, 2026-09-23: PRs #75 (0.1.27) and #76 (0.1.28) are merged, and
 **0.1.28 is published** as
 [v0.1.28-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.28-preview.1)

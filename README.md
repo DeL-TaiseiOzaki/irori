@@ -44,7 +44,7 @@
 - 配布用の署名がないため、Windows は発行元を確認できない旨の警告を表示します。**Mac は初回起動が拒否されます。** 「システム設定 → プライバシーとセキュリティ」で irori のブロック通知の横の「このまま開く」を一度押してください。2 回目からは通常どおり開けます。
 - Windows は AMD Ryzen・Intel の **x64 向け**で、Windows ARM 版ではありません。Mac は **Apple Silicon（M シリーズ）専用**です。Intel Mac には対応しません。
 - Windows 11 / macOS 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
-- インストール済みのアプリでは「更新を確認」で新しい版が案内されます。main に入ったアプリの変更は検証版として速やかに公開し、1 時間を超えて未公開のままなら自動チェックが知らせます（[DISTRIBUTION](docs/DISTRIBUTION.md)）。
+- 0.1.29 以降をインストールしたアプリは、新しい版を自分で見つけて案内し、「更新して再起動」を押すだけで更新します。再ダウンロードや再インストールは要りません（[UPDATES](docs/UPDATES.md)）。0.1.28 以前からは、一度だけダウンロードサイトから入れ直してください。main に入ったアプリの変更は検証版として速やかに公開し、1 時間を超えて未公開のままなら自動チェックが知らせます（[DISTRIBUTION](docs/DISTRIBUTION.md)）。
 
 インストール後に必要なもの:
 
@@ -143,7 +143,7 @@ PowerShell では `$env:IRORI_UI_REAL_AGENTS="1"` を設定してからデスク
 
 | 目的 | ドキュメント |
 | --- | --- |
-| 配布と公開手順 | [DISTRIBUTION](docs/DISTRIBUTION.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
+| 配布と公開手順 | [DISTRIBUTION](docs/DISTRIBUTION.md) / [UPDATES](docs/UPDATES.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
 | 現在地と受け入れ範囲 | [STATUS](docs/STATUS.md) / [ACCEPTANCE](docs/ACCEPTANCE.md) / [CHECKPOINT](docs/CHECKPOINT.md) |
 | 日々の編集と記録 | [DAILY-WORKFLOW](docs/DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](docs/EDITING-AND-RECORDS.md) / [EDITOR-ASSISTANCE](docs/EDITOR-ASSISTANCE.md) / [RECOVERY-AND-NOTE-TOOLS](docs/RECOVERY-AND-NOTE-TOOLS.md) |
 | エージェントと会話 | [HARNESSES](docs/HARNESSES.md) / [CONVERSATIONS](docs/CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](docs/WORKSPACE-CONNECTIONS.md) |

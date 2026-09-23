@@ -929,7 +929,7 @@ function App() {
               irori<span className="preview">{appVersion} Preview</span>
               <Appearance onError={report} />
             </div>
-            <UpdateNotice check={host.checkForUpdates} open={host.openUpdatePage} />
+            <UpdateNotice host={host} />
             <CloudRecovery />
             <button
               className="workspace-switch"

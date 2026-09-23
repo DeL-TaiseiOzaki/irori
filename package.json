@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -26,6 +26,7 @@
     "package": "npm run build && electron-forge package",
     "make": "npm run build && electron-forge make",
     "test:package": "tsx scripts/package-smoke.ts",
+    "test:update-package": "tsx scripts/update-package-smoke.ts",
     "setup:cloud": "node scripts/prepare-rclone.mjs"
   },
   "dependencies": {

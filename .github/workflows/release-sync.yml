@@ -58,7 +58,12 @@ jobs:
           version=${TAG#v}
           version=${version%%-*}
           assets=$(gh release view "$TAG" --json assets --jq '.assets[] | select(.state == "uploaded") | .name')
-          for name in "irori-$version-windows-x64-Setup.exe" "irori-$version-macos-arm64.dmg" SHA256SUMS.txt; do
+          required=("irori-$version-windows-x64-Setup.exe" "irori-$version-macos-arm64.dmg" SHA256SUMS.txt)
+          # From 0.1.29 an installed irori updates itself on Windows from Squirrel's full package.
+          if [ "$(printf '%s\n' 0.1.29 "$version" | sort -V | head -n 1)" = 0.1.29 ]; then
+            required+=("irori-$version-full.nupkg")
+          fi
+          for name in "${required[@]}"; do
             grep -qxF "$name" <<<"$assets" || { echo "::error::$TAG has no uploaded $name"; exit 1; }
           done
           # The page bundles its manifest into a script, so look for the tag in what it loads.
@@ -68,4 +73,4 @@ jobs:
             if curl -fsSL --max-time 30 "$SITE$script" | grep -qF "/releases/download/$TAG/"; then found=1; fi
           done
           [ -n "$found" ] || { echo "::error::The download website does not offer $TAG"; exit 1; }
-          echo "$TAG has both installers and SHA256SUMS.txt, and the download website offers it." >> "$GITHUB_STEP_SUMMARY"
+          echo "$TAG has ${required[*]}, and the download website offers it." >> "$GITHUB_STEP_SUMMARY"

@@ -27,6 +27,10 @@ export const hostArguments = {
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),
   openUpdatePage: z.tuple([z.enum(['release', 'download'])]),
+  updateState: z.tuple([]),
+  installUpdate: z.tuple([]),
+  cancelUpdate: z.tuple([]),
+  restartToUpdate: z.tuple([]),
   openUrl: z.tuple([externalUrl]),
   deviceSettings: z.tuple([]),
   saveDeviceSettings: z.tuple([

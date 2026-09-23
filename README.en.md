@@ -46,7 +46,7 @@ The distribution entrance is the **[download site](https://del-taiseiozaki.githu
 - Neither build carries a distribution signature. Windows shows its unknown-publisher warning. **A Mac refuses the first launch**: open System Settings, Privacy & Security, and press the button beside irori's blocked notice once. Later launches behave normally.
 - Windows is built for **x64** (AMD Ryzen / Intel); this is not a Windows ARM build. The Mac build is **Apple Silicon (M series) only**; Intel Macs are not supported.
 - Installation, IME and CLI integration on real Windows 11 and macOS devices are still awaiting acceptance. Start with a disposable KB folder or a copy.
-- An installed build offers a newer version through **更新を確認**. Application changes merged to main are published as a preview promptly, and an automated check flags one left unpublished for more than an hour ([DISTRIBUTION](docs/DISTRIBUTION.md)).
+- From 0.1.29 an installed build finds a newer version by itself and updates with one press of **更新して再起動**, with no download or reinstall by hand ([UPDATES](docs/UPDATES.md)). From 0.1.28 or earlier, install once more from the download website. Application changes merged to main are published as a preview promptly, and an automated check flags one left unpublished for more than an hour ([DISTRIBUTION](docs/DISTRIBUTION.md)).
 
 After installing you also need:
 
@@ -145,7 +145,7 @@ Design decisions are recorded in [ADR 001 (host)](docs/decisions/001-initial-hos
 
 | Topic | Documents |
 | --- | --- |
-| Distribution and publication | [DISTRIBUTION](docs/DISTRIBUTION.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
+| Distribution and publication | [DISTRIBUTION](docs/DISTRIBUTION.md) / [UPDATES](docs/UPDATES.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
 | Status and acceptance | [STATUS](docs/STATUS.md) / [ACCEPTANCE](docs/ACCEPTANCE.md) / [CHECKPOINT](docs/CHECKPOINT.md) |
 | Daily editing and records | [DAILY-WORKFLOW](docs/DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](docs/EDITING-AND-RECORDS.md) / [EDITOR-ASSISTANCE](docs/EDITOR-ASSISTANCE.md) / [RECOVERY-AND-NOTE-TOOLS](docs/RECOVERY-AND-NOTE-TOOLS.md) |
 | Agents and conversations | [HARNESSES](docs/HARNESSES.md) / [CONVERSATIONS](docs/CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](docs/WORKSPACE-CONNECTIONS.md) |
