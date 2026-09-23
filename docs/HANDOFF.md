@@ -1,6 +1,12 @@
 # irori continuation handoff
 
-Current development, 2026-09-23 (evening): **0.1.29 is published** as
+Current development, 2026-09-23 (night): **0.1.30 is published** as
+[v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1).
+It reads a newer release's own file list when GitHub's release list omits it
+(PR #84); releases are now published from a draft. The owner installs 0.1.30
+once by hand, and the first real in-app update is 0.1.30 to the next version.
+
+Earlier the same evening, **0.1.29 was published** as
 [v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1).
 It adds in-app updates with one button (PR #80, [ADR 010](decisions/010-in-app-updates.md),
 [UPDATES](UPDATES.md)); PR #81 steadied their Windows smoke and PR #82 pointed the

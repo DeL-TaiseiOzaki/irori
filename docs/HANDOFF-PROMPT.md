@@ -1,13 +1,13 @@
 # irori — Continuation prompt
 
-Updated 2026-09-23 (evening), after v0.1.29-preview.1 was published and the
+Updated 2026-09-23 (evening), after v0.1.30-preview.1 was published and the
 records merged. Give this file to the next agent, or copy its contents into a
 new session. Inspect current files and Git state before acting; later work
 takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which had **0.1.29**
+Take over **irori** development from current `main`, which had **0.1.30**
 published and the download page in step when this was written.
 Nothing is waiting to be merged. Choose a bounded next change with executable
 acceptance checks and carry it through implementation and verification. Make
@@ -89,7 +89,11 @@ workspace's `_research/ontology-evolution-2026-09-22/`.
 
 ## Delivery state
 
-Version **0.1.29** is published as
+Version **0.1.30** (PR #84: a newer release's own assets endpoint when the list
+omits its files; releases published from a draft) is published as
+[v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1)
+through release run 35851726103 from main run 35850884875 (source `2814b93`).
+Before it, version **0.1.29** was published as
 [v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1)
 through release run 35845216421 from main run 35843823360 (source `93951b9`).
 The downloads are 198,619,136 bytes (Windows x64) and 166,268,652 (Mac arm64),
@@ -100,8 +104,8 @@ stale asset lists; STATUS records what was observed. Confirm that the release
 list, with the app's `Accept` and `X-GitHub-Api-Version` headers, names all six
 files and that a `release-sync.yml` drift run passes.
 
-An installed 0.1.28 or earlier cannot update itself: the owner installs 0.1.29
-once by hand. The first real in-app update, 0.1.29 to the next published
+An installed 0.1.28 or earlier cannot update itself: the owner installs 0.1.30
+once by hand. The first real in-app update, 0.1.30 to the next published
 version, is device evidence still owed on Windows 11 and macOS 26, including
 the Mac's App Management response to the bundle swap.
 
