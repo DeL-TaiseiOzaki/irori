@@ -50,6 +50,18 @@ const exists = (file: string) =>
     () => true,
     () => false,
   );
+// Windows keeps a freshly installed file locked for a moment, by a process Squirrel started or
+// by the runner's antivirus reading new executables; wait for the lock instead of failing.
+async function unlocked(action: () => Promise<void>) {
+  for (const deadline = Date.now() + 60_000; ; await pause(500)) {
+    try {
+      return await action();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(code) || Date.now() > deadline) throw error;
+    }
+  }
+}
 
 async function windows() {
   const root = path.join(process.env.LOCALAPPDATA!, 'irori');
@@ -67,6 +79,10 @@ async function windows() {
     async () => (await exists(path.join(installed, 'irori.exe'))) || undefined,
   );
   await run('taskkill', ['/F', '/IM', 'irori.exe']).catch(() => {});
+  await until('irori to exit', async () => {
+    const { stdout } = await run('tasklist', ['/NH']);
+    return /^irori\.exe\s/im.test(stdout) ? undefined : true;
+  });
   // Make the installation an older one, so that this build's package is an update to it:
   // Squirrel reads the installed version from packages\RELEASES and the app-<version> folder.
   const older = '0.0.1';
@@ -74,9 +90,11 @@ async function windows() {
   const local = (await readFile(path.join(packages, 'RELEASES'), 'utf8')).replace(/^\uFEFF/, '');
   const [digest, name, size] = local.trim().split(/\s+/);
   assert.equal(name, `irori-${version}-full.nupkg`, local);
-  await rename(path.join(packages, name), path.join(packages, `irori-${older}-full.nupkg`));
+  await unlocked(() =>
+    rename(path.join(packages, name), path.join(packages, `irori-${older}-full.nupkg`)),
+  );
   await writeFile(path.join(packages, 'RELEASES'), `${digest} irori-${older}-full.nupkg ${size}`);
-  await rename(installed, path.join(root, `app-${older}`));
+  await unlocked(() => rename(installed, path.join(root, `app-${older}`)));
 
   // What UpdateService hands the installer: the verified package in its own feed folder.
   const feed = await mkdtemp(path.join(tmpdir(), 'irori-feed-'));
