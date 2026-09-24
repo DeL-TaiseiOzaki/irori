@@ -27,6 +27,8 @@ export interface Entry {
   layer: Layer;
   note: boolean;
   blocked?: string;
+  /** A folder inside a Drive connection that can be edited, where a note can be added. */
+  writable?: boolean;
 }
 export interface Document {
   scopeId: string;
@@ -35,6 +37,8 @@ export interface Document {
   hash: string;
   readOnly?: boolean;
   workspaceId?: string;
+  /** The file is inside a Google Drive connection rather than in the KB's own files. */
+  cloud?: boolean;
   draft?: { text: string; baseHash: string };
 }
 export interface Question {
@@ -95,6 +99,8 @@ export interface CloudAccount {
   provider: 'google-drive';
   state: 'authorizing' | 'ready' | 'incomplete';
   detail?: string;
+  /** Signed in with permission to change Drive files. Accounts added before 0.1.35 may read only. */
+  writable?: boolean;
 }
 export interface CloudFolder {
   id: string;
@@ -113,12 +119,19 @@ export interface CloudAttachment {
   folderName: string;
   contentsRoot: string;
   name: string;
-  access: 'read-only';
+  access: CloudAccess;
 }
+export type CloudAccess = 'read-only' | 'read-write';
 export interface CloudConnection extends CloudAttachment {
   accountName?: string;
+  /** The bound account may change Drive files; without it an editable connection mounts read-only. */
+  accountWritable?: boolean;
   state: 'unconfigured' | 'disconnected' | 'connecting' | 'mounted' | 'error';
   detail?: string;
+  /** Mounted so that files can be changed. */
+  writable?: boolean;
+  /** Saved changes still waiting to reach Google Drive. */
+  pending?: number;
 }
 export interface CloudSetup {
   available: boolean;
@@ -134,6 +147,7 @@ export interface AddCloudAttachment {
   folder: CloudFolder;
   contentsRoot: string;
   name: string;
+  access?: CloudAccess;
 }
 export interface TerminalShell {
   id: string;
@@ -289,6 +303,8 @@ export interface HostAPI {
   cloudAccounts(): Promise<CloudAccount[]>;
   addCloudAccount(name: string): Promise<CloudAccount>;
   cancelCloudAccount(id: string): Promise<void>;
+  /** Signs the account in again, now with permission to change Drive files. */
+  reauthorizeCloudAccount(id: string): Promise<void>;
   removeCloudAccount(id: string): Promise<void>;
   cloudDrives(accountId: string): Promise<CloudFolder[]>;
   cloudFolders(accountId: string, folderId: string, driveId?: string): Promise<CloudFolder[]>;
@@ -299,6 +315,12 @@ export interface HostAPI {
   bindCloud(scopeId: string, mountId: string, accountId: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
+  /** Whether the connection may change its Drive folder; a connected folder is remounted. */
+  setCloudAccess(scopeId: string, mountId: string, access: CloudAccess): Promise<void>;
+  /** Shows the connected folder in the system file manager, for adding files there. */
+  openCloudFolder(scopeId: string, mountId: string): Promise<void>;
+  /** Creates an empty Markdown note in an editable Drive folder and returns it. */
+  createCloudNote(scopeId: string, directory: string, name: string): Promise<Document>;
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;

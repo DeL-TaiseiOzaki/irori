@@ -23,7 +23,14 @@ for (const [i, root] of roots.entries()) {
 }
 const accounts = [
   { id: randomUUID(), name: '個人アカウント', provider: 'google-drive', state: 'ready' },
-  { id: randomUUID(), name: '仕事アカウント', provider: 'google-drive', state: 'ready' },
+  // Signed in with permission to change files; the first account predates that.
+  {
+    id: randomUUID(),
+    name: '仕事アカウント',
+    provider: 'google-drive',
+    state: 'ready',
+    writable: true,
+  },
 ];
 await writeFile(path.join(files.dataDir, 'cloud-accounts.json'), JSON.stringify(accounts));
 const executable = path.join(base, 'rclone-fixture');
@@ -58,6 +65,16 @@ try {
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Googleアカウントを追加' })).toBeDisabled();
+  // An account from before editing existed may only read until it signs in again.
+  const olderAccount = page.locator('.account-row').filter({ hasText: '個人アカウント' });
+  await expect(olderAccount).toContainText('読み取りのみ許可');
+  await expect(olderAccount.getByRole('button', { name: '書き込みを許可' })).toBeVisible();
+  await expect(
+    page
+      .locator('.account-row')
+      .filter({ hasText: '仕事アカウント' })
+      .getByRole('button', { name: '書き込みを許可' }),
+  ).toHaveCount(0);
   await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
   await expect(page.locator('.folder-row')).toHaveCount(2);
   // A response from an old account must not overwrite the currently displayed folders.
@@ -81,6 +98,8 @@ try {
   await page.locator('.folder-row').nth(1).getByRole('radio').check();
   await page.getByLabel('contents内のフォルダ名').fill('調査 資料');
   await expect(page.locator('.mount-preview')).toContainText('contents/調査 資料/');
+  const editable = page.getByLabel('このフォルダを irori から編集できるようにする');
+  await expect(editable).toBeChecked();
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.locator('.connection-card')).toContainText('contents/調査 資料/');
   await page.locator('.folder-row').first().getByRole('radio').check();
@@ -97,14 +116,23 @@ try {
   await page.getByRole('button', { name: '「成果物」を接続先にする' }).click();
   await expect(page.locator('.mount-preview')).toContainText('接続するフォルダ: 成果物');
   await page.getByLabel('contents内のフォルダ名').fill('納品物');
+  await editable.uncheck();
+  await expect(page.locator('.attachment-form')).toContainText('読み取り専用で登録します');
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.locator('.connection-card')).toHaveCount(2);
+  // An editable connection says why it will mount read-only while its account may only read.
+  await expect(page.locator('.connection-card').filter({ hasText: '調査 資料' })).toContainText(
+    '読み取りのみ許可されているため',
+  );
+  const deliveries = page.locator('.connection-card').filter({ hasText: '納品物' });
+  await deliveries.getByRole('button', { name: '編集できるようにする' }).click();
+  await expect(deliveries.getByRole('button', { name: '読み取り専用にする' })).toBeVisible();
   const stored = JSON.parse(
     await readFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), 'utf8'),
   );
-  expect(stored.map((item: any) => [item.name, item.folderId, item.driveId])).toEqual([
-    ['調査 資料', 'folder-second', undefined],
-    ['納品物', 'shared-folder', 'shared-fixture'],
+  expect(stored.map((item: any) => [item.name, item.folderId, item.driveId, item.access])).toEqual([
+    ['調査 資料', 'folder-second', undefined, 'read-write'],
+    ['納品物', 'shared-folder', 'shared-fixture', 'read-write'],
   ]);
   expect(JSON.stringify(stored)).not.toContain(accounts[0].id);
   expect(JSON.stringify(stored)).not.toContain(base);
@@ -240,6 +268,8 @@ try {
           'two accounts',
           'shared-drive folder selection',
           'an opened folder can itself be connected',
+          'editable by default, read-only by choice, switched per connection',
+          'an account that may only read offers to allow writing',
           'dialog text contrast in light and dark themes',
           'user-selected Japanese mount names',
           'duplicate-name rejection',

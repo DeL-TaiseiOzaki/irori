@@ -13,10 +13,19 @@ const accountSchema = z.object({
   provider: z.literal('google-drive'),
   state: z.enum(['authorizing', 'ready', 'incomplete']),
   detail: z.string().optional(),
+  // Accounts signed in before 0.1.35 asked for read access only and lack this.
+  writable: z.boolean().optional(),
 });
 const entriesSchema = z.array(z.object({ ID: providerId, Name: z.string(), IsDir: z.boolean() }));
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-type AuthTask = { id: string; cancelled: boolean; done?: Promise<void>; jobId?: number };
+type AuthTask = {
+  id: string;
+  cancelled: boolean;
+  done?: Promise<void>;
+  jobId?: number;
+  /** Signing an existing account in again: cancelling keeps the account and its bindings. */
+  again?: boolean;
+};
 export class CloudAccounts {
   private accounts: CloudAccount[] = [];
   private active?: AuthTask;
@@ -55,8 +64,8 @@ export class CloudAccounts {
           if (account.state === 'authorizing') {
             account.state = 'incomplete';
             account.detail = t(
-              '前回の認証が完了していません。取り消して追加し直してください。',
-              'The previous sign-in did not finish. Cancel it and add the account again.',
+              '前回の認証が完了していません。再ログインするか、取り消して追加し直してください。',
+              'The previous sign-in did not finish. Sign in again, or cancel it and add the account again.',
             );
           }
       })();
@@ -109,7 +118,9 @@ export class CloudAccounts {
       const parameters = {
         client_id: this.oauth.clientId!,
         client_secret: this.oauth.clientSecret ?? '',
-        scope: 'drive.readonly',
+        // Folders are edited in place, so the account may change files; Google asks
+        // the person to allow that when they sign in.
+        scope: 'drive',
         config_auth_no_browser: 'true',
       };
       let method = 'config/create';
@@ -185,6 +196,7 @@ export class CloudAccounts {
         if (!output.State) {
           account.state = 'ready';
           account.detail = undefined;
+          account.writable = true;
           return;
         }
         const answer =
@@ -228,6 +240,47 @@ export class CloudAccounts {
       if (this.active === task) this.active = undefined;
     }
   }
+  /**
+   * Signs an existing account in again with permission to change files. The remote
+   * keeps its name, so the connections bound to the account keep working afterwards.
+   */
+  async reauthorize(id: string) {
+    await this.init();
+    if (this.active)
+      throw Error(
+        t(
+          '進行中のアカウント認証を完了または取り消してください。',
+          'Finish or cancel the account sign-in in progress.',
+        ),
+      );
+    if (!this.configured)
+      throw Error(
+        t(
+          'このビルドにはGoogleログイン設定がありません。配布用OAuth設定が必要です。',
+          'This build has no Google sign-in configuration. A distribution OAuth configuration is required.',
+        ),
+      );
+    const account = this.get(id);
+    const previous = { ...account };
+    account.state = 'authorizing';
+    account.detail = undefined;
+    const task: AuthTask = { id, cancelled: false, again: true };
+    this.active = task;
+    try {
+      await this.persist();
+    } catch (error) {
+      Object.assign(account, previous);
+      this.active = undefined;
+      throw error;
+    }
+    task.done = this.authorize(account, task);
+  }
+  /** Signed in and allowed to change files. */
+  async writable(id: string) {
+    await this.init();
+    const account = this.get(id);
+    return account.state === 'ready' && account.writable === true;
+  }
   async cancel(id: string) {
     await this.init();
     const account = this.get(id);
@@ -249,6 +302,17 @@ export class CloudAccounts {
         await this.rpc.call('job/stop', { jobid: task.jobId }).catch(() => {});
       await this.rpc.call('config/oauthstop').catch(() => {});
       await task.done;
+    }
+    if (task?.again) {
+      // The account stays with its bindings; only the new sign-in is abandoned.
+      account.state = 'incomplete';
+      account.detail = t(
+        '再ログインを取り消しました。もう一度「再ログイン」を押すと続けられます。',
+        'Signing in again was cancelled. Press “Sign in again” to continue.',
+      );
+      if (this.active === task) this.active = undefined;
+      await this.persist();
+      return;
     }
     await this.rpc.call('config/delete', { name: this.remote(id) });
     this.accounts = this.accounts.filter((item) => item.id !== id);

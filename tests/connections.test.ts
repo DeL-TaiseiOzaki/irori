@@ -11,6 +11,7 @@ import {
   stat,
   chmod,
   rmdir,
+  readdir,
 } from 'node:fs/promises';
 import { promises } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -70,7 +71,7 @@ async function fixture(t: any) {
   return { base, files, space, accountId, secondAccountId, rpc, cloud };
 }
 
-async function mountedFixture(t: any) {
+async function mountedFixture(t: any, { writable = false } = {}) {
   const value = await fixture(t);
   const { cloud, space, accountId, rpc } = value;
   const connection = await cloud.add({
@@ -91,6 +92,7 @@ async function mountedFixture(t: any) {
     device: info.dev,
     inode: info.ino,
     filesystem: 'fixture:',
+    writable,
   });
   cloud['states'].set(key, { state: 'mounted' });
   const original = rpc.call.bind(rpc);
@@ -173,6 +175,262 @@ test('Paths inside a mount resolve without realpath, and links below the mount p
         /alias escapes/,
       );
   }
+});
+
+test(
+  'Mount options follow the connection and its account, and each mount is its own file system',
+  { skip: process.platform === 'win32' && 'POSIX placeholder fixture' },
+  async (t) => {
+    const { files, space, accountId, secondAccountId, rpc, cloud } = await fixture(t);
+    // The first account signed in with permission to change files; the second before that existed.
+    const accountsFile = path.join(files.dataDir, 'cloud-accounts.json');
+    const stored = JSON.parse(await readFile(accountsFile, 'utf8'));
+    stored[0].writable = true;
+    await writeFile(accountsFile, JSON.stringify(stored));
+    cloud.setup = async () => ({
+      available: true,
+      oauthConfigured: true,
+      mountAvailable: true,
+      detail: 'Protocol fixture only',
+    });
+    let count = 0;
+    const mountOptions = async (access: 'read-only' | 'read-write', account: string) => {
+      const connection = await cloud.add({
+        scopeId: space.scopeId,
+        accountId: account,
+        folder: { id: 'folder-one', parentId: 'root', name: 'Source' },
+        contentsRoot: 'contents',
+        name: `Folder ${++count}`,
+        access,
+      });
+      assert.equal(connection.access, access);
+      // Ordinary test directories are never mounted, so the identity check fails after the request.
+      await assert.rejects(cloud.connect(space.scopeId, connection.mountId), /ファイルシステム/);
+      const request = rpc.calls.filter((item) => item.method === 'mount/mount').at(-1)!;
+      assert.equal(request.params.fs.description, `irori-mount-${connection.mountId}`);
+      return request.params.vfsOpt;
+    };
+    assert.deepEqual(await mountOptions('read-write', accountId), {
+      ReadOnly: false,
+      CacheMode: 2,
+      DirPerms: 0o700,
+      FilePerms: 0o600,
+    });
+    assert.equal((await mountOptions('read-write', secondAccountId)).ReadOnly, true);
+    assert.equal((await mountOptions('read-only', accountId)).ReadOnly, true);
+    const declared = JSON.parse(
+      await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8'),
+    );
+    assert.deepEqual(
+      declared.map((item: any) => item.access),
+      ['read-write', 'read-write', 'read-only'],
+    );
+  },
+);
+
+test('An editable Drive file is written in place and keeps its draft until the file holds the text', async (t) => {
+  const { files, space, target } = await mountedFixture(t, { writable: true });
+  await writeFile(path.join(target, 'note.md'), '# Remote\n');
+  const rel = 'contents/Mounted fixture/note.md';
+  const opened = await files.read(space.scopeId, rel);
+  assert.equal(opened.readOnly, false);
+  assert.equal(opened.cloud, true);
+  const inode = (await stat(path.join(target, 'note.md'))).ino;
+  const saved = await files.save({ ...opened, text: '# Remote\n\nEdited in irori\n' });
+  assert.equal(saved.text, '# Remote\n\nEdited in irori\n');
+  // The same file with new bytes, so Drive keeps it as a new version of that file.
+  assert.equal((await stat(path.join(target, 'note.md'))).ino, inode);
+  assert.deepEqual(await readdir(target), ['note.md']);
+  await assert.rejects(files.save({ ...opened, text: 'Stale edit' }), /CONFLICT/);
+  assert.equal((await files.read(space.scopeId, rel)).draft?.text, 'Stale edit');
+  assert.equal(
+    await readFile(path.join(target, 'note.md'), 'utf8'),
+    '# Remote\n\nEdited in irori\n',
+  );
+});
+
+test('A read-only Drive connection opens files read-only and refuses saves and new notes', async (t) => {
+  const { files, space, target, cloud } = await mountedFixture(t);
+  await writeFile(path.join(target, 'note.md'), '# Remote\n');
+  const doc = await files.read(space.scopeId, 'contents/Mounted fixture/note.md');
+  assert.equal(doc.readOnly, true);
+  await assert.rejects(files.save({ ...doc, text: 'Changed' }), /読み取り専用/);
+  await assert.rejects(
+    cloud.createNote(space.scopeId, 'contents/Mounted fixture', 'Idea'),
+    /読み取り専用/,
+  );
+  assert.equal((await files.entries(space.scopeId, 'contents'))[0].writable, undefined);
+  assert.equal(await readFile(path.join(target, 'note.md'), 'utf8'), '# Remote\n');
+});
+
+test('Notes are added to an editable Drive folder without replacing a file', async (t) => {
+  const { files, space, target, cloud } = await mountedFixture(t, { writable: true });
+  await mkdir(path.join(target, 'Folder'));
+  assert.equal(
+    (await files.entries(space.scopeId, 'contents')).find(
+      (entry) => entry.name === 'Mounted fixture',
+    )?.writable,
+    true,
+  );
+  assert.equal(
+    (await files.entries(space.scopeId, 'contents/Mounted fixture')).find(
+      (entry) => entry.name === 'Folder',
+    )?.writable,
+    true,
+  );
+  const created = await cloud.createNote(
+    space.scopeId,
+    'contents/Mounted fixture/Folder',
+    'アイデア',
+  );
+  assert.equal(created.path, 'contents/Mounted fixture/Folder/アイデア.md');
+  assert.equal(created.readOnly, false);
+  assert.equal(
+    await readFile(path.join(target, 'Folder', 'アイデア.md'), 'utf8'),
+    '# アイデア\n\n',
+  );
+  await assert.rejects(
+    cloud.createNote(space.scopeId, 'contents/Mounted fixture/Folder', 'アイデア'),
+    { code: 'EEXIST' },
+  );
+});
+
+test('Changes waiting to upload are counted and keep their folder connected', async (t) => {
+  const { cloud, space, connection, rpc, accountId } = await mountedFixture(t, { writable: true });
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) => {
+    if (method === 'vfs/stats') {
+      assert.equal(params?.fs, 'fixture:');
+      return { diskCache: { uploadsInProgress: 1, uploadsQueued: 2 } };
+    }
+    return original(method, params);
+  };
+  assert.equal((await cloud.connections(space.scopeId))[0].pending, 3);
+  assert.equal(await cloud.pendingUploads(), 3);
+  await assert.rejects(cloud.disconnect(space.scopeId, connection.mountId), /送信待ち/);
+  await assert.rejects(cloud.setAccess(space.scopeId, connection.mountId, 'read-only'), /送信待ち/);
+  // Signing the account in again replaces its remote, which a mounted folder is using.
+  await assert.rejects(cloud.reauthorizeAccount(accountId), /接続を解除/);
+  assert.equal(cloud['mounted'].size, 1);
+});
+
+test('Access is changed per connection and kept in its declaration', async (t) => {
+  const { cloud, space, connection } = await mountedFixture(t);
+  await cloud.disconnect(space.scopeId, connection.mountId);
+  await cloud.setAccess(space.scopeId, connection.mountId, 'read-only');
+  assert.equal((await cloud.connections(space.scopeId))[0].access, 'read-only');
+  await cloud.setAccess(space.scopeId, connection.mountId, 'read-write');
+  const declared = JSON.parse(
+    await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8'),
+  );
+  assert.equal(declared[0].access, 'read-write');
+});
+
+test('A workspace Drive document saves through the cloud service with its own draft', async (t) => {
+  const { files, rpc, accountId } = await fixture(t);
+  const workspaces = new WorkspaceService(files);
+  const workspace = await workspaces.save('Drive only', []);
+  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
+  const root = await cloud.workspaceRoot(workspace.id);
+  const connection = await cloud.add({
+    scopeId: workspace.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '資料',
+    folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
+  });
+  const target = path.join(root.root, 'contents', '資料');
+  await mkdir(target, { recursive: true });
+  await writeFile(path.join(target, 'note.md'), '# Shared\n');
+  const info = await stat(target);
+  cloud['mounted'].set(`${workspace.id}:${connection.mountId}`, {
+    attachment: connection,
+    target,
+    device: info.dev,
+    inode: info.ino,
+    filesystem: 'fixture:',
+    writable: true,
+  });
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) =>
+    method === 'mount/listmounts'
+      ? { mountPoints: [{ MountPoint: target, Fs: 'fixture:' }] }
+      : original(method, params);
+  const opened = await cloud.read(workspace.id, 'contents/資料/note.md');
+  assert.equal(opened.workspaceId, workspace.id);
+  assert.equal(opened.readOnly, false);
+  await cloud.draft({ ...opened, text: '# Shared\n\nUnsaved\n' });
+  assert.equal(
+    (await cloud.read(workspace.id, 'contents/資料/note.md')).draft?.text,
+    '# Shared\n\nUnsaved\n',
+  );
+  const saved = await cloud.save({ ...opened, text: '# Shared\n\nSaved\n' });
+  assert.equal(saved.text, '# Shared\n\nSaved\n');
+  assert.equal(saved.draft, undefined);
+  assert.equal(await readFile(path.join(target, 'note.md'), 'utf8'), '# Shared\n\nSaved\n');
+});
+
+test('A new sign-in asks for write access, and an older account signs in again keeping its name', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori write access '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const rpc = new FixtureRclone();
+  const legacyId = randomUUID();
+  // An account signed in before 0.1.35 carries no write permission.
+  await writeFile(
+    path.join(base, 'cloud-accounts.json'),
+    JSON.stringify([{ id: legacyId, name: 'Older', provider: 'google-drive', state: 'ready' }]),
+  );
+  const accounts = new CloudAccounts(base, rpc, async () => {}, {
+    clientId: 'fixture-client',
+    clientSecret: 'fixture-secret',
+  });
+  // A sign-in has finished once it no longer holds the account controller.
+  const settle = async () => {
+    for (let n = 0; n < 100 && accounts['active']; n++)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+  };
+  assert.equal(await accounts.writable(legacyId), false);
+  const added = await accounts.add('New');
+  await settle();
+  assert.equal(await accounts.writable(added.id), true);
+  await accounts.reauthorize(legacyId);
+  await settle();
+  assert.equal(await accounts.writable(legacyId), true);
+  const created = rpc.calls.filter((item) => item.method === 'config/create');
+  assert.deepEqual(
+    created.map((item) => [item.params.name, item.params.parameters.scope]),
+    [
+      [accounts.remote(added.id), 'drive'],
+      [accounts.remote(legacyId), 'drive'],
+    ],
+  );
+  assert.equal((await accounts.list()).length, 2);
+  await accounts.close();
+});
+
+test('Cancelling a second sign-in keeps the account and its remote name', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori write access cancel '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const rpc = new FixtureRclone();
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) =>
+    method === 'job/status' ? { finished: false } : original(method, params);
+  const id = randomUUID();
+  await writeFile(
+    path.join(base, 'cloud-accounts.json'),
+    JSON.stringify([{ id, name: 'Older', provider: 'google-drive', state: 'ready' }]),
+  );
+  const accounts = new CloudAccounts(base, rpc, async () => {}, {
+    clientId: 'fixture',
+    clientSecret: 'fixture',
+  });
+  await accounts.reauthorize(id);
+  await accounts.cancel(id);
+  const [account] = await accounts.list();
+  assert.equal(account.id, id);
+  assert.equal(account.state, 'incomplete');
+  assert.ok(!rpc.calls.some((item) => item.method === 'config/delete'));
+  await accounts.close();
 });
 
 test('Closing after a disappeared mount succeeds when its service and filesystem agree', async (t) => {
@@ -542,7 +800,8 @@ test(
         text: 'unsafe',
         hash: '0'.repeat(64),
       }),
-      /読み取り専用/,
+      // An unmounted connection has no folder to write to, whatever its access.
+      /未接続/,
     );
   },
 );
@@ -808,7 +1067,12 @@ test('Connection limit rejects additions before writing an unreadable declaratio
     name: 'First',
   };
   const connection = await cloud.add(input);
-  const { accountName: _account, state: _state, ...record } = connection;
+  const {
+    accountName: _account,
+    accountWritable: _writable,
+    state: _state,
+    ...record
+  } = connection;
   await writeFile(
     path.join(space.root, '.irori/cloud-mounts.json'),
     JSON.stringify(

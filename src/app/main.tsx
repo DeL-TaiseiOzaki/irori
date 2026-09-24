@@ -338,6 +338,8 @@ function App() {
   const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
+  // An editable Drive folder the next note goes into, instead of the active KB.
+  const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
@@ -478,10 +480,10 @@ function App() {
     if (followConversation.current && conversation.current)
       conversation.current.scrollTop = conversation.current.scrollHeight;
   }, [events, panel]);
-  // Who typed which line of the open note. A cloud file is read-only and has no
-  // record; a failure here leaves the note unmarked rather than unopenable.
+  // Who typed which line of the open note. A Drive file is outside the KB's Git
+  // history and has no record; a failure here leaves the note unmarked rather than unopenable.
   useEffect(() => {
-    if (!doc || doc.workspaceId) return setAuthorship(undefined);
+    if (!doc || doc.workspaceId || doc.cloud) return setAuthorship(undefined);
     let current = true;
     const { scopeId, path, text } = doc;
     void host
@@ -567,7 +569,9 @@ function App() {
     setStatus(
       next.readOnly
         ? t('クラウド資料・読み取り専用', 'Cloud material · Read-only')
-        : t('この端末に保存済み', 'Saved on this device'),
+        : next.cloud
+          ? t('Google Drive の資料・編集できます', 'Google Drive material · editable')
+          : t('この端末に保存済み', 'Saved on this device'),
     );
   }
   async function refreshSpaces() {
@@ -654,6 +658,10 @@ function App() {
       delete window.iroriFlushDraft;
     };
   }, []);
+  function closeNewNote() {
+    setNewNote(false);
+    setCloudNoteTarget(undefined);
+  }
   async function save(): Promise<boolean> {
     if (saving.current) {
       if (!(await saving.current)) return false;
@@ -675,7 +683,14 @@ function App() {
           current.current = { ...current.current, doc: saved, buffer: latest };
           setDoc(saved);
           setBuffer(latest);
-          setStatus(t('この端末に保存済み', 'Saved on this device'));
+          setStatus(
+            saved.cloud
+              ? t(
+                  '保存しました。Google Drive へ自動で送信されます。',
+                  'Saved. It is uploaded to Google Drive automatically.',
+                )
+              : t('この端末に保存済み', 'Saved on this device'),
+          );
         }
         return true;
       } catch (e) {
@@ -1114,6 +1129,10 @@ function App() {
                     }
                   });
                 }}
+                onCreateIn={(space, entry) => {
+                  setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
+                  setNewNote(true);
+                }}
                 onRefresh={() => setRevision((value) => value + 1)}
                 drive={
                   cloudRoot && (
@@ -1143,6 +1162,10 @@ function App() {
                         selected={doc}
                         readEntries={host.cloudEntries}
                         onOpen={(root, entry) => void openCloud(root, entry)}
+                        onCreate={(root, entry) => {
+                          setCloudNoteTarget({ scopeId: root.scopeId, directory: entry.path });
+                          setNewNote(true);
+                        }}
                       />
                     </section>
                   )
@@ -1519,12 +1542,15 @@ function App() {
                                 if (searchTarget)
                                   setSearchNotice(navigationNotice(searchTarget, found));
                               }}
-                              onUpload={async (file) =>
-                                host.saveImage(
-                                  doc.scopeId,
-                                  doc.path,
-                                  new Uint8Array(await file.arrayBuffer()),
-                                )
+                              onUpload={
+                                doc.cloud
+                                  ? undefined
+                                  : async (file) =>
+                                      host.saveImage(
+                                        doc.scopeId,
+                                        doc.path,
+                                        new Uint8Array(await file.arrayBuffer()),
+                                      )
                               }
                               resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
                             />
@@ -2070,8 +2096,8 @@ function App() {
                   </div>
                   <small id="agent-access-detail" className="muted" role="status">
                     {t(
-                      `${agentAccessDetail(agent, access)} 次に送る指示に適用します。 iroriのGoogle Drive接続は読み取り専用です。`,
-                      `${agentAccessDetail(agent, access)} Applies to the next instruction sent. irori's Google Drive connection is read-only.`,
+                      `${agentAccessDetail(agent, access)} 次に送る指示に適用します。 この KB の contents に編集可で接続した Google Drive フォルダは、エージェントも変更できます。`,
+                      `${agentAccessDetail(agent, access)} Applies to the next instruction sent. Google Drive folders connected as editable in this KB's contents can be changed by agents too.`,
                     )}
                   </small>
                 </div>
@@ -2265,16 +2291,12 @@ function App() {
         />
       )}
       {newNote && (
-        <Dialog
-          label={t('ノートを作成', 'Create note')}
-          busy={creatingNote}
-          onClose={() => setNewNote(false)}
-        >
+        <Dialog label={t('ノートを作成', 'Create note')} busy={creatingNote} onClose={closeNewNote}>
           <form
             className="modal"
             onSubmit={(e) => {
               e.preventDefault();
-              if (active && !creatingNote) {
+              if ((active || cloudNoteTarget) && !creatingNote) {
                 setCreatingNote(true);
                 void (async () => {
                   if (!(await save()))
@@ -2284,11 +2306,17 @@ function App() {
                         'Save the current note before creating a new one.',
                       ),
                     );
-                  return host.createNote(active.scopeId, noteName, noteDirectory);
+                  return cloudNoteTarget
+                    ? host.createCloudNote(
+                        cloudNoteTarget.scopeId,
+                        cloudNoteTarget.directory,
+                        noteName,
+                      )
+                    : host.createNote(active!.scopeId, noteName, noteDirectory);
                 })()
                   .then((d) => {
                     load(d);
-                    setNewNote(false);
+                    closeNewNote();
                     setNoteName('');
                     setRevision((r) => r + 1);
                   })
@@ -2305,21 +2333,28 @@ function App() {
               placeholder={t('ノート名', 'Note name')}
               required
             />
-            <label>
-              {t(
-                '保存先フォルダー（KB 内の相対パス）',
-                'Destination folder (path relative to the KB)',
-              )}
-              <input
-                aria-label={t('保存先フォルダー', 'Destination folder')}
-                value={noteDirectory}
-                onChange={(event) => setNoteDirectory(event.target.value)}
-                maxLength={4096}
-                placeholder={defaultNoteDirectory}
-              />
-            </label>
+            {cloudNoteTarget ? (
+              <p className="mount-preview">
+                {t('保存先（Google Drive）', 'Destination (Google Drive)')}:{' '}
+                {cloudNoteTarget.directory}/
+              </p>
+            ) : (
+              <label>
+                {t(
+                  '保存先フォルダー（KB 内の相対パス）',
+                  'Destination folder (path relative to the KB)',
+                )}
+                <input
+                  aria-label={t('保存先フォルダー', 'Destination folder')}
+                  value={noteDirectory}
+                  onChange={(event) => setNoteDirectory(event.target.value)}
+                  maxLength={4096}
+                  placeholder={defaultNoteDirectory}
+                />
+              </label>
+            )}
             <div className="actions">
-              <button type="button" disabled={creatingNote} onClick={() => setNewNote(false)}>
+              <button type="button" disabled={creatingNote} onClick={closeNewNote}>
                 {t('キャンセル', 'Cancel')}
               </button>
               <button className="primary" disabled={creatingNote}>

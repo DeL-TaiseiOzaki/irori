@@ -8,15 +8,18 @@ import type { GoogleOAuth } from './oauth';
 import { Rclone, type RcloneAPI } from './rclone';
 import { cloudDeclaration, mountNameError, nameKey } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
-import { readLocalJson, writeLocalJson } from '../host/local-json';
-import { readTextDocument } from '../host/files';
+import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
+import { draftFile, hash, readTextDocument, textFileByteLimit } from '../host/files';
+import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type { WriteTarget } from './outbox';
 import type {
   AddCloudAttachment,
+  CloudAccess,
   CloudAttachment,
   CloudConnection,
   CloudSetup,
+  Document,
   Entry,
 } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -35,11 +38,15 @@ type Mounted = {
   device: number;
   inode: number;
   filesystem: string;
+  /** Mounted so that files can be changed: the connection allows it and so does its account. */
+  writable: boolean;
 };
 export class CloudService {
   readonly accounts: CloudAccounts;
   private queue = new SerialQueue();
   private mounted = new Map<string, Mounted>();
+  // Each owner's root, as last read, so writability can be answered without I/O.
+  private roots = new Map<string, string>();
   private states = new Map<string, { state: CloudConnection['state']; detail?: string }>();
   private stopping = false;
   constructor(
@@ -290,12 +297,16 @@ export class CloudService {
               });
           }
         }
+        const account = accounts.find((item) => item.id === binding?.accountId);
+        const current = this.mounted.get(key);
         return {
           ...record,
-          accountName: accounts.find((account) => account.id === binding?.accountId)?.name,
+          accountName: account?.name,
+          accountWritable: account?.state === 'ready' && account.writable === true,
           ...(this.states.get(key) ?? {
             state: binding ? ('disconnected' as const) : ('unconfigured' as const),
           }),
+          ...(current ? { writable: current.writable, pending: await this.pending(current) } : {}),
         };
       }),
     );
@@ -386,7 +397,8 @@ export class CloudService {
         folderName: input.folder.name,
         contentsRoot: input.contentsRoot,
         name: input.name,
-        access: 'read-only',
+        // Materials are worked on in the IDE, so a new connection may change its folder.
+        access: input.access ?? 'read-write',
       });
       if (!(await this.files.get(input.scopeId)).contents.includes(record.contentsRoot))
         throw Error(
@@ -537,101 +549,113 @@ export class CloudService {
     });
   }
   connect(scopeId: string, mountId: string) {
-    return this.mutate(async () => {
-      const key = this.key(scopeId, mountId);
-      const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
-      if (!record) throw Error('Unknown cloud connection');
-      if (this.mounted.has(key)) {
-        try {
-          await this.assertMounted(this.mounted.get(key)!);
-          this.states.set(key, { state: 'mounted' });
-          return;
-        } catch {
-          this.mounted.delete(key);
-        }
+    return this.mutate(() => this.mount(scopeId, mountId));
+  }
+  private async mount(scopeId: string, mountId: string) {
+    const key = this.key(scopeId, mountId);
+    const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
+    if (!record) throw Error('Unknown cloud connection');
+    if (this.mounted.has(key)) {
+      try {
+        await this.assertMounted(this.mounted.get(key)!);
+        this.states.set(key, { state: 'mounted' });
+        return;
+      } catch {
+        this.mounted.delete(key);
       }
-      const binding = await this.binding(scopeId, mountId);
-      if (!binding)
+    }
+    const binding = await this.binding(scopeId, mountId);
+    if (!binding)
+      throw Error(
+        t(
+          'この端末で使用するアカウントを紐づけてください。',
+          'Link the account to use on this device.',
+        ),
+      );
+    this.states.set(key, { state: 'connecting' });
+    let target: string | undefined;
+    let requested = false;
+    try {
+      const setup = await this.setup();
+      if (!setup.mountAvailable) throw Error(setup.detail);
+      await this.accounts.verify(binding.accountId, {
+        id: record.folderId,
+        name: record.folderName,
+        parentId: record.parentId,
+        driveId: record.driveId,
+      });
+      await this.checkVacant(record, binding);
+      const parent = (await this.parent(record, true))!;
+      target = path.join(parent, record.name);
+      await this.checkVacant(record, binding);
+      if (process.platform !== 'win32') {
+        const existing = await fs.lstat(target).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+          return undefined;
+        });
+        if (!existing) {
+          await fs.mkdir(target, { mode: 0o000 });
+          const stat = await fs.lstat(target);
+          binding.placeholder = { dev: stat.dev, ino: stat.ino };
+          await writeLocalJson(this.bindingFile(scopeId, mountId), binding);
+        }
+        await fs.chmod(target, 0o700);
+      }
+      // An editable connection whose account may only read still mounts, read-only,
+      // until the account is signed in again with permission to change files.
+      const writable =
+        record.access === 'read-write' && (await this.accounts.writable(binding.accountId));
+      // The description only makes each mount a distinct rclone file system, so two
+      // connections to one Drive folder never share a write cache or its statistics.
+      const remote = {
+        ...(await this.accounts.filesystem(binding.accountId, record.folderId, record.driveId)),
+        description: `irori-mount-${record.mountId}`,
+      };
+      const identity = await this.rpc.call('operations/fsinfo', { fs: remote });
+      const filesystem = `${z.string().min(1).parse(identity.Name)}:${z.string().parse(identity.Root)}`;
+      requested = true;
+      await this.rpc.call('mount/mount', {
+        fs: remote,
+        mountPoint: target,
+        ...(process.platform === 'darwin' ? { mountType: 'nfsmount' } : {}),
+        mountOpt: { AllowOther: false },
+        // Writing needs rclone's write cache (CacheMode 2, "writes"): files are staged on
+        // this device and uploaded shortly after they are closed. macOS's NFS mount is
+        // read-only without it. Changes left when irori quits are uploaded on the next mount.
+        vfsOpt: writable
+          ? { ReadOnly: false, CacheMode: 2, DirPerms: 0o700, FilePerms: 0o600 }
+          : { ReadOnly: true, CacheMode: 0, DirPerms: 0o500, FilePerms: 0o400 },
+      });
+      const stat = await fs.stat(target);
+      if (stat.dev === (await fs.stat(parent)).dev)
         throw Error(
           t(
-            'この端末で使用するアカウントを紐づけてください。',
-            'Link the account to use on this device.',
+            'マウントされたファイルシステムを確認できません。',
+            'Could not verify the mounted file system.',
           ),
         );
-      this.states.set(key, { state: 'connecting' });
-      let target: string | undefined;
-      let requested = false;
-      try {
-        const setup = await this.setup();
-        if (!setup.mountAvailable) throw Error(setup.detail);
-        await this.accounts.verify(binding.accountId, {
-          id: record.folderId,
-          name: record.folderName,
-          parentId: record.parentId,
-          driveId: record.driveId,
-        });
-        await this.checkVacant(record, binding);
-        const parent = (await this.parent(record, true))!;
-        target = path.join(parent, record.name);
-        await this.checkVacant(record, binding);
-        if (process.platform !== 'win32') {
-          const existing = await fs.lstat(target).catch((error: NodeJS.ErrnoException) => {
-            if (error.code !== 'ENOENT') throw error;
-            return undefined;
-          });
-          if (!existing) {
-            await fs.mkdir(target, { mode: 0o000 });
-            const stat = await fs.lstat(target);
-            binding.placeholder = { dev: stat.dev, ino: stat.ino };
-            await writeLocalJson(this.bindingFile(scopeId, mountId), binding);
-          }
-          await fs.chmod(target, 0o700);
-        }
-        const remote = await this.accounts.filesystem(
-          binding.accountId,
-          record.folderId,
-          record.driveId,
-        );
-        const identity = await this.rpc.call('operations/fsinfo', { fs: remote });
-        const filesystem = `${z.string().min(1).parse(identity.Name)}:${z.string().parse(identity.Root)}`;
-        requested = true;
-        await this.rpc.call('mount/mount', {
-          fs: remote,
-          mountPoint: target,
-          ...(process.platform === 'darwin' ? { mountType: 'nfsmount' } : {}),
-          mountOpt: { AllowOther: false },
-          vfsOpt: { ReadOnly: true, CacheMode: 0, DirPerms: 0o500, FilePerms: 0o400 },
-        });
-        const stat = await fs.stat(target);
-        if (stat.dev === (await fs.stat(parent)).dev)
-          throw Error(
-            t(
-              'マウントされたファイルシステムを確認できません。',
-              'Could not verify the mounted file system.',
-            ),
-          );
-        const mounted = {
-          attachment: record,
-          target,
-          device: stat.dev,
-          inode: stat.ino,
-          filesystem,
-        };
-        await this.assertMounted(mounted);
-        this.mounted.set(key, mounted);
-        this.states.set(key, { state: 'mounted' });
-      } catch (error) {
-        if (requested && target)
-          await this.rpc.call('mount/unmount', { mountPoint: target }).catch(() => {});
-        if (target && binding.placeholder) {
-          const info = await fs.lstat(target).catch(() => undefined);
-          if (info?.dev === binding.placeholder.dev && info.ino === binding.placeholder.ino)
-            await fs.chmod(target, 0o000).catch(() => {});
-        }
-        this.states.set(key, { state: 'error', detail: (error as Error).message });
-        throw error;
+      const mounted = {
+        attachment: record,
+        target,
+        device: stat.dev,
+        inode: stat.ino,
+        filesystem,
+        writable,
+      };
+      await this.assertMounted(mounted);
+      this.mounted.set(key, mounted);
+      this.states.set(key, { state: 'mounted' });
+    } catch (error) {
+      if (requested && target)
+        await this.rpc.call('mount/unmount', { mountPoint: target }).catch(() => {});
+      if (target && binding.placeholder) {
+        const info = await fs.lstat(target).catch(() => undefined);
+        if (info?.dev === binding.placeholder.dev && info.ino === binding.placeholder.ino)
+          await fs.chmod(target, 0o000).catch(() => {});
       }
-    });
+      this.states.set(key, { state: 'error', detail: (error as Error).message });
+      throw error;
+    }
   }
   private async assertMounted(mounted: Mounted) {
     const records = await this.rpc.call('mount/listmounts');
@@ -649,7 +673,206 @@ export class CloudService {
       );
   }
   disconnect(scopeId: string, mountId: string) {
-    return this.mutate(() => this.unmount(scopeId, mountId));
+    return this.mutate(async () => {
+      await this.assertSent(scopeId, mountId);
+      await this.unmount(scopeId, mountId);
+    });
+  }
+  /** Refuses to take a mount away while saved changes still wait to be uploaded. */
+  private async assertSent(scopeId: string, mountId: string) {
+    const mounted = this.mounted.get(this.key(scopeId, mountId));
+    const pending = mounted && (await this.pending(mounted));
+    if (pending)
+      throw Error(
+        t(
+          `Google Drive への送信待ちが ${pending} 件あります。送信が終わってから操作してください。`,
+          `${pending} saved changes are still waiting to be uploaded to Google Drive. Try again once they are sent.`,
+        ),
+      );
+  }
+  /** Saved changes of a writable mount still waiting to reach Google Drive, if rclone can tell. */
+  private async pending(mounted: Mounted): Promise<number | undefined> {
+    if (!mounted.writable) return 0;
+    try {
+      const stats = await this.rpc.call('vfs/stats', { fs: mounted.filesystem });
+      const count =
+        Number(stats?.diskCache?.uploadsInProgress ?? 0) +
+        Number(stats?.diskCache?.uploadsQueued ?? 0);
+      return Number.isFinite(count) ? count : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  /** Saved changes still waiting to be uploaded, across every mount. */
+  async pendingUploads() {
+    let total = 0;
+    for (const mounted of this.mounted.values()) total += (await this.pending(mounted)) ?? 0;
+    return total;
+  }
+  /**
+   * Whether a connection may change its Drive folder. The mount options are fixed
+   * when a folder is mounted, so a connected folder is mounted again.
+   */
+  setAccess(scopeId: string, mountId: string, access: CloudAccess) {
+    return this.mutate(async () => {
+      const records = await this.declarations(scopeId);
+      const record = records.find((item) => item.mountId === mountId);
+      if (!record) throw Error('Unknown cloud connection');
+      if (record.access === access) return;
+      const key = this.key(scopeId, mountId);
+      const wasMounted = this.mounted.has(key);
+      if (wasMounted) {
+        await this.assertSent(scopeId, mountId);
+        await this.unmount(scopeId, mountId);
+      }
+      if (JSON.stringify(await this.declarations(scopeId)) !== JSON.stringify(records))
+        throw Error(
+          t(
+            '接続情報が外部で変更されました。再読み込みしてください。',
+            'The connection information changed outside irori. Reload it.',
+          ),
+        );
+      await writeLocalJson(
+        await this.declarationFile(scopeId),
+        records.map((item) => (item.mountId === mountId ? { ...item, access } : item)),
+      );
+      if (wasMounted) await this.mount(scopeId, mountId);
+    });
+  }
+  /**
+   * Signs an account in again with permission to change files. Its remote is
+   * replaced while signing in, so no folder may be mounted through it meanwhile.
+   */
+  reauthorizeAccount(id: string) {
+    return this.mutate(async () => {
+      for (const mounted of this.mounted.values()) {
+        const binding = await this.binding(mounted.attachment.scopeId, mounted.attachment.mountId);
+        if (binding?.accountId === id)
+          throw Error(
+            t(
+              'このアカウントを使う接続を解除してから再ログインしてください。',
+              'Disconnect the folders that use this account before signing in again.',
+            ),
+          );
+      }
+      await this.accounts.reauthorize(id);
+    });
+  }
+  /** The folder a connection is mounted on, for the system file manager. */
+  async folder(scopeId: string, mountId: string) {
+    const mounted = this.mounted.get(this.key(scopeId, mountId));
+    if (!mounted)
+      throw Error(
+        t(
+          'クラウドフォルダは未接続です。接続画面から再接続してください。',
+          'The cloud folder is not connected. Reconnect it from the Connect screen.',
+        ),
+      );
+    await this.assertMounted(mounted);
+    return mounted.target;
+  }
+  /** Whether a path lies inside a folder mounted so that it can be changed. */
+  writable(scopeId: string, rel: string) {
+    const root = this.roots.get(scopeId);
+    if (!root) return false;
+    const target = path.join(root, rel);
+    return [...this.mounted.values()].some(
+      (item) => item.attachment.scopeId === scopeId && item.writable && within(item.target, target),
+    );
+  }
+  private async assertWritable(scopeId: string, rel: string) {
+    await this.rootOf(scopeId);
+    if (!this.writable(scopeId, rel))
+      throw Error(
+        t(
+          'このクラウドフォルダは読み取り専用で接続されています。',
+          'This cloud folder is connected read-only.',
+        ),
+      );
+  }
+  private async rootOf(scopeId: string) {
+    const root = (await this.files.get(scopeId)).root;
+    this.roots.set(scopeId, root);
+    return root;
+  }
+  /**
+   * Writes an edited text file in place. Replacing it through a temporary file would
+   * make Drive delete the original and upload a new one, losing its version history
+   * and sharing; writing the same file makes the upload a new version of it.
+   */
+  write(doc: Document) {
+    return this.mutate(async () => {
+      if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
+        throw Error('The text editor supports files up to 2 MiB');
+      if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
+      const filename = await this.resolve(doc.scopeId, doc.path);
+      await this.assertWritable(doc.scopeId, doc.path);
+      const conflict = () =>
+        Error(
+          t(
+            'CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。',
+            'CONFLICT: Check the changes on disk. Your draft is kept.',
+          ),
+        );
+      const before = await fs.readFile(filename);
+      if (hash(before) !== doc.hash) throw conflict();
+      if (hash(doc.text) === doc.hash) return;
+      // The previous version stays on this device as well as in Drive's history.
+      await writeLocalFile(
+        path.join(this.files.dataDir, `backup-${hash(before)}.txt`),
+        before.toString('utf8'),
+      );
+      if (hash(await fs.readFile(filename)) !== doc.hash) throw conflict();
+      await fs.writeFile(filename, doc.text);
+    });
+  }
+  /** A text file in a Drive connection, with whether it may be edited and any kept draft. */
+  async document(scopeId: string, rel: string): Promise<Document> {
+    const root = await this.files.get(scopeId);
+    this.roots.set(scopeId, root.root);
+    const doc = await readTextDocument(await this.resolve(scopeId, rel), scopeId, rel);
+    const writable = this.writable(scopeId, rel);
+    const draft = writable
+      ? await readLocalJson(draftFile(this.files.dataDir, scopeId, rel), null)
+      : null;
+    return {
+      ...doc,
+      readOnly: !writable,
+      cloud: true,
+      ...(root.workspace ? { workspaceId: scopeId } : {}),
+      ...(draft
+        ? { draft: z.object({ text: z.string(), baseHash: z.string() }).parse(draft) }
+        : {}),
+    };
+  }
+  /** Keeps the unsaved text of a workspace Drive document on this device. */
+  async draft(doc: Document) {
+    await this.workspaceRoot(doc.scopeId);
+    await this.assertWritable(doc.scopeId, doc.path);
+    await writeLocalJson(draftFile(this.files.dataDir, doc.scopeId, doc.path), {
+      text: doc.text,
+      baseHash: doc.hash,
+    });
+  }
+  /** Saves a workspace Drive document, keeping a draft until the file holds the text. */
+  async save(doc: Document) {
+    await this.draft(doc);
+    await this.write(doc);
+    await fs.rm(draftFile(this.files.dataDir, doc.scopeId, doc.path), { force: true });
+    return this.document(doc.scopeId, doc.path);
+  }
+  /** Adds an empty Markdown note to an editable Drive folder; an existing file is never replaced. */
+  createNote(scopeId: string, directory: string, name: string) {
+    return this.mutate(async () => {
+      const filename = noteFilename(name);
+      const folder = await this.resolve(scopeId, directory);
+      await this.assertWritable(scopeId, directory);
+      if (!(await fs.stat(folder)).isDirectory()) throw Error('Choose a folder for the new note');
+      await fs.writeFile(path.join(folder, filename), `# ${filename.slice(0, -3)}\n\n`, {
+        flag: 'wx',
+      });
+      return this.document(scopeId, `${directory}/${filename}`);
+    });
   }
   private async unmount(scopeId: string, mountId: string) {
     const key = this.key(scopeId, mountId);
@@ -703,7 +926,7 @@ export class CloudService {
       rel.split('/').some((part) => !part || part === '.' || part === '..')
     )
       throw Error('Invalid cloud path');
-    const target = path.join((await this.files.get(scopeId)).root, rel);
+    const target = path.join(await this.rootOf(scopeId), rel);
     const entry = [...this.mounted.values()].find(
       (item) => item.attachment.scopeId === scopeId && within(item.target, target),
     );
@@ -741,6 +964,7 @@ export class CloudService {
         note: false,
         blocked:
           record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
+        ...(record.state === 'mounted' && record.writable ? { writable: true } : {}),
       }));
     const parent = await this.parent({ scopeId, contentsRoot: rel });
     if (parent)
@@ -766,6 +990,7 @@ export class CloudService {
     if (roots) return roots;
     const entries = await fs.readdir(await this.resolve(id, rel), { withFileTypes: true });
     if (entries.length > 4000) throw Error('This directory exceeds the 4,000-entry limit');
+    const writable = this.writable(id, rel);
     return entries
       .map((entry): Entry => ({
         path: `${rel}/${entry.name}`,
@@ -776,16 +1001,13 @@ export class CloudService {
         blocked: entry.isSymbolicLink()
           ? t('リンク先は開けません', 'Link targets cannot be opened')
           : undefined,
+        ...(writable && entry.isDirectory() && !entry.isSymbolicLink() ? { writable: true } : {}),
       }))
       .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
   }
   async read(id: string, rel: string) {
     await this.workspaceRoot(id);
-    return {
-      ...(await readTextDocument(await this.resolve(id, rel), id, rel)),
-      readOnly: true,
-      workspaceId: id,
-    };
+    return this.document(id, rel);
   }
   async close() {
     this.stopping = true;

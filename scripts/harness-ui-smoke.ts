@@ -247,7 +247,7 @@ try {
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
   await access.selectOption('full-access');
   await expect(page.locator('#agent-access-detail')).toContainText(
-    'Google Drive接続は読み取り専用',
+    '編集可で接続した Google Drive フォルダは、エージェントも変更できます',
   );
   let doneCount = await page.locator('.message.done').count();
   await page.getByLabel('エージェントへの指示').fill('access fixture');
