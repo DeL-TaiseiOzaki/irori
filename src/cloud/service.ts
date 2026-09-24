@@ -698,9 +698,15 @@ export class CloudService {
         t('マウント先の識別情報が変わりました。', 'The identity of the mount point has changed.'),
       );
   }
-  disconnect(scopeId: string, mountId: string) {
+  /**
+   * `leavePending` takes the folder away although saved changes still wait: they
+   * stay in rclone's cache and are uploaded when the folder is next mounted
+   * editable. An upload that keeps failing, for example for want of permission,
+   * would otherwise leave no way to disconnect, sign in again or make it read-only.
+   */
+  disconnect(scopeId: string, mountId: string, leavePending = false) {
     return this.mutate(async () => {
-      await this.assertSent(scopeId, mountId);
+      if (!leavePending) await this.assertSent(scopeId, mountId);
       await this.unmount(scopeId, mountId);
     });
   }
@@ -780,7 +786,7 @@ export class CloudService {
    * Whether a connection may change its Drive folder. The mount options are fixed
    * when a folder is mounted, so a connected folder is mounted again.
    */
-  setAccess(scopeId: string, mountId: string, access: CloudAccess) {
+  setAccess(scopeId: string, mountId: string, access: CloudAccess, leavePending = false) {
     return this.mutate(async () => {
       const records = await this.declarations(scopeId);
       const record = records.find((item) => item.mountId === mountId);
@@ -789,7 +795,7 @@ export class CloudService {
       const key = this.key(scopeId, mountId);
       const wasMounted = this.mounted.has(key);
       if (wasMounted) {
-        await this.assertSent(scopeId, mountId);
+        if (!leavePending) await this.assertSent(scopeId, mountId);
         await this.unmount(scopeId, mountId);
       }
       if (JSON.stringify(await this.declarations(scopeId)) !== JSON.stringify(records))

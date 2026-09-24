@@ -1876,6 +1876,14 @@ footer > span {
   gap: 5px;
   margin: 12px 0;
 }
+.leave-pending {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
+  font-size: 12px;
+}
 .connection-card {
   border: 1px solid var(--rule);
   padding: 16px;

@@ -222,6 +222,33 @@ test('Changes waiting to upload are counted and keep their folder connected', as
   // Signing the account in again replaces its remote, which a mounted folder is using.
   await assert.rejects(cloud.reauthorizeAccount(accountId), /接続を解除/);
   assert.equal(cloud['mounted'].size, 1);
+  // Changes that cannot be sent must not trap the folder: the person may leave them,
+  // and they upload from the cache when the folder is next mounted editable.
+  // The folder is mounted again read-only; ordinary test directories cannot be.
+  cloud.setup = async () => ({
+    available: true,
+    oauthConfigured: true,
+    mountAvailable: false,
+    detail: 'Protocol fixture only',
+  });
+  await assert.rejects(
+    cloud.setAccess(space.scopeId, connection.mountId, 'read-only', true),
+    /Protocol fixture only/,
+  );
+  assert.equal(cloud['mounted'].size, 0);
+  assert.equal((await cloud.connections(space.scopeId))[0].access, 'read-only');
+});
+
+test('A folder whose changes cannot be sent can still be disconnected by choice', async (t) => {
+  const { cloud, space, connection, rpc } = await mountedFixture(t, { writable: true });
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) =>
+    method === 'vfs/stats'
+      ? { diskCache: { uploadsInProgress: 0, uploadsQueued: 1 } }
+      : original(method, params);
+  await assert.rejects(cloud.disconnect(space.scopeId, connection.mountId), /送信待ち/);
+  await cloud.disconnect(space.scopeId, connection.mountId, true);
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'disconnected');
 });
 
 test('Access is changed per connection and kept in its declaration', async (t) => {

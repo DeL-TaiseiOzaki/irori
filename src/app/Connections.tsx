@@ -43,6 +43,8 @@ export function Connections({
     [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<string>(),
     [newName, setNewName] = useState('');
+  // A folder with changes still waiting is only taken away after the person agrees.
+  const [leaving, setLeaving] = useState<{ mountId: string; action: 'disconnect' | 'read-only' }>();
   const current = trail.at(-1);
   const form = useRef<HTMLFormElement>(null);
   const setupRead = useResource(() => host.cloudSetup(), [space.scopeId, revision]);
@@ -500,13 +502,15 @@ export function Connections({
                 <button
                   disabled={disabled || connection.state === 'connecting'}
                   onClick={() =>
-                    void perform(() =>
-                      host.setCloudAccess(
-                        space.scopeId,
-                        connection.mountId,
-                        connection.access === 'read-write' ? 'read-only' : 'read-write',
-                      ),
-                    )
+                    connection.pending && connection.access === 'read-write'
+                      ? setLeaving({ mountId: connection.mountId, action: 'read-only' })
+                      : void perform(() =>
+                          host.setCloudAccess(
+                            space.scopeId,
+                            connection.mountId,
+                            connection.access === 'read-write' ? 'read-only' : 'read-write',
+                          ),
+                        )
                   }
                 >
                   {connection.access === 'read-write'
@@ -517,7 +521,11 @@ export function Connections({
                   <button
                     disabled={disabled}
                     onClick={() =>
-                      void perform(() => host.disconnectCloud(space.scopeId, connection.mountId))
+                      connection.pending
+                        ? setLeaving({ mountId: connection.mountId, action: 'disconnect' })
+                        : void perform(() =>
+                            host.disconnectCloud(space.scopeId, connection.mountId),
+                          )
                     }
                   >
                     {t('接続を解除', 'Disconnect')}
@@ -569,6 +577,42 @@ export function Connections({
                   {t('登録を解除', 'Remove registration')}
                 </button>
               </div>
+              {leaving?.mountId === connection.mountId && (
+                <div className="leave-pending" role="alert">
+                  <p>
+                    {t(
+                      `Google Drive への送信待ちが ${connection.pending ?? 0} 件あります。待たずに${leaving.action === 'disconnect' ? '接続を解除' : '読み取り専用に'}すると、変更はこの端末に残り、次にこのフォルダを編集可で接続したときに送信されます。`,
+                      `${connection.pending ?? 0} changes are still waiting to upload to Google Drive. If you ${leaving.action === 'disconnect' ? 'disconnect' : 'make the folder read-only'} without waiting, they stay on this device and are uploaded the next time this folder is connected as editable.`,
+                    )}
+                  </p>
+                  <div className="actions">
+                    <button disabled={disabled} onClick={() => setLeaving(undefined)}>
+                      {t('キャンセル', 'Cancel')}
+                    </button>
+                    <button
+                      disabled={disabled}
+                      onClick={() => {
+                        const action = leaving.action;
+                        setLeaving(undefined);
+                        void perform(() =>
+                          action === 'disconnect'
+                            ? host.disconnectCloud(space.scopeId, connection.mountId, true)
+                            : host.setCloudAccess(
+                                space.scopeId,
+                                connection.mountId,
+                                'read-only',
+                                true,
+                              ),
+                        );
+                      }}
+                    >
+                      {leaving.action === 'disconnect'
+                        ? t('待たずに接続を解除', 'Disconnect without waiting')
+                        : t('待たずに読み取り専用にする', 'Make read-only without waiting')}
+                    </button>
+                  </div>
+                </div>
+              )}
               {editing === connection.mountId && (
                 <form
                   className="actions"

@@ -313,12 +313,18 @@ export interface HostAPI {
   cloudConnections(scopeId: string): Promise<CloudConnection[]>;
   addCloudAttachment(input: AddCloudAttachment): Promise<CloudConnection>;
   connectCloud(scopeId: string, mountId: string): Promise<void>;
-  disconnectCloud(scopeId: string, mountId: string): Promise<void>;
+  /** `leavePending` disconnects although saved changes wait; they upload on the next editable mount. */
+  disconnectCloud(scopeId: string, mountId: string, leavePending?: boolean): Promise<void>;
   bindCloud(scopeId: string, mountId: string, accountId: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
   /** Whether the connection may change its Drive folder; a connected folder is remounted. */
-  setCloudAccess(scopeId: string, mountId: string, access: CloudAccess): Promise<void>;
+  setCloudAccess(
+    scopeId: string,
+    mountId: string,
+    access: CloudAccess,
+    leavePending?: boolean,
+  ): Promise<void>;
   /** Shows the connected folder in the system file manager, for adding files there. */
   openCloudFolder(scopeId: string, mountId: string): Promise<void>;
   /** Creates an empty Markdown note in an editable Drive folder and returns it. */
