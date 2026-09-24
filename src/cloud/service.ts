@@ -13,6 +13,7 @@ import { draftFile, hash, readTextDocument, textFileByteLimit } from '../host/fi
 import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type { WriteTarget } from './outbox';
+import { uploadErrorMessage, type UploadErrorCategory } from './upload-errors';
 import type {
   AddCloudAttachment,
   CloudAccess,
@@ -32,6 +33,20 @@ const bindingSchema = z.object({
   placeholder: z.object({ dev: z.number(), ino: z.number() }).optional(),
 });
 type Binding = z.infer<typeof bindingSchema>;
+// rclone's upload queue (vfs/rc.go `vfs/queue`): `tries` counts the upload attempts
+// made for an item, including one in progress.
+const queueSchema = z.object({
+  queue: z
+    .array(
+      z.object({
+        name: z.string(),
+        tries: z.number().optional(),
+        uploading: z.boolean().optional(),
+      }),
+    )
+    .nullish()
+    .transform((items) => items ?? []),
+});
 type Mounted = {
   attachment: CloudAttachment;
   target: string;
@@ -306,7 +321,7 @@ export class CloudService {
           ...(this.states.get(key) ?? {
             state: binding ? ('disconnected' as const) : ('unconfigured' as const),
           }),
-          ...(current ? { writable: current.writable, pending: await this.pending(current) } : {}),
+          ...(current ? await this.uploads(current) : {}),
         };
       }),
     );
@@ -701,6 +716,47 @@ export class CloudService {
       return Number.isFinite(count) ? count : undefined;
     } catch {
       return undefined;
+    }
+  }
+  /** What a mount reports about its uploads: how many wait, and why they fail when they do. */
+  private async uploads(
+    mounted: Mounted,
+  ): Promise<Pick<CloudConnection, 'writable' | 'pending' | 'uploadError'>> {
+    const pending = await this.pending(mounted);
+    const failing = pending ? await this.failingUploads(mounted) : [];
+    if (!failing.length) return { writable: mounted.writable, pending };
+    // One line names the category the most failing changes share.
+    const counts = new Map<UploadErrorCategory, number>();
+    for (const category of failing) counts.set(category, (counts.get(category) ?? 0) + 1);
+    const [category] = [...counts].sort((a, b) => b[1] - a[1])[0];
+    return {
+      writable: mounted.writable,
+      pending,
+      uploadError: uploadErrorMessage(category, failing.length),
+    };
+  }
+  /**
+   * The category of each queued upload rclone has tried and failed. The queue says
+   * how often an item was tried, and an item still queued after a try failed it; why
+   * is only in rclone's log, matched by the item's name. Nothing here throws: a
+   * queue that cannot be read leaves the connection with its waiting count alone.
+   */
+  private async failingUploads(mounted: Mounted): Promise<UploadErrorCategory[]> {
+    try {
+      const queue = queueSchema.safeParse(
+        await this.rpc.call('vfs/queue', { fs: mounted.filesystem }),
+      );
+      if (!queue.success) return [];
+      const failures = this.rpc.uploadFailures?.() ?? [];
+      return queue.data.queue
+        .filter((item) => (item.tries ?? 0) >= (item.uploading ? 2 : 1))
+        .map((item) => {
+          for (let i = failures.length - 1; i >= 0; i--)
+            if (failures[i].path === item.name) return failures[i].category;
+          return 'other';
+        });
+    } catch {
+      return [];
     }
   }
   /** Saved changes still waiting to be uploaded, across every mount. */

@@ -5,10 +5,13 @@ import type { ChildProcess } from 'node:child_process';
 import { launch, killTree, agentEnv } from '../agents/process';
 import { readJson } from '../host/http';
 import { t } from '../domain/i18n';
+import { UploadFailures, type UploadFailure } from './upload-errors';
 
 export interface RcloneAPI {
   call(method: string, params?: Record<string, unknown>): Promise<any>;
   close(): Promise<void>;
+  /** The last uploads rclone reported as failed, oldest first, when the service can tell. */
+  uploadFailures?(): UploadFailure[];
 }
 
 // Only host services have this API. No method names, credentials or RPC endpoint reach IPC.
@@ -18,6 +21,7 @@ export class Rclone implements RcloneAPI {
   private endpoint = '';
   private secret = randomBytes(32).toString('hex');
   private stopped = false;
+  private failures = new UploadFailures();
   constructor(
     private dataDir: string,
     private executable = process.env.IRORI_RCLONE_PATH || 'rclone',
@@ -70,6 +74,8 @@ export class Rclone implements RcloneAPI {
       env,
     );
     this.child = child;
+    // A new process has a new upload queue; the failures of the old one no longer apply.
+    const failures = (this.failures = new UploadFailures());
     child.stdin?.end();
     child.stdout?.resume();
     try {
@@ -95,8 +101,11 @@ export class Rclone implements RcloneAPI {
         };
         child.once('error', fail);
         child.once('close', fail);
-        child.stderr?.on('data', (bytes) => {
-          // Inspect only the startup address; never propagate raw provider logs.
+        child.stderr?.on('data', (bytes: Buffer) => {
+          // Read only the startup address and upload failures from the log; raw
+          // provider lines are never propagated.
+          failures.feed(bytes);
+          if (this.endpoint) return;
           buffer = (buffer + bytes.toString()).slice(-4096);
           const match = buffer.match(/Serving remote control on (http:\/\/127\.0\.0\.1:\d+)\//);
           if (match) {
@@ -124,6 +133,9 @@ export class Rclone implements RcloneAPI {
   async call(method: string, params: Record<string, unknown> = {}) {
     await this.start();
     return this.request(method, params);
+  }
+  uploadFailures() {
+    return this.failures.list();
   }
   private async request(method: string, params: Record<string, unknown>) {
     try {
