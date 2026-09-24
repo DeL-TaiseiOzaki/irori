@@ -314,8 +314,15 @@ export function Editor({
       .addFeature(imageBlock, {
         onUpload: async (file) => {
           try {
-            if (readOnly || !onUpload)
+            if (readOnly)
               throw Error(t('このノートは読み取り専用です。', 'This note is read-only.'));
+            if (!onUpload)
+              throw Error(
+                t(
+                  'このノートには画像を貼り付けられません。',
+                  'Images cannot be pasted into this note.',
+                ),
+              );
             markEdited();
             return await onUpload(file);
           } catch (error) {

@@ -39,6 +39,6 @@ export const cloudDeclaration = z
     folderName: z.string().max(1024),
     contentsRoot: z.string().min(1).max(4096),
     name: mountName,
-    access: z.literal('read-only'),
+    access: z.enum(['read-only', 'read-write']),
   })
   .strict();

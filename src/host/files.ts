@@ -34,6 +34,9 @@ const declaration = z.object({
   contents: z.array(relative).min(1),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
+/** Where the unsaved text of one document is kept on this device. */
+export const draftFile = (dataDir: string, scopeId: string, rel: string) =>
+  path.join(dataDir, `draft-${hash(scopeId + '\0' + rel)}.json`);
 export const textFilePattern = /\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i;
 export const textFileByteLimit = 2 * 1024 * 1024;
 export async function readTextDocument(
@@ -54,6 +57,11 @@ export class FileService {
     resolve(scopeId: string, rel: string): Promise<string>;
     rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined>;
     isWorkspacePath?(root: string): Promise<boolean>;
+    /** A Drive file with its editability and kept draft. */
+    document?(scopeId: string, rel: string): Promise<Document>;
+    /** Writes an edited Drive file in place, hash checked. */
+    write?(doc: Document): Promise<void>;
+    writable?(scopeId: string, rel: string): boolean;
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
@@ -235,6 +243,12 @@ export class FileService {
             : f.isSymbolicLink()
               ? t('リンク先はこの版では開けません', 'Link targets cannot be opened in this version')
               : undefined,
+        ...(layer === 'contents' &&
+        f.isDirectory() &&
+        !f.isSymbolicLink() &&
+        this.cloud?.writable?.(id, p)
+          ? { writable: true }
+          : {}),
       });
     }
     if (!rel)
@@ -253,6 +267,8 @@ export class FileService {
     );
   }
   async read(id: string, rel: string): Promise<Document> {
+    if (classify(this.get(id), rel) === 'contents' && this.cloud?.document)
+      return this.cloud.document(id, rel);
     const filename = await this.resolve(id, rel);
     const doc = await readTextDocument(filename, id, rel);
     if (classify(this.get(id), rel) === 'contents') return { ...doc, readOnly: true };
@@ -266,7 +282,7 @@ export class FileService {
     return doc;
   }
   private draftPath(doc: Pick<Document, 'scopeId' | 'path'>) {
-    return path.join(this.dataDir, `draft-${hash(doc.scopeId + '\0' + doc.path)}.json`);
+    return draftFile(this.dataDir, doc.scopeId, doc.path);
   }
   async draft(doc: Document) {
     return this.queue.run(() => this.writeDraft(doc));
@@ -281,10 +297,18 @@ export class FileService {
       if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
         throw Error('The text editor supports files up to 2 MiB');
       if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
-      if (classify(this.get(doc.scopeId), doc.path) === 'contents')
-        throw Error(
-          t('このクラウド接続は読み取り専用です。', 'This cloud connection is read-only.'),
-        );
+      if (classify(this.get(doc.scopeId), doc.path) === 'contents') {
+        if (!this.cloud?.write)
+          throw Error(
+            t('このクラウド接続は読み取り専用です。', 'This cloud connection is read-only.'),
+          );
+        // A Drive file is written in place by the cloud service; the draft stays
+        // until the file holds the text.
+        await this.writeDraft(doc);
+        await this.cloud.write(doc);
+        await fs.rm(this.draftPath(doc), { force: true });
+        return this.read(doc.scopeId, doc.path);
+      }
       await this.writeDraft(doc);
       const filename = await this.resolve(doc.scopeId, doc.path);
       const before = await fs.readFile(filename);

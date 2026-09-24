@@ -475,6 +475,7 @@ app
           );
         return cloud.removeAccount(id);
       },
+      reauthorizeCloudAccount: (id) => cloud.reauthorizeAccount(id),
       cloudDrives: (id) => cloud.accounts.drives(id),
       cloudFolders: (...args) => cloud.accounts.folders(...args),
       cloudConnections: (id) => cloud.connections(id),
@@ -483,6 +484,13 @@ app
       disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
+      openCloudFolder: async (...args) => {
+        const error = await shell.openPath(await cloud.folder(...args));
+        if (error) throw Error(error);
+      },
+      createCloudNote: (scopeId, directory, name) =>
+        changeFiles(() => changed(scopeId, () => cloud.createNote(scopeId, directory, name))),
       bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
       spaces: () => files.list(),
       chooseFolder: async () => {
@@ -507,19 +515,25 @@ app
       readImage: (...args) => images.read(...args),
       save: (doc) =>
         changeFiles(async () => {
+          // A workspace's Drive files belong to no KB: the cloud service saves them.
+          if (!files.list().some((space) => space.scopeId === doc.scopeId)) return cloud.save(doc);
           // The bytes this save replaces: only the lines it introduces are the
           // person's, since the file already carried the rest.
           const before = await files.read(doc.scopeId, doc.path).catch(() => undefined);
           const saved = await files.save(doc);
           // The save does not wait on it: the store orders its own reads, so the
           // editor's next request sees this observation either way.
-          if (before?.hash === doc.hash)
+          // A Drive file is outside the KB's Git history, so it has no authorship record.
+          if (before?.hash === doc.hash && !saved.cloud)
             void authorship
               .observe({ scopeId: saved.scopeId, path: saved.path }, saved.text, before.text)
               .catch(() => {});
           return saved;
         }),
-      draft: (doc) => files.draft(doc),
+      draft: (doc) =>
+        files.list().some((space) => space.scopeId === doc.scopeId)
+          ? files.draft(doc)
+          : cloud.draft(doc),
       createNote: (id, name, directory) =>
         changeFiles(async () =>
           files.createNote(id, name, directory ?? (await noteDirectory(files, id))),
@@ -629,6 +643,34 @@ app
           cancelId: 0,
         });
         if (answer.response !== 1) return false;
+      }
+      // Saved Drive changes upload shortly after they are written. Quitting first
+      // leaves them in rclone's cache, to be uploaded when the folder is next connected.
+      for (let pending = await cloud.pendingUploads(); pending > 0;) {
+        const answer = await dialog.showMessageBox(window!, {
+          message: t(
+            `Google Drive への送信待ちが ${pending} 件あります。`,
+            `${pending} saved changes are still waiting to be uploaded to Google Drive.`,
+          ),
+          detail: t(
+            '待たずに終了すると、変更はこの端末に残り、次にそのフォルダを接続したときに送信されます。',
+            'If you quit without waiting, the changes stay on this device and are uploaded the next time that folder is connected.',
+          ),
+          buttons: [
+            t('戻る', 'Back'),
+            t('送信を待つ', 'Wait for the upload'),
+            restart
+              ? t('待たずに再起動', 'Restart without waiting')
+              : t('待たずに閉じる', 'Close without waiting'),
+          ],
+          cancelId: 0,
+          defaultId: 1,
+        });
+        if (answer.response === 0) return false;
+        if (answer.response === 2) break;
+        const deadline = Date.now() + 60000;
+        while ((pending = await cloud.pendingUploads()) > 0 && Date.now() < deadline)
+          await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       await agents.cancel();
       try {

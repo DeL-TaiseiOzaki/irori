@@ -1131,6 +1131,26 @@ textarea {
 .layer-subtitle {
   display: none;
 }
+/* A folder's own action sits over the right end of its row. */
+.tree-item {
+  position: relative;
+}
+.tree-item:has(> .tree-action) > .tree-row {
+  padding-right: 28px;
+}
+.tree-action {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--nav-muted);
+}
+.tree-action:hover {
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
+}
 .scope-tree {
   margin: 4px 0 8px;
   min-width: 0;
@@ -1800,6 +1820,10 @@ footer > span {
   flex-direction: column;
   gap: 8px;
   margin: 12px 0;
+}
+.connections label.checkbox {
+  flex-direction: row;
+  align-items: center;
 }
 .account-row,
 .folder-row {

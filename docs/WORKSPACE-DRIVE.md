@@ -1,6 +1,6 @@
 # Independent workspace Drive connections
 
-Date: 2026-09-13. Implementation of the workspace ownership part of [ADR 002](decisions/002-release-and-workspace.md). This is still a read-only cloud preview.
+Date: 2026-09-13. Implementation of the workspace ownership part of [ADR 002](decisions/002-release-and-workspace.md). Written as a read-only cloud preview; from 0.1.35 a connection can be editable, as [ADR 012](decisions/012-drive-editing.md) describes.
 
 ## Ordinary flow
 

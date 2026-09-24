@@ -15,6 +15,11 @@ function states(): Record<CloudConnection['state'], string> {
     error: t('接続を確認してください', 'Check the connection'),
   };
 }
+function stateLabel(connection: CloudConnection) {
+  if (connection.state === 'mounted' && connection.writable)
+    return t('接続済み・編集できます', 'Connected · editable');
+  return states()[connection.state];
+}
 
 export function Connections({
   space,
@@ -27,6 +32,8 @@ export function Connections({
 }) {
   const [accountId, setAccountId] = useState(''),
     [accountName, setAccountName] = useState('');
+  // Materials are worked on in the IDE; a folder can still be kept read-only.
+  const [editable, setEditable] = useState(true);
   const [trail, setTrail] = useState<CloudFolder[]>([]);
   const [selected, setSelected] = useState<CloudFolder>(),
     [name, setName] = useState(''),
@@ -149,12 +156,37 @@ export function Connections({
               <span>
                 <strong>{account.name}</strong> ·{' '}
                 {account.state === 'ready'
-                  ? t('認証済み', 'Authenticated')
+                  ? account.writable
+                    ? t('認証済み', 'Authenticated')
+                    : t('認証済み・読み取りのみ許可', 'Authenticated · read access only')
                   : account.state === 'authorizing'
                     ? t('ブラウザでログインしてください', 'Please sign in via the browser')
                     : t('認証未完了', 'Authentication incomplete')}
                 {account.detail && <small>{account.detail}</small>}
+                {account.state === 'ready' && !account.writable && (
+                  <small>
+                    {t(
+                      'フォルダを編集するには、書き込みを許可してもう一度ログインしてください。',
+                      'To edit folders, allow writing and sign in again.',
+                    )}
+                  </small>
+                )}
               </span>
+              {(account.state === 'incomplete' ||
+                (account.state === 'ready' && !account.writable)) && (
+                <button
+                  disabled={
+                    disabled ||
+                    !setup?.oauthConfigured ||
+                    accounts.some((item) => item.state === 'authorizing')
+                  }
+                  onClick={() => void perform(() => host.reauthorizeCloudAccount(account.id))}
+                >
+                  {account.state === 'ready'
+                    ? t('書き込みを許可', 'Allow writing')
+                    : t('再ログイン', 'Sign in again')}
+                </button>
+              )}
               {account.state !== 'ready' && (
                 <button
                   disabled={disabled}
@@ -341,6 +373,7 @@ export function Connections({
                     folder: selected,
                     contentsRoot,
                     name,
+                    access: editable ? 'read-write' : 'read-only',
                   });
                   setSelected(undefined);
                   setName('');
@@ -380,11 +413,28 @@ export function Connections({
                 {t('マウント先', 'Mount location')}: {contentsRoot}/{name}/
               </p>
               {invalidName && <p role="alert">{invalidName}</p>}
-              <p className="muted">
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={editable}
+                  disabled={disabled}
+                  onChange={(e) => setEditable(e.target.checked)}
+                />
                 {t(
-                  '読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。',
-                  'Registers as read-only. The chosen name is saved with the connection and reused on reconnection.',
+                  'このフォルダを irori から編集できるようにする',
+                  'Allow editing this folder from irori',
                 )}
+              </label>
+              <p className="muted">
+                {editable
+                  ? t(
+                      '保存した変更はこの端末に一時保存され、Google Drive へ自動で送信されます。選んだ名前は接続情報に保存し、再接続時にも使用します。',
+                      'Saved changes are kept on this device briefly and uploaded to Google Drive automatically. The chosen name is saved with the connection and reused on reconnection.',
+                    )
+                  : t(
+                      '読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。',
+                      'Registers as read-only. The chosen name is saved with the connection and reused on reconnection.',
+                    )}
               </p>
               <button className="primary" disabled={disabled || !!invalidName}>
                 {setup?.mountAvailable
@@ -406,11 +456,58 @@ export function Connections({
               </strong>
               <small>
                 {connection.accountName ?? t('アカウント未設定', 'Account not set')} ·{' '}
-                {connection.folderName}
+                {connection.folderName} ·{' '}
+                {connection.access === 'read-write'
+                  ? t('編集可', 'Editable')
+                  : t('読み取り専用', 'Read-only')}
               </small>
-              <p>{states()[connection.state]}</p>
+              <p>{stateLabel(connection)}</p>
               {connection.detail && <p>{connection.detail}</p>}
+              {connection.access === 'read-write' &&
+                connection.accountName &&
+                !connection.accountWritable && (
+                  <p className="muted">
+                    {t(
+                      'このアカウントは読み取りのみ許可されているため、読み取り専用で接続します。アカウントの「書き込みを許可」で再ログインすると編集できます。',
+                      'This account may only read, so the folder connects read-only. Sign in again with “Allow writing” on the account to edit it.',
+                    )}
+                  </p>
+                )}
+              {!!connection.pending && (
+                <p role="status">
+                  {t(
+                    `Google Drive への送信待ち ${connection.pending} 件`,
+                    `${connection.pending} changes waiting to upload to Google Drive`,
+                  )}
+                </p>
+              )}
               <div className="actions">
+                {connection.state === 'mounted' && (
+                  <button
+                    disabled={disabled}
+                    onClick={() =>
+                      void perform(() => host.openCloudFolder(space.scopeId, connection.mountId))
+                    }
+                  >
+                    {t('フォルダを開く', 'Open folder')}
+                  </button>
+                )}
+                <button
+                  disabled={disabled || connection.state === 'connecting'}
+                  onClick={() =>
+                    void perform(() =>
+                      host.setCloudAccess(
+                        space.scopeId,
+                        connection.mountId,
+                        connection.access === 'read-write' ? 'read-only' : 'read-write',
+                      ),
+                    )
+                  }
+                >
+                  {connection.access === 'read-write'
+                    ? t('読み取り専用にする', 'Make read-only')
+                    : t('編集できるようにする', 'Allow editing')}
+                </button>
                 {connection.state === 'mounted' || connection.state === 'error' ? (
                   <button
                     disabled={disabled}

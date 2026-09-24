@@ -482,8 +482,8 @@ export function KnowledgePanel({
           <h3>{t('Drive への送信準備', 'Pending upload to Drive')}</h3>
           <p>
             {t(
-              '現在の Google 接続は読み取り専用です。送信前のファイルを端末に保持できます。',
-              'The current Google connection is read-only. A file can be kept on this device before it is sent.',
+              '編集可で接続した Drive フォルダには、ファイルを開いて直接保存できます。ここでは、送信前のファイルをこの端末に保持できます。',
+              'A Drive folder connected as editable takes saves directly when you open a file there. Here, a file can be kept on this device before it is sent.',
             )}
           </p>
           <label>

@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Drive editing, 2026-09-25: **0.1.35** is prepared on `feat/drive-editing`,
+stacked on 0.1.34, from the owner's statement that materials in `contents` are
+edited and added to, not read-only. [ADR 012](decisions/012-drive-editing.md)
+records the design: per-connection `access` (new connections `read-write`,
+older declarations stay `read-only` until switched), sign-in with the `drive`
+scope and **書き込みを許可** to sign older accounts in again under the same
+remote, rclone's write cache for editable mounts with a per-mount
+`description`, in-place hash-checked saves (never temporary file and rename),
+workspace Drive documents saved and drafted through the cloud service, pending
+uploads from `vfs/stats` shown in the dialog and guarding disconnect, access
+changes and quitting, notes added from the sidebar, and **フォルダを開く**.
+Connection tests cover mount options, in-place saving with drafts and
+conflicts, read-only refusals, added notes, pending uploads, workspace
+documents and signing in again; the package smoke now expects the `drive` scope.
+
 Windows Drive folders, 2026-09-25: **0.1.34** is prepared on
 `fix/windows-drive-mount` from the owner's report that a connected Drive folder
 showed `UNKNOWN: unknown error, realpath` on Windows, in both the workspace Drive

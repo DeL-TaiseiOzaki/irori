@@ -259,7 +259,7 @@ try {
   assert.equal(cloudSetup.version, 'v1.75.1');
   let oauthHandoff: {
     googleAuthorization: boolean;
-    readonlyScope: boolean;
+    driveScope: boolean;
     clientConfigured: boolean;
   } | null = null;
   if (cloudSetup.oauthConfigured) {
@@ -271,7 +271,7 @@ try {
       shell.openExternal = async (address) => {
         const result = {
           googleAuthorization: false,
-          readonlyScope: false,
+          driveScope: false,
           clientConfigured: false,
         };
         try {
@@ -287,9 +287,8 @@ try {
             response.status === 307 &&
             authorization.origin === 'https://accounts.google.com' &&
             ['/o/oauth2/auth', '/o/oauth2/v2/auth'].includes(authorization.pathname);
-          result.readonlyScope =
-            authorization.searchParams.get('scope') ===
-            'https://www.googleapis.com/auth/drive.readonly';
+          result.driveScope =
+            authorization.searchParams.get('scope') === 'https://www.googleapis.com/auth/drive';
           const client = authorization.searchParams.get('client_id') ?? '';
           result.clientConfigured =
             client.endsWith('.apps.googleusercontent.com') &&
@@ -318,7 +317,7 @@ try {
       );
       assert.deepEqual(oauthHandoff, {
         googleAuthorization: true,
-        readonlyScope: true,
+        driveScope: true,
         clientConfigured: true,
       });
     } finally {
