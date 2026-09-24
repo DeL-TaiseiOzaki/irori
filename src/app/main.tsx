@@ -612,8 +612,10 @@ function App() {
         current.current.doc?.hash === now.doc.hash &&
         current.current.doc?.scopeId === now.doc.scopeId &&
         current.current.doc?.path === now.doc.path
-      )
+      ) {
         report(e);
+        return false;
+      }
     }
   }
   useEffect(() => {
@@ -711,6 +713,17 @@ function App() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [dirty, buffer, doc, external, gitBusy]);
+  // rclone learns of a change made in Drive elsewhere only by polling, so a Drive
+  // document at rest is read again now and then; the change would otherwise show
+  // only when a save ran into it. A failed check ends the checks until the document
+  // changes, so an unreachable folder is reported once rather than every tick.
+  useEffect(() => {
+    if (!doc?.cloud || dirty) return;
+    const timer = setInterval(async () => {
+      if ((await reconcile()) === false) clearInterval(timer);
+    }, 25000);
+    return () => clearInterval(timer);
+  }, [doc, dirty]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.terminal-panel')) return;

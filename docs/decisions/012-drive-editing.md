@@ -33,6 +33,17 @@ this ([HANDOFF](../HANDOFF.md)).
   with the previous bytes kept as a device backup. It is never replaced through
   a temporary file: on Drive that deletes the file and uploads a new one,
   losing its version history and sharing.
+- **Conflicts.** The mount learns of a change made elsewhere only when rclone
+  polls Drive, about once a minute. Before writing, irori asks Drive directly,
+  past the mount's cache, for the file's MD5 checksum (`operations/stat`) and
+  compares it with the bytes the editor started from. A file still in rclone's
+  upload queue (`vfs/queue`) is our own earlier save and is not compared. A
+  different checksum refuses the save as a conflict, keeps the draft and
+  refreshes the folder in the mount (`vfs/refresh`) so the editor shows
+  Drive's version. When Drive cannot be asked, or has no checksum for the file
+  (a Google Docs file), the save goes ahead: editing keeps working offline and
+  rclone uploads later. An open Drive document at rest is read again every
+  25 s, so a change rclone has noticed appears without a save.
 - **Uploading.** rclone uploads a file shortly after it is closed. irori shows
   how many changes wait (`vfs/stats`), refuses to disconnect a folder or change
   its access while changes wait, and asks before quitting: wait, or quit and
@@ -46,11 +57,10 @@ this ([HANDOFF](../HANDOFF.md)).
 ## Not included
 
 Renaming, moving or deleting Drive files from irori's own interface; pasting
-images into a Drive note; conflict handling beyond the editor's hash check (a
-change made elsewhere reaches the mount through rclone's polling, and a save in
-between overwrites it, with Drive keeping the previous revision); and reporting
-why an upload fails, such as a folder shared view-only, beyond a waiting count
-that does not fall.
+images into a Drive note; merging a version changed in Drive with the draft,
+beyond showing it beside the draft as for a local change; and reporting why an
+upload fails, such as a folder shared view-only, beyond a waiting count that
+does not fall.
 
 ## Relation to the outbox
 

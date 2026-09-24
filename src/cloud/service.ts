@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from '../host/serial-queue';
 import { CloudAccounts } from './accounts';
@@ -38,6 +38,8 @@ type Mounted = {
   device: number;
   inode: number;
   filesystem: string;
+  /** The fs spec the folder was mounted with, for asking Drive directly, past the mount's cache. */
+  remote: Record<string, string>;
   /** Mounted so that files can be changed: the connection allows it and so does its account. */
   writable: boolean;
 };
@@ -640,6 +642,7 @@ export class CloudService {
         device: stat.dev,
         inode: stat.ino,
         filesystem,
+        remote,
         writable,
       };
       await this.assertMounted(mounted);
@@ -805,7 +808,7 @@ export class CloudService {
       if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
         throw Error('The text editor supports files up to 2 MiB');
       if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
-      const filename = await this.resolve(doc.scopeId, doc.path);
+      const { mounted, filename } = await this.locate(doc.scopeId, doc.path);
       await this.assertWritable(doc.scopeId, doc.path);
       const conflict = () =>
         Error(
@@ -817,6 +820,7 @@ export class CloudService {
       const before = await fs.readFile(filename);
       if (hash(before) !== doc.hash) throw conflict();
       if (hash(doc.text) === doc.hash) return;
+      if (await this.changedInDrive(mounted, filename, before)) throw conflict();
       // The previous version stays on this device as well as in Drive's history.
       await writeLocalFile(
         path.join(this.files.dataDir, `backup-${hash(before)}.txt`),
@@ -825,6 +829,39 @@ export class CloudService {
       if (hash(await fs.readFile(filename)) !== doc.hash) throw conflict();
       await fs.writeFile(filename, doc.text);
     });
+  }
+  /**
+   * Whether Drive holds a version of the file other than the bytes the editor started
+   * from. The mount learns of a change made elsewhere only when rclone polls Drive,
+   * about once a minute, so a save inside that window would overwrite it unnoticed.
+   * Drive is asked directly, past the mount's cache, for the file's MD5 checksum. A
+   * file still in rclone's upload queue is our own earlier save that Drive has not
+   * received yet, so it is not compared. When Drive cannot be asked (offline, a
+   * timeout, an RC error) or has no checksum for the file (a Google Docs file, or one
+   * no longer there), the save is allowed: editing keeps working offline, and rclone
+   * uploads the change once it can.
+   */
+  private async changedInDrive(mounted: Mounted, filename: string, before: Buffer) {
+    const remote = path.relative(mounted.target, filename).split(path.sep).join('/');
+    try {
+      const { queue } = await this.rpc.call('vfs/queue', { fs: mounted.filesystem });
+      if (Array.isArray(queue) && queue.some((item) => item?.name === remote)) return false;
+      const { item } = await this.rpc.call('operations/stat', {
+        fs: mounted.remote,
+        remote,
+        opt: { filesOnly: true, hashTypes: ['md5'] },
+      });
+      const checksum = item?.Hashes?.md5;
+      if (typeof checksum !== 'string' || !checksum) return false;
+      if (checksum.toLowerCase() === createHash('md5').update(before).digest('hex')) return false;
+    } catch {
+      return false;
+    }
+    // Drive's version reaches the mount now rather than at the next poll, so the
+    // editor's reload shows it. The save is refused either way.
+    const dir = remote.includes('/') ? remote.slice(0, remote.lastIndexOf('/')) : '';
+    await this.rpc.call('vfs/refresh', { fs: mounted.filesystem, dir }).catch(() => {});
+    return true;
   }
   /** A text file in a Drive connection, with whether it may be edited and any kept draft. */
   async document(scopeId: string, rel: string): Promise<Document> {
@@ -928,6 +965,10 @@ export class CloudService {
     this.states.set(key, { state: 'disconnected' });
   }
   async resolve(scopeId: string, rel: string) {
+    return (await this.locate(scopeId, rel)).filename;
+  }
+  /** The verified mount holding a path, and the path's location on it. */
+  private async locate(scopeId: string, rel: string) {
     if (
       !rel ||
       rel.includes('\\') ||
@@ -957,7 +998,7 @@ export class CloudService {
       if ((await fs.lstat(actual)).isSymbolicLink())
         throw Error('Cloud path alias escapes its mount');
     }
-    return actual;
+    return { mounted: entry, filename: actual };
   }
   async rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined> {
     const space = await this.files.get(scopeId);
