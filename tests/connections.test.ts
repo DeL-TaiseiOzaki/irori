@@ -259,6 +259,10 @@ test('A workspace Drive document saves through the cloud service with its own dr
     device: info.dev,
     inode: info.ino,
     filesystem: 'fixture:',
+    remote: {
+      ...(await cloud.accounts.filesystem(accountId, 'folder-one')),
+      description: `irori-mount-${connection.mountId}`,
+    },
     writable: true,
   });
   const original = rpc.call.bind(rpc);

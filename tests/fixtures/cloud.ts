@@ -65,6 +65,11 @@ export async function mountedFixture(t: any, { writable = false } = {}) {
   await mkdir(target, { recursive: true });
   const info = await stat(target);
   const key = `${space.scopeId}:${connection.mountId}`;
+  // The fs spec a real mount is created with; the service asks Drive through it.
+  const remote = {
+    ...(await cloud.accounts.filesystem(accountId, 'folder-one')),
+    description: `irori-mount-${connection.mountId}`,
+  };
   // Model a previously verified mount; ordinary test directories are never mounted.
   cloud['mounted'].set(key, {
     attachment: connection,
@@ -72,6 +77,7 @@ export async function mountedFixture(t: any, { writable = false } = {}) {
     device: info.dev,
     inode: info.ino,
     filesystem: 'fixture:',
+    remote,
     writable,
   });
   cloud['states'].set(key, { state: 'mounted' });
@@ -95,5 +101,5 @@ export async function mountedFixture(t: any, { writable = false } = {}) {
   rpc.close = async () => {
     state.closed = true;
   };
-  return { ...value, connection, target, state };
+  return { ...value, connection, target, remote, state };
 }
