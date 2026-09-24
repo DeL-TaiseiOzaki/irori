@@ -8,6 +8,7 @@ import {
 } from 'react-resizable-panels';
 import type { CloudRoot, Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
+import { EntryMenu, type EntryAction } from './CloudEntryActions';
 import { layoutStorage } from './device-settings';
 import { useResource } from './useResource';
 import { t } from '../domain/i18n';
@@ -32,6 +33,7 @@ export function Tree<T extends CloudRoot>({
   selected,
   onOpen,
   onCreate,
+  onAction,
   readEntries = host.entries,
 }: {
   space: T;
@@ -43,6 +45,8 @@ export function Tree<T extends CloudRoot>({
   onOpen: (space: T, entry: Entry) => void;
   /** Adds a note to an editable Drive folder. */
   onCreate?: (space: T, entry: Entry) => void;
+  /** Renames, moves or deletes an entry of an editable Drive folder. */
+  onAction?: (space: T, entry: Entry, action: EntryAction) => void;
   readEntries?: (id: string, path: string) => Promise<Entry[]>;
 }) {
   const listing = useResource(
@@ -101,6 +105,9 @@ export function Tree<T extends CloudRoot>({
                 </span>
               )}
             </button>
+            {onAction && entry.writable && !entry.connection && !entry.blocked && (
+              <EntryMenu entry={entry} onAction={(action) => onAction(space, entry, action)} />
+            )}
             {onCreate && entry.directory && entry.writable && !entry.blocked && (
               <button
                 className="tree-action"
@@ -121,6 +128,7 @@ export function Tree<T extends CloudRoot>({
                 selected={selected}
                 onOpen={onOpen}
                 onCreate={onCreate}
+                onAction={onAction}
                 readEntries={readEntries}
               />
             )}
@@ -144,6 +152,7 @@ function ScopeTree({
   onConnect,
   onNote,
   onCreateIn,
+  onEntryAction,
 }: {
   space: Space;
   layer: Layer;
@@ -157,6 +166,7 @@ function ScopeTree({
   onConnect: (space: Space) => void;
   onNote: (space: Space) => void;
   onCreateIn?: (space: Space, entry: Entry) => void;
+  onEntryAction?: (space: Space, entry: Entry, action: EntryAction) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   return (
@@ -219,6 +229,7 @@ function ScopeTree({
             selected={selected}
             onOpen={onOpen}
             onCreate={locked ? undefined : onCreateIn}
+            onAction={locked ? undefined : onEntryAction}
           />
         ) : (
           <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
@@ -288,6 +299,7 @@ export function LayerExplorer({
   onConnect,
   onNote,
   onCreateIn,
+  onEntryAction,
   onRefresh,
   drive,
 }: {
@@ -302,6 +314,8 @@ export function LayerExplorer({
   onNote: (space: Space) => void;
   /** Adds a note to an editable Drive folder in a KB's materials. */
   onCreateIn?: (space: Space, entry: Entry) => void;
+  /** Renames, moves or deletes an entry of an editable Drive folder in a KB's materials. */
+  onEntryAction?: (space: Space, entry: Entry, action: EntryAction) => void;
   onRefresh: () => void;
   /** The workspace's Drive list, shown as a resizable row below the materials. */
   drive?: ReactNode;
@@ -455,6 +469,7 @@ export function LayerExplorer({
                   onConnect={onConnect}
                   onNote={onNote}
                   onCreateIn={onCreateIn}
+                  onEntryAction={onEntryAction}
                 />
               ))
             ) : (

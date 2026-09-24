@@ -1876,6 +1876,14 @@ footer > span {
   gap: 5px;
   margin: 12px 0;
 }
+.leave-pending {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
+  font-size: 12px;
+}
 .connection-card {
   border: 1px solid var(--rule);
   padding: 16px;
@@ -2471,5 +2479,39 @@ footer > span {
   color: var(--ember-ink);
 }
 .appearance-menu [role='menuitemradio'][data-highlighted] {
+  background: var(--surface-selected);
+}
+/* An entry of an editable Drive folder carries its menu at the row's right end;
+   a folder's note button sits to its left, and the row keeps clear of both. */
+.tree-action + .tree-action {
+  right: 26px;
+}
+.tree-item:has(> .tree-action + .tree-action) > .tree-row {
+  padding-right: 50px;
+}
+.tree-action[data-popup-open] {
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
+}
+.entry-menu {
+  z-index: 40;
+  min-width: 150px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sheet);
+  outline: none;
+  font-size: 12px;
+}
+.entry-menu [role='menuitem'] {
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.entry-menu [role='menuitem'][data-highlighted] {
   background: var(--surface-selected);
 }

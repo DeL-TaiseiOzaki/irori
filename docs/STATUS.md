@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Drive editing completed, 2026-09-25: **0.1.36** is prepared on
+`feat/drive-complete`, stacked on 0.1.35, from the owner's request to finish every
+remaining Drive item at once. Four delegated branches (three on Fable) were
+merged: rename/move/delete through the mount (`moveEntry`/`deleteEntry`,
+`Entry.connection` for connection roots, a sidebar menu and document toolbar,
+`CloudEntryActions.tsx`); images in editable Drive notes (`ImageService` takes the
+cloud service; exclusive direct writes); a save-time Drive version check
+(`operations/stat` MD5 against the editor's starting bytes, skipped for items in
+`vfs/queue`, bounded to 5 s, `vfs/refresh` on conflict; a 25 s re-read of open
+Drive documents); and upload failure reasons (`src/cloud/upload-errors.ts`
+classifies rclone's stderr ERROR lines into path + category, matched to failing
+`vfs/queue` items, shown as `CloudConnection.uploadError`). The lead added
+leaving unsent changes when disconnecting or making a folder read-only, since a
+permanent failure otherwise trapped the folder. [ADR 012](decisions/012-drive-editing.md)
+is updated. Unit tests: 280 pass.
+
 Drive editing, 2026-09-25: **0.1.35** is prepared on `feat/drive-editing`,
 stacked on 0.1.34, from the owner's statement that materials in `contents` are
 edited and added to, not read-only. [ADR 012](decisions/012-drive-editing.md)

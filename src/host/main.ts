@@ -95,11 +95,7 @@ app
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
     );
     files.cloud = cloud;
-    const images = new ImageService(files, async (id, rel) => {
-      if (files.list().some((space) => space.scopeId === id)) return files.resolve(id, rel);
-      await cloud.workspaceRoot(id);
-      return cloud.resolve(id, rel);
-    });
+    const images = new ImageService(files, cloud);
     const knowledge = new KnowledgeStore(files.dataDir, async (ref) => {
       if (files.list().some((space) => space.scopeId === ref.scopeId))
         return files.resolve(ref.scopeId, ref.path);
@@ -491,6 +487,10 @@ app
       },
       createCloudNote: (scopeId, directory, name) =>
         changeFiles(() => changed(scopeId, () => cloud.createNote(scopeId, directory, name))),
+      moveCloudEntry: (scopeId, from, to) =>
+        changeFiles(() => changed(scopeId, () => cloud.moveEntry(scopeId, from, to))),
+      deleteCloudEntry: (scopeId, target) =>
+        changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target))),
       bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
       spaces: () => files.list(),
       chooseFolder: async () => {
