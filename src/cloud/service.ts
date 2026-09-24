@@ -715,8 +715,17 @@ export class CloudService {
         ),
       );
     await this.assertMounted(entry);
-    const actual = await fs.realpath(target);
-    if (!within(entry.target, actual)) throw Error('Cloud path alias escapes its mount');
+    // The mount point's identity is verified above; below it no component may be
+    // a link, checked one component at a time as parent() does above it. realpath
+    // cannot be used: on Windows a WinFsp volume mounted on a folder has no DOS
+    // name, so GetFinalPathNameByHandleW fails and Node reports UNKNOWN for every
+    // path inside the mount.
+    let actual = entry.target;
+    for (const part of path.relative(entry.target, target).split(path.sep).filter(Boolean)) {
+      actual = path.join(actual, part);
+      if ((await fs.lstat(actual)).isSymbolicLink())
+        throw Error('Cloud path alias escapes its mount');
+    }
     return actual;
   }
   async rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined> {

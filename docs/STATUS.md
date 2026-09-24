@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Windows Drive folders, 2026-09-25: **0.1.34** is prepared on
+`fix/windows-drive-mount` from the owner's report that a connected Drive folder
+showed `UNKNOWN: unknown error, realpath` on Windows, in both the workspace Drive
+list and a KB's materials. The mount itself succeeded. `CloudService.resolve`
+called `fs.realpath` on the path, and on Windows rclone's WinFsp volume mounted
+on a folder is a junction to `\??\Volume{GUID}` with no DOS name, so libuv's
+`GetFinalPathNameByHandleW(VOLUME_NAME_DOS)` fails and Node reports `UNKNOWN`
+for every path in the mount (nodejs/node#50019, closed as not planned).
+`resolve` now walks the components below the verified mount point with `lstat`
+and refuses any link, as `parent()` already did above it. A connections test
+models the Windows failure and fails on the old code with the same error. The
+cloud dialog also stops showing `rclone <version> · …` when mounting is
+available; the line appears only when a prerequisite is missing or mounting is
+unusable.
+
 Delivery, 2026-09-25: PRs #86 (0.1.31), #87 (0.1.32) and #88 (0.1.33) are
 merged with the owner's go-ahead, and **0.1.33 is published** as
 [v0.1.33-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.33-preview.1)

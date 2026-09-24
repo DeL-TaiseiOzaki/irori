@@ -70,7 +70,9 @@ try {
   await page.getByRole('button', { name: 'Cloud connection', exact: true }).click();
   const cloud = page.getByRole('dialog', { name: 'Cloud connection' });
   await expect(cloud).toBeVisible();
-  await expect(cloud.locator('.setup-state')).not.toContainText('…', { timeout: 15000 });
+  await expect(cloud.locator('.connections')).toHaveAttribute('aria-busy', 'false', {
+    timeout: 15000,
+  });
   await japaneseLeft(page, 'the cloud connection dialog');
   await cloud.getByRole('button', { name: 'Close', exact: true }).click();
   visited.push('cloud connection dialog');

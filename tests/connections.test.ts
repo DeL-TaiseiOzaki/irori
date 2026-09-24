@@ -12,10 +12,12 @@ import {
   chmod,
   rmdir,
 } from 'node:fs/promises';
+import { promises } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { mountNameError } from '../src/domain/connections';
+import { within } from '../src/domain/scopes';
 import { WorkspaceService, inspectRepository, githubRepository } from '../src/host/workspaces';
 import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
@@ -130,6 +132,47 @@ test('A recovered mount clears its transient error on refresh and explicit recon
     assert.equal((await cloud.rootEntries(space.scopeId, 'contents'))![0].blocked, undefined);
   }
   assert(!rpc.calls.some((item) => item.method === 'mount/mount'));
+});
+
+test('Paths inside a mount resolve without realpath, and links below the mount point are refused', async (t) => {
+  const { files, space, target, base } = await mountedFixture(t);
+  await mkdir(path.join(target, 'Folder'));
+  await writeFile(path.join(target, 'Folder', 'note.md'), '# Remote\n');
+  // On Windows a WinFsp volume mounted on a folder has no DOS name, so realpath
+  // fails with UNKNOWN for every path inside it. Model exactly that.
+  const realpath = promises.realpath;
+  promises.realpath = (async (value: string, ...rest: unknown[]) => {
+    if (within(target, path.resolve(String(value))))
+      throw Object.assign(Error(`UNKNOWN: unknown error, realpath '${value}'`), {
+        code: 'UNKNOWN',
+      });
+    return (realpath as (...args: unknown[]) => Promise<string>)(value, ...rest);
+  }) as typeof promises.realpath;
+  t.after(() => {
+    promises.realpath = realpath;
+  });
+  assert.deepEqual(
+    (await files.entries(space.scopeId, 'contents/Mounted fixture')).map((entry) => entry.name),
+    ['Folder'],
+  );
+  assert.deepEqual(
+    (await files.entries(space.scopeId, 'contents/Mounted fixture/Folder')).map(
+      (entry) => entry.name,
+    ),
+    ['note.md'],
+  );
+  assert.equal(
+    await files.resolve(space.scopeId, 'contents/Mounted fixture/Folder/note.md'),
+    path.join(target, 'Folder', 'note.md'),
+  );
+  if (process.platform !== 'win32') {
+    await symlink(base, path.join(target, 'escape'), 'dir');
+    for (const rel of ['escape', 'escape/KB'])
+      await assert.rejects(
+        files.resolve(space.scopeId, `contents/Mounted fixture/${rel}`),
+        /alias escapes/,
+      );
+  }
 });
 
 test('Closing after a disappeared mount succeeds when its service and filesystem agree', async (t) => {
