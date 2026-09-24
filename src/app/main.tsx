@@ -1556,7 +1556,7 @@ function App() {
                                   setSearchNotice(navigationNotice(searchTarget, found));
                               }}
                               onUpload={
-                                doc.cloud
+                                doc.readOnly
                                   ? undefined
                                   : async (file) =>
                                       host.saveImage(

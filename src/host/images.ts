@@ -31,32 +31,68 @@ export function imagePath(note: string, url: string) {
     );
   return path.posix.normalize(path.posix.join(path.posix.dirname(note), decoded));
 }
+/** What ImageService needs from CloudService to reach into a Drive connection. */
+export interface ImageCloudHooks {
+  /** Resolves a Drive-connected path to its real filesystem location, mount verified. */
+  resolve(scopeId: string, rel: string): Promise<string>;
+  /** Whether the connection covering rel is mounted so that it can be changed. */
+  writable(scopeId: string, rel: string): boolean;
+}
 export class ImageService {
   private queue = new SerialQueue();
   constructor(
     private files: FileService,
-    private resolve = files.resolve.bind(files),
+    private cloud?: ImageCloudHooks,
   ) {}
   save(scopeId: string, note: string, bytes: Uint8Array) {
     return this.queue.run(() => this.saveBytes(scopeId, note, bytes));
   }
+  // A workspace scope holds only Drive connections and FileService does not know it;
+  // every other scope is a registered KB, where only its `contents` layer is Drive-backed.
+  private resolvePath(scopeId: string, rel: string) {
+    if (this.files.list().some((space) => space.scopeId === scopeId))
+      return this.files.resolve(scopeId, rel);
+    if (!this.cloud) throw Error('Unknown space');
+    return this.cloud.resolve(scopeId, rel);
+  }
+  private isDrive(scopeId: string, note: string) {
+    if (!this.files.list().some((space) => space.scopeId === scopeId)) return true;
+    return classify(this.files.get(scopeId), note) === 'contents';
+  }
   private async saveBytes(scopeId: string, note: string, bytes: Uint8Array) {
     const ext = imageType(bytes);
-    if (!/\.md$/i.test(note) || classify(this.files.get(scopeId), note) === 'contents')
+    if (!/\.md$/i.test(note))
       throw Error(
         t(
           '編集できる Markdown ノートに画像を追加してください。',
           'Add images to an editable Markdown note.',
         ),
       );
-    const filename = await this.files.resolve(scopeId, note);
+    const drive = this.isDrive(scopeId, note);
+    if (drive && !this.cloud)
+      throw Error(
+        t(
+          '編集できる Markdown ノートに画像を追加してください。',
+          'Add images to an editable Markdown note.',
+        ),
+      );
+    // Resolving first verifies the mount, which is also what lets the writable check
+    // below answer correctly for a connection not yet touched in this process.
+    const filename = await this.resolvePath(scopeId, note);
+    if (drive && this.cloud && !this.cloud.writable(scopeId, note))
+      throw Error(
+        t(
+          'このクラウドフォルダは読み取り専用で接続されています。',
+          'This cloud folder is connected read-only.',
+        ),
+      );
     const relDir = path.posix.join(path.posix.dirname(note), '_assets');
     const directory = path.join(path.dirname(filename), '_assets');
     // Check existing aliases before any write; never create a disconnected cloud fallback.
     await fs.mkdir(directory).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== 'EEXIST') throw error;
     });
-    const actual = await this.files.resolve(scopeId, relDir);
+    const actual = await this.resolvePath(scopeId, relDir);
     if (actual !== directory || (await fs.lstat(directory)).isSymbolicLink())
       throw Error(
         t('_assets は通常のフォルダにしてください。', '_assets must be an ordinary folder.'),
@@ -75,13 +111,17 @@ export class ImageService {
         );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      await writeLocalFile(target, Buffer.from(bytes));
+      if (drive)
+        // Drive has no atomic rename: replacing a file there deletes and re-creates it.
+        // The file is new either way, so an exclusive direct write is enough.
+        await fs.writeFile(target, Buffer.from(bytes), { flag: 'wx' });
+      else await writeLocalFile(target, Buffer.from(bytes));
     }
     return `_assets/${name}`;
   }
   async read(scopeId: string, note: string, url: string) {
-    await this.resolve(scopeId, note);
-    const filename = await this.resolve(scopeId, imagePath(note, url));
+    await this.resolvePath(scopeId, note);
+    const filename = await this.resolvePath(scopeId, imagePath(note, url));
     if ((await fs.stat(filename)).size > imageLimit)
       throw Error(t('画像は 20 MiB 以下にしてください。', 'Images must be 20 MiB or smaller.'));
     const bytes = await fs.readFile(filename);
