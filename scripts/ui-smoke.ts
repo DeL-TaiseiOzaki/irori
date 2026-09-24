@@ -178,7 +178,7 @@ try {
   const paneWidth = () =>
     page.locator('.explorer-pane').evaluate((element) => element.getBoundingClientRect().width);
   const startWidth = await paneWidth();
-  const handle = page.locator('.pane-handle').first();
+  const handle = page.getByRole('separator', { name: 'サイドバーの幅', exact: true });
   const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
