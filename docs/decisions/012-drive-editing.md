@@ -1,7 +1,7 @@
 # 012 — Editing Google Drive folders in place
 
-Date: 2026-09-25. Status: owner request accepted and implemented for 0.1.35;
-trials on Windows 11 and macOS devices are pending.
+Date: 2026-09-25. Status: owner request accepted and implemented for 0.1.35,
+completed in 0.1.36; trials on Windows 11 and macOS devices are pending.
 
 ## Decision
 
@@ -52,15 +52,31 @@ this ([HANDOFF](../HANDOFF.md)).
 - **Adding.** A note can be added to an editable folder from the sidebar, and
   **フォルダを開く** shows the mounted folder in the system file manager for
   other files. Agents working in a KB can change the editable folders mounted
-  in its `contents`.
+  in its `contents`. Images pasted or dropped into a Drive note are written
+  beside it under `_assets/`, as for a KB note, with an exclusive direct write.
+- **Renaming, moving and deleting** (0.1.36). A file or folder inside an
+  editable connection can be renamed, moved within that connection, or deleted
+  from the sidebar menu or the open document's toolbar. irori renames on the
+  mount, which rclone turns into Drive's own move, so the file keeps its ID,
+  history and sharing. Deleting sends items to Drive's trash (`use_trash`, on by
+  default), where they can be restored for 30 days; a deleted folder's files are
+  trashed one by one. The connection folder itself is changed only in the
+  connection dialog. A rename that differs only in case goes through a temporary
+  name, since the mount may not tell the two apart.
+- **Upload failures** (0.1.36). rclone reports a failed upload on stderr; irori
+  keeps only the file's path and a category (permission, storage, sign-in,
+  network, rate limit, other), never the raw line, and matches failing items in
+  rclone's upload queue (`vfs/queue`) to say on the connection why changes are
+  not arriving. Failures that do not clear, such as a folder shared view-only,
+  no longer trap the folder: disconnecting or making it read-only can leave the
+  changes in rclone's cache, to be uploaded the next time the folder is mounted
+  editable.
 
 ## Not included
 
-Renaming, moving or deleting Drive files from irori's own interface; pasting
-images into a Drive note; merging a version changed in Drive with the draft,
-beyond showing it beside the draft as for a local change; and reporting why an
-upload fails, such as a folder shared view-only, beyond a waiting count that
-does not fall.
+Merging a version changed in Drive with the draft, beyond showing it beside the
+draft as for a local change; rewriting knowledge records that refer to a moved
+Drive file; and trashing a folder as one item rather than file by file.
 
 ## Relation to the outbox
 
