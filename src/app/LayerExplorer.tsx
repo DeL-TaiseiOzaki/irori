@@ -10,9 +10,17 @@ import type { CloudRoot, Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
 import { layoutStorage } from './device-settings';
 import { useResource } from './useResource';
+import { t } from '../domain/i18n';
 
 const host = window.irori;
-const categories = { personal: '個人', team: 'チーム', organization: '組織' };
+// A function so the category name is read in the language of each render.
+function categoryLabel(category: Space['category']) {
+  return {
+    personal: t('個人', 'Personal'),
+    team: t('チーム', 'Team'),
+    organization: t('組織', 'Organization'),
+  }[category];
+}
 type Listing = { entries: Entry[]; error?: string };
 
 export function Tree<T extends CloudRoot>({
@@ -50,14 +58,14 @@ export function Tree<T extends CloudRoot>({
   const entries = data?.entries.filter((entry) => entry.layer === layer) ?? [];
   return (
     <div className="tree">
-      {!data && <small className="tree-empty">読み込み中…</small>}
+      {!data && <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>}
       {data?.error && (
         <small className="tree-error" role="alert">
           {data.error}
         </small>
       )}
       {data && !data.error && !entries.length && (
-        <small className="tree-empty">項目がありません</small>
+        <small className="tree-empty">{t('項目がありません', 'No items')}</small>
       )}
       {entries.map((entry) => {
         const isOpen = expanded.includes(entry.path);
@@ -83,7 +91,11 @@ export function Tree<T extends CloudRoot>({
               <Icon name={entry.directory ? 'folder' : 'file'} size={14} />
               <span className="filename">{entry.name.replace(/\.md$/, '')}</span>
               {entry.blocked && (
-                <span className="badge">{layer === 'contents' ? '未接続' : '利用不可'}</span>
+                <span className="badge">
+                  {layer === 'contents'
+                    ? t('未接続', 'Not connected')
+                    : t('利用不可', 'Unavailable')}
+                </span>
               )}
             </button>
             {entry.directory && isOpen && !entry.blocked && (
@@ -140,7 +152,10 @@ function ScopeTree({
       <div className="scope-heading">
         <button
           className="scope-toggle"
-          aria-label={`${space.name} の${layer}を${expanded ? '折りたたむ' : '展開'}`}
+          aria-label={t(
+            `${space.name} の${layer}を${expanded ? '折りたたむ' : '展開'}`,
+            `${expanded ? 'Collapse' : 'Expand'} ${layer} for ${space.name}`,
+          )}
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
         >
@@ -150,26 +165,28 @@ function ScopeTree({
           className="space-title"
           disabled={locked}
           onClick={() => onSelect(space)}
-          title={`${categories[space.category]} · ${space.root}`}
+          title={`${categoryLabel(space.category)} · ${space.root}`}
         >
           <span className="filename">{space.name}</span>
-          {space.category === 'organization' && <span className="badge">組織</span>}
+          {space.category === 'organization' && (
+            <span className="badge">{t('組織', 'Organization')}</span>
+          )}
         </button>
         {layer === 'contents' && (
           <button
             className="scope-action"
             disabled={locked}
-            aria-label={`${space.name} のクラウド接続`}
+            aria-label={t(`${space.name} のクラウド接続`, `Cloud connection for ${space.name}`)}
             onClick={() => onConnect(space)}
           >
-            接続
+            {t('接続', 'Connect')}
           </button>
         )}
         {layer === 'Knowledge_Base' && (
           <button
             className="scope-action"
             disabled={locked}
-            aria-label={`${space.name} にノートを作成`}
+            aria-label={t(`${space.name} にノートを作成`, `Create a note in ${space.name}`)}
             onClick={() => onNote(space)}
           >
             <Icon name="plus" size={14} />
@@ -187,7 +204,7 @@ function ScopeTree({
             onOpen={onOpen}
           />
         ) : (
-          <small className="tree-empty">読み込み中…</small>
+          <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
         ))}
     </section>
   );
@@ -201,9 +218,10 @@ type Row = {
   panes: PaneId[];
   defaultSize: string;
   minSize: number;
-  /** Names the border above this row, shared with the previous row. */
-  handleLabel?: string;
-  splitLabel?: string;
+  /** Names the border above this row, shared with the previous row. Read at
+   * render time (not module load) so it stays in the current language. */
+  handleLabel?: () => string;
+  splitLabel?: () => string;
 };
 // A folded row keeps its heading line (the heading's min-height).
 const headingHeight = 38;
@@ -215,16 +233,17 @@ const rows: Row[] = [
     panes: ['my-kb', 'team-kb'],
     defaultSize: '40%',
     minSize: 60,
-    handleLabel: 'Schema とナレッジの境界',
-    splitLabel: '個人とチームのナレッジの境界',
+    handleLabel: () => t('Schema とナレッジの境界', 'Border between Schema and Knowledge'),
+    splitLabel: () =>
+      t('個人とチームのナレッジの境界', 'Border between personal and team Knowledge'),
   },
   {
     id: 'contents',
     panes: ['my-contents', 'team-contents'],
     defaultSize: '34%',
     minSize: 60,
-    handleLabel: 'ナレッジと資料の境界',
-    splitLabel: '個人とチームの資料の境界',
+    handleLabel: () => t('ナレッジと資料の境界', 'Border between Knowledge and Materials'),
+    splitLabel: () => t('個人とチームの資料の境界', 'Border between personal and team Materials'),
   },
 ];
 // The workspace's Drive list is a fourth row when the workspace has one; its
@@ -234,7 +253,7 @@ const driveRow: Row = {
   panes: [],
   defaultSize: '20%',
   minSize: 60,
-  handleLabel: '資料と Google Drive の境界',
+  handleLabel: () => t('資料と Google Drive の境界', 'Border between Materials and Google Drive'),
 };
 const withDrive: Row[] = rows.map((row) => ({
   ...row,
@@ -292,28 +311,33 @@ export function LayerExplorer({
     };
   }, [scopeKey, revision]);
   const panes: Record<PaneId, PaneSpec> = {
-    schema: { title: 'Schema', subtitle: '設定・エージェントの指示', layer: 'schema', spaces },
+    schema: {
+      title: 'Schema',
+      subtitle: t('設定・エージェントの指示', 'Settings and agent instructions'),
+      layer: 'schema',
+      spaces,
+    },
     'my-kb': {
-      title: '個人のナレッジ',
-      subtitle: '個人のナレッジ',
+      title: t('個人のナレッジ', 'Personal Knowledge'),
+      subtitle: t('個人のナレッジ', 'Personal Knowledge'),
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
     'team-kb': {
-      title: 'チームのナレッジ',
-      subtitle: 'チーム・組織のナレッジ',
+      title: t('チームのナレッジ', 'Team Knowledge'),
+      subtitle: t('チーム・組織のナレッジ', 'Team and organization Knowledge'),
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category !== 'personal'),
     },
     'my-contents': {
-      title: '個人の資料',
-      subtitle: '個人の資料・クラウド',
+      title: t('個人の資料', 'Personal Materials'),
+      subtitle: t('個人の資料・クラウド', 'Personal Materials and cloud'),
       layer: 'contents',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
     'team-contents': {
-      title: 'チームの資料',
-      subtitle: 'チーム・組織の資料',
+      title: t('チームの資料', 'Team Materials'),
+      subtitle: t('チーム・組織の資料', 'Team and organization Materials'),
       layer: 'contents',
       spaces: spaces.filter((s) => s.category !== 'personal'),
     },
@@ -385,7 +409,7 @@ export function LayerExplorer({
           {id === 'schema' && (
             <button
               className="scope-action"
-              aria-label="エクスプローラーを更新"
+              aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
               onClick={onRefresh}
             >
               <Icon name="refresh" size={14} />
@@ -414,7 +438,10 @@ export function LayerExplorer({
               ))
             ) : (
               <p className="tree-empty">
-                スペースが未登録です。下の「スペースを追加」から登録できます。
+                {t(
+                  'スペースが未登録です。下の「スペースを追加」から登録できます。',
+                  'No space is registered yet. Register one from "Add space" below.',
+                )}
               </p>
             )}
           </div>
@@ -423,7 +450,7 @@ export function LayerExplorer({
     );
   };
   return (
-    <nav className="layer-explorer" aria-label="レイヤー別エクスプローラー">
+    <nav className="layer-explorer" aria-label={t('レイヤー別エクスプローラー', 'Layer explorer')}>
       <PaneGroup
         className="layer-rows"
         orientation="vertical"
@@ -437,7 +464,10 @@ export function LayerExplorer({
         {shown.map((row, index) => (
           <Fragment key={row.id}>
             {index > 0 && (
-              <PaneSeparator className="pane-handle layer-handle" aria-label={row.handleLabel} />
+              <PaneSeparator
+                className="pane-handle layer-handle"
+                aria-label={row.handleLabel?.()}
+              />
             )}
             <Pane
               id={row.id}
@@ -481,7 +511,7 @@ function SplitRow({ row, render }: { row: Row; render: (id: PaneId) => ReactNode
       {row.panes.map((id, index) => (
         <Fragment key={id}>
           {index > 0 && (
-            <PaneSeparator className="pane-handle layer-handle" aria-label={row.splitLabel} />
+            <PaneSeparator className="pane-handle layer-handle" aria-label={row.splitLabel?.()} />
           )}
           <Pane id={id} className="layer-cell" minSize={96}>
             {render(id)}

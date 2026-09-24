@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AgentId } from './types';
+import { t } from './i18n';
 
 export const draftKey = z.discriminatedUnion('kind', [
   z
@@ -105,7 +106,13 @@ export class DraftController {
           error: '',
         });
       } catch (error) {
-        this.update({ pending: false, error: `下書きを読み込めませんでした: ${String(error)}` });
+        this.update({
+          pending: false,
+          error: t(
+            `下書きを読み込めませんでした: ${String(error)}`,
+            `Could not load the draft: ${String(error)}`,
+          ),
+        });
       }
     })().finally(() => {
       this.reading = undefined;
@@ -137,7 +144,10 @@ export class DraftController {
           } catch (error) {
             this.update({
               pending: false,
-              error: `下書きを保存できませんでした: ${String(error)}`,
+              error: t(
+                `下書きを保存できませんでした: ${String(error)}`,
+                `Could not save the draft: ${String(error)}`,
+              ),
             });
           }
         }

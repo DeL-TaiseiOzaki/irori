@@ -10,6 +10,7 @@ import { FileService, textFilePattern } from './files';
 import { foldsCase } from './links';
 import { SearchIndex, trigramQuery } from './search-index';
 import { referencesTo } from './note-references';
+import { t } from '../domain/i18n';
 
 export const searchLimits = {
   files: 50000,
@@ -85,7 +86,8 @@ export class SearchService {
       incomplete: false,
     };
     const current = () => {
-      if (generation !== this.generation) throw Error('新しい検索に切り替わりました。');
+      if (generation !== this.generation)
+        throw Error(t('新しい検索に切り替わりました。', 'A newer search replaced this one.'));
       if (performance.now() >= deadline) {
         result.incomplete = true;
         return false;

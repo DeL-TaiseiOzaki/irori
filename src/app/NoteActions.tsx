@@ -3,22 +3,33 @@ import type { Document } from '../domain/types';
 import { noteFilename, type TrashedNote } from '../domain/note-operations';
 import type { LinkUpdate } from '../domain/note-links';
 import { Dialog } from './Dialog';
+import { displayLocale, t } from '../domain/i18n';
 
 const host = window.irori;
 
 /** What the move did to links, for the status line. */
 function linkNotice(update: LinkUpdate) {
-  const done = [
-    update.self ? `このノート内 ${update.self} 件` : '',
-    update.notes ? `参照元 ${update.notes} 件のノートの ${update.links} 件` : '',
-  ].filter(Boolean);
+  const selfJa = update.self ? `このノート内 ${update.self} 件` : '';
+  const selfEn = update.self ? `${update.self} in this note` : '';
+  const notesJa = update.notes ? `参照元 ${update.notes} 件のノートの ${update.links} 件` : '';
+  const notesEn = update.notes ? `${update.links} across ${update.notes} referring notes` : '';
+  const doneJa = [selfJa, notesJa].filter(Boolean).join('と');
+  const doneEn = [selfEn, notesEn].filter(Boolean).join(' and ');
   return [
-    done.length
-      ? `${done.join('と')}のリンクを更新しました。`
-      : '更新が必要なリンクはありませんでした。',
-    update.skipped.length ? `更新できなかったノート: ${update.skipped.join('、')}。` : '',
+    doneJa
+      ? t(`${doneJa}のリンクを更新しました。`, `Updated ${doneEn} links.`)
+      : t('更新が必要なリンクはありませんでした。', 'No links needed updating.'),
+    update.skipped.length
+      ? t(
+          `更新できなかったノート: ${update.skipped.join('、')}。`,
+          ` Notes that could not be updated: ${update.skipped.join(', ')}.`,
+        )
+      : '',
     update.incomplete
-      ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
+      ? t(
+          '上限または読めないファイルにより、すべての参照元を確認できていません。',
+          ' A limit or unreadable files meant not every referring note could be checked.',
+        )
       : '',
   ].join('');
 }
@@ -73,9 +84,17 @@ export function NoteActions({
     setError('');
     try {
       const saved = await beforeChange();
-      if (!saved) throw Error('ノートを保存してからもう一度操作してください。');
+      if (!saved)
+        throw Error(
+          t('ノートを保存してからもう一度操作してください。', 'Save the note before trying again.'),
+        );
       if (saved.scopeId !== doc.scopeId || saved.path !== doc.path)
-        throw Error('選択中のノートが変わりました。開き直してください。');
+        throw Error(
+          t(
+            '選択中のノートが変わりました。開き直してください。',
+            'The selected note has changed. Open it again.',
+          ),
+        );
       if (action === 'trash') {
         await host.trashNote(saved);
         onChanged(null);
@@ -85,8 +104,12 @@ export function NoteActions({
         const moved = await host.moveNote(saved, destination, links);
         onChanged(
           moved,
-          `${moved.notice ?? 'ノートの場所を変更しました。'}${
-            moved.links ? linkNotice(moved.links) : links ? '' : 'リンクは更新していません。'
+          `${moved.notice ?? t('ノートの場所を変更しました。', 'Moved the note.')}${
+            moved.links
+              ? linkNotice(moved.links)
+              : links
+                ? ''
+                : t('リンクは更新していません。', 'Links were not updated.')
           }`,
         );
       }
@@ -99,16 +122,48 @@ export function NoteActions({
     }
   }
   if (doc.readOnly || doc.workspaceId || !/\.md$/i.test(doc.path)) return null;
+  const dialogLabel =
+    action === 'move'
+      ? t('ノートの名前と場所', 'Note name and location')
+      : t('ノートを削除', 'Delete note');
+  const linksHint = !links
+    ? t(
+        '参照元のリンクは更新しません。相対リンクを含むノートは同じフォルダで名前を変更してください。',
+        'Referring links will not be updated. If this note contains relative links, rename it within the same folder.',
+      )
+    : !referring
+      ? t('参照元のリンクを調べています…', 'Checking referring links…')
+      : 'error' in referring
+        ? t(
+            `参照元のリンクを確認できませんでした: ${referring.error}`,
+            `Could not check referring links: ${referring.error}`,
+          )
+        : t(
+            `${
+              referring.notes
+                ? `参照元 ${referring.notes} 件のノートにある ${referring.links} 件のリンクと、`
+                : 'このノートを参照するリンクはありません。'
+            }このノート内の相対リンクを移動先に合わせて更新します。${
+              referring.incomplete
+                ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
+                : ''
+            }`,
+            `${
+              referring.notes
+                ? `The ${referring.links} links in ${referring.notes} referring notes and this note's relative links`
+                : "No links refer to this note. This note's relative links"
+            } will be updated to match the destination.${
+              referring.incomplete
+                ? ' A limit or unreadable files meant not every referring note could be checked.'
+                : ''
+            }`,
+          );
   return (
     <>
-      <button onClick={() => open('move')}>名前・場所</button>
-      <button onClick={() => open('trash')}>削除</button>
+      <button onClick={() => open('move')}>{t('名前・場所', 'Name & location')}</button>
+      <button onClick={() => open('trash')}>{t('削除', 'Delete')}</button>
       {action && (
-        <Dialog
-          label={action === 'move' ? 'ノートの名前と場所' : 'ノートを削除'}
-          busy={busy}
-          onClose={close}
-        >
+        <Dialog label={dialogLabel} busy={busy} onClose={close}>
           <form
             className="modal"
             onSubmit={(event) => {
@@ -116,12 +171,12 @@ export function NoteActions({
               void submit();
             }}
           >
-            <h2>{action === 'move' ? 'ノートの名前と場所' : 'ノートを削除'}</h2>
+            <h2>{dialogLabel}</h2>
             <p>{doc.path}</p>
             {action === 'move' ? (
               <>
                 <label>
-                  ノート名
+                  {t('ノート名', 'Note name')}
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -130,7 +185,7 @@ export function NoteActions({
                   />
                 </label>
                 <label>
-                  移動先フォルダ
+                  {t('移動先フォルダ', 'Destination folder')}
                   <input
                     value={directory}
                     onChange={(event) => setDirectory(event.target.value)}
@@ -138,7 +193,10 @@ export function NoteActions({
                   />
                 </label>
                 <p className="hint">
-                  同じスペース内の既存フォルダを指定します。空欄はスペース直下です。
+                  {t(
+                    '同じスペース内の既存フォルダを指定します。空欄はスペース直下です。',
+                    'Specify an existing folder within the same space. Leave it blank for the top of the space.',
+                  )}
                 </p>
                 <label>
                   <input
@@ -147,40 +205,33 @@ export function NoteActions({
                     disabled={busy}
                     onChange={(event) => setLinks(event.target.checked)}
                   />{' '}
-                  リンクも更新する
+                  {t('リンクも更新する', 'Also update links')}
                 </label>
                 <p className="hint">
-                  {!links
-                    ? '参照元のリンクは更新しません。相対リンクを含むノートは同じフォルダで名前を変更してください。'
-                    : !referring
-                      ? '参照元のリンクを調べています…'
-                      : 'error' in referring
-                        ? `参照元のリンクを確認できませんでした: ${referring.error}`
-                        : `${
-                            referring.notes
-                              ? `参照元 ${referring.notes} 件のノートにある ${referring.links} 件のリンクと、`
-                              : 'このノートを参照するリンクはありません。'
-                          }このノート内の相対リンクを移動先に合わせて更新します。${
-                            referring.incomplete
-                              ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
-                              : ''
-                          }`}{' '}
-                  本文のリンクと frontmatter の関係・出典が対象です。irori
-                  で貼り付けた画像は移動先にも保持します。
+                  {linksHint}{' '}
+                  {t(
+                    '本文のリンクと frontmatter の関係・出典が対象です。irori で貼り付けた画像は移動先にも保持します。',
+                    'This covers links in the body and the relationship/source in frontmatter. Images pasted in irori are kept at the destination too.',
+                  )}
                 </p>
               </>
             ) : (
               <p>
-                この端末の「削除済みノート」から復元できます。画像ファイルは残ります。このノートへのリンクは更新しません。
+                {t(
+                  'この端末の「削除済みノート」から復元できます。画像ファイルは残ります。このノートへのリンクは更新しません。',
+                  'You can restore this from "Deleted notes" on this device. Image files are kept. Links to this note are not updated.',
+                )}
               </p>
             )}
             {error && <p role="alert">{error}</p>}
             <div className="actions">
               <button type="button" disabled={busy} onClick={close}>
-                キャンセル
+                {t('キャンセル', 'Cancel')}
               </button>
               <button className="primary" disabled={busy}>
-                {action === 'move' ? '変更する' : '削除済みに移す'}
+                {action === 'move'
+                  ? t('変更する', 'Change')
+                  : t('削除済みに移す', 'Move to deleted')}
               </button>
             </div>
           </form>
@@ -234,29 +285,34 @@ export function TrashNotes({
     }
   }
   return (
-    <Dialog label="削除済みノート" busy={busy} onClose={onClose}>
+    <Dialog label={t('削除済みノート', 'Deleted notes')} busy={busy} onClose={onClose}>
       <div className="modal">
-        <h2>削除済みノート</h2>
+        <h2>{t('削除済みノート', 'Deleted notes')}</h2>
         <p>
-          この端末で削除したノートを元の場所に戻します。同じ場所にファイルがある場合は復元できません。
+          {t(
+            'この端末で削除したノートを元の場所に戻します。同じ場所にファイルがある場合は復元できません。',
+            'Restores notes deleted on this device to their original location. It cannot restore one if a file already exists there.',
+          )}
         </p>
         {error && <p role="alert">{error}</p>}
         {loading ? (
-          <p role="status">読み込み中…</p>
+          <p role="status">{t('読み込み中…', 'Loading…')}</p>
         ) : notes.length === 0 ? (
-          <p>削除済みのノートはありません。</p>
+          <p>{t('削除済みのノートはありません。', 'There are no deleted notes.')}</p>
         ) : (
           <ul>
             {notes.map((note) => (
               <li key={note.id}>
                 <span>{note.path}</span>{' '}
-                <time dateTime={note.deletedAt}>{new Date(note.deletedAt).toLocaleString()}</time>{' '}
+                <time dateTime={note.deletedAt}>
+                  {new Date(note.deletedAt).toLocaleString(displayLocale())}
+                </time>{' '}
                 <button
                   disabled={busy}
-                  aria-label={`${note.path} を復元`}
+                  aria-label={t(`${note.path} を復元`, `Restore ${note.path}`)}
                   onClick={() => void restore(note.id)}
                 >
-                  復元
+                  {t('復元', 'Restore')}
                 </button>
               </li>
             ))}
@@ -264,7 +320,7 @@ export function TrashNotes({
         )}
         <div className="actions">
           <button disabled={busy} onClick={onClose}>
-            閉じる
+            {t('閉じる', 'Close')}
           </button>
         </div>
       </div>

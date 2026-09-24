@@ -23,6 +23,7 @@ import { HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import { assistanceExtensions, editingCore, languageForFilename } from './assistance';
+import { t } from '../domain/i18n';
 // Crepe's own entry point and its combined stylesheet are flattened bundles that
 // import KaTeX and its fonts unconditionally, so `features: { Latex: false }` —
 // a runtime flag read after bundling — never removed them. Composing the builder
@@ -91,52 +92,55 @@ const sourceHighlight = HighlightStyle.define([
   { tag: tags.invalid, textDecoration: 'underline wavy var(--danger)' },
 ]);
 
-// Crepe's editor chrome ships English copy. The product is Japanese, so the
-// strings come from its own configuration rather than from new components.
-const japaneseEditorChrome = {
-  placeholder: { text: '本文を入力…' },
-  linkTooltip: {
-    inputPlaceholder: 'リンク先を貼り付け…',
-    editButton: '編集',
-    removeButton: '削除',
-    confirmButton: '確定',
-  },
-  codeMirror: {
-    languages,
-    // Code blocks inside the note are CodeMirror as well; share the token theme.
-    theme: sourceTheme,
-    searchPlaceholder: '言語を検索…',
-    noResultText: '該当する言語がありません',
-    copyText: 'コピー',
-    previewLabel: 'プレビュー',
-  },
-  blockEdit: {
-    textGroup: {
-      label: 'テキスト',
-      text: { label: '本文' },
-      h1: { label: '見出し 1' },
-      h2: { label: '見出し 2' },
-      h3: { label: '見出し 3' },
-      h4: { label: '見出し 4' },
-      h5: { label: '見出し 5' },
-      h6: { label: '見出し 6' },
-      quote: { label: '引用' },
-      divider: { label: '区切り線' },
+// Crepe's editor chrome ships English copy by default; the interface language
+// supplies these strings instead. A function, not a module-level constant, so
+// each editor instance reads the language current when it is created.
+function editorChrome() {
+  return {
+    placeholder: { text: t('本文を入力…', 'Type here…') },
+    linkTooltip: {
+      inputPlaceholder: t('リンク先を貼り付け…', 'Paste a link…'),
+      editButton: t('編集', 'Edit'),
+      removeButton: t('削除', 'Remove'),
+      confirmButton: t('確定', 'Confirm'),
     },
-    listGroup: {
-      label: 'リスト',
-      bulletList: { label: '箇条書き' },
-      orderedList: { label: '番号付き' },
-      taskList: { label: 'タスク' },
+    codeMirror: {
+      languages,
+      // Code blocks inside the note are CodeMirror as well; share the token theme.
+      theme: sourceTheme,
+      searchPlaceholder: t('言語を検索…', 'Search languages…'),
+      noResultText: t('該当する言語がありません', 'No matching language'),
+      copyText: t('コピー', 'Copy'),
+      previewLabel: t('プレビュー', 'Preview'),
     },
-    advancedGroup: {
-      label: 'ブロック',
-      image: { label: '画像' },
-      codeBlock: { label: 'コード' },
-      table: { label: '表' },
+    blockEdit: {
+      textGroup: {
+        label: t('テキスト', 'Text'),
+        text: { label: t('本文', 'Text') },
+        h1: { label: t('見出し 1', 'Heading 1') },
+        h2: { label: t('見出し 2', 'Heading 2') },
+        h3: { label: t('見出し 3', 'Heading 3') },
+        h4: { label: t('見出し 4', 'Heading 4') },
+        h5: { label: t('見出し 5', 'Heading 5') },
+        h6: { label: t('見出し 6', 'Heading 6') },
+        quote: { label: t('引用', 'Quote') },
+        divider: { label: t('区切り線', 'Divider') },
+      },
+      listGroup: {
+        label: t('リスト', 'List'),
+        bulletList: { label: t('箇条書き', 'Bullet list') },
+        orderedList: { label: t('番号付き', 'Numbered list') },
+        taskList: { label: t('タスク', 'Task list') },
+      },
+      advancedGroup: {
+        label: t('ブロック', 'Block'),
+        image: { label: t('画像', 'Image') },
+        codeBlock: { label: t('コード', 'Code') },
+        table: { label: t('表', 'Table') },
+      },
     },
-  },
-} as const;
+  };
+}
 
 /**
  * A line the person wrote or revised carries a mark in the source gutter. Other
@@ -297,19 +301,21 @@ export function Editor({
       element.addEventListener(event, markEdited, true);
     element.addEventListener('keydown', keyboard, true);
     element.addEventListener('pointerdown', toolbar, true);
+    const chrome = editorChrome();
     const crepe = new CrepeBuilder({ root: element, defaultValue: encoding.body })
       .addFeature(cursor)
       .addFeature(listItem)
       .addFeature(toolbarFeature)
       .addFeature(table)
-      .addFeature(placeholder, japaneseEditorChrome.placeholder)
-      .addFeature(linkTooltip, japaneseEditorChrome.linkTooltip)
-      .addFeature(codeMirror, japaneseEditorChrome.codeMirror)
-      .addFeature(blockEdit, japaneseEditorChrome.blockEdit)
+      .addFeature(placeholder, chrome.placeholder)
+      .addFeature(linkTooltip, chrome.linkTooltip)
+      .addFeature(codeMirror, chrome.codeMirror)
+      .addFeature(blockEdit, chrome.blockEdit)
       .addFeature(imageBlock, {
         onUpload: async (file) => {
           try {
-            if (readOnly || !onUpload) throw Error('このノートは読み取り専用です。');
+            if (readOnly || !onUpload)
+              throw Error(t('このノートは読み取り専用です。', 'This note is read-only.'));
             markEdited();
             return await onUpload(file);
           } catch (error) {
@@ -329,12 +335,12 @@ export function Editor({
             return '';
           }
         },
-        blockUploadButton: '画像を選択',
-        inlineUploadButton: '画像を選択',
-        blockUploadPlaceholderText: '画像の相対パス',
-        inlineUploadPlaceholderText: '画像の相対パス',
-        blockCaptionPlaceholderText: 'キャプション',
-        blockConfirmButton: '追加',
+        blockUploadButton: t('画像を選択', 'Choose image'),
+        inlineUploadButton: t('画像を選択', 'Choose image'),
+        blockUploadPlaceholderText: t('画像の相対パス', 'Relative path to the image'),
+        inlineUploadPlaceholderText: t('画像の相対パス', 'Relative path to the image'),
+        blockCaptionPlaceholderText: t('キャプション', 'Caption'),
+        blockConfirmButton: t('追加', 'Add'),
       });
     crepe.editor
       .config((ctx) => {
@@ -463,10 +469,12 @@ export function Editor({
     <>
       {imageErrors.length > 0 && (
         <div className="hint image-errors" role="alert">
-          <strong>表示できない画像があります。</strong>
+          <strong>{t('表示できない画像があります。', 'Some images cannot be shown.')}</strong>
           <p>
-            画像ファイルの場所・接続と、対応形式（PNG・JPEG・GIF・WebP、20 MiB
-            以下）を確認して、ノートを開き直してください。本文の画像リンクは保持しています。
+            {t(
+              '画像ファイルの場所・接続と、対応形式（PNG・JPEG・GIF・WebP、20 MiB 以下）を確認して、ノートを開き直してください。本文の画像リンクは保持しています。',
+              "Check the image file's location, connection, and supported format (PNG, JPEG, GIF, WebP, 20 MiB or smaller), then reopen the note. Image links in the body are kept.",
+            )}
           </p>
           <ul>
             {imageErrors.map((url) => (

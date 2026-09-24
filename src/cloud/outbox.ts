@@ -7,6 +7,7 @@ import { pendingWrite, type PendingWrite, type SourceRef } from '../domain/knowl
 import { readLocalJson, writeLocalJson } from '../host/local-json';
 import { SerialQueue } from '../host/serial-queue';
 import type { RcloneAPI } from './rclone';
+import { t } from '../domain/i18n';
 
 const writeTarget = pendingWrite
   .pick({ ownerId: true, mountId: true, folderId: true, accountId: true, driveId: true })
@@ -108,7 +109,10 @@ export class CloudOutbox {
       let record = pendingWrite.parse(await readLocalJson(filename, null));
       if (!record.accountId)
         throw Error(
-          '送信準備にアカウント情報がありません。保持版を復元し、送信先を確認して準備し直してください。',
+          t(
+            '送信準備にアカウント情報がありません。保持版を復元し、送信先を確認して準備し直してください。',
+            'This pending upload has no account. Restore the kept copy, check the destination and prepare it again.',
+          ),
         );
       if (
         record.id !== id ||
@@ -119,7 +123,9 @@ export class CloudOutbox {
         record.accountId !== destination.accountId ||
         record.driveId !== destination.driveId
       )
-        throw Error('送信先の識別情報が変わっています。');
+        throw Error(
+          t('送信先の識別情報が変わっています。', 'The identity of the destination has changed.'),
+        );
       if (record.state === 'confirmed') return record;
       const persist = async (state: PendingWrite['state'], detail?: string) => {
         record = {
@@ -137,13 +143,26 @@ export class CloudOutbox {
           value?.hash === record.source.hash && value.size === record.source.size;
         const existing = await remote.observe(record.name);
         if (matches(existing)) return persist('confirmed'); // A previous uncertain copy completed.
-        if (existing) return persist('failed', '送信先に異なる版があります。上書きしていません。');
+        if (existing)
+          return persist(
+            'failed',
+            t(
+              '送信先に異なる版があります。上書きしていません。',
+              'The destination has a different version. Nothing was overwritten.',
+            ),
+          );
         await persist('uploading');
         await remote.copy(this.knowledge.blobPath(record.source.hash), record.name);
         if (!matches(await remote.observe(record.name))) throw Error('Remote bytes not confirmed');
         return persist('confirmed');
       } catch {
-        return persist('failed', '送信完了を確認できません。元の版を端末に保持しています。');
+        return persist(
+          'failed',
+          t(
+            '送信完了を確認できません。元の版を端末に保持しています。',
+            'Could not confirm the upload finished. The original version is kept on this device.',
+          ),
+        );
       }
     });
   }

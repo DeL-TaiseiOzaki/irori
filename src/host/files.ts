@@ -16,6 +16,7 @@ import {
   type TrashedNote,
 } from '../domain/note-operations';
 import { defaultNoteDirectory } from '../domain/notes';
+import { t } from '../domain/i18n';
 const relative = z
   .string()
   .min(1)
@@ -227,9 +228,12 @@ export class FileService {
         blocked:
           layer === 'contents' &&
           !(this.cloud && (s.contents.includes(p) || classify(s, rel) === 'contents'))
-            ? '接続未検証・ローカル保存先としては使用できません'
+            ? t(
+                '接続未検証・ローカル保存先としては使用できません',
+                'Connection not verified; cannot be used as local storage',
+              )
             : f.isSymbolicLink()
-              ? 'リンク先はこの版では開けません'
+              ? t('リンク先はこの版では開けません', 'Link targets cannot be opened in this version')
               : undefined,
       });
     }
@@ -242,7 +246,7 @@ export class FileService {
             directory: true,
             layer: 'contents',
             note: false,
-            blocked: this.cloud ? undefined : '未接続',
+            blocked: this.cloud ? undefined : t('未接続', 'Not connected'),
           });
     return out.sort(
       (a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name),
@@ -278,12 +282,19 @@ export class FileService {
         throw Error('The text editor supports files up to 2 MiB');
       if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
       if (classify(this.get(doc.scopeId), doc.path) === 'contents')
-        throw Error('このクラウド接続は読み取り専用です。');
+        throw Error(
+          t('このクラウド接続は読み取り専用です。', 'This cloud connection is read-only.'),
+        );
       await this.writeDraft(doc);
       const filename = await this.resolve(doc.scopeId, doc.path);
       const before = await fs.readFile(filename);
       if (hash(before) !== doc.hash)
-        throw Error('CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。');
+        throw Error(
+          t(
+            'CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。',
+            'CONFLICT: Check the changes on disk. Your draft is kept.',
+          ),
+        );
       if (hash(doc.text) !== doc.hash) {
         // Retain the previous observed version against a racing external writer.
         await writeLocalFile(
@@ -324,7 +335,12 @@ export class FileService {
           noteFilename(path.posix.basename(rel)).toLowerCase() !==
             path.posix.basename(rel).toLowerCase()))
     )
-      throw Error('同じスペースのナレッジ内にある Markdown ノートを指定してください。');
+      throw Error(
+        t(
+          '同じスペースのナレッジ内にある Markdown ノートを指定してください。',
+          'Choose a Markdown note in the Knowledge of the same space.',
+        ),
+      );
     return path.join(space.root, rel);
   }
   private async noteDirectory(id: string, rel: string, create = false) {
@@ -341,9 +357,14 @@ export class FileService {
         stat = await fs.lstat(filename);
       }
       if (stat.isSymbolicLink() || !stat.isDirectory())
-        throw Error('フォルダの alias / シンボリックリンクは操作できません。');
+        throw Error(
+          t(
+            'フォルダの alias / シンボリックリンクは操作できません。',
+            'Folder aliases and symbolic links cannot be changed.',
+          ),
+        );
       if ((await this.resolve(id, prefix)) !== filename)
-        throw Error('フォルダの alias が変更されています。');
+        throw Error(t('フォルダの alias が変更されています。', 'The folder alias has changed.'));
     }
     return this.resolve(id, rel, true);
   }
@@ -356,12 +377,24 @@ export class FileService {
     );
     const stat = await fs.lstat(filename);
     if (!stat.isFile() || stat.isSymbolicLink())
-      throw Error('通常の Markdown ノートを選択してください。');
+      throw Error(
+        t('通常の Markdown ノートを選択してください。', 'Choose an ordinary Markdown note.'),
+      );
     const doc = await this.read(ref.scopeId, ref.path);
     if (doc.hash !== ref.hash)
-      throw Error('CONFLICT: ノートが変更されています。開き直してください。');
+      throw Error(
+        t(
+          'CONFLICT: ノートが変更されています。開き直してください。',
+          'CONFLICT: The note has changed. Open it again.',
+        ),
+      );
     if (doc.draft && doc.draft.text !== doc.text)
-      throw Error('未保存の下書きを保存または解決してからノートを整理してください。');
+      throw Error(
+        t(
+          '未保存の下書きを保存または解決してからノートを整理してください。',
+          'Save or resolve the unsaved draft before organizing notes.',
+        ),
+      );
     return { filename, doc, stat };
   }
   async createNote(id: string, name: string, directory = defaultNoteDirectory) {
@@ -401,7 +434,12 @@ export class FileService {
         rel.split('/').some((part) => part.startsWith('.')) ||
         !textFilePattern.test(rel)
       )
-        throw Error('生成したファイルはこの KB のナレッジ層にだけ書き込めます。');
+        throw Error(
+          t(
+            '生成したファイルはこの KB のナレッジ層にだけ書き込めます。',
+            "Generated files can be written only to this KB's Knowledge layer.",
+          ),
+        );
       const directory = path.posix.dirname(rel);
       const parent = await this.noteDirectory(id, directory === '.' ? '' : directory, true);
       const filename = path.join(parent, path.posix.basename(rel));
@@ -409,7 +447,9 @@ export class FileService {
         if (error.code !== 'ENOENT') throw error;
       });
       if (existing && (!existing.isFile() || existing.isSymbolicLink()))
-        throw Error('生成先が通常のファイルではありません。');
+        throw Error(
+          t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
+        );
       // A previous version may have generated an oversized file. Hash it without
       // loading its bytes into memory, retaining the ordinary replacement guard.
       const currentHash = async () => {
@@ -417,7 +457,10 @@ export class FileService {
         const file = await fs.open(filename, 'r');
         try {
           const before = await file.stat();
-          if (!before.isFile()) throw Error('生成先が通常のファイルではありません。');
+          if (!before.isFile())
+            throw Error(
+              t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
+            );
           let size = 0;
           for await (const chunk of file.createReadStream({ autoClose: false, end: before.size })) {
             digest.update(chunk);
@@ -429,14 +472,25 @@ export class FileService {
             after.size !== before.size ||
             after.mtimeMs !== before.mtimeMs
           )
-            throw Error('CONFLICT: 生成先のファイルが変更されています。');
+            throw Error(
+              t(
+                'CONFLICT: 生成先のファイルが変更されています。',
+                'CONFLICT: The output file has changed.',
+              ),
+            );
         } finally {
           await file.close();
         }
         return digest.digest('hex');
       };
       if (expected === null) {
-        if (existing) throw Error('CONFLICT: 生成先にファイルが作られています。');
+        if (existing)
+          throw Error(
+            t(
+              'CONFLICT: 生成先にファイルが作られています。',
+              'CONFLICT: A file was created at the output location.',
+            ),
+          );
         const created = await fs.open(filename, 'wx');
         try {
           await created.writeFile(text);
@@ -446,7 +500,12 @@ export class FileService {
         }
       } else {
         if (!existing || (await currentHash()) !== expected)
-          throw Error('CONFLICT: 生成先のファイルが変更されています。');
+          throw Error(
+            t(
+              'CONFLICT: 生成先のファイルが変更されています。',
+              'CONFLICT: The output file has changed.',
+            ),
+          );
         const temp = path.join(parent, `.irori-save-${randomUUID()}.tmp`);
         try {
           const pending = await fs.open(temp, 'wx', existing.mode);
@@ -457,7 +516,12 @@ export class FileService {
             await pending.close();
           }
           if ((await currentHash()) !== expected)
-            throw Error('CONFLICT: 生成先のファイルが変更されています。');
+            throw Error(
+              t(
+                'CONFLICT: 生成先のファイルが変更されています。',
+                'CONFLICT: The output file has changed.',
+              ),
+            );
           await fs.rename(temp, filename);
         } finally {
           await fs.rm(temp, { force: true });
@@ -490,7 +554,10 @@ export class FileService {
         );
         if (!rewriting && references.links)
           throw Error(
-            '相対参照を含むノートを移動するには「リンクも更新する」を有効にしてください。',
+            t(
+              '相対参照を含むノートを移動するには「リンクも更新する」を有効にしてください。',
+              'To move a note with relative references, turn on "Also update links".',
+            ),
           );
       }
       await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
@@ -504,7 +571,12 @@ export class FileService {
           },
         )
       )
-        throw Error('移動先には既にファイルがあります。別の名前を指定してください。');
+        throw Error(
+          t(
+            '移動先には既にファイルがあります。別の名前を指定してください。',
+            'A file already exists at the destination. Choose another name.',
+          ),
+        );
       for (const asset of assets) {
         const oldRel = path.posix.join(from, asset);
         const newRel = path.posix.join(to, asset);
@@ -512,10 +584,10 @@ export class FileService {
         const oldFile = await this.resolve(ref.scopeId, oldRel);
         const stat = await fs.lstat(path.join(this.get(ref.scopeId).root, oldRel));
         if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 20 * 1024 * 1024)
-          throw Error('画像ファイルを確認してください。');
+          throw Error(t('画像ファイルを確認してください。', 'Check the image file.'));
         const bytes = await fs.readFile(oldFile);
         if (hash(bytes) !== path.posix.basename(asset).slice(6, 70))
-          throw Error('ノートの画像が変更されています。');
+          throw Error(t('ノートの画像が変更されています。', "The note's image has changed."));
         await this.noteDirectory(ref.scopeId, path.posix.dirname(newRel), true);
         const newFile = path.join(this.get(ref.scopeId).root, newRel);
         try {
@@ -528,7 +600,12 @@ export class FileService {
             existing.isSymbolicLink() ||
             hash(await fs.readFile(newFile)) !== hash(bytes)
           )
-            throw Error('移動先の画像と内容が一致しません。');
+            throw Error(
+              t(
+                '移動先の画像と内容が一致しません。',
+                'The image at the destination has different contents.',
+              ),
+            );
         }
       }
       await this.existingNote(ref);
@@ -544,7 +621,12 @@ export class FileService {
       }
       const latest = await this.existingNote(ref);
       if (latest.stat.ino !== source.stat.ino || hash(await fs.readFile(destination)) !== ref.hash)
-        throw Error('CONFLICT: 移動中にノートが変更されました。両方のファイルを確認してください。');
+        throw Error(
+          t(
+            'CONFLICT: 移動中にノートが変更されました。両方のファイルを確認してください。',
+            'CONFLICT: The note changed during the move. Check both files.',
+          ),
+        );
       await fs.unlink(source.filename);
       return this.read(ref.scopeId, destinationPath);
     });
@@ -555,7 +637,9 @@ export class FileService {
   }
   private async trashRecord(id: string) {
     if ((await fs.stat(this.trashPath(id))).size > 16 * 1024 * 1024)
-      throw Error('削除したノートの記録が大きすぎます。');
+      throw Error(
+        t('削除したノートの記録が大きすぎます。', 'The record of the deleted note is too large.'),
+      );
     const value = JSON.parse(await fs.readFile(this.trashPath(id), 'utf8'));
     const record = trashedNote
       .extend({
@@ -565,7 +649,12 @@ export class FileService {
       })
       .parse(value);
     if (record.id !== id || hash(record.text) !== record.hash)
-      throw Error('削除したノートの保存内容が一致しません。');
+      throw Error(
+        t(
+          '削除したノートの保存内容が一致しません。',
+          'The saved contents of the deleted note do not match.',
+        ),
+      );
     return record;
   }
   async trashNote(ref: NoteRef): Promise<TrashedNote> {
@@ -583,7 +672,9 @@ export class FileService {
       await writeLocalJson(this.trashPath(record.id), record);
       const latest = await this.existingNote(ref);
       if (latest.stat.ino !== source.stat.ino)
-        throw Error('CONFLICT: ノートが置き換えられています。');
+        throw Error(
+          t('CONFLICT: ノートが置き換えられています。', 'CONFLICT: The note has been replaced.'),
+        );
       await fs.unlink(source.filename);
       return trashedNote.parse(record);
     });
@@ -617,7 +708,7 @@ export class FileService {
         record.checkoutRootHash !== hash(this.get(scopeId).root) ||
         record.restored
       )
-        throw Error('復元するノートを確認してください。');
+        throw Error(t('復元するノートを確認してください。', 'Check the note to restore.'));
       const destination = this.noteLocation(scopeId, record.path);
       const directory = path.posix.dirname(record.path);
       await this.noteDirectory(scopeId, directory === '.' ? '' : directory, true);
@@ -635,8 +726,10 @@ export class FileService {
       } catch {
         return {
           ...doc,
-          notice:
+          notice: t(
             'ノートは復元しましたが、削除済み一覧の更新に失敗しました。このノートを再度復元する必要はありません。',
+            'The note was restored, but the list of deleted notes could not be updated. You do not need to restore this note again.',
+          ),
         };
       }
     });

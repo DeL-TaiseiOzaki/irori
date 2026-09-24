@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { webAddress } from './links';
+import { t } from './i18n';
 
 /**
  * Where a link written in a note points. The recommended knowledge base writes
@@ -34,40 +35,68 @@ function reject(reason: string): LinkTarget {
  */
 export function resolveNoteLink(from: string, href: string): LinkTarget {
   const raw = href.trim();
-  if (!raw) return reject('リンク先が空です。');
+  if (!raw) return reject(t('リンク先が空です。', 'The link has no destination.'));
   if (raw.startsWith('#')) return { kind: 'anchor' };
   if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
     const address = webAddress(raw);
     return address
       ? { kind: 'external', url: address.href }
-      : reject('http と https 以外のリンクは開けません。');
+      : reject(
+          t('http と https 以外のリンクは開けません。', 'Only http and https links can be opened.'),
+        );
   }
   // `//host/x` is an address without a scheme, not a path inside the KB.
-  if (raw.startsWith('//')) return reject('http と https 以外のリンクは開けません。');
-  if (raw.startsWith('/')) return reject('KB の外を指す絶対パスのリンクは開けません。');
-  if (raw.includes('\\')) return reject('リンク先のパスに使えない文字があります。');
+  if (raw.startsWith('//'))
+    return reject(
+      t('http と https 以外のリンクは開けません。', 'Only http and https links can be opened.'),
+    );
+  if (raw.startsWith('/'))
+    return reject(
+      t(
+        'KB の外を指す絶対パスのリンクは開けません。',
+        'Links with an absolute path outside the KB cannot be opened.',
+      ),
+    );
+  if (raw.includes('\\'))
+    return reject(
+      t(
+        'リンク先のパスに使えない文字があります。',
+        'The link path contains a character that is not allowed.',
+      ),
+    );
   const [withoutFragment] = raw.split('#');
   if (!withoutFragment) return { kind: 'anchor' };
   let target: string;
   try {
     target = decodeURIComponent(withoutFragment);
   } catch {
-    return reject('リンク先のパスを読み取れません。');
+    return reject(t('リンク先のパスを読み取れません。', 'The link path cannot be read.'));
   }
-  if (target.includes('\0')) return reject('リンク先のパスに使えない文字があります。');
+  if (target.includes('\0'))
+    return reject(
+      t(
+        'リンク先のパスに使えない文字があります。',
+        'The link path contains a character that is not allowed.',
+      ),
+    );
   const segments = from.split('/').slice(0, -1);
   for (const segment of target.split('/')) {
     if (!segment || segment === '.') continue;
     if (segment === '..') {
-      if (!segments.length) return reject('KB の外を指すリンクは開けません。');
+      if (!segments.length)
+        return reject(
+          t('KB の外を指すリンクは開けません。', 'Links pointing outside the KB cannot be opened.'),
+        );
       segments.pop();
       continue;
     }
     segments.push(segment);
   }
-  if (!segments.length) return reject('リンク先が KB のルートです。');
+  if (!segments.length)
+    return reject(t('リンク先が KB のルートです。', 'The link points to the root of the KB.'));
   // A trailing separator is a folder, which the editor has nothing to open.
-  if (/[/]\s*$/.test(target)) return reject('フォルダーへのリンクは開けません。');
+  if (/[/]\s*$/.test(target))
+    return reject(t('フォルダーへのリンクは開けません。', 'Links to folders cannot be opened.'));
   return { kind: 'internal', path: segments.join('/') };
 }
 

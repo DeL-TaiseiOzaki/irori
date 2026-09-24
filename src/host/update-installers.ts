@@ -4,6 +4,7 @@ import { access, mkdir, mkdtemp, rename, rm, rmdir, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { UpdateInstaller } from './updates';
+import { t } from '../domain/i18n';
 
 export interface Commands {
   run(
@@ -67,7 +68,10 @@ export class SquirrelInstaller implements UpdateInstaller {
       await access(this.updateExe);
       return undefined;
     } catch {
-      return 'インストーラーで導入した irori だけが、アプリ内で更新できます。インストーラーを取得してください。';
+      return t(
+        'インストーラーで導入した irori だけが、アプリ内で更新できます。インストーラーを取得してください。',
+        'Only irori installed with the installer can update in the app. Get the installer.',
+      );
     }
   }
 
@@ -82,12 +86,18 @@ export class SquirrelInstaller implements UpdateInstaller {
       `${sha1.toUpperCase()} ${path.basename(file)} ${size}`,
     );
     await step(
-      'Windows の更新処理を完了できませんでした。インストーラーを取得して更新してください。',
+      t(
+        'Windows の更新処理を完了できませんでした。インストーラーを取得して更新してください。',
+        'The Windows update could not finish. Get the installer to update.',
+      ),
       this.commands.run(this.updateExe, ['--update', feed], 15 * 60_000),
     );
     // Update.exe also succeeds when it finds nothing newer to apply.
     await step(
-      `更新後の irori ${version} が見つかりません。インストーラーを取得して更新してください。`,
+      t(
+        `更新後の irori ${version} が見つかりません。インストーラーを取得して更新してください。`,
+        `The updated irori ${version} was not found. Get the installer to update.`,
+      ),
       access(path.join(this.root, `app-${version}`, this.exeName)),
     );
   }
@@ -96,7 +106,10 @@ export class SquirrelInstaller implements UpdateInstaller {
     // As autoUpdater.quitAndInstall does: Update.exe waits for this process to exit, then
     // starts the newest installed version.
     await step(
-      '新しい版を起動する準備ができませんでした。',
+      t(
+        '新しい版を起動する準備ができませんでした。',
+        'Could not prepare to start the new version.',
+      ),
       this.commands.detach(this.updateExe, ['--processStartAndWait', this.exeName]),
     );
   }
@@ -136,16 +149,25 @@ export class BundleInstaller implements UpdateInstaller {
       path.extname(this.bundle) !== '.app' ||
       path.relative(this.bundle, this.execPath) !== path.join('Contents', 'MacOS', 'irori')
     )
-      return 'アプリのバンドルを特定できないため、アプリ内で更新できません。インストーラーを取得してください。';
+      return t(
+        'アプリのバンドルを特定できないため、アプリ内で更新できません。インストーラーを取得してください。',
+        'The app bundle could not be identified, so irori cannot update in the app. Get the installer.',
+      );
     // macOS runs a quarantined app that was never moved from a read-only, randomized path.
     if (this.bundle.includes('/AppTranslocation/'))
-      return 'irori を「アプリケーション」フォルダに移してから開くと、アプリ内で更新できます。';
+      return t(
+        'irori を「アプリケーション」フォルダに移してから開くと、アプリ内で更新できます。',
+        'Move irori to the Applications folder and open it there to update in the app.',
+      );
     try {
       await access(path.dirname(this.bundle), constants.W_OK);
       await access(this.bundle, constants.W_OK);
       return undefined;
     } catch {
-      return 'irori を置いているフォルダに書き込めないため、アプリ内で更新できません。インストーラーを取得してください。';
+      return t(
+        'irori を置いているフォルダに書き込めないため、アプリ内で更新できません。インストーラーを取得してください。',
+        'irori cannot write to the folder it is in, so it cannot update in the app. Get the installer.',
+      );
     }
   }
 
@@ -160,7 +182,7 @@ export class BundleInstaller implements UpdateInstaller {
     const mount = await mkdtemp(path.join(tmpdir(), 'irori-update-'));
     try {
       await step(
-        '更新のディスクイメージを開けませんでした。',
+        t('更新のディスクイメージを開けませんでした。', 'Could not open the update disk image.'),
         run('hdiutil', [
           'attach',
           file,
@@ -174,7 +196,10 @@ export class BundleInstaller implements UpdateInstaller {
       try {
         // ditto keeps the symlinks, permissions and extended attributes the seal covers.
         await step(
-          '更新のディスクイメージから irori を取り出せませんでした。',
+          t(
+            '更新のディスクイメージから irori を取り出せませんでした。',
+            'Could not copy irori out of the update disk image.',
+          ),
           run('ditto', [path.join(mount, 'irori.app'), this.staged]),
         );
       } finally {
@@ -185,17 +210,25 @@ export class BundleInstaller implements UpdateInstaller {
       await rmdir(mount).catch(() => {});
     }
     await step(
-      '新しい版の署名を確認できませんでした。',
+      t('新しい版の署名を確認できませんでした。', "Could not verify the new version's signature."),
       run('codesign', ['--verify', '--deep', '--strict', this.staged]),
     );
     const { stderr } = await step(
-      '新しい版の署名を確認できませんでした。',
+      t('新しい版の署名を確認できませんでした。', "Could not verify the new version's signature."),
       run('codesign', ['--display', '--verbose=2', this.staged]),
     );
     if (!/^Identifier=io\.github\.deltaiseiozaki\.irori$/m.test(stderr))
-      throw Error('更新のディスクイメージにあるアプリが irori ではありません。');
+      throw Error(
+        t(
+          '更新のディスクイメージにあるアプリが irori ではありません。',
+          'The app in the update disk image is not irori.',
+        ),
+      );
     const { stdout } = await step(
-      '新しい版のバージョンを確認できませんでした。',
+      t(
+        '新しい版のバージョンを確認できませんでした。',
+        "Could not check the new version's version number.",
+      ),
       run('plutil', [
         '-extract',
         'CFBundleShortVersionString',
@@ -206,7 +239,12 @@ export class BundleInstaller implements UpdateInstaller {
       ]),
     );
     if (stdout.trim() !== version)
-      throw Error(`ディスクイメージの irori ${stdout.trim()} が公開版 ${version} と一致しません。`);
+      throw Error(
+        t(
+          `ディスクイメージの irori ${stdout.trim()} が公開版 ${version} と一致しません。`,
+          `irori ${stdout.trim()} in the disk image does not match the published version ${version}.`,
+        ),
+      );
   }
 
   async restart() {
@@ -236,7 +274,12 @@ export class BundleInstaller implements UpdateInstaller {
       // Nothing would start the new version, so the running one goes back in place.
       await rename(this.bundle, this.staged).catch(() => {});
       await rename(previous, this.bundle).catch(() => {});
-      throw Error('新しい版を起動する準備ができませんでした。');
+      throw Error(
+        t(
+          '新しい版を起動する準備ができませんでした。',
+          'Could not prepare to start the new version.',
+        ),
+      );
     }
   }
 }
@@ -245,8 +288,14 @@ function refused(error: unknown) {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
   // App Management refuses an app that modifies another app's bundle with EPERM.
   if (code === 'EPERM')
-    return 'macOS が irori の置き換えを許可しませんでした。「システム設定」→「プライバシーとセキュリティ」→「アプリ管理」で irori を許可してから再試行するか、インストーラーを取得してください。';
-  return `irori を置き換えられませんでした（${code ?? 'unknown'}）。インストーラーを取得してください。`;
+    return t(
+      'macOS が irori の置き換えを許可しませんでした。「システム設定」→「プライバシーとセキュリティ」→「アプリ管理」で irori を許可してから再試行するか、インストーラーを取得してください。',
+      'macOS did not allow irori to be replaced. Allow irori in System Settings > Privacy & Security > App Management and try again, or get the installer.',
+    );
+  return t(
+    `irori を置き換えられませんでした（${code ?? 'unknown'}）。インストーラーを取得してください。`,
+    `Could not replace irori (${code ?? 'unknown'}). Get the installer.`,
+  );
 }
 
 /** The installer for the platform a packaged irori runs on, if it can replace itself there. */

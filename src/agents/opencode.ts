@@ -6,6 +6,7 @@ import { boundedResponse } from '../host/http';
 import type { OpencodeClient, Event, PermissionRuleset } from '@opencode-ai/sdk/v2/client';
 import { agentEnv, launch } from './process';
 import type { NativeContext } from './adapter';
+import { t } from '../domain/i18n';
 
 // A fresh authenticated native server per run; never attach to an arbitrary existing server.
 export class OpenCodeServer {
@@ -35,7 +36,12 @@ export class OpenCodeServer {
     await new Promise<void>((resolve, reject) => {
       let buffer = '';
       const timeout = setTimeout(
-        () => done(Error('OpenCodeの起動がタイムアウトしました。')),
+        () =>
+          done(
+            Error(
+              t('OpenCodeの起動がタイムアウトしました。', 'OpenCode timed out while starting.'),
+            ),
+          ),
         15000,
       );
       const abort = () => done(Error('OpenCode server stopped'));
@@ -87,7 +93,10 @@ export class OpenCodeServer {
     if (!response.ok) {
       await response.body?.cancel();
       throw Error(
-        `OpenCode操作に失敗しました（HTTP ${response.status}）。ネイティブ設定・ログイン・バージョンを確認してください。`,
+        t(
+          `OpenCode操作に失敗しました（HTTP ${response.status}）。ネイティブ設定・ログイン・バージョンを確認してください。`,
+          `The OpenCode operation failed (HTTP ${response.status}). Check its native settings, sign-in and version.`,
+        ),
       );
     }
     return response;
@@ -164,7 +173,13 @@ export async function runOpenCode(ctx: NativeContext) {
     if (requests.has(p.id)) return;
     requests.add(p.id);
     if (event.type === 'permission.asked') {
-      const reply = await ctx.ask(`${String(event.properties.permission)} の許可`, p);
+      const reply = await ctx.ask(
+        t(
+          `${String(event.properties.permission)} の許可`,
+          `Allow ${String(event.properties.permission)}`,
+        ),
+        p,
+      );
       if (!server.signal.aborted)
         await data(
           server.client.permission.reply({
@@ -176,7 +191,13 @@ export async function runOpenCode(ctx: NativeContext) {
       const p = event.properties;
       if (!Array.isArray(p.questions)) {
         await data(server.client.question.reject({ requestID: p.id }));
-        ctx.event('error', 'OpenCodeの質問形式を読み取れません。要求を拒否しました。');
+        ctx.event(
+          'error',
+          t(
+            'OpenCodeの質問形式を読み取れません。要求を拒否しました。',
+            "Could not read OpenCode's question format. The request was declined.",
+          ),
+        );
         return;
       }
       const questions = p.questions.map((q, i) => ({
@@ -185,7 +206,7 @@ export async function runOpenCode(ctx: NativeContext) {
         options: q.options?.map((o) => String(o.label)),
         multiple: q.multiple === true,
       }));
-      const reply = await ctx.ask('OpenCode からの質問', p, questions);
+      const reply = await ctx.ask(t('OpenCode からの質問', 'Question from OpenCode'), p, questions);
       if (!server.signal.aborted) {
         if (reply.allow)
           await data(
@@ -224,7 +245,10 @@ export async function runOpenCode(ctx: NativeContext) {
         session = await data(server.client.session.update({ sessionID: session.id, permission }));
       if (!confirmed())
         throw Error(
-          'OpenCodeが選択したアクセス設定を確認できません。更新またはCLIの設定を選んでください。',
+          t(
+            'OpenCodeが選択したアクセス設定を確認できません。更新またはCLIの設定を選んでください。',
+            "Could not confirm that OpenCode applied the selected access setting. Update it or choose the CLI's settings.",
+          ),
         );
     }
     sessionId = session.id;

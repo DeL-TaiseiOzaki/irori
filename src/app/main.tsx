@@ -22,6 +22,7 @@ import {
 } from './device-settings';
 import { Appearance } from './Appearance';
 import { useLanguage } from './useLanguage';
+import { t } from '../domain/i18n';
 import { CloudRecovery } from './CloudRecovery';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { MagnetTabs } from './obsidian/MagnetTabs';
@@ -158,12 +159,16 @@ function Request({
     }
   }
   if (done || ended)
-    return <div className="request resolved">{done ? '回答済み' : '要求は終了しました'}</div>;
+    return (
+      <div className="request resolved">
+        {done ? t('回答済み', 'Answered') : t('要求は終了しました', 'The request has ended')}
+      </div>
+    );
   return (
     <div className="request">
       <strong>{event.text}</strong>
       <details>
-        <summary>操作の詳細</summary>
+        <summary>{t('操作の詳細', 'Operation details')}</summary>
         <pre>{event.details}</pre>
       </details>
       {event.questions?.map((q) => (
@@ -204,7 +209,7 @@ function Request({
           {q.multiple ? (
             <textarea
               aria-label={q.title}
-              placeholder="複数の回答は1行ずつ入力"
+              placeholder={t('複数の回答は1行ずつ入力', 'Enter multiple answers, one per line')}
               value={
                 Array.isArray(answers[q.id])
                   ? (answers[q.id] as string[]).join('\n')
@@ -222,9 +227,9 @@ function Request({
         </fieldset>
       ))}
       <div className="actions">
-        <button onClick={() => void reply(false)}>拒否</button>
+        <button onClick={() => void reply(false)}>{t('拒否', 'Deny')}</button>
         <button className="primary" onClick={() => void reply(true)}>
-          {event.questions ? '回答する' : '今回のみ許可'}
+          {event.questions ? t('回答する', 'Answer') : t('今回のみ許可', 'Allow this time')}
         </button>
       </div>
     </div>
@@ -277,22 +282,31 @@ function SessionControls({
     <div className="session-controls">
       <small role="status">
         {!session
-          ? '会話の状態を確認中…'
+          ? t('会話の状態を確認中…', 'Checking the conversation state…')
           : session.state === 'saved'
             ? (session.access ?? 'default') === access
-              ? '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。'
-              : 'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。'
+              ? t(
+                  '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。',
+                  'The next run continues the previous conversation. History is saved on this device.',
+                )
+              : t(
+                  'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。',
+                  'Because the access setting changed, the next run starts a new conversation. The displayed history remains.',
+                )
             : session.state === 'empty'
-              ? '次の実行で新しい会話を始めます。'
+              ? t('次の実行で新しい会話を始めます。', 'The next run starts a new conversation.')
               : session.detail}
       </small>
       {session && session.state !== 'empty' && (
         <>
           <button disabled={running || resetting} onClick={() => void reset()}>
-            会話の継続をリセット
+            {t('会話の継続をリセット', 'Reset conversation continuation')}
           </button>
           <small>
-            このスペース・エージェントの継続を解除します。ノートと保存した履歴は残ります。
+            {t(
+              'このスペース・エージェントの継続を解除します。ノートと保存した履歴は残ります。',
+              'This clears continuation for this space and agent. Notes and saved history remain.',
+            )}
           </small>
         </>
       )}
@@ -302,9 +316,20 @@ function SessionControls({
 /** A backlink points at a link on the line, a search hit at matching text; the notice says which. */
 type Navigation = SearchTarget & { link?: boolean };
 function navigationNotice(target: Navigation, found: boolean) {
-  const what = target.link ? 'リンク' : '一致箇所';
-  if (found) return `${target.line} 行目の${what}を選択しました。`;
-  return `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'}`;
+  const what = t(target.link ? 'リンク' : '一致箇所', target.link ? 'link' : 'matching text');
+  if (found)
+    return t(
+      `${target.line} 行目の${what}を選択しました。`,
+      `Selected the ${what} on line ${target.line}.`,
+    );
+  return t(
+    `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${
+      target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'
+    }`,
+    `Could not safely locate the ${what}. The file may have changed, or it may contain Markdown syntax that isn’t shown. ${
+      target.link ? `Check line ${target.line}.` : 'Search again to check.'
+    }`,
+  );
 }
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
@@ -508,8 +533,16 @@ function App() {
       // The note stays open, so the answer belongs beside it rather than in the
       // status line the window shows only when nothing is open.
       else if (target.kind === 'missing')
-        setSearchNotice(`リンク先のファイルがまだありません: ${target.path}`);
-      else if (target.kind === 'anchor') setSearchNotice('このノート内の見出しへのリンクです。');
+        setSearchNotice(
+          t(
+            `リンク先のファイルがまだありません: ${target.path}`,
+            `The linked file doesn’t exist yet: ${target.path}`,
+          ),
+        );
+      else if (target.kind === 'anchor')
+        setSearchNotice(
+          t('このノート内の見出しへのリンクです。', 'This links to a heading in this note.'),
+        );
       else setSearchNotice(target.reason);
     } catch (error) {
       report(error);
@@ -531,7 +564,11 @@ function App() {
           : 'source',
     );
     setEditorKey((k) => k + 1);
-    setStatus(next.readOnly ? 'クラウド資料・読み取り専用' : 'この端末に保存済み');
+    setStatus(
+      next.readOnly
+        ? t('クラウド資料・読み取り専用', 'Cloud material · Read-only')
+        : t('この端末に保存済み', 'Saved on this device'),
+    );
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -638,7 +675,7 @@ function App() {
           current.current = { ...current.current, doc: saved, buffer: latest };
           setDoc(saved);
           setBuffer(latest);
-          setStatus('この端末に保存済み');
+          setStatus(t('この端末に保存済み', 'Saved on this device'));
         }
         return true;
       } catch (e) {
@@ -694,7 +731,12 @@ function App() {
       }
       if (!(await save())) return false;
       if ((sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
-        setError('送信待ちを完了してからスペースを切り替えてください。');
+        setError(
+          t(
+            '送信待ちを完了してからスペースを切り替えてください。',
+            'Finish the pending send before switching spaces.',
+          ),
+        );
         return false;
       }
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
@@ -767,7 +809,10 @@ function App() {
       }
       if (!(await composer.clear(draftRevision)))
         report(
-          '指示は受け付けられましたが、入力欄の下書きを消去できませんでした。再送信せず、保存を再試行してください。',
+          t(
+            '指示は受け付けられましたが、入力欄の下書きを消去できませんでした。再送信せず、保存を再試行してください。',
+            'The instruction was accepted, but the composer draft could not be cleared. Do not resend; retry saving instead.',
+          ),
         );
       setFresh(false);
     } catch (e) {
@@ -849,7 +894,12 @@ function App() {
         })) {
           if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
             await host.connectCloud(id, connection.mountId).catch(() => {
-              setStatus('接続できないクラウドがあります。「クラウド接続」で確認できます。');
+              setStatus(
+                t(
+                  '接続できないクラウドがあります。「クラウド接続」で確認できます。',
+                  'A cloud could not connect. Check it from "Cloud connection".',
+                ),
+              );
             });
           }
         }
@@ -919,7 +969,7 @@ function App() {
       className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}
     >
       <a className="skip-to-editor" href="#editor-main">
-        編集領域へ移動
+        {t('編集領域へ移動', 'Skip to editor')}
       </a>
       <PaneGroup
         className="workspace-panes"
@@ -941,7 +991,12 @@ function App() {
               disabled={dirty || running || connecting || !!terminalSpace || gitBusy}
               onClick={() => {
                 if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-                  report('未保存のノートを保存してから移動してください。');
+                  report(
+                    t(
+                      '未保存のノートを保存してから移動してください。',
+                      'Save the unsaved note before moving.',
+                    ),
+                  );
                   return;
                 }
                 void flushDrafts()
@@ -951,14 +1006,14 @@ function App() {
             >
               <Icon name="grid" />
               <span>
-                <small>ワークスペース</small>
-                {workspace?.name ?? 'ワークスペース'}
+                <small>{t('ワークスペース', 'Workspace')}</small>
+                {workspace?.name ?? t('ワークスペース', 'Workspace')}
               </span>
               <Icon name="chevron" className="rotated" size={13} />
             </button>
             <MagnetTabs
               className="workspace-views"
-              label="ワークスペースの表示"
+              label={t('ワークスペースの表示', 'Workspace view')}
               value={gitOpen ? 'source-control' : 'notes'}
               onValueChange={(selected) => {
                 if (selected === 'notes') {
@@ -975,7 +1030,7 @@ function App() {
                   value: 'notes',
                   label: (
                     <>
-                      <Icon name="folder" /> ノート
+                      <Icon name="folder" /> {t('ノート', 'Notes')}
                     </>
                   ),
                   disabled: gitBusy,
@@ -984,7 +1039,7 @@ function App() {
                   value: 'source-control',
                   label: (
                     <>
-                      <Icon name="branch" /> ソース管理
+                      <Icon name="branch" /> {t('ソース管理', 'Source control')}
                     </>
                   ),
                   disabled:
@@ -1002,7 +1057,12 @@ function App() {
                 revision={revision}
                 beforeAction={async () => {
                   if (running || sending || queued.length > 0 || connecting) {
-                    report('実行が終わってから Git を操作してください。');
+                    report(
+                      t(
+                        '実行が終わってから Git を操作してください。',
+                        'Operate Git after the run finishes.',
+                      ),
+                    );
                     return false;
                   }
                   return save();
@@ -1025,7 +1085,7 @@ function App() {
                 }
                 onClick={() => setSearchOpen(true)}
               >
-                <Icon name="search" /> KB内を検索
+                <Icon name="search" /> {t('KB内を検索', 'Search in KB')}
               </button>
               <LayerExplorer
                 spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
@@ -1057,7 +1117,10 @@ function App() {
                 onRefresh={() => setRevision((value) => value + 1)}
                 drive={
                   cloudRoot && (
-                    <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
+                    <section
+                      className="workspace-drive"
+                      aria-label={t('ワークスペースの Google Drive', 'Workspace’s Google Drive')}
+                    >
                       <div className="scope-heading">
                         <strong>
                           <Icon name="cloud" size={14} /> Google Drive
@@ -1066,9 +1129,9 @@ function App() {
                           className="scope-action"
                           disabled={dirty || running || connecting}
                           onClick={() => showConnections(cloudRoot)}
-                          aria-label="Drive フォルダを接続"
+                          aria-label={t('Drive フォルダを接続', 'Connect a Drive folder')}
                         >
-                          接続
+                          {t('接続', 'Connect')}
                         </button>
                       </div>
                       <Tree
@@ -1091,7 +1154,7 @@ function App() {
                   disabled={running || sending || gitBusy || connecting}
                   onClick={openDaily}
                 >
-                  今日のノート
+                  {t('今日のノート', "Today's note")}
                 </button>
               )}
               {active && (
@@ -1104,7 +1167,7 @@ function App() {
                     });
                   }}
                 >
-                  削除したノートを復元
+                  {t('削除したノートを復元', 'Restore deleted notes')}
                 </button>
               )}
               <button
@@ -1112,21 +1175,23 @@ function App() {
                 disabled={running || dirty || connecting}
                 onClick={() => setAdd(true)}
               >
-                <Icon name="plus" /> スペースを追加
+                <Icon name="plus" /> {t('スペースを追加', 'Add space')}
               </button>
             </div>
           </aside>
         </Pane>
-        <PaneSeparator className="pane-handle" aria-label="サイドバーの幅" />
+        <PaneSeparator className="pane-handle" aria-label={t('サイドバーの幅', 'Sidebar width')} />
         <Pane id="workspace" className="workspace-pane" minSize={360}>
           <main id="editor-main" tabIndex={-1}>
             <header>
               <div className="document-location" title={doc?.path}>
                 <span className="muted">
-                  {doc?.workspaceId ? `${workspace?.name} · Drive` : (active?.name ?? 'ようこそ')}
+                  {doc?.workspaceId
+                    ? `${workspace?.name} · Drive`
+                    : (active?.name ?? t('ようこそ', 'Welcome'))}
                 </span>
                 <Icon name="chevron" size={12} />
-                <strong>{doc?.path.split('/').at(-1) ?? 'ノートを選択'}</strong>
+                <strong>{doc?.path.split('/').at(-1) ?? t('ノートを選択', 'Select a note')}</strong>
               </div>
               <div className="actions">
                 {cloudRoot && (
@@ -1134,7 +1199,7 @@ function App() {
                     disabled={running || dirty || connecting || gitBusy}
                     onClick={() => showConnections(cloudRoot)}
                   >
-                    <Icon name="cloud" /> クラウド接続
+                    <Icon name="cloud" /> {t('クラウド接続', 'Cloud connection')}
                   </button>
                 )}
                 {active && (
@@ -1142,10 +1207,10 @@ function App() {
                     disabled={running || dirty || connecting || gitBusy}
                     onClick={() => setOntologyOpen(true)}
                   >
-                    オントロジー
+                    {t('オントロジー', 'Ontology')}
                   </button>
                 )}
-                {connecting && <small>接続を準備中…</small>}
+                {connecting && <small>{t('接続を準備中…', 'Preparing connection…')}</small>}
                 {active && (
                   <button
                     disabled={connecting || gitBusy}
@@ -1155,16 +1220,17 @@ function App() {
                       });
                     }}
                   >
-                    <Icon name="plus" /> ノートを作成
+                    <Icon name="plus" /> {t('ノートを作成', 'Create note')}
                   </button>
                 )}
                 {doc && (
                   <>
                     <button disabled={gitBusy} onClick={() => void reconcile()}>
-                      再読み込み
+                      {t('再読み込み', 'Reload')}
                     </button>
                     <button disabled={!dirty || !!external} onClick={() => void save()}>
-                      保存{dirty ? ' •' : ''}
+                      {t('保存', 'Save')}
+                      {dirty ? ' •' : ''}
                     </button>
                   </>
                 )}
@@ -1177,36 +1243,58 @@ function App() {
             )}
             {personLineCount > 0 && (
               <p className="hint authorship" role="status">
-                人が書いた・直した行: {personLineCount} 行。
-                {mode === 'source' ? '左端の印が該当行です。' : 'ソース表示で行ごとに示します。'}
+                {t(
+                  `人が書いた・直した行: ${personLineCount} 行。`,
+                  `Lines a person wrote or edited: ${personLineCount}.`,
+                )}
+                {mode === 'source'
+                  ? t('左端の印が該当行です。', 'The mark on the left edge shows those lines.')
+                  : t(
+                      'ソース表示で行ごとに示します。',
+                      'Switch to source view to see them line by line.',
+                    )}
               </p>
             )}
             {error && (
               <div className="error" role="alert">
                 {error}
-                <button onClick={() => setError('')}>閉じる</button>
+                <button onClick={() => setError('')}>{t('閉じる', 'Close')}</button>
               </div>
             )}
             {external && (
               <div className="conflict" role="alert">
-                <strong>外部でノートが変更されました。未保存の編集を保持しています。</strong>
+                <strong>
+                  {t(
+                    '外部でノートが変更されました。未保存の編集を保持しています。',
+                    'The note changed outside irori. Your unsaved edits are kept.',
+                  )}
+                </strong>
                 <div className="versions">
                   <label>
-                    あなたの編集<pre>{buffer}</pre>
+                    {t('あなたの編集', 'Your edit')}
+                    <pre>{buffer}</pre>
                   </label>
                   <label>
-                    ディスク上の最新版<pre>{external.text}</pre>
+                    {t('ディスク上の最新版', 'Latest version on disk')}
+                    <pre>{external.text}</pre>
                   </label>
                 </div>
-                <button onClick={() => load(external)}>ディスク版を表示（下書きは保持）</button>
+                <button onClick={() => load(external)}>
+                  {t('ディスク版を表示（下書きは保持）', 'Show the disk version (keep draft)')}
+                </button>
                 <button
                   onClick={() => {
                     setDoc(external);
                     setExternal(undefined);
-                    setStatus('最新版を基準に、編集内容を確認して保存してください');
+                    setStatus(
+                      t(
+                        '最新版を基準に、編集内容を確認して保存してください',
+                        'Review your edit against the latest version and save',
+                      ),
+                    );
                   }}
                 >
-                  編集を維持して手動で統合
+                  {t('編集を維持して手動で統合', 'Keep the edit and merge manually')}
                 </button>
               </div>
             )}
@@ -1222,7 +1310,7 @@ function App() {
                   {doc ? (
                     <>
                       <div className="doc-toolbar">
-                        <span>{dirty ? '保存待ち' : status}</span>
+                        <span>{dirty ? t('保存待ち', 'Pending save') : status}</span>
                         <div className="actions">
                           {!doc.readOnly &&
                             /\.md$/i.test(doc.path) &&
@@ -1242,7 +1330,10 @@ function App() {
                                 beforeChange={async () => {
                                   if (running || sending || queued.length || gitBusy || connecting)
                                     throw Error(
-                                      '実行・Git 操作・接続が完了してからノートを整理してください。',
+                                      t(
+                                        '実行・Git 操作・接続が完了してからノートを整理してください。',
+                                        'Organize notes after the run, Git operation, and connection finish.',
+                                      ),
                                     );
                                   if (!(await save())) return null;
                                   return current.current.doc ?? null;
@@ -1280,8 +1371,11 @@ function App() {
                                   setStatus(
                                     notice ??
                                       (next
-                                        ? 'ノートの場所を変更しました。'
-                                        : 'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。'),
+                                        ? t('ノートの場所を変更しました。', 'The note has moved.')
+                                        : t(
+                                            'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。',
+                                            'The note is kept for restoring. Bring it back from "Restore deleted notes".',
+                                          )),
                                   );
                                 }}
                               />
@@ -1303,7 +1397,7 @@ function App() {
                               });
                             }}
                           >
-                            参照に追加
+                            {t('参照に追加', 'Add as reference')}
                           </button>
                           {active && (
                             <button
@@ -1313,14 +1407,14 @@ function App() {
                                 });
                               }}
                             >
-                              資料と成果物
+                              {t('資料と成果物', 'Materials and outputs')}
                             </button>
                           )}
                           {!doc.workspaceId && (
                             <button
                               onClick={() => setBacklinks({ scopeId: doc.scopeId, path: doc.path })}
                             >
-                              リンク元
+                              {t('リンク元', 'Backlinks')}
                             </button>
                           )}
                         </div>
@@ -1334,7 +1428,7 @@ function App() {
                                 setEditorKey((key) => key + 1);
                               }}
                             >
-                              表
+                              {t('表', 'Table')}
                             </button>
                           )}
                           {!/\.md$/i.test(doc.path) && (
@@ -1346,15 +1440,18 @@ function App() {
                                 setEditorKey((k) => k + 1);
                               }}
                             >
-                              ソース
+                              {t('ソース', 'Source')}
                             </button>
                           )}
                           {mode !== 'table' && (
                             <button
                               className={editorAssistance ? 'selected' : ''}
-                              aria-label="コード支援"
+                              aria-label={t('コード支援', 'Code assistance')}
                               aria-pressed={editorAssistance}
-                              title="色分け・行番号・折りたたみ・補完などの表示をまとめて切り替えます"
+                              title={t(
+                                '色分け・行番号・折りたたみ・補完などの表示をまとめて切り替えます',
+                                'Toggles syntax highlighting, line numbers, folding, and completion together',
+                              )}
                               disabled={savingAssistance}
                               onClick={() => {
                                 const previous = editorAssistance;
@@ -1369,14 +1466,14 @@ function App() {
                                   .finally(() => setSavingAssistance(false));
                               }}
                             >
-                              コード支援 {editorAssistance ? 'ON' : 'OFF'}
+                              {t('コード支援', 'Code assistance')} {editorAssistance ? 'ON' : 'OFF'}
                             </button>
                           )}
                         </div>
                       </div>
                       {doc.draft && doc.draft.text !== doc.text && (
                         <div className="hint">
-                          復元できる下書きがあります。
+                          {t('復元できる下書きがあります。', 'A recoverable draft is available.')}
                           <button
                             onClick={() => {
                               setBuffer(doc.draft!.text);
@@ -1385,7 +1482,7 @@ function App() {
                               if (doc.draft!.baseHash !== doc.hash) setExternal(doc);
                             }}
                           >
-                            下書きを復元
+                            {t('下書きを復元', 'Restore draft')}
                           </button>
                         </div>
                       )}
@@ -1395,7 +1492,13 @@ function App() {
                             {searchNotice}
                           </p>
                         )}
-                        <Suspense fallback={<p className="hint">エディタを開いています…</p>}>
+                        <Suspense
+                          fallback={
+                            <p className="hint">
+                              {t('エディタを開いています…', 'Opening the editor…')}
+                            </p>
+                          }
+                        >
                           {mode === 'table' ? (
                             <CsvPreview key={editorKey} text={buffer} />
                           ) : (
@@ -1432,11 +1535,19 @@ function App() {
                   ) : (
                     <div className="welcome">
                       <img className="welcome-mark" src={appIcon} alt="" width="80" height="80" />
-                      <h1>ここから、考えを広げよう。</h1>
+                      <h1>
+                        {t('ここから、考えを広げよう。', "Let's expand your thinking from here.")}
+                      </h1>
                       <p>
-                        左のナレッジからノートを開くと、編集を始められます。
+                        {t(
+                          '左のナレッジからノートを開くと、編集を始められます。',
+                          'Open a note from the Knowledge on the left to start editing.',
+                        )}
                         <br />
-                        新しいノートを作ったり、AIと一緒に整理することもできます。
+                        {t(
+                          '新しいノートを作ったり、AIと一緒に整理することもできます。',
+                          'You can also create a new note or organize it together with AI.',
+                        )}
                       </p>
                       <div className="welcome-actions">
                         <ArrowFillButton
@@ -1446,29 +1557,43 @@ function App() {
                             setNewNote(true);
                           }}
                         >
-                          新しいノートを作成
+                          {t('新しいノートを作成', 'Create a new note')}
                         </ArrowFillButton>
                         {notesDeclared?.daily && (
                           <button disabled={!active || running || connecting} onClick={openDaily}>
                             <Icon name="plus" />
-                            今日のノート
+                            {t('今日のノート', "Today's note")}
                           </button>
                         )}
                         <button onClick={() => setAdd(true)}>
                           <Icon name="folder" />
-                          KBフォルダを開く
+                          {t('KBフォルダを開く', 'Open a KB folder')}
                         </button>
                       </div>
-                      <p className="hint">Markdown ファイルは、あなたのフォルダに保存されます。</p>
+                      <p className="hint">
+                        {t(
+                          'Markdown ファイルは、あなたのフォルダに保存されます。',
+                          'Markdown files are saved to your folder.',
+                        )}
+                      </p>
                     </div>
                   )}
                 </div>
               </Pane>
               {terminalSpace && (
                 <>
-                  <PaneSeparator className="pane-handle" aria-label="ターミナルの高さ" />
+                  <PaneSeparator
+                    className="pane-handle"
+                    aria-label={t('ターミナルの高さ', 'Terminal height')}
+                  />
                   <Pane id="terminal" className="terminal-pane" defaultSize={300} minSize={120}>
-                    <Suspense fallback={<p className="hint">ターミナルを開いています…</p>}>
+                    <Suspense
+                      fallback={
+                        <p className="hint">
+                          {t('ターミナルを開いています…', 'Opening the terminal…')}
+                        </p>
+                      }
+                    >
                       <TerminalPanel
                         space={terminalSpace}
                         onClose={() => setTerminalSpace(undefined)}
@@ -1479,23 +1604,32 @@ function App() {
               )}
             </PaneGroup>
             <footer>
-              <span role="status">{status || (active ? `${active.name}で作業中` : '')}</span>
+              <span role="status">
+                {status || (active ? t(`${active.name}で作業中`, `Working in ${active.name}`) : '')}
+              </span>
               <button
                 disabled={!active && !terminalSpace}
                 aria-expanded={!!terminalSpace}
                 onClick={() => setTerminalSpace((value) => (value ? undefined : active))}
               >
-                <Icon name="terminal" /> {terminalSpace ? 'ターミナルを終了' : 'ターミナル'}
+                <Icon name="terminal" />{' '}
+                {terminalSpace
+                  ? t('ターミナルを終了', 'End terminal')
+                  : t('ターミナル', 'Terminal')}
               </button>
               <button className="consult" onClick={() => setPanel((p) => !p)}>
-                <Icon name="sparkles" /> {panel ? 'AIパネルを閉じる' : 'AIに相談'}
+                <Icon name="sparkles" />{' '}
+                {panel ? t('AIパネルを閉じる', 'Close AI panel') : t('AIに相談', 'Ask AI')}
               </button>
             </footer>
           </main>
         </Pane>
         {panel && (
           <>
-            <PaneSeparator className="pane-handle" aria-label="AIパネルの幅" />
+            <PaneSeparator
+              className="pane-handle"
+              aria-label={t('AIパネルの幅', 'AI panel width')}
+            />
             <Pane
               id="assistant"
               className="assistant-pane"
@@ -1507,12 +1641,15 @@ function App() {
                 <div className="agent-heading">
                   <h2>
                     <Icon name="sparkles" />
-                    AIに相談
+                    {t('AIに相談', 'Ask AI')}
                   </h2>
                   <div className="actions">
                     <button
-                      aria-label="新しい会話"
-                      title="次の送信から新しい会話"
+                      aria-label={t('新しい会話', 'New conversation')}
+                      title={t(
+                        '次の送信から新しい会話',
+                        'Starts a new conversation from the next send',
+                      )}
                       aria-pressed={fresh}
                       disabled={running || sending || queued.length > 0}
                       onClick={() => {
@@ -1525,8 +1662,8 @@ function App() {
                     <Popover.Root>
                       <Popover.Trigger
                         className="agent-settings"
-                        aria-label="会話と接続の設定"
-                        title="会話と接続の設定"
+                        aria-label={t('会話と接続の設定', 'Conversation and connection settings')}
+                        title={t('会話と接続の設定', 'Conversation and connection settings')}
                       >
                         •••
                       </Popover.Trigger>
@@ -1539,21 +1676,31 @@ function App() {
                             initialFocus={(interaction) => interaction === 'keyboard'}
                           >
                             <div className="agent-settings-heading">
-                              <Popover.Title render={<strong />}>会話と接続</Popover.Title>
-                              <Popover.Close aria-label="会話の設定を閉じる">
+                              <Popover.Title render={<strong />}>
+                                {t('会話と接続', 'Conversation and connection')}
+                              </Popover.Title>
+                              <Popover.Close
+                                aria-label={t('会話の設定を閉じる', 'Close conversation settings')}
+                              >
                                 <Icon name="close" />
                               </Popover.Close>
                             </div>
                             <p>
                               {agentNames[agent]}{' '}
                               <span>
-                                {infos.find((i) => i.id === agent)?.version || 'CLIを確認中'}
+                                {infos.find((i) => i.id === agent)?.version ||
+                                  t('CLIを確認中', 'Checking the CLI')}
                               </span>
                             </p>
                             <p>{infos.find((i) => i.id === agent)?.detail}</p>
                             {infos.find((i) => i.id === agent)?.available &&
                               infos.find((i) => i.id === agent)?.tested === false && (
-                                <p>このCLIバージョンは未検証です。</p>
+                                <p>
+                                  {t(
+                                    'このCLIバージョンは未検証です。',
+                                    'This CLI version is untested.',
+                                  )}
+                                </p>
                               )}
                             {active && (
                               <SessionControls
@@ -1576,27 +1723,39 @@ function App() {
                         </Popover.Positioner>
                       </Popover.Portal>
                     </Popover.Root>
-                    <button aria-label="AIパネルを閉じる" onClick={() => setPanel(false)}>
+                    <button
+                      aria-label={t('AIパネルを閉じる', 'Close AI panel')}
+                      onClick={() => setPanel(false)}
+                    >
                       <Icon name="close" />
                     </button>
                   </div>
                 </div>
                 {infos.find((i) => i.id === agent)?.available === false && (
                   <p className="agent-connection-error" role="alert">
-                    CLI が見つかりません。インストールとネイティブログインを確認してください。
+                    {t(
+                      'CLI が見つかりません。インストールとネイティブログインを確認してください。',
+                      'The CLI was not found. Check the installation and native login.',
+                    )}
                   </p>
                 )}
                 {!conversationReady && (
                   <div className="hint" role="status">
-                    {conversationError || '保存した会話を読み込んでいます…'}
+                    {conversationError ||
+                      t('保存した会話を読み込んでいます…', 'Loading the saved conversation…')}
                     {conversationError && (
-                      <button onClick={() => setHistoryReload((value) => value + 1)}>再試行</button>
+                      <button onClick={() => setHistoryReload((value) => value + 1)}>
+                        {t('再試行', 'Retry')}
+                      </button>
                     )}
                   </div>
                 )}
                 {historyTruncated && (
                   <div className="hint">
-                    保存上限により、古い履歴や長い出力の一部を省略しています。
+                    {t(
+                      '保存上限により、古い履歴や長い出力の一部を省略しています。',
+                      'Older history and part of long output are omitted due to the save limit.',
+                    )}
                   </div>
                 )}
                 <div
@@ -1611,25 +1770,29 @@ function App() {
                 >
                   {events.length === 0 && (
                     <div className="agent-empty">
-                      <p>ノートについて相談する</p>
+                      <p>{t('ノートについて相談する', 'Ask about the note')}</p>
                       <div className="prompt-suggestions">
-                        {['このノートの要点をまとめて', 'この内容から次のアクションを整理して'].map(
-                          (suggestion) => (
-                            <button
-                              key={suggestion}
-                              disabled={!doc || running}
-                              onClick={() => {
-                                setPrompt(suggestion);
-                                document
-                                  .querySelector<HTMLTextAreaElement>('.composer textarea')
-                                  ?.focus();
-                              }}
-                            >
-                              {suggestion}
-                              <Icon name="arrow" size={13} />
-                            </button>
+                        {[
+                          t('このノートの要点をまとめて', 'Summarize the key points of this note'),
+                          t(
+                            'この内容から次のアクションを整理して',
+                            'Work out the next actions from this content',
                           ),
-                        )}
+                        ].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            disabled={!doc || running}
+                            onClick={() => {
+                              setPrompt(suggestion);
+                              document
+                                .querySelector<HTMLTextAreaElement>('.composer textarea')
+                                ?.focus();
+                            }}
+                          >
+                            {suggestion}
+                            <Icon name="arrow" size={13} />
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -1661,10 +1824,15 @@ function App() {
                   )}
                 </div>
                 {queued.length > 0 && (
-                  <div className="message-queue" aria-label="送信待ち">
-                    <strong>送信待ち {queued.length} 件</strong>
+                  <div className="message-queue" aria-label={t('送信待ち', 'Pending send')}>
+                    <strong>{t(`送信待ち ${queued.length} 件`, `${queued.length} pending`)}</strong>
                     {queuePaused && (
-                      <p>送信待ちはこの端末に保存されています。内容を確認して再開してください。</p>
+                      <p>
+                        {t(
+                          '送信待ちはこの端末に保存されています。内容を確認して再開してください。',
+                          'Pending sends are saved on this device. Review them and resume.',
+                        )}
+                      </p>
                     )}
                     {queued.map((item) => (
                       <div key={item.id}>
@@ -1672,7 +1840,10 @@ function App() {
                         <small>{agentAccessLabel(agent, item.access)}</small>
                         <button
                           disabled={sending}
-                          aria-label={`送信待ち ${item.id} を削除`}
+                          aria-label={t(
+                            `送信待ち ${item.id} を削除`,
+                            `Remove pending send ${item.id}`,
+                          )}
                           onClick={() => {
                             setSending(true);
                             void host
@@ -1682,7 +1853,7 @@ function App() {
                               .finally(() => setSending(false));
                           }}
                         >
-                          取消
+                          {t('取消', 'Cancel')}
                         </button>
                       </div>
                     ))}
@@ -1691,7 +1862,7 @@ function App() {
                         disabled={running || sending || !conversationReady}
                         onClick={() => setQueuePaused(false)}
                       >
-                        送信を再開
+                        {t('送信を再開', 'Resume sending')}
                       </button>
                     )}
                   </div>
@@ -1699,14 +1870,20 @@ function App() {
                 <div className="composer">
                   {fresh && (
                     <p className="new-session" role="status">
-                      次の送信から新しい会話を始めます。
-                      <button onClick={() => setFresh(false)}>取り消す</button>
+                      {t(
+                        '次の送信から新しい会話を始めます。',
+                        'The next send starts a new conversation.',
+                      )}
+                      <button onClick={() => setFresh(false)}>{t('取り消す', 'Undo')}</button>
                     </p>
                   )}
-                  <div className="composer-context" aria-label="相談の対象">
+                  <div
+                    className="composer-context"
+                    aria-label={t('相談の対象', 'Ask about')}
+                  >
                     <span className="context-chip" title={active?.name}>
                       <Icon name="folder" size={12} />
-                      {active?.name ?? 'スペース未選択'}
+                      {active?.name ?? t('スペース未選択', 'No space selected')}
                     </span>
                     {doc?.scopeId === active?.scopeId && doc && (
                       <span className="context-chip" title={doc.path}>
@@ -1716,7 +1893,10 @@ function App() {
                     )}
                   </div>
                   {sources.length > 0 && (
-                    <div className="selected-sources" aria-label="選択した参照資料">
+                    <div
+                      className="selected-sources"
+                      aria-label={t('選択した参照資料', 'Selected reference materials')}
+                    >
                       {sources.map((source) => (
                         <div key={`${source.scopeId}:${source.path}`}>
                           <span title={source.path}>
@@ -1725,7 +1905,10 @@ function App() {
                             / {source.path}
                           </span>
                           <button
-                            aria-label={`${source.path} を参照から外す`}
+                            aria-label={t(
+                              `${source.path} を参照から外す`,
+                              `Remove ${source.path} from references`,
+                            )}
                             onClick={() => setSources((all) => all.filter((ref) => ref !== source))}
                           >
                             ×
@@ -1735,8 +1918,11 @@ function App() {
                     </div>
                   )}
                   <textarea
-                    aria-label="エージェントへの指示"
-                    placeholder="ノートについて相談、編集を依頼…"
+                    aria-label={t('エージェントへの指示', 'Instruction to the agent')}
+                    placeholder={t(
+                      'ノートについて相談、編集を依頼…',
+                      'Ask about the note, request an edit…',
+                    )}
                     value={prompt}
                     disabled={!composer.ready || sending}
                     maxLength={100000}
@@ -1756,22 +1942,30 @@ function App() {
                   {composer.error ? (
                     <div className="hint" role="alert">
                       {composer.error}
-                      <button onClick={() => void composer.retry()}>下書き保存を再試行</button>
+                      <button onClick={() => void composer.retry()}>
+                        {t('下書き保存を再試行', 'Retry saving draft')}
+                      </button>
                     </div>
                   ) : (
                     <small className="muted" role="status">
                       {!composer.ready
-                        ? '下書きを読み込み中…'
+                        ? t('下書きを読み込み中…', 'Loading the draft…')
                         : composer.pending
-                          ? '下書きを保存中…'
+                          ? t('下書きを保存中…', 'Saving the draft…')
                           : prompt
-                            ? '未送信の下書きをこの端末に保存済み'
+                            ? t(
+                                '未送信の下書きをこの端末に保存済み',
+                                'The unsent draft is saved on this device',
+                              )
                             : ''}
                     </small>
                   )}
                   {skillProblems.length > 0 && (
                     <small className="muted" role="status">
-                      読み込めないスキル: {skillProblems.map((p) => p.directory).join('、')}
+                      {t(
+                        `読み込めないスキル: ${skillProblems.map((p) => p.directory).join('、')}`,
+                        `Skills that failed to load: ${skillProblems.map((p) => p.directory).join(', ')}`,
+                      )}
                     </small>
                   )}
                   {skillsRetired.map((s) => (
@@ -1784,7 +1978,10 @@ function App() {
                       {personLinesOffered && (
                         <label
                           className="composer-toggle"
-                          title="開いているノートで、人が書いた・直した行をエージェントに伝えます"
+                          title={t(
+                            '開いているノートで、人が書いた・直した行をエージェントに伝えます',
+                            'Tells the agent which lines in the open note a person wrote or edited',
+                          )}
                         >
                           <input
                             type="checkbox"
@@ -1792,7 +1989,7 @@ function App() {
                             disabled={sending || gitBusy}
                             onChange={(e) => setPersonLines(e.target.checked)}
                           />
-                          人の行を伝える
+                          {t('人の行を伝える', "Share the person's lines")}
                         </label>
                       )}
                       {active && (skills.length > 0 || skillsRetired.length > 0) && (
@@ -1806,7 +2003,7 @@ function App() {
                         />
                       )}
                       <select
-                        aria-label="エージェント"
+                        aria-label={t('エージェント', 'Agent')}
                         value={agent}
                         disabled={running || sending || queued.length > 0 || gitBusy}
                         onChange={(e) => {
@@ -1823,7 +2020,7 @@ function App() {
                         ))}
                       </select>
                       <select
-                        aria-label="エージェントのアクセス"
+                        aria-label={t('エージェントのアクセス', 'Agent access')}
                         aria-describedby="agent-access-detail"
                         value={access}
                         disabled={sending || gitBusy || agentAccessOptions(agent).length === 1}
@@ -1849,7 +2046,7 @@ function App() {
                             void host.cancel(active!.scopeId).catch(report);
                           }}
                         >
-                          停止
+                          {t('停止', 'Stop')}
                         </button>
                       )}
                       <button
@@ -1868,13 +2065,17 @@ function App() {
                         }
                         onClick={() => void start()}
                       >
-                        {running || queued.length ? '送信待ちに追加' : '送信'}
+                        {running || queued.length
+                          ? t('送信待ちに追加', 'Add to pending sends')
+                          : t('送信', 'Send')}
                       </button>
                     </div>
                   </div>
                   <small id="agent-access-detail" className="muted" role="status">
-                    {agentAccessDetail(agent, access)} 次に送る指示に適用します。 iroriのGoogle
-                    Drive接続は読み取り専用です。
+                    {t(
+                      `${agentAccessDetail(agent, access)} 次に送る指示に適用します。 iroriのGoogle Drive接続は読み取り専用です。`,
+                      `${agentAccessDetail(agent, access)} Applies to the next instruction sent. irori's Google Drive connection is read-only.`,
+                    )}
                   </small>
                 </div>
               </aside>
@@ -1902,7 +2103,13 @@ function App() {
             const target = spaces.find(
               (space) => space.scopeId === scopeId && workspace?.scopeIds.includes(space.scopeId),
             );
-            if (!target) throw Error('この KB をワークスペースに追加してから開いてください。');
+            if (!target)
+              throw Error(
+                t(
+                  'この KB をワークスペースに追加してから開いてください。',
+                  'Add this KB to the workspace before opening it.',
+                ),
+              );
             const opened = await open(
               target,
               {
@@ -1916,7 +2123,10 @@ function App() {
             );
             if (!opened)
               throw Error(
-                'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                t(
+                  'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                  'Could not open the file. Check the note being edited and the run/connection state.',
+                ),
               );
             setSearchOpen(false);
           }}
@@ -1951,7 +2161,10 @@ function App() {
               ));
             if (!opened)
               throw Error(
-                'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                t(
+                  'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                  'Could not open the note. Check the note being edited and the run/connection state.',
+                ),
               );
             setBacklinks(undefined);
           }}
@@ -1983,11 +2196,19 @@ function App() {
               layer: 'Knowledge_Base',
             };
             if (!target && cloudRoot?.scopeId !== source.scopeId)
-              throw Error('この資料のスペースをワークスペースに追加してから開いてください。');
+              throw Error(
+                t(
+                  'この資料のスペースをワークスペースに追加してから開いてください。',
+                  'Add this material’s space to the workspace before opening it.',
+                ),
+              );
             const opened = target ? await open(target, entry) : await openCloud(cloudRoot!, entry);
             if (!opened)
               throw Error(
-                'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                t(
+                  'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                  'Could not open the file. Check the note being edited and the run/connection state.',
+                ),
               );
             setKnowledgeOpen(false);
           }}
@@ -1995,7 +2216,11 @@ function App() {
         />
       )}
       {ontologyOpen && active && (
-        <Suspense fallback={<p className="hint">オントロジーを開いています…</p>}>
+        <Suspense
+          fallback={
+            <p className="hint">{t('オントロジーを開いています…', 'Opening the ontology…')}</p>
+          }
+        >
           <OntologyPanel
             space={active}
             revision={revision}
@@ -2043,7 +2268,11 @@ function App() {
         />
       )}
       {newNote && (
-        <Dialog label="ノートを作成" busy={creatingNote} onClose={() => setNewNote(false)}>
+        <Dialog
+          label={t('ノートを作成', 'Create note')}
+          busy={creatingNote}
+          onClose={() => setNewNote(false)}
+        >
           <form
             className="modal"
             onSubmit={(e) => {
@@ -2051,7 +2280,13 @@ function App() {
               if (active && !creatingNote) {
                 setCreatingNote(true);
                 void (async () => {
-                  if (!(await save())) throw Error('現在のノートを保存してから作成してください。');
+                  if (!(await save()))
+                    throw Error(
+                      t(
+                        '現在のノートを保存してから作成してください。',
+                        'Save the current note before creating a new one.',
+                      ),
+                    );
                   return host.createNote(active.scopeId, noteName, noteDirectory);
                 })()
                   .then((d) => {
@@ -2065,18 +2300,21 @@ function App() {
               }
             }}
           >
-            <h2>ノートを作成</h2>
+            <h2>{t('ノートを作成', 'Create note')}</h2>
             <input
-              aria-label="ノート名"
+              aria-label={t('ノート名', 'Note name')}
               value={noteName}
               onChange={(e) => setNoteName(e.target.value)}
-              placeholder="ノート名"
+              placeholder={t('ノート名', 'Note name')}
               required
             />
             <label>
-              保存先フォルダー（KB 内の相対パス）
+              {t(
+                '保存先フォルダー（KB 内の相対パス）',
+                'Destination folder (path relative to the KB)',
+              )}
               <input
-                aria-label="保存先フォルダー"
+                aria-label={t('保存先フォルダー', 'Destination folder')}
                 value={noteDirectory}
                 onChange={(event) => setNoteDirectory(event.target.value)}
                 maxLength={4096}
@@ -2085,10 +2323,10 @@ function App() {
             </label>
             <div className="actions">
               <button type="button" disabled={creatingNote} onClick={() => setNewNote(false)}>
-                キャンセル
+                {t('キャンセル', 'Cancel')}
               </button>
               <button className="primary" disabled={creatingNote}>
-                作成
+                {t('作成', 'Create')}
               </button>
             </div>
           </form>
@@ -2101,7 +2339,13 @@ function App() {
           onRestored={(next, notice) => {
             setTrashOpen(false);
             load(next);
-            setStatus(notice ?? 'ノートを元の場所に復元しました。');
+            setStatus(
+              notice ??
+                t(
+                  'ノートを元の場所に復元しました。',
+                  'The note was restored to its original location.',
+                ),
+            );
             setRevision((value) => value + 1);
           }}
         />
@@ -2114,13 +2358,16 @@ function App() {
 function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div className="app-crash" role="alert">
-      <h1>画面の描画でエラーが発生しました</h1>
+      <h1>{t('画面の描画でエラーが発生しました', 'The screen failed to render')}</h1>
       <p>
-        保存済みのノートには影響しません。未保存の編集は失われることがあります。再表示しても直らない場合は、アプリを再起動してください。
+        {t(
+          '保存済みのノートには影響しません。未保存の編集は失われることがあります。再表示しても直らない場合は、アプリを再起動してください。',
+          'Saved notes are unaffected. Unsaved edits may be lost. If re-displaying does not fix it, restart the app.',
+        )}
       </p>
       <pre>{String(error)}</pre>
       <button className="primary" onClick={resetErrorBoundary}>
-        再表示
+        {t('再表示', 'Show again')}
       </button>
     </div>
   );

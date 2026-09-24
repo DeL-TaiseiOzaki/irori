@@ -9,6 +9,7 @@ import type {
   UpdateState,
   UpdateTarget,
 } from '../domain/updates';
+import { t } from '../domain/i18n';
 
 const repository = 'https://github.com/DeL-TaiseiOzaki/irori';
 export const officialReleasesEndpoint =
@@ -36,7 +37,8 @@ const targets: Record<
     package: (version) => `irori-${version}-macos-arm64.dmg`,
   },
 };
-const distributedTargets = 'Windows x64 と Apple シリコンの Mac';
+const distributedTargets = () =>
+  t('Windows x64 と Apple シリコンの Mac', 'Windows x64 and Apple silicon Macs');
 const versionPattern =
   /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-preview\.(0|[1-9]\d*))?$/;
 const assetsSchema = z
@@ -101,12 +103,18 @@ class Cancelled extends Error {}
 const invalid = () =>
   new UpdateError(
     'invalid',
-    '公開版の情報を確認できませんでした。時間をおいて再試行してください。',
+    t(
+      '公開版の情報を確認できませんでした。時間をおいて再試行してください。',
+      'Could not read the published release information. Try again later.',
+    ),
   );
 const mismatch = () =>
   new UpdateError(
     'invalid',
-    'ダウンロードした更新ファイルが公開版と一致しませんでした。もう一度お試しください。',
+    t(
+      'ダウンロードした更新ファイルが公開版と一致しませんでした。もう一度お試しください。',
+      'The downloaded update did not match the published release. Try again.',
+    ),
   );
 
 // One deadline over a request and its body. A fetch that ignores its signal still loses the
@@ -277,7 +285,10 @@ export class UpdateService {
       return {
         status: 'unsupported',
         currentVersion,
-        detail: `この環境向けのインストール版はまだ公開されていません。現在の配布対象は ${distributedTargets} です。`,
+        detail: t(
+          `この環境向けのインストール版はまだ公開されていません。現在の配布対象は ${distributedTargets()} です。`,
+          `No installable version for this environment has been published yet. Currently available for ${distributedTargets()}.`,
+        ),
       };
     }
     const current = version(currentVersion);
@@ -286,12 +297,18 @@ export class UpdateService {
         status: 'error',
         currentVersion,
         reason: 'invalid',
-        detail: '実行中のアプリのバージョンを確認できませんでした。',
+        detail: t(
+          '実行中のアプリのバージョンを確認できませんでした。',
+          'Could not determine the version of the running app.',
+        ),
       };
     try {
       const releases = await withDeadline(
         this.options.timeoutMs ?? 10000,
-        '更新の確認がタイムアウトしました。接続を確認して再試行してください。',
+        t(
+          '更新の確認がタイムアウトしました。接続を確認して再試行してください。',
+          'Checking for updates timed out. Check your connection and try again.',
+        ),
         (signal) => this.readReleases(signal, current),
       );
       const candidates: (Published & { parsed: NonNullable<ReturnType<typeof version>> })[] = [];
@@ -326,8 +343,10 @@ export class UpdateService {
           status: 'error',
           currentVersion,
           reason: 'unavailable',
-          detail:
+          detail: t(
             'この環境向けの公開インストーラーが見つかりませんでした。時間をおいて再試行してください。',
+            'No published installer for this environment was found. Try again later.',
+          ),
         };
       this.published = latest;
       // Published preview tags identify delivery iterations; the installed app's
@@ -338,13 +357,19 @@ export class UpdateService {
           status: 'current',
           currentVersion,
           release: latest.release,
-          detail: 'このアプリより新しい公開版はありません。',
+          detail: t(
+            'このアプリより新しい公開版はありません。',
+            'No newer version than this app has been published.',
+          ),
         };
       return {
         status: 'available',
         currentVersion,
         release: latest.release,
-        detail: `${latest.release.version} を利用できます。`,
+        detail: t(
+          `${latest.release.version} を利用できます。`,
+          `${latest.release.version} is available.`,
+        ),
         install: await this.installable(latest),
       };
     } catch (error) {
@@ -355,7 +380,10 @@ export class UpdateService {
         reason: known ? error.reason : 'offline',
         detail: known
           ? error.message
-          : '更新情報に接続できませんでした。インターネット接続を確認して再試行してください。',
+          : t(
+              '更新情報に接続できませんでした。インターネット接続を確認して再試行してください。',
+              'Could not reach the update information. Check your internet connection and try again.',
+            ),
       };
     }
   }
@@ -364,14 +392,22 @@ export class UpdateService {
     const installer = this.options.installer;
     const detail =
       !installer || !this.options.directory
-        ? 'この起動方法のアプリはアプリ内で更新できません。インストーラーを取得してください。'
+        ? t(
+            'この起動方法のアプリはアプリ内で更新できません。インストーラーを取得してください。',
+            'An app started this way cannot update in the app. Get the installer.',
+          )
         : !published.package || !published.checksums
-          ? 'この公開版にはアプリ内で更新するためのファイルがありません。インストーラーを取得してください。'
+          ? t(
+              'この公開版にはアプリ内で更新するためのファイルがありません。インストーラーを取得してください。',
+              'This release has no files for updating in the app. Get the installer.',
+            )
           : await installer
               .unavailable()
-              .catch(
-                () =>
+              .catch(() =>
+                t(
                   'アプリ内で更新できるか確認できませんでした。インストーラーを取得してください。',
+                  'Could not check whether the app can update itself. Get the installer.',
+                ),
               );
     return detail ? { available: false, detail } : { available: true };
   }
@@ -403,12 +439,18 @@ export class UpdateService {
     if (response.status === 403 || response.status === 429)
       throw new UpdateError(
         'rate-limited',
-        '更新の確認が混み合っています。時間をおいて再試行してください。',
+        t(
+          '更新の確認が混み合っています。時間をおいて再試行してください。',
+          'The update check is busy. Try again later.',
+        ),
       );
     if (!response.ok)
       throw new UpdateError(
         'offline',
-        '更新情報に接続できませんでした。時間をおいて再試行してください。',
+        t(
+          '更新情報に接続できませんでした。時間をおいて再試行してください。',
+          'Could not reach the update information. Try again later.',
+        ),
       );
     const body = await readBody(response, signal, maxResponseBytes);
     let data: unknown;
@@ -424,7 +466,12 @@ export class UpdateService {
 
   async open(target: UpdateTarget, openExternal: (url: string) => Promise<unknown>): Promise<void> {
     if (!this.published || (target !== 'release' && target !== 'download'))
-      throw Error('更新を確認してから公開ページを開いてください。');
+      throw Error(
+        t(
+          '更新を確認してから公開ページを開いてください。',
+          'Check for updates before opening the release page.',
+        ),
+      );
     // Both links were constructed from the fixed official repository and a
     // validated version/asset name, then matched against the public response.
     await openExternal(
@@ -451,7 +498,9 @@ export class UpdateService {
       this.latest.release?.version !== published.release.version ||
       this.latest.install?.available !== true
     )
-      return Promise.reject(Error('更新を確認してから実行してください。'));
+      return Promise.reject(
+        Error(t('更新を確認してから実行してください。', 'Check for updates before running this.')),
+      );
     const { version } = published.release;
     if (this.progress.phase === 'ready' && this.progress.version === version)
       return Promise.resolve(true);
@@ -473,7 +522,10 @@ export class UpdateService {
               detail:
                 error instanceof UpdateError
                   ? error.message
-                  : '更新ファイルをダウンロードできませんでした。接続を確認して再試行してください。',
+                  : t(
+                      '更新ファイルをダウンロードできませんでした。接続を確認して再試行してください。',
+                      'Could not download the update. Check your connection and try again.',
+                    ),
             });
           return false;
         },
@@ -493,7 +545,7 @@ export class UpdateService {
   /** Switches to the prepared version; the caller then lets this process exit. */
   async restart(): Promise<void> {
     if (this.progress.phase !== 'ready' || !this.options.installer)
-      throw Error('更新の準備ができていません。');
+      throw Error(t('更新の準備ができていません。', 'The update is not ready.'));
     // A shutdown that failed after the switch is retried without switching twice: the new
     // version already waits for this process to exit.
     if (this.switched) return;
@@ -521,7 +573,10 @@ export class UpdateService {
       if (!digest)
         throw new UpdateError(
           'invalid',
-          `公開版の ${checksumsName} に更新ファイルが載っていません。インストーラーを取得してください。`,
+          t(
+            `公開版の ${checksumsName} に更新ファイルが載っていません。インストーラーを取得してください。`,
+            `The release's ${checksumsName} does not list the update file. Get the installer.`,
+          ),
         );
       const file = path.join(folder, item.name);
       let shown = 0;
@@ -537,7 +592,9 @@ export class UpdateService {
       } catch (error) {
         throw new UpdateError(
           'invalid',
-          error instanceof Error ? error.message : '更新を準備できませんでした。',
+          error instanceof Error
+            ? error.message
+            : t('更新を準備できませんでした。', 'Could not prepare the update.'),
         );
       }
     } finally {
@@ -568,7 +625,10 @@ export class UpdateService {
         void response.body?.cancel().catch(() => {});
         throw new UpdateError(
           'offline',
-          '更新ファイルを取得できませんでした。時間をおいて再試行してください。',
+          t(
+            '更新ファイルを取得できませんでした。時間をおいて再試行してください。',
+            'Could not fetch the update. Try again later.',
+          ),
         );
       }
       return response;
@@ -579,7 +639,10 @@ export class UpdateService {
   private async readChecksums(item: Asset, signal: AbortSignal) {
     const body = await withDeadline(
       this.options.timeoutMs ?? 10000,
-      '更新ファイルの確認がタイムアウトしました。接続を確認して再試行してください。',
+      t(
+        '更新ファイルの確認がタイムアウトしました。接続を確認して再試行してください。',
+        'Verifying the update timed out. Check your connection and try again.',
+      ),
       async (bounded) => readBody(await this.request(item.url, bounded), bounded, maxChecksumBytes),
       signal,
     );
@@ -621,7 +684,10 @@ export class UpdateService {
           stop(
             new UpdateError(
               'timeout',
-              'ダウンロードが進まなくなりました。接続を確認して再試行してください。',
+              t(
+                'ダウンロードが進まなくなりました。接続を確認して再試行してください。',
+                'The download stalled. Check your connection and try again.',
+              ),
             ),
           ),
         this.options.idleMs ?? 60_000,

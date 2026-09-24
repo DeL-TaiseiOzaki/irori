@@ -6,6 +6,7 @@ import type { TerminalEvent, TerminalSession, TerminalShell } from '../domain/ty
 import { agentEnv } from '../agents/process';
 import { detectShells } from './shells';
 import { SerialQueue } from '../host/serial-queue';
+import { t } from '../domain/i18n';
 
 type Running = { info: TerminalSession; pty: IPty; pending: number };
 const highWater = 100000,
@@ -27,9 +28,13 @@ export class TerminalService {
   }
   async open(scopeId: string, shellId: string, cols: number, rows: number) {
     return this.queue.run(async () => {
-      if (this.running.size >= 4) throw Error('ターミナルは同時に4つまで開けます。');
+      if (this.running.size >= 4)
+        throw Error(
+          t('ターミナルは同時に4つまで開けます。', 'Up to 4 terminals can be open at once.'),
+        );
       const shell = (await this.available()).find((item) => item.id === shellId);
-      if (!shell) throw Error('検出済みのシェルを選択してください。');
+      if (!shell)
+        throw Error(t('検出済みのシェルを選択してください。', 'Choose a detected shell.'));
       const space = await this.files.get(scopeId);
       const cwd = await this.files.resolve(scopeId, '', true);
       const env = agentEnv();
@@ -61,7 +66,7 @@ export class TerminalService {
   }
   write(id: string, data: string) {
     const session = this.running.get(id);
-    if (!session) throw Error('ターミナルは終了しています。');
+    if (!session) throw Error(t('ターミナルは終了しています。', 'The terminal has exited.'));
     session.pty.write(data);
   }
   resize(id: string, cols: number, rows: number) {

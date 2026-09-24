@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { parseCsv } from '../domain/ontology';
+import { t } from '../domain/i18n';
 
 export function CsvPreview({ text }: { text: string }) {
   const [page, setPage] = useState(0);
@@ -19,22 +20,30 @@ export function CsvPreview({ text }: { text: string }) {
   const { columns, rows } = result.table;
   const current = Math.min(page, Math.max(0, Math.ceil(rows.length / 100) - 1));
   return (
-    <section className="csv-preview" aria-label="CSV の表">
+    <section className="csv-preview" aria-label={t('CSV の表', 'CSV table')}>
       <div className="actions">
         <p>
-          {rows.length} 行 · {columns.length} 列 <span className="muted">編集は「ソース」から</span>
+          {t(
+            `${rows.length} 行 · ${columns.length} 列`,
+            `${rows.length} rows · ${columns.length} columns`,
+          )}{' '}
+          <span className="muted">{t('編集は「ソース」から', 'Edit from "Source"')}</span>
         </p>
         <button disabled={!current} onClick={() => setPage(current - 1)}>
-          前の 100 行
+          {t('前の 100 行', 'Previous 100 rows')}
         </button>
         <span>
           {current * 100 + (rows.length ? 1 : 0)}–{Math.min(rows.length, (current + 1) * 100)}
         </span>
         <button disabled={(current + 1) * 100 >= rows.length} onClick={() => setPage(current + 1)}>
-          次の 100 行
+          {t('次の 100 行', 'Next 100 rows')}
         </button>
       </div>
-      <div className="csv-scroll" tabIndex={0} aria-label="CSV の行と列">
+      <div
+        className="csv-scroll"
+        tabIndex={0}
+        aria-label={t('CSV の行と列', 'CSV rows and columns')}
+      >
         <table>
           <thead>
             <tr>

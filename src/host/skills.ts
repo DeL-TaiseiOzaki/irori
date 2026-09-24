@@ -20,6 +20,7 @@ import {
   type SkillProblem,
 } from '../domain/skills';
 import { userSkillRoots, type SkillReach } from '../domain/skill-reach';
+import { t } from '../domain/i18n';
 
 const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
 // The Agent Skills convention keeps metadata values as strings; a list is tolerated.
@@ -168,7 +169,10 @@ export async function requireSkill(
 ): Promise<AgentSkill> {
   const found = await readPackage(files, scopeId, name);
   if (found?.retired) throw Error(retirementNotice(found.retired));
-  if (!found?.skill) throw Error(`このスペースに ${name} スキルがありません。`);
+  if (!found?.skill)
+    throw Error(
+      t(`このスペースに ${name} スキルがありません。`, `This space has no ${name} skill.`),
+    );
   return found.skill;
 }
 

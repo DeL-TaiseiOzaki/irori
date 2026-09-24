@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { t } from './i18n';
 
 /** The runtime-neutral skill package location, shared with Codex, OpenCode and Pi. */
 export const skillsRoot = '.agents/skills';
@@ -59,8 +60,13 @@ export function skillVisible(skill: AgentSkill, audience: SkillAudience) {
 /** The same sentence under the picker and in the failure of a run that named it. */
 export function retirementNotice(skill: RetiredSkill) {
   return (
-    `${skill.name} スキルは ${skill.retired} に退役しました: ${skill.reason}` +
-    (skill.replacement ? `（代わりに ${skill.replacement}）` : '')
+    t(
+      `${skill.name} スキルは ${skill.retired} に退役しました: ${skill.reason}`,
+      `The ${skill.name} skill was retired on ${skill.retired}: ${skill.reason}`,
+    ) +
+    (skill.replacement
+      ? t(`（代わりに ${skill.replacement}）`, ` (use ${skill.replacement} instead)`)
+      : '')
   );
 }
 

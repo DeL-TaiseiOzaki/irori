@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { kbPath } from './ontology';
+import { t } from './i18n';
 
 /** Where a KB asks irori to put notes: `.irori/notes.json`, tracked with the KB. */
 export const notesDeclarationFile = '.irori/notes.json';
@@ -50,6 +51,12 @@ export function expandTokens(text: string, tokens: Record<string, string>): stri
 }
 
 export function dailyNotePath(declaration: NotesDeclaration, at: Date): string {
-  if (!declaration.daily) throw Error('この KB はデイリーノートの場所を宣言していません。');
+  if (!declaration.daily)
+    throw Error(
+      t(
+        'この KB はデイリーノートの場所を宣言していません。',
+        'This KB does not declare where daily notes go.',
+      ),
+    );
   return expandTokens(declaration.daily.path, dateTokens(at));
 }

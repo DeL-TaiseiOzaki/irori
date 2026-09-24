@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { Space, TerminalEvent, TerminalSession, TerminalShell } from '../domain/types';
 import { Icon } from './Icon';
+import { t } from '../domain/i18n';
 
 const host = window.irori;
 
@@ -63,7 +64,9 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
         });
       } else {
         setRunning(false);
-        term.writeln(`\r\n[プロセスが終了しました: ${event.code}]`);
+        term.writeln(
+          t(`\r\n[プロセスが終了しました: ${event.code}]`, `\r\n[Process exited: ${event.code}]`),
+        );
         session.current = undefined;
       }
     };
@@ -89,7 +92,8 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
       if (disposed) return;
       setShells(options);
       const shell = options.find((item) => item.id === selected) ?? options[0];
-      if (!shell) throw Error('使用できるシェルが見つかりません。');
+      if (!shell)
+        throw Error(t('使用できるシェルが見つかりません。', 'No usable shell was found.'));
       setSelected(shell.id);
       fit.fit();
       current = await host.openTerminal(space.scopeId, shell.id, term.cols, term.rows);
@@ -127,13 +131,16 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
     setRunning(false);
   }
   return (
-    <section className="terminal-panel" aria-label={`${space.name} のターミナル`}>
+    <section
+      className="terminal-panel"
+      aria-label={t(`${space.name} のターミナル`, `${space.name} terminal`)}
+    >
       <div className="terminal-toolbar">
         <strong>
           <Icon name="terminal" /> {space.name}
         </strong>
         <select
-          aria-label="ターミナルのシェル"
+          aria-label={t('ターミナルのシェル', 'Terminal shell')}
           value={selected}
           disabled={running || starting}
           onChange={(event) => setSelected(event.target.value)}
@@ -144,20 +151,26 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
             </option>
           ))}
         </select>
-        <span className="terminal-state">{starting ? '起動中…' : running ? '実行中' : '終了'}</span>
+        <span className="terminal-state">
+          {starting
+            ? t('起動中…', 'Starting…')
+            : running
+              ? t('実行中', 'Running')
+              : t('終了', 'Exited')}
+        </span>
         {running ? (
-          <button onClick={() => void stop()}>プロセスを終了</button>
+          <button onClick={() => void stop()}>{t('プロセスを終了', 'End process')}</button>
         ) : (
           <button
             disabled={starting || !selected}
             onClick={() => setGeneration((value) => value + 1)}
           >
-            開く
+            {t('開く', 'Open')}
           </button>
         )}
         <button
-          title="ターミナルのプロセスを終了して閉じる"
-          aria-label="ターミナルを終了して閉じる"
+          title={t('ターミナルのプロセスを終了して閉じる', 'End the terminal process and close it')}
+          aria-label={t('ターミナルを終了して閉じる', 'End and close the terminal')}
           onClick={onClose}
         >
           <Icon name="close" />

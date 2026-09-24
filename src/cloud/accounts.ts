@@ -6,6 +6,7 @@ import { providerId } from '../domain/connections';
 import { readLocalJson, writeLocalJson } from '../host/local-json';
 import type { RcloneAPI } from './rclone';
 import type { GoogleOAuth } from './oauth';
+import { t } from '../domain/i18n';
 const accountSchema = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
@@ -38,7 +39,10 @@ export class CloudAccounts {
   }
   private get(id: string) {
     const account = this.accounts.find((item) => item.id === id);
-    if (!account) throw Error('登録されていないクラウドアカウントです。');
+    if (!account)
+      throw Error(
+        t('登録されていないクラウドアカウントです。', 'This cloud account is not registered.'),
+      );
     return account;
   }
   async init() {
@@ -50,7 +54,10 @@ export class CloudAccounts {
         for (const account of this.accounts)
           if (account.state === 'authorizing') {
             account.state = 'incomplete';
-            account.detail = '前回の認証が完了していません。取り消して追加し直してください。';
+            account.detail = t(
+              '前回の認証が完了していません。取り消して追加し直してください。',
+              'The previous sign-in did not finish. Cancel it and add the account again.',
+            );
           }
       })();
     return this.initialized;
@@ -64,9 +71,20 @@ export class CloudAccounts {
   }
   async add(name: string): Promise<CloudAccount> {
     await this.init();
-    if (this.active) throw Error('進行中のアカウント認証を完了または取り消してください。');
+    if (this.active)
+      throw Error(
+        t(
+          '進行中のアカウント認証を完了または取り消してください。',
+          'Finish or cancel the account sign-in in progress.',
+        ),
+      );
     if (!this.configured)
-      throw Error('このビルドにはGoogleログイン設定がありません。配布用OAuth設定が必要です。');
+      throw Error(
+        t(
+          'このビルドにはGoogleログイン設定がありません。配布用OAuth設定が必要です。',
+          'This build has no Google sign-in configuration. A distribution OAuth configuration is required.',
+        ),
+      );
     const account = accountSchema.parse({
       id: randomUUID(),
       name,
@@ -118,7 +136,10 @@ export class CloudAccounts {
           if (status.finished) {
             if (!status.success)
               throw Error(
-                'Google認証を完了できませんでした。ログインを取り消して再試行してください。',
+                t(
+                  'Google認証を完了できませんでした。ログインを取り消して再試行してください。',
+                  'Google sign-in could not finish. Cancel the sign-in and try again.',
+                ),
               );
             output = status.output;
             break;
@@ -133,7 +154,12 @@ export class CloudAccounts {
                 url.port !== '53682' ||
                 url.pathname !== '/auth'
               )
-                throw Error('Google認証の接続先を確認できません。');
+                throw Error(
+                  t(
+                    'Google認証の接続先を確認できません。',
+                    'Could not verify the Google sign-in endpoint.',
+                  ),
+                );
               if (task.cancelled) return;
               await this.openBrowser(url.href);
               opened = true;
@@ -143,9 +169,19 @@ export class CloudAccounts {
         }
         if (task.cancelled) return;
         if (!output)
-          throw Error('Google認証がタイムアウトしました。取り消して追加し直してください。');
+          throw Error(
+            t(
+              'Google認証がタイムアウトしました。取り消して追加し直してください。',
+              'Google sign-in timed out. Cancel it and add the account again.',
+            ),
+          );
         if (output.Error)
-          throw Error('Google認証を完了できませんでした。取り消して再試行してください。');
+          throw Error(
+            t(
+              'Google認証を完了できませんでした。取り消して再試行してください。',
+              'Google sign-in could not finish. Cancel it and try again.',
+            ),
+          );
         if (!output.State) {
           account.state = 'ready';
           account.detail = undefined;
@@ -157,7 +193,13 @@ export class CloudAccounts {
             : output.Option?.Name === 'config_change_team_drive'
               ? 'false'
               : undefined;
-        if (answer === undefined) throw Error('このrcloneバージョンの認証手順に未対応です。');
+        if (answer === undefined)
+          throw Error(
+            t(
+              'このrcloneバージョンの認証手順に未対応です。',
+              "This rclone version's sign-in steps are not supported.",
+            ),
+          );
         method = 'config/update';
         opt = {
           nonInteractive: true,
@@ -167,7 +209,7 @@ export class CloudAccounts {
           result: answer,
         };
       }
-      throw Error('認証手順の上限に達しました。');
+      throw Error(t('認証手順の上限に達しました。', 'The sign-in reached its step limit.'));
     } catch (error) {
       account.state = 'incomplete';
       account.detail = (error as Error).message;
@@ -178,7 +220,10 @@ export class CloudAccounts {
       if (!task.cancelled)
         await this.persist().catch(() => {
           account.state = 'incomplete';
-          account.detail = '認証状態を端末に保存できませんでした。';
+          account.detail = t(
+            '認証状態を端末に保存できませんでした。',
+            'Could not save the sign-in state on this device.',
+          );
         });
       if (this.active === task) this.active = undefined;
     }
@@ -186,8 +231,17 @@ export class CloudAccounts {
   async cancel(id: string) {
     await this.init();
     const account = this.get(id);
-    if (account.state === 'ready') throw Error('認証済みアカウントはこの操作では削除できません。');
-    if (this.active && this.active.id !== id) throw Error('進行中の認証を先に完了してください。');
+    if (account.state === 'ready')
+      throw Error(
+        t(
+          '認証済みアカウントはこの操作では削除できません。',
+          'A signed-in account cannot be removed this way.',
+        ),
+      );
+    if (this.active && this.active.id !== id)
+      throw Error(
+        t('進行中の認証を先に完了してください。', 'Finish the sign-in in progress first.'),
+      );
     const task = this.active;
     if (task) {
       task.cancelled = true;
@@ -203,7 +257,9 @@ export class CloudAccounts {
   async filesystem(accountId: string, folderId = 'root', driveId?: string) {
     await this.init();
     if (this.get(accountId).state !== 'ready')
-      throw Error('アカウントのログインを完了してください。');
+      throw Error(
+        t('アカウントのログインを完了してください。', 'Finish signing in to the account.'),
+      );
     providerId.parse(folderId);
     if (driveId) providerId.parse(driveId);
     return {
@@ -214,8 +270,15 @@ export class CloudAccounts {
   }
   async remove(id: string) {
     await this.init();
-    if (this.active) throw Error('進行中のアカウント認証を完了または取り消してください。');
-    if (this.get(id).state !== 'ready') throw Error('未完了の認証は取り消してください。');
+    if (this.active)
+      throw Error(
+        t(
+          '進行中のアカウント認証を完了または取り消してください。',
+          'Finish or cancel the account sign-in in progress.',
+        ),
+      );
+    if (this.get(id).state !== 'ready')
+      throw Error(t('未完了の認証は取り消してください。', 'Cancel the unfinished sign-in.'));
     await this.rpc.call('config/delete', { name: this.remote(id) });
     this.accounts = this.accounts.filter((item) => item.id !== id);
     await this.persist();
@@ -233,7 +296,7 @@ export class CloudAccounts {
       .max(4000)
       .parse(value.result);
     return [
-      { id: 'root', name: 'マイドライブ' },
+      { id: 'root', name: t('マイドライブ', 'My Drive') },
       ...drives.map((item) => ({ ...item, driveId: item.id })),
     ];
   }
@@ -251,11 +314,20 @@ export class CloudAccounts {
       .map((item) => ({ id: item.ID, name: item.Name, parentId, ...(driveId ? { driveId } : {}) }));
   }
   async verify(id: string, folder: CloudFolder) {
-    if (!folder.parentId) throw Error('フォルダ一覧からマウントするフォルダを選択してください。');
+    if (!folder.parentId)
+      throw Error(
+        t(
+          'フォルダ一覧からマウントするフォルダを選択してください。',
+          'Choose the folder to mount from the folder list.',
+        ),
+      );
     const items = await this.folders(id, folder.parentId, folder.driveId);
     if (!items.some((item) => item.id === folder.id))
       throw Error(
-        '選択したフォルダの識別情報を確認できません。移動・削除・アクセス権を確認してください。',
+        t(
+          '選択したフォルダの識別情報を確認できません。移動・削除・アクセス権を確認してください。',
+          'Could not verify the selected folder. Check whether it was moved or deleted, and its access rights.',
+        ),
       );
   }
   async close() {

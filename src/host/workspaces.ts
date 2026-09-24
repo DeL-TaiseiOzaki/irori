@@ -7,6 +7,7 @@ import { GitProcess } from '../git/process';
 import { readLocalJson, writeLocalJson } from './local-json';
 import type { FileService } from './files';
 import type { WorkspaceProfile, RepositoryInfo } from '../domain/types';
+import { t } from '../domain/i18n';
 const profile = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
@@ -33,7 +34,9 @@ export class WorkspaceService {
       });
       const value = profile.parse({ id: id ?? randomUUID(), name, scopeIds });
       if (current.some((item) => item.id !== id && item.name === value.name))
-        throw Error('同じ名前のワークスペースがあります。');
+        throw Error(
+          t('同じ名前のワークスペースがあります。', 'A workspace with the same name exists.'),
+        );
       await writeLocalJson(path.join(this.files.dataDir, 'workspaces.json'), [
         ...current.filter((item) => item.id !== id),
         value,
@@ -73,7 +76,8 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
     (await runner.run(cwd, args, { inspection: true })).trimEnd();
   try {
     root = await fs.realpath(root);
-    if (!(await fs.stat(root)).isDirectory()) throw Error('フォルダを選択してください。');
+    if (!(await fs.stat(root)).isDirectory())
+      throw Error(t('フォルダを選択してください。', 'Choose a folder.'));
     let gitRoot: string;
     try {
       gitRoot = await git(root, ['rev-parse', '--show-toplevel']);
@@ -85,7 +89,10 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
         return {
           root,
           kind: 'unavailable',
-          detail: 'Gitが見つかりません。Gitをインストールしてください。',
+          detail: t(
+            'Gitが見つかりません。Gitをインストールしてください。',
+            'Git was not found. Install Git.',
+          ),
         };
       }
       try {
@@ -93,7 +100,10 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
         return {
           root,
           kind: 'unavailable',
-          detail: 'このGitリポジトリを確認できません。所有者・権限を確認してください。',
+          detail: t(
+            'このGitリポジトリを確認できません。所有者・権限を確認してください。',
+            'Could not check this Git repository. Check its owner and permissions.',
+          ),
         };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -101,7 +111,10 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       return {
         root,
         kind: 'folder',
-        detail: '通常のフォルダです。既存ノートをそのまま登録できます。',
+        detail: t(
+          '通常のフォルダです。既存ノートをそのまま登録できます。',
+          'An ordinary folder. Its existing notes can be added as they are.',
+        ),
       };
     }
     gitRoot = await fs.realpath(gitRoot);
@@ -109,7 +122,10 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       return {
         root: gitRoot,
         kind: 'unavailable',
-        detail: 'リポジトリ内のサブフォルダです。表示されたリポジトリのルートを選択してください。',
+        detail: t(
+          'リポジトリ内のサブフォルダです。表示されたリポジトリのルートを選択してください。',
+          'This is a subfolder of a repository. Choose the repository root shown.',
+        ),
       };
     const [remote, branch, changes] = await Promise.all([
       git(root, ['config', '--get', 'remote.origin.url']).catch(() => ''),
@@ -128,7 +144,10 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
     return {
       root,
       kind: 'unavailable',
-      detail: 'フォルダまたはGit情報を確認できません。接続先とアクセス権を確認してください。',
+      detail: t(
+        'フォルダまたはGit情報を確認できません。接続先とアクセス権を確認してください。',
+        'Could not read the folder or its Git information. Check the location and access rights.',
+      ),
     };
   } finally {
     await runner.close();
