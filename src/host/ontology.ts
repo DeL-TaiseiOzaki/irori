@@ -4,6 +4,7 @@ import { classify } from '../domain/scopes';
 import type { Document, Entry } from '../domain/types';
 import { ontologyDeclaration, ontologyGraph, type OntologyView } from '../domain/ontology';
 import { graphIndexDeclaration, graphIndexFiles } from '../domain/graph-index';
+import { t } from '../domain/i18n';
 
 /** Refuses a path outside this KB's knowledge layer or reached through an alias, without opening it. */
 export async function knowledgePath(files: FileService, scopeId: string, relative: string) {
@@ -62,7 +63,13 @@ function moduleNoteResolver(files: FileService, scopeId: string) {
       }
       const matches = (await entries).get(segment.normalize('NFC')) ?? [];
       if (!matches.length) return relative; // Keep a genuinely missing note as a link.
-      if (matches.length > 1) throw Error('グラフのノート名が Unicode 正規化後に重複しています。');
+      if (matches.length > 1)
+        throw Error(
+          t(
+            'グラフのノート名が Unicode 正規化後に重複しています。',
+            'Graph note names collide after Unicode normalization.',
+          ),
+        );
       const entry = matches[0];
       if (entry.blocked) throw Error('Ontology note paths must not be aliases or blocked entries');
       directory = entry.path;

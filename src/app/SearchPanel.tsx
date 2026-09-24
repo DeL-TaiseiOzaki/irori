@@ -3,6 +3,7 @@ import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import type { Space } from '../domain/types';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { t } from '../domain/i18n';
 
 const host = window.irori;
 
@@ -70,7 +71,10 @@ export function SearchPanel({
       if (request.current !== id) return;
       if (!saved)
         throw Error(
-          '編集中のノートを保存できませんでした。閉じて、保存や競合の状態を確認してください。',
+          t(
+            '編集中のノートを保存できませんでした。閉じて、保存や競合の状態を確認してください。',
+            'Could not save the note you were editing. Close this and check its save or conflict state.',
+          ),
         );
       const value = await host.search(scopeId, query);
       if (request.current === id) setResult(value);
@@ -96,21 +100,24 @@ export function SearchPanel({
 
   return (
     <Dialog
-      label="KB内を検索"
+      label={t('KB内を検索', 'Search in KB')}
       className="modal-dialog search-dialog"
       busy={opening}
       onClose={onClose}
     >
       <div className="search-heading">
         <h2>
-          <Icon name="search" size={20} /> KB内を検索
+          <Icon name="search" size={20} /> {t('KB内を検索', 'Search in KB')}
         </h2>
         <button onClick={onClose} disabled={opening}>
-          閉じる
+          {t('閉じる', 'Close')}
         </button>
       </div>
       <p className="muted" id="search-scope-help">
-        選んだローカル KB の本文を検索します。スキーマ・contents・Drive は対象外です。
+        {t(
+          '選んだローカル KB の本文を検索します。スキーマ・contents・Drive は対象外です。',
+          'Searches the body text of the selected local KB. Schema, contents, and Drive are not included.',
+        )}
       </p>
       <form
         onSubmit={(event) => {
@@ -119,9 +126,9 @@ export function SearchPanel({
         }}
       >
         <label>
-          検索する KB
+          {t('検索する KB', 'KB to search')}
           <select
-            aria-label="検索する KB"
+            aria-label={t('検索する KB', 'KB to search')}
             aria-describedby="search-scope-help"
             value={scopeId}
             disabled={opening}
@@ -138,16 +145,16 @@ export function SearchPanel({
           </select>
         </label>
         <label>
-          本文を検索
+          {t('本文を検索', 'Search body text')}
           <input
             ref={queryInput}
             type="search"
-            aria-label="本文を検索"
+            aria-label={t('本文を検索', 'Search body text')}
             aria-describedby="search-query-help"
             maxLength={200}
             value={query}
             disabled={opening}
-            placeholder="ノート本文の言葉を入力"
+            placeholder={t('ノート本文の言葉を入力', 'Enter words from the note body')}
             onChange={(event) => {
               invalidate();
               setQuery(event.target.value);
@@ -156,14 +163,17 @@ export function SearchPanel({
         </label>
         <div className="search-submit">
           <p className="muted" id="search-query-help">
-            文字列として検索します。英字の大文字・小文字は区別しません（最大 200 文字）。
+            {t(
+              '文字列として検索します。英字の大文字・小文字は区別しません（最大 200 文字）。',
+              'Searches as a literal string, case-insensitive for ASCII letters (up to 200 characters).',
+            )}
           </p>
           <button
             className="primary"
             type="submit"
             disabled={!member || !query.trim() || searching || opening}
           >
-            {searching ? '検索中…' : '検索'}
+            {searching ? t('検索中…', 'Searching…') : t('検索', 'Search')}
           </button>
         </div>
       </form>
@@ -173,33 +183,51 @@ export function SearchPanel({
         </p>
       )}
       <div role="status" aria-live="polite">
-        {searching && <p>本文を検索しています…</p>}
+        {searching && <p>{t('本文を検索しています…', 'Searching body text…')}</p>}
         {result && (
           <p>
-            {result.hits.length} 件の一致 · {result.scannedFiles} ファイルを検索
+            {t(`${result.hits.length} 件の一致`, `${result.hits.length} matches`)} ·{' '}
+            {t(`${result.scannedFiles} ファイルを検索`, `${result.scannedFiles} files searched`)}
           </p>
         )}
       </div>
       {result && (
-        <section aria-label="本文の検索結果">
+        <section aria-label={t('本文の検索結果', 'Body text search results')}>
           {(result.incomplete || result.skippedFiles > 0) && (
             <p className="search-notice">
               {result.incomplete &&
-                '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。'}
-              {result.skippedFiles > 0 && ` ${result.skippedFiles} ファイルをスキップしました。`}{' '}
-              必要に応じて検索語を絞って再検索してください。
+                t(
+                  '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。',
+                  'These are the results within what could be searched. A limit or unreadable files meant not every note could be checked.',
+                )}
+              {result.skippedFiles > 0 &&
+                ' ' +
+                  t(
+                    `${result.skippedFiles} ファイルをスキップしました。`,
+                    `Skipped ${result.skippedFiles} files.`,
+                  )}{' '}
+              {t(
+                '必要に応じて検索語を絞って再検索してください。',
+                'Narrow the search term and search again if needed.',
+              )}
             </p>
           )}
           {changed && (
             <p className="search-notice">
-              KB のファイルが更新されました。最新の内容を確認するには再検索してください。
+              {t(
+                'KB のファイルが更新されました。最新の内容を確認するには再検索してください。',
+                'Files in the KB have changed. Search again to see the latest content.',
+              )}
             </p>
           )}
           {!result.hits.length && (
             <p>
               {result.incomplete
-                ? '検索できた範囲に一致する本文はありません。'
-                : '一致する本文はありません。'}
+                ? t(
+                    '検索できた範囲に一致する本文はありません。',
+                    'No matching body text within what could be searched.',
+                  )
+                : t('一致する本文はありません。', 'No matching body text.')}
             </p>
           )}
           <Hits hits={result.hits} disabled={opening || !member} onOpen={open} />
@@ -226,7 +254,7 @@ function Hits({
             <span className="search-result-location">
               <Icon name="file" />
               <strong>{hit.path}</strong>
-              <small>{hit.line} 行目</small>
+              <small>{t(`${hit.line} 行目`, `Line ${hit.line}`)}</small>
             </span>
             <span className="search-result-preview">{hit.preview}</span>
           </button>
@@ -295,43 +323,55 @@ export function BacklinksPanel({
 
   return (
     <Dialog
-      label="リンク元"
+      label={t('リンク元', 'Backlinks')}
       className="modal-dialog search-dialog"
       busy={opening}
       onClose={onClose}
     >
       <div className="search-heading">
-        <h2>リンク元</h2>
+        <h2>{t('リンク元', 'Backlinks')}</h2>
         <button onClick={onClose} disabled={opening}>
-          閉じる
+          {t('閉じる', 'Close')}
         </button>
       </div>
-      <p className="muted">{path} にリンクしている、この KB のノートです。</p>
+      <p className="muted">
+        {t(
+          `${path} にリンクしている、この KB のノートです。`,
+          `Notes in this KB that link to ${path}.`,
+        )}
+      </p>
       {error && (
         <p className="search-error" role="alert">
           {error}
         </p>
       )}
       <div role="status" aria-live="polite">
-        {finding && <p>リンク元を調べています…</p>}
+        {finding && <p>{t('リンク元を調べています…', 'Looking for backlinks…')}</p>}
         {result && (
           <p>
-            {result.hits.length} 件のリンク · {result.scannedFiles} ノートを確認
+            {t(`${result.hits.length} 件のリンク`, `${result.hits.length} links`)} ·{' '}
+            {t(`${result.scannedFiles} ノートを確認`, `${result.scannedFiles} notes checked`)}
           </p>
         )}
       </div>
       {result && (
-        <section aria-label="リンク元の一覧">
+        <section aria-label={t('リンク元の一覧', 'List of backlinks')}>
           {result.incomplete && (
             <p className="search-notice">
-              確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。
+              {t(
+                '確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。',
+                'These are the results within what could be checked. A limit or unreadable files meant not every note could be checked.',
+              )}
             </p>
           )}
           {!result.hits.length && (
             <p>
               {result.incomplete
-                ? '確認できた範囲に、このノートへのリンクはありません。'
-                : 'このノートへのリンクはありません。'}
+                ? t(
+                    '確認できた範囲に、このノートへのリンクはありません。',
+                    'No links to this note within what could be checked.',
+                  )
+                : t('このノートへのリンクはありません。', 'No links to this note.')}
             </p>
           )}
           <Hits hits={result.hits} disabled={opening} onOpen={open} />

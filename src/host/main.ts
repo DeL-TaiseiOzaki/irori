@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
 import { realpath, open as openFileHandle } from 'node:fs/promises';
@@ -55,7 +56,10 @@ app
     const settings = new SettingsService(app.getPath('userData'));
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
-    nativeTheme.themeSource = (await settings.read()).theme;
+    const device = await settings.read();
+    nativeTheme.themeSource = device.theme;
+    // Dialogs and messages the host writes follow the reader's language too.
+    setLanguage(device.language);
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
     const drafts = new DraftService(files);
@@ -120,11 +124,29 @@ app
       authorship,
     );
     function canStartAgent() {
-      if (git.busy || fileMutations) throw Error('Git 操作・保存の完了後に実行してください。');
-      if (cloud.busy) throw Error('クラウド接続の準備中です。完了後に実行してください。');
+      if (git.busy || fileMutations)
+        throw Error(
+          t(
+            'Git 操作・保存の完了後に実行してください。',
+            'Wait for Git operations and saving to finish.',
+          ),
+        );
+      if (cloud.busy)
+        throw Error(
+          t(
+            'クラウド接続の準備中です。完了後に実行してください。',
+            'The cloud connection is being prepared. Try again when it finishes.',
+          ),
+        );
     }
     async function changeFiles<T>(fn: () => Promise<T>) {
-      if (git.busy) throw Error('Git 操作の完了後に保存・登録してください。');
+      if (git.busy)
+        throw Error(
+          t(
+            'Git 操作の完了後に保存・登録してください。',
+            'Save or register after the Git operation finishes.',
+          ),
+        );
       fileMutations++;
       try {
         return await fn();
@@ -194,15 +216,20 @@ app
     }
     function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (agents.busy(scopeId) || git.busy)
-        throw Error('実行を停止してからクラウド接続を変更してください。');
+        throw Error(
+          t(
+            '実行を停止してからクラウド接続を変更してください。',
+            'Stop the run before changing cloud connections.',
+          ),
+        );
       return changed(scopeId, operation);
     }
     async function openFile(filename: string) {
       const choice = await dialog.showMessageBox(window!, {
         type: 'question',
-        message: '外部アプリで開きますか？',
+        message: t('外部アプリで開きますか？', 'Open in an external app?'),
         detail: filename,
-        buttons: ['キャンセル', '開く'],
+        buttons: [t('キャンセル', 'Cancel'), t('開く', 'Open')],
         defaultId: 0,
         cancelId: 0,
       });
@@ -230,10 +257,20 @@ app
         changeFiles(() =>
           changed(ref.scopeId, async () => {
             if (agents.busy(ref.scopeId) || cloud.busy)
-              throw Error('実行と接続の準備が終わってからノートを整理してください。');
+              throw Error(
+                t(
+                  '実行と接続の準備が終わってからノートを整理してください。',
+                  'Wait for runs and connection setup to finish before organizing notes.',
+                ),
+              );
             const source = await knowledge.capture(ref);
             if (source.hash !== ref.hash)
-              throw Error('ノートが変更されています。開き直して確認してください。');
+              throw Error(
+                t(
+                  'ノートが変更されています。開き直して確認してください。',
+                  'The note has changed. Open it again and check.',
+                ),
+              );
             const next = await files.moveNote(ref, destination, links);
             if (next.path === ref.path) return next;
             // The record is rebound to the bytes as moved, before any link is rewritten.
@@ -242,12 +279,21 @@ app
               .then(
                 () => undefined,
                 () =>
-                  'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
+                  t(
+                    'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
+                    'The note moved, but its material IDs could not be reconnected. Reconnect the new location from "Materials & artifacts".',
+                  ),
               );
             try {
               await authorship.carry(ref, next, next.text);
             } catch {
-              notice = [notice, 'ノートは移動しましたが、人の行の記録を引き継げませんでした。']
+              notice = [
+                notice,
+                t(
+                  'ノートは移動しましたが、人の行の記録を引き継げませんでした。',
+                  'The note moved, but the record of human-written lines could not be carried over.',
+                ),
+              ]
                 .filter(Boolean)
                 .join(' ');
             }
@@ -258,7 +304,10 @@ app
               } catch {
                 notice = [
                   notice,
-                  `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
+                  t(
+                    `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
+                    `Links in ${after.path} were updated, but the record of human-written lines could not be carried over.`,
+                  ),
                 ]
                   .filter(Boolean)
                   .join(' ');
@@ -271,7 +320,12 @@ app
         changeFiles(() =>
           changed(ref.scopeId, async () => {
             if (agents.busy(ref.scopeId) || cloud.busy)
-              throw Error('実行と接続の準備が終わってからノートを整理してください。');
+              throw Error(
+                t(
+                  '実行と接続の準備が終わってからノートを整理してください。',
+                  'Wait for runs and connection setup to finish before organizing notes.',
+                ),
+              );
             return files.trashNote(ref);
           }),
         ),
@@ -280,7 +334,12 @@ app
         changeFiles(() =>
           changed(id, async () => {
             if (agents.busy(id) || cloud.busy)
-              throw Error('実行と接続の準備が終わってから復元してください。');
+              throw Error(
+                t(
+                  '実行と接続の準備が終わってから復元してください。',
+                  'Wait for runs and connection setup to finish before restoring.',
+                ),
+              );
             return files.restoreNote(id, trashId);
           }),
         ),
@@ -295,7 +354,7 @@ app
       restoreSource: async (source) => {
         const bytes = await knowledge.bytes(source);
         const choice = await dialog.showSaveDialog(window!, {
-          title: '保持版を別ファイルに復元',
+          title: t('保持版を別ファイルに復元', 'Restore the kept copy to another file'),
           defaultPath: path.basename(source.path),
         });
         if (choice.canceled || !choice.filePath) return;
@@ -323,13 +382,20 @@ app
       // rather than trusting that it did.
       openUrl: async (url) => {
         const address = webAddress(url);
-        if (!address) throw Error('http または https のリンクだけを開けます。');
+        if (!address)
+          throw Error(
+            t(
+              'http または https のリンクだけを開けます。',
+              'Only http or https links can be opened.',
+            ),
+          );
         await shell.openExternal(address.href);
       },
       deviceSettings: () => settings.read(),
       saveDeviceSettings: async (patch) => {
         const next = await settings.save(patch);
         nativeTheme.themeSource = next.theme;
+        setLanguage(next.language);
         return next;
       },
       openCloudSetupHelp: () =>
@@ -363,7 +429,12 @@ app
       saveWorkspace: (...args) => workspaces.save(...args),
       removeWorkspace: async (id) => {
         if (cloud.busy || agents.anyBusy || git.busy)
-          throw Error('操作の完了後に登録を削除してください。');
+          throw Error(
+            t(
+              '操作の完了後に登録を削除してください。',
+              'Remove it after the current operation finishes.',
+            ),
+          );
         await cloud.removeWorkspace(id, () => workspaces.remove(id));
       },
       cloudSetup: () => cloud.setup(),
@@ -373,7 +444,12 @@ app
         changeFiles(() =>
           changed(id, async () => {
             if (agents.busy(id) || cloud.busy)
-              throw Error('実行と接続の準備が終わってからグラフ索引を更新してください。');
+              throw Error(
+                t(
+                  '実行と接続の準備が終わってからグラフ索引を更新してください。',
+                  'Wait for runs and connection setup to finish before updating the graph index.',
+                ),
+              );
             return graphIndex.update(id);
           }),
         ),
@@ -391,7 +467,12 @@ app
       cancelCloudAccount: (id) => cloud.cancelAccount(id),
       removeCloudAccount: (id) => {
         if (agents.anyBusy || git.busy)
-          throw Error('実行を停止してからアカウントを登録解除してください。');
+          throw Error(
+            t(
+              '実行を停止してからアカウントを登録解除してください。',
+              'Stop the run before removing the account.',
+            ),
+          );
         return cloud.removeAccount(id);
       },
       cloudDrives: (id) => cloud.accounts.drives(id),
@@ -407,7 +488,7 @@ app
       chooseFolder: async () => {
         const choice = await dialog.showOpenDialog(window!, {
           properties: ['openDirectory'],
-          title: 'KBフォルダを選択',
+          title: t('KBフォルダを選択', 'Choose a KB folder'),
         });
         return choice.canceled ? null : choice.filePaths[0];
       },
@@ -493,8 +574,16 @@ app
     async function shutDown(restart?: () => Promise<void>) {
       if (git.busy) {
         await dialog.showMessageBox(window!, {
-          message: `Git 操作が実行中です。完了後に${restart ? '再起動してください' : 'ウィンドウを閉じてください'}。`,
-          buttons: ['戻る'],
+          message: restart
+            ? t(
+                'Git 操作が実行中です。完了後に再起動してください。',
+                'A Git operation is running. Restart after it finishes.',
+              )
+            : t(
+                'Git 操作が実行中です。完了後にウィンドウを閉じてください。',
+                'A Git operation is running. Close the window after it finishes.',
+              ),
+          buttons: [t('戻る', 'Back')],
         });
         return false;
       }
@@ -506,7 +595,15 @@ app
         if (!window?.webContents.isCrashed()) {
           await dialog.showMessageBox(window!, {
             type: 'error',
-            message: `下書きを保存できませんでした。${restart ? '再起動せず、' : ''}ウィンドウを開いたままにします。`,
+            message: restart
+              ? t(
+                  '下書きを保存できませんでした。再起動せず、ウィンドウを開いたままにします。',
+                  'Could not save the draft. irori will not restart and the window stays open.',
+                )
+              : t(
+                  '下書きを保存できませんでした。ウィンドウを開いたままにします。',
+                  'Could not save the draft. The window stays open.',
+                ),
             detail: String(error),
           });
           return false;
@@ -514,8 +611,21 @@ app
       }
       if (agents.anyBusy || terminals.busy) {
         const answer = await dialog.showMessageBox(window!, {
-          message: `実行中のエージェント・ターミナルを停止して${restart ? '再起動' : '閉じ'}ますか？`,
-          buttons: ['戻る', restart ? '停止して再起動' : '停止して閉じる'],
+          message: restart
+            ? t(
+                '実行中のエージェント・ターミナルを停止して再起動しますか？',
+                'Stop the running agents and terminals and restart?',
+              )
+            : t(
+                '実行中のエージェント・ターミナルを停止して閉じますか？',
+                'Stop the running agents and terminals and close?',
+              ),
+          buttons: [
+            t('戻る', 'Back'),
+            restart
+              ? t('停止して再起動', 'Stop and restart')
+              : t('停止して閉じる', 'Stop and close'),
+          ],
           cancelId: 0,
         });
         if (answer.response !== 1) return false;
@@ -527,7 +637,10 @@ app
       } catch {
         await dialog.showMessageBox(window!, {
           type: 'error',
-          message: '会話履歴を保存できませんでした。再試行してください。',
+          message: t(
+            '会話履歴を保存できませんでした。再試行してください。',
+            'Could not save the conversation history. Try again.',
+          ),
         });
         return false;
       }
@@ -539,7 +652,10 @@ app
       } catch (error) {
         await dialog.showMessageBox(window!, {
           type: 'error',
-          message: 'クラウド接続を終了できませんでした。再試行してください。',
+          message: t(
+            'クラウド接続を終了できませんでした。再試行してください。',
+            'Could not close the cloud connections. Try again.',
+          ),
           detail: String(error),
         });
         return false;

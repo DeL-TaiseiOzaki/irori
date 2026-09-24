@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { t } from './i18n';
 
 export const noteRef = z.object({
   scopeId: z.uuid(),
@@ -21,7 +22,12 @@ export function noteFilename(name: string) {
     /[. ]$/.test(stem) ||
     /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(stem)
   )
-    throw Error('ノート名には記号や末尾の空白を含まない名前を指定してください。');
+    throw Error(
+      t(
+        'ノート名には記号や末尾の空白を含まない名前を指定してください。',
+        'Use a note name without symbols or trailing spaces.',
+      ),
+    );
   return `${stem}.md`;
 }
 
@@ -38,8 +44,14 @@ export function imagesForNoteMove(text: string, rewriting = false): string[] {
   const reject = () => {
     throw Error(
       rewriting
-        ? 'Wiki リンクや HTML を含むノートは別フォルダに移動できません。同じフォルダで名前を変更してください。'
-        : '相対リンクを含むノートは、リンクを更新せずに別フォルダへ移動できません。「リンクも更新する」を有効にするか、同じフォルダで名前を変更してください。',
+        ? t(
+            'Wiki リンクや HTML を含むノートは別フォルダに移動できません。同じフォルダで名前を変更してください。',
+            'A note containing wiki links or HTML cannot move to another folder. Rename it in the same folder instead.',
+          )
+        : t(
+            '相対リンクを含むノートは、リンクを更新せずに別フォルダへ移動できません。「リンクも更新する」を有効にするか、同じフォルダで名前を変更してください。',
+            'A note containing relative links cannot move to another folder without updating them. Turn on "Also update links" or rename it in the same folder.',
+          ),
     );
   };
   if (/\[\[|\b(?:src|href)\s*=/i.test(text)) reject();

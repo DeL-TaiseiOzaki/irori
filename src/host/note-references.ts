@@ -1,6 +1,7 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { frontmatterBlock } from '../domain/graph-index';
 import { linkCount, linksTo, resolveNoteLink, rewriteLinks, samePath } from '../domain/note-links';
+import { t } from '../domain/i18n';
 
 type Reference = { start: number; end: number; href: string; rooted: boolean };
 
@@ -15,7 +16,12 @@ function metadata(text: string) {
   const body = text.indexOf('\n', close) < 0 ? text.length : text.indexOf('\n', close) + 1;
   const document = parseDocument(block, { schema: 'failsafe', logLevel: 'silent' });
   if (document.errors.length)
-    throw Error('frontmatter の構文を確認してからリンクを更新してください。');
+    throw Error(
+      t(
+        'frontmatter の構文を確認してからリンクを更新してください。',
+        'Check the frontmatter syntax before updating links.',
+      ),
+    );
   const references: Reference[] = [];
   if (!isMap(document.contents)) return { body, references };
   for (const [key, field] of [
@@ -24,16 +30,38 @@ function metadata(text: string) {
   ] as const) {
     const sequence = document.contents.get(key, true);
     if (sequence === undefined) continue;
-    if (!isSeq(sequence)) throw Error('frontmatter の関係・出典は配列で指定してください。');
+    if (!isSeq(sequence))
+      throw Error(
+        t(
+          'frontmatter の関係・出典は配列で指定してください。',
+          'Frontmatter relations and sources must be lists.',
+        ),
+      );
     for (const item of sequence.items) {
-      if (!isMap(item)) throw Error('frontmatter の関係・出典の参照を確認してください。');
+      if (!isMap(item))
+        throw Error(
+          t(
+            'frontmatter の関係・出典の参照を確認してください。',
+            'Check the references in the frontmatter relations and sources.',
+          ),
+        );
       const value = item.get(field, true);
       if (value === undefined) continue;
       if (!isScalar(value) || typeof value.value !== 'string' || !value.range || value.anchor)
-        throw Error('frontmatter の参照には単一行の文字列を指定してください。');
+        throw Error(
+          t(
+            'frontmatter の参照には単一行の文字列を指定してください。',
+            'Frontmatter references must be single-line strings.',
+          ),
+        );
       const [from, to] = value.range;
       if (/[\r\n]/.test(block.slice(from, to)))
-        throw Error('複数行の frontmatter 参照は自動更新できません。');
+        throw Error(
+          t(
+            '複数行の frontmatter 参照は自動更新できません。',
+            'Multi-line frontmatter references cannot be updated automatically.',
+          ),
+        );
       references.push({
         start: start + from,
         end: start + to,

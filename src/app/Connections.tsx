@@ -1,16 +1,20 @@
 import { Dialog } from './Dialog';
 import { useEffect, useRef, useState } from 'react';
-import type { CloudFolder, CloudRoot } from '../domain/types';
+import type { CloudConnection, CloudFolder, CloudRoot } from '../domain/types';
 import { mountNameError } from '../domain/connections';
 import { useResource } from './useResource';
+import { t } from '../domain/i18n';
 const host = window.irori;
-const states = {
-  unconfigured: 'アカウント未設定',
-  disconnected: '未接続',
-  connecting: '接続中',
-  mounted: '接続済み・読み取り専用',
-  error: '接続を確認してください',
-};
+// States are looked up inside render so they resolve in the current language.
+function states(): Record<CloudConnection['state'], string> {
+  return {
+    unconfigured: t('アカウント未設定', 'Account not set'),
+    disconnected: t('未接続', 'Not connected'),
+    connecting: t('接続中', 'Connecting'),
+    mounted: t('接続済み・読み取り専用', 'Connected · read-only'),
+    error: t('接続を確認してください', 'Check the connection'),
+  };
+}
 
 export function Connections({
   space,
@@ -84,18 +88,24 @@ export function Connections({
   const disabled = busy || running;
   const invalidName = selected ? mountNameError(name) : undefined;
   return (
-    <Dialog label="クラウド接続" busy={busy} onClose={onClose}>
+    <Dialog label={t('クラウド接続', 'Cloud connection')} busy={busy} onClose={onClose}>
       <div className="modal connections">
         <div className="actions">
-          <h2>{space.name} のクラウド接続</h2>
+          <h2>{t(`${space.name} のクラウド接続`, `Cloud connections for ${space.name}`)}</h2>
           <button disabled={busy} onClick={onClose}>
-            閉じる
+            {t('閉じる', 'Close')}
           </button>
         </div>
         <p>
           {space.workspace
-            ? 'Google Drive のフォルダを、このワークスペースに接続します。KB の追加・切り替えとは独立して使えます。'
-            : 'この KB に保存されている既存の接続を管理します。新しい接続はワークスペースの Drive 欄から追加できます。'}
+            ? t(
+                'Google Drive のフォルダを、このワークスペースに接続します。KB の追加・切り替えとは独立して使えます。',
+                'Connects a Google Drive folder to this workspace. This is independent of adding or switching a KB.',
+              )
+            : t(
+                'この KB に保存されている既存の接続を管理します。新しい接続はワークスペースの Drive 欄から追加できます。',
+                'Manages the existing connections saved in this KB. Add a new connection from the workspace’s Drive section.',
+              )}
         </p>
         {setup?.prerequisite && (
           <div className="actions">
@@ -104,23 +114,25 @@ export function Connections({
               disabled={disabled}
             >
               {setup.prerequisite === 'winfsp'
-                ? 'WinFsp のダウンロードページを開く'
-                : 'マウント機能の導入手順を開く'}
+                ? t('WinFsp のダウンロードページを開く', 'Open the WinFsp download page')
+                : t('マウント機能の導入手順を開く', 'Open the mount feature setup instructions')}
             </button>
             <button onClick={() => setRevision((value) => value + 1)} disabled={disabled}>
-              導入後に再確認
+              {t('導入後に再確認', 'Recheck after installing')}
             </button>
           </div>
         )}
         <p className="setup-state" role="status">
           {setup
             ? `${setup.version ? `rclone ${setup.version} · ` : ''}${setup.detail}`
-            : '接続機能を確認しています…'}
+            : t('接続機能を確認しています…', 'Checking the connection feature…')}
         </p>
         {setup && !setup.oauthConfigured && (
           <p>
-            この検証版では Google 接続の配布準備が未完了です。接続対応版への更新が必要です。Google
-            アカウント側の設定変更は不要です。
+            {t(
+              'この検証版では Google 接続の配布準備が未完了です。接続対応版への更新が必要です。Google アカウント側の設定変更は不要です。',
+              'Distribution setup for Google connections is not yet complete in this preview. An update to a connection-enabled build is required. No change to Google account settings is needed.',
+            )}
           </p>
         )}
         {issue && (
@@ -129,16 +141,16 @@ export function Connections({
           </p>
         )}
         <section>
-          <h3>1. アカウント</h3>
+          <h3>{t('1. アカウント', '1. Account')}</h3>
           {accounts.map((account) => (
             <div className="account-row" key={account.id}>
               <span>
                 <strong>{account.name}</strong> ·{' '}
                 {account.state === 'ready'
-                  ? '認証済み'
+                  ? t('認証済み', 'Authenticated')
                   : account.state === 'authorizing'
-                    ? 'ブラウザでログインしてください'
-                    : '認証未完了'}
+                    ? t('ブラウザでログインしてください', 'Please sign in via the browser')
+                    : t('認証未完了', 'Authentication incomplete')}
                 {account.detail && <small>{account.detail}</small>}
               </span>
               {account.state !== 'ready' && (
@@ -146,7 +158,7 @@ export function Connections({
                   disabled={disabled}
                   onClick={() => void perform(() => host.cancelCloudAccount(account.id))}
                 >
-                  認証を取り消す
+                  {t('認証を取り消す', 'Cancel authentication')}
                 </button>
               )}
               {account.state === 'ready' && (
@@ -159,7 +171,7 @@ export function Connections({
                     })
                   }
                 >
-                  アカウントの登録解除
+                  {t('アカウントの登録解除', 'Remove account')}
                 </button>
               )}
             </div>
@@ -175,8 +187,8 @@ export function Connections({
             }}
           >
             <input
-              aria-label="アカウントの表示名"
-              placeholder="個人用、仕事用など"
+              aria-label={t('アカウントの表示名', 'Account display name')}
+              placeholder={t('個人用、仕事用など', 'e.g. Personal, Work')}
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               required
@@ -189,16 +201,16 @@ export function Connections({
                 accounts.some((item) => item.state === 'authorizing')
               }
             >
-              Googleアカウントを追加
+              {t('Googleアカウントを追加', 'Add Google account')}
             </button>
           </form>
         </section>
         <section>
-          <h3>2. フォルダとマウント先</h3>
+          <h3>{t('2. フォルダとマウント先', '2. Folder and mount location')}</h3>
           <label>
-            使用するアカウント
+            {t('使用するアカウント', 'Account to use')}
             <select
-              aria-label="使用するクラウドアカウント"
+              aria-label={t('使用するクラウドアカウント', 'Cloud account to use')}
               value={accountId}
               disabled={disabled}
               onChange={(e) => {
@@ -208,7 +220,7 @@ export function Connections({
                 setAccountId(e.target.value);
               }}
             >
-              <option value="">アカウントを選択</option>
+              <option value="">{t('アカウントを選択', 'Select an account')}</option>
               {accounts
                 .filter((a) => a.state === 'ready')
                 .map((a) => (
@@ -220,9 +232,9 @@ export function Connections({
           </label>
           {drives.length > 0 && (
             <label>
-              ドライブ
+              {t('ドライブ', 'Drive')}
               <select
-                aria-label="ドライブ"
+                aria-label={t('ドライブ', 'Drive')}
                 disabled={disabled || loading}
                 value={trail[0]?.id ?? ''}
                 onChange={(e) => setTrail([drives.find((drive) => drive.id === e.target.value)!])}
@@ -256,12 +268,15 @@ export function Connections({
                     disabled={disabled}
                     onClick={() => choose(current)}
                   >
-                    「{current.name}」を接続先にする
+                    {t(
+                      `「${current.name}」を接続先にする`,
+                      `Use "${current.name}" as the connection`,
+                    )}
                   </button>
                 )}
               </div>
               {loading ? (
-                <p>フォルダを読み込んでいます…</p>
+                <p>{t('フォルダを読み込んでいます…', 'Loading folders…')}</p>
               ) : (
                 <div className="cloud-folders">
                   {folders.map((folder) => (
@@ -286,12 +301,17 @@ export function Connections({
                         disabled={disabled}
                         onClick={() => setTrail((all) => [...all, folder])}
                       >
-                        開く
+                        {t('開く', 'Open')}
                       </button>
                     </div>
                   ))}
                   {folders.length === 0 && (
-                    <p className="muted">この場所にはフォルダがありません。</p>
+                    <p className="muted">
+                      {t(
+                        'この場所にはフォルダがありません。',
+                        'There are no folders in this location.',
+                      )}
+                    </p>
                   )}
                 </div>
               )}
@@ -299,14 +319,17 @@ export function Connections({
           )}
           {current && !selected && (
             <p className="muted">
-              接続するフォルダを一覧で選ぶか、開いたフォルダの「接続先にする」を押すと、ここに接続ボタンが表示されます。
+              {t(
+                '接続するフォルダを一覧で選ぶか、開いたフォルダの「接続先にする」を押すと、ここに接続ボタンが表示されます。',
+                'Choose a folder from the list, or open a folder and press "Use as the connection" — the connect button then appears here.',
+              )}
             </p>
           )}
           {selected && (
             <form
               ref={form}
               className="attachment-form"
-              aria-label="接続先の登録"
+              aria-label={t('接続先の登録', 'Register connection')}
               onSubmit={(e) => {
                 e.preventDefault();
                 void perform(async () => {
@@ -326,9 +349,9 @@ export function Connections({
             >
               {space.contents.length > 1 && (
                 <label>
-                  contentsの配置先
+                  {t('contentsの配置先', 'Materials location')}
                   <select
-                    aria-label="contentsの配置先"
+                    aria-label={t('contentsの配置先', 'Materials location')}
                     value={contentsRoot}
                     disabled={disabled}
                     onChange={(e) => setContentsRoot(e.target.value)}
@@ -340,9 +363,9 @@ export function Connections({
                 </label>
               )}
               <label>
-                contents内のフォルダ名
+                {t('contents内のフォルダ名', 'Folder name within Materials')}
                 <input
-                  aria-label="contents内のフォルダ名"
+                  aria-label={t('contents内のフォルダ名', 'Folder name within Materials')}
                   value={name}
                   disabled={disabled}
                   onChange={(e) => setName(e.target.value)}
@@ -350,32 +373,40 @@ export function Connections({
                 />
               </label>
               <p className="mount-preview" aria-live="polite">
-                接続するフォルダ: {selected.name}
+                {t('接続するフォルダ', 'Folder to connect')}: {selected.name}
                 <br />
-                マウント先: {contentsRoot}/{name}/
+                {t('マウント先', 'Mount location')}: {contentsRoot}/{name}/
               </p>
               {invalidName && <p role="alert">{invalidName}</p>}
               <p className="muted">
-                読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。
+                {t(
+                  '読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。',
+                  'Registers as read-only. The chosen name is saved with the connection and reused on reconnection.',
+                )}
               </p>
               <button className="primary" disabled={disabled || !!invalidName}>
-                {setup?.mountAvailable ? '登録して接続' : '接続先を登録'}
+                {setup?.mountAvailable
+                  ? t('登録して接続', 'Register and connect')
+                  : t('接続先を登録', 'Register connection')}
               </button>
             </form>
           )}
         </section>
         <section>
-          <h3>登録済みの接続先</h3>
-          {connections.length === 0 && <p className="muted">まだ接続先がありません。</p>}
+          <h3>{t('登録済みの接続先', 'Registered connections')}</h3>
+          {connections.length === 0 && (
+            <p className="muted">{t('まだ接続先がありません。', 'No connections yet.')}</p>
+          )}
           {connections.map((connection) => (
             <div className="connection-card" key={connection.mountId}>
               <strong>
                 {connection.contentsRoot}/{connection.name}/
               </strong>
               <small>
-                {connection.accountName ?? 'アカウント未設定'} · {connection.folderName}
+                {connection.accountName ?? t('アカウント未設定', 'Account not set')} ·{' '}
+                {connection.folderName}
               </small>
-              <p>{states[connection.state]}</p>
+              <p>{states()[connection.state]}</p>
               {connection.detail && <p>{connection.detail}</p>}
               <div className="actions">
                 {connection.state === 'mounted' || connection.state === 'error' ? (
@@ -385,7 +416,7 @@ export function Connections({
                       void perform(() => host.disconnectCloud(space.scopeId, connection.mountId))
                     }
                   >
-                    接続を解除
+                    {t('接続を解除', 'Disconnect')}
                   </button>
                 ) : null}
                 {connection.state !== 'mounted' && (
@@ -397,7 +428,7 @@ export function Connections({
                       void perform(() => host.connectCloud(space.scopeId, connection.mountId))
                     }
                   >
-                    再接続
+                    {t('再接続', 'Reconnect')}
                   </button>
                 )}
                 {connection.state !== 'mounted' && (
@@ -409,7 +440,7 @@ export function Connections({
                       )
                     }
                   >
-                    選択中のアカウントに紐づける
+                    {t('選択中のアカウントに紐づける', 'Bind to the selected account')}
                   </button>
                 )}
                 <button
@@ -421,7 +452,7 @@ export function Connections({
                     setNewName(connection.name);
                   }}
                 >
-                  名前を変更
+                  {t('名前を変更', 'Rename')}
                 </button>
                 <button
                   disabled={
@@ -431,7 +462,7 @@ export function Connections({
                     void perform(() => host.removeCloud(space.scopeId, connection.mountId))
                   }
                 >
-                  登録を解除
+                  {t('登録を解除', 'Remove registration')}
                 </button>
               </div>
               {editing === connection.mountId && (
@@ -446,15 +477,17 @@ export function Connections({
                   }}
                 >
                   <input
-                    aria-label="新しいマウント先のフォルダ名"
+                    aria-label={t('新しいマウント先のフォルダ名', 'New mount folder name')}
                     value={newName}
                     disabled={disabled}
                     onChange={(e) => setNewName(e.target.value)}
                     required
                   />
-                  <button disabled={disabled || !!mountNameError(newName)}>名前を保存</button>
+                  <button disabled={disabled || !!mountNameError(newName)}>
+                    {t('名前を保存', 'Save name')}
+                  </button>
                   <button type="button" disabled={disabled} onClick={() => setEditing(undefined)}>
-                    キャンセル
+                    {t('キャンセル', 'Cancel')}
                   </button>
                   {mountNameError(newName) && <small role="alert">{mountNameError(newName)}</small>}
                 </form>
@@ -463,8 +496,10 @@ export function Connections({
           ))}
           {connections.length > 0 && (
             <p className="muted">
-              名前変更・登録解除は接続を解除してから行います。登録解除後もGoogle
-              Driveの元フォルダと既存のローカルデータは残ります。
+              {t(
+                '名前変更・登録解除は接続を解除してから行います。登録解除後もGoogle Driveの元フォルダと既存のローカルデータは残ります。',
+                'Rename and removal require disconnecting first. The original Google Drive folder and existing local data remain after removal.',
+              )}
             </p>
           )}
         </section>

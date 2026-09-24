@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import { launch, killTree, agentEnv } from '../agents/process';
 import { readJson } from '../host/http';
+import { t } from '../domain/i18n';
 
 export interface RcloneAPI {
   call(method: string, params?: Record<string, unknown>): Promise<any>;
@@ -22,7 +23,8 @@ export class Rclone implements RcloneAPI {
     private executable = process.env.IRORI_RCLONE_PATH || 'rclone',
   ) {}
   private async start() {
-    if (this.stopped) throw Error('クラウドサービスは終了しました。');
+    if (this.stopped)
+      throw Error(t('クラウドサービスは終了しました。', 'The cloud service has stopped.'));
     if (this.starting) return this.starting;
     this.starting = this.launch();
     try {
@@ -73,13 +75,23 @@ export class Rclone implements RcloneAPI {
     try {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
-          () => reject(Error('rcloneの起動がタイムアウトしました。')),
+          () =>
+            reject(
+              Error(t('rcloneの起動がタイムアウトしました。', 'rclone timed out while starting.')),
+            ),
           10000,
         );
         let buffer = '';
         const fail = () => {
           clearTimeout(timer);
-          reject(Error('rcloneを起動できません。インストールと実行権限を確認してください。'));
+          reject(
+            Error(
+              t(
+                'rcloneを起動できません。インストールと実行権限を確認してください。',
+                'Could not start rclone. Check that it is installed and executable.',
+              ),
+            ),
+          );
         };
         child.once('error', fail);
         child.once('close', fail);
@@ -95,7 +107,10 @@ export class Rclone implements RcloneAPI {
         });
       });
       const identity = await this.request('core/pid', {});
-      if (identity.pid !== child.pid) throw Error('クラウドサービスの識別に失敗しました。');
+      if (identity.pid !== child.pid)
+        throw Error(
+          t('クラウドサービスの識別に失敗しました。', 'Could not identify the cloud service.'),
+        );
       child.once('close', () => {
         this.endpoint = '';
         this.starting = undefined;
@@ -126,7 +141,12 @@ export class Rclone implements RcloneAPI {
       return await readJson(response);
     } catch {
       // RC error bodies can contain credentials, input parameters and machine paths.
-      throw Error('クラウド操作に失敗しました。接続・ログイン状態を確認して再試行してください。');
+      throw Error(
+        t(
+          'クラウド操作に失敗しました。接続・ログイン状態を確認して再試行してください。',
+          'The cloud operation failed. Check the connection and sign-in, then try again.',
+        ),
+      );
     }
   }
   async close() {

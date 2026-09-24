@@ -10,6 +10,7 @@ import {
   type NoteAuthorship,
   type SourceRef,
 } from '../domain/knowledge';
+import { t } from '../domain/i18n';
 
 /**
  * A line with less than this much prose in it says nothing about who wrote it.
@@ -173,7 +174,12 @@ export class AuthorshipStore {
   async carry(from: SourceRef, to: SourceRef, before: string, after = before) {
     const lines = after.split('\n');
     if (from.scopeId !== to.scopeId || lines.length !== before.split('\n').length)
-      throw Error('作者情報を移すには同じスペース内で行の対応が保たれている必要があります。');
+      throw Error(
+        t(
+          '作者情報を移すには同じスペース内で行の対応が保たれている必要があります。',
+          'Authorship can move only within the same space, with the lines still matching.',
+        ),
+      );
     const view = await this.view(from, before);
     return this.queue.run(async () => {
       const record: AuthorshipRecord =

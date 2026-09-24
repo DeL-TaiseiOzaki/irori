@@ -1,4 +1,5 @@
 import type { DeviceSettings } from '../domain/types';
+import { setLanguage } from '../domain/i18n';
 import type { SkillAudience } from '../domain/skills';
 
 const host = window.irori;
@@ -10,6 +11,7 @@ const host = window.irori;
  */
 let current: DeviceSettings = {
   theme: 'system',
+  language: 'ja',
   markdownFont: 'sans',
   editorAssistance: true,
   layouts: {},
@@ -27,6 +29,29 @@ export async function loadDeviceSettings() {
 
 export function currentTheme() {
   return current.theme;
+}
+
+export function currentLanguageChoice() {
+  return current.language;
+}
+
+/** Sets the interface language and the document's, which screen readers use. */
+export function applyLanguage(language: DeviceSettings['language'] = current.language) {
+  document.documentElement.lang = language;
+  setLanguage(language);
+}
+
+export async function chooseLanguage(language: DeviceSettings['language']) {
+  const previous = current.language;
+  applyLanguage(language);
+  try {
+    current = await host.saveDeviceSettings({ language });
+  } catch (error) {
+    applyLanguage(previous);
+    throw error;
+  }
+  applyLanguage();
+  return current;
 }
 
 export function currentMarkdownFont() {

@@ -11,20 +11,36 @@ import {
   notesDeclarationFile,
   type NotesDeclaration,
 } from '../domain/notes';
+import { t } from '../domain/i18n';
 
 async function insideKnowledge(files: FileService, scopeId: string, relative: string) {
   const space = files.get(scopeId);
   if (classify(space, relative) !== 'Knowledge_Base')
-    throw Error('ノートの場所はこの KB のナレッジ層の中で宣言してください。');
+    throw Error(
+      t(
+        'ノートの場所はこの KB のナレッジ層の中で宣言してください。',
+        "Declare note locations inside this KB's Knowledge layer.",
+      ),
+    );
 }
 
 async function ownFile(files: FileService, scopeId: string, relative: string) {
   const space = files.get(scopeId);
   if (classify(space, relative) === 'contents')
-    throw Error('contents のファイルはテンプレートに使えません。');
+    throw Error(
+      t(
+        'contents のファイルはテンプレートに使えません。',
+        'Files in contents cannot be used as templates.',
+      ),
+    );
   const actual = await files.resolve(scopeId, relative);
   if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
-    throw Error('テンプレートに alias / シンボリックリンクは使えません。');
+    throw Error(
+      t(
+        'テンプレートに alias / シンボリックリンクは使えません。',
+        'Templates cannot be aliases or symbolic links.',
+      ),
+    );
 }
 
 /**
@@ -66,7 +82,13 @@ export async function openDailyNote(
   at = new Date(),
 ): Promise<Document> {
   const declaration = await readNotesDeclaration(files, scopeId);
-  if (!declaration?.daily) throw Error('この KB はデイリーノートの場所を宣言していません。');
+  if (!declaration?.daily)
+    throw Error(
+      t(
+        'この KB はデイリーノートの場所を宣言していません。',
+        'This KB does not declare where daily notes go.',
+      ),
+    );
   const relative = dailyNotePath(declaration, at);
   try {
     return await files.read(scopeId, relative);

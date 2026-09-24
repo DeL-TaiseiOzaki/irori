@@ -19,6 +19,7 @@ import type {
   CloudSetup,
   Entry,
 } from '../domain/types';
+import { t } from '../domain/i18n';
 
 const bindingSchema = z.object({
   scopeId: z.uuid(),
@@ -62,7 +63,10 @@ export class CloudService {
       await this.workspaceRoot(id);
       if ((await this.declarations(id)).length)
         throw Error(
-          'このワークスペースの Drive 接続を登録解除してから削除してください。KB と Drive のファイルは残ります。',
+          t(
+            'このワークスペースの Drive 接続を登録解除してから削除してください。KB と Drive のファイルは残ります。',
+            "Unregister this workspace's Drive connections before removing it. The KB and Drive files stay.",
+          ),
         );
       await remove();
     });
@@ -93,7 +97,10 @@ export class CloudService {
         const binding = bindingSchema.parse(await readLocalJson(path.join(directory, name), null));
         if (binding.accountId === id)
           throw Error(
-            'このアカウントを使う接続先があります。各スペースで登録解除するか、別のアカウントに紐づけてください。',
+            t(
+              'このアカウントを使う接続先があります。各スペースで登録解除するか、別のアカウントに紐づけてください。',
+              'Some connections use this account. Unregister them in each space or link them to another account.',
+            ),
           );
       }
       await this.accounts.remove(id);
@@ -103,7 +110,10 @@ export class CloudService {
     return `${scopeId}:${mountId}`;
   }
   private mutate<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.stopping) return Promise.reject(Error('クラウドサービスは終了中です。'));
+    if (this.stopping)
+      return Promise.reject(
+        Error(t('クラウドサービスは終了中です。', 'The cloud service is stopping.')),
+      );
     return this.queue.run(fn);
   }
   async setup(): Promise<CloudSetup> {
@@ -111,18 +121,26 @@ export class CloudService {
       const version = await this.rpc.call('core/version');
       const types = await this.rpc.call('mount/types');
       let mountAvailable = Array.isArray(types.mountTypes) && types.mountTypes.length > 0;
-      let detail = 'クラウドフォルダは読み取り専用で接続します。';
+      let detail = t(
+        'クラウドフォルダは読み取り専用で接続します。',
+        'Cloud folders connect read-only.',
+      );
       let prerequisite: CloudSetup['prerequisite'];
       if (!mountAvailable)
-        detail = 'このrcloneには利用できるマウント機能がありません。接続先の登録は可能です。';
+        detail = t(
+          'このrcloneには利用できるマウント機能がありません。接続先の登録は可能です。',
+          'This rclone has no usable mount support. Connections can still be registered.',
+        );
       if (process.platform === 'linux') {
         try {
           await fs.access('/dev/fuse');
         } catch {
           mountAvailable = false;
           prerequisite = 'fuse';
-          detail =
-            'この環境にはFUSEがありません。フォルダ選択・登録は可能ですが、マウントにはFUSEが必要です。';
+          detail = t(
+            'この環境にはFUSEがありません。フォルダ選択・登録は可能ですが、マウントにはFUSEが必要です。',
+            'FUSE is not available here. You can still choose and register folders, but mounting needs FUSE.',
+          );
         }
       } else if (process.platform === 'win32') {
         try {
@@ -136,14 +154,20 @@ export class CloudService {
         } catch {
           mountAvailable = false;
           prerequisite = 'winfsp';
-          detail = 'フォルダを接続するにはWinFspのインストールが必要です。';
+          detail = t(
+            'フォルダを接続するにはWinFspのインストールが必要です。',
+            'Connecting folders requires WinFsp to be installed.',
+          );
         }
       } else if (process.platform === 'darwin') {
-        detail = 'macOSのNFSマウントを使用します。このビルドの実機動作は未検証です。';
+        detail = t(
+          'macOSのNFSマウントを使用します。このビルドの実機動作は未検証です。',
+          'Uses the macOS NFS mount. This build has not been tested on real hardware.',
+        );
         mountAvailable = types.mountTypes.includes('nfsmount');
       } else {
         mountAvailable = false;
-        detail = 'このOSでのマウントは未対応です。';
+        detail = t('このOSでのマウントは未対応です。', 'Mounting is not supported on this OS.');
       }
       return {
         available: true,
@@ -192,7 +216,12 @@ export class CloudService {
         ids.has(record.mountId) ||
         paths.has(name)
       )
-        throw Error('クラウド接続宣言の識別情報またはパスが重複・不一致です。');
+        throw Error(
+          t(
+            'クラウド接続宣言の識別情報またはパスが重複・不一致です。',
+            'A cloud connection declaration has a duplicate or mismatched identity or path.',
+          ),
+        );
       ids.add(record.mountId);
       paths.add(name);
     }
@@ -216,11 +245,19 @@ export class CloudService {
   writeTarget(scopeId: string, mountId: string): Promise<WriteTarget> {
     return this.mutate(async () => {
       const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
-      if (!record) throw Error('送信先の接続が見つかりません。');
+      if (!record)
+        throw Error(
+          t('送信先の接続が見つかりません。', 'The destination connection was not found.'),
+        );
       const binding = await this.binding(scopeId, mountId);
       const account = (await this.accounts.list()).find((item) => item.id === binding?.accountId);
       if (!binding || account?.state !== 'ready')
-        throw Error('送信準備にはログイン済みアカウントを紐づけてください。');
+        throw Error(
+          t(
+            '送信準備にはログイン済みアカウントを紐づけてください。',
+            'Link a signed-in account before preparing an upload.',
+          ),
+        );
       return {
         ownerId: scopeId,
         mountId,
@@ -246,7 +283,10 @@ export class CloudService {
             if (this.mounted.get(key) === mounted)
               this.states.set(key, {
                 state: 'error',
-                detail: '接続が失われました。再接続してください。',
+                detail: t(
+                  '接続が失われました。再接続してください。',
+                  'The connection was lost. Connect again.',
+                ),
               });
           }
         }
@@ -285,7 +325,12 @@ export class CloudService {
         stat = await fs.lstat(current);
       }
       if (!stat.isDirectory() || stat.isSymbolicLink())
-        throw Error('contentsの親フォルダにリンクやファイルがあります。');
+        throw Error(
+          t(
+            'contentsの親フォルダにリンクやファイルがあります。',
+            'The parent folder of contents contains a link or a file.',
+          ),
+        );
     }
     return current;
   }
@@ -311,14 +356,25 @@ export class CloudService {
         await fs.chmod(target, 0o000);
       }
     }
-    throw Error('同じ名前のフォルダ・ファイルまたは接続先があります。別の名前を指定してください。');
+    throw Error(
+      t(
+        '同じ名前のフォルダ・ファイルまたは接続先があります。別の名前を指定してください。',
+        'A folder, file or connection with the same name exists. Choose another name.',
+      ),
+    );
   }
   add(input: AddCloudAttachment) {
     return this.mutate(async () => {
       const error = mountNameError(input.name);
       if (error) throw Error(error);
       const records = await this.declarations(input.scopeId);
-      if (records.length >= 100) throw Error('接続先は1スペースにつき100件まで登録できます。');
+      if (records.length >= 100)
+        throw Error(
+          t(
+            '接続先は1スペースにつき100件まで登録できます。',
+            'Each space can register up to 100 connections.',
+          ),
+        );
       const record = cloudDeclaration.parse({
         schemaVersion: 1,
         mountId: randomUUID(),
@@ -333,7 +389,9 @@ export class CloudService {
         access: 'read-only',
       });
       if (!(await this.files.get(input.scopeId)).contents.includes(record.contentsRoot))
-        throw Error('contentsの登録先を選択してください。');
+        throw Error(
+          t('contentsの登録先を選択してください。', 'Choose where in contents to register it.'),
+        );
       if (
         records.some(
           (item) =>
@@ -341,12 +399,17 @@ export class CloudService {
             nameKey(record.contentsRoot + '/' + record.name),
         )
       )
-        throw Error('同じ名前の接続先があります。');
+        throw Error(t('同じ名前の接続先があります。', 'A connection with the same name exists.'));
       await this.checkVacant(record);
       await this.accounts.verify(input.accountId, input.folder);
       await this.checkVacant(record);
       if (JSON.stringify(await this.declarations(input.scopeId)) !== JSON.stringify(records))
-        throw Error('接続情報が外部で変更されました。再読み込みしてから登録してください。');
+        throw Error(
+          t(
+            '接続情報が外部で変更されました。再読み込みしてから登録してください。',
+            'The connection information changed outside irori. Reload before registering.',
+          ),
+        );
       await writeLocalJson(await this.declarationFile(input.scopeId), [...records, record]);
       await writeLocalJson(this.bindingFile(record.scopeId, record.mountId), {
         scopeId: record.scopeId,
@@ -362,7 +425,12 @@ export class CloudService {
   bind(scopeId: string, mountId: string, accountId: string) {
     return this.mutate(async () => {
       if (this.mounted.has(this.key(scopeId, mountId)))
-        throw Error('接続を解除してからアカウントを変更してください。');
+        throw Error(
+          t(
+            '接続を解除してからアカウントを変更してください。',
+            'Disconnect before changing the account.',
+          ),
+        );
       const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
       if (!record) throw Error('Unknown cloud connection');
       await this.accounts.verify(accountId, {
@@ -394,7 +462,12 @@ export class CloudService {
     });
     if (!info || info.isSymbolicLink()) return;
     if (info.dev !== (await fs.stat(parent)).dev)
-      throw Error('マウントが残っています。接続を解除してから変更してください。');
+      throw Error(
+        t(
+          'マウントが残っています。接続を解除してから変更してください。',
+          'A mount is still active. Disconnect before changing it.',
+        ),
+      );
     if (
       !info.isDirectory() ||
       info.dev !== binding?.placeholder?.dev ||
@@ -413,7 +486,13 @@ export class CloudService {
   edit(scopeId: string, mountId: string, name?: string) {
     return this.mutate(async () => {
       const key = this.key(scopeId, mountId);
-      if (this.mounted.has(key)) throw Error('接続を解除してから名前変更・登録解除してください。');
+      if (this.mounted.has(key))
+        throw Error(
+          t(
+            '接続を解除してから名前変更・登録解除してください。',
+            'Disconnect before renaming or unregistering.',
+          ),
+        );
       const records = await this.declarations(scopeId);
       const record = records.find((item) => item.mountId === mountId);
       if (!record) throw Error('Unknown cloud connection');
@@ -431,7 +510,7 @@ export class CloudService {
                 nameKey(`${record.contentsRoot}/${name}`),
           )
         )
-          throw Error('同じ名前の接続先があります。');
+          throw Error(t('同じ名前の接続先があります。', 'A connection with the same name exists.'));
         await this.checkVacant(replacement);
       }
       const binding = await this.binding(scopeId, mountId);
@@ -441,7 +520,12 @@ export class CloudService {
         await writeLocalJson(this.bindingFile(scopeId, mountId), binding);
       }
       if (JSON.stringify(await this.declarations(scopeId)) !== JSON.stringify(records))
-        throw Error('接続情報が外部で変更されました。再読み込みしてください。');
+        throw Error(
+          t(
+            '接続情報が外部で変更されました。再読み込みしてください。',
+            'The connection information changed outside irori. Reload it.',
+          ),
+        );
       await writeLocalJson(
         await this.declarationFile(scopeId),
         records.flatMap((item) =>
@@ -467,7 +551,13 @@ export class CloudService {
         }
       }
       const binding = await this.binding(scopeId, mountId);
-      if (!binding) throw Error('この端末で使用するアカウントを紐づけてください。');
+      if (!binding)
+        throw Error(
+          t(
+            'この端末で使用するアカウントを紐づけてください。',
+            'Link the account to use on this device.',
+          ),
+        );
       this.states.set(key, { state: 'connecting' });
       let target: string | undefined;
       let requested = false;
@@ -514,7 +604,12 @@ export class CloudService {
         });
         const stat = await fs.stat(target);
         if (stat.dev === (await fs.stat(parent)).dev)
-          throw Error('マウントされたファイルシステムを確認できません。');
+          throw Error(
+            t(
+              'マウントされたファイルシステムを確認できません。',
+              'Could not verify the mounted file system.',
+            ),
+          );
         const mounted = {
           attachment: record,
           target,
@@ -546,10 +641,12 @@ export class CloudService {
         (item: any) => item.MountPoint === mounted.target && item.Fs === mounted.filesystem,
       )
     )
-      throw Error('マウントが利用できません。');
+      throw Error(t('マウントが利用できません。', 'The mount is not available.'));
     const stat = await fs.lstat(mounted.target);
     if (stat.isSymbolicLink() || stat.dev !== mounted.device || stat.ino !== mounted.inode)
-      throw Error('マウント先の識別情報が変わりました。');
+      throw Error(
+        t('マウント先の識別情報が変わりました。', 'The identity of the mount point has changed.'),
+      );
   }
   disconnect(scopeId: string, mountId: string) {
     return this.mutate(() => this.unmount(scopeId, mountId));
@@ -584,7 +681,12 @@ export class CloudService {
           (!remaining.isSymbolicLink() &&
             remaining.dev !== (await fs.stat(path.dirname(mounted.target))).dev))
       )
-        throw Error('マウントの解除を確認できません。もう一度接続を解除してください。');
+        throw Error(
+          t(
+            'マウントの解除を確認できません。もう一度接続を解除してください。',
+            'Could not confirm the unmount. Disconnect again.',
+          ),
+        );
       const binding = await this.binding(scopeId, mountId);
       if (binding?.placeholder) {
         if (remaining?.dev === binding.placeholder.dev && remaining.ino === binding.placeholder.ino)
@@ -605,7 +707,13 @@ export class CloudService {
     const entry = [...this.mounted.values()].find(
       (item) => item.attachment.scopeId === scopeId && within(item.target, target),
     );
-    if (!entry) throw Error('クラウドフォルダは未接続です。接続画面から再接続してください。');
+    if (!entry)
+      throw Error(
+        t(
+          'クラウドフォルダは未接続です。接続画面から再接続してください。',
+          'The cloud folder is not connected. Reconnect it from the Connect screen.',
+        ),
+      );
     await this.assertMounted(entry);
     const actual = await fs.realpath(target);
     if (!within(entry.target, actual)) throw Error('Cloud path alias escapes its mount');
@@ -622,7 +730,8 @@ export class CloudService {
         directory: true,
         layer: 'contents',
         note: false,
-        blocked: record.state === 'mounted' ? undefined : (record.detail ?? '未接続'),
+        blocked:
+          record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
       }));
     const parent = await this.parent({ scopeId, contentsRoot: rel });
     if (parent)
@@ -634,7 +743,10 @@ export class CloudService {
             directory: item.isDirectory(),
             layer: 'contents',
             note: false,
-            blocked: '登録されていないローカルデータです。既存の内容を保持しています。',
+            blocked: t(
+              '登録されていないローカルデータです。既存の内容を保持しています。',
+              'Unregistered local data. Its existing contents are kept.',
+            ),
           });
       }
     return entries;
@@ -652,7 +764,9 @@ export class CloudService {
         directory: entry.isDirectory(),
         note: /\.md$/i.test(entry.name),
         layer: 'contents',
-        blocked: entry.isSymbolicLink() ? 'リンク先は開けません' : undefined,
+        blocked: entry.isSymbolicLink()
+          ? t('リンク先は開けません', 'Link targets cannot be opened')
+          : undefined,
       }))
       .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
   }

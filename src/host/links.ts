@@ -2,6 +2,7 @@ import { lstat } from 'node:fs/promises';
 import { resolveNoteLink, type ResolvedLink } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import type { FileService } from './files';
+import { t } from '../domain/i18n';
 
 /**
  * Whether the disk reaches `relative` through its name in the other case, as a
@@ -37,17 +38,32 @@ export async function resolveLink(
   const target = resolveNoteLink(from, href);
   if (target.kind !== 'internal') return target;
   if (classify(files.get(scopeId), target.path) === 'contents')
-    return { kind: 'rejected', reason: 'contents のファイルへのリンクはこの版では開けません。' };
+    return {
+      kind: 'rejected',
+      reason: t(
+        'contents のファイルへのリンクはこの版では開けません。',
+        'Links to files in contents cannot be opened in this version.',
+      ),
+    };
   let filename;
   try {
     filename = await files.resolve(scopeId, target.path);
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'ENOENT'
       ? { kind: 'missing', path: target.path }
-      : { kind: 'rejected', reason: 'このリンクはこの KB の外を指しています。' };
+      : {
+          kind: 'rejected',
+          reason: t(
+            'このリンクはこの KB の外を指しています。',
+            'This link points outside this KB.',
+          ),
+        };
   }
   // A directory, a device file or a link replaced after resolution is not a document.
   if (!(await lstat(filename)).isFile())
-    return { kind: 'rejected', reason: 'リンク先がファイルではありません。' };
+    return {
+      kind: 'rejected',
+      reason: t('リンク先がファイルではありません。', 'The link target is not a file.'),
+    };
   return { kind: 'file', path: target.path, note: /\.md$/i.test(target.path) };
 }

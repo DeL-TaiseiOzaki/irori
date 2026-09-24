@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { DraftController, type DraftKey, type DraftState } from '../domain/drafts';
+import { t } from '../domain/i18n';
 
 const empty: DraftState = { text: '', record: null, ready: false, pending: false, error: '' };
 const noopSubscribe = () => () => {};
@@ -21,7 +22,12 @@ export async function flushDrafts(): Promise<void> {
     }),
   );
   if (results.some((saved) => !saved))
-    throw Error('下書きを保存できません。画面の保存エラーを確認して再試行してください。');
+    throw Error(
+      t(
+        '下書きを保存できません。画面の保存エラーを確認して再試行してください。',
+        'Could not save the draft. Check the on-screen save error and try again.',
+      ),
+    );
 }
 
 /** Include canonical checkout identity in addition to the key when a renderer target can change. */

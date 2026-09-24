@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { t } from './i18n';
 
 /**
  * Links that arrive from agent output or document content are untrusted text.
@@ -20,6 +21,7 @@ export function webAddress(value: string): URL | undefined {
   return parsed;
 }
 
-export const externalUrl = z
-  .string()
-  .refine((value) => !!webAddress(value), 'http または https のリンクだけを開けます。');
+export const externalUrl = z.string().refine((value) => !!webAddress(value), {
+  error: () =>
+    t('http または https のリンクだけを開けます。', 'Only http or https links can be opened.'),
+});

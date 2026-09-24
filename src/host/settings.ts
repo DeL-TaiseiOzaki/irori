@@ -4,9 +4,11 @@ import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
 import { markdownFonts, type DeviceSettings } from '../domain/types';
 import { skillAudience } from '../domain/skills';
+import { languages } from '../domain/i18n';
 
 const settings = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
+  language: z.enum(languages).default('ja'),
   markdownFont: z.enum(markdownFonts).default('sans'),
   editorAssistance: z.boolean().default(true),
   // The pane library owns this format; it is stored as written and bounded.
@@ -38,6 +40,7 @@ export class SettingsService {
       const next = settings.parse({
         theme: patch.theme ?? current.theme,
         markdownFont: patch.markdownFont ?? current.markdownFont,
+        language: patch.language ?? current.language,
         editorAssistance: patch.editorAssistance ?? current.editorAssistance,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },

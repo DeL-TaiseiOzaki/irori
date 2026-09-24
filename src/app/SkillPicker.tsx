@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { skillVisible, type AgentSkill, type SkillAudience } from '../domain/skills';
 import { chooseSkillAudience, currentSkillAudience } from './device-settings';
 import { SkillReach } from './SkillReach';
+import { t } from '../domain/i18n';
 
 /**
  * The composer's skill choice for one KB. A reader who chose a role or project on
@@ -51,7 +52,9 @@ export function SkillPicker({
         disabled={disabled}
         onChange={(e) => change(e.target.value || undefined)}
       >
-        <option value="">{label}: すべて</option>
+        <option value="">
+          {label}: {t('すべて', 'All')}
+        </option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -61,18 +64,22 @@ export function SkillPicker({
     );
   return (
     <>
-      {select('役割', roles, audience.role, (role) => choose({ role }))}
-      {select('プロジェクト', projects, audience.project, (project) => choose({ project }))}
+      {select(t('役割', 'Role'), roles, audience.role, (role) => choose({ role }))}
+      {select(t('プロジェクト', 'Project'), projects, audience.project, (project) =>
+        choose({ project }),
+      )}
       {skills.length > 0 && (
         <select
-          aria-label="スキル"
+          aria-label={t('スキル', 'Skill')}
           className="composer-skill"
           value={value}
-          title={skills.find((s) => s.name === value)?.description ?? 'スキルを使わない'}
+          title={
+            skills.find((s) => s.name === value)?.description ?? t('スキルを使わない', 'No skill')
+          }
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="">スキルなし</option>
+          <option value="">{t('スキルなし', 'No skill')}</option>
           {visible.map((s) => (
             <option key={s.name} value={s.name} title={s.description}>
               {s.name} — {s.description}
@@ -83,10 +90,13 @@ export function SkillPicker({
       <button
         type="button"
         disabled={disabled}
-        title="各エージェントがこの KB のスキルを自力で見つけるかを確認します"
+        title={t(
+          '各エージェントがこの KB のスキルを自力で見つけるかを確認します',
+          'Check whether each agent can find this KB’s skills on its own',
+        )}
         onClick={() => setReach(true)}
       >
-        到達確認
+        {t('到達確認', 'Check reach')}
       </button>
       {reach && <SkillReach scopeId={scopeId} onClose={() => setReach(false)} />}
     </>

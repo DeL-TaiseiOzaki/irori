@@ -8,6 +8,7 @@ import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
 import { externalUrl } from './links';
+import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience } from './skills';
 
@@ -36,6 +37,7 @@ export const hostArguments = {
   saveDeviceSettings: z.tuple([
     z.object({
       theme: z.enum(['system', 'light', 'dark']).optional(),
+      language: z.enum(languages).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       editorAssistance: z.boolean().optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.

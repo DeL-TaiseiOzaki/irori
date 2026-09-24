@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { z } from 'zod';
+import { t } from './i18n';
 
 const column = z.string().min(1).max(120);
 export const kbPath = z
@@ -72,11 +73,23 @@ export function parseCsv(text: string): CsvTable {
     columns.some((name) => !name.trim()) ||
     new Set(columns).size !== columns.length
   )
-    throw Error('CSV の列名は空欄・重複にできません。');
+    throw Error(
+      t('CSV の列名は空欄・重複にできません。', 'CSV column names cannot be blank or duplicated.'),
+    );
   if (rows.length > 20000 || columns.length > 100)
-    throw Error('CSV 表示は 20,000 行・100 列までです。ソースで確認してください。');
+    throw Error(
+      t(
+        'CSV 表示は 20,000 行・100 列までです。ソースで確認してください。',
+        'The CSV view shows up to 20,000 rows and 100 columns. Check the source instead.',
+      ),
+    );
   if (rows.some((row) => row.length !== columns.length))
-    throw Error('CSV の列数が一致しません。ソースで確認してください。');
+    throw Error(
+      t(
+        'CSV の列数が一致しません。ソースで確認してください。',
+        'The CSV rows have different numbers of columns. Check the source.',
+      ),
+    );
   return { columns, rows };
 }
 
@@ -88,7 +101,8 @@ export function ontologyGraph(
   function records(text: string, columns: string[]) {
     const table = parseCsv(text);
     for (const column of columns)
-      if (!table.columns.includes(column)) throw Error(`CSV に列「${column}」がありません。`);
+      if (!table.columns.includes(column))
+        throw Error(t(`CSV に列「${column}」がありません。`, `The CSV has no column "${column}".`));
     return table.rows.map((row) =>
       Object.fromEntries(table.columns.map((name, index) => [name, row[index]])),
     );
@@ -106,13 +120,24 @@ export function ontologyGraph(
     parent: mapping.parent ? row[mapping.parent] || undefined : undefined,
     group: mapping.group ? row[mapping.group] || undefined : undefined,
   }));
-  if (entities.length > 2000) throw Error('オントロジー表示は 2,000 エンティティまでです。');
+  if (entities.length > 2000)
+    throw Error(
+      t(
+        'オントロジー表示は 2,000 エンティティまでです。',
+        'The ontology view shows up to 2,000 entities.',
+      ),
+    );
   const byId = new Map(entities.map((entity) => [entity.id, entity]));
   if (
     byId.size !== entities.length ||
     entities.some((entity) => !entity.id.trim() || !entity.label.trim())
   )
-    throw Error('エンティティの ID・ラベルは必須です。ID は重複できません。');
+    throw Error(
+      t(
+        'エンティティの ID・ラベルは必須です。ID は重複できません。',
+        'Every entity needs an ID and a label. IDs cannot repeat.',
+      ),
+    );
   const edges: OntologyEdge[] = [];
   for (const entity of entities) {
     if (entity.note)
@@ -122,8 +147,20 @@ export function ontologyGraph(
     const seen = new Set([entity.id]);
     let parent = entity.parent;
     while (parent) {
-      if (!byId.has(parent)) throw Error(`親エンティティ「${parent}」が見つかりません。`);
-      if (seen.has(parent)) throw Error('親子階層に循環があります。CSV を確認してください。');
+      if (!byId.has(parent))
+        throw Error(
+          t(
+            `親エンティティ「${parent}」が見つかりません。`,
+            `Parent entity "${parent}" was not found.`,
+          ),
+        );
+      if (seen.has(parent))
+        throw Error(
+          t(
+            '親子階層に循環があります。CSV を確認してください。',
+            'The parent-child hierarchy has a cycle. Check the CSV.',
+          ),
+        );
       seen.add(parent);
       parent = byId.get(parent)!.parent;
     }
@@ -132,20 +169,26 @@ export function ontologyGraph(
         id: `parent:${entity.id}`,
         source: entity.parent,
         target: entity.id,
-        label: '親子',
+        label: t('親子', 'Parent'),
         hierarchy: true,
       });
   }
   if (declaration.relations) {
     const mapping = declaration.relations;
-    if (relationsText === undefined) throw Error('関係 CSV がありません。');
+    if (relationsText === undefined)
+      throw Error(t('関係 CSV がありません。', 'The relations CSV is missing.'));
     for (const [index, row] of records(relationsText, [
       mapping.source,
       mapping.target,
       mapping.label,
     ]).entries()) {
       if (!byId.has(row[mapping.source]) || !byId.has(row[mapping.target]))
-        throw Error(`関係 CSV の ${index + 2} 行目に不明なエンティティ ID があります。`);
+        throw Error(
+          t(
+            `関係 CSV の ${index + 2} 行目に不明なエンティティ ID があります。`,
+            `Row ${index + 2} of the relations CSV has an unknown entity ID.`,
+          ),
+        );
       edges.push({
         id: `relation:${index}`,
         source: row[mapping.source],
@@ -155,7 +198,13 @@ export function ontologyGraph(
       });
     }
   }
-  if (edges.length > 10000) throw Error('オントロジー表示は 10,000 関係までです。');
+  if (edges.length > 10000)
+    throw Error(
+      t(
+        'オントロジー表示は 10,000 関係までです。',
+        'The ontology view shows up to 10,000 relations.',
+      ),
+    );
   return { entities, edges };
 }
 

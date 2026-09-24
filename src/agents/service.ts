@@ -26,6 +26,7 @@ import { ConversationStore } from './conversations';
 import { startInput } from '../domain/conversation';
 import { promptWithSkill } from '../domain/skills';
 import { requireSkill } from '../host/skills';
+import { t } from '../domain/i18n';
 type Reply = { allow: boolean; answers?: AgentAnswers };
 type Run = {
   id: string;
@@ -67,7 +68,14 @@ export class AgentService {
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, () => {
       for (const run of [...this.runs.values()]) {
-        this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
+        this.publish(
+          run,
+          'error',
+          t(
+            '会話履歴を保存できません。実行を停止します。',
+            'Could not save the conversation history. Stopping the run.',
+          ),
+        );
         void this.cancel(run.binding.scopeId);
       }
     });
@@ -93,10 +101,21 @@ export class AgentService {
   queueMessage(input: StartRun) {
     input = startInput.parse(input);
     requireAgentAccess(input.agent, input.access);
-    if (input.newSession) throw Error('新しい会話は送信待ちを完了してから開始してください。');
+    if (input.newSession)
+      throw Error(
+        t(
+          '新しい会話は送信待ちを完了してから開始してください。',
+          'Finish the queued instructions before starting a new conversation.',
+        ),
+      );
     const run = this.runs.get(input.scopeId);
     if (this.resetting.has(input.scopeId) || (run && run.binding.agent !== input.agent))
-      throw Error('このスペースで実行中のCLIに指示を追加してください。');
+      throw Error(
+        t(
+          'このスペースで実行中のCLIに指示を追加してください。',
+          'Add instructions to the CLI running in this space.',
+        ),
+      );
     return this.conversations.enqueue(this.binding(input.scopeId, input.agent), input);
   }
   removeQueued(scopeId: string, agent: AgentId, id: string) {
@@ -105,7 +124,8 @@ export class AgentService {
   async startQueued(scopeId: string, agent: AgentId, id: string, canStart = () => {}) {
     const { queued } = await this.conversation(scopeId, agent);
     const next = queued[0];
-    if (!next || next.id !== id) throw Error('送信待ちの順序が変わりました。');
+    if (!next || next.id !== id)
+      throw Error(t('送信待ちの順序が変わりました。', 'The queue order has changed.'));
     canStart();
     const runId = this.start({ ...next, scopeId, agent }, id);
     await this.runs.get(scopeId)!.accepted;
@@ -120,11 +140,22 @@ export class AgentService {
     return this.conversations.flush();
   }
   async resetSession(scopeId: string, agent: AgentId) {
-    if (this.busy(scopeId)) throw Error('実行を停止してから会話の継続をリセットしてください。');
+    if (this.busy(scopeId))
+      throw Error(
+        t(
+          '実行を停止してから会話の継続をリセットしてください。',
+          'Stop the run before resetting the conversation.',
+        ),
+      );
     this.resetting.add(scopeId);
     try {
       if ((await this.conversation(scopeId, agent)).queued.length)
-        throw Error('送信待ちを完了または取り消してから会話をリセットしてください。');
+        throw Error(
+          t(
+            '送信待ちを完了または取り消してから会話をリセットしてください。',
+            'Finish or cancel the queued instructions before resetting the conversation.',
+          ),
+        );
       await this.sessions.reset(this.binding(scopeId, agent));
     } finally {
       this.resetting.delete(scopeId);
@@ -147,10 +178,16 @@ export class AgentService {
                   : false,
             detail:
               id === 'pi'
-                ? 'Piのネイティブ設定を使用。標準のツール実行には許可ダイアログがありません。プロジェクト拡張はPi側の信頼設定に従います。'
+                ? t(
+                    'Piのネイティブ設定を使用。標準のツール実行には許可ダイアログがありません。プロジェクト拡張はPi側の信頼設定に従います。',
+                    "Uses Pi's native settings. Standard tool runs have no permission dialog. Project extensions follow Pi's trust settings.",
+                  )
                 : id === 'opencode'
-                  ? 'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。'
-                  : '既存のCLI認証・設定を使用',
+                  ? t(
+                      'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。',
+                      "Uses OpenCode's native sign-in, model and permission settings. Its ask requests appear in the panel.",
+                    )
+                  : t('既存のCLI認証・設定を使用', "Uses the CLI's existing sign-in and settings"),
           };
         } catch (e) {
           return { id, version: '', available: false, tested: false, detail: String(e) };
@@ -200,7 +237,14 @@ export class AgentService {
     const event = this.publish(run, type, text, extra);
     if (run.recorded)
       void this.conversations.event(run.binding, event).catch(() => {
-        this.publish(run, 'error', '会話履歴を保存できません。実行を停止します。');
+        this.publish(
+          run,
+          'error',
+          t(
+            '会話履歴を保存できません。実行を停止します。',
+            'Could not save the conversation history. Stopping the run.',
+          ),
+        );
         void this.cancel(run.binding.scopeId);
       });
   }
@@ -269,7 +313,11 @@ export class AgentService {
   }
   private async execute(run: Run, input: StartRun) {
     const timer = setTimeout(() => {
-      this.event(run, 'error', '実行時間の上限（10分）に達しました。');
+      this.event(
+        run,
+        'error',
+        t('実行時間の上限（10分）に達しました。', 'The run reached its time limit (10 minutes).'),
+      );
       void this.cancel(run.binding.scopeId);
     }, 600000);
     let outcome: AgentEvent['outcome'] = 'completed';
@@ -279,7 +327,8 @@ export class AgentService {
       await this.conversations.begin(run.binding, run.id, input, run.queuedId);
       run.recorded = true;
       run.accept();
-      if (input.newSession) this.publish(run, 'status', '新しい会話を開始します。');
+      if (input.newSession)
+        this.publish(run, 'status', t('新しい会話を開始します。', 'Starting a new conversation.'));
       this.publish(run, 'status', input.prompt, { role: 'user' });
       if (run.cancelled) return;
       const space = this.files.get(input.scopeId);
@@ -305,7 +354,14 @@ export class AgentService {
         ? await requireSkill(this.files, input.scopeId, input.skill)
         : undefined;
       if (selectedSkill)
-        this.event(run, 'status', `${selectedSkill.name} スキルの手順で実行します。`);
+        this.event(
+          run,
+          'status',
+          t(
+            `${selectedSkill.name} スキルの手順で実行します。`,
+            `Running with the ${selectedSkill.name} skill's procedure.`,
+          ),
+        );
       record = await this.knowledge.begin(run.id, input);
       if (record.sources.length)
         promptParts.push(
@@ -336,12 +392,27 @@ export class AgentService {
         this.event(
           run,
           'status',
-          'アクセス設定が変わったため、新しい会話で実行します。表示履歴は残ります。',
+          t(
+            'アクセス設定が変わったため、新しい会話で実行します。表示履歴は残ります。',
+            'The access setting changed, so this runs in a new conversation. The displayed history stays.',
+          ),
         );
       resuming = !!saved;
       if (run.cancelled) return;
-      if (saved) this.event(run, 'status', '保存済みの会話を引き継ぎます。');
-      this.event(run, 'status', `${agentNames[input.agent]} を ${space.name} で実行中`);
+      if (saved)
+        this.event(
+          run,
+          'status',
+          t('保存済みの会話を引き継ぎます。', 'Continuing the saved conversation.'),
+        );
+      this.event(
+        run,
+        'status',
+        t(
+          `${agentNames[input.agent]} を ${space.name} で実行中`,
+          `Running ${agentNames[input.agent]} in ${space.name}`,
+        ),
+      );
       this.event(
         run,
         'status',
@@ -388,7 +459,10 @@ export class AgentService {
           this.event(
             run,
             'error',
-            '前回の会話を引き継ぐ実行に失敗しました。再試行するか、会話の継続をリセットして新しい会話を始めてください。',
+            t(
+              '前回の会話を引き継ぐ実行に失敗しました。再試行するか、会話の継続をリセットして新しい会話を始めてください。',
+              'The run continuing the previous conversation failed. Try again, or reset the conversation and start a new one.',
+            ),
           );
       }
     } finally {
@@ -400,7 +474,14 @@ export class AgentService {
       if (run.cancelled) outcome = 'cancelled';
       if (record)
         await this.knowledge.finish(record, outcome).catch(() => {
-          this.event(run, 'error', '実行結果の記録に失敗しました。資料の保持版は残っています。');
+          this.event(
+            run,
+            'error',
+            t(
+              '実行結果の記録に失敗しました。資料の保持版は残っています。',
+              'Could not record the run result. The kept copies of the materials remain.',
+            ),
+          );
         });
       const done: AgentEvent = {
         runId: run.id,
@@ -408,18 +489,20 @@ export class AgentService {
         outcome,
         text:
           outcome === 'completed'
-            ? '完了'
+            ? t('完了', 'Completed')
             : outcome === 'cancelled'
-              ? '停止しました'
-              : '実行に失敗しました',
+              ? t('停止しました', 'Stopped')
+              : t('実行に失敗しました', 'Run failed'),
       };
       if (run.recorded) {
         try {
           await this.conversations.finish(run.binding, done);
         } catch {
           done.outcome = 'failed';
-          done.text =
-            '実行は終了しましたが、会話履歴を保存できませんでした。変更内容を確認してください。';
+          done.text = t(
+            '実行は終了しましたが、会話履歴を保存できませんでした。変更内容を確認してください。',
+            'The run finished, but the conversation history could not be saved. Review the changes.',
+          );
         }
       }
       if (this.runs.get(run.binding.scopeId) === run) this.runs.delete(run.binding.scopeId);
@@ -473,7 +556,7 @@ export class AgentService {
             details: JSON.stringify(p.item).slice(0, 16000),
           });
         if (m.method === 'item/completed' && p.item?.type === 'fileChange')
-          this.event(run, 'tool', 'ファイルを変更しました', {
+          this.event(run, 'tool', t('ファイルを変更しました', 'Changed files'), {
             details: JSON.stringify(p.item).slice(0, 16000),
           });
         if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
@@ -522,7 +605,7 @@ export class AgentService {
       m.method === 'item/commandExecution/requestApproval' ||
       m.method === 'item/fileChange/requestApproval'
     ) {
-      const reply = await this.ask(run, p.reason ?? '実行の許可', p);
+      const reply = await this.ask(run, p.reason ?? t('実行の許可', 'Allow this action'), p);
       result = { decision: reply.allow ? 'accept' : 'decline' };
     } else if (m.method === 'item/tool/requestUserInput') {
       const questions: Question[] = p.questions.map((q: any) => ({
@@ -530,7 +613,12 @@ export class AgentService {
         title: q.question,
         options: q.options?.map((o: any) => o.label),
       }));
-      const reply = await this.ask(run, 'エージェントからの質問', p, questions);
+      const reply = await this.ask(
+        run,
+        t('エージェントからの質問', 'Question from the agent'),
+        p,
+        questions,
+      );
       result = {
         answers: Object.fromEntries(
           questions.map((q) => [
@@ -544,11 +632,22 @@ export class AgentService {
         ),
       };
     } else if (m.method === 'item/permissions/requestApproval') {
-      const reply = await this.ask(run, p.reason ?? '追加アクセスの許可', p);
+      const reply = await this.ask(
+        run,
+        p.reason ?? t('追加アクセスの許可', 'Allow additional access'),
+        p,
+      );
       result = { permissions: reply.allow ? p.permissions : {}, scope: 'turn' };
     } else {
       // Unsupported forms/dynamic tools must never be implicitly approved.
-      this.event(run, 'error', `未対応の要求を拒否しました: ${m.method}`);
+      this.event(
+        run,
+        'error',
+        t(
+          `未対応の要求を拒否しました: ${m.method}`,
+          `Declined an unsupported request: ${m.method}`,
+        ),
+      );
       rpc.send({
         id: m.id,
         error: { code: -32601, message: 'This request is not supported by irori yet' },
@@ -628,7 +727,12 @@ export class AgentService {
               options: q.options?.map((o: any) => o.label),
               multiple: q.multiSelect === true,
             }));
-            const reply = await this.ask(run, 'Claude Code からの質問', input, questions);
+            const reply = await this.ask(
+              run,
+              t('Claude Code からの質問', 'Question from Claude Code'),
+              input,
+              questions,
+            );
             return reply.allow
               ? {
                   behavior: 'allow',
@@ -644,7 +748,7 @@ export class AgentService {
                 }
               : { behavior: 'deny', message: 'User declined to answer' };
           }
-          const reply = await this.ask(run, `${tool} の許可`, input);
+          const reply = await this.ask(run, t(`${tool} の許可`, `Allow ${tool}`), input);
           return reply.allow
             ? { behavior: 'allow', updatedInput: input }
             : { behavior: 'deny', message: 'The user denied this operation.' };

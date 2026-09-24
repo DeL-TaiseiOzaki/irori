@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import type { HostAPI } from '../domain/types';
 import type { UpdateCheck, UpdateState, UpdateTarget } from '../domain/updates';
+import { t } from '../domain/i18n';
 import './update-notice.css';
 
 export type UpdateHost = Pick<
@@ -52,7 +53,12 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
     } catch (e) {
       if (alive.current)
         setError(
-          kind === 'update' ? message(e) : '更新情報を開けませんでした。もう一度お試しください。',
+          kind === 'update'
+            ? message(e)
+            : t(
+                '更新情報を開けませんでした。もう一度お試しください。',
+                'Could not open update information. Please try again.',
+              ),
         );
     } finally {
       if (alive.current) setBusy('');
@@ -72,7 +78,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
   const working = install.phase === 'downloading' || install.phase === 'preparing';
   const failed = install.phase === 'failed';
   return (
-    <div className="update-notice" aria-label="アプリの更新">
+    <div className="update-notice" aria-label={t('アプリの更新', 'App updates')}>
       <button
         type="button"
         disabled={!!busy || working}
@@ -83,15 +89,17 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
           })
         }
       >
-        {busy === 'check' ? '確認中…' : '更新を確認'}
+        {busy === 'check' ? t('確認中…', 'Checking…') : t('更新を確認', 'Check for updates')}
       </button>
       {working ? (
         <div className="update-notice-result" role="status">
           {install.phase === 'downloading' ? (
             <>
-              <p>{install.version} をダウンロードしています</p>
+              <p>
+                {t(`${install.version} をダウンロードしています`, `Downloading ${install.version}`)}
+              </p>
               <progress
-                aria-label="ダウンロードの進み具合"
+                aria-label={t('ダウンロードの進み具合', 'Download progress')}
                 max={install.total}
                 value={install.received}
               />
@@ -101,20 +109,32 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
               </p>
               <div className="update-notice-actions">
                 <button type="button" onClick={() => void host.cancelUpdate().catch(() => {})}>
-                  キャンセル
+                  {t('キャンセル', 'Cancel')}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p>{install.version} を確認して準備しています</p>
-              <p className="update-notice-version">終わると irori を再起動します。</p>
+              <p>
+                {t(
+                  `${install.version} を確認して準備しています`,
+                  `Verifying and preparing ${install.version}`,
+                )}
+              </p>
+              <p className="update-notice-version">
+                {t('終わると irori を再起動します。', 'irori will restart once this is done.')}
+              </p>
             </>
           )}
         </div>
       ) : install.phase === 'ready' ? (
         <div className="update-notice-result" role="status">
-          <p>{install.version} に更新する準備ができました。</p>
+          <p>
+            {t(
+              `${install.version} に更新する準備ができました。`,
+              `Ready to update to ${install.version}.`,
+            )}
+          </p>
           <div className="update-notice-actions">
             <button
               type="button"
@@ -122,7 +142,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
               disabled={!!busy}
               onClick={restart}
             >
-              再起動して更新
+              {t('再起動して更新', 'Restart and update')}
             </button>
           </div>
         </div>
@@ -132,12 +152,20 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
             className="update-notice-result"
             role={failed || shown?.status === 'error' ? 'alert' : 'status'}
           >
-            {failed && <p>更新できませんでした。{install.detail}</p>}
+            {failed && (
+              <p>
+                {t('更新できませんでした。', 'Could not update.')}
+                {install.detail}
+              </p>
+            )}
             {shown && <p>{shown.detail}</p>}
             {shown?.status === 'available' && (
               <>
                 <p className="update-notice-version">
-                  使用中 {shown.currentVersion} → 公開版 {shown.release?.version}
+                  {t(
+                    `使用中 ${shown.currentVersion} → 公開版 ${shown.release?.version}`,
+                    `Current ${shown.currentVersion} → Published ${shown.release?.version}`,
+                  )}
                 </p>
                 {shown.install?.available ? (
                   <>
@@ -148,19 +176,24 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                         disabled={!!busy}
                         onClick={update}
                       >
-                        {failed ? 'もう一度更新' : '更新して再起動'}
+                        {failed
+                          ? t('もう一度更新', 'Try updating again')
+                          : t('更新して再起動', 'Update and restart')}
                       </button>
                       <button type="button" disabled={!!busy} onClick={() => open('release')}>
-                        変更点を見る
+                        {t('変更点を見る', 'View changes')}
                       </button>
                       {failed && (
                         <button type="button" disabled={!!busy} onClick={() => open('download')}>
-                          インストーラーを取得
+                          {t('インストーラーを取得', 'Get the installer')}
                         </button>
                       )}
                     </div>
                     <p className="update-notice-version">
-                      ダウンロードと確認が終わると、irori を再起動して新しい版を開きます。
+                      {t(
+                        'ダウンロードと確認が終わると、irori を再起動して新しい版を開きます。',
+                        'Once downloading and verification finish, irori will restart into the new version.',
+                      )}
                     </p>
                   </>
                 ) : (
@@ -170,14 +203,17 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                     )}
                     <div className="update-notice-actions">
                       <button type="button" disabled={!!busy} onClick={() => open('download')}>
-                        インストーラーを取得
+                        {t('インストーラーを取得', 'Get the installer')}
                       </button>
                       <button type="button" disabled={!!busy} onClick={() => open('release')}>
-                        変更点を見る
+                        {t('変更点を見る', 'View changes')}
                       </button>
                     </div>
                     <p className="update-notice-version">
-                      ブラウザで開きます。取得後、アプリを終了してインストールしてください。
+                      {t(
+                        'ブラウザで開きます。取得後、アプリを終了してインストールしてください。',
+                        'Opens in your browser. After downloading, quit the app and install it.',
+                      )}
                     </p>
                   </>
                 )}

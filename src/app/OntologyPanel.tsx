@@ -15,6 +15,7 @@ import { useResource } from './useResource';
 import { selectSubgraph, type OntologyView } from '../domain/ontology';
 import type { GraphIndexStatus } from '../domain/graph-index';
 import type { Space } from '../domain/types';
+import { t } from '../domain/i18n';
 
 function Graph({
   view,
@@ -64,7 +65,10 @@ function Graph({
     return { nodes, edges };
   }, [view]);
   return (
-    <div className="ontology-graph" aria-label="オントロジーの階層グラフ">
+    <div
+      className="ontology-graph"
+      aria-label={t('オントロジーの階層グラフ', 'Ontology hierarchy graph')}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -80,9 +84,9 @@ function Graph({
           if (nodes.length === 1) onSelect(String(nodes[0].data.entityId));
         }}
         ariaLabelConfig={{
-          'controls.zoomIn.ariaLabel': '拡大',
-          'controls.zoomOut.ariaLabel': '縮小',
-          'controls.fitView.ariaLabel': '全体を表示',
+          'controls.zoomIn.ariaLabel': t('拡大', 'Zoom in'),
+          'controls.zoomOut.ariaLabel': t('縮小', 'Zoom out'),
+          'controls.fitView.ariaLabel': t('全体を表示', 'Fit view'),
         }}
       >
         <Background color="#d1d4d5" gap={22} />
@@ -114,26 +118,26 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
     <>
       <div className="ontology-controls">
         <label>
-          サブグラフ
+          {t('サブグラフ', 'Subgraph')}
           <select
-            aria-label="サブグラフ"
+            aria-label={t('サブグラフ', 'Subgraph')}
             value={group}
             onChange={(event) => setGroup(event.target.value)}
           >
-            <option value="">すべてのグループ</option>
+            <option value="">{t('すべてのグループ', 'All groups')}</option>
             {groups.map((value) => (
               <option key={value}>{value}</option>
             ))}
           </select>
         </label>
         <label>
-          階層の起点
+          {t('階層の起点', 'Hierarchy root')}
           <select
-            aria-label="階層の起点"
+            aria-label={t('階層の起点', 'Hierarchy root')}
             value={root}
             onChange={(event) => setRoot(event.target.value)}
           >
-            <option value="">全階層</option>
+            <option value="">{t('全階層', 'All hierarchy')}</option>
             {view.entities.map((entity) => (
               <option key={entity.id} value={entity.id}>
                 {entity.label}
@@ -147,7 +151,7 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
             checked={hierarchy}
             onChange={(event) => setHierarchy(event.target.checked)}
           />
-          親子関係だけを表示
+          {t('親子関係だけを表示', 'Show only parent-child relations')}
         </label>
         <button
           onClick={() => {
@@ -156,22 +160,28 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
             setHierarchy(false);
           }}
         >
-          絞り込みを解除
+          {t('絞り込みを解除', 'Clear filters')}
         </button>
       </div>
       <p className="muted" role="status">
-        {subgraph.entities.length} / {view.entities.length} エンティティ · {subgraph.edges.length} /{' '}
-        {view.edges.length} 関係を表示。グループ外・階層外の関係は非表示です。
+        {t(
+          `${subgraph.entities.length} / ${view.entities.length} エンティティ · ${subgraph.edges.length} / ${view.edges.length} 関係を表示。グループ外・階層外の関係は非表示です。`,
+          `Showing ${subgraph.entities.length} / ${view.entities.length} entities · ${subgraph.edges.length} / ${view.edges.length} relations. Relations outside the group or hierarchy are hidden.`,
+        )}
       </p>
       {tooLarge ? (
         <p className="hint">
-          グラフは 250 エンティティ・1,000
-          関係まで表示できます。サブグラフや階層で絞り込んでください。下の一覧からもノートを開けます。
+          {t(
+            'グラフは 250 エンティティ・1,000 関係まで表示できます。サブグラフや階層で絞り込んでください。下の一覧からもノートを開けます。',
+            'The graph can show up to 250 entities and 1,000 relations. Narrow it with a subgraph or hierarchy. Notes can also be opened from the list below.',
+          )}
         </p>
       ) : subgraph.entities.length ? (
         <Graph key={`${group}:${root}:${hierarchy}`} view={subgraph} onSelect={setSelectedId} />
       ) : (
-        <p>この条件に一致するエンティティはありません。</p>
+        <p>
+          {t('この条件に一致するエンティティはありません。', 'No entities match this condition.')}
+        </p>
       )}
       <div className="ontology-selection" aria-live="polite">
         {selected ? (
@@ -179,22 +189,29 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
             <strong>{selected.label}</strong>
             <code>{selected.id}</code>
             {selected.note ? (
-              <button onClick={() => onOpen(selected.note!)}>関連ノートを開く</button>
+              <button onClick={() => onOpen(selected.note!)}>
+                {t('関連ノートを開く', 'Open related note')}
+              </button>
             ) : (
-              <span className="muted">関連ノートは未登録です</span>
+              <span className="muted">
+                {t('関連ノートは未登録です', 'No related note is registered')}
+              </span>
             )}
           </>
         ) : (
           <span className="muted">
-            グラフのエンティティを選ぶか、下の一覧からノートを開けます。
+            {t(
+              'グラフのエンティティを選ぶか、下の一覧からノートを開けます。',
+              'Select an entity in the graph, or open a note from the list below.',
+            )}
           </span>
         )}
       </div>
       <details className="ontology-list" open>
-        <summary>エンティティとノートの一覧</summary>
+        <summary>{t('エンティティとノートの一覧', 'List of entities and notes')}</summary>
         <div className="actions">
           <button disabled={!current} onClick={() => setPage(current - 1)}>
-            前の 100 件
+            {t('前の 100 件', 'Previous 100')}
           </button>
           <span>
             {current * 100 + (subgraph.entities.length ? 1 : 0)}–
@@ -204,16 +221,16 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
             disabled={(current + 1) * 100 >= subgraph.entities.length}
             onClick={() => setPage(current + 1)}
           >
-            次の 100 件
+            {t('次の 100 件', 'Next 100')}
           </button>
         </div>
         <table>
           <thead>
             <tr>
-              <th scope="col">エンティティ</th>
+              <th scope="col">{t('エンティティ', 'Entity')}</th>
               <th scope="col">ID</th>
-              <th scope="col">グループ</th>
-              <th scope="col">ノート</th>
+              <th scope="col">{t('グループ', 'Group')}</th>
+              <th scope="col">{t('ノート', 'Note')}</th>
             </tr>
           </thead>
           <tbody>
@@ -228,7 +245,7 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
                   {entity.note ? (
                     <button onClick={() => onOpen(entity.note!)}>{entity.note}</button>
                   ) : (
-                    '未登録'
+                    t('未登録', 'Not registered')
                   )}
                 </td>
               </tr>
@@ -237,9 +254,13 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
         </table>
       </details>
       <div className="actions">
-        <button onClick={() => onOpen(view.entitiesPath)}>エンティティ CSV を開く</button>
+        <button onClick={() => onOpen(view.entitiesPath)}>
+          {t('エンティティ CSV を開く', 'Open entities CSV')}
+        </button>
         {view.relationsPath && (
-          <button onClick={() => onOpen(view.relationsPath!)}>関係 CSV を開く</button>
+          <button onClick={() => onOpen(view.relationsPath!)}>
+            {t('関係 CSV を開く', 'Open relations CSV')}
+          </button>
         )}
       </div>
     </>
@@ -248,17 +269,28 @@ function OntologyContent({ view, onOpen }: { view: OntologyView; onOpen: (path: 
 
 /** The freshness line for the graph index the KB carries, as the host reports it. */
 function describeGraphIndex(status: GraphIndexStatus) {
-  const detail = [
+  const detailJa = [
     status.excluded
       ? `リンク先のページがない・URL などの関係 ${status.excluded} 件は除外しています。`
       : '',
     status.unreadable ? `frontmatter を読めないページが ${status.unreadable} 件あります。` : '',
   ].join('');
+  const detailEn = [
+    status.excluded
+      ? `Excludes ${status.excluded} relations with no linked page or a URL target.`
+      : '',
+    status.unreadable ? `${status.unreadable} pages have unreadable frontmatter.` : '',
+  ].join(' ');
   if (status.current)
-    return `グラフ索引（Knowledge_Base/ontology/）はページと一致しています。${detail}`;
-  return (
+    return t(
+      `グラフ索引（Knowledge_Base/ontology/）はページと一致しています。${detailJa}`,
+      `The graph index (Knowledge_Base/ontology/) matches the pages.${detailEn ? ` ${detailEn}` : ''}`,
+    );
+  return t(
     `グラフ索引（Knowledge_Base/ontology/）はページと一致しません。更新するとエンティティ +${status.entities.added} / −${status.entities.removed}、` +
-    `関係 +${status.relations.added} / −${status.relations.removed}。${detail}`
+      `関係 +${status.relations.added} / −${status.relations.removed}。${detailJa}`,
+    `The graph index (Knowledge_Base/ontology/) does not match the pages. Updating would change entities +${status.entities.added} / −${status.entities.removed}, ` +
+      `relations +${status.relations.added} / −${status.relations.removed}.${detailEn ? ` ${detailEn}` : ''}`,
   );
 }
 
@@ -299,7 +331,10 @@ export function OntologyPanel({
     try {
       await window.irori.updateGraphIndex(space.scopeId);
       setNotice(
-        'Knowledge_Base/ontology/ をコミットすると、ほかの端末でも同じグラフが表示されます。',
+        t(
+          'Knowledge_Base/ontology/ をコミットすると、ほかの端末でも同じグラフが表示されます。',
+          'Committing Knowledge_Base/ontology/ shows the same graph on other devices.',
+        ),
       );
       setRefresh((value) => value + 1);
     } catch (error) {
@@ -309,31 +344,52 @@ export function OntologyPanel({
     }
   }
   return (
-    <Dialog label="オントロジー" onClose={onClose}>
+    <Dialog label={t('オントロジー', 'Ontology')} onClose={onClose}>
       <section className="modal ontology-panel">
         <div className="actions">
-          <h2>{space.name} のオントロジー</h2>
-          <button onClick={() => setRefresh((value) => value + 1)}>再読み込み</button>
-          <button onClick={onClose}>閉じる</button>
+          <h2>{t(`${space.name} のオントロジー`, `Ontology for ${space.name}`)}</h2>
+          <button onClick={() => setRefresh((value) => value + 1)}>
+            {t('再読み込み', 'Reload')}
+          </button>
+          <button onClick={onClose}>{t('閉じる', 'Close')}</button>
         </div>
         <p>
           {module
-            ? 'ページの frontmatter から生成したグラフ索引を表示します。構築・整理は CLI エージェントと協調して進められます。'
-            : 'CSV の保存内容を表示します。構築・整理は CLI エージェントと協調して進められます。'}
+            ? t(
+                'ページの frontmatter から生成したグラフ索引を表示します。構築・整理は CLI エージェントと協調して進められます。',
+                'Shows the graph index generated from page frontmatter. Building and organizing it can proceed in coordination with a CLI agent.',
+              )
+            : t(
+                'CSV の保存内容を表示します。構築・整理は CLI エージェントと協調して進められます。',
+                'Shows the saved CSV content. Building and organizing it can proceed in coordination with a CLI agent.',
+              )}
         </p>
-        <button onClick={onConfigure}>構築・表示設定をエージェントに相談</button>
+        <button onClick={onConfigure}>
+          {t(
+            '構築・表示設定をエージェントに相談',
+            'Ask an agent about building or display settings',
+          )}
+        </button>
         {(module || repairModule) && (
           <div className="graph-index">
             <p className="muted" role="status">
               {status.loading
-                ? 'グラフ索引（Knowledge_Base/ontology/）とページの整合性を確認しています…'
+                ? t(
+                    'グラフ索引（Knowledge_Base/ontology/）とページの整合性を確認しています…',
+                    'Checking that the graph index (Knowledge_Base/ontology/) matches the pages…',
+                  )
                 : status.error
-                  ? `グラフ索引を確認できません: ${status.error}`
+                  ? t(
+                      `グラフ索引を確認できません: ${status.error}`,
+                      `Cannot check the graph index: ${status.error}`,
+                    )
                   : status.data && describeGraphIndex(status.data)}
             </p>
             <div className="actions">
               <button disabled={busy} onClick={generate}>
-                {repairModule ? 'ページからグラフ索引を再生成' : 'グラフ索引を更新'}
+                {repairModule
+                  ? t('ページからグラフ索引を再生成', 'Regenerate graph index from pages')
+                  : t('グラフ索引を更新', 'Update graph index')}
               </button>
             </div>
           </div>
@@ -350,18 +406,20 @@ export function OntologyPanel({
           </p>
         )}
         {loading ? (
-          <p>CSV を読み込んでいます…</p>
+          <p>{t('CSV を読み込んでいます…', 'Loading CSV…')}</p>
         ) : data ? (
           <OntologyContent key={JSON.stringify(data.revisions)} view={data} onOpen={onOpen} />
         ) : (
           !error && (
             <div className="graph-index">
               <p>
-                この KB にはオントロジーの表示設定がありません。ページの
-                frontmatter（type・title・relations）からグラフ索引を作成できます。
+                {t(
+                  'この KB にはオントロジーの表示設定がありません。ページの frontmatter（type・title・relations）からグラフ索引を作成できます。',
+                  'This KB has no ontology display settings. A graph index can be created from page frontmatter (type, title, relations).',
+                )}
               </p>
               <button disabled={busy} onClick={generate}>
-                グラフ索引を作成
+                {t('グラフ索引を作成', 'Create graph index')}
               </button>
             </div>
           )

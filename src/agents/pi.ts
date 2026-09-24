@@ -4,6 +4,7 @@ import { JsonLineConnection } from './json-lines';
 import type { ChildProcess } from 'node:child_process';
 import { launch, version } from './process';
 import type { NativeContext } from './adapter';
+import { t } from '../domain/i18n';
 
 // Pi uses its own response envelopes, not JSON-RPC.
 export class PiRpc {
@@ -44,7 +45,12 @@ export class PiRpc {
 export async function runPi(ctx: NativeContext) {
   const installed = (await version('pi')).match(/(?:^|\s)(\d+)\.(\d+)\.(\d+)/);
   if (!installed || (Number(installed[1]) === 0 && Number(installed[2]) < 85))
-    throw Error('Pi 0.85以降が必要です。ネイティブCLIを更新してください。');
+    throw Error(
+      t(
+        'Pi 0.85以降が必要です。ネイティブCLIを更新してください。',
+        'Pi 0.85 or later is required. Update the native CLI.',
+      ),
+    );
   // Exact files only: never let a missing saved path create a fresh native session.
   if (ctx.session) {
     if (!path.isAbsolute(ctx.session)) throw Error('Invalid saved Pi session path');
@@ -106,7 +112,8 @@ export async function runPi(ctx: NativeContext) {
         ctx.event('tool', String(event.toolName ?? 'Pi tool'), {
           details: JSON.stringify(event).slice(0, 16000),
         });
-      if (event.type === 'auto_retry_start') ctx.event('status', 'Pi がネイティブの再試行を実行中');
+      if (event.type === 'auto_retry_start')
+        ctx.event('status', t('Pi がネイティブの再試行を実行中', 'Pi is retrying natively'));
       if (event.type === 'extension_error') {
         ctx.event('error', String(event.error));
         fail(Error('Pi extension failed'));
@@ -132,18 +139,24 @@ export async function runPi(ctx: NativeContext) {
     }
     if (!['select', 'input', 'editor', 'confirm'].includes(event.method)) {
       rpc.send({ type: 'extension_ui_response', id: event.id, cancelled: true });
-      ctx.event('error', `未対応のPi拡張UI: ${String(event.method)}`);
+      ctx.event(
+        'error',
+        t(
+          `未対応のPi拡張UI: ${String(event.method)}`,
+          `Unsupported Pi extension UI: ${String(event.method)}`,
+        ),
+      );
       return;
     }
     const reply = await ctx.ask(
-      String(event.title ?? 'Pi からの確認'),
+      String(event.title ?? t('Pi からの確認', 'Confirmation from Pi')),
       event,
       event.method === 'confirm'
         ? undefined
         : [
             {
               id: event.id,
-              title: String(event.title ?? 'Pi からの質問'),
+              title: String(event.title ?? t('Pi からの質問', 'Question from Pi')),
               options: event.method === 'select' ? event.options : undefined,
             },
           ],

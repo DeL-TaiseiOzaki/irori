@@ -18,6 +18,7 @@ import {
   type SourceLocation,
 } from '../domain/knowledge';
 import type { StartRun } from '../domain/types';
+import { t } from '../domain/i18n';
 
 /** Private immutable bytes and observations. No transcripts or cross-KB metadata are published. */
 export class KnowledgeStore {
@@ -36,7 +37,12 @@ export class KnowledgeStore {
   async bytes(version: SourceVersion) {
     const bytes = await fs.readFile(this.blobPath(version.hash));
     if (bytes.length !== version.size || hash(bytes) !== version.hash)
-      throw Error('保持した資料の整合性を確認できません。');
+      throw Error(
+        t(
+          '保持した資料の整合性を確認できません。',
+          'Could not verify the integrity of the kept material.',
+        ),
+      );
     return bytes;
   }
   capture(ref: SourceRef): Promise<SourceVersion> {
@@ -45,13 +51,24 @@ export class KnowledgeStore {
       const filename = await this.resolve(ref);
       const stat = await fs.stat(filename);
       if (!stat.isFile() || stat.size > 64 * 1024 * 1024)
-        throw Error('保持できる資料は 64 MiB 以下のファイルです。');
+        throw Error(
+          t(
+            '保持できる資料は 64 MiB 以下のファイルです。',
+            'Only files of 64 MiB or less can be kept as materials.',
+          ),
+        );
       const bytes = await fs.readFile(filename);
-      if (bytes.length > 64 * 1024 * 1024) throw Error('資料のサイズ上限を超えています。');
+      if (bytes.length > 64 * 1024 * 1024)
+        throw Error(t('資料のサイズ上限を超えています。', 'The material exceeds the size limit.'));
       const digest = hash(bytes);
       // Re-read to reject a file that changed while being observed (no filesystem snapshot claim).
       if (hash(await fs.readFile(filename)) !== digest)
-        throw Error('資料が変更中です。保存完了後に再試行してください。');
+        throw Error(
+          t(
+            '資料が変更中です。保存完了後に再試行してください。',
+            'The material is changing. Try again after it finishes saving.',
+          ),
+        );
       const { filename: indexFile, entries: index } = await this.index(ref.scopeId);
       const known = Object.hasOwn(index, ref.path);
       const id = known ? index[ref.path] : randomUUID();
@@ -61,7 +78,8 @@ export class KnowledgeStore {
       }
       const blob = this.blobPath(digest);
       try {
-        if (hash(await fs.readFile(blob)) !== digest) throw Error('保持した資料が破損しています。');
+        if (hash(await fs.readFile(blob)) !== digest)
+          throw Error(t('保持した資料が破損しています。', 'The kept material is corrupted.'));
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         await writeLocalFile(blob, bytes);
@@ -149,7 +167,13 @@ export class KnowledgeStore {
     const run = runRecord.parse(
       await readLocalJson(path.join(this.directory, 'runs', ref.scopeId, `${runId}.json`), null),
     );
-    if (run.scopeId !== ref.scopeId) throw Error('成果物は実行したスペースで登録してください。');
+    if (run.scopeId !== ref.scopeId)
+      throw Error(
+        t(
+          '成果物は実行したスペースで登録してください。',
+          'Register the output in the space where the run happened.',
+        ),
+      );
     const source = await this.capture(ref);
     const record = artifactRecord.parse({
       id: randomUUID(),
@@ -167,9 +191,15 @@ export class KnowledgeStore {
   async sourceText(version: SourceVersion) {
     sourceVersion.parse(version);
     if (version.size > 2 * 1024 * 1024)
-      throw Error('この資料のプレビューは 2 MiB を超えています。');
+      throw Error(
+        t(
+          'この資料のプレビューは 2 MiB を超えています。',
+          'This material is over 2 MiB, too large to preview.',
+        ),
+      );
     const text = new TextDecoder('utf-8', { fatal: true }).decode(await this.bytes(version));
-    if (text.includes('\0')) throw Error('この資料はバイナリ形式です。');
+    if (text.includes('\0'))
+      throw Error(t('この資料はバイナリ形式です。', 'This material is a binary file.'));
     return text;
   }
   private async index(scopeId: string) {
@@ -177,7 +207,9 @@ export class KnowledgeStore {
     const filename = path.join(this.directory, `index-${scopeId}.json`);
     const entries = z.record(z.string(), z.uuid()).parse(await readLocalJson(filename, {}));
     if (new Set(Object.values(entries)).size !== Object.keys(entries).length)
-      throw Error('資料 ID の登録が重複しています。');
+      throw Error(
+        t('資料 ID の登録が重複しています。', 'The material ID is registered more than once.'),
+      );
     return { filename, entries };
   }
   locate(version: SourceVersion): Promise<SourceLocation> {
@@ -208,11 +240,18 @@ export class KnowledgeStore {
       sourceVersion.parse(previous);
       sourceDestination.parse(next);
       if (previous.scopeId !== next.scopeId)
-        throw Error('資料 ID は同じスペース内で再接続してください。');
+        throw Error(
+          t(
+            '資料 ID は同じスペース内で再接続してください。',
+            'Reconnect a material ID within the same space.',
+          ),
+        );
       const { filename: indexFile, entries: index } = await this.index(next.scopeId);
       const current = Object.keys(index).find((key) => index[key] === previous.id);
       if (!current || Object.hasOwn(index, next.path))
-        throw Error('資料の登録状態が変わっています。');
+        throw Error(
+          t('資料の登録状態が変わっています。', 'The material registration has changed.'),
+        );
       // Copies never inherit an existing identity. Only explicitly reconnect a missing source.
       let missing = false;
       try {
@@ -222,19 +261,29 @@ export class KnowledgeStore {
         missing = true;
       }
       if (!missing)
-        throw Error('現在の場所に資料があります。コピーには別の資料 ID を使ってください。');
+        throw Error(
+          t(
+            '現在の場所に資料があります。コピーには別の資料 ID を使ってください。',
+            'The material is still at its current location. Use a different material ID for a copy.',
+          ),
+        );
       await this.bytes(previous);
       const filename = await this.resolve(next);
       const stat = await fs.stat(filename);
       if (!stat.isFile() || stat.size !== previous.size || stat.size > 64 * 1024 * 1024)
-        throw Error('移動先の版が一致しません。');
+        throw Error(
+          t('移動先の版が一致しません。', 'The version at the destination does not match.'),
+        );
       if (
         hash(await fs.readFile(filename)) !== previous.hash ||
         hash(await fs.readFile(filename)) !== previous.hash
       )
-        throw Error('移動先の版が一致しません。');
+        throw Error(
+          t('移動先の版が一致しません。', 'The version at the destination does not match.'),
+        );
       // Resolve again before recording; preserve all historical paths and bytes.
-      if ((await this.resolve(next)) !== filename) throw Error('移動先が変更中です。');
+      if ((await this.resolve(next)) !== filename)
+        throw Error(t('移動先が変更中です。', 'The destination is changing.'));
       delete index[current];
       index[next.path] = previous.id;
       await writeLocalJson(indexFile, index);

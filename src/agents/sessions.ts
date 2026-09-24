@@ -5,6 +5,7 @@ import { writeLocalJson } from '../host/local-json';
 import { z } from 'zod';
 import type { AgentAccess, AgentId, AgentSession } from '../domain/types';
 import { agentIds, agentAccessModes } from '../domain/types';
+import { t } from '../domain/i18n';
 
 export type SessionBinding = { scopeId: string; agent: AgentId; root: string };
 export function sessionKey(binding: SessionBinding) {
@@ -46,7 +47,10 @@ export class SessionStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw Error(
-        '保存済みの会話を読み込めません。再試行するか、会話の継続をリセットしてください。',
+        t(
+          '保存済みの会話を読み込めません。再試行するか、会話の継続をリセットしてください。',
+          'Could not load the saved conversation. Try again or reset the conversation.',
+        ),
         { cause: error },
       );
     }

@@ -13,6 +13,7 @@ import {
 import { FileService, hash } from './files';
 import { SerialQueue } from './serial-queue';
 import { writeLocalJson } from './local-json';
+import { t } from '../domain/i18n';
 
 const storedDraft = draftValue
   .extend({
@@ -85,7 +86,10 @@ export class DraftService {
       const existing = await this.readTarget(target);
       if ((existing?.revision ?? null) !== expectedRevision)
         throw Error(
-          '別の操作で下書きが更新されました。入力を保持したまま、保存を再試行してください。',
+          t(
+            '別の操作で下書きが更新されました。入力を保持したまま、保存を再試行してください。',
+            'Another action updated the draft. Your input is kept; try saving again.',
+          ),
         );
       const record: DraftRecord = {
         ...value,

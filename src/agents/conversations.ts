@@ -11,6 +11,7 @@ import {
 import { readLocalJson, writeLocalJson } from '../host/local-json';
 import { SerialQueue } from '../host/serial-queue';
 import { sessionKey, type SessionBinding } from './sessions';
+import { t } from '../domain/i18n';
 
 // Persist display text, never live approval identifiers or replayable questions.
 const storedEvent = z.object({
@@ -67,13 +68,21 @@ export class ConversationStore {
       value.agent !== binding.agent ||
       value.root !== binding.root
     )
-      throw Error('保存した会話のスペース・CLI・フォルダが一致しません。');
+      throw Error(
+        t(
+          '保存した会話のスペース・CLI・フォルダが一致しません。',
+          'The saved conversation does not match this space, CLI or folder.',
+        ),
+      );
     // A new host cannot establish whether the old native turn completed. Never requeue it.
     if (value.activeRunId) {
       this.append(value, {
         runId: value.activeRunId,
         type: 'error',
-        text: '前回の実行結果は未確認です。変更内容を確認してください。この指示は再送していません。',
+        text: t(
+          '前回の実行結果は未確認です。変更内容を確認してください。この指示は再送していません。',
+          'The previous run did not report its result. Review the changes. This instruction was not sent again.',
+        ),
       });
       delete value.activeRunId;
       await this.persist(binding, value);
@@ -84,7 +93,12 @@ export class ConversationStore {
     const key = sessionKey(binding);
     // Keep accepted messages intact. Refuse a new oversized queue before acknowledging it.
     if (bytes(value.queued) > 1024 * 1024)
-      throw Error('送信待ちの保存容量を超えています。指示や参照資料を減らしてください。');
+      throw Error(
+        t(
+          '送信待ちの保存容量を超えています。指示や参照資料を減らしてください。',
+          'The queue is out of storage. Shorten the instructions or reference fewer materials.',
+        ),
+      );
     await writeLocalJson(this.filename(key), recordSchema.parse(value));
     this.records.set(key, value);
     this.dirty.delete(key);
@@ -119,7 +133,8 @@ export class ConversationStore {
   enqueue(binding: SessionBinding, input: StartRun) {
     return this.queue.run(async () => {
       const value = structuredClone(await this.load(binding));
-      if (value.queued.length >= 20) throw Error('送信待ちは 20 件までです。');
+      if (value.queued.length >= 20)
+        throw Error(t('送信待ちは 20 件までです。', 'The queue holds up to 20 instructions.'));
       value.queued.push(queuedMessage.parse({ ...input, id: randomUUID() }));
       await this.persist(binding, value);
       return structuredClone(value.queued);
@@ -129,7 +144,7 @@ export class ConversationStore {
     return this.queue.run(async () => {
       const value = structuredClone(await this.load(binding));
       if (!value.queued.some((item) => item.id === id))
-        throw Error('この指示は送信待ちにありません。');
+        throw Error(t('この指示は送信待ちにありません。', 'This instruction is not in the queue.'));
       value.queued = value.queued.filter((item) => item.id !== id);
       await this.persist(binding, value);
       return structuredClone(value.queued);
@@ -139,13 +154,24 @@ export class ConversationStore {
     return this.queue.run(async () => {
       const value = structuredClone(await this.load(binding));
       if (queuedId) {
-        if (value.queued[0]?.id !== queuedId) throw Error('送信待ちの順序が変わりました。');
+        if (value.queued[0]?.id !== queuedId)
+          throw Error(t('送信待ちの順序が変わりました。', 'The queue order has changed.'));
         value.queued.shift();
-      } else if (value.queued.length) throw Error('送信待ちを再開または取り消してください。');
+      } else if (value.queued.length)
+        throw Error(
+          t(
+            '送信待ちを再開または取り消してください。',
+            'Resume or cancel the queued instructions.',
+          ),
+        );
       messageInput.parse(input);
       value.activeRunId = runId;
       if (input.newSession)
-        this.append(value, { runId, type: 'status', text: '新しい会話を開始します。' });
+        this.append(value, {
+          runId,
+          type: 'status',
+          text: t('新しい会話を開始します。', 'Starting a new conversation.'),
+        });
       this.append(value, { runId, type: 'status', role: 'user', text: input.prompt });
       // Claim the queued instruction and record its run in one durable write, before CLI launch.
       await this.persist(binding, value);

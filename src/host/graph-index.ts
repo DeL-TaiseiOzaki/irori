@@ -24,6 +24,7 @@ import {
 import { textFileByteLimit, type FileService } from './files';
 import { knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
+import { t } from '../domain/i18n';
 
 /** A page's facts at the size and modification time they were read. */
 interface Remembered {
@@ -66,7 +67,10 @@ export class GraphIndexService {
   async update(scopeId: string): Promise<GraphIndexUpdate> {
     if ((await readDeclaration(this.files, scopeId)) !== null)
       throw Error(
-        'この KB は .irori/ontology.json で表示設定を宣言しているため、グラフ索引は生成しません。',
+        t(
+          'この KB は .irori/ontology.json で表示設定を宣言しているため、グラフ索引は生成しません。',
+          'This KB declares its view in .irori/ontology.json, so no graph index is generated.',
+        ),
       );
     const built = await this.build(scopeId);
     const written: string[] = [];
@@ -133,14 +137,22 @@ export class GraphIndexService {
     );
     this.remembered.set(scopeId, next);
     if (walk.incomplete)
-      throw Error('ナレッジ層を最後まで読めなかったため、グラフ索引を確認できません。');
+      throw Error(
+        t(
+          'ナレッジ層を最後まで読めなかったため、グラフ索引を確認できません。',
+          'The Knowledge layer could not be read completely, so the graph index cannot be checked.',
+        ),
+      );
     const tables = buildGraphIndex(pages);
     if (
       tables.entities.length > graphIndexLimits.entities ||
       tables.relations.length > graphIndexLimits.relations
     )
       throw Error(
-        `グラフ索引は ${graphIndexLimits.entities.toLocaleString('en-US')} エンティティ・${graphIndexLimits.relations.toLocaleString('en-US')} 関係までです（今は ${tables.entities.length.toLocaleString('en-US')} エンティティ・${tables.relations.length.toLocaleString('en-US')} 関係）。書き込まずに終了しました。`,
+        t(
+          `グラフ索引は ${graphIndexLimits.entities.toLocaleString('en-US')} エンティティ・${graphIndexLimits.relations.toLocaleString('en-US')} 関係までです（今は ${tables.entities.length.toLocaleString('en-US')} エンティティ・${tables.relations.length.toLocaleString('en-US')} 関係）。書き込まずに終了しました。`,
+          `The graph index holds up to ${graphIndexLimits.entities.toLocaleString('en-US')} entities and ${graphIndexLimits.relations.toLocaleString('en-US')} relations (now ${tables.entities.length.toLocaleString('en-US')} entities and ${tables.relations.length.toLocaleString('en-US')} relations). Stopped without writing.`,
+        ),
       );
     const texts = renderGraphIndex(tables);
     // Validate every output before publishing the first: long paths repeated in
@@ -148,10 +160,18 @@ export class GraphIndexService {
     for (const [key, text] of Object.entries(texts)) {
       if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
         throw Error(
-          `${graphIndexFiles[key as keyof typeof texts]} が 2 MiB を超えるため、グラフ索引は書き込まれませんでした。`,
+          t(
+            `${graphIndexFiles[key as keyof typeof texts]} が 2 MiB を超えるため、グラフ索引は書き込まれませんでした。`,
+            `${graphIndexFiles[key as keyof typeof texts]} exceeds 2 MiB, so the graph index was not written.`,
+          ),
         );
       if (text.includes('\0'))
-        throw Error('生成するグラフ索引に NUL があるため、書き込まれませんでした。');
+        throw Error(
+          t(
+            '生成するグラフ索引に NUL があるため、書き込まれませんでした。',
+            'The generated graph index contains NUL, so it was not written.',
+          ),
+        );
     }
     return { tables, texts, pages: pages.length, unreadable };
   }
@@ -173,7 +193,10 @@ async function moduleFile(files: FileService, scopeId: string, relative: string)
   const file = await open(filename, 'r');
   try {
     const before = await file.stat();
-    if (!before.isFile()) throw Error('生成先が通常のファイルではありません。');
+    if (!before.isFile())
+      throw Error(
+        t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
+      );
     const digest = createHash('sha256');
     const chunks: Buffer[] = [];
     let size = 0;
@@ -185,7 +208,12 @@ async function moduleFile(files: FileService, scopeId: string, relative: string)
     }
     const after = await file.stat();
     if (size !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
-      throw Error('CONFLICT: グラフ索引の読み取り中にファイルが変更されました。');
+      throw Error(
+        t(
+          'CONFLICT: グラフ索引の読み取り中にファイルが変更されました。',
+          'CONFLICT: A file changed while the graph index was being read.',
+        ),
+      );
     await knowledgePath(files, scopeId, relative);
     let text: string | undefined;
     if (size <= textFileByteLimit)
