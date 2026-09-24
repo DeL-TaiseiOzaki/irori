@@ -32,6 +32,14 @@ const bindingSchema = z.object({
   placeholder: z.object({ dev: z.number(), ino: z.number() }).optional(),
 });
 type Binding = z.infer<typeof bindingSchema>;
+/** Settles with the promise, or rejects once `ms` have passed. */
+function bounded<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Error('Timed out')), ms);
+  });
+  return Promise.race([promise, expiry]).finally(() => clearTimeout(timer));
+}
 type Mounted = {
   attachment: CloudAttachment;
   target: string;
@@ -846,11 +854,16 @@ export class CloudService {
     try {
       const { queue } = await this.rpc.call('vfs/queue', { fs: mounted.filesystem });
       if (Array.isArray(queue) && queue.some((item) => item?.name === remote)) return false;
-      const { item } = await this.rpc.call('operations/stat', {
-        fs: mounted.remote,
-        remote,
-        opt: { filesOnly: true, hashTypes: ['md5'] },
-      });
+      // Autosave runs a second after typing stops, so an unreachable Drive may cost a
+      // save a few seconds at most, not rclone's own connection timeout.
+      const { item } = await bounded(
+        this.rpc.call('operations/stat', {
+          fs: mounted.remote,
+          remote,
+          opt: { filesOnly: true, hashTypes: ['md5'] },
+        }),
+        5000,
+      );
       const checksum = item?.Hashes?.md5;
       if (typeof checksum !== 'string' || !checksum) return false;
       if (checksum.toLowerCase() === createHash('md5').update(before).digest('hex')) return false;
