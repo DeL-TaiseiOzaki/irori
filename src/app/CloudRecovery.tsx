@@ -41,37 +41,39 @@ export function CloudRecovery() {
       </button>
       {open && (
         <Dialog label="端末の送信準備" busy={busy} onClose={() => setOpen(false)}>
-          <header className="actions">
-            <h2>端末の送信準備</h2>
-            <button disabled={busy} onClick={() => setOpen(false)}>
-              閉じる
-            </button>
-          </header>
-          <p>
-            接続やワークスペースの登録を削除した後も、送信準備として保持した版を別ファイルに復元できます。
-          </p>
-          <p>復元後、送信先を確認して準備し直してください。この操作では Drive へ送信しません。</p>
-          {error && <p role="alert">{error}</p>}
-          {!result && busy && <p role="status">読み込み中…</p>}
-          {result && result.unreadable > 0 && (
-            <p role="alert">
-              読み込めない記録があります（{result.unreadable} 件）。読み込めた記録は復元できます。
+          <div className="modal">
+            <header className="actions">
+              <h2>端末の送信準備</h2>
+              <button disabled={busy} onClick={() => setOpen(false)}>
+                閉じる
+              </button>
+            </header>
+            <p>
+              接続やワークスペースの登録を削除した後も、送信準備として保持した版を別ファイルに復元できます。
             </p>
-          )}
-          {result && !result.entries.length && <p>復元できる送信準備はありません。</p>}
-          <ul>
-            {result?.entries.map((item) => (
-              <li key={`${item.ownerId}/${item.id}`}>
-                <strong>{item.name}</strong>
-                <p>
-                  {item.source.path} · {new Date(item.createdAt).toLocaleString()}
-                </p>
-                <button disabled={busy} onClick={() => void restore(item.source)}>
-                  別ファイルに復元
-                </button>
-              </li>
-            ))}
-          </ul>
+            <p>復元後、送信先を確認して準備し直してください。この操作では Drive へ送信しません。</p>
+            {error && <p role="alert">{error}</p>}
+            {!result && busy && <p role="status">読み込み中…</p>}
+            {result && result.unreadable > 0 && (
+              <p role="alert">
+                読み込めない記録があります（{result.unreadable} 件）。読み込めた記録は復元できます。
+              </p>
+            )}
+            {result && !result.entries.length && <p>復元できる送信準備はありません。</p>}
+            <ul>
+              {result?.entries.map((item) => (
+                <li key={`${item.ownerId}/${item.id}`}>
+                  <strong>{item.name}</strong>
+                  <p>
+                    {item.source.path} · {new Date(item.createdAt).toLocaleString()}
+                  </p>
+                  <button disabled={busy} onClick={() => void restore(item.source)}>
+                    別ファイルに復元
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </Dialog>
       )}
     </>

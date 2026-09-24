@@ -66,7 +66,7 @@
   font-size: 12px;
 }
 .git-sidebar button.primary {
-  color: #fff;
+  color: var(--nav-text-strong);
   background: var(--nav);
 }
 .git-sidebar .git-toolbar {
@@ -158,7 +158,7 @@
   background: transparent;
 }
 .git-sidebar .git-stage-file:hover:not(:disabled) {
-  background: #e7e9e7;
+  background: var(--surface-selected);
 }
 .git-sidebar .git-confirmation {
   flex-shrink: 0;

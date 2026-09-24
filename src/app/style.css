@@ -1745,7 +1745,7 @@ footer > span {
 }
 .agent-question button[aria-pressed='true'] {
   background: var(--nav);
-  color: white;
+  color: var(--nav-text-strong);
 }
 /* Repository and cloud setup share one restrained form system. */
 .repository-preview,
@@ -1806,6 +1806,21 @@ footer > span {
   flex: 1;
   cursor: pointer;
 }
+.folder-row.selected {
+  background: var(--ember-wash);
+  box-shadow: inset 3px 0 0 var(--ember);
+}
+.folder-trail .choose-current {
+  margin-left: auto;
+}
+.folder-trail .choose-current[aria-pressed='true'] {
+  background: var(--ember-wash);
+  border-color: var(--ember-border);
+}
+.attachment-form {
+  margin-top: 16px;
+  padding-top: 4px;
+}
 .cloud-folders {
   max-height: 230px;
   overflow: auto;
@@ -1853,7 +1868,7 @@ footer > span {
   white-space: pre-wrap;
   overflow: auto;
   max-height: 130px;
-  background: white;
+  background: var(--surface);
   padding: 8px;
 }
 .modal-dialog {
@@ -1869,7 +1884,10 @@ footer > span {
   backdrop-filter: blur(3px);
 }
 .modal {
-  background: white;
+  /* A dialog sits in the top layer but inherits its colour from wherever it is
+     rendered, often the dark sidebar; the surface and the ink are set together. */
+  background: var(--surface);
+  color: var(--ink);
   border: 1px solid var(--rule-soft);
   border-radius: 14px;
   box-shadow: var(--shadow-modal);

@@ -91,7 +91,11 @@ try {
   await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[1].id);
   await page.getByLabel('ドライブ', { exact: true }).selectOption('shared-fixture');
   await expect(page.locator('.folder-row')).toHaveCount(1);
-  await page.locator('.folder-row').getByRole('radio').check();
+  // Opening a folder must still leave a way to connect that folder itself.
+  await page.locator('.folder-row').getByRole('button', { name: '開く' }).click();
+  await expect(page.getByRole('button', { name: '接続先を登録', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '「成果物」を接続先にする' }).click();
+  await expect(page.locator('.mount-preview')).toContainText('接続するフォルダ: 成果物');
   await page.getByLabel('contents内のフォルダ名').fill('納品物');
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.locator('.connection-card')).toHaveCount(2);
@@ -105,6 +109,32 @@ try {
   expect(JSON.stringify(stored)).not.toContain(accounts[0].id);
   expect(JSON.stringify(stored)).not.toContain(base);
   await page.screenshot({ path: 'test-results/irori-cloud-connections.png' });
+  // Dialog text must stay readable on the dialog's own surface in both themes.
+  const luminance = (colour: string) => {
+    const [r, g, b] = colour
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map((value) => {
+        const c = Number(value) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    const surface = await page
+      .locator('.connections')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    const text = await page
+      .locator('.connections h3')
+      .first()
+      .evaluate((element) => getComputedStyle(element).color);
+    const [light, dark] = [luminance(surface), luminance(text)].sort((a, b) => b - a);
+    expect((light + 0.05) / (dark + 0.05), `${theme} dialog contrast`).toBeGreaterThan(4.5);
+  }
+  // Buttons fade their background, so let the switch settle before the evidence image.
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/irori-cloud-connections-dark.png' });
 } finally {
   await app.close();
 }
@@ -209,6 +239,8 @@ try {
           'multi-scope startup profile',
           'two accounts',
           'shared-drive folder selection',
+          'an opened folder can itself be connected',
+          'dialog text contrast in light and dark themes',
           'user-selected Japanese mount names',
           'duplicate-name rejection',
           'provider folder IDs preserved',

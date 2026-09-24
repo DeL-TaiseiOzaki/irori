@@ -1,5 +1,5 @@
 import { Dialog } from './Dialog';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CloudFolder, CloudRoot } from '../domain/types';
 import { mountNameError } from '../domain/connections';
 import { useResource } from './useResource';
@@ -33,6 +33,7 @@ export function Connections({
   const [editing, setEditing] = useState<string>(),
     [newName, setNewName] = useState('');
   const current = trail.at(-1);
+  const form = useRef<HTMLFormElement>(null);
   const setupRead = useResource(() => host.cloudSetup(), [space.scopeId, revision]);
   const overview = useResource(
     () => Promise.all([host.cloudAccounts(), host.cloudConnections(space.scopeId)]),
@@ -71,6 +72,14 @@ export function Connections({
       setRevision((v) => v + 1);
       setBusy(false);
     }
+  }
+  useEffect(() => {
+    // The form opens below a scrolled folder list; bring it to the reader.
+    if (selected) form.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selected?.id]);
+  function choose(folder: CloudFolder) {
+    setSelected(folder);
+    setName(folder.name);
   }
   const disabled = busy || running;
   const invalidName = selected ? mountNameError(name) : undefined;
@@ -238,23 +247,35 @@ export function Connections({
                     {folder.name}
                   </button>
                 ))}
+                {/* A drive root has no parent to verify it against, so only folders
+                    reached by opening can be chosen as the folder being viewed. */}
+                {current.parentId && (
+                  <button
+                    className="choose-current"
+                    aria-pressed={selected?.id === current.id}
+                    disabled={disabled}
+                    onClick={() => choose(current)}
+                  >
+                    「{current.name}」を接続先にする
+                  </button>
+                )}
               </div>
               {loading ? (
                 <p>フォルダを読み込んでいます…</p>
               ) : (
                 <div className="cloud-folders">
                   {folders.map((folder) => (
-                    <div className="folder-row" key={folder.id}>
+                    <div
+                      className={`folder-row ${selected?.id === folder.id ? 'selected' : ''}`}
+                      key={folder.id}
+                    >
                       <label>
                         <input
                           type="radio"
                           name="cloud-folder"
                           checked={selected?.id === folder.id}
                           disabled={disabled}
-                          onChange={() => {
-                            setSelected(folder);
-                            setName(folder.name);
-                          }}
+                          onChange={() => choose(folder)}
                         />
                         <span>
                           {folder.name}
@@ -276,8 +297,16 @@ export function Connections({
               )}
             </>
           )}
+          {current && !selected && (
+            <p className="muted">
+              接続するフォルダを一覧で選ぶか、開いたフォルダの「接続先にする」を押すと、ここに接続ボタンが表示されます。
+            </p>
+          )}
           {selected && (
             <form
+              ref={form}
+              className="attachment-form"
+              aria-label="接続先の登録"
               onSubmit={(e) => {
                 e.preventDefault();
                 void perform(async () => {
@@ -321,6 +350,8 @@ export function Connections({
                 />
               </label>
               <p className="mount-preview" aria-live="polite">
+                接続するフォルダ: {selected.name}
+                <br />
                 マウント先: {contentsRoot}/{name}/
               </p>
               {invalidName && <p role="alert">{invalidName}</p>}
