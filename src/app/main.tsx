@@ -1050,6 +1050,35 @@ function App() {
                   });
                 }}
                 onRefresh={() => setRevision((value) => value + 1)}
+                drive={
+                  cloudRoot && (
+                    <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
+                      <div className="scope-heading">
+                        <strong>
+                          <Icon name="cloud" size={14} /> Google Drive
+                        </strong>
+                        <button
+                          className="scope-action"
+                          disabled={dirty || running || connecting}
+                          onClick={() => showConnections(cloudRoot)}
+                          aria-label="Drive フォルダを接続"
+                        >
+                          接続
+                        </button>
+                      </div>
+                      <Tree
+                        space={cloudRoot}
+                        layer="contents"
+                        directory="contents"
+                        roots={{ entries: [] }}
+                        revision={revision}
+                        selected={doc}
+                        readEntries={host.cloudEntries}
+                        onOpen={(root, entry) => void openCloud(root, entry)}
+                      />
+                    </section>
+                  )
+                }
               />
               {active && notesDeclared?.daily && (
                 <button
@@ -1072,33 +1101,6 @@ function App() {
                 >
                   削除したノートを復元
                 </button>
-              )}
-              {cloudRoot && (
-                <section className="workspace-drive" aria-label="ワークスペースの Google Drive">
-                  <div className="scope-heading">
-                    <strong>
-                      <Icon name="cloud" size={14} /> Google Drive
-                    </strong>
-                    <button
-                      className="scope-action"
-                      disabled={dirty || running || connecting}
-                      onClick={() => showConnections(cloudRoot)}
-                      aria-label="Drive フォルダを接続"
-                    >
-                      接続
-                    </button>
-                  </div>
-                  <Tree
-                    space={cloudRoot}
-                    layer="contents"
-                    directory="contents"
-                    roots={{ entries: [] }}
-                    revision={revision}
-                    selected={doc}
-                    readEntries={host.cloudEntries}
-                    onOpen={(root, entry) => void openCloud(root, entry)}
-                  />
-                </section>
               )}
               <button
                 className="add-space"

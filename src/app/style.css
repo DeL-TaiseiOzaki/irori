@@ -912,8 +912,10 @@ textarea {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
-.workspace-panes > .explorer-pane > .sidebar,
-.workspace-panes > .assistant-pane > .agent-panel,
+/* The pane library wraps each pane's classed element in its own [data-panel]
+   element, so these select from the classed element, not from the group. */
+.explorer-pane > .sidebar,
+.assistant-pane > .agent-panel,
 .workspace-pane > main {
   flex: 1;
   min-height: 0;
@@ -923,6 +925,8 @@ textarea {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* On a short window the sidebar scrolls rather than clipping the Drive list. */
+  overflow-y: auto;
 }
 .workspace-views {
   --magnet-highlight: var(--nav-raised);
@@ -1037,16 +1041,35 @@ textarea {
   flex-shrink: 0;
 }
 .layer-explorer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  /* A resizable group has no height of its own, so the explorer keeps room for
+     its three headings and some of each tree before the Drive list takes space. */
+  min-height: 240px;
   border-top: 1px solid var(--nav-rule);
 }
+/* Rows and the personal/team split are resizable groups; the reader's sizes
+   are kept on the device like the other panes. */
+.layer-rows {
+  flex: 1;
+  min-height: 0;
+}
+.layer-row,
+.layer-split,
+.layer-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.layer-handle {
+  background: var(--nav-rule);
+}
 .workspace-drive {
-  flex: 0 1 180px;
-  min-height: 80px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   border-bottom: 1px solid var(--nav-rule);
   padding: 8px;
@@ -1061,19 +1084,14 @@ textarea {
 .layer-pane {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
   min-height: 0;
-  border-bottom: 1px solid var(--nav-rule);
-}
-.layer-pane.schema {
-  grid-column: 1 / -1;
-}
-.layer-pane.my-kb,
-.layer-pane.my-contents {
-  border-right: 1px solid var(--nav-rule);
+  overflow: hidden;
 }
 .layer-heading {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;

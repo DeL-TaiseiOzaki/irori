@@ -10,7 +10,8 @@ const settings = z.object({
   markdownFont: z.enum(markdownFonts).default('sans'),
   editorAssistance: z.boolean().default(true),
   // The pane library owns this format; it is stored as written and bounded.
-  layouts: z.record(z.string().max(64), z.string().max(4096)).default({}),
+  // Keys are the library's: its prefix, the group id and every panel id.
+  layouts: z.record(z.string().max(160), z.string().max(4096)).default({}),
   skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
 });
 
