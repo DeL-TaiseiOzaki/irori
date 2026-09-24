@@ -92,6 +92,7 @@ test('A workspace-scoped Drive note accepts a pasted image', async (t) => {
     device: info.dev,
     inode: info.ino,
     filesystem: 'fixture:',
+    remote: { _name: 'fixture' },
     writable: true,
   });
   const original = rpc.call.bind(rpc);
