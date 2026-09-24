@@ -1,6 +1,15 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import {
+  Group as PaneGroup,
+  Panel as Pane,
+  Separator as PaneSeparator,
+  useDefaultLayout,
+  usePanelRef,
+  type PanelImperativeHandle,
+} from 'react-resizable-panels';
 import type { CloudRoot, Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
+import { layoutStorage } from './device-settings';
 import { useResource } from './useResource';
 
 const host = window.irori;
@@ -185,6 +194,45 @@ function ScopeTree({
   );
 }
 
+type PaneId = 'schema' | 'my-kb' | 'team-kb' | 'my-contents' | 'team-contents';
+type RowId = 'schema' | 'knowledge' | 'contents';
+type PaneSpec = { title: string; subtitle: string; layer: Layer; spaces: Space[] };
+type Row = {
+  id: RowId;
+  panes: PaneId[];
+  defaultSize: string;
+  minSize: number;
+  handleLabel: string;
+  splitLabel?: string;
+};
+// A folded row keeps its heading line (the heading's min-height).
+const headingHeight = 38;
+const rows: Row[] = [
+  {
+    id: 'schema',
+    panes: ['schema'],
+    defaultSize: '26%',
+    minSize: 80,
+    handleLabel: 'Schema の高さ',
+  },
+  {
+    id: 'knowledge',
+    panes: ['my-kb', 'team-kb'],
+    defaultSize: '40%',
+    minSize: 80,
+    handleLabel: 'ナレッジの高さ',
+    splitLabel: '個人とチームのナレッジの幅',
+  },
+  {
+    id: 'contents',
+    panes: ['my-contents', 'team-contents'],
+    defaultSize: '34%',
+    minSize: 80,
+    handleLabel: '資料の高さ',
+    splitLabel: '個人とチームの資料の幅',
+  },
+];
+
 export function LayerExplorer({
   spaces,
   activeId,
@@ -209,7 +257,7 @@ export function LayerExplorer({
   onRefresh: () => void;
 }) {
   const [roots, setRoots] = useState<Record<string, Listing>>({});
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [collapsed, setCollapsed] = useState<PaneId[]>([]);
   const scopeKey = spaces.map((space) => space.scopeId).join(':');
   useEffect(() => {
     let live = true;
@@ -231,130 +279,190 @@ export function LayerExplorer({
       live = false;
     };
   }, [scopeKey, revision]);
-  const panes: { id: string; title: string; subtitle: string; layer: Layer; spaces: Space[] }[] = [
-    {
-      id: 'schema',
-      title: 'Schema',
-      subtitle: '設定・エージェントの指示',
-      layer: 'schema',
-      spaces,
-    },
-    {
-      id: 'my-kb',
+  const panes: Record<PaneId, PaneSpec> = {
+    schema: { title: 'Schema', subtitle: '設定・エージェントの指示', layer: 'schema', spaces },
+    'my-kb': {
       title: '個人のナレッジ',
       subtitle: '個人のナレッジ',
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
-    {
-      id: 'team-kb',
+    'team-kb': {
       title: 'チームのナレッジ',
       subtitle: 'チーム・組織のナレッジ',
       layer: 'Knowledge_Base',
       spaces: spaces.filter((s) => s.category !== 'personal'),
     },
-    {
-      id: 'my-contents',
+    'my-contents': {
       title: '個人の資料',
       subtitle: '個人の資料・クラウド',
       layer: 'contents',
       spaces: spaces.filter((s) => s.category === 'personal'),
     },
-    {
-      id: 'team-contents',
+    'team-contents': {
       title: 'チームの資料',
       subtitle: 'チーム・組織の資料',
       layer: 'contents',
       spaces: spaces.filter((s) => s.category !== 'personal'),
     },
-  ];
-  return (
-    <nav
-      className="layer-explorer"
-      aria-label="レイヤー別エクスプローラー"
-      style={{
-        gridTemplateRows: [
-          collapsed.includes('schema') ? '38px' : 'minmax(130px, 0.8fr)',
-          ['my-kb', 'team-kb'].every((id) => collapsed.includes(id))
-            ? '38px'
-            : 'minmax(160px, 1.2fr)',
-          ['my-contents', 'team-contents'].every((id) => collapsed.includes(id))
-            ? '38px'
-            : 'minmax(145px, 1fr)',
-        ].join(' '),
-      }}
-    >
-      {panes.map((pane) => (
-        <section key={pane.id} className={`layer-pane ${pane.id}`} aria-label={pane.title}>
-          <div className="layer-heading">
-            <h2>
-              <button
-                aria-expanded={!collapsed.includes(pane.id)}
-                onClick={() =>
-                  setCollapsed((value) =>
-                    value.includes(pane.id)
-                      ? value.filter((id) => id !== pane.id)
-                      : [...value, pane.id],
-                  )
+  };
+  const rowRefs = {
+    schema: usePanelRef(),
+    knowledge: usePanelRef(),
+    contents: usePanelRef(),
+  } satisfies Record<RowId, unknown>;
+  // A row folds to its headings when every pane in it is folded; that is also
+  // what dragging a row below its minimum means, so both stay one state.
+  useEffect(() => {
+    for (const row of rows) {
+      const handle = rowRefs[row.id].current;
+      if (!handle) continue;
+      const folded = row.panes.every((id) => collapsed.includes(id));
+      if (folded && !handle.isCollapsed()) handle.collapse();
+      if (!folded && handle.isCollapsed()) handle.expand();
+    }
+  }, [collapsed]);
+  function syncRow(row: Row, handle: PanelImperativeHandle | null) {
+    if (!handle) return;
+    const folded = handle.isCollapsed();
+    setCollapsed((value) => {
+      const all = row.panes.every((id) => value.includes(id));
+      if (folded && !all) return [...value.filter((id) => !row.panes.includes(id)), ...row.panes];
+      if (!folded && all) return value.filter((id) => !row.panes.includes(id));
+      return value;
+    });
+  }
+  const rowLayout = useDefaultLayout({
+    id: 'irori-explorer-rows',
+    panelIds: rows.map((row) => row.id),
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
+  const renderPane = (id: PaneId) => {
+    const pane = panes[id];
+    return (
+      <section className={`layer-pane ${id}`} aria-label={pane.title}>
+        <div className="layer-heading">
+          <h2>
+            <button
+              aria-expanded={!collapsed.includes(id)}
+              onClick={() =>
+                setCollapsed((value) =>
+                  value.includes(id) ? value.filter((item) => item !== id) : [...value, id],
+                )
+              }
+            >
+              <Icon
+                name={
+                  pane.layer === 'schema' ? 'schema' : pane.layer === 'contents' ? 'cloud' : 'book'
                 }
-              >
-                <Icon
-                  name={
-                    pane.layer === 'schema'
-                      ? 'schema'
-                      : pane.layer === 'contents'
-                        ? 'cloud'
-                        : 'book'
-                  }
-                  size={14}
+                size={14}
+              />
+              <span>{pane.title}</span>
+              <Icon name="chevron" size={10} className={collapsed.includes(id) ? '' : 'rotated'} />
+            </button>
+          </h2>
+          {id === 'schema' && (
+            <button
+              className="scope-action"
+              aria-label="エクスプローラーを更新"
+              onClick={onRefresh}
+            >
+              <Icon name="refresh" size={14} />
+            </button>
+          )}
+        </div>
+        {!collapsed.includes(id) && (
+          <div className="layer-body">
+            <p className="layer-subtitle">{pane.subtitle}</p>
+            {pane.spaces.length ? (
+              pane.spaces.map((space) => (
+                <ScopeTree
+                  key={space.scopeId}
+                  space={space}
+                  layer={pane.layer}
+                  roots={roots[space.scopeId]}
+                  revision={revision}
+                  activeId={activeId}
+                  selected={selected}
+                  locked={locked}
+                  onSelect={onSelect}
+                  onOpen={onOpen}
+                  onConnect={onConnect}
+                  onNote={onNote}
                 />
-                <span>{pane.title}</span>
-                <Icon
-                  name="chevron"
-                  size={10}
-                  className={collapsed.includes(pane.id) ? '' : 'rotated'}
-                />
-              </button>
-            </h2>
-            {pane.id === 'schema' && (
-              <button
-                className="scope-action"
-                aria-label="エクスプローラーを更新"
-                onClick={onRefresh}
-              >
-                <Icon name="refresh" size={14} />
-              </button>
+              ))
+            ) : (
+              <p className="tree-empty">
+                スペースが未登録です。下の「スペースを追加」から登録できます。
+              </p>
             )}
           </div>
-          {!collapsed.includes(pane.id) && (
-            <div className="layer-body">
-              <p className="layer-subtitle">{pane.subtitle}</p>
-              {pane.spaces.length ? (
-                pane.spaces.map((space) => (
-                  <ScopeTree
-                    key={space.scopeId}
-                    space={space}
-                    layer={pane.layer}
-                    roots={roots[space.scopeId]}
-                    revision={revision}
-                    activeId={activeId}
-                    selected={selected}
-                    locked={locked}
-                    onSelect={onSelect}
-                    onOpen={onOpen}
-                    onConnect={onConnect}
-                    onNote={onNote}
-                  />
-                ))
+        )}
+      </section>
+    );
+  };
+  return (
+    <nav className="layer-explorer" aria-label="レイヤー別エクスプローラー">
+      <PaneGroup
+        className="layer-rows"
+        orientation="vertical"
+        defaultLayout={rowLayout.defaultLayout}
+        onLayoutChanged={rowLayout.onLayoutChanged}
+      >
+        {rows.map((row, index) => (
+          <Fragment key={row.id}>
+            {index > 0 && (
+              <PaneSeparator className="pane-handle layer-handle" aria-label={row.handleLabel} />
+            )}
+            <Pane
+              id={row.id}
+              className="layer-row"
+              panelRef={rowRefs[row.id]}
+              defaultSize={row.defaultSize}
+              minSize={row.minSize}
+              collapsible
+              collapsedSize={headingHeight}
+              onResize={() => syncRow(row, rowRefs[row.id].current)}
+            >
+              {row.panes.length === 1 ? (
+                renderPane(row.panes[0])
               ) : (
-                <p className="tree-empty">
-                  スペースが未登録です。下の「スペースを追加」から登録できます。
-                </p>
+                <SplitRow row={row} render={renderPane} />
               )}
-            </div>
-          )}
-        </section>
-      ))}
+            </Pane>
+          </Fragment>
+        ))}
+      </PaneGroup>
     </nav>
+  );
+}
+
+/** Personal and team panes share a row whose split the reader moves. */
+function SplitRow({ row, render }: { row: Row; render: (id: PaneId) => ReactNode }) {
+  const layout = useDefaultLayout({
+    id: `irori-explorer-${row.id}`,
+    panelIds: row.panes,
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
+  return (
+    <PaneGroup
+      className="layer-split"
+      orientation="horizontal"
+      defaultLayout={layout.defaultLayout}
+      onLayoutChanged={layout.onLayoutChanged}
+    >
+      {row.panes.map((id, index) => (
+        <Fragment key={id}>
+          {index > 0 && (
+            <PaneSeparator className="pane-handle layer-handle" aria-label={row.splitLabel} />
+          )}
+          <Pane id={id} className="layer-cell" minSize={96}>
+            {render(id)}
+          </Pane>
+        </Fragment>
+      ))}
+    </PaneGroup>
   );
 }

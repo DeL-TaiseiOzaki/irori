@@ -38,7 +38,8 @@ export const hostArguments = {
       theme: z.enum(['system', 'light', 'dark']).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       editorAssistance: z.boolean().optional(),
-      layouts: z.record(z.string().max(64), z.string().max(4096)).optional(),
+      // The pane library keys a layout by its prefix, the group id and every panel id.
+      layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
     }),
   ]),

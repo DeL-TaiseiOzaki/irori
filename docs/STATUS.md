@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Resizable explorer panes, 2026-09-25: **0.1.32** is prepared on
+`feat/resizable-explorer-panes`, stacked on 0.1.31, from the owner's request to
+size each knowledge and materials frame freely. `LayerExplorer` replaces its CSS
+grid with a vertical `react-resizable-panels` group (Schema, knowledge,
+materials) and a horizontal group per shared row (personal, team), saved through
+`layoutStorage` like the workspace panes. Folding both panes of a row collapses
+the row to its heading, and a row dragged below its minimum folds both panes.
+The settings schema and request validator allowed layout keys of 64 characters,
+while the library writes `react-resizable-panels:<group>:<panel ids>`; the
+three-pane workspace key is 67, so the sidebar and AI panel widths with the
+panel open were never saved. The limit is 160. `layers-ui-smoke` drags each
+border and checks the saved layouts; `settings.test` stores the 67-character key.
+
 Dialog contrast and Drive folder choice, 2026-09-25: **0.1.31** is prepared on
 `fix/dialog-contrast-cloud-folder` from the owner's report. `.modal` painted a
 fixed white panel while inheriting the dark theme's light text (contrast 1.26:1

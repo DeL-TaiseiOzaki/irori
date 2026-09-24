@@ -38,6 +38,13 @@ test('a choice is written down and read back after a restart', async () => {
   assert.match(await readFile(path.join(dir, 'device-settings.json'), 'utf8'), /"theme": "dark"/);
 });
 
+test('a layout keyed by several panel ids is kept', async () => {
+  const { settings } = await service();
+  const key = 'react-resizable-panels:irori-explorer-contents:my-contents:team-contents';
+  await settings.save({ layouts: { [key]: '{"my-contents":40,"team-contents":60}' } });
+  assert.equal((await settings.read()).layouts[key], '{"my-contents":40,"team-contents":60}');
+});
+
 test('layout records merge instead of replacing each other', async () => {
   const { settings } = await service();
   await settings.save({ layouts: { workspace: '{"explorer":30}' } });
@@ -97,7 +104,10 @@ test('the request validator bounds what a renderer may store', () => {
   assert.equal(save.safeParse([{ theme: 'neon' }]).success, false);
   assert.equal(save.safeParse([{ markdownFont: 'comic' }]).success, false);
   assert.equal(save.safeParse([{ layouts: { workspace: 'x'.repeat(5000) } }]).success, false);
-  assert.equal(save.safeParse([{ layouts: { ['k'.repeat(65)]: '{}' } }]).success, false);
+  // The key the pane library writes for the three-pane workspace is 67 characters.
+  const workspaceKey = 'react-resizable-panels:irori-workspace:explorer:workspace:assistant';
+  assert.equal(save.safeParse([{ layouts: { [workspaceKey]: '{}' } }]).success, true);
+  assert.equal(save.safeParse([{ layouts: { ['k'.repeat(161)]: '{}' } }]).success, false);
   assert.equal(save.safeParse([{ skillAudiences: { kb: { role: 'editor' } } }]).success, true);
   assert.equal(save.safeParse([{ skillAudiences: { kb: {} } }]).success, true);
   assert.equal(save.safeParse([{ skillAudiences: { kb: { role: 'a b' } } }]).success, false);
