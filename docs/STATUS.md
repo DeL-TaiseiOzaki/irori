@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-25: PRs #86 (0.1.31), #87 (0.1.32) and #88 (0.1.33) are
+merged with the owner's go-ahead, and **0.1.33 is published** as
+[v0.1.33-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.33-preview.1)
+by release run `36049854031` from main's CI run `36048278155` (source
+`8692623`). Its Windows package job first failed when the packaged app's first
+heading took longer than the smoke's five seconds; the failed job alone passed
+on rerun. The release carries Windows 198,637,056 bytes, Mac 166,244,038 bytes
+and `irori-0.1.33-full.nupkg` 197,997,545 bytes. 0.1.31 and 0.1.32 were not
+published on their own; an installed 0.1.29 or later is offered 0.1.33 in the app.
+
 Interface language, 2026-09-25: **0.1.33** is prepared on `feat/ui-language`,
 stacked on 0.1.32, from the owner's request to choose English or Japanese as
 the system language. [ADR 011](decisions/011-interface-language.md) records the
