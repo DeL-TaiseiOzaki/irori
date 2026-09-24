@@ -481,6 +481,11 @@ export function Connections({
                   )}
                 </p>
               )}
+              {connection.uploadError && (
+                <p className="error" role="alert">
+                  {connection.uploadError}
+                </p>
+              )}
               <div className="actions">
                 {connection.state === 'mounted' && (
                   <button

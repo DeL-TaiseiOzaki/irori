@@ -7,9 +7,12 @@ import path from 'node:path';
 import { FileService } from '../../src/host/files';
 import { CloudService } from '../../src/cloud/service';
 import type { RcloneAPI } from '../../src/cloud/rclone';
+import type { UploadFailure } from '../../src/cloud/upload-errors';
 
 export class FixtureRclone implements RcloneAPI {
   calls: { method: string; params: any }[] = [];
+  /** What a real rclone would have read from its log; a test fills it in. */
+  failures: UploadFailure[] = [];
   folders = [
     { ID: 'folder-one', Name: 'Drive original name', IsDir: true },
     { ID: 'folder-two', Name: 'Drive original name', IsDir: true },
@@ -25,6 +28,9 @@ export class FixtureRclone implements RcloneAPI {
       return { jobid: this.calls.length };
     if (method === 'job/status') return { finished: true, success: true, output: {} };
     return {};
+  }
+  uploadFailures() {
+    return this.failures;
   }
   async close() {}
 }
