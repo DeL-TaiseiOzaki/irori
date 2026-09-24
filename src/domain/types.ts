@@ -27,8 +27,16 @@ export interface Entry {
   layer: Layer;
   note: boolean;
   blocked?: string;
-  /** A folder inside a Drive connection that can be edited, where a note can be added. */
+  /**
+   * Inside an editable Drive connection: the entry can be renamed, moved and
+   * deleted, and a folder can take a new note.
+   */
   writable?: boolean;
+  /**
+   * The folder a Drive connection is mounted on. Its name and registration belong
+   * to the connection dialog, so it is never renamed, moved or deleted as an entry.
+   */
+  connection?: boolean;
 }
 export interface Document {
   scopeId: string;

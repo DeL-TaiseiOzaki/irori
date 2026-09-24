@@ -2,6 +2,12 @@ import { classify } from '../domain/scopes';
 import { useDraft, flushDrafts } from './useDraft';
 import { UpdateNotice } from './UpdateNotice';
 import { NoteActions, TrashNotes } from './NoteActions';
+import {
+  CloudDocumentActions,
+  CloudEntryDialog,
+  type EntryAction,
+  type EntryChange,
+} from './CloudEntryActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
@@ -340,6 +346,12 @@ function App() {
   const [creatingNote, setCreatingNote] = useState(false);
   // An editable Drive folder the next note goes into, instead of the active KB.
   const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
+  // A file or folder of an editable Drive folder being renamed, moved or deleted.
+  const [entryAction, setEntryAction] = useState<{
+    space: CloudRoot;
+    entry: Entry;
+    action: EntryAction;
+  }>();
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
@@ -959,6 +971,52 @@ function App() {
       return false;
     }
   }
+  // The open document and the references follow a moved entry and leave with a deleted one.
+  async function entryChanged(change: EntryChange) {
+    const under = (ref: SourceRef) =>
+      ref.scopeId === change.scopeId &&
+      (ref.path === change.from || ref.path.startsWith(`${change.from}/`));
+    const follow = (ref: SourceRef): SourceRef | undefined =>
+      change.action === 'delete'
+        ? undefined
+        : { scopeId: ref.scopeId, path: change.to + ref.path.slice(change.from.length) };
+    const open = current.current.doc;
+    if (open && under(open)) {
+      const next = follow(open);
+      const reopened =
+        next &&
+        (await (
+          open.workspaceId
+            ? host.cloudRead(open.workspaceId, next.path)
+            : host.read(open.scopeId, next.path)
+        ).catch((error) => {
+          report(error);
+          return undefined;
+        }));
+      if (reopened) load(reopened);
+      else {
+        current.current = { doc: undefined, buffer: '', external: undefined };
+        setDoc(undefined);
+        setBuffer('');
+        setExternal(undefined);
+      }
+    }
+    setSources((all) =>
+      all.flatMap((ref) => {
+        if (!under(ref)) return [ref];
+        const moved = follow(ref);
+        return moved ? [moved] : [];
+      }),
+    );
+    setRevision((value) => value + 1);
+    setStatus(
+      change.action === 'delete'
+        ? t('Google Drive のゴミ箱に移しました。', "Moved to Google Drive's trash.")
+        : change.action === 'rename'
+          ? t('名前を変更しました。', 'Renamed.')
+          : t('移動しました。', 'Moved.'),
+    );
+  }
   // Pane sizes are the user's, not the stylesheet's: the group remembers each
   // layout per set of visible panes.
   // The identifiers must describe the panes actually on screen: the group stores
@@ -1146,6 +1204,7 @@ function App() {
                   setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
                   setNewNote(true);
                 }}
+                onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
                 onRefresh={() => setRevision((value) => value + 1)}
                 drive={
                   cloudRoot && (
@@ -1179,6 +1238,9 @@ function App() {
                           setCloudNoteTarget({ scopeId: root.scopeId, directory: entry.path });
                           setNewNote(true);
                         }}
+                        onAction={(root, entry, action) =>
+                          setEntryAction({ space: root, entry, action })
+                        }
                       />
                     </section>
                   )
@@ -1416,6 +1478,28 @@ function App() {
                                 }}
                               />
                             )}
+                          {doc.cloud && !doc.readOnly && (
+                            <CloudDocumentActions
+                              onAction={(action) => {
+                                const space = doc.workspaceId
+                                  ? cloudRoot
+                                  : spaces.find((item) => item.scopeId === doc.scopeId);
+                                if (space)
+                                  setEntryAction({
+                                    space,
+                                    entry: {
+                                      path: doc.path,
+                                      name: doc.path.split('/').at(-1)!,
+                                      directory: false,
+                                      note: /\.md$/i.test(doc.path),
+                                      layer: 'contents',
+                                      writable: true,
+                                    },
+                                    action,
+                                  });
+                              }}
+                            />
+                          )}
                           <button
                             disabled={
                               sources.length >= 20 ||
@@ -2376,6 +2460,31 @@ function App() {
             </div>
           </form>
         </Dialog>
+      )}
+      {entryAction && (
+        <CloudEntryDialog
+          key={`${entryAction.space.scopeId}:${entryAction.entry.path}:${entryAction.action}`}
+          space={entryAction.space}
+          entry={entryAction.entry}
+          action={entryAction.action}
+          beforeChange={async () => {
+            if (running || sending || queued.length || gitBusy || connecting)
+              throw Error(
+                t(
+                  '実行・Git 操作・接続が完了してから資料を整理してください。',
+                  'Organize materials after the run, Git operation and connection finish.',
+                ),
+              );
+            return save();
+          }}
+          onBusyChange={(busy) => {
+            reconciliation.current++;
+            organizing.current = busy;
+            if (!busy) void reconcile();
+          }}
+          onDone={entryChanged}
+          onClose={() => setEntryAction(undefined)}
+        />
       )}
       {trashOpen && active && (
         <TrashNotes

@@ -243,10 +243,7 @@ export class FileService {
             : f.isSymbolicLink()
               ? t('リンク先はこの版では開けません', 'Link targets cannot be opened in this version')
               : undefined,
-        ...(layer === 'contents' &&
-        f.isDirectory() &&
-        !f.isSymbolicLink() &&
-        this.cloud?.writable?.(id, p)
+        ...(layer === 'contents' && !f.isSymbolicLink() && this.cloud?.writable?.(id, p)
           ? { writable: true }
           : {}),
       });
