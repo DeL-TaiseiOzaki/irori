@@ -127,6 +127,8 @@ export const hostArguments = {
   setCloudAccess: z.tuple([id, id, z.enum(['read-only', 'read-write'])]),
   openCloudFolder: z.tuple([id, id]),
   createCloudNote: z.tuple([id, path, name.trim().min(1)]),
+  moveCloudEntry: z.tuple([id, path, path]),
+  deleteCloudEntry: z.tuple([id, path]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),

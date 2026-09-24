@@ -861,6 +861,14 @@ export class CloudService {
     await fs.rm(draftFile(this.files.dataDir, doc.scopeId, doc.path), { force: true });
     return this.document(doc.scopeId, doc.path);
   }
+  /** Renames or moves an entry inside one editable connection. Implemented on feat/drive-entries. */
+  moveEntry(scopeId: string, from: string, to: string): Promise<Entry> {
+    return Promise.reject(Error(`Not implemented: move ${scopeId} ${from} ${to}`));
+  }
+  /** Moves an entry of an editable connection to Drive's trash. Implemented on feat/drive-entries. */
+  deleteEntry(scopeId: string, target: string): Promise<void> {
+    return Promise.reject(Error(`Not implemented: delete ${scopeId} ${target}`));
+  }
   /** Adds an empty Markdown note to an editable Drive folder; an existing file is never replaced. */
   createNote(scopeId: string, directory: string, name: string) {
     return this.mutate(async () => {

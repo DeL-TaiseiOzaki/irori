@@ -491,6 +491,10 @@ app
       },
       createCloudNote: (scopeId, directory, name) =>
         changeFiles(() => changed(scopeId, () => cloud.createNote(scopeId, directory, name))),
+      moveCloudEntry: (scopeId, from, to) =>
+        changeFiles(() => changed(scopeId, () => cloud.moveEntry(scopeId, from, to))),
+      deleteCloudEntry: (scopeId, target) =>
+        changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target))),
       bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
       spaces: () => files.list(),
       chooseFolder: async () => {

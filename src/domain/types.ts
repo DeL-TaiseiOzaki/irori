@@ -132,6 +132,8 @@ export interface CloudConnection extends CloudAttachment {
   writable?: boolean;
   /** Saved changes still waiting to reach Google Drive. */
   pending?: number;
+  /** Why saved changes are not reaching Google Drive, in the interface language. */
+  uploadError?: string;
 }
 export interface CloudSetup {
   available: boolean;
@@ -321,6 +323,13 @@ export interface HostAPI {
   openCloudFolder(scopeId: string, mountId: string): Promise<void>;
   /** Creates an empty Markdown note in an editable Drive folder and returns it. */
   createCloudNote(scopeId: string, directory: string, name: string): Promise<Document>;
+  /**
+   * Renames or moves a file or folder inside one editable Drive connection. `to` is
+   * the full new path; an existing entry is never replaced. Returns the moved entry.
+   */
+  moveCloudEntry(scopeId: string, from: string, to: string): Promise<Entry>;
+  /** Moves a file or folder of an editable Drive connection to Google Drive's trash. */
+  deleteCloudEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;
