@@ -1,13 +1,13 @@
 {
-  "version": "0.1.33",
-  "notes": "https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.33-preview.1",
+  "version": "0.1.36",
+  "notes": "https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.36-preview.1",
   "downloads": {
     "windows-x64": {
-      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.33-preview.1/irori-0.1.33-windows-x64-Setup.exe",
+      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.36-preview.1/irori-0.1.36-windows-x64-Setup.exe",
       "size": "189.4 MiB"
     },
     "macos-arm64": {
-      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.33-preview.1/irori-0.1.33-macos-arm64.dmg",
+      "url": "https://github.com/DeL-TaiseiOzaki/irori/releases/download/v0.1.36-preview.1/irori-0.1.36-macos-arm64.dmg",
       "size": "158.5 MiB"
     }
   }

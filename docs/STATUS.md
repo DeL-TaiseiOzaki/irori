@@ -1,5 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-26: PRs #90 (0.1.34), #91 (0.1.35) and #92 (0.1.36) are
+merged with the owner's go-ahead, and **0.1.36 is published** as
+[v0.1.36-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.36-preview.1)
+by release run `36070496716` from main's CI run `36069692901` (source
+`7127111`). #92's pull-request verify first failed in `git-ui-smoke`'s five-second
+wait for the resolved-conflict count, a known timing-sensitive step it does not
+touch; the failed job alone passed on rerun, and main's CI passed first time.
+The release carries Windows 198,652,416 bytes, Mac 166,234,704 bytes and
+`irori-0.1.36-full.nupkg` 198,012,875 bytes. 0.1.34 and 0.1.35 were not published
+on their own.
+
 Drive editing completed, 2026-09-25: **0.1.36** is prepared on
 `feat/drive-complete`, stacked on 0.1.35, from the owner's request to finish every
 remaining Drive item at once. Four delegated branches (three on Fable) were
