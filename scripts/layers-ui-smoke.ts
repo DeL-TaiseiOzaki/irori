@@ -85,6 +85,66 @@ try {
   await expect(
     page.locator('.layer-pane.team-contents').getByRole('button', { name: /調査 資料/ }),
   ).toHaveCount(3);
+  // Every pane can be resized by the reader, and the sizes are kept on the device.
+  // The window reaches its requested height some time after launch; the checks
+  // need the explorer's full height, not the squeezed one.
+  await expect.poll(() => page.evaluate(() => innerHeight)).toBeGreaterThan(900);
+  const height = async (pane: string) =>
+    (await page.locator(`.layer-pane.${pane}`).boundingBox())!.height;
+  const width = async (pane: string) =>
+    (await page.locator(`.layer-pane.${pane}`).boundingBox())!.width;
+  const drag = async (label: string, dx: number, dy: number) => {
+    const box = (await page.getByRole('separator', { name: label }).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+  // Moves stay small so that no row reaches its minimum and folds.
+  const [schemaBefore, knowledgeBefore] = [await height('schema'), await height('my-kb')];
+  await drag('Schema とナレッジの境界', 0, 30);
+  await expect.poll(() => height('schema')).toBeGreaterThan(schemaBefore + 20);
+  expect(await height('my-kb')).toBeLessThan(knowledgeBefore - 20);
+  const [knowledgeMiddle, contentsBefore] = [await height('my-kb'), await height('my-contents')];
+  await drag('ナレッジと資料の境界', 0, 15);
+  await expect.poll(() => height('my-kb')).toBeGreaterThan(knowledgeMiddle + 8);
+  expect(await height('my-contents')).toBeLessThan(contentsBefore - 8);
+  const personalWidth = await width('my-kb');
+  await drag('個人とチームのナレッジの境界', 50, 0);
+  await expect.poll(() => width('my-kb')).toBeGreaterThan(personalWidth + 30);
+  // The materials row keeps its own split.
+  expect(Math.abs((await width('my-contents')) - personalWidth)).toBeLessThan(2);
+  // The workspace's Drive list is a row of its own.
+  const driveHeight = async () => (await page.locator('.workspace-drive').boundingBox())!.height;
+  const driveBefore = await driveHeight();
+  await drag('資料と Google Drive の境界', 0, -15);
+  await expect.poll(driveHeight).toBeGreaterThan(driveBefore + 8);
+  // Folding both halves of a row gives its space to the other rows.
+  const others = async () =>
+    (await height('schema')) + (await height('my-contents')) + (await driveHeight());
+  const [knowledgeOpen, othersOpen] = [await height('my-kb'), await others()];
+  await page.getByRole('button', { name: '個人のナレッジ', exact: false }).click();
+  await page.getByRole('button', { name: 'チームのナレッジ', exact: false }).click();
+  await expect.poll(() => height('my-kb')).toBeLessThan(40);
+  expect(await others()).toBeGreaterThan(othersOpen + knowledgeOpen - 45);
+  await page.getByRole('button', { name: '個人のナレッジ', exact: false }).click();
+  await expect.poll(() => height('my-kb')).toBeGreaterThan(knowledgeOpen - 2);
+  await expect(page.locator('.layer-pane.team-kb .layer-body')).toHaveCount(0);
+  await page.getByRole('button', { name: 'チームのナレッジ', exact: false }).click();
+  await expect
+    .poll(async () =>
+      Object.keys(
+        JSON.parse(
+          await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8').catch(
+            () => '{}',
+          ),
+        ).layouts ?? {},
+      ).join(' '),
+    )
+    .toMatch(
+      /irori-explorer-rows.*irori-explorer-knowledge|irori-explorer-knowledge.*irori-explorer-rows/,
+    );
+  await page.screenshot({ path: 'test-results/irori-resized-explorer.png' });
   const personalSchema = schema.locator(`[data-scope-id="${spaces[0].scopeId}"]`);
   await personalSchema.getByRole('button', { name: 'schema', exact: true }).click();
   await expect(personalSchema.getByRole('button', { name: 'policy', exact: true })).toBeVisible();
@@ -139,53 +199,6 @@ try {
   await expect(page.locator('.layer-pane.my-contents .layer-body')).toHaveCount(0);
   await page.getByRole('button', { name: '個人の資料', exact: false }).click();
   await expect(page.locator('.layer-pane.my-contents .layer-body')).toBeVisible();
-  // Every pane can be resized by the reader, and the sizes are kept on the device.
-  const height = async (pane: string) =>
-    (await page.locator(`.layer-pane.${pane}`).boundingBox())!.height;
-  const width = async (pane: string) =>
-    (await page.locator(`.layer-pane.${pane}`).boundingBox())!.width;
-  const drag = async (label: string, dx: number, dy: number) => {
-    const box = (await page.getByRole('separator', { name: label }).boundingBox())!;
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 8 });
-    await page.mouse.up();
-  };
-  const [schemaBefore, knowledgeBefore] = [await height('schema'), await height('my-kb')];
-  await drag('Schema の高さ', 0, -60);
-  await expect.poll(() => height('schema')).toBeLessThan(schemaBefore - 40);
-  expect(await height('my-kb')).toBeGreaterThan(knowledgeBefore + 40);
-  const contentsBefore = await height('my-contents');
-  await drag('資料の高さ', 0, -50);
-  await expect.poll(() => height('my-contents')).toBeGreaterThan(contentsBefore + 30);
-  const personalWidth = await width('my-kb');
-  await drag('個人とチームのナレッジの幅', 50, 0);
-  await expect.poll(() => width('my-kb')).toBeGreaterThan(personalWidth + 30);
-  expect(Math.abs((await width('my-contents')) - personalWidth)).toBeLessThan(2);
-  // Folding both halves of a row gives its space to the other rows.
-  const contentsOpen = await height('my-contents');
-  await page.getByRole('button', { name: '個人のナレッジ', exact: false }).click();
-  await page.getByRole('button', { name: 'チームのナレッジ', exact: false }).click();
-  await expect.poll(() => height('my-kb')).toBeLessThan(45);
-  await expect.poll(() => height('my-contents')).toBeGreaterThan(contentsOpen + 40);
-  await page.getByRole('button', { name: '個人のナレッジ', exact: false }).click();
-  await expect.poll(() => height('my-kb')).toBeGreaterThan(80);
-  await expect(page.locator('.layer-pane.team-kb .layer-body')).toHaveCount(0);
-  await page.getByRole('button', { name: 'チームのナレッジ', exact: false }).click();
-  await expect
-    .poll(async () =>
-      Object.keys(
-        JSON.parse(
-          await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8').catch(
-            () => '{}',
-          ),
-        ).layouts ?? {},
-      ).join(' '),
-    )
-    .toMatch(
-      /irori-explorer-rows.*irori-explorer-knowledge|irori-explorer-knowledge.*irori-explorer-rows/,
-    );
-  await page.screenshot({ path: 'test-results/irori-resized-explorer.png' });
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/layers-ui-smoke.json',
@@ -195,6 +208,7 @@ try {
           'five panes and personal/team/organization grouping',
           'rows and personal/team splits resize and are kept on the device',
           'folding a whole row gives its height to the others',
+          'the workspace Drive list resizes as a row',
           'per-repository schema isolation',
           'nested contents excluded from schema',
           'unconfigured aliases visible without a mount',

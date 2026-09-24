@@ -5,7 +5,6 @@ import {
   Separator as PaneSeparator,
   useDefaultLayout,
   usePanelRef,
-  type PanelImperativeHandle,
 } from 'react-resizable-panels';
 import type { CloudRoot, Document, Entry, Layer, Space } from '../domain/types';
 import { Icon } from './Icon';
@@ -195,43 +194,52 @@ function ScopeTree({
 }
 
 type PaneId = 'schema' | 'my-kb' | 'team-kb' | 'my-contents' | 'team-contents';
-type RowId = 'schema' | 'knowledge' | 'contents';
+type RowId = 'schema' | 'knowledge' | 'contents' | 'drive';
 type PaneSpec = { title: string; subtitle: string; layer: Layer; spaces: Space[] };
 type Row = {
   id: RowId;
   panes: PaneId[];
   defaultSize: string;
   minSize: number;
-  handleLabel: string;
+  /** Names the border above this row, shared with the previous row. */
+  handleLabel?: string;
   splitLabel?: string;
 };
 // A folded row keeps its heading line (the heading's min-height).
 const headingHeight = 38;
+// The minimum is a heading and one tree line; anything smaller folds the row.
 const rows: Row[] = [
-  {
-    id: 'schema',
-    panes: ['schema'],
-    defaultSize: '26%',
-    minSize: 80,
-    handleLabel: 'Schema の高さ',
-  },
+  { id: 'schema', panes: ['schema'], defaultSize: '26%', minSize: 60 },
   {
     id: 'knowledge',
     panes: ['my-kb', 'team-kb'],
     defaultSize: '40%',
-    minSize: 80,
-    handleLabel: 'ナレッジの高さ',
-    splitLabel: '個人とチームのナレッジの幅',
+    minSize: 60,
+    handleLabel: 'Schema とナレッジの境界',
+    splitLabel: '個人とチームのナレッジの境界',
   },
   {
     id: 'contents',
     panes: ['my-contents', 'team-contents'],
     defaultSize: '34%',
-    minSize: 80,
-    handleLabel: '資料の高さ',
-    splitLabel: '個人とチームの資料の幅',
+    minSize: 60,
+    handleLabel: 'ナレッジと資料の境界',
+    splitLabel: '個人とチームの資料の境界',
   },
 ];
+// The workspace's Drive list is a fourth row when the workspace has one; its
+// heading is its own, so it resizes but does not fold.
+const driveRow: Row = {
+  id: 'drive',
+  panes: [],
+  defaultSize: '20%',
+  minSize: 60,
+  handleLabel: '資料と Google Drive の境界',
+};
+const withDrive: Row[] = rows.map((row) => ({
+  ...row,
+  defaultSize: { schema: '22%', knowledge: '32%', contents: '26%', drive: '20%' }[row.id],
+}));
 
 export function LayerExplorer({
   spaces,
@@ -244,6 +252,7 @@ export function LayerExplorer({
   onConnect,
   onNote,
   onRefresh,
+  drive,
 }: {
   spaces: Space[];
   activeId?: string;
@@ -255,7 +264,10 @@ export function LayerExplorer({
   onConnect: (space: Space) => void;
   onNote: (space: Space) => void;
   onRefresh: () => void;
+  /** The workspace's Drive list, shown as a resizable row below the materials. */
+  drive?: ReactNode;
 }) {
+  const shown = drive ? [...withDrive, driveRow] : rows;
   const [roots, setRoots] = useState<Record<string, Listing>>({});
   const [collapsed, setCollapsed] = useState<PaneId[]>([]);
   const scopeKey = spaces.map((space) => space.scopeId).join(':');
@@ -310,31 +322,39 @@ export function LayerExplorer({
     schema: usePanelRef(),
     knowledge: usePanelRef(),
     contents: usePanelRef(),
+    drive: usePanelRef(),
   } satisfies Record<RowId, unknown>;
   // A row folds to its headings when every pane in it is folded; that is also
   // what dragging a row below its minimum means, so both stay one state.
-  useEffect(() => {
-    for (const row of rows) {
+  function applyFolds() {
+    for (const row of shown) {
       const handle = rowRefs[row.id].current;
-      if (!handle) continue;
+      if (!handle || !row.panes.length) continue;
       const folded = row.panes.every((id) => collapsed.includes(id));
       if (folded && !handle.isCollapsed()) handle.collapse();
       if (!folded && handle.isCollapsed()) handle.expand();
     }
-  }, [collapsed]);
-  function syncRow(row: Row, handle: PanelImperativeHandle | null) {
-    if (!handle) return;
-    const folded = handle.isCollapsed();
+  }
+  useEffect(applyFolds, [collapsed]);
+  // Only a drag folds or unfolds panes: a layout pass at mount or on a window
+  // resize can squeeze a row below its minimum without the reader asking.
+  function syncRows() {
     setCollapsed((value) => {
-      const all = row.panes.every((id) => value.includes(id));
-      if (folded && !all) return [...value.filter((id) => !row.panes.includes(id)), ...row.panes];
-      if (!folded && all) return value.filter((id) => !row.panes.includes(id));
-      return value;
+      let next = value;
+      for (const row of shown) {
+        const handle = rowRefs[row.id].current;
+        if (!handle || !row.panes.length) continue;
+        const folded = handle.isCollapsed();
+        const all = row.panes.every((id) => next.includes(id));
+        if (folded && !all) next = [...next.filter((id) => !row.panes.includes(id)), ...row.panes];
+        if (!folded && all) next = next.filter((id) => !row.panes.includes(id));
+      }
+      return next;
     });
   }
   const rowLayout = useDefaultLayout({
     id: 'irori-explorer-rows',
-    panelIds: rows.map((row) => row.id),
+    panelIds: shown.map((row) => row.id),
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
@@ -408,9 +428,13 @@ export function LayerExplorer({
         className="layer-rows"
         orientation="vertical"
         defaultLayout={rowLayout.defaultLayout}
-        onLayoutChanged={rowLayout.onLayoutChanged}
+        onLayoutChanged={(layout, meta) => {
+          rowLayout.onLayoutChanged(layout, meta);
+          if (meta?.isUserInteraction) syncRows();
+          else applyFolds();
+        }}
       >
-        {rows.map((row, index) => (
+        {shown.map((row, index) => (
           <Fragment key={row.id}>
             {index > 0 && (
               <PaneSeparator className="pane-handle layer-handle" aria-label={row.handleLabel} />
@@ -421,11 +445,12 @@ export function LayerExplorer({
               panelRef={rowRefs[row.id]}
               defaultSize={row.defaultSize}
               minSize={row.minSize}
-              collapsible
+              collapsible={row.panes.length > 0}
               collapsedSize={headingHeight}
-              onResize={() => syncRow(row, rowRefs[row.id].current)}
             >
-              {row.panes.length === 1 ? (
+              {row.id === 'drive' ? (
+                drive
+              ) : row.panes.length === 1 ? (
                 renderPane(row.panes[0])
               ) : (
                 <SplitRow row={row} render={renderPane} />

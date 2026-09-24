@@ -4,8 +4,13 @@ Resizable explorer panes, 2026-09-25: **0.1.32** is prepared on
 `feat/resizable-explorer-panes`, stacked on 0.1.31, from the owner's request to
 size each knowledge and materials frame freely. `LayerExplorer` replaces its CSS
 grid with a vertical `react-resizable-panels` group (Schema, knowledge,
-materials) and a horizontal group per shared row (personal, team), saved through
-`layoutStorage` like the workspace panes. Folding both panes of a row collapses
+materials, and the workspace Drive list when present) and a horizontal group
+per shared row (personal, team), saved through `layoutStorage` like the
+workspace panes. Folds follow the reader's drags only (`isUserInteraction`); a
+layout pass that squeezes a row re-applies the reader's folds. The rule meant to
+stretch `.sidebar` in its pane selected `.workspace-panes > .explorer-pane`,
+which never matched because the library wraps each pane in its own element; the
+old grid's intrinsic height hid that, and the selectors now start at the pane. Folding both panes of a row collapses
 the row to its heading, and a row dragged below its minimum folds both panes.
 The settings schema and request validator allowed layout keys of 64 characters,
 while the library writes `react-resizable-panels:<group>:<panel ids>`; the
