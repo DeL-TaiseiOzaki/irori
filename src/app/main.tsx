@@ -1877,10 +1877,7 @@ function App() {
                       <button onClick={() => setFresh(false)}>{t('取り消す', 'Undo')}</button>
                     </p>
                   )}
-                  <div
-                    className="composer-context"
-                    aria-label={t('相談の対象', 'Ask about')}
-                  >
+                  <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
                     <span className="context-chip" title={active?.name}>
                       <Icon name="folder" size={12} />
                       {active?.name ?? t('スペース未選択', 'No space selected')}

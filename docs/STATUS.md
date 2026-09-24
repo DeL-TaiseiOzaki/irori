@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Interface language, 2026-09-25: **0.1.33** is prepared on `feat/ui-language`,
+stacked on 0.1.32, from the owner's request to choose English or Japanese as
+the system language. [ADR 011](decisions/011-interface-language.md) records the
+design: a `language` device setting (`ja` default, `en`), chosen in the display
+settings menu and applied live from the App root; `t(ja, en)` in
+`src/domain/i18n.ts` at each use site in both processes, with the Japanese text
+unchanged so existing tests keep selecting by it. About 1,100 `t()` calls across
+60 files were written by five delegated agents with disjoint file ownership and
+then reviewed. Knowledge-base content, agent prompts, matching strings and tool
+output are not translated. The new `language-ui-smoke` visits the workspace, a
+note, the cloud, search and note dialogs, the AI panel, source control, a host
+error and the startup screen after a restart with English-named fixtures, and
+fails on any Japanese interface text. Known limits: text already in component
+state, and an open editor's own chrome, change language when shown again.
+
 Resizable explorer panes, 2026-09-25: **0.1.32** is prepared on
 `feat/resizable-explorer-panes`, stacked on 0.1.31, from the owner's request to
 size each knowledge and materials frame freely. `LayerExplorer` replaces its CSS

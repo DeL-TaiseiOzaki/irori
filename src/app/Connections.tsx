@@ -88,7 +88,7 @@ export function Connections({
   const disabled = busy || running;
   const invalidName = selected ? mountNameError(name) : undefined;
   return (
-    <Dialog label={t('クラウド接続', 'Cloud connections')} busy={busy} onClose={onClose}>
+    <Dialog label={t('クラウド接続', 'Cloud connection')} busy={busy} onClose={onClose}>
       <div className="modal connections">
         <div className="actions">
           <h2>{t(`${space.name} のクラウド接続`, `Cloud connections for ${space.name}`)}</h2>

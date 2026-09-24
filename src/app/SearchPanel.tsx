@@ -100,14 +100,14 @@ export function SearchPanel({
 
   return (
     <Dialog
-      label={t('KB内を検索', 'Search within KB')}
+      label={t('KB内を検索', 'Search in KB')}
       className="modal-dialog search-dialog"
       busy={opening}
       onClose={onClose}
     >
       <div className="search-heading">
         <h2>
-          <Icon name="search" size={20} /> {t('KB内を検索', 'Search within KB')}
+          <Icon name="search" size={20} /> {t('KB内を検索', 'Search in KB')}
         </h2>
         <button onClick={onClose} disabled={opening}>
           {t('閉じる', 'Close')}
