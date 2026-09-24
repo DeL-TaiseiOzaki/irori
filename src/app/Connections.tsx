@@ -89,7 +89,7 @@ export function Connections({
   const invalidName = selected ? mountNameError(name) : undefined;
   return (
     <Dialog label={t('クラウド接続', 'Cloud connection')} busy={busy} onClose={onClose}>
-      <div className="modal connections">
+      <div className="modal connections" aria-busy={!setup}>
         <div className="actions">
           <h2>{t(`${space.name} のクラウド接続`, `Cloud connections for ${space.name}`)}</h2>
           <button disabled={busy} onClick={onClose}>
@@ -122,11 +122,13 @@ export function Connections({
             </button>
           </div>
         )}
-        <p className="setup-state" role="status">
-          {setup
-            ? `${setup.version ? `rclone ${setup.version} · ` : ''}${setup.detail}`
-            : t('接続機能を確認しています…', 'Checking the connection feature…')}
-        </p>
+        {/* Only a missing prerequisite or an unusable mount is worth a line here;
+            that folders connect read-only is said where one is registered. */}
+        {setup && (!setup.available || !setup.mountAvailable) && (
+          <p className="setup-state" role="status">
+            {setup.detail}
+          </p>
+        )}
         {setup && !setup.oauthConfigured && (
           <p>
             {t(
