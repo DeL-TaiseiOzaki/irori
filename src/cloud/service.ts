@@ -6,7 +6,7 @@ import { SerialQueue } from '../host/serial-queue';
 import { CloudAccounts } from './accounts';
 import type { GoogleOAuth } from './oauth';
 import { Rclone, type RcloneAPI } from './rclone';
-import { cloudDeclaration, mountNameError, nameKey } from '../domain/connections';
+import { cloudDeclaration, entryNameError, mountNameError, nameKey } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
 import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, hash, readTextDocument, textFileByteLimit } from '../host/files';
@@ -32,6 +32,21 @@ const bindingSchema = z.object({
   placeholder: z.object({ dev: z.number(), ino: z.number() }).optional(),
 });
 type Binding = z.infer<typeof bindingSchema>;
+function assertCloudPath(rel: string) {
+  if (
+    !rel ||
+    rel.includes('\\') ||
+    rel.split('/').some((part) => !part || part === '.' || part === '..')
+  )
+    throw Error('Invalid cloud path');
+}
+const connectionFolderError = () =>
+  Error(
+    t(
+      '接続フォルダ自体はここでは変更できません。名前の変更や登録解除は「クラウド接続」から行ってください。',
+      'The connection folder itself is not changed here. Rename or unregister it from "Cloud connection".',
+    ),
+  );
 type Mounted = {
   attachment: CloudAttachment;
   target: string;
@@ -861,13 +876,127 @@ export class CloudService {
     await fs.rm(draftFile(this.files.dataDir, doc.scopeId, doc.path), { force: true });
     return this.document(doc.scopeId, doc.path);
   }
-  /** Renames or moves an entry inside one editable connection. Implemented on feat/drive-entries. */
-  moveEntry(scopeId: string, from: string, to: string): Promise<Entry> {
-    return Promise.reject(Error(`Not implemented: move ${scopeId} ${from} ${to}`));
+  /** A path inside a verified mount that may be changed, with the mount it lies in. */
+  private async editable(scopeId: string, rel: string) {
+    const actual = await this.resolve(scopeId, rel);
+    await this.assertWritable(scopeId, rel);
+    const mounted = [...this.mounted.values()].find(
+      (item) => item.attachment.scopeId === scopeId && within(item.target, actual),
+    )!;
+    if (actual === mounted.target) throw connectionFolderError();
+    return { actual, mounted };
   }
-  /** Moves an entry of an editable connection to Drive's trash. Implemented on feat/drive-entries. */
+  /**
+   * Renames or moves a file or folder inside one editable connection. The mount
+   * turns the rename into rclone's Move or DirMove, which Drive performs server-side
+   * by updating the entry's name and parents, so it keeps its ID, version history
+   * and sharing; a file still in the write cache is renamed there and uploaded
+   * under its new name. `to` is the full new path; an existing entry is never
+   * replaced, and neither is a name that differs only in case or normalization.
+   */
+  moveEntry(scopeId: string, from: string, to: string): Promise<Entry> {
+    return this.mutate(async () => {
+      const { actual, mounted } = await this.editable(scopeId, from);
+      assertCloudPath(to);
+      const name = path.posix.basename(to);
+      const invalid = entryNameError(name);
+      if (invalid) throw Error(invalid);
+      const info = await fs.lstat(actual);
+      const directory = path.posix.dirname(to);
+      const parent = path.join(await this.rootOf(scopeId), directory);
+      if (!within(mounted.target, parent))
+        throw Error(
+          t(
+            '同じ接続フォルダの中にだけ移動できます。',
+            'An entry can only be moved within its own connected folder.',
+          ),
+        );
+      try {
+        await this.resolve(scopeId, directory);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        throw Error(t('移動先のフォルダがありません。', 'The destination folder does not exist.'));
+      }
+      if (!(await fs.stat(parent)).isDirectory())
+        throw Error(
+          t('移動先にはフォルダを指定してください。', 'Choose a folder as the destination.'),
+        );
+      if (info.isDirectory() && within(actual, parent))
+        throw Error(
+          t(
+            'フォルダを自分自身やその中のフォルダには移動できません。',
+            'A folder cannot be moved into itself or into one of its own folders.',
+          ),
+        );
+      const destination = path.join(parent, name);
+      const key = nameKey(name);
+      if (
+        (await fs.readdir(parent)).some(
+          (item) => nameKey(item) === key && path.join(parent, item) !== actual,
+        )
+      )
+        throw Error(
+          t(
+            '同じ名前のファイルまたはフォルダがあります。別の名前を指定してください。',
+            'A file or folder with the same name exists. Choose another name.',
+          ),
+        );
+      if (destination !== actual) {
+        if (path.dirname(actual) === parent && nameKey(path.basename(actual)) === key) {
+          // Only the case or the normalization of the name changes. A case-insensitive
+          // mount can take both names for one entry, so go through a name it tells apart.
+          const temporary = path.join(parent, `${name}.irori-${randomUUID().slice(0, 8)}`);
+          await fs.rename(actual, temporary);
+          try {
+            await fs.rename(temporary, destination);
+          } catch (error) {
+            await fs.rename(temporary, actual).catch(() => {});
+            throw error;
+          }
+        } else await fs.rename(actual, destination);
+        // A kept draft follows its file. Drafts are found by a hash of the path, so
+        // those of files inside a moved folder stay under their old paths: the open
+        // document is saved before a move, so at most a conflict draft is left behind.
+        if (info.isFile()) await this.moveDraft(scopeId, from, to);
+      }
+      return {
+        path: to,
+        name,
+        directory: info.isDirectory(),
+        layer: 'contents',
+        note: /\.md$/i.test(name),
+        writable: true,
+      };
+    });
+  }
+  private async moveDraft(scopeId: string, from: string, to: string) {
+    const destination = draftFile(this.files.dataDir, scopeId, to);
+    // A draft already under the new path belonged to a file that is gone.
+    await fs.rm(destination, { force: true });
+    await fs
+      .rename(draftFile(this.files.dataDir, scopeId, from), destination)
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+  }
+  /**
+   * Removes a file or folder of an editable connection through the mount. rclone's
+   * Drive backend sends what is deleted to Drive's trash (`use_trash`, on unless
+   * turned off; irori's remote sets only the account, the root folder and the
+   * drive), so the entry can be restored there. A folder is removed entry by entry,
+   * as the file system requires, so each of its files reaches the trash on its own.
+   */
   deleteEntry(scopeId: string, target: string): Promise<void> {
-    return Promise.reject(Error(`Not implemented: delete ${scopeId} ${target}`));
+    return this.mutate(async () => {
+      const { actual } = await this.editable(scopeId, target);
+      if ((await fs.lstat(actual)).isDirectory()) await fs.rm(actual, { recursive: true });
+      else {
+        await fs.unlink(actual);
+        // The draft would only offer text for a file that is gone. Drafts of files
+        // inside a removed folder cannot be found by path and stay unread.
+        await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
+      }
+    });
   }
   /** Adds an empty Markdown note to an editable Drive folder; an existing file is never replaced. */
   createNote(scopeId: string, directory: string, name: string) {
@@ -928,12 +1057,7 @@ export class CloudService {
     this.states.set(key, { state: 'disconnected' });
   }
   async resolve(scopeId: string, rel: string) {
-    if (
-      !rel ||
-      rel.includes('\\') ||
-      rel.split('/').some((part) => !part || part === '.' || part === '..')
-    )
-      throw Error('Invalid cloud path');
+    assertCloudPath(rel);
     const target = path.join(await this.rootOf(scopeId), rel);
     const entry = [...this.mounted.values()].find(
       (item) => item.attachment.scopeId === scopeId && within(item.target, target),
@@ -973,6 +1097,7 @@ export class CloudService {
         blocked:
           record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
         ...(record.state === 'mounted' && record.writable ? { writable: true } : {}),
+        connection: true,
       }));
     const parent = await this.parent({ scopeId, contentsRoot: rel });
     if (parent)
@@ -1009,7 +1134,7 @@ export class CloudService {
         blocked: entry.isSymbolicLink()
           ? t('リンク先は開けません', 'Link targets cannot be opened')
           : undefined,
-        ...(writable && entry.isDirectory() && !entry.isSymbolicLink() ? { writable: true } : {}),
+        ...(writable && !entry.isSymbolicLink() ? { writable: true } : {}),
       }))
       .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
   }
