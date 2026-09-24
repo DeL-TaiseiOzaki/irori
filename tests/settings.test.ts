@@ -9,6 +9,7 @@ import { markdownFonts } from '../src/domain/types';
 
 const defaults = {
   theme: 'system',
+  language: 'ja',
   markdownFont: 'sans',
   editorAssistance: true,
   layouts: {},
@@ -36,6 +37,18 @@ test('a choice is written down and read back after a restart', async () => {
   });
   // The renderer is loaded from a file URL, so this file is the only durable copy.
   assert.match(await readFile(path.join(dir, 'device-settings.json'), 'utf8'), /"theme": "dark"/);
+});
+
+test('the interface language is Japanese until chosen, and a choice survives a restart', async () => {
+  const { dir, settings } = await service();
+  // A record written before the language setting existed still reads as Japanese.
+  await writeFile(path.join(dir, 'device-settings.json'), '{"theme":"dark"}');
+  assert.equal((await settings.read()).language, 'ja');
+  await settings.save({ language: 'en' });
+  await settings.save({ theme: 'light' });
+  const restarted = await new SettingsService(dir).read();
+  assert.equal(restarted.language, 'en');
+  assert.equal(restarted.theme, 'light');
 });
 
 test('a layout keyed by several panel ids is kept', async () => {
@@ -102,6 +115,8 @@ test('the request validator bounds what a renderer may store', () => {
     assert.equal(save.safeParse([{ markdownFont }]).success, true);
   assert.equal(save.safeParse([{ layouts: { workspace: '{"explorer":30}' } }]).success, true);
   assert.equal(save.safeParse([{ theme: 'neon' }]).success, false);
+  assert.equal(save.safeParse([{ language: 'en' }]).success, true);
+  assert.equal(save.safeParse([{ language: 'fr' }]).success, false);
   assert.equal(save.safeParse([{ markdownFont: 'comic' }]).success, false);
   assert.equal(save.safeParse([{ layouts: { workspace: 'x'.repeat(5000) } }]).success, false);
   // The key the pane library writes for the three-pane workspace is 67 characters.

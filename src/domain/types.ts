@@ -170,6 +170,8 @@ export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 
 export type MarkdownFont = (typeof markdownFonts)[number];
 export interface DeviceSettings {
   theme: 'system' | 'light' | 'dark';
+  /** The interface language; Japanese unless the reader chose otherwise. */
+  language: import('./i18n').Language;
   markdownFont: MarkdownFont;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;

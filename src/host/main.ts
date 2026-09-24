@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { setLanguage } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
 import { realpath, open as openFileHandle } from 'node:fs/promises';
@@ -55,7 +56,10 @@ app
     const settings = new SettingsService(app.getPath('userData'));
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
-    nativeTheme.themeSource = (await settings.read()).theme;
+    const device = await settings.read();
+    nativeTheme.themeSource = device.theme;
+    // Dialogs and messages the host writes follow the reader's language too.
+    setLanguage(device.language);
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
     const drafts = new DraftService(files);
@@ -330,6 +334,7 @@ app
       saveDeviceSettings: async (patch) => {
         const next = await settings.save(patch);
         nativeTheme.themeSource = next.theme;
+        setLanguage(next.language);
         return next;
       },
       openCloudSetupHelp: () =>

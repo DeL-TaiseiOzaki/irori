@@ -11,6 +11,7 @@ import { SkillPicker } from './SkillPicker';
 import { retirementNotice } from '../domain/skills';
 import { Popover } from '@base-ui/react/popover';
 import {
+  applyLanguage,
   applyMarkdownFont,
   applyTheme,
   chooseEditorAssistance,
@@ -20,6 +21,7 @@ import {
   watchSystemTheme,
 } from './device-settings';
 import { Appearance } from './Appearance';
+import { useLanguage } from './useLanguage';
 import { CloudRecovery } from './CloudRecovery';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { MagnetTabs } from './obsidian/MagnetTabs';
@@ -305,6 +307,9 @@ function navigationNotice(target: Navigation, found: boolean) {
   return `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'}`;
 }
 function App() {
+  // Interface text is chosen while rendering, so a language change re-renders
+  // the whole tree from here; component state, drafts and the editor are kept.
+  useLanguage();
   const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
@@ -2126,6 +2131,7 @@ watchSystemTheme();
 void loadDeviceSettings().finally(() => {
   applyTheme();
   applyMarkdownFont();
+  applyLanguage();
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary FallbackComponent={AppCrash}>
       <App />
