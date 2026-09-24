@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Dialog contrast and Drive folder choice, 2026-09-25: **0.1.31** is prepared on
+`fix/dialog-contrast-cloud-folder` from the owner's report. `.modal` painted a
+fixed white panel while inheriting the dark theme's light text (contrast 1.26:1
+measured), so the cloud connection dialog was unreadable; panels now use
+`--surface`/`--ink`, the remaining literal colours in dialogs and the Git panel
+use tokens, and `CloudRecovery` gains its missing panel. The Drive folder list
+could only choose a subfolder through its radio button, so a folder reached with
+**開く** could never be connected. The opened folder now has
+**「名前」を接続先にする**, the chosen row is highlighted and the form scrolls
+into view. `cloud-ui-smoke` connects an opened shared-drive folder and asserts
+dialog contrast above 4.5:1 in both themes; it fails on the old stylesheet.
+
 Delivery, 2026-09-23 (night): PR #84 is merged and **0.1.30 is published** as
 [v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1)
 by release run `35851726103` from main's CI run `35850884875` (source
