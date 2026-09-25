@@ -1,5 +1,12 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-26: PR #94 is merged with the owner's go-ahead, and **0.1.37
+is published** as
+[v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1)
+by release run `36091671804` from main's CI run `36091077153` (source `5270ac9`),
+which passed first time. The release carries Windows 198,651,392 bytes, Mac
+166,238,512 bytes and `irori-0.1.37-full.nupkg` 198,011,147 bytes.
+
 Drive folders in KBs, 2026-09-26: **0.1.37** is prepared on `feat/drive-in-kb`
 from the owner's decision to drop the separate Google Drive frame
 ([ADR 013](decisions/013-drive-folders-in-kbs.md), superseding ADR 002 Q02's
