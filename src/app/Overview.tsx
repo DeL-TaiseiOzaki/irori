@@ -12,6 +12,8 @@ import { MagnetTabs } from './obsidian/MagnetTabs';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
 import { currentStep, lastRun, openRequest, useBrainAi, type BrainAi } from './useBrainAi';
+import type { YourAi } from '../domain/you';
+import { openTasks, YourAiPanel } from './YourAiPanel';
 import './overview.css';
 
 const host = window.irori;
@@ -199,18 +201,29 @@ const at = (point: { x: number; y: number }): CSSProperties => ({
   top: `${(point.y / board.height) * 100}%`,
 });
 
+// Sparks travel along hand-offs unless the reader asks for less motion.
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 function OverviewMap({
   spaces,
   ais,
   refresh,
+  you,
+  yourAi,
+  onShowYou,
   onEnter,
 }: {
   spaces: Space[];
   ais: Record<string, BrainAi>;
   refresh: number;
+  you?: YourAi;
+  yourAi: BrainAi;
+  onShowYou: () => void;
   onEnter: Actions['onEnter'];
 }) {
-  const layout = useMemo(() => mapLayout(spaces), [spaces]);
+  const layout = useMemo(() => mapLayout(spaces, { hearth: !!you }), [spaces, !!you]);
+  // Your AI's hand-offs still under way: a line from the hearth to each brain.
+  const tasks = openTasks(yourAi);
   const ids = spaces.map((space) => space.scopeId);
   const histories = useResource(
     async () =>
@@ -258,7 +271,52 @@ function OverviewMap({
               vectorEffect="non-scaling-stroke"
             />
           ))}
+          {layout.hearth &&
+            tasks.map((task) => {
+              const d = curve(layout.hearth!, node(task.scopeId)).d;
+              return (
+                <g key={task.id} className={`map-hand-off ${task.state}`}>
+                  <path d={d} vectorEffect="non-scaling-stroke" />
+                  {!reducedMotion.matches && (
+                    <circle r="4" className="map-spark">
+                      <animateMotion dur="2.6s" repeatCount="indefinite" path={d} />
+                    </circle>
+                  )}
+                </g>
+              );
+            })}
         </svg>
+        {layout.hearth &&
+          tasks.map((task) => (
+            <span
+              key={task.id}
+              className={`map-pill hand-off ${task.state}`}
+              style={at(curve(layout.hearth!, node(task.scopeId)).label)}
+              title={task.label}
+            >
+              <Icon name="arrow" size={11} strokeWidth={2.4} />
+              {task.label}
+            </span>
+          ))}
+        {layout.hearth && you && (
+          <button
+            className={`map-hearth ${yourAi.running ? 'working' : ''}`}
+            style={at(layout.hearth)}
+            aria-label={t('あなたの AI の Schema を開く', "Open your AI's Schema")}
+            onClick={onShowYou}
+          >
+            <span className="map-orb" aria-hidden="true">
+              <Icon name="sparkles" size={30} strokeWidth={1.9} />
+            </span>
+            <strong>{t('あなたの AI', 'Your AI')}</strong>
+            <small>
+              <Icon name="schema" size={11} />
+              {you.state === 'ready'
+                ? t('あなたの Schema', 'Your Schema')
+                : t('まだ用意されていません', 'Not set up yet')}
+            </small>
+          </button>
+        )}
         {links.map((link) => (
           <span
             key={`${link.from}>${link.to}`}
@@ -276,10 +334,11 @@ function OverviewMap({
         {layout.nodes.map((item, index) => {
           const brain = space(item.scopeId);
           const ai = ais[item.scopeId] ?? idle;
+          const handed = tasks.some((task) => task.scopeId === item.scopeId);
           return (
             <button
               key={item.scopeId}
-              className={`map-node ${aiState(ai)}`}
+              className={`map-node ${aiState(ai)} ${handed ? 'handed' : ''}`}
               style={at(item)}
               aria-label={t(`${brain.name} を開く`, `Open ${brain.name}`)}
               onClick={() => onEnter(brain)}
@@ -295,6 +354,12 @@ function OverviewMap({
         })}
       </div>
       <footer className="map-legend">
+        {you && (
+          <span>
+            <i className="legend-hand-off" />
+            {t('あなたの AI からの依頼', 'Handed over by your AI')}
+          </span>
+        )}
         <span>
           <i className="legend-reference" />
           {t('別の Brain のノートを参照', "Read another brain's notes")}
@@ -615,6 +680,11 @@ export function Overview({
   onAdd,
   onConnect,
   onSend,
+  you,
+  onCreateYou,
+  onShowYou,
+  onSendYou,
+  onStopYou,
   ...actions
 }: {
   workspace: WorkspaceProfile;
@@ -628,8 +698,17 @@ export function Overview({
   onAdd: () => void;
   onConnect: (space: Space) => void;
   onSend: (scopeId: string, prompt: string) => Promise<void>;
+  /** Your AI, once its record is read; `state` says whether its folder is set up. */
+  you?: YourAi;
+  onCreateYou: () => Promise<void>;
+  onShowYou: () => void;
+  onSendYou: (prompt: string) => Promise<void>;
+  onStopYou: () => Promise<void>;
 } & Actions) {
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
+  // Beside the map: your AI, or each brain's own AI.
+  const [island, setIsland] = useState<'you' | 'brains'>('you');
+  const yourAi = (you && ais[you.id]) ?? idle;
   // What the Overview itself did (a send, a resume) is read back at once.
   const [acted, setActed] = useState(0);
   const reread =
@@ -662,6 +741,15 @@ export function Overview({
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
       ))}
+      {you?.state === 'ready' && (
+        <AiWatch
+          key={`you:${you.id}`}
+          scopeId={you.id}
+          agent="claude"
+          refresh={acted}
+          onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
+        />
+      )}
       <div className="overview-main">
         <header className="overview-header">
           <h1>{t('全体', 'Overview')}</h1>
@@ -719,7 +807,15 @@ export function Overview({
             </p>
           </div>
         ) : view === 'map' ? (
-          <OverviewMap spaces={spaces} ais={ais} refresh={revision} onEnter={actions.onEnter} />
+          <OverviewMap
+            spaces={spaces}
+            ais={ais}
+            refresh={revision}
+            you={you}
+            yourAi={yourAi}
+            onShowYou={onShowYou}
+            onEnter={actions.onEnter}
+          />
         ) : (
           <OverviewColumns
             spaces={spaces}
@@ -732,38 +828,73 @@ export function Overview({
         )}
       </div>
       {view === 'map' && !!spaces.length && (
-        <aside className="overview-ai chrome" aria-label={t('Brain の AI', 'Brain AIs')}>
-          <header className="overview-ai-head">
-            <span className="overview-orb" aria-hidden="true">
-              <Icon name="sparkles" size={15} strokeWidth={2.1} />
-            </span>
-            <span>
-              <strong>{t('Brain の AI', 'Brain AIs')}</strong>
-              <small>
-                {running || waiting
-                  ? [
-                      running && t(`実行中 ${running}`, `${running} running`),
-                      waiting && t(`許可待ち ${waiting}`, `${waiting} need approval`),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
-                  : t('すべて待機中', 'All idle')}
-              </small>
-            </span>
-          </header>
-          <div className="overview-ai-list">
-            {spaces.map((space) => (
-              <AiCard
-                key={space.scopeId}
-                space={space}
-                ai={ais[space.scopeId] ?? idle}
-                agent={agentFor(space.scopeId)}
-                named
-                {...shared}
+        <aside
+          className="overview-ai chrome"
+          aria-label={
+            island === 'you' ? t('あなたの AI', 'Your AI') : t('Brain の AI', 'Brain AIs')
+          }
+        >
+          <MagnetTabs
+            className="overview-island-tabs"
+            label={t('全体の AI', 'AIs in the Overview')}
+            value={island}
+            onValueChange={setIsland}
+            options={[
+              { value: 'you', label: t('あなたの AI', 'Your AI') },
+              { value: 'brains', label: t('Brain の AI', 'Brain AIs') },
+            ]}
+          />
+          {island === 'you' ? (
+            <YourAiPanel
+              you={you}
+              brains={spaces}
+              ai={yourAi}
+              onCreate={onCreateYou}
+              onShow={onShowYou}
+              onSend={reread(onSendYou)}
+              onStop={reread(onStopYou)}
+              onError={actions.onError}
+            />
+          ) : (
+            <>
+              <header className="overview-ai-head">
+                <span className="overview-orb" aria-hidden="true">
+                  <Icon name="sparkles" size={15} strokeWidth={2.1} />
+                </span>
+                <span>
+                  <strong>{t('Brain の AI', 'Brain AIs')}</strong>
+                  <small>
+                    {running || waiting
+                      ? [
+                          running && t(`実行中 ${running}`, `${running} running`),
+                          waiting && t(`許可待ち ${waiting}`, `${waiting} need approval`),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : t('すべて待機中', 'All idle')}
+                  </small>
+                </span>
+              </header>
+              <div className="overview-ai-list">
+                {spaces.map((space) => (
+                  <AiCard
+                    key={space.scopeId}
+                    space={space}
+                    ai={ais[space.scopeId] ?? idle}
+                    agent={agentFor(space.scopeId)}
+                    named
+                    {...shared}
+                  />
+                ))}
+              </div>
+              <OverviewComposer
+                spaces={spaces}
+                ais={ais}
+                agentFor={agentFor}
+                onSend={reread(onSend)}
               />
-            ))}
-          </div>
-          <OverviewComposer spaces={spaces} ais={ais} agentFor={agentFor} onSend={reread(onSend)} />
+            </>
+          )}
         </aside>
       )}
     </div>

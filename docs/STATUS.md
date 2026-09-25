@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Your AI, 2026-09-26: **0.1.42** is prepared on `feat/your-ai`. Your AI is the
+person's own Claude Code agent, run from `~/irori/you` (device record
+`your-ai.json`, id reused for its conversations), set up from the Overview with
+an irori-written starter (`AGENTS.md`, the `brain-agents` skill, an empty
+`.claude/agents/`). A request carries the workspace's free brains (`brains` on
+`StartRun`); the host resolves their folders as `additionalDirectories`, names
+each brain's sub-agent (`brainAgentNames`) in a preamble, holds those brains for
+the run (`busy`), and keeps writes in bounds with a `PreToolUse` rule
+(`src/agents/delegation.ts`). Hand-offs are forced to the foreground, since a
+background sub-agent's edits are refused without a prompt. Events carry
+`delegate` (hand-off start, sub-agent steps and requests via `canUseTool`'s
+`agentID`, the `task_notification` report). The host now announces the end of
+every request (`resolved`), and every view uses that instead of "a later event
+arrived", which also fixes Claude Code brain runs where the tool-call message
+came after its request. Renderer: the Overview's island has **あなたの AI | Brain
+の AI**, the map has the hearth orb with hand-off lines and sparks, and the Your
+AI screen shows the folder and each brain's definition. Tests:
+`tests/your-ai.test.ts`, a Claude protocol fixture
+(`tests/fixtures/claude-your-ai.mjs`), `your-ai-ui-smoke`, and the opt-in real
+run `npm run test:your-ai`, which passed with Claude Code 2.1.280 on 2026-09-26
+(see [YOUR-AI](YOUR-AI.md)).
+
 Delivery, 2026-09-26: PRs #97–#101 are merged with the owner's go-ahead, and
 **0.1.41 is published** as
 [v0.1.41-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.41-preview.1)

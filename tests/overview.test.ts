@@ -42,7 +42,22 @@ test('brains with no category at all are one row without areas', () => {
   const layout = mapLayout([{ scopeId: ids.a }, { scopeId: ids.b }]);
   assert.equal(layout.groups.length, 0);
   assert.equal(layout.nodes[0].y, layout.nodes[1].y);
-  assert.deepEqual(mapLayout([]), { nodes: [], groups: [] });
+  assert.deepEqual(mapLayout([]), { nodes: [], groups: [], hearth: undefined });
+});
+
+test('with your AI, the hearth is on the left and the brains keep to its right', () => {
+  const layout = mapLayout(
+    [
+      { scopeId: ids.a, category: 'team' },
+      { scopeId: ids.b, category: 'team' },
+      { scopeId: ids.c },
+    ],
+    { hearth: true },
+  );
+  assert.ok(layout.hearth && layout.hearth.x < 200);
+  for (const node of layout.nodes)
+    assert.ok(node.x > layout.hearth.x + 150 && node.x < board.width);
+  for (const group of layout.groups) assert.ok(group.x > layout.hearth.x + 60);
 });
 
 function run(scopeId: string, createdAt: string, sources: [string, string][]): RunRecord {

@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, type ReactNode } from 'react';
-import type { AgentAnswers, AgentEvent } from '../domain/types';
+import type { AgentAnswers, AgentEvent, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { BrainTile } from './BrainTile';
 
 const host = window.irori;
 // A reply is Markdown, but its renderer is the heaviest thing a session that
@@ -47,10 +48,13 @@ export function eventTarget(details?: string) {
 export function AgentRequest({
   event,
   ended,
+  brain,
   onError,
 }: {
   event: AgentEvent;
   ended: boolean;
+  /** The brain whose sub-agent asks, when your AI handed work to it. */
+  brain?: Space;
   onError: (e: unknown) => void;
 }) {
   const [answers, setAnswers] = useState<AgentAnswers>({});
@@ -73,6 +77,12 @@ export function AgentRequest({
   const target = eventTarget(event.details);
   return (
     <div className="request" role="group" aria-label={t('許可の要求', 'Permission request')}>
+      {brain && (
+        <span className="request-brain">
+          <BrainTile space={brain} size={16} radius={5} />
+          {t(`${brain.name} の AI から`, `From ${brain.name}'s AI`)}
+        </span>
+      )}
       <strong className="request-title">
         <Icon name="shield" size={16} />
         {event.text}
@@ -150,15 +160,32 @@ export function AgentRequest({
 }
 
 /**
- * A request is over once its run ended or moved on: an answer given in another
- * view is not offered again here.
+ * A request is over once it was answered — here or in another view — or
+ * declined, or its run ended. Other events of the run say nothing: a sub-agent
+ * of another brain works on meanwhile, and the message announcing a tool call
+ * can arrive after the request it raised.
  */
 export function requestEnded(events: AgentEvent[], index: number) {
-  const { runId } = events[index];
-  return events.slice(index + 1).some((event) => event.runId === runId);
+  const { runId, requestId } = events[index];
+  return events
+    .slice(index + 1)
+    .some(
+      (event) =>
+        event.runId === runId &&
+        (event.type === 'done' || (!!requestId && event.resolved === requestId)),
+    );
 }
 
-function Step({ event, running }: { event: AgentEvent; running: boolean }) {
+function Step({
+  event,
+  running,
+  brain,
+}: {
+  event: AgentEvent;
+  running: boolean;
+  /** The brain a sub-agent's step works in. */
+  brain?: Space;
+}) {
   const target = eventTarget(event.details);
   return (
     <details className="step">
@@ -168,6 +195,7 @@ function Step({ event, running }: { event: AgentEvent; running: boolean }) {
           size={15}
           className={running ? 'step-icon running' : 'step-icon'}
         />
+        {brain && <BrainTile space={brain} size={14} radius={4} className="step-brain" />}
         <span className="step-verb">{event.text}</span>
         {target && <span className="step-target">{target}</span>}
       </summary>
@@ -176,20 +204,99 @@ function Step({ event, running }: { event: AgentEvent; running: boolean }) {
   );
 }
 
+export type TaskState = 'working' | 'waiting' | 'reported' | 'failed' | 'stopped';
+
+/**
+ * The hand-offs of one run of your AI, each with its brain, what it was asked
+ * and how far it is: a request it waits on, a report, or still working.
+ */
+export function runTasks(events: AgentEvent[], runId: string, active: boolean) {
+  const tasks = new Map<string, { scopeId: string; label: string; state: TaskState }>();
+  events.forEach((event, index) => {
+    const delegate = event.delegate;
+    if (event.runId !== runId || !delegate) return;
+    const task = tasks.get(delegate.task);
+    if (delegate.state === 'started')
+      tasks.set(delegate.task, { scopeId: delegate.scopeId, label: event.text, state: 'working' });
+    else if (task && (delegate.state === 'reported' || delegate.state === 'failed'))
+      task.state = delegate.state;
+    else if (
+      task &&
+      (event.type === 'permission' || event.type === 'question') &&
+      !requestEnded(events, index)
+    )
+      task.state = 'waiting';
+  });
+  for (const task of tasks.values())
+    if (!active && (task.state === 'working' || task.state === 'waiting')) task.state = 'stopped';
+  return [...tasks.entries()].map(([id, task]) => ({ id, ...task }));
+}
+
+export function taskStateWords(state: TaskState) {
+  return {
+    working: t('作業中', 'Working'),
+    waiting: t('許可待ち', 'Needs approval'),
+    reported: t('完了', 'Done'),
+    failed: t('失敗', 'Failed'),
+    stopped: t('中断', 'Stopped'),
+  }[state];
+}
+
+function TaskList({ tasks, brains }: { tasks: ReturnType<typeof runTasks>; brains: Space[] }) {
+  return (
+    <ul className="task-list" aria-label={t('Brain への依頼', 'Hand-offs to brains')}>
+      {tasks.map((task) => {
+        const brain = brains.find((space) => space.scopeId === task.scopeId);
+        return (
+          <li key={task.id} className={`task ${task.state}`}>
+            {brain && <BrainTile space={brain} size={22} radius={7} />}
+            <span className="task-text">
+              <small>
+                {brain
+                  ? t(`${brain.name} の AI`, `${brain.name}'s AI`)
+                  : t('Brain の AI', 'A brain')}
+              </small>
+              <span>{task.label}</span>
+            </span>
+            <span className={`task-state ${task.state}`}>
+              {task.state === 'working' ? (
+                <Icon name="loader" size={12} className="spin" />
+              ) : task.state === 'reported' ? (
+                <Icon name="check" size={12} />
+              ) : (
+                <i />
+              )}
+              {taskStateWords(task.state)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /**
  * One brain's conversation: the person's messages, and for each run the agent's
- * words, its steps as a timeline, its requests and how it ended.
+ * words, its steps as a timeline, its requests and how it ended. Your AI's
+ * conversation also shows each run's hand-offs as a task list, and the brains'
+ * reports.
  */
 export function AgentLog({
   events,
   activeRun,
+  brains = [],
   onError,
 }: {
   events: AgentEvent[];
   /** The run still in progress, whose latest step is the one being taken. */
   activeRun?: string;
+  /** The brains your AI hands work to, for their names and tiles. */
+  brains?: Space[];
   onError: (e: unknown) => void;
 }) {
+  const brainOf = (event: AgentEvent) =>
+    event.delegate ? brains.find((space) => space.scopeId === event.delegate!.scopeId) : undefined;
+  const listed = new Set<string>();
   const items: ReactNode[] = [];
   let steps: AgentEvent[] = [];
   let labelled = '';
@@ -203,6 +310,7 @@ export function AgentLog({
           <Step
             key={i}
             event={event}
+            brain={brainOf(event)}
             running={event.runId === activeRun && event === events.at(-1)}
           />
         ))}
@@ -210,6 +318,7 @@ export function AgentLog({
     );
   };
   events.forEach((event, i) => {
+    if (event.resolved) return;
     const key = `${event.runId}-${i}`;
     if (event.type !== 'tool') flushSteps(key);
     if (event.role === 'user') {
@@ -231,10 +340,43 @@ export function AgentLog({
         </div>,
       );
     }
+    if (event.delegate?.state === 'started') {
+      // A run's hand-offs show once, as a list that follows their progress.
+      if (!listed.has(event.runId)) {
+        listed.add(event.runId);
+        items.push(
+          <TaskList
+            key={`tasks-${key}`}
+            tasks={runTasks(events, event.runId, event.runId === activeRun)}
+            brains={brains}
+          />,
+        );
+      }
+      return;
+    }
+    if (event.delegate && event.type === 'status') {
+      const brain = brainOf(event);
+      items.push(
+        <div className={`message report ${event.delegate.state}`} key={key}>
+          <span className="report-from">
+            {brain && <BrainTile space={brain} size={16} radius={5} />}
+            {brain ? t(`${brain.name} の AI から`, `From ${brain.name}'s AI`) : t('報告', 'Report')}
+          </span>
+          <AgentMarkdown text={event.text} />
+        </div>,
+      );
+      return;
+    }
     if (event.type === 'tool') steps.push(event);
     else if (event.type === 'permission' || event.type === 'question')
       items.push(
-        <AgentRequest key={key} event={event} ended={requestEnded(events, i)} onError={onError} />,
+        <AgentRequest
+          key={key}
+          event={event}
+          ended={requestEnded(events, i)}
+          brain={brainOf(event)}
+          onError={onError}
+        />,
       );
     else
       items.push(

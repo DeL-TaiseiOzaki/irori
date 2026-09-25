@@ -6,6 +6,7 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
+import { requestEnded } from './AgentLog';
 
 const host = window.irori;
 
@@ -70,15 +71,15 @@ export function useBrainAi(scopeId: string, agent: AgentId, refresh = 0): BrainA
 /** The request a waiting run asks the person to answer, if any. */
 export function openRequest(ai: BrainAi) {
   if (!ai.running) return undefined;
-  const index = lastIndex(
-    ai.events,
-    (event) => event.type === 'permission' || event.type === 'question',
-  );
-  if (index < 0) return undefined;
-  const event = ai.events[index];
-  return ai.events.slice(index + 1).some((later) => later.runId === event.runId)
-    ? undefined
-    : event;
+  for (let index = ai.events.length - 1; index >= 0; index--) {
+    const event = ai.events[index];
+    if (
+      (event.type === 'permission' || event.type === 'question') &&
+      !requestEnded(ai.events, index)
+    )
+      return event;
+  }
+  return undefined;
 }
 
 /** The person's latest instruction and how the run it started went. */

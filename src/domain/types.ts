@@ -65,6 +65,15 @@ export interface Question {
   multiple?: boolean;
 }
 export type AgentAnswers = Record<string, string | string[]>;
+/**
+ * Work your AI handed to a brain's sub-agent: which brain, which hand-off (the
+ * delegation's tool call), and how far it is.
+ */
+export interface Delegate {
+  scopeId: string;
+  task: string;
+  state: 'started' | 'working' | 'reported' | 'failed';
+}
 export interface AgentEvent {
   scopeId?: string;
   agent?: AgentId;
@@ -76,6 +85,13 @@ export interface AgentEvent {
   questions?: Question[];
   details?: string;
   outcome?: 'completed' | 'failed' | 'cancelled';
+  /** Set on your AI's events that belong to a brain's sub-agent. */
+  delegate?: Delegate;
+  /**
+   * The request this event ends — answered, declined or cancelled — so every
+   * view stops offering it. Such an event is shown nowhere and never saved.
+   */
+  resolved?: string;
 }
 export interface AgentInfo {
   id: AgentId;
@@ -198,6 +214,8 @@ export interface StartRun {
   skill?: string;
   /** Tell the agent which lines of the note the person wrote or revised. */
   personLines?: boolean;
+  /** Brains handed to your AI for this request; only your AI's runs take them. */
+  brains?: string[];
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
@@ -423,6 +441,14 @@ export interface HostAPI {
   startQueuedMessage(scopeId: string, agent: AgentId, id: string): Promise<string>;
   resetAgentSession(scopeId: string, agent: AgentId): Promise<void>;
   start(input: StartRun): Promise<string>;
+  /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
+  yourAi(): Promise<import('./you').YourAi>;
+  /** Writes the starter into an absent or empty folder; never over existing files. */
+  createYourAi(): Promise<import('./you').YourAi>;
+  yourAiEntries(path: string): Promise<import('./you').YourAiEntry[]>;
+  yourAiRead(path: string): Promise<{ path: string; text: string }>;
+  /** The sub-agent each brain gets from your AI, and whether its definition exists. */
+  yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
   /** Stops the run in one space, or every run when no space is named. */
   cancel(scopeId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;

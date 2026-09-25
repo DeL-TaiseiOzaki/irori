@@ -649,3 +649,217 @@ button.column-row:hover {
 .brain-column .ai-card .request-actions {
   flex-wrap: wrap;
 }
+
+/* The island's two faces: your AI, or each brain's own AI. */
+.overview-island-tabs {
+  margin: 10px 12px 2px;
+}
+.your-ai-head .overview-space {
+  flex: 1;
+}
+.your-ai-head {
+  position: relative;
+}
+.your-ai-schema {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.your-ai-schema:hover {
+  color: var(--tx);
+  background: none;
+  text-decoration: underline;
+}
+.your-ai-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 10px;
+}
+.your-ai-scope {
+  align-self: flex-start;
+}
+.your-ai-queued {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.your-ai-setup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 26px;
+  text-align: center;
+}
+.your-ai-setup h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.your-ai-setup p {
+  margin: 0;
+  color: var(--tx-2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.your-ai-path {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-3) !important;
+  font-size: 11.5px !important;
+}
+.overview-orb.large {
+  width: 56px;
+  height: 56px;
+  box-shadow: 0 0 34px 4px var(--ember-glow);
+}
+.your-ai-loading {
+  padding: 18px;
+}
+
+/* Your AI at the hearth of the map, and its hand-offs to the brains. */
+.map-hearth {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 18px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  transform: translate(-50%, -50%);
+}
+.map-hearth:hover {
+  background: none;
+}
+.map-orb {
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--ember-2, var(--ember)), var(--ember));
+  color: var(--on-ember);
+  box-shadow:
+    0 0 0 6px var(--ember-soft),
+    0 0 44px 8px var(--ember-glow);
+  transition: transform 140ms ease;
+}
+.map-hearth:hover .map-orb {
+  transform: scale(1.04);
+}
+.map-hearth.working .map-orb {
+  animation: hearth-glow 3.2s ease-in-out infinite;
+}
+@keyframes hearth-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 6px var(--ember-soft),
+      0 0 44px 8px var(--ember-glow);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px var(--ember-soft),
+      0 0 64px 14px var(--ember-glow);
+  }
+}
+.map-hearth strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.map-hearth small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.map-hand-off path {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 2;
+  opacity: 0.85;
+}
+.map-hand-off.waiting path {
+  stroke-dasharray: 6 5;
+}
+.map-spark {
+  fill: var(--ember);
+  filter: drop-shadow(0 0 4px var(--ember));
+}
+.map-pill.hand-off {
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  background: var(--ember);
+  box-shadow: none;
+  color: var(--on-ember);
+  font-weight: 600;
+}
+.map-node.handed .brain-tile {
+  box-shadow:
+    0 6px 18px rgb(0 0 0 / 0.25),
+    0 0 0 3px var(--ember-soft),
+    0 0 26px 4px var(--ember-glow);
+}
+.legend-hand-off {
+  width: 26px;
+  border-top: 2px solid var(--ember);
+}
+
+/* Map | Columns and Your AI | Brain AIs: segmented pairs on the field colour,
+   like a brain's Files | Changes. */
+.overview-views,
+.overview-island-tabs {
+  --magnet-highlight: transparent;
+  gap: 3px !important;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.overview-views .obsidian-magnet-tab,
+.overview-island-tabs .obsidian-magnet-tab {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.overview-island-tabs .obsidian-magnet-tab {
+  flex: 1;
+}
+.overview-views .obsidian-magnet-tab[aria-pressed='true'],
+.overview-views .obsidian-magnet-tab:hover:not(:disabled),
+.overview-island-tabs .obsidian-magnet-tab[aria-pressed='true'],
+.overview-island-tabs .obsidian-magnet-tab:hover:not(:disabled) {
+  color: var(--tx);
+}
+.overview-views .obsidian-magnet-marker,
+.overview-island-tabs .obsidian-magnet-marker {
+  inset: 0;
+  height: auto;
+  border-radius: 8px;
+  background: var(--raised-2);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}

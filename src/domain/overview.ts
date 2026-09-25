@@ -24,7 +24,10 @@ const order: (Category | undefined)[] = ['organization', 'team', 'personal', und
  * workspace's order. The owner will design how the map is built later, so this
  * is the only place that decides positions.
  */
-export function mapLayout(spaces: { scopeId: string; category?: Category }[]) {
+export function mapLayout(
+  spaces: { scopeId: string; category?: Category }[],
+  { hearth = false }: { hearth?: boolean } = {},
+) {
   const rows = order
     .map((category) => ({
       category,
@@ -38,8 +41,10 @@ export function mapLayout(spaces: { scopeId: string; category?: Category }[]) {
   const top = (board.height - step * (rows.length - 1)) / 2;
   rows.forEach((row, index) => {
     const y = top + step * index;
-    const span = Math.min(board.width - 200, 240 * row.members.length);
-    const left = (board.width - span) / 2;
+    // Your AI keeps the hearth on the left; the brains take the rest.
+    const area = hearth ? { left: 300, width: board.width - 330 } : { left: 0, width: board.width };
+    const span = Math.min(area.width - 200, 240 * row.members.length);
+    const left = area.left + (area.width - span) / 2;
     const xs = row.members.map((_, column) => left + (span / row.members.length) * (column + 0.5));
     row.members.forEach((space, column) =>
       nodes.push({ scopeId: space.scopeId, x: xs[column], y }),
@@ -53,7 +58,7 @@ export function mapLayout(spaces: { scopeId: string; category?: Category }[]) {
         height: 176,
       });
   });
-  return { nodes, groups };
+  return { nodes, groups, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };
 }
 
 /** One brain's AI read notes of another brain: drawn from the source to the reader. */

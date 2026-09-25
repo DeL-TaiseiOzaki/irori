@@ -99,6 +99,9 @@ try {
   await expect(map.getByRole('button', { name: 'Product を開く' })).toContainText('許可待ち');
   await expect(map.getByRole('button', { name: 'Research を開く' })).toContainText('実行中');
   await expect(map.locator('.map-group')).toHaveCount(2);
+  // Beside the map, your AI comes first; each brain's own AI is the other tab.
+  await expect(page.getByRole('complementary', { name: 'あなたの AI' })).toBeVisible();
+  await page.getByRole('button', { name: 'Brain の AI', exact: true }).click();
   const ais = page.getByRole('complementary', { name: 'Brain の AI' });
   const productAi = ais.getByRole('group', { name: 'Product の AI' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });

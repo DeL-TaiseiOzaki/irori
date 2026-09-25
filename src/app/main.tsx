@@ -125,6 +125,7 @@ import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
 import { Overview, type OverviewView } from './Overview';
+import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
 const host = window.irori;
 function SessionControls({
@@ -267,7 +268,8 @@ function App() {
   // The palette opened from the Overview searches every brain.
   const [searchAll, setSearchAll] = useState(false);
   // The workspace's level: every brain at once, or the brain on show.
-  const [level, setLevel] = useState<'overview' | 'brain'>('brain');
+  // The Your AI screen is a level of its own beside the Overview.
+  const [level, setLevel] = useState<'overview' | 'brain' | 'you'>('brain');
   const [overviewView, setOverviewView] = useState<OverviewView>('map');
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
@@ -393,14 +395,55 @@ function App() {
   function markRunning(scopeId: string, value: boolean) {
     setRunningScopes((all) => mark(all, scopeId, value));
   }
-  // A run waits for the person while a permission or question is open.
-  function markWaiting(scopeId: string, value: boolean) {
-    setWaitingScopes((all) => mark(all, scopeId, value));
+  // A run waits for the person while a permission or question is open. Each open
+  // request names its run and scopes: a sub-agent's request also holds its brain.
+  const openRequests = useRef(new Map<string, { runId: string; scopes: string[] }>());
+  const [openRequestCount, setOpenRequestCount] = useState(0);
+  function showWaiting() {
+    setOpenRequestCount(openRequests.current.size);
+    const scopes = new Set([...openRequests.current.values()].flatMap((request) => request.scopes));
+    setWaitingScopes((all) =>
+      all.length === scopes.size && all.every((scopeId) => scopes.has(scopeId)) ? all : [...scopes],
+    );
+  }
+  function trackRequests(event: AgentEvent) {
+    const open = openRequests.current;
+    if ((event.type === 'permission' || event.type === 'question') && event.requestId)
+      open.set(event.requestId, {
+        runId: event.runId,
+        scopes: [event.scopeId!, ...(event.delegate ? [event.delegate.scopeId] : [])],
+      });
+    if (event.resolved) open.delete(event.resolved);
+    if (event.type === 'done')
+      for (const [id, request] of open) if (request.runId === event.runId) open.delete(id);
+    showWaiting();
+  }
+  /** What a freshly read conversation says is open replaces what this scope held. */
+  function resetRequests(scopeId: string, requests: AgentEvent[] = []) {
+    const open = openRequests.current;
+    for (const [id, request] of open) if (request.scopes[0] === scopeId) open.delete(id);
+    for (const request of requests) trackRequests({ ...request, scopeId });
+    showWaiting();
+  }
+  // Your AI: its folder on this device, and whether it is working. While it
+  // works, the brains handed to it are held, as a brain's own run holds it.
+  const [youRevision, setYouRevision] = useState(0);
+  const youRead = useResource(() => host.yourAi(), [], { refresh: youRevision });
+  const you = youRead.data;
+  const yourAiRunning = !!you && runningScopes.includes(you.id);
+  // The brains handed to your AI's run in progress; unknown after a reload, when
+  // the workspace's brains count as handed.
+  const [handed, setHanded] = useState<string[]>();
+  useEffect(() => {
+    if (!yourAiRunning) setHanded(undefined);
+  }, [yourAiRunning]);
+  function heldByYou(scopeId: string) {
+    return yourAiRunning && (handed ?? workspace?.scopeIds ?? []).includes(scopeId);
   }
   function aiState(scopeId: string): BrainAiState {
     return waitingScopes.includes(scopeId)
       ? 'waiting'
-      : runningScopes.includes(scopeId)
+      : runningScopes.includes(scopeId) || heldByYou(scopeId)
         ? 'running'
         : 'idle';
   }
@@ -427,7 +470,7 @@ function App() {
           setEvents(withRequests(value));
           setQueued(value.queued);
           markRunning(active.scopeId, !!value.activeRunId);
-          markWaiting(active.scopeId, !!value.requests?.length);
+          resetRequests(active.scopeId, value.requests);
           // Work queued behind a run goes on when it ends; a queue left without
           // one (after a failure or a restart) waits for the person to resume it.
           setQueuePaused(!value.activeRunId);
@@ -610,8 +653,9 @@ function App() {
         const incoming = event.event;
         if (incoming.scopeId) {
           const scopeId = incoming.scopeId;
-          markRunning(scopeId, incoming.type !== 'done');
-          markWaiting(scopeId, incoming.type === 'permission' || incoming.type === 'question');
+          // An answered request says only that it ended; the run goes on.
+          if (!incoming.resolved) markRunning(scopeId, incoming.type !== 'done');
+          trackRequests(incoming);
           // The AI that runs in a brain is that brain's AI from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
@@ -813,6 +857,15 @@ function App() {
     });
   }
   async function start() {
+    if (active && heldByYou(active.scopeId)) {
+      report(
+        t(
+          'あなたの AI が作業中です。終わってからこの Brain の AI に頼んでください。',
+          "Your AI is working. Ask this brain's AI after it finishes.",
+        ),
+      );
+      return;
+    }
     if (
       !active ||
       !conversationReady ||
@@ -953,6 +1006,52 @@ function App() {
       markRunning(scopeId, false);
       throw error;
     }
+  }
+  /**
+   * Sends to your AI with the workspace's brains that are free, or queues behind
+   * its run. It works on Claude Code for now.
+   */
+  async function sendToYou(message: string, skill?: string) {
+    if (!you) return;
+    if (!(await save()))
+      throw Error(
+        t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
+      );
+    const brains = workspaceSpaces
+      .map((space) => space.scopeId)
+      .filter((scopeId) => !runningScopes.includes(scopeId));
+    const input = {
+      scopeId: you.id,
+      agent: 'claude' as const,
+      access: 'default' as const,
+      prompt: message,
+      brains,
+      skill,
+    };
+    const value = await host.agentConversation(you.id, 'claude');
+    if (value.activeRunId || value.queued.length || draining.current.has(you.id)) {
+      await host.queueAgentMessage(input);
+      return;
+    }
+    markRunning(you.id, true);
+    setHanded(brains);
+    try {
+      await host.start(input);
+    } catch (error) {
+      markRunning(you.id, false);
+      throw error;
+    }
+  }
+  /** Asks your AI to write each brain's sub-agent definition; irori never writes them. */
+  async function updateDefinitions() {
+    await sendToYou(
+      t(
+        'この Brain ごとのサブエージェント定義を、brain-agents スキルに従って作成・更新してください。',
+        "Create or update each brain's sub-agent definition following the brain-agents skill.",
+      ),
+      'brain-agents',
+    );
+    setLevel('overview');
   }
   /** Resumes a brain's queue from the Overview. */
   async function resumeQueue(scopeId: string) {
@@ -1116,7 +1215,9 @@ function App() {
       />
     );
   // A run, a send, queued work or a connection holds what changes the brain on show.
-  const brainLocked = running || sending || queued.length > 0 || connecting;
+  // Your AI's run holds the brains handed to it as a brain's own run holds it.
+  const heldHere = !!active && heldByYou(active.scopeId);
+  const brainLocked = running || sending || queued.length > 0 || connecting || heldHere;
   // Other brains stay open to choose while this one's AI runs.
   const switchLocked = sending || connecting;
   const anyRunning = runningScopes.length > 0;
@@ -1227,13 +1328,35 @@ function App() {
             onSend={sendToBrain}
             onResume={resumeQueue}
             onStop={(scopeId) => host.cancel(scopeId)}
+            you={you}
+            onCreateYou={async () => {
+              await host.createYourAi();
+              setYouRevision((value) => value + 1);
+            }}
+            onShowYou={() => {
+              if (you?.state === 'ready') setLevel('you');
+            }}
+            onSendYou={(prompt) => sendToYou(prompt)}
+            onStopYou={async () => {
+              if (you) await host.cancel(you.id);
+            }}
             onEnter={(space, options) => void enterBrain(space, options)}
+            onError={report}
+          />
+        )}
+        {level === 'you' && workspace && you?.state === 'ready' && (
+          <YourAiScreen
+            you={you}
+            spaces={workspaceSpaces}
+            running={yourAiRunning}
+            onUpdateDefinitions={updateDefinitions}
+            onBack={() => setLevel('overview')}
             onError={report}
           />
         )}
         <PaneGroup
           className="islands"
-          inert={level === 'overview'}
+          inert={level !== 'brain'}
           orientation="horizontal"
           defaultLayout={islandLayout.defaultLayout}
           onLayoutChanged={islandLayout.onLayoutChanged}
@@ -2217,6 +2340,15 @@ function App() {
                         <button onClick={() => setFresh(false)}>{t('取り消す', 'Undo')}</button>
                       </p>
                     )}
+                    {heldHere && (
+                      <p className="agent-held" role="status">
+                        <Icon name="sparkles" size={13} />
+                        {t(
+                          'あなたの AI がこの Brain にも仕事を渡しています。終わるまでこの Brain の AI は待機します。',
+                          "Your AI is handing work to this brain too. This brain's AI waits until it finishes.",
+                        )}
+                      </p>
+                    )}
                     <div className="composer-box">
                       <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
                         <span className="context-chip" title={active?.root}>
@@ -2410,6 +2542,7 @@ function App() {
                               connecting ||
                               !prompt.trim() ||
                               !!external ||
+                              heldHere ||
                               agentInfo?.available !== true
                             }
                             onClick={() => void start()}
@@ -2472,7 +2605,7 @@ function App() {
         git={gitRead.data}
         uploads={uploads}
         running={runningScopes.length}
-        waiting={waitingScopes.length}
+        waiting={openRequestCount}
         status={status}
         workspaceDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
         terminalOpen={!!terminalSpace}
