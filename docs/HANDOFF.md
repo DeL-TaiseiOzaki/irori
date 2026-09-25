@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Current development, 2026-09-25: **0.1.37 is published** as
+[v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1);
+nothing is open. One session delivered 0.1.31–0.1.37 from the owner's reports
+and requests: readable dialogs and choosing an opened Drive folder (#86),
+resizable explorer rows (#87), an English/Japanese interface ([ADR 011](decisions/011-interface-language.md), #88),
+the Windows WinFsp `realpath` failure (#90), editable Drive folders
+([ADR 012](decisions/012-drive-editing.md), #91), rename/move/delete, images,
+a save-time Drive version check and upload failure reasons (#92), and Drive
+folders belonging to KBs with the separate Drive frame removed
+([ADR 013](decisions/013-drive-folders-in-kbs.md), #94). 0.1.33 and 0.1.36 were
+published on the way. None of the Drive work has been tried on the owner's
+Windows 11 or macOS devices yet; see [HANDOFF-PROMPT](HANDOFF-PROMPT.md) for the
+owner's first steps after updating and the next work.
+
 Current development, 2026-09-23 (night): **0.1.30 is published** as
 [v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1).
 It reads a newer release's own file list when GitHub's release list omits it
