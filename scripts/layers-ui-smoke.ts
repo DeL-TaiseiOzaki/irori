@@ -114,14 +114,8 @@ try {
   await expect.poll(() => width('my-kb')).toBeGreaterThan(personalWidth + 30);
   // The materials row keeps its own split.
   expect(Math.abs((await width('my-contents')) - personalWidth)).toBeLessThan(2);
-  // The workspace's Drive list is a row of its own.
-  const driveHeight = async () => (await page.locator('.workspace-drive').boundingBox())!.height;
-  const driveBefore = await driveHeight();
-  await drag('資料と Google Drive の境界', 0, -15);
-  await expect.poll(driveHeight).toBeGreaterThan(driveBefore + 8);
   // Folding both halves of a row gives its space to the other rows.
-  const others = async () =>
-    (await height('schema')) + (await height('my-contents')) + (await driveHeight());
+  const others = async () => (await height('schema')) + (await height('my-contents'));
   const [knowledgeOpen, othersOpen] = [await height('my-kb'), await others()];
   await page.getByRole('button', { name: '個人のナレッジ', exact: false }).click();
   await page.getByRole('button', { name: 'チームのナレッジ', exact: false }).click();
@@ -208,7 +202,6 @@ try {
           'five panes and personal/team/organization grouping',
           'rows and personal/team splits resize and are kept on the device',
           'folding a whole row gives its height to the others',
-          'the workspace Drive list resizes as a row',
           'per-repository schema isolation',
           'nested contents excluded from schema',
           'unconfigured aliases visible without a mount',

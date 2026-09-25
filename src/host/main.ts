@@ -481,6 +481,8 @@ app
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
+      moveCloudConnection: (from, mountId, to) =>
+        changeCloud(to, () => changeCloud(from, () => cloud.moveConnection(from, mountId, to))),
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
         if (error) throw Error(error);

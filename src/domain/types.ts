@@ -333,6 +333,16 @@ export interface HostAPI {
     access: CloudAccess,
     leavePending?: boolean,
   ): Promise<void>;
+  /**
+   * Moves a workspace's Drive connection from before 0.1.37 into a KB's materials.
+   * `duplicate` is true when the KB already connected that folder and the
+   * workspace's connection was only unregistered.
+   */
+  moveCloudConnection(
+    fromScopeId: string,
+    mountId: string,
+    toScopeId: string,
+  ): Promise<{ duplicate: boolean }>;
   /** Shows the connected folder in the system file manager, for adding files there. */
   openCloudFolder(scopeId: string, mountId: string): Promise<void>;
   /** Creates an empty Markdown note in an editable Drive folder and returns it. */

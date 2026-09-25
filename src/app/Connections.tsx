@@ -23,10 +23,13 @@ function stateLabel(connection: CloudConnection) {
 
 export function Connections({
   space,
+  workspaceId,
   running,
   onClose,
 }: {
   space: CloudRoot;
+  /** The open workspace, whose own Drive connections from earlier versions can be moved here. */
+  workspaceId?: string;
   running: boolean;
   onClose: () => void;
 }) {
@@ -49,8 +52,13 @@ export function Connections({
   const form = useRef<HTMLFormElement>(null);
   const setupRead = useResource(() => host.cloudSetup(), [space.scopeId, revision]);
   const overview = useResource(
-    () => Promise.all([host.cloudAccounts(), host.cloudConnections(space.scopeId)]),
-    [space.scopeId, revision],
+    () =>
+      Promise.all([
+        host.cloudAccounts(),
+        host.cloudConnections(space.scopeId),
+        workspaceId && !space.workspace ? host.cloudConnections(workspaceId) : [],
+      ]),
+    [space.scopeId, workspaceId, revision],
     { interval: 2000 },
   );
   const driveRead = useResource(() => host.cloudDrives(accountId), [accountId], {
@@ -62,7 +70,8 @@ export function Connections({
     { enabled: !!accountId && !!current },
   );
   const setup = setupRead.data;
-  const [accounts = [], connections = []] = overview.data ?? [];
+  const [accounts = [], connections = [], earlier = []] = overview.data ?? [];
+  const [moved, setMoved] = useState('');
   const drives = driveRead.data ?? [],
     folders = folderRead.data ?? [];
   const loading = driveRead.loading || folderRead.loading;
@@ -106,16 +115,68 @@ export function Connections({
           </button>
         </div>
         <p>
-          {space.workspace
-            ? t(
-                'Google Drive のフォルダを、このワークスペースに接続します。KB の追加・切り替えとは独立して使えます。',
-                'Connects a Google Drive folder to this workspace. This is independent of adding or switching a KB.',
-              )
-            : t(
-                'この KB に保存されている既存の接続を管理します。新しい接続はワークスペースの Drive 欄から追加できます。',
-                'Manages the existing connections saved in this KB. Add a new connection from the workspace’s Drive section.',
-              )}
+          {t(
+            'Google Drive のフォルダを、この KB の資料（contents）に接続します。この KB で作業するエージェントからも使えます。',
+            "Connects a Google Drive folder to this KB's materials (contents). Agents working in this KB can use it too.",
+          )}
         </p>
+        {moved && (
+          <p className="moved-notice" role="status">
+            {moved}
+          </p>
+        )}
+        {earlier.length > 0 && workspaceId && (
+          <section className="earlier-connections">
+            <h3>
+              {t(
+                'ワークスペースに接続されている Drive フォルダ',
+                'Drive folders connected to the workspace',
+              )}
+            </h3>
+            <p className="muted">
+              {t(
+                'Drive フォルダは KB の資料に接続するようになりました。以前ワークスペースに接続したフォルダは、この KB に移すと資料として表示されます。フォルダの ID・名前・編集の設定はそのままです。',
+                "Drive folders are now connected to a KB's materials. Move a folder connected to the workspace earlier into this KB to see it among the materials; its ID, name and editing setting stay.",
+              )}
+            </p>
+            {earlier.map((connection) => (
+              <div className="connection-card" key={connection.mountId}>
+                <strong>{connection.name}/</strong>
+                <small>
+                  {connection.accountName ?? t('アカウント未設定', 'Account not set')} ·{' '}
+                  {connection.folderName}
+                </small>
+                <div className="actions">
+                  <button
+                    disabled={disabled}
+                    onClick={() =>
+                      void perform(async () => {
+                        const { duplicate } = await host.moveCloudConnection(
+                          workspaceId,
+                          connection.mountId,
+                          space.scopeId,
+                        );
+                        setMoved(
+                          duplicate
+                            ? t(
+                                `この KB にはすでに同じフォルダが接続されているため、ワークスペース側の「${connection.name}」の登録だけを解除しました。`,
+                                `This KB already connects the same folder, so only the workspace's “${connection.name}” was unregistered.`,
+                              )
+                            : t(
+                                `「${connection.name}」をこの KB の資料に移しました。`,
+                                `Moved “${connection.name}” into this KB's materials.`,
+                              ),
+                        );
+                      })
+                    }
+                  >
+                    {t('この KB に移す', 'Move to this KB')}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
         {setup?.prerequisite && (
           <div className="actions">
             <button

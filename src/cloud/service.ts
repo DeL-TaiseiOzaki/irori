@@ -105,18 +105,97 @@ export class CloudService {
     if (!root.workspace) throw Error('Select a workspace for this operation');
     return root;
   }
+  /**
+   * Drive folders now belong to KBs, and a workspace's own connections from earlier
+   * versions have no view of their own; removing the workspace unregisters them.
+   * Only irori's records go: the folders' files stay in Drive and on this device.
+   */
   removeWorkspace(id: string, remove: () => Promise<void>) {
     return this.mutate(async () => {
       await this.workspaceRoot(id);
-      if ((await this.declarations(id)).length)
-        throw Error(
-          t(
-            'このワークスペースの Drive 接続を登録解除してから削除してください。KB と Drive のファイルは残ります。',
-            "Unregister this workspace's Drive connections before removing it. The KB and Drive files stay.",
-          ),
-        );
+      const records = await this.declarations(id);
+      for (const record of records) await this.assertSent(id, record.mountId);
+      for (const record of records) {
+        await this.unmount(id, record.mountId);
+        await this.forget(id, record);
+      }
       await remove();
     });
+  }
+  /**
+   * Moves a workspace's Drive connection, from before Drive folders belonged to
+   * KBs, into a KB's materials. The mount ID, folder, name and access stay, so
+   * changes still waiting in rclone's cache upload once the folder is mounted
+   * there. A KB that already connects the same folder keeps its own connection,
+   * and the workspace's is only unregistered.
+   */
+  moveConnection(from: string, mountId: string, to: string) {
+    return this.mutate(async () => {
+      const records = await this.declarations(from);
+      const record = records.find((item) => item.mountId === mountId);
+      if (!record) throw Error('Unknown cloud connection');
+      const target = await this.files.get(to);
+      if (target.workspace || to === from)
+        throw Error(t('移動先の KB を選んでください。', 'Choose the KB to move it to.'));
+      const key = this.key(from, mountId);
+      const wasMounted = this.mounted.has(key);
+      if (wasMounted) {
+        await this.assertSent(from, mountId);
+        await this.unmount(from, mountId);
+      }
+      const binding = await this.binding(from, mountId);
+      const existing = await this.declarations(to);
+      const duplicate = existing.some(
+        (item) => item.folderId === record.folderId && item.driveId === record.driveId,
+      );
+      if (!duplicate) {
+        const moved = cloudDeclaration.parse({
+          ...record,
+          scopeId: to,
+          contentsRoot: target.contents.includes(record.contentsRoot)
+            ? record.contentsRoot
+            : target.contents[0],
+        });
+        if (existing.some((item) => item.mountId === mountId))
+          throw Error('Duplicate cloud connection identity');
+        if (
+          existing.some(
+            (item) =>
+              nameKey(`${item.contentsRoot}/${item.name}`) ===
+              nameKey(`${moved.contentsRoot}/${moved.name}`),
+          )
+        )
+          throw Error(
+            t(
+              `この KB には同じ名前の接続先（${moved.name}）があります。名前を変更してから移してください。`,
+              `This KB already has a connection named ${moved.name}. Rename it before moving.`,
+            ),
+          );
+        await this.checkVacant(moved);
+        await writeLocalJson(await this.declarationFile(to), [...existing, moved]);
+        if (binding)
+          await writeLocalJson(this.bindingFile(to, mountId), {
+            scopeId: to,
+            mountId,
+            root: target.root,
+            accountId: binding.accountId,
+          });
+      }
+      await this.forget(from, record);
+      if (wasMounted && !duplicate && binding) await this.mount(to, mountId);
+      return { duplicate };
+    });
+  }
+  /** Drops a connection's records here, keeping its folder's files. It must not be mounted. */
+  private async forget(scopeId: string, record: CloudAttachment) {
+    const binding = await this.binding(scopeId, record.mountId);
+    await this.releasePlaceholder(record, binding);
+    await writeLocalJson(
+      await this.declarationFile(scopeId),
+      (await this.declarations(scopeId)).filter((item) => item.mountId !== record.mountId),
+    );
+    await fs.rm(this.bindingFile(scopeId, record.mountId), { force: true });
+    this.states.delete(this.key(scopeId, record.mountId));
   }
   async isWorkspacePath(root: string) {
     for (const item of await this.files.list()) {

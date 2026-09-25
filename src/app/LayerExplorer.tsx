@@ -239,7 +239,7 @@ function ScopeTree({
 }
 
 type PaneId = 'schema' | 'my-kb' | 'team-kb' | 'my-contents' | 'team-contents';
-type RowId = 'schema' | 'knowledge' | 'contents' | 'drive';
+type RowId = 'schema' | 'knowledge' | 'contents';
 type PaneSpec = { title: string; subtitle: string; layer: Layer; spaces: Space[] };
 type Row = {
   id: RowId;
@@ -274,20 +274,6 @@ const rows: Row[] = [
     splitLabel: () => t('個人とチームの資料の境界', 'Border between personal and team Materials'),
   },
 ];
-// The workspace's Drive list is a fourth row when the workspace has one; its
-// heading is its own, so it resizes but does not fold.
-const driveRow: Row = {
-  id: 'drive',
-  panes: [],
-  defaultSize: '20%',
-  minSize: 60,
-  handleLabel: () => t('資料と Google Drive の境界', 'Border between Materials and Google Drive'),
-};
-const withDrive: Row[] = rows.map((row) => ({
-  ...row,
-  defaultSize: { schema: '22%', knowledge: '32%', contents: '26%', drive: '20%' }[row.id],
-}));
-
 export function LayerExplorer({
   spaces,
   activeId,
@@ -301,7 +287,6 @@ export function LayerExplorer({
   onCreateIn,
   onEntryAction,
   onRefresh,
-  drive,
 }: {
   spaces: Space[];
   activeId?: string;
@@ -317,10 +302,7 @@ export function LayerExplorer({
   /** Renames, moves or deletes an entry of an editable Drive folder in a KB's materials. */
   onEntryAction?: (space: Space, entry: Entry, action: EntryAction) => void;
   onRefresh: () => void;
-  /** The workspace's Drive list, shown as a resizable row below the materials. */
-  drive?: ReactNode;
 }) {
-  const shown = drive ? [...withDrive, driveRow] : rows;
   const [roots, setRoots] = useState<Record<string, Listing>>({});
   const [collapsed, setCollapsed] = useState<PaneId[]>([]);
   const scopeKey = spaces.map((space) => space.scopeId).join(':');
@@ -380,12 +362,11 @@ export function LayerExplorer({
     schema: usePanelRef(),
     knowledge: usePanelRef(),
     contents: usePanelRef(),
-    drive: usePanelRef(),
   } satisfies Record<RowId, unknown>;
   // A row folds to its headings when every pane in it is folded; that is also
   // what dragging a row below its minimum means, so both stay one state.
   function applyFolds() {
-    for (const row of shown) {
+    for (const row of rows) {
       const handle = rowRefs[row.id].current;
       if (!handle || !row.panes.length) continue;
       const folded = row.panes.every((id) => collapsed.includes(id));
@@ -399,7 +380,7 @@ export function LayerExplorer({
   function syncRows() {
     setCollapsed((value) => {
       let next = value;
-      for (const row of shown) {
+      for (const row of rows) {
         const handle = rowRefs[row.id].current;
         if (!handle || !row.panes.length) continue;
         const folded = handle.isCollapsed();
@@ -412,7 +393,7 @@ export function LayerExplorer({
   }
   const rowLayout = useDefaultLayout({
     id: 'irori-explorer-rows',
-    panelIds: shown.map((row) => row.id),
+    panelIds: rows.map((row) => row.id),
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
@@ -497,7 +478,7 @@ export function LayerExplorer({
           else applyFolds();
         }}
       >
-        {shown.map((row, index) => (
+        {rows.map((row, index) => (
           <Fragment key={row.id}>
             {index > 0 && (
               <PaneSeparator
@@ -514,9 +495,7 @@ export function LayerExplorer({
               collapsible={row.panes.length > 0}
               collapsedSize={headingHeight}
             >
-              {row.id === 'drive' ? (
-                drive
-              ) : row.panes.length === 1 ? (
+              {row.panes.length === 1 ? (
                 renderPane(row.panes[0])
               ) : (
                 <SplitRow row={row} render={renderPane} />
