@@ -20,6 +20,7 @@ export function StatusBar({
   workspaceDisabled,
   terminalOpen,
   terminalDisabled,
+  aiTarget,
   onWorkspace,
   onAi,
   onTerminal,
@@ -36,6 +37,8 @@ export function StatusBar({
   workspaceDisabled: boolean;
   terminalOpen: boolean;
   terminalDisabled: boolean;
+  /** Where the AI summary leads: the Overview while other brains' AIs work, else the AI panel. */
+  aiTarget: 'overview' | 'panel';
   onWorkspace: () => void;
   onAi: () => void;
   onTerminal: () => void;
@@ -82,7 +85,11 @@ export function StatusBar({
       </span>
       <button
         className="status-item ai-summary"
-        title={t('AI パネルを開く', 'Open the AI panel')}
+        title={
+          aiTarget === 'overview'
+            ? t('全体で AI を見る', 'See the AIs in the Overview')
+            : t('AI パネルを開く', 'Open the AI panel')
+        }
         onClick={onAi}
       >
         <Icon name="sparkles" size={13} />

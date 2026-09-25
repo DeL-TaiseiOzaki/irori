@@ -10,7 +10,7 @@ import {
 } from './CloudEntryActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
-import { appendConversationEvent, type QueuedMessage } from '../domain/conversation';
+import { appendConversationEvent, withRequests, type QueuedMessage } from '../domain/conversation';
 import { agentAccessOptions, agentAccessLabel, agentAccessDetail } from '../domain/agent-access';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
@@ -124,6 +124,7 @@ import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
 import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
+import { Overview, type OverviewView } from './Overview';
 import { StatusBar } from './StatusBar';
 const host = window.irori;
 function SessionControls({
@@ -263,6 +264,11 @@ function App() {
   // What the stage shows: the note, the brain's home, its graph, or its materials.
   const [view, setView] = useState<'note' | 'home' | 'graph' | 'records'>('note');
   const [searchOpen, setSearchOpen] = useState(false);
+  // The palette opened from the Overview searches every brain.
+  const [searchAll, setSearchAll] = useState(false);
+  // The workspace's level: every brain at once, or the brain on show.
+  const [level, setLevel] = useState<'overview' | 'brain'>('brain');
+  const [overviewView, setOverviewView] = useState<OverviewView>('map');
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
@@ -282,12 +288,25 @@ function App() {
   const [error, setError] = useState(''),
     [status, setStatus] = useState(''),
     [panel, setPanel] = useState(false),
-    [agent, setAgent] = useState<AgentId>('codex'),
+    // Each brain keeps the AI chosen for it; a brain not chosen yet starts with the last choice.
+    [agentChoice, setAgentChoice] = useState<{
+      last: AgentId;
+      brains: Record<string, AgentId>;
+    }>({ last: 'codex', brains: {} }),
     [infos, setInfos] = useState<AgentInfo[]>([]);
   // The workspace's brains in the order its owner chose.
   const workspaceSpaces = (workspace?.scopeIds ?? []).flatMap((id) =>
     spaces.filter((space) => space.scopeId === id),
   );
+  const agentFor = (scopeId?: string) =>
+    (scopeId && agentChoice.brains[scopeId]) || agentChoice.last;
+  const agent = agentFor(active?.scopeId);
+  function setAgent(next: AgentId) {
+    setAgentChoice((choice) => ({
+      last: next,
+      brains: active ? { ...choice.brains, [active.scopeId]: next } : choice.brains,
+    }));
+  }
   const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
   const access = accessSelection?.owner === accessOwner ? accessSelection.value : 'default';
   useEffect(() => setAccessSelection(undefined), [workspace?.id, active?.scopeId, agent]);
@@ -351,6 +370,16 @@ function App() {
   const [historyTruncated, setHistoryTruncated] = useState(false);
   const [historyReload, setHistoryReload] = useState(0);
   const eventRevision = useRef(0);
+  // Back from the Overview, the panel reads its brain's conversation again: the
+  // Overview may have sent to it, queued for it or answered it meanwhile.
+  const shownLevel = useRef(level);
+  useEffect(() => {
+    if (shownLevel.current === 'overview' && level === 'brain')
+      setHistoryReload((value) => value + 1);
+    shownLevel.current = level;
+  }, [level]);
+  // Brains whose next queued instruction is being sent, so it is sent once.
+  const draining = useRef(new Set<string>());
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
@@ -395,16 +424,13 @@ function App() {
           const value = await host.agentConversation(active.scopeId, agent);
           if (!current) return;
           if (revision !== eventRevision.current) continue;
-          setEvents(value.events);
+          setEvents(withRequests(value));
           setQueued(value.queued);
           markRunning(active.scopeId, !!value.activeRunId);
-          const last = value.events.at(-1);
-          markWaiting(
-            active.scopeId,
-            !!value.activeRunId &&
-              last?.runId === value.activeRunId &&
-              (last.type === 'permission' || last.type === 'question'),
-          );
+          markWaiting(active.scopeId, !!value.requests?.length);
+          // Work queued behind a run goes on when it ends; a queue left without
+          // one (after a failure or a restart) waits for the person to resume it.
+          setQueuePaused(!value.activeRunId);
           setHistoryTruncated(value.truncated);
           setConversationReady(true);
           return;
@@ -526,6 +552,7 @@ function App() {
   function show(next: Document, navigation?: Navigation) {
     load(next, navigation);
     setView('note');
+    setLevel('brain');
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -582,13 +609,24 @@ function App() {
       } else if (event.type === 'agent') {
         const incoming = event.event;
         if (incoming.scopeId) {
-          markRunning(incoming.scopeId, incoming.type !== 'done');
-          markWaiting(
-            incoming.scopeId,
-            incoming.type === 'permission' || incoming.type === 'question',
-          );
+          const scopeId = incoming.scopeId;
+          markRunning(scopeId, incoming.type !== 'done');
+          markWaiting(scopeId, incoming.type === 'permission' || incoming.type === 'question');
+          // The AI that runs in a brain is that brain's AI from now on.
+          if (incoming.agent) {
+            const agentId = incoming.agent;
+            setAgentChoice((choice) =>
+              choice.brains[scopeId] === agentId
+                ? choice
+                : { ...choice, brains: { ...choice.brains, [scopeId]: agentId } },
+            );
+          }
         }
-        if (conversationKey.current !== `${incoming.scopeId}:${incoming.agent}`) return;
+        if (conversationKey.current !== `${incoming.scopeId}:${incoming.agent}`) {
+          if (incoming.type === 'done' && incoming.outcome === 'completed' && incoming.agent)
+            void sendNextQueued(incoming.scopeId!, incoming.agent);
+          return;
+        }
         eventRevision.current++;
         updateEvents((all) => {
           const next = appendConversationEvent(all, incoming).slice(-400);
@@ -699,7 +737,10 @@ function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !startup && !searchOpen) {
         e.preventDefault();
-        if (workspaceSpaces.length && !connecting) setSearchOpen(true);
+        if (workspaceSpaces.length && !connecting) {
+          setSearchAll(level === 'overview');
+          setSearchOpen(true);
+        }
       }
     };
     window.addEventListener('keydown', key);
@@ -709,7 +750,9 @@ function App() {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
     if (!(await save())) return false;
-    if (sending || queued.length || connecting) return false;
+    // Another brain's AI keeps running and its queue keeps going; only a send
+    // in flight or a connection being prepared holds the brain on show.
+    if (sending || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
       setActive(space);
       setDoc(undefined);
@@ -728,11 +771,11 @@ function App() {
         return false;
       }
       if (!(await save())) return false;
-      if ((sending || queued.length > 0) && space.scopeId !== active?.scopeId) {
+      if (sending && space.scopeId !== active?.scopeId) {
         setError(
           t(
-            '送信待ちを完了してからスペースを切り替えてください。',
-            'Finish the pending send before switching spaces.',
+            '送信が終わってから Brain を切り替えてください。',
+            'Switch brains after the send finishes.',
           ),
         );
         return false;
@@ -823,6 +866,7 @@ function App() {
   }
   useEffect(() => {
     if (
+      !active ||
       !conversationReady ||
       running ||
       sending ||
@@ -830,11 +874,14 @@ function App() {
       queuePaused ||
       external ||
       !queued.length ||
-      submitting.current
+      submitting.current ||
+      draining.current.has(active.scopeId)
     )
       return;
     const next = queued[0];
+    const scopeId = active.scopeId;
     submitting.current = true;
+    draining.current.add(scopeId);
     setSending(true);
     void (async () => {
       if (!(await save())) {
@@ -853,9 +900,66 @@ function App() {
       }
     })().finally(() => {
       submitting.current = false;
+      draining.current.delete(scopeId);
       setSending(false);
     });
   }, [conversationReady, running, sending, queued, queuePaused, external, gitBusy]);
+  /**
+   * Sends the next queued instruction of a brain whose conversation is not the
+   * one on show: its run ended while the person looked at another brain or the
+   * Overview. The brain on show sends its own queue from the effect above.
+   */
+  async function sendNextQueued(scopeId: string, agentId: AgentId) {
+    if (draining.current.has(scopeId)) return;
+    draining.current.add(scopeId);
+    try {
+      const value = await host.agentConversation(scopeId, agentId);
+      const next = value.queued[0];
+      if (!next || value.activeRunId) return;
+      const open = current.current;
+      // A note of that brain in conflict must be settled before its AI reads it.
+      if (open.doc?.scopeId === scopeId && open.external) return;
+      if (!(await save())) return;
+      markRunning(scopeId, true);
+      await host.startQueuedMessage(scopeId, agentId, next.id);
+      if (conversationKey.current === `${scopeId}:${agentId}`)
+        setQueued((all) => all.filter((item) => item.id !== next.id));
+    } catch (error) {
+      markRunning(scopeId, false);
+      report(error);
+    } finally {
+      draining.current.delete(scopeId);
+    }
+  }
+  /** Sends to a brain's AI from the Overview, or queues behind its run or its waiting queue. */
+  async function sendToBrain(scopeId: string, message: string) {
+    const agentId = agentFor(scopeId);
+    const key = `${scopeId}:${agentId}`;
+    if (!(await save()))
+      throw Error(
+        t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
+      );
+    const value = await host.agentConversation(scopeId, agentId);
+    const input = { scopeId, agent: agentId, access: 'default' as const, prompt: message };
+    if (value.activeRunId || value.queued.length || draining.current.has(scopeId)) {
+      const list = await host.queueAgentMessage(input);
+      if (conversationKey.current === key) setQueued(list);
+      return;
+    }
+    markRunning(scopeId, true);
+    try {
+      await host.start(input);
+    } catch (error) {
+      markRunning(scopeId, false);
+      throw error;
+    }
+  }
+  /** Resumes a brain's queue from the Overview. */
+  async function resumeQueue(scopeId: string) {
+    const agentId = agentFor(scopeId);
+    if (conversationKey.current === `${scopeId}:${agentId}`) setQueuePaused(false);
+    else await sendNextQueued(scopeId, agentId);
+  }
   async function openWorkspace(profile: WorkspaceProfile) {
     if (gitBusy) return;
     setBrainMode('files');
@@ -863,6 +967,7 @@ function App() {
     setSources([]);
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
     setWorkspace(profile);
+    setLevel('brain');
     setActive(available[0]);
     setDoc(undefined);
     setBuffer('');
@@ -1010,8 +1115,11 @@ function App() {
         onOpen={(profile) => void openWorkspace(profile)}
       />
     );
-  // A run, a send, queued work or a connection keeps the brain on show.
+  // A run, a send, queued work or a connection holds what changes the brain on show.
   const brainLocked = running || sending || queued.length > 0 || connecting;
+  // Other brains stay open to choose while this one's AI runs.
+  const switchLocked = sending || connecting;
+  const anyRunning = runningScopes.length > 0;
   const docSpace =
     doc && !doc.workspaceId ? spaces.find((s) => s.scopeId === doc.scopeId) : undefined;
   const docLayer = doc?.cloud
@@ -1028,6 +1136,19 @@ function App() {
   );
   const referenced =
     !!doc && sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path);
+  // Another brain's AI is running or waiting: the AI summary leads to the Overview.
+  const othersActive = runningScopes.some((id) => id !== active?.scopeId);
+  function showOverview() {
+    if (!workspaceSpaces.length) return;
+    setLevel('overview');
+  }
+  /** Shows a brain, from the rail or the Overview: its note, or its AI panel. */
+  async function enterBrain(space: Space, options: { ai?: boolean; entry?: Entry } = {}) {
+    const selected = options.entry ? await open(space, options.entry) : await selectSpace(space);
+    if (!selected) return;
+    setLevel('brain');
+    if (options.ai) setPanel(true);
+  }
   function leaveWorkspace() {
     if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
       report(
@@ -1072,19 +1193,47 @@ function App() {
         <Rail
           spaces={workspaceSpaces}
           activeId={active?.scopeId}
+          overview={level === 'overview'}
           aiState={aiState}
-          locked={brainLocked || gitBusy}
-          homeDisabled={dirty || running || connecting || !!terminalSpace || gitBusy}
-          addDisabled={running || dirty || connecting}
+          locked={switchLocked || gitBusy}
+          homeDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
+          addDisabled={anyRunning || dirty || connecting}
           searchDisabled={!workspaceSpaces.length || connecting}
           onHome={leaveWorkspace}
-          onSelect={(space) => void selectSpace(space)}
+          onOverview={showOverview}
+          onSelect={(space) => void enterBrain(space)}
           onAdd={() => setAdd(true)}
-          onSearch={() => setSearchOpen(true)}
+          onSearch={() => {
+            setSearchAll(level === 'overview');
+            setSearchOpen(true);
+          }}
           settings={<Settings onRecover={() => setRecovering(true)} onError={report} />}
         />
+        {level === 'overview' && workspace && (
+          <Overview
+            workspace={workspace}
+            spaces={workspaceSpaces}
+            view={overviewView}
+            revision={revision}
+            addDisabled={anyRunning || dirty || connecting}
+            agentFor={agentFor}
+            onView={setOverviewView}
+            onSearch={() => {
+              setSearchAll(true);
+              setSearchOpen(true);
+            }}
+            onAdd={() => setAdd(true)}
+            onConnect={(space) => showConnections(space)}
+            onSend={sendToBrain}
+            onResume={resumeQueue}
+            onStop={(scopeId) => host.cancel(scopeId)}
+            onEnter={(space, options) => void enterBrain(space, options)}
+            onError={report}
+          />
+        )}
         <PaneGroup
           className="islands"
+          inert={level === 'overview'}
           orientation="horizontal"
           defaultLayout={islandLayout.defaultLayout}
           onLayoutChanged={islandLayout.onLayoutChanged}
@@ -1127,7 +1276,10 @@ function App() {
                 }}
                 onMaterials={openMaterials}
                 onSettings={() => setBrainSettings(true)}
-                onSearch={() => setSearchOpen(true)}
+                onSearch={() => {
+                  setSearchAll(false);
+                  setSearchOpen(true);
+                }}
                 onCreateIn={(space, entry) => {
                   setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
                   setNewNote(true);
@@ -2322,11 +2474,18 @@ function App() {
         running={runningScopes.length}
         waiting={waitingScopes.length}
         status={status}
-        workspaceDisabled={dirty || running || connecting || !!terminalSpace || gitBusy}
+        workspaceDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
         terminalOpen={!!terminalSpace}
         terminalDisabled={!active && !terminalSpace}
         onWorkspace={leaveWorkspace}
-        onAi={() => setPanel(true)}
+        aiTarget={othersActive ? 'overview' : 'panel'}
+        onAi={() => {
+          if (othersActive) showOverview();
+          else {
+            setLevel('brain');
+            setPanel(true);
+          }
+        }}
         onTerminal={() => setTerminalSpace((value) => (value ? undefined : active))}
       />
       {connectionsOpen && connectionTarget && (
@@ -2414,7 +2573,7 @@ function App() {
       {searchOpen && (
         <SearchPanel
           spaces={spaces.filter((space) => workspace?.scopeIds.includes(space.scopeId))}
-          initialScopeId={active?.scopeId}
+          initialScopeId={searchAll ? 'all' : active?.scopeId}
           beforeSearch={save}
           onOpen={async (scopeId, hit, query) => {
             const target = spaces.find(

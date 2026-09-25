@@ -23,12 +23,14 @@ export function aiStateWords(state: BrainAiState) {
 export function Rail({
   spaces,
   activeId,
+  overview,
   aiState,
   locked,
   homeDisabled,
   addDisabled,
   searchDisabled,
   onHome,
+  onOverview,
   onSelect,
   onAdd,
   onSearch,
@@ -36,13 +38,16 @@ export function Rail({
 }: {
   spaces: Space[];
   activeId?: string;
+  /** The Overview is on show instead of a brain. */
+  overview: boolean;
   aiState: (scopeId: string) => BrainAiState;
-  /** Another brain cannot be chosen now (a run, a send or a connection is in progress). */
+  /** Another brain cannot be chosen now (a send or a connection is in progress). */
   locked: boolean;
   homeDisabled: boolean;
   addDisabled: boolean;
   searchDisabled: boolean;
   onHome: () => void;
+  onOverview: () => void;
   onSelect: (space: Space) => void;
   onAdd: () => void;
   onSearch: () => void;
@@ -59,23 +64,24 @@ export function Rail({
       >
         <img src={appIcon} alt="" width="28" height="28" />
       </button>
-      <div className="rail-slot">
-        {/* The Overview arrives with parallel brain AIs; its place is kept. */}
+      <div className={`rail-slot ${overview ? 'active' : ''}`}>
+        {overview && <span className="rail-bar" aria-hidden="true" />}
         <button
           className="rail-button rail-overview"
-          aria-label={t('全体（準備中）', 'Overview (coming soon)')}
-          disabled
+          aria-label={t('全体', 'Overview')}
+          aria-current={overview ? 'page' : undefined}
+          disabled={!spaces.length}
+          onClick={onOverview}
         >
           <Icon name="map" size={19} />
         </button>
         <span className="rail-label" aria-hidden="true">
           {t('全体', 'Overview')}
-          <span className="rail-label-state">{t('準備中', 'Coming soon')}</span>
         </span>
       </div>
       <span className="rail-rule" aria-hidden="true" />
       {spaces.map((space) => {
-        const active = space.scopeId === activeId;
+        const active = !overview && space.scopeId === activeId;
         const state = aiState(space.scopeId);
         return (
           <div

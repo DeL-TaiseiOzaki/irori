@@ -1,0 +1,651 @@
+/* The Overview: every brain of the workspace as a map or side by side, and their AIs. */
+
+.overview {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  padding: 0 8px 0 0;
+  color: var(--tx);
+  animation: irori-rise 0.32s var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+.overview-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.overview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 4px 0 14px;
+}
+.overview-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.overview-sub {
+  color: var(--tx-3);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.overview-space {
+  flex: 1;
+}
+.overview-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: min(300px, 32vw);
+  height: 34px;
+  padding: 0 8px 0 11px;
+  border-radius: 10px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--tx-3);
+  font-size: 12.5px;
+}
+.overview-search > span {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overview-search kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  font: 10.5px var(--font-mono);
+}
+.overview-add {
+  height: 34px;
+}
+.overview-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--tx-2);
+}
+
+/* The AI's state as words, with its mark. */
+.ai-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.ai-state > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.ai-state.running,
+.ai-state.waiting {
+  color: var(--ember);
+  font-weight: 600;
+}
+.ai-state.waiting > i {
+  background: var(--ember);
+  box-shadow: none;
+}
+.ai-state .spin {
+  animation: irori-spin 1.1s linear infinite;
+}
+
+/* The map. */
+.map-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle, var(--hair-2) 1px, transparent 1.2px) 0 0 / 22px 22px,
+    var(--panel);
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+.map-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 560px;
+  min-height: 420px;
+  margin: 36px 48px 12px;
+}
+.map-group {
+  position: absolute;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--raised) 45%, transparent);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.map-group > span {
+  position: absolute;
+  top: 10px;
+  left: 16px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+.map-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.map-reference {
+  fill: none;
+  stroke: var(--tx-3);
+  stroke-width: 1.3;
+  stroke-dasharray: 5 5;
+  opacity: 0.8;
+  animation: map-flow 1.6s linear infinite;
+}
+@keyframes map-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.map-pill {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translate(-50%, -50%);
+}
+.map-node {
+  position: absolute;
+  z-index: 2;
+  min-width: 120px;
+  padding: 0;
+  border-radius: 16px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  transform: translate(-50%, -50%);
+}
+.map-node-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  animation: map-float 6.5s ease-in-out infinite;
+}
+.map-node:hover {
+  background: none;
+}
+.map-node:hover .brain-tile {
+  transform: scale(1.04);
+}
+.map-node .brain-tile {
+  transition: transform 140ms ease;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+}
+.map-node.running .brain-tile,
+.map-node.waiting .brain-tile {
+  animation: map-work 3.2s ease-in-out infinite;
+}
+.map-node.waiting .brain-tile {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+.map-node strong {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+@keyframes map-float {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes map-work {
+  0%,
+  100% {
+    box-shadow:
+      0 6px 18px rgb(0 0 0 / 0.25),
+      0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow:
+      0 6px 18px rgb(0 0 0 / 0.25),
+      0 0 30px 6px var(--ember-glow);
+  }
+}
+.map-legend {
+  display: flex;
+  gap: 22px;
+  padding: 10px 18px 14px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.legend-reference {
+  width: 26px;
+  border-top: 1.5px dashed var(--tx-3);
+}
+.legend-group {
+  width: 26px;
+  height: 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--raised) 45%, transparent);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+/* One brain's AI in a few lines. */
+.ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+.ai-card > header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.ai-card-spark {
+  color: var(--ember);
+  flex: none;
+}
+.ai-card-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx);
+}
+.ai-card-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  color: var(--tx-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.ai-card-line .mono {
+  color: var(--tx-3);
+  font-size: 11px;
+}
+.ai-card-line.queued {
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: var(--field);
+}
+.ai-card-line.error {
+  color: var(--del-ink, var(--tx));
+}
+.ai-card-line.shimmer {
+  background: linear-gradient(90deg, var(--tx-2) 40%, var(--tx) 50%, var(--tx-2) 60%) 0 0 / 200%
+    100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: irori-shimmer 2.4s linear infinite;
+}
+.ai-card-line.shimmer .mono {
+  color: var(--tx-3);
+  -webkit-text-fill-color: var(--tx-3);
+}
+.ai-card-actions {
+  display: flex;
+  gap: 8px;
+}
+.ai-card .request {
+  padding: 11px;
+  gap: 9px;
+}
+
+/* The Brain AIs island beside the map. */
+.overview-ai {
+  flex: none;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 8px;
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.overview-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.overview-ai-head > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.overview-ai-head strong {
+  font-size: 14px;
+}
+.overview-ai-head small {
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.overview-orb {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ember);
+  color: var(--on-ember);
+  box-shadow: 0 0 18px var(--ember-glow);
+}
+.overview-ai-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.overview-ai-list > .ai-card {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+}
+.overview-ai-list > .ai-card.waiting {
+  box-shadow: inset 0 0 0 1px var(--ember-line);
+}
+.overview-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+.overview-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.target-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 25px;
+  padding: 0 9px 0 4px;
+  border-radius: 8px;
+  color: var(--tx-2);
+  font-size: 11.5px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+.target-chip.on {
+  background: var(--raised-2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+}
+.target-chip > input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.target-chip:has(input:focus-visible) {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+.overview-composer textarea {
+  resize: none;
+  min-height: 54px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  font: inherit;
+  font-size: 13px;
+}
+.overview-composer textarea:focus {
+  outline: none;
+}
+.overview-composer > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.overview-composer > footer small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.overview-composer .ember-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 10px;
+}
+.overview-error {
+  margin: 0;
+  color: var(--tx);
+  font-size: 12px;
+}
+
+/* Brains side by side, one row per layer. */
+.overview-columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 84px repeat(var(--columns), minmax(250px, 1fr));
+  grid-template-rows: auto minmax(150px, auto) auto auto 1fr;
+  gap: 0 10px;
+  padding: 0 0 8px;
+  overflow: auto;
+}
+.columns-gutter,
+.brain-column {
+  grid-row: 1 / span 5;
+  display: grid;
+  grid-template-rows: subgrid;
+}
+.columns-gutter > span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  color: var(--tx-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.columns-gutter .layer-icon.schema,
+.brain-column .layer-icon.schema {
+  color: var(--schema);
+}
+.columns-gutter .layer-icon.contents,
+.brain-column .layer-icon.contents {
+  color: var(--cont);
+}
+.brain-column {
+  min-width: 0;
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.brain-column.waiting {
+  box-shadow:
+    0 0 0 2px var(--ember),
+    0 0 26px var(--ember-glow);
+}
+.column-head {
+  padding: 10px 12px;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.column-brain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 3px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  text-align: left;
+}
+.column-brain:hover {
+  background: var(--raised);
+}
+.column-brain > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.column-brain strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.column-brain small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tx-3);
+  font-size: 11px;
+}
+.column-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.column-cell:last-child {
+  box-shadow: none;
+}
+.column-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  font-size: 12.5px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button.column-row:hover {
+  background: var(--raised);
+}
+.column-row > .ui-icon {
+  flex: none;
+  color: var(--tx-3);
+}
+.column-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.column-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cont) 16%, transparent);
+  color: var(--cont);
+  font-size: 11px;
+}
+.column-note {
+  padding: 4px 8px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.column-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 8px 0;
+}
+.column-skills > span {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--tx-2);
+  font: 11px var(--font-mono);
+}
+.column-connect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  border: 0;
+  outline: 1px dashed var(--hair-3);
+  outline-offset: -1px;
+  color: var(--tx-2);
+  font-size: 12.5px;
+}
+.brain-column .ai-card .request-actions {
+  flex-wrap: wrap;
+}

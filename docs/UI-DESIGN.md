@@ -17,6 +17,12 @@ Everything below this section is the history of the earlier layout.
   the device. A 28 px status bar carries the workspace, the current brain, its
   branch, Drive uploads, the AI summary across brains, the terminal toggle and
   the version.
+- **Overview.** The rail's map button shows every brain of the workspace
+  instead of one brain's islands, which stay mounted underneath. **地図** lays
+  brains out in rows by category (`src/domain/overview.ts`, replaceable) with
+  reference lines between brains and a **Brain の AI** island (state, request,
+  stop, resume, send); **並列** shows AI / Schema / Knowledge / Contents per
+  brain. Each brain's AI runs independently of the one on show.
 - **Tokens.** `src/app/tokens.css` holds the three themes (hearth, light, dark)
   with the canvas's exact values: chrome (`--bg --panel --raised --raised-2
   --field --hair* --tx*`), stage (`--stage* --card --rule* --ink*`), the AI's

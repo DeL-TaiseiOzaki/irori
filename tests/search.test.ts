@@ -197,6 +197,48 @@ test(
   },
 );
 
+test(
+  'A scan of another KB meanwhile does not cancel the search in progress',
+  { timeout: 10000 },
+  async (t) => {
+    const { base, files, space, write } = await fixture(t);
+    await write('note.md', 'needle');
+    const otherRoot = path.join(base, 'Other');
+    await mkdir(otherRoot);
+    await writeFile(path.join(otherRoot, 'note.md'), 'needle and [link](other.md)');
+    const other = await files.register(otherRoot, 'Other', 'team');
+    const entries = files.entries.bind(files);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let paused!: () => void;
+    const started = new Promise<void>((resolve) => {
+      paused = resolve;
+    });
+    files.entries = async (id, directory) => {
+      if (id === space.scopeId) {
+        paused();
+        await gate;
+      }
+      return entries(id, directory);
+    };
+    const service = new SearchService(files);
+    const search = service.search(space.scopeId, 'needle');
+    await started;
+    try {
+      assert.equal((await service.search(other.scopeId, 'needle')).hits.length, 1);
+      assert.equal((await service.backlinks(other.scopeId, 'other.md')).hits.length, 1);
+    } finally {
+      release();
+    }
+    assert.deepEqual(
+      (await search).hits.map((hit) => hit.path),
+      ['note.md'],
+    );
+  },
+);
+
 test('Long matching lines keep the literal match in the preview, and IPC rejects invalid queries', async (t) => {
   const { files, space, write } = await fixture(t);
   await write('long.md', '前'.repeat(500) + 'Needle' + '後'.repeat(500));

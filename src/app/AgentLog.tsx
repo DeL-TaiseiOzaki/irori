@@ -43,7 +43,8 @@ export function eventTarget(details?: string) {
   return '';
 }
 
-function Request({
+/** A permission or a question from a run, answered here or wherever else it shows. */
+export function AgentRequest({
   event,
   ended,
   onError,
@@ -148,6 +149,15 @@ function Request({
   );
 }
 
+/**
+ * A request is over once its run ended or moved on: an answer given in another
+ * view is not offered again here.
+ */
+export function requestEnded(events: AgentEvent[], index: number) {
+  const { runId } = events[index];
+  return events.slice(index + 1).some((event) => event.runId === runId);
+}
+
 function Step({ event, running }: { event: AgentEvent; running: boolean }) {
   const target = eventTarget(event.details);
   return (
@@ -224,12 +234,7 @@ export function AgentLog({
     if (event.type === 'tool') steps.push(event);
     else if (event.type === 'permission' || event.type === 'question')
       items.push(
-        <Request
-          key={key}
-          event={event}
-          ended={events.some((e) => e.runId === event.runId && e.type === 'done')}
-          onError={onError}
-        />,
+        <AgentRequest key={key} event={event} ended={requestEnded(events, i)} onError={onError} />,
       );
     else
       items.push(
