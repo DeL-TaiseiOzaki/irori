@@ -1,14 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-26: PRs #97–#101 are merged with the owner's go-ahead, and
+**0.1.41 is published** as
+[v0.1.41-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.41-preview.1)
+by release run `36155578107` from main's CI run `36154273703` (source `a49c1a4`),
+which passed first time. It carries the whole v5 switch: 0.1.38, 0.1.39 and
+0.1.40 were not published on their own, and the 0.1.41 notes cover everything
+since 0.1.37. The release carries Windows 198,837,248 bytes, Mac 166,474,608
+bytes and `irori-0.1.41-full.nupkg` 198,197,251 bytes. The hourly drift check
+failed once while the stack was being merged (main held 0.1.39 for more than an
+hour while the owner's answers were pending).
+
 UI v5, 2026-09-25: the owner approved the v5 design canvas and asked to switch
 the whole interface to it. [ADR 014](decisions/014-ui-v5.md) records the
 decisions: the brain (one registered KB with its Schema, Knowledge and Contents)
 is the unit, a workspace is any combination of brains, the levels are Overview →
 Brain → Note, each brain's AI is its CLI agent, your AI is the person's own agent
 that hands tasks to brain AIs, brains get an editable icon and colour, and ember
-belongs to the AI alone. Three questions (default language, your AI's folder,
-where brain identity is stored) are open with the owner and use the ADR's
-defaults meanwhile. The work lands as stacked pull requests.
+belongs to the AI alone. The owner answered the three questions (default language, your AI's
+folder, where brain identity is stored) on 2026-09-26 with the defaults the ADR
+used. The work lands as stacked pull requests.
 
 UI v5 Overview, 2026-09-25: **0.1.41** is prepared on `feat/overview`, stacked
 on brain identity. The renderer no longer holds the brain on show while its AI
