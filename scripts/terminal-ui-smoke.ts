@@ -20,7 +20,10 @@ try {
   const page = await app.firstWindow();
   await page.getByRole('checkbox', { name: /端末のKB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'ターミナル', exact: true }).click();
+  await page
+    .locator('.status-bar')
+    .getByRole('button', { name: 'ターミナル', exact: true })
+    .click();
   const panel = page.getByRole('region', { name: '端末のKB のターミナル' });
   await expect(panel.locator('.terminal-state')).toHaveText('実行中');
   await panel.locator('.xterm-helper-textarea').focus();
@@ -41,10 +44,9 @@ try {
   expect(footer!.y + footer!.height).toBeLessThanOrEqual(720);
   const home = page.getByRole('button', { name: 'ワークスペースを選択', exact: true });
   await expect(home).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'ターミナル', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(
+    page.locator('.status-bar').getByRole('button', { name: 'ターミナル', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-terminal.png' });
   await panel.getByRole('button', { name: 'プロセスを終了', exact: true }).click();

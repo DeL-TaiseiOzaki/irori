@@ -257,6 +257,7 @@ export function BrainPanel({
   connections,
   onOpen,
   onRefresh,
+  onHome,
   onDaily,
   onNewNote,
   onGraph,
@@ -289,6 +290,8 @@ export function BrainPanel({
   connections: CloudConnection[];
   onOpen: (space: Space, entry: Entry) => void;
   onRefresh: () => void;
+  /** Shows the brain's home on the stage. */
+  onHome: () => void;
   onDaily: () => void;
   onNewNote: () => void;
   onGraph: () => void;
@@ -397,14 +400,23 @@ export function BrainPanel({
     <section className="brain-panel chrome" aria-label={space.name}>
       <header className="brain-header">
         <div className="brain-identity">
-          <BrainTile space={space} size={34} radius={10} />
-          <span className="brain-names" title={`${category} · ${space.root}`}>
-            <strong>{space.name}</strong>
-            <small>
-              <Icon name={categoryIcons[space.category]} size={12} />
-              {category}
-            </small>
-          </span>
+          <button
+            className="brain-home-link"
+            title={t(
+              `Brain のホーム · ${category} · ${space.root}`,
+              `The brain's home · ${category} · ${space.root}`,
+            )}
+            onClick={onHome}
+          >
+            <BrainTile space={space} size={34} radius={10} />
+            <span className="brain-names">
+              <strong>{space.name}</strong>
+              <small>
+                <Icon name={categoryIcons[space.category]} size={12} />
+                {category}
+              </small>
+            </span>
+          </button>
           <Menu.Root modal={false}>
             <Menu.Trigger
               className="icon-button"
@@ -470,9 +482,9 @@ export function BrainPanel({
           ]}
         />
       </header>
-      {mode === 'changes' ? (
-        <div className="brain-changes">{children}</div>
-      ) : (
+      {mode === 'changes' && <div className="brain-changes">{children}</div>}
+      {/* The files stay mounted behind the changes, so open folders stay open. */}
+      <div className="brain-files" hidden={mode === 'changes'}>
         <PaneGroup
           className="brain-sections"
           orientation="vertical"
@@ -540,7 +552,7 @@ export function BrainPanel({
             ];
           })}
         </PaneGroup>
-      )}
+      </div>
     </section>
   );
 }

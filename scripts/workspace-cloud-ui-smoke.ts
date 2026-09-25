@@ -107,7 +107,9 @@ try {
   await expect(page.getByRole('region', { name: 'ワークスペースの Google Drive' })).toHaveCount(0);
   await page.getByRole('button', { name: '既存KB のクラウド接続', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
-  await expect(dialog.getByRole('heading', { name: '既存KB のクラウド接続' })).toBeVisible();
+  await expect(
+    dialog.getByRole('heading', { name: '既存KB の Contents に Google Drive を接続' }),
+  ).toBeVisible();
   const moving = dialog.locator('.earlier-connections');
   await expect(moving.locator('.connection-card')).toHaveCount(2);
   for (const name of ['資料 1', '資料 2']) {
@@ -135,7 +137,10 @@ try {
     ),
   ).toEqual([]);
   await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Contents', exact: true })).toContainText('資料 1');
+  // The brain panel's Contents tree; the brain's home has a Contents card too.
+  await expect(
+    page.locator('.brain-sections').getByRole('region', { name: 'Contents', exact: true }),
+  ).toContainText('資料 1');
 
   // Preparing an upload now offers the KB's Drive folders.
   await page.getByRole('button', { name: 'note', exact: true }).click();
@@ -145,7 +150,7 @@ try {
   await expect(page.locator('.context-chip.reference')).toContainText('note.md');
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
-  const records = page.getByRole('dialog', { name: '資料と成果物' });
+  const records = page.getByRole('region', { name: '資料と成果物' });
   await records.locator('summary').first().click();
   await records.getByRole('button', { name: '保持版を見る', exact: true }).click();
   await expect(records.getByLabel('保持した資料の版')).toContainText('Earlier retained source');
@@ -175,11 +180,11 @@ try {
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '資料と成果物' })).toContainText(
+  await expect(page.getByRole('region', { name: '資料と成果物' })).toContainText(
     '送信待ち・端末に保持',
   );
   await page
-    .getByRole('dialog', { name: '資料と成果物' })
+    .getByRole('region', { name: '資料と成果物' })
     .getByRole('button', { name: '閉じる', exact: true })
     .click();
   await page.getByRole('button', { name: '既存KB のクラウド接続', exact: true }).click();

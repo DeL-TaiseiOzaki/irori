@@ -1,0 +1,534 @@
+/* Start: choose or combine brains into a workspace, on the graphite chrome. */
+.start {
+  height: 100vh;
+  display: flex;
+  background: var(--bg);
+  color: var(--tx);
+  color-scheme: var(--chrome-scheme);
+}
+.start h1,
+.start h2,
+.start h3,
+.start p {
+  margin: 0;
+}
+
+/* The intro column: brand, headline, the brains-to-workspaces diagram. */
+.start-intro {
+  width: clamp(380px, 42vw, 600px);
+  flex: none;
+  padding: 56px clamp(32px, 4.2vw, 60px) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+  overflow: auto;
+}
+.start-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.start-brand .brand-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+.start-brand > span {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.start-brand small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--tx-3);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  border-radius: 7px;
+  padding: 2px 8px;
+}
+.start-intro h1 {
+  font-size: 42px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-feature-settings: 'palt';
+}
+.start-diagram {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  flex: none;
+  overflow: visible;
+}
+.start-diagram path {
+  fill: none;
+  stroke-width: 1.4;
+}
+.start-diagram g.primary {
+  stroke: var(--tx-2);
+  fill: var(--tx-2);
+}
+.start-diagram g.secondary {
+  stroke: var(--hair-3);
+  fill: var(--hair-3);
+}
+.start-diagram-brain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.start-diagram-brain small {
+  max-width: 100%;
+  font-size: 11px;
+  color: var(--tx-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.start-diagram-workspace {
+  height: 100%;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.start-diagram-workspace.primary {
+  background: var(--solid);
+  color: var(--on-solid);
+  box-shadow: none;
+}
+.start-diagram-workspace > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.start-diagram-workspace small {
+  font-size: inherit;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.start-footer {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin-left: -10px;
+  font-size: 12.5px;
+  color: var(--tx-2);
+}
+.start-footer .update-notice > button,
+.start-footer .cloud-recovery-trigger {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 12.5px;
+}
+.start-footer .update-notice > button:hover:not(:disabled),
+.start-footer .cloud-recovery-trigger:hover {
+  background: var(--raised);
+  color: var(--tx);
+}
+
+/* The panel: saved workspaces, combining brains, adding a brain. */
+.start-main {
+  flex: 1;
+  min-width: 0;
+  margin: 16px 16px 16px 0;
+  padding: 46px clamp(28px, 3.6vw, 52px);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  overflow: auto;
+}
+.start-main h2 {
+  font-size: 24px;
+  font-weight: 700;
+  font-feature-settings: 'palt';
+}
+.start-main h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tx-3);
+  letter-spacing: 0.04em;
+}
+.start-main section {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.start-main hr {
+  width: 100%;
+  height: 1px;
+  margin: 8px 0;
+  border: 0;
+  background: var(--hair);
+  flex: none;
+}
+.start-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--tx-3);
+}
+.start-main [role='alert'] {
+  overflow-wrap: anywhere;
+}
+.start-workspaces {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.start-workspace {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.start .workspace-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 74px;
+  padding: 0 16px 0 18px;
+  border-radius: 16px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair);
+  text-align: left;
+  --stack-ring: var(--panel);
+}
+.start .workspace-card:hover:not(:disabled),
+.start-workspace:first-child .workspace-card,
+.start-workspace[data-editing] .workspace-card {
+  background: var(--raised);
+  --stack-ring: var(--raised);
+}
+.start-workspace[data-editing] .workspace-card {
+  box-shadow: inset 0 0 0 1.5px var(--solid);
+}
+.start-stack {
+  display: flex;
+  flex: none;
+  padding-left: 7px;
+}
+.start-stack .brain-tile {
+  margin-left: -7px;
+  box-shadow: 0 0 0 3px var(--stack-ring);
+}
+.start-workspace-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.start-workspace-text strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+.start-workspace-text small {
+  font-size: 12px;
+  color: var(--tx-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.start-open {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--raised-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.start-workspace:first-child .start-open {
+  background: var(--solid);
+  color: var(--on-solid);
+}
+.start .start-icon-button {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 0;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.start .start-icon-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--tx);
+}
+
+/* The library: every registered brain as a selectable chip. */
+.start-library {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.start-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  max-width: 100%;
+  padding: 0 12px 0 9px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--medium) var(--ease),
+    box-shadow var(--medium) var(--ease);
+}
+.start-chip:hover {
+  background: var(--raised);
+}
+.start-chip:has(:checked) {
+  background: var(--raised-2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1.5px var(--solid);
+}
+.start-chip > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.start-chip small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--tx-3);
+}
+.start-chip.unavailable {
+  box-shadow: none;
+  border: 1px dashed var(--hair-3);
+  padding-block: 6px;
+}
+.start-check {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+.start-check input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--hair-3);
+  cursor: pointer;
+}
+.start-check input:checked {
+  background: var(--solid);
+  box-shadow: none;
+}
+.start-check .ui-icon {
+  position: absolute;
+  inset: 3px;
+  color: var(--on-solid);
+  pointer-events: none;
+  opacity: 0;
+}
+.start-check input:checked + .ui-icon {
+  opacity: 1;
+}
+
+/* Name and create. */
+.start-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.start-name {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 13px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+.start-name:focus-within {
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+}
+.start-name > span {
+  font-size: 12px;
+  color: var(--tx-3);
+  white-space: nowrap;
+}
+.start-name input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 14px;
+}
+.start-name input:focus-visible {
+  outline: 0;
+}
+.start .obsidian-arrow-fill-btn {
+  min-height: 46px;
+  background: var(--solid);
+  color: var(--on-solid);
+  border-color: transparent;
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.start .obsidian-arrow-fill-btn__circle {
+  background: var(--on-solid);
+  color: var(--solid);
+}
+.start .start-text-button {
+  height: 36px;
+  padding: 0 12px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+}
+.start .start-text-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--tx);
+}
+
+/* Add a brain: an existing folder or a clone. */
+.start-add {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.start .start-add button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 78px;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  text-align: left;
+}
+.start .start-add button:hover:not(:disabled) {
+  background: var(--raised);
+}
+.start-add-icon {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--raised-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.start-add strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.start-add small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tx-3);
+}
+
+/* A narrow window stacks the columns and leaves the diagram out. */
+@media (max-width: 860px) {
+  .start {
+    height: auto;
+    min-height: 100vh;
+    flex-direction: column;
+  }
+  .start-intro {
+    width: auto;
+    padding: 28px 28px 8px;
+    gap: 20px;
+    overflow: visible;
+  }
+  .start-intro h1 {
+    font-size: 30px;
+  }
+  .start-diagram {
+    display: none;
+  }
+  .start-main {
+    margin: 0 12px 12px;
+    overflow: visible;
+  }
+}
+
+/* Registering a brain: a paper sheet over the start screen or the workspace. */
+.register-space {
+  width: 520px;
+  padding: 28px 30px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--stage);
+  box-shadow: var(--pop);
+}
+.register-space h2 {
+  font-size: 18px;
+  font-weight: 650;
+  margin-bottom: 20px;
+}
+.register-space .repository-preview {
+  background: var(--stage-2);
+  border-radius: 12px;
+}
+.register-space label .actions {
+  flex-wrap: nowrap;
+}
+.register-space label .actions input {
+  flex: 1;
+  margin-top: 0;
+}
+.register-space label > .actions {
+  margin-top: 7px;
+}
+.register-space details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.register-space .obsidian-arrow-fill-btn {
+  background: var(--ink-solid);
+  color: var(--on-ink-solid);
+  border-color: transparent;
+  font-weight: 600;
+}
+.register-space .obsidian-arrow-fill-btn__circle {
+  background: var(--on-ink-solid);
+  color: var(--ink-solid);
+}

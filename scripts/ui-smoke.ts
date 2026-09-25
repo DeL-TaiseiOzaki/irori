@@ -140,7 +140,8 @@ try {
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await expect(page.getByRole('button', { name: '新しいノートを作成', exact: true })).toBeVisible();
+  // The workspace opens on the first brain's home.
+  await expect(page.getByRole('button', { name: 'ノートを作成', exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/obsidian-workspace-hearth.png', fullPage: true });
   await choose('ダーク');
   await page.screenshot({

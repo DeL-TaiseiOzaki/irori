@@ -64,7 +64,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-startup.png' });
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Googleアカウントを追加' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Google アカウントを追加' })).toBeDisabled();
   // An account from before editing existed may only read until it signs in again.
   const olderAccount = page.locator('.account-row').filter({ hasText: '個人アカウント' });
   await expect(olderAccount).toContainText('読み取りのみ許可');
@@ -96,14 +96,14 @@ try {
   await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
   await expect(page.locator('.folder-row')).toHaveCount(2);
   await page.locator('.folder-row').nth(1).getByRole('radio').check();
-  await page.getByLabel('contents内のフォルダ名').fill('調査 資料');
+  await page.getByLabel('contents 内のフォルダ名').fill('調査 資料');
   await expect(page.locator('.mount-preview')).toContainText('contents/調査 資料/');
-  const editable = page.getByLabel('このフォルダを irori から編集できるようにする');
+  const editable = page.getByLabel('irori とエージェントから編集できるようにする');
   await expect(editable).toBeChecked();
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.locator('.connection-card')).toContainText('contents/調査 資料/');
   await page.locator('.folder-row').first().getByRole('radio').check();
-  await page.getByLabel('contents内のフォルダ名').fill('調査 資料');
+  await page.getByLabel('contents 内のフォルダ名').fill('調査 資料');
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('同じ名前');
   await expect(page.locator('.connection-card')).toHaveCount(1);
@@ -114,8 +114,8 @@ try {
   await page.locator('.folder-row').getByRole('button', { name: '開く' }).click();
   await expect(page.getByRole('button', { name: '接続先を登録', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '「成果物」を接続先にする' }).click();
-  await expect(page.locator('.mount-preview')).toContainText('接続するフォルダ: 成果物');
-  await page.getByLabel('contents内のフォルダ名').fill('納品物');
+  await expect(page.locator('.mount-preview .mount-source')).toHaveText('成果物');
+  await page.getByLabel('contents 内のフォルダ名').fill('納品物');
   await editable.uncheck();
   await expect(page.locator('.attachment-form')).toContainText('読み取り専用で登録します');
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
@@ -213,30 +213,34 @@ try {
   await page
     .locator('.account-row')
     .first()
-    .getByRole('button', { name: 'アカウントの登録解除' })
+    .getByRole('button', { name: 'アカウントの操作' })
     .click();
+  await page.getByRole('menuitem', { name: 'アカウントの登録解除' }).click();
   await expect(page.getByRole('dialog', { name: 'クラウド接続' }).getByRole('alert')).toContainText(
     '接続先があります',
   );
   await page
     .locator('.connection-card')
     .first()
-    .getByRole('button', { name: '名前を変更' })
+    .getByRole('button', { name: '接続先の操作' })
     .click();
+  await page.getByRole('menuitem', { name: '名前を変更' }).click();
   await page.getByLabel('新しいマウント先のフォルダ名').fill('新しい 調査資料');
   await page.getByRole('button', { name: '名前を保存' }).click();
   await expect(page.locator('.connection-card').first()).toContainText('contents/新しい 調査資料/');
   await page
     .locator('.connection-card')
     .nth(1)
-    .getByRole('button', { name: '登録を解除', exact: true })
+    .getByRole('button', { name: '接続先の操作' })
     .click();
+  await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
   await expect(page.locator('.connection-card')).toHaveCount(1);
   await page
     .locator('.account-row')
     .nth(1)
-    .getByRole('button', { name: 'アカウントの登録解除' })
+    .getByRole('button', { name: 'アカウントの操作' })
     .click();
+  await page.getByRole('menuitem', { name: 'アカウントの登録解除' }).click();
   await expect(page.locator('.account-row')).toHaveCount(1);
   await page
     .getByRole('dialog', { name: 'クラウド接続' })

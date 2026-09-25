@@ -98,7 +98,7 @@ try {
   await page.keyboard.type(' saved before navigation');
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
-  let panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  let panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   const search = () => panel.getByLabel('資料・成果物の記録を検索');
   await search().fill('ＲＥＰＯＲＴ.ＰＰＴＸ');
   await expect(panel.locator('details')).toHaveCount(1);
@@ -169,7 +169,7 @@ try {
   await page.getByRole('button', { name: '移動先', exact: true }).click();
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
-  panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
   await panel.locator('summary').click();
   await panel
@@ -194,7 +194,7 @@ try {
   await page.getByRole('button', { name: '移動先', exact: true }).click();
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
-  panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
   await panel.locator('summary').click();
   await panel

@@ -404,3 +404,12 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+.brain-files {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.brain-files[hidden] {
+  display: none;
+}

@@ -189,7 +189,7 @@ try {
   await brain('個人KB').click();
   await contents.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'クラウド接続' })).toContainText(
-    '個人KB のクラウド接続',
+    '個人KB の Contents に Google Drive を接続',
   );
   await expect(page.locator('.connection-card')).toContainText('schema/raw/調査 資料/');
   await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
