@@ -307,7 +307,7 @@ export function Startup({
   }
   return (
     <div className="startup">
-      <aside className="startup-intro">
+      <aside className="startup-intro chrome">
         <div className="brand">
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
           irori<span className="preview">{appVersion} Preview</span>

@@ -192,8 +192,15 @@ export interface StartRun {
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
+/** Hearth is graphite chrome with a paper stage; system picks hearth or dark with the desktop. */
+export const themes = ['system', 'hearth', 'light', 'dark'] as const;
+export type Theme = (typeof themes)[number];
+/** What the operating system is told: its window frame sits beside the rail's graphite. */
+export function nativeThemeSource(theme: Theme): 'system' | 'light' | 'dark' {
+  return theme === 'hearth' ? 'dark' : theme;
+}
 export interface DeviceSettings {
-  theme: 'system' | 'light' | 'dark';
+  theme: Theme;
   /** The interface language; Japanese unless the reader chose otherwise. */
   language: import('./i18n').Language;
   markdownFont: MarkdownFont;

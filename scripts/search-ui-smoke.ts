@@ -62,7 +62,7 @@ try {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nAutosaveSearchToken\n');
-  const launcher = page.getByRole('button', { name: 'KB内を検索', exact: true });
+  const launcher = page.getByRole('button', { name: /^検索（/ });
   await launcher.click();
   const panel = page.getByRole('dialog', { name: 'KB内を検索', exact: true });
   const query = panel.getByLabel('本文を検索', { exact: true });
@@ -269,7 +269,12 @@ try {
     ipcMain.handle('irori', fixture.original);
   });
 
-  // An unresolved external edit still blocks search's preflight save.
+  // An unresolved external edit still blocks search's preflight save. The panel
+  // shows one brain at a time, so the search target's brain is chosen first.
+  await page
+    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('button', { name: /^検索対象KB・AI/ })
+    .click();
   await page.getByRole('button', { name: 'editing', exact: true }).click();
   await expect(editor).toContainText('AutosaveSearchToken');
   await editor.click();

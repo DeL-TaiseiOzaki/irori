@@ -102,7 +102,7 @@ async function launch() {
   await expect(page.getByRole('button', { name: '更新を確認', exact: true })).toBeVisible();
   await page.locator('.workspace-card').filter({ hasText: '日常操作の検証' }).click();
   await page
-    .locator('.layer-pane.my-kb')
+    .getByRole('region', { name: 'Knowledge', exact: true })
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('Daily fixture note');
@@ -120,12 +120,20 @@ async function close() {
   await app!.close();
   app = undefined;
 }
+/** A brain's tile on the rail. */
+function brainButton(page: Page, space: Space) {
+  const name = space.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page
+    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('button', { name: new RegExp(`^${name}・AI`) });
+}
+/** Opens the note's menu and takes one of its actions. */
+async function noteMenu(page: Page, name: string) {
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+}
 async function chooseScope(page: Page, space: Space) {
-  await page
-    .locator(
-      `.scope-tree[data-scope-id="${space.scopeId}"][aria-label$="Knowledge_Base"] .space-title`,
-    )
-    .click();
+  await brainButton(page, space).click();
   await expect(page.locator('.composer-context')).toContainText(space.name);
 }
 async function chooseAgent(page: Page, agent: AgentId) {
@@ -186,11 +194,7 @@ try {
     await expect(send).toBeDisabled();
     await page.getByLabel('エージェント', { exact: true }).selectOption('claude');
     await expect(page.getByLabel('エージェント', { exact: true })).toHaveValue('codex');
-    await page
-      .locator(
-        `.scope-tree[data-scope-id="${spaces[1].scopeId}"][aria-label$="Knowledge_Base"] .space-title`,
-      )
-      .click();
+    await brainButton(page, spaces[1]).click();
     await expect(page.locator('.composer-context')).toContainText(spaces[0].name);
     await expect(composer).toHaveValue(failedText);
   } finally {
@@ -246,7 +250,7 @@ try {
     .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
     .click();
 
-  await page.getByRole('button', { name: 'ノートを作成', exact: true }).click();
+  await page.getByRole('button', { name: / にノートを作成$/ }).click();
   const create = page.getByRole('dialog', { name: 'ノートを作成', exact: true });
   await create.getByLabel('ノート名', { exact: true }).fill('整理前');
   await create.getByLabel('保存先フォルダー', { exact: true }).fill(customDirectory);
@@ -283,7 +287,7 @@ try {
     Buffer.from(png, 'base64'),
   );
 
-  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  await noteMenu(page, '名前・場所');
   let move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
   await move.getByLabel('ノート名', { exact: true }).fill('名前変更');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
@@ -291,11 +295,11 @@ try {
   const renamedPath = path.join(root, customDirectory, '名前変更.md');
   expect(await exists(originalPath)).toBe(false);
   expect(await readFile(renamedPath, 'utf8')).toBe(savedMarkdown);
-  await expect(page.locator('.document-location')).toContainText('名前変更.md');
+  await expect(page.locator('.crumbs')).toHaveAttribute('title', /名前変更\.md$/);
   await imageIsVisible(page);
-  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
+  await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
 
-  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  await noteMenu(page, '名前・場所');
   move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
   await move.getByLabel('移動先フォルダ', { exact: true }).fill(destination);
   await move.getByRole('button', { name: '変更する', exact: true }).click();
@@ -308,16 +312,17 @@ try {
   );
   expect(await exists(path.join(root, customDirectory, imageRelative))).toBe(true);
   await imageIsVisible(page);
-  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
+  await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
 
-  await page.getByRole('button', { name: '削除', exact: true }).click();
+  await noteMenu(page, '削除');
   const trash = page.getByRole('dialog', { name: 'ノートを削除', exact: true });
   await trash.getByRole('button', { name: '削除済みに移す', exact: true }).click();
   await expect(trash).toHaveCount(0);
   expect(await exists(movedPath)).toBe(false);
   expect(await exists(path.join(root, destination, imageRelative))).toBe(true);
-  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
-  await page.getByRole('button', { name: '削除したノートを復元', exact: true }).click();
+  await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Brain のメニュー', exact: true }).click();
+  await page.getByRole('menuitem', { name: '削除したノートを復元', exact: true }).click();
   const restore = page.getByRole('dialog', { name: '削除済みノート', exact: true });
   await restore
     .getByRole('button', { name: `${destination}/名前変更.md を復元`, exact: true })
@@ -325,7 +330,7 @@ try {
   await expect(restore).toHaveCount(0);
   expect(await readFile(movedPath, 'utf8')).toBe(savedMarkdown);
   await imageIsVisible(page);
-  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
+  await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
   expect(
     await page.evaluate((scopeId) => window.irori.trashedNotes(scopeId), spaces[0].scopeId),
   ).toEqual([]);
@@ -341,7 +346,7 @@ try {
   expect(await readFile(path.join(root, '画像エラー.md'), 'utf8')).toBe(brokenMarkdown);
   await page.screenshot({ path: 'test-results/irori-missing-images.png' });
   await page
-    .locator('.layer-pane.my-kb')
+    .getByRole('region', { name: 'Knowledge', exact: true })
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.image-errors')).toHaveCount(0);
@@ -352,7 +357,7 @@ try {
   expect(await exists(dailyPath)).toBe(false);
   await page.getByRole('button', { name: '今日のノート', exact: true }).click();
   await expect.poll(() => exists(dailyPath)).toBe(true);
-  await expect(page.locator('.document-location')).toContainText(`${today.date}.md`);
+  await expect(page.locator('.crumbs')).toHaveAttribute('title', new RegExp(`${today.date}\\.md$`));
   await expect(page.locator('.ProseMirror')).toContainText(`Daily ${today.date}`);
   expect(await readFile(dailyPath, 'utf8')).toBe(`# Daily ${today.date}\n\n## Log\n`);
   await page.locator('.ProseMirror').click();
@@ -361,10 +366,10 @@ try {
   await page.keyboard.press('ControlOrMeta+s');
   await expect.poll(() => readFile(dailyPath, 'utf8')).toContain('今日の記録');
   await page.getByRole('button', { name: '今日のノート', exact: true }).click();
-  await expect(page.locator('.document-location')).toContainText(`${today.date}.md`);
+  await expect(page.locator('.crumbs')).toHaveAttribute('title', new RegExp(`${today.date}\\.md$`));
   await expect(page.locator('.ProseMirror')).toContainText('今日の記録');
   expect(await readFile(dailyPath, 'utf8')).toContain('# Daily ');
-  await expect(page.locator('main > .error[role="alert"]')).toHaveCount(0);
+  await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
   // The team KB declares nothing, so it offers no daily note.
   await chooseScope(page, spaces[1]);
   await expect(page.getByRole('button', { name: '今日のノート', exact: true })).toHaveCount(0);

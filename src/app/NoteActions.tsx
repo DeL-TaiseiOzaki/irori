@@ -34,20 +34,31 @@ function linkNotice(update: LinkUpdate) {
   ].join('');
 }
 
-export function NoteActions({
+export type NoteAction = 'move' | 'trash';
+
+/** Whether a note can be renamed, moved or deleted here: a writable Markdown note of a KB. */
+export function noteActionsApply(doc: Document) {
+  return !doc.readOnly && !doc.workspaceId && /\.md$/i.test(doc.path);
+}
+
+/** Renames and moves a note, or moves it to the deleted notes; opened from the note's menu. */
+export function NoteActionDialog({
   doc,
+  action,
+  onClose,
   beforeChange,
   onChanged,
   onBusyChange,
 }: {
   doc: Document;
+  action: NoteAction;
+  onClose: () => void;
   beforeChange: () => Promise<Document | null>;
   onChanged: (doc: Document | null, notice?: string) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
-  const [action, setAction] = useState<'move' | 'trash'>();
-  const [name, setName] = useState('');
-  const [directory, setDirectory] = useState('');
+  const [name, setName] = useState(() => doc.path.split('/').at(-1)!.replace(/\.md$/i, ''));
+  const [directory, setDirectory] = useState(() => doc.path.split('/').slice(0, -1).join('/'));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [links, setLinks] = useState(true);
@@ -70,14 +81,7 @@ export function NoteActions({
       current = false;
     };
   }, [action, doc.scopeId, doc.path]);
-  const close = () => setAction(undefined);
-  function open(next: 'move' | 'trash') {
-    const parts = doc.path.split('/');
-    setName(parts.pop()!.replace(/\.md$/i, ''));
-    setDirectory(parts.join('/'));
-    setError('');
-    setAction(next);
-  }
+  const close = onClose;
   async function submit() {
     onBusyChange(true);
     setBusy(true);
@@ -121,7 +125,6 @@ export function NoteActions({
       onBusyChange(false);
     }
   }
-  if (doc.readOnly || doc.workspaceId || !/\.md$/i.test(doc.path)) return null;
   const dialogLabel =
     action === 'move'
       ? t('ノートの名前と場所', 'Note name and location')
@@ -159,85 +162,77 @@ export function NoteActions({
             }`,
           );
   return (
-    <>
-      <button onClick={() => open('move')}>{t('名前・場所', 'Name & location')}</button>
-      <button onClick={() => open('trash')}>{t('削除', 'Delete')}</button>
-      {action && (
-        <Dialog label={dialogLabel} busy={busy} onClose={close}>
-          <form
-            className="modal"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <h2>{dialogLabel}</h2>
-            <p>{doc.path}</p>
-            {action === 'move' ? (
-              <>
-                <label>
-                  {t('ノート名', 'Note name')}
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    disabled={busy}
-                    required
-                  />
-                </label>
-                <label>
-                  {t('移動先フォルダ', 'Destination folder')}
-                  <input
-                    value={directory}
-                    onChange={(event) => setDirectory(event.target.value)}
-                    disabled={busy}
-                  />
-                </label>
-                <p className="hint">
-                  {t(
-                    '同じスペース内の既存フォルダを指定します。空欄はスペース直下です。',
-                    'Specify an existing folder within the same space. Leave it blank for the top of the space.',
-                  )}
-                </p>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={links}
-                    disabled={busy}
-                    onChange={(event) => setLinks(event.target.checked)}
-                  />{' '}
-                  {t('リンクも更新する', 'Also update links')}
-                </label>
-                <p className="hint">
-                  {linksHint}{' '}
-                  {t(
-                    '本文のリンクと frontmatter の関係・出典が対象です。irori で貼り付けた画像は移動先にも保持します。',
-                    'This covers links in the body and the relationship/source in frontmatter. Images pasted in irori are kept at the destination too.',
-                  )}
-                </p>
-              </>
-            ) : (
-              <p>
-                {t(
-                  'この端末の「削除済みノート」から復元できます。画像ファイルは残ります。このノートへのリンクは更新しません。',
-                  'You can restore this from "Deleted notes" on this device. Image files are kept. Links to this note are not updated.',
-                )}
-              </p>
+    <Dialog label={dialogLabel} busy={busy} onClose={close}>
+      <form
+        className="modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <h2>{dialogLabel}</h2>
+        <p>{doc.path}</p>
+        {action === 'move' ? (
+          <>
+            <label>
+              {t('ノート名', 'Note name')}
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                disabled={busy}
+                required
+              />
+            </label>
+            <label>
+              {t('移動先フォルダ', 'Destination folder')}
+              <input
+                value={directory}
+                onChange={(event) => setDirectory(event.target.value)}
+                disabled={busy}
+              />
+            </label>
+            <p className="hint">
+              {t(
+                '同じスペース内の既存フォルダを指定します。空欄はスペース直下です。',
+                'Specify an existing folder within the same space. Leave it blank for the top of the space.',
+              )}
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={links}
+                disabled={busy}
+                onChange={(event) => setLinks(event.target.checked)}
+              />{' '}
+              {t('リンクも更新する', 'Also update links')}
+            </label>
+            <p className="hint">
+              {linksHint}{' '}
+              {t(
+                '本文のリンクと frontmatter の関係・出典が対象です。irori で貼り付けた画像は移動先にも保持します。',
+                'This covers links in the body and the relationship/source in frontmatter. Images pasted in irori are kept at the destination too.',
+              )}
+            </p>
+          </>
+        ) : (
+          <p>
+            {t(
+              'この端末の「削除済みノート」から復元できます。画像ファイルは残ります。このノートへのリンクは更新しません。',
+              'You can restore this from "Deleted notes" on this device. Image files are kept. Links to this note are not updated.',
             )}
-            {error && <p role="alert">{error}</p>}
-            <div className="actions">
-              <button type="button" disabled={busy} onClick={close}>
-                {t('キャンセル', 'Cancel')}
-              </button>
-              <button className="primary" disabled={busy}>
-                {action === 'move'
-                  ? t('変更する', 'Change')
-                  : t('削除済みに移す', 'Move to deleted')}
-              </button>
-            </div>
-          </form>
-        </Dialog>
-      )}
-    </>
+          </p>
+        )}
+        {error && <p role="alert">{error}</p>}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={close}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button className="primary" disabled={busy}>
+            {action === 'move' ? t('変更する', 'Change') : t('削除済みに移す', 'Move to deleted')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

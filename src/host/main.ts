@@ -31,7 +31,7 @@ import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkillReach, readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
-import type { HostEvent, Space } from '../domain/types';
+import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
 let window: BrowserWindow | undefined;
@@ -57,7 +57,7 @@ app
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
     const device = await settings.read();
-    nativeTheme.themeSource = device.theme;
+    nativeTheme.themeSource = nativeThemeSource(device.theme);
     // Dialogs and messages the host writes follow the reader's language too.
     setLanguage(device.language);
     const search = new SearchService(files);
@@ -390,7 +390,7 @@ app
       deviceSettings: () => settings.read(),
       saveDeviceSettings: async (patch) => {
         const next = await settings.save(patch);
-        nativeTheme.themeSource = next.theme;
+        nativeTheme.themeSource = nativeThemeSource(next.theme);
         setLanguage(next.language);
         return next;
       },

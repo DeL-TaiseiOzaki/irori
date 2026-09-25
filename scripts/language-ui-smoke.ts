@@ -45,8 +45,9 @@ async function japaneseLeft(page: Page, where: string) {
 }
 
 async function chooseLanguage(page: Page, name: string, trigger: RegExp) {
-  await page.getByLabel(trigger).click();
-  await page.getByRole('menuitemradio', { name, exact: true }).click();
+  await page.getByRole('button', { name: trigger }).click();
+  await page.getByRole('radio', { name, exact: true }).check();
+  await page.keyboard.press('Escape');
 }
 
 const visited: string[] = [];
@@ -59,7 +60,7 @@ try {
   await expect(page.getByRole('button', { name: 'AIに相談', exact: true })).toBeVisible();
 
   // The switch is immediate: no restart, and the open workspace stays open.
-  await chooseLanguage(page, 'English', /表示設定/);
+  await chooseLanguage(page, 'English', /^設定（/);
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('en');
   await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'welcome', exact: true }).click();
@@ -67,7 +68,7 @@ try {
   await japaneseLeft(page, 'the workspace with a note open');
   visited.push('workspace and open note');
 
-  await page.getByRole('button', { name: 'Cloud connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Cloud connection for Research', exact: true }).click();
   const cloud = page.getByRole('dialog', { name: 'Cloud connection' });
   await expect(cloud).toBeVisible();
   await expect(cloud.locator('.connections')).toHaveAttribute('aria-busy', 'false', {
@@ -77,7 +78,7 @@ try {
   await cloud.getByRole('button', { name: 'Close', exact: true }).click();
   visited.push('cloud connection dialog');
 
-  await page.getByRole('button', { name: 'Search in KB', exact: true }).click();
+  await page.getByRole('button', { name: /^Search \(/ }).click();
   const search = page.getByRole('dialog', { name: 'Search in KB' });
   await expect(search).toBeVisible();
   await japaneseLeft(page, 'the search dialog');
@@ -85,7 +86,7 @@ try {
   await expect(search).toHaveCount(0);
   visited.push('search dialog');
 
-  await page.getByRole('button', { name: 'Create note', exact: true }).click();
+  await page.getByRole('button', { name: 'Create a note in Research', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await japaneseLeft(page, 'the note creation dialog');
   await page.keyboard.press('Escape');
@@ -98,10 +99,11 @@ try {
   await page.getByRole('button', { name: 'Close AI panel' }).first().click();
   visited.push('AI panel');
 
-  await page.getByRole('button', { name: 'Source control' }).click();
+  const modes = page.getByRole('group', { name: 'Brain view' });
+  await modes.getByRole('button', { name: /^Changes/ }).click();
   await expect(page.locator('.git-sidebar')).toBeVisible();
   await japaneseLeft(page, 'source control');
-  await page.getByRole('button', { name: 'Notes' }).click();
+  await modes.getByRole('button', { name: 'Files', exact: true }).click();
   visited.push('source control');
 
   // The host speaks the same language: a message it writes arrives in English.
@@ -131,7 +133,7 @@ try {
   await japaneseLeft(page, 'the startup screen');
   visited.push('startup screen after restart');
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  await chooseLanguage(page, '日本語', /Display settings/);
+  await chooseLanguage(page, '日本語', /^Settings \(/);
   await expect(page.getByRole('button', { name: 'AIに相談', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
 } finally {
