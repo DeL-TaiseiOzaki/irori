@@ -1,11 +1,25 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile, copyFile, chmod, rm } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  readFile,
+  readdir,
+  copyFile,
+  chmod,
+  rm,
+  realpath,
+} from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { WorkspaceService } from '../src/host/workspaces';
 import { KnowledgeStore } from '../src/knowledge/store';
 
+// Drive folders belong to KBs from 0.1.37. A workspace's own connections from
+// earlier versions are seeded here as those versions wrote them, and must be
+// movable into a KB, while nothing shows a separate Drive frame any more.
 if (process.platform === 'win32') {
   console.log(
     'Workspace Drive UI uses a POSIX protocol fixture; native Windows mounts remain unverified.',
@@ -33,6 +47,41 @@ const accounts = [
   { id: randomUUID(), name: 'Account two', provider: 'google-drive', state: 'ready' },
 ];
 await writeFile(path.join(files.dataDir, 'cloud-accounts.json'), JSON.stringify(accounts));
+const workspaces = new WorkspaceService(files);
+const workspace = await workspaces.save('Drive workspace', [space.scopeId]);
+const older = await workspaces.save('Older workspace', []);
+/** Writes a workspace's Drive connections the way versions before 0.1.37 did. */
+async function seedWorkspaceConnections(id: string, names: string[]) {
+  const root = path.join(files.dataDir, 'workspace-cloud', id);
+  await mkdir(path.join(root, '.irori'), { recursive: true });
+  await mkdir(path.join(files.dataDir, 'cloud-bindings'), { recursive: true });
+  const records = names.map((name, index) => ({
+    schemaVersion: 1,
+    mountId: randomUUID(),
+    scopeId: id,
+    provider: 'google-drive',
+    folderId: index === 0 ? 'folder-first' : 'folder-second',
+    parentId: 'root',
+    folderName: '同じ名前',
+    contentsRoot: 'contents',
+    name,
+    access: 'read-only',
+  }));
+  await writeFile(path.join(root, '.irori', 'cloud-mounts.json'), JSON.stringify(records));
+  for (const [index, record] of records.entries())
+    await writeFile(
+      path.join(files.dataDir, 'cloud-bindings', `${id}-${record.mountId}.json`),
+      JSON.stringify({
+        scopeId: id,
+        mountId: record.mountId,
+        root: await realpath(root),
+        accountId: accounts[index % 2].id,
+      }),
+    );
+  return records;
+}
+const earlier = await seedWorkspaceConnections(workspace.id, ['資料 1', '資料 2']);
+await seedWorkspaceConnections(older.id, ['古い資料']);
 const executable = path.join(base, 'rclone-fixture');
 await copyFile('tests/fixtures/rclone-ui.mjs', executable);
 await chmod(executable, 0o700);
@@ -47,48 +96,48 @@ const launch = () =>
     args: [...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), '.'],
     env,
   });
+const errors: string[] = [];
 let app = await launch();
 try {
   let page = await app.firstWindow();
-  await page.getByLabel('ワークスペース名').fill('Drive workspace');
-  await page.getByRole('button', { name: 'ワークスペースを作成', exact: true }).click();
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await page.locator('.workspace-card').filter({ hasText: 'Drive workspace' }).click();
+  await expect(page.getByRole('button', { name: 'note', exact: true })).toBeVisible();
+  // No separate Drive frame: Drive folders are part of a KB's materials.
+  await expect(page.getByRole('region', { name: 'ワークスペースの Google Drive' })).toHaveCount(0);
   await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Drive workspace のクラウド接続' })).toBeVisible();
-  for (const [index, account] of accounts.entries()) {
-    await page.getByLabel('使用するクラウドアカウント').selectOption(account.id);
-    await expect(page.locator('.folder-row')).toHaveCount(2);
-    await page.locator('.folder-row').first().getByRole('radio').check();
-    await page.getByLabel('contents内のフォルダ名').fill(`資料 ${index + 1}`);
-    await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
-    await expect(page.locator('.connection-card')).toHaveCount(index + 1);
+  const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
+  await expect(dialog.getByRole('heading', { name: '既存KB のクラウド接続' })).toBeVisible();
+  const moving = dialog.locator('.earlier-connections');
+  await expect(moving.locator('.connection-card')).toHaveCount(2);
+  for (const name of ['資料 1', '資料 2']) {
+    await moving
+      .locator('.connection-card')
+      .filter({ hasText: `${name}/` })
+      .getByRole('button', { name: 'この KB に移す', exact: true })
+      .click();
+    await expect(dialog.locator('.moved-notice')).toContainText(
+      `「${name}」をこの KB の資料に移しました`,
+    );
   }
-  const profiles = await page.evaluate(() => window.irori.workspaces());
-  expect(profiles[0].scopeIds).toEqual([]);
-  const root = await page.evaluate((id) => window.irori.workspaceCloud(id), profiles[0].id);
-  expect(root.workspace).toBe(true);
-  const declarations = JSON.parse(
-    await readFile(path.join(root.root, '.irori/cloud-mounts.json'), 'utf8'),
-  );
-  expect(declarations.map((item: { name: string }) => item.name)).toEqual(['資料 1', '資料 2']);
+  await expect(dialog.locator('.earlier-connections')).toHaveCount(0);
+  await expect(dialog.locator('.connection-card')).toHaveCount(2);
+  const declared = JSON.parse(await readFile(path.join(kb, '.irori/cloud-mounts.json'), 'utf8'));
   expect(
-    await readFile(path.join(kb, '.irori/cloud-mounts.json'), 'utf8').catch(() => null),
-  ).toBeNull();
-  await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'ワークスペースの Google Drive' })).toContainText(
-    '資料 1',
-  );
-  await page.locator('.workspace-switch').click();
-  await page.getByRole('button', { name: 'Drive workspace の登録を削除', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Drive 接続を登録解除');
-  await page.getByRole('button', { name: 'Drive workspace を編集', exact: true }).click();
-  await page.getByRole('checkbox', { name: /既存KB/ }).check();
-  await page.getByRole('button', { name: '変更を保存して開く', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'クラウド接続', exact: true })).toBeEnabled();
+    declared.map((item: { mountId: string; name: string }) => [item.mountId, item.name]),
+  ).toEqual(earlier.map((item) => [item.mountId, item.name]));
   expect(
-    (await page.evaluate((id) => window.irori.cloudConnections(id), profiles[0].id)).map(
-      (item) => item.mountId,
+    JSON.parse(
+      await readFile(
+        path.join(files.dataDir, 'workspace-cloud', workspace.id, '.irori/cloud-mounts.json'),
+        'utf8',
+      ),
     ),
-  ).toEqual(declarations.map((item: { mountId: string }) => item.mountId));
+  ).toEqual([]);
+  await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(page.locator('.layer-pane.my-contents')).toContainText('資料 1');
+
+  // Preparing an upload now offers the KB's Drive folders.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Preserved note');
   await page.getByRole('button', { name: '参照に追加', exact: true }).click();
@@ -102,13 +151,13 @@ try {
   await records.getByLabel('成果物に関連する実行').selectOption(retainedRun.id);
   await records.getByRole('button', { name: 'この版を成果物として登録', exact: true }).click();
   await expect(records.getByRole('status')).toContainText('成果物の版');
-  await records.getByLabel('送信準備の Drive フォルダ').selectOption(declarations[0].mountId);
+  await records.getByLabel('送信準備の Drive フォルダ').selectOption(earlier[0].mountId);
   await records.getByRole('button', { name: '送信準備として保持', exact: true }).click();
   await expect(records.getByRole('status')).toContainText('Drive にはまだ送信していません');
   await expect(records).toContainText('送信待ち・端末に保持');
   const restoredFile = path.join(base, 'restored.md');
-  await app.evaluate(({ dialog }, filename) => {
-    dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
+  await app.evaluate(({ dialog: native }, filename) => {
+    native.showSaveDialog = async () => ({ canceled: false, filePath: filename });
   }, restoredFile);
   await records.getByRole('button', { name: '別ファイルに復元', exact: true }).last().click();
   await expect.poll(() => readFile(restoredFile, 'utf8')).toBe('# Preserved note\n');
@@ -117,8 +166,10 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-workspace-drive.png' });
   await app.close();
+
   app = await launch();
   page = await app.firstWindow();
+  page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Drive workspace' }).click();
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
@@ -129,22 +180,25 @@ try {
     .getByRole('dialog', { name: '資料と成果物' })
     .getByRole('button', { name: '閉じる', exact: true })
     .click();
-  await expect(page.getByRole('button', { name: 'Drive フォルダを接続' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Drive フォルダを接続' }).click();
-  await expect(page.locator('.connection-card')).toHaveCount(2);
-  await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
-  await page.locator('.workspace-switch').click();
-  await page.getByLabel('ワークスペース名').fill('Separate workspace');
-  await page.getByRole('button', { name: 'ワークスペースを作成', exact: true }).click();
   await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
-  await expect(page.locator('.connection-card')).toHaveCount(0);
-  await expect(page.locator('.account-row')).toHaveCount(2);
+  await expect(page.getByRole('dialog').locator('.connection-card')).toHaveCount(2);
+  await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
+  // A workspace that still holds connections of its own can be removed; only its
+  // records go.
+  await page.locator('.workspace-switch').click();
+  await page.getByRole('button', { name: 'Older workspace の登録を削除', exact: true }).click();
+  await expect(page.locator('.workspace-card').filter({ hasText: 'Older workspace' })).toHaveCount(
+    0,
+  );
+  expect(
+    (await readdir(path.join(files.dataDir, 'cloud-bindings'))).some((name) =>
+      name.startsWith(older.id),
+    ),
+  ).toBe(false);
   expect(await readFile(path.join(kb, 'note.md'), 'utf8')).toBe('# Preserved note\n');
-  expect((await page.evaluate(() => window.irori.spaces())).map((item) => item.scopeId)).toEqual([
-    space.scopeId,
-  ]);
+  expect(errors).toEqual([]);
   console.log(
-    'Workspace Drive UI passed: empty workspace, two accounts, independent KB membership, deletion guard, restart and separate-workspace isolation. Protocol fixture only.',
+    'Workspace Drive UI passed: no separate Drive frame, earlier workspace connections moved into a KB with their IDs, upload preparation to the KB folder, restart, and removal of a workspace that still held connections. Protocol fixture only.',
   );
 } finally {
   await app.close();

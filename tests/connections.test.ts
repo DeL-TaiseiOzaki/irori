@@ -508,6 +508,95 @@ test('Preparation retains the bound account and drive and rejects delivery after
   assert.equal((await outbox.list(space.scopeId))[0].accountId, accountId);
 });
 
+test('A workspace connection from before KB-owned Drive folders moves into a KB unchanged', async (t) => {
+  const { files, space, rpc, accountId } = await fixture(t);
+  const workspaces = new WorkspaceService(files);
+  const workspace = await workspaces.save('Research', [space.scopeId]);
+  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
+  files.cloud = cloud;
+  const folder = { id: 'folder-one', name: 'Original', parentId: 'root' };
+  const earlier = await cloud.add({
+    scopeId: workspace.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '資料',
+    folder,
+    access: 'read-only',
+  });
+  assert.deepEqual(await cloud.moveConnection(workspace.id, earlier.mountId, space.scopeId), {
+    duplicate: false,
+  });
+  assert.deepEqual(await cloud.connections(workspace.id), []);
+  const [moved] = await cloud.connections(space.scopeId);
+  // The same mount ID keeps rclone's cache of unsent changes for this folder.
+  assert.equal(moved.mountId, earlier.mountId);
+  assert.equal(moved.access, 'read-only');
+  assert.equal(moved.folderId, 'folder-one');
+  assert.equal(moved.accountName, 'Personal account');
+  const declared = JSON.parse(
+    await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8'),
+  );
+  assert.equal(declared[0].scopeId, space.scopeId);
+  assert.ok(!JSON.stringify(declared).includes(accountId));
+  // A second workspace connection to a folder the KB already connects is only unregistered.
+  const again = await cloud.add({
+    scopeId: workspace.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '別名',
+    folder,
+  });
+  assert.deepEqual(await cloud.moveConnection(workspace.id, again.mountId, space.scopeId), {
+    duplicate: true,
+  });
+  assert.equal((await cloud.connections(space.scopeId)).length, 1);
+  assert.deepEqual(await cloud.connections(workspace.id), []);
+  // A different folder under a name the KB already uses is refused, and stays put.
+  const clash = await cloud.add({
+    scopeId: workspace.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '資料',
+    folder: { id: 'folder-two', name: 'Other', parentId: 'root' },
+  });
+  await assert.rejects(
+    cloud.moveConnection(workspace.id, clash.mountId, space.scopeId),
+    /同じ名前/,
+  );
+  assert.equal((await cloud.connections(workspace.id)).length, 1);
+  await assert.rejects(cloud.moveConnection(workspace.id, clash.mountId, workspace.id), /KB/);
+});
+
+test('Removing a workspace unregisters its own Drive connections and keeps every file', async (t) => {
+  const { files, space, rpc, accountId } = await fixture(t);
+  const workspaces = new WorkspaceService(files);
+  const workspace = await workspaces.save('Research', [space.scopeId]);
+  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
+  files.cloud = cloud;
+  const root = await cloud.workspaceRoot(workspace.id);
+  await cloud.add({
+    scopeId: workspace.id,
+    accountId,
+    contentsRoot: 'contents',
+    name: '資料',
+    folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
+  });
+  await mkdir(path.join(root.root, 'contents', 'Local only'), { recursive: true });
+  await writeFile(path.join(root.root, 'contents', 'Local only', 'keep.md'), 'Keep');
+  await cloud.removeWorkspace(workspace.id, () => workspaces.remove(workspace.id));
+  assert.deepEqual(await workspaces.list(), []);
+  assert.equal(
+    await readFile(path.join(root.root, 'contents', 'Local only', 'keep.md'), 'utf8'),
+    'Keep',
+  );
+  assert.equal(
+    (await readdir(path.join(files.dataDir, 'cloud-bindings'))).filter((name) =>
+      name.startsWith(workspace.id),
+    ).length,
+    0,
+  );
+});
+
 test('workspace Drive connections are independent of KB membership and survive restart without writing KB metadata', async (t) => {
   const { base, files, space, rpc, accountId } = await fixture(t);
   const workspaces = new WorkspaceService(files);
@@ -526,10 +615,6 @@ test('workspace Drive connections are independent of KB membership and survive r
     folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
   });
   assert.equal((await cloud.connections(first.id))[0].accountName, 'Personal account');
-  await assert.rejects(
-    cloud.removeWorkspace(first.id, () => workspaces.remove(first.id)),
-    /登録解除/,
-  );
   assert.deepEqual(await cloud.connections(second.id), []);
   await assert.rejects(readFile(path.join(space.root, '.irori/cloud-mounts.json')), {
     code: 'ENOENT',

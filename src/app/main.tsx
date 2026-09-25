@@ -914,10 +914,12 @@ function App() {
     setCloudRoot(undefined);
     try {
       setCloudRoot(await host.workspaceCloud(profile.id));
-      const nextIds = [...available.map((space) => space.scopeId), profile.id];
+      // Drive folders belong to KBs; a workspace's own connections from before
+      // that are moved into a KB from its connection dialog, and are not mounted.
+      const nextIds = available.map((space) => space.scopeId);
       for (const previousId of workspace ? [...workspace.scopeIds, workspace.id] : []) {
         if (
-          !nextIds.includes(previousId) &&
+          (previousId === workspace?.id || !nextIds.includes(previousId)) &&
           (previousId === workspace?.id || spaces.some((space) => space.scopeId === previousId))
         )
           for (const connection of await host.cloudConnections(previousId).catch((error) => {
@@ -1206,45 +1208,6 @@ function App() {
                 }}
                 onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
                 onRefresh={() => setRevision((value) => value + 1)}
-                drive={
-                  cloudRoot && (
-                    <section
-                      className="workspace-drive"
-                      aria-label={t('ワークスペースの Google Drive', 'Workspace’s Google Drive')}
-                    >
-                      <div className="scope-heading">
-                        <strong>
-                          <Icon name="cloud" size={14} /> Google Drive
-                        </strong>
-                        <button
-                          className="scope-action"
-                          disabled={dirty || running || connecting}
-                          onClick={() => showConnections(cloudRoot)}
-                          aria-label={t('Drive フォルダを接続', 'Connect a Drive folder')}
-                        >
-                          {t('接続', 'Connect')}
-                        </button>
-                      </div>
-                      <Tree
-                        space={cloudRoot}
-                        layer="contents"
-                        directory="contents"
-                        roots={{ entries: [] }}
-                        revision={revision}
-                        selected={doc}
-                        readEntries={host.cloudEntries}
-                        onOpen={(root, entry) => void openCloud(root, entry)}
-                        onCreate={(root, entry) => {
-                          setCloudNoteTarget({ scopeId: root.scopeId, directory: entry.path });
-                          setNewNote(true);
-                        }}
-                        onAction={(root, entry, action) =>
-                          setEntryAction({ space: root, entry, action })
-                        }
-                      />
-                    </section>
-                  )
-                }
               />
               {active && notesDeclared?.daily && (
                 <button
@@ -1292,10 +1255,12 @@ function App() {
                 <strong>{doc?.path.split('/').at(-1) ?? t('ノートを選択', 'Select a note')}</strong>
               </div>
               <div className="actions">
-                {cloudRoot && (
+                {/* Drive folders belong to a KB's materials, so the header opens the
+                    open KB's connections. */}
+                {active && (
                   <button
                     disabled={running || dirty || connecting || gitBusy}
-                    onClick={() => showConnections(cloudRoot)}
+                    onClick={() => showConnections(active)}
                   >
                     <Icon name="cloud" /> {t('クラウド接続', 'Cloud connection')}
                   </button>
@@ -2207,6 +2172,7 @@ function App() {
         <Connections
           key={connectionTarget.scopeId}
           space={connectionTarget}
+          workspaceId={workspace?.id}
           running={running}
           onClose={() => {
             setConnectionsOpen(false);
@@ -2296,7 +2262,7 @@ function App() {
           key={active.scopeId}
           space={active}
           doc={doc}
-          cloudOwner={cloudRoot?.scopeId}
+          cloudOwner={active.scopeId}
           sourceNames={Object.fromEntries([
             ...spaces
               .filter((item) => workspace?.scopeIds.includes(item.scopeId))

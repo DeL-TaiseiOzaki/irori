@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Drive folders in KBs, 2026-09-26: **0.1.37** is prepared on `feat/drive-in-kb`
+from the owner's decision to drop the separate Google Drive frame
+([ADR 013](decisions/013-drive-folders-in-kbs.md), superseding ADR 002 Q02's
+workspace-owned connections). The sidebar's Drive row, its styles and the
+workspace dialog entry points are removed; the header **クラウド接続** opens the
+open KB's connections; workspace connections are no longer mounted on opening a
+workspace; `CloudService.moveConnection` moves one into a KB keeping its mount
+ID, folder, name and access (a duplicate folder only unregisters the workspace's
+copy); `removeWorkspace` unregisters a workspace's own connections instead of
+refusing; the materials panel prepares uploads for the open KB. The workspace
+Drive UI smoke is rewritten for the move, and the layers smoke no longer drags a
+Drive row.
+
 Delivery, 2026-09-26: PRs #90 (0.1.34), #91 (0.1.35) and #92 (0.1.36) are
 merged with the owner's go-ahead, and **0.1.36 is published** as
 [v0.1.36-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.36-preview.1)

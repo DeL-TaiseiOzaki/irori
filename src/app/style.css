@@ -925,7 +925,7 @@ textarea {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  /* On a short window the sidebar scrolls rather than clipping the Drive list. */
+  /* On a short window the sidebar scrolls rather than clipping what is below the explorer. */
   overflow-y: auto;
 }
 .workspace-views {
@@ -1045,7 +1045,7 @@ textarea {
   flex-direction: column;
   flex: 1 1 0;
   /* A resizable group has no height of its own, so the explorer keeps room for
-     its three headings and some of each tree before the Drive list takes space. */
+     its three headings and some of each tree. */
   min-height: 240px;
   border-top: 1px solid var(--nav-rule);
 }
@@ -1066,20 +1066,6 @@ textarea {
 }
 .layer-handle {
   background: var(--nav-rule);
-}
-.workspace-drive {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border-bottom: 1px solid var(--nav-rule);
-  padding: 8px;
-}
-.workspace-drive .scope-heading strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  font-size: 12px;
 }
 .layer-pane {
   display: flex;
