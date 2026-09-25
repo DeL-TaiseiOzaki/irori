@@ -106,7 +106,7 @@ export function YourAiPanel({
         <span className="overview-orb" aria-hidden="true">
           <Icon name="sparkles" size={15} strokeWidth={2.1} />
         </span>
-        <span>
+        <span className="your-ai-title">
           <strong>{t('あなたの AI', 'Your AI')}</strong>
           <button className="your-ai-schema" onClick={onShow}>
             {t('Claude Code · あなたの Schema', 'Claude Code · your Schema')}

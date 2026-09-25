@@ -72,7 +72,10 @@ function AiWatch({
 }
 
 interface Actions {
-  onEnter: (space: Space, options?: { ai?: boolean; entry?: Entry }) => void;
+  onEnter: (
+    space: Space,
+    options?: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } },
+  ) => void;
   onResume: (scopeId: string) => Promise<void>;
   onStop: (scopeId: string) => Promise<void>;
   onError: (error: unknown) => void;
@@ -341,7 +344,13 @@ function OverviewMap({
               className={`map-node ${aiState(ai)} ${handed ? 'handed' : ''}`}
               style={at(item)}
               aria-label={t(`${brain.name} を開く`, `Open ${brain.name}`)}
-              onClick={() => onEnter(brain)}
+              onClick={(event) => {
+                // The Overview zooms away around the brain that was chosen.
+                const box = event.currentTarget.getBoundingClientRect();
+                onEnter(brain, {
+                  origin: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+                });
+              }}
             >
               {/* The brain floats inside a still button, so a pointer can hold on to it. */}
               <span className="map-node-body" style={{ animationDelay: `${-index * 1.3}s` }}>
@@ -669,6 +678,7 @@ function OverviewComposer({
  * side by side, with a way to answer, stop, resume and instruct each AI.
  */
 export function Overview({
+  scene,
   workspace,
   spaces,
   view,
@@ -700,6 +710,8 @@ export function Overview({
   onSend: (scopeId: string, prompt: string) => Promise<void>;
   /** Your AI, once its record is read; `state` says whether its folder is set up. */
   you?: YourAi;
+  /** The zoom into a brain (from `origin`), or back from one. */
+  scene?: { kind: 'leave' | 'return'; origin?: { x: number; y: number } };
   onCreateYou: () => Promise<void>;
   onShowYou: () => void;
   onSendYou: (prompt: string) => Promise<void>;
@@ -731,7 +743,18 @@ export function Overview({
     onStop: reread(actions.onStop),
   };
   return (
-    <div className={`overview ${view}`}>
+    <div
+      className={`overview chrome ${view} ${scene ? `level-${scene.kind}` : ''}`}
+      inert={scene?.kind === 'leave'}
+      style={
+        scene?.origin
+          ? ({
+              '--zoom-x': `${scene.origin.x}px`,
+              '--zoom-y': `${scene.origin.y}px`,
+            } as CSSProperties)
+          : undefined
+      }
+    >
       {spaces.map((space) => (
         <AiWatch
           key={`${space.scopeId}:${agentFor(space.scopeId)}`}

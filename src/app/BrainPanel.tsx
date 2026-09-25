@@ -163,7 +163,10 @@ export function Tree({
                 size={15}
                 className={`tree-icon ${entry.connection ? 'drive' : ''}`}
               />
-              <span className="filename">{entry.name.replace(/\.md$/, '')}</span>
+              {/* Notes read as titles; Schema files keep their names, as agents know them. */}
+              <span className="filename">
+                {layer === 'schema' ? entry.name : entry.name.replace(/\.md$/, '')}
+              </span>
               {entry.blocked ? (
                 <span className="badge">
                   {layer === 'contents'

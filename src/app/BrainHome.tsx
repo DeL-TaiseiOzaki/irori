@@ -139,7 +139,11 @@ export function BrainHome({
   const history = useResource(() => host.knowledgeHistory(space.scopeId), [space.scopeId], {
     refresh: revision,
   });
-  const schema = firstEntries(roots?.entries.filter((entry) => entry.layer === 'schema') ?? [], 6);
+  // The instruction files first; the skills have their own row below.
+  const schemaEntries = (roots?.entries ?? [])
+    .filter((entry) => entry.layer === 'schema' && entry.path !== '.agents')
+    .sort((a, b) => Number(a.directory) - Number(b.directory) || a.name.localeCompare(b.name));
+  const schema = { shown: schemaEntries.slice(0, 6), more: Math.max(0, schemaEntries.length - 6) };
   const knowledge = firstEntries(
     (knowledgeRoot
       ? knowledgeRead.data

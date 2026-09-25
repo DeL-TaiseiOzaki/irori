@@ -227,6 +227,24 @@ body {
   background: var(--backdrop);
   backdrop-filter: blur(3px);
 }
+/* Sheets rise a little as they open, over a backdrop that fades in. */
+.modal-dialog[open] {
+  animation: sheet-rise var(--slow) var(--ease) both;
+}
+.modal-dialog[open]::backdrop {
+  animation: sheet-backdrop var(--slow) ease both;
+}
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes sheet-backdrop {
+  from {
+    opacity: 0;
+  }
+}
 .modal {
   /* A dialog sits in the top layer but inherits its colour from wherever it is
      rendered, often the dark sidebar; the surface and the ink are set together. */

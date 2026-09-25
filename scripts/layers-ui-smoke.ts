@@ -82,8 +82,8 @@ try {
   const contents = section('Contents');
   await expect(panel.locator('.brain-names')).toContainText('個人KB');
   await expect(panel.locator('.brain-names')).toContainText('個人');
-  await expect(schema.getByRole('button', { name: 'AGENTS', exact: true })).toHaveCount(1);
-  await expect(schema.getByRole('button', { name: 'README', exact: true })).toHaveCount(0);
+  await expect(schema.getByRole('button', { name: 'AGENTS.md', exact: true })).toHaveCount(1);
+  await expect(schema.getByRole('button', { name: /^README/ })).toHaveCount(0);
   await expect(knowledge.getByRole('button', { name: 'README', exact: true })).toHaveCount(1);
   await expect(knowledge.getByRole('button', { name: /AGENTS/ })).toHaveCount(0);
   // An unconfigured Drive alias is visible without a mount, in the brain's Contents only.
@@ -91,7 +91,7 @@ try {
   await expect(contents.getByText('未接続')).toBeVisible();
   // A nested contents root under schema/ stays out of the Schema section.
   await schema.getByRole('button', { name: 'schema', exact: true }).click();
-  await expect(schema.getByRole('button', { name: 'policy', exact: true })).toBeVisible();
+  await expect(schema.getByRole('button', { name: 'policy.md', exact: true })).toBeVisible();
   await expect(schema.getByRole('button', { name: /raw|調査 資料/ })).toHaveCount(0);
   // The organization's category shows beside its name.
   await brain('組織KB').click();
@@ -140,7 +140,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-resized-sections.png' });
   // Same-named notes belong to their own brains; switching saves the one being edited.
   await brain('個人KB').click();
-  await schema.getByRole('button', { name: 'AGENTS', exact: true }).click();
+  await schema.getByRole('button', { name: 'AGENTS.md', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('個人KB rules');
   await brain('Engineering').click();
   await knowledge.getByRole('button', { name: 'README', exact: true }).click();

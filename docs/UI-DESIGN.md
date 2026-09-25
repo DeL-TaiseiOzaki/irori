@@ -37,7 +37,16 @@ Everything below this section is the history of the earlier layout.
   ink on paper). Layers are told apart by icon colour only.
 - **Motion.** Hover and press 140 ms, tabs and chips 200 ms, panels and sheets
   320 ms on `cubic-bezier(.2,.8,.2,1)`; ambient loops (the running ring, the
-  waiting halo, glows) stop under reduced motion.
+  waiting halo, glows) stop under reduced motion. Moving from the Overview into a
+  brain is a zoom (`goToLevel` in `main.tsx`, `level-*` in `shell.css`): the
+  Overview grows ×2.3 around the chosen brain and fades while the brain's
+  islands rise from ×0.9, about 560 ms; going back reverses it. Under reduced
+  motion the levels switch at once. Sheets rise 8 px over a fading backdrop; a
+  permission request arrives with a small overshoot, then breathes.
+- **Checking against the canvas.** `tsx scripts/ui-screens.ts [theme-lang …]`
+  (for example `hearth-ja dark-en light-ja`) writes the main screens to
+  `test-results/screens/` with placeholder brains, to compare with the canvas's
+  artboards.
 
 ## Before v5
 

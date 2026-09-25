@@ -72,6 +72,8 @@ function Graph({
         nodes={nodes}
         edges={edges}
         fitView
+        // A small graph shows at its own size instead of filling the view.
+        fitViewOptions={{ maxZoom: 1 }}
         minZoom={0.1}
         maxZoom={2}
         nodesDraggable={false}
@@ -89,7 +91,7 @@ function Graph({
         }}
       >
         <Background color="var(--stage-3)" gap={22} size={1.6} />
-        <Controls showInteractive={false} />
+        <Controls showInteractive={false} fitViewOptions={{ maxZoom: 1 }} />
       </ReactFlow>
     </div>
   );

@@ -660,6 +660,16 @@ button.column-row:hover {
 .your-ai-head {
   position: relative;
 }
+.your-ai-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+.your-ai-title strong {
+  font-size: 14px;
+}
 .your-ai-schema {
   padding: 0;
   border: 0;
@@ -862,4 +872,11 @@ button.column-row:hover {
   border-radius: 8px;
   background: var(--raised-2);
   box-shadow: inset 0 0 0 1px var(--hair);
+}
+.your-ai-log .agent-empty p {
+  margin: 0;
+  color: var(--tx-3);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.7;
 }
