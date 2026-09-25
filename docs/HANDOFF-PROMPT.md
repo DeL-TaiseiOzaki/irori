@@ -1,17 +1,23 @@
 # irori — Continuation prompt
 
-Updated 2026-09-23 (evening), after v0.1.30-preview.1 was published and the
-records merged. Give this file to the next agent, or copy its contents into a
-new session. Inspect current files and Git state before acting; later work
-takes precedence over this file.
+Updated 2026-09-26, while the UI v5 switch was being finished. Give this file
+to the next agent, or copy its contents into a new session. Inspect current
+files and Git state before acting; later work takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which had **0.1.30**
-published and the download page in step when this was written.
-Nothing is waiting to be merged. Choose a bounded next change with executable
-acceptance checks and carry it through implementation and verification. Make
-independent progress while device and account evidence is pending.
+Take over **irori** development from current `main`. At this update, **0.1.41**
+(UI v5 stages 1–4) was published and the download page in step. Two stacked pull
+requests were waiting for the owner's merge words:
+
+- #103, your AI (0.1.42);
+- #104, motion and finish (0.1.43).
+
+Once they are merged, publish 0.1.43 as [DISTRIBUTION](DISTRIBUTION.md) describes.
+Then choose a bounded next change with executable acceptance checks and carry it
+through implementation and verification. [HANDOFF](HANDOFF.md) lists the open v5
+follow-ups. For v5, read [ADR 014](decisions/014-ui-v5.md), the newest
+[STATUS](STATUS.md) entries and [YOUR-AI](YOUR-AI.md).
 
 Work in the independent `irori/` repository inside the `KB_design/` workspace.
 The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
@@ -27,7 +33,9 @@ and commit messages in English. The user prefers simple, minimal code and asks
 for unnecessary parts to be cut. Every new feature starts on a dedicated branch
 and reaches `main` through a pull request. Development, verification,
 feature-branch commit/push and PR creation are authorized; merging needs the
-owner's own words. New user directions override this file.
+owner's own words, naming the pull request. Real Claude Code runs for your AI's
+acceptance (`npm run test:your-ai`) were authorized on 2026-09-26. New user
+directions override this file.
 
 ## Read first
 
