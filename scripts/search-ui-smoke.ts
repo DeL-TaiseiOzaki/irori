@@ -71,7 +71,8 @@ try {
   const submit = panel.getByRole('button', { name: '検索', exact: true });
   const results = panel.getByRole('region', { name: '本文の検索結果', exact: true });
   await expect(query).toBeFocused();
-  await expect(panel.getByRole('radio')).toHaveCount(2);
+  // One radio per brain plus the "all brains" chip; the active KB is chosen first.
+  await expect(panel.getByRole('radio')).toHaveCount(3);
   await expect(scope('検索対象KB')).toBeChecked();
   await query.fill('AutosaveSearchToken');
   await query.press('Enter');
@@ -140,6 +141,37 @@ try {
   await submit.click();
   await expect(results.locator('li')).toHaveCount(1);
   await expect(results).toContainText('Literal a.*b example.');
+
+  // Cross-brain search: one query against every brain, grouped by brain with a
+  // BrainTile, name and hit count per group.
+  await scope('すべての Brain').check();
+  await query.fill('orbital');
+  await submit.click();
+  await expect(results.locator('li')).toHaveCount(2);
+  const targetGroup = results.getByRole('group', { name: '検索対象KB', exact: true });
+  const referenceGroup = results.getByRole('group', { name: '参照KB', exact: true });
+  await expect(targetGroup).toContainText('notes/body.md');
+  await expect(referenceGroup).toContainText('reference.md');
+  await expect(referenceGroup).toContainText('ORBITAL in another KB.');
+  await expect(targetGroup.locator('h3.palette-group > span:not(.brain-tile)')).toHaveText('1');
+  await expect(referenceGroup.locator('h3.palette-group > span:not(.brain-tile)')).toHaveText('1');
+  // The keyboard choice moves across every group in display order.
+  await query.press('ArrowDown');
+  await expect(referenceGroup.locator('button[aria-current="true"]')).toHaveCount(1);
+  await query.press('Enter');
+  await expect(panel).toHaveCount(0);
+  await expect(editor).toContainText('ORBITAL in another KB.');
+  await launcher.click();
+  // Opening a hit switches the active brain; the panel still preselects it, not "all".
+  await expect(scope('参照KB')).toBeChecked();
+  await scope('すべての Brain').check();
+  await query.fill('ＯＲＢＩＴＡＬ');
+  await submit.click();
+  await expect(results).toContainText('一致する本文はありません。');
+  await scope('検索対象KB').check();
+  await query.fill('a.*b');
+  await submit.click();
+  await expect(results.locator('li')).toHaveCount(1);
 
   // Real files exercise incomplete search and refresh notices; the index records the
   // oversized file as unreadable and the walk reports it on every request.

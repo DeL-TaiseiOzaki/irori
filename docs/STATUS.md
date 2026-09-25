@@ -10,6 +10,29 @@ belongs to the AI alone. Three questions (default language, your AI's folder,
 where brain identity is stored) are open with the owner and use the ADR's
 defaults meanwhile. The work lands as stacked pull requests.
 
+UI v5 Overview, 2026-09-25: **0.1.41** is prepared on `feat/overview`, stacked
+on brain identity. The renderer no longer holds the brain on show while its AI
+runs or has a queue: another brain can be chosen and run its own AI (the host
+already allowed one run per scope). A brain keeps the AI chosen for it. A queue
+goes on when its brain's run completes even while another brain or the
+Overview is on show (`sendNextQueued`); a stopped or failed run still pauses
+it. The conversation snapshot carries the requests a run waits on now
+(`Conversation.requests`, `withRequests`), since saved history keeps them only
+as text, so a request can be answered after switching brains or from the
+Overview. The rail's **全体** opens the Overview (`Overview.tsx`,
+`overview.css`): a map (deterministic rows by category in `domain/overview.ts`,
+reference lines from run records whose sources belong to another workspace
+brain) with a **Brain の AI** island (state, request cards, stop, resume, and a
+composer that sends or queues to a chosen brain), and a side-by-side view (AI /
+Schema / Knowledge / Contents per brain). The ⌘K palette gains **すべての Brain**,
+grouped by brain; the search host now supersedes a scan only within the same KB,
+so scans of different KBs run side by side. The workspace cannot be left while
+any brain's AI runs. New `overview-ui-smoke` (two fixture runs at once,
+switching during a run, a background queue, answering, stop/resume, sending and
+queueing from the Overview); unit tests for the layout, the reference lines, two
+brains' runs with live requests and per-KB scans. Your AI (the hearth of the map)
+is phase 5.
+
 Brain identity, 2026-09-25: **0.1.40** is prepared on `feat/brain-identity`,
 stacked on the brain views. `.irori/scope.json` gains an optional `appearance`
 (`icon`: a glyph of 24, one or two characters, or an image `.irori/icon-<hash>.<ext>`;

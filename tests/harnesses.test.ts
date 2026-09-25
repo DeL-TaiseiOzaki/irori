@@ -10,6 +10,7 @@ import { SessionStore, sessionKey } from '../src/agents/sessions';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
+import { withRequests } from '../src/domain/conversation';
 
 const fixtureOptions = {
   skip: process.platform === 'win32' && 'POSIX executable fixture',
@@ -380,5 +381,68 @@ test(
       false,
       'no harness directory appears in the KB',
     );
+  },
+);
+
+test(
+  'Two brains run at once, and a waiting request can be answered from a freshly read conversation',
+  fixtureOptions,
+  async (t) => {
+    const { space, files } = await setup(t);
+    const otherRoot = path.join(path.dirname(space.root), 'Other KB');
+    await mkdir(otherRoot);
+    const other = await files.register(otherRoot, 'Other', 'team');
+    const ended = new Map<string, () => void>();
+    const done = (scopeId: string) =>
+      new Promise<void>((resolve) => {
+        ended.set(scopeId, resolve);
+      });
+    const waiting = new Map<string, () => void>();
+    const asked = (scopeId: string) =>
+      new Promise<void>((resolve) => {
+        waiting.set(scopeId, resolve);
+      });
+    const service = new AgentService(files, (event) => {
+      if (event.type === 'permission' || event.type === 'question') waiting.get(event.scopeId!)?.();
+      if (event.type === 'done') ended.get(event.scopeId!)?.();
+    });
+    t.after(() => service.cancel());
+    const firstAsked = asked(space.scopeId);
+    const secondAsked = asked(other.scopeId);
+    const firstDone = done(space.scopeId);
+    const secondDone = done(other.scopeId);
+    await service.startAccepted({ scopeId: space.scopeId, agent: 'pi', prompt: 'dialog' });
+    await service.startAccepted({ scopeId: other.scopeId, agent: 'pi', prompt: 'dialog' });
+    await Promise.all([firstAsked, secondAsked]);
+    assert.deepEqual(service.runningScopes().sort(), [space.scopeId, other.scopeId].sort());
+    // The saved history holds the request as text; the snapshot carries the live one.
+    const read = await service.conversation(other.scopeId, 'pi');
+    assert.equal(read.requests?.length, 1);
+    assert.equal(
+      read.events.some((event) => event.type === 'permission'),
+      false,
+    );
+    const [request] = withRequests(read).filter((event) => event.requestId);
+    assert.equal(request.requestId, read.requests![0].requestId);
+    assert.equal(
+      withRequests(read).filter((event) => event.text === request.text).length,
+      1,
+      'the status line is replaced, not repeated',
+    );
+    assert.deepEqual((await service.conversation(space.scopeId, 'pi')).requests?.length, 1);
+    // Answering one brain leaves the other waiting.
+    const input = asked(other.scopeId);
+    service.respond(request.requestId!, false);
+    await input;
+    const next = (await service.conversation(other.scopeId, 'pi')).requests!;
+    assert.equal(next.length, 1);
+    assert.notEqual(next[0].requestId, request.requestId);
+    service.respond(next[0].requestId!, true, { [next[0].questions?.[0].id ?? '']: 'Choice' });
+    await secondDone;
+    assert.equal(service.busy(other.scopeId), false);
+    assert.equal(service.busy(space.scopeId), true);
+    assert.deepEqual((await service.conversation(other.scopeId, 'pi')).requests, []);
+    await service.cancel(space.scopeId);
+    await firstDone;
   },
 );

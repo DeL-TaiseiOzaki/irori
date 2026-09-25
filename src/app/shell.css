@@ -12,12 +12,27 @@
 .app-body {
   flex: 1;
   min-height: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+/* The Overview and the brain on show share one place beside the rail; the
+   brain's islands stay mounted under the Overview so the note, the terminal and
+   the panes keep their state. */
+.app-body > .overview,
+.app-body > .islands {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
 }
 .islands {
   flex: 1;
   min-width: 0;
   padding: 8px 8px 0 0;
+}
+.islands[inert] {
+  visibility: hidden;
 }
 .brain-pane,
 .stage-pane,
@@ -129,6 +144,10 @@
 }
 .rail-overview {
   border-radius: 12px;
+}
+.rail-overview[aria-current] {
+  background: var(--solid);
+  color: var(--on-solid);
 }
 .rail-slot {
   position: relative;

@@ -7,6 +7,15 @@ import { BrainTile } from './BrainTile';
 import { t } from '../domain/i18n';
 
 const host = window.irori;
+/** The chip and `scopeId` value that searches every brain, grouping the results by brain. */
+const ALL_BRAINS = 'all';
+
+/** One brain's outcome inside an all-brains search: either a result or its own error. */
+interface BrainSearch {
+  space: Space;
+  result?: KnowledgeSearch;
+  error?: string;
+}
 
 export function SearchPanel({
   spaces,
@@ -22,10 +31,15 @@ export function SearchPanel({
   onClose: () => void;
 }) {
   const [scopeId, setScopeId] = useState(
-    spaces.find((space) => space.scopeId === initialScopeId)?.scopeId ?? spaces[0]?.scopeId ?? '',
+    initialScopeId === ALL_BRAINS
+      ? ALL_BRAINS
+      : (spaces.find((space) => space.scopeId === initialScopeId)?.scopeId ??
+          spaces[0]?.scopeId ??
+          ''),
   );
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<KnowledgeSearch>();
+  const [allResults, setAllResults] = useState<BrainSearch[]>([]);
   const [searching, setSearching] = useState(false);
   const [opening, setOpening] = useState(false);
   const [changed, setChanged] = useState(false);
@@ -34,7 +48,12 @@ export function SearchPanel({
   const [chosen, setChosen] = useState(0);
   const request = useRef(0);
   const queryInput = useRef<HTMLInputElement>(null);
-  const member = spaces.some((space) => space.scopeId === scopeId);
+  const allBrains = scopeId === ALL_BRAINS;
+  const member = allBrains ? spaces.length > 0 : spaces.some((space) => space.scopeId === scopeId);
+  // The latest membership list for the "files changed" listener below, without
+  // resubscribing it on every render (the parent passes a fresh array each time).
+  const spacesRef = useRef(spaces);
+  spacesRef.current = spaces;
 
   useEffect(() => {
     // Dialog's child effect opens the native modal before this parent effect.
@@ -49,9 +68,15 @@ export function SearchPanel({
   useEffect(
     () =>
       host.onEvent((event) => {
-        if (event.type === 'files' && event.scopeId === scopeId) setChanged(true);
+        if (event.type !== 'files') return;
+        if (
+          allBrains
+            ? spacesRef.current.some((space) => space.scopeId === event.scopeId)
+            : event.scopeId === scopeId
+        )
+          setChanged(true);
       }),
-    [scopeId],
+    [scopeId, allBrains],
   );
 
   function invalidate() {
@@ -59,6 +84,7 @@ export function SearchPanel({
     setChosen(0);
     setSearching(false);
     setResult(undefined);
+    setAllResults([]);
     setError('');
     setChanged(false);
   }
@@ -68,6 +94,7 @@ export function SearchPanel({
     const id = ++request.current;
     setSearching(true);
     setResult(undefined);
+    setAllResults([]);
     setError('');
     setChanged(false);
     try {
@@ -80,8 +107,22 @@ export function SearchPanel({
             'Could not save the note you were editing. Close this and check its save or conflict state.',
           ),
         );
-      const value = await host.search(scopeId, query);
-      if (request.current === id) setResult(value);
+      if (allBrains) {
+        // Every brain at once: each KB has its own index, and one brain's
+        // failure stays inside its own group.
+        const settled: BrainSearch[] = await Promise.all(
+          spaces.map((space) =>
+            host.search(space.scopeId, query).then(
+              (result) => ({ space, result }),
+              (error: unknown) => ({ space, error: String(error) }),
+            ),
+          ),
+        );
+        if (request.current === id) setAllResults(settled);
+      } else {
+        const value = await host.search(scopeId, query);
+        if (request.current === id) setResult(value);
+      }
     } catch (error) {
       if (request.current === id) setError(String(error));
     } finally {
@@ -89,12 +130,12 @@ export function SearchPanel({
     }
   }
 
-  async function open(hit: SearchHit) {
-    if (!result || !member || opening) return;
+  async function open(hitScopeId: string, hit: SearchHit, searchedQuery: string) {
+    if (!member || opening) return;
     setOpening(true);
     setError('');
     try {
-      await onOpen(result.scopeId, hit, result.query);
+      await onOpen(hitScopeId, hit, searchedQuery);
     } catch (error) {
       setError(String(error));
     } finally {
@@ -103,7 +144,39 @@ export function SearchPanel({
   }
 
   const space = spaces.find((item) => item.scopeId === scopeId);
-  const hits = result?.hits ?? [];
+  const hasResults = allBrains ? allResults.length > 0 : !!result;
+  const allTotalHits = allResults.reduce((sum, entry) => sum + (entry.result?.hits.length ?? 0), 0);
+  const allTotalScanned = allResults.reduce(
+    (sum, entry) => sum + (entry.result?.scannedFiles ?? 0),
+    0,
+  );
+  const allIncomplete = allResults.some((entry) => entry.result?.incomplete);
+  const allSkipped = allResults.reduce((sum, entry) => sum + (entry.result?.skippedFiles ?? 0), 0);
+  const totalHits = allBrains ? allTotalHits : (result?.hits.length ?? 0);
+  const totalScanned = allBrains ? allTotalScanned : (result?.scannedFiles ?? 0);
+  const incomplete = allBrains ? allIncomplete : !!result?.incomplete;
+  const skippedFiles = allBrains ? allSkipped : (result?.skippedFiles ?? 0);
+  // Each brain's hits keep their own local index; a running offset makes the
+  // choice keyboard-navigable across every group in display order.
+  let cursor = 0;
+  const baseIndices = allResults.map((entry) => {
+    const base = cursor;
+    cursor += entry.result?.hits.length ?? 0;
+    return base;
+  });
+  const flat: { hitScopeId: string; hit: SearchHit; query: string }[] = allBrains
+    ? allResults.flatMap((entry) =>
+        (entry.result?.hits ?? []).map((hit) => ({
+          hitScopeId: entry.space.scopeId,
+          hit,
+          query: entry.result!.query,
+        })),
+      )
+    : (result?.hits ?? []).map((hit) => ({
+        hitScopeId: result!.scopeId,
+        hit,
+        query: result!.query,
+      }));
   return (
     <Dialog
       label={t('KB内を検索', 'Search in KB')}
@@ -115,11 +188,11 @@ export function SearchPanel({
         className="palette chrome"
         onKeyDown={(event) => {
           // The results are chosen from the keyboard while the query keeps focus.
-          if (!hits.length || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+          if (!flat.length || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
           event.preventDefault();
           setChosen((value) =>
             event.key === 'ArrowDown'
-              ? Math.min(hits.length - 1, value + 1)
+              ? Math.min(flat.length - 1, value + 1)
               : Math.max(0, value - 1),
           );
         }}
@@ -129,7 +202,9 @@ export function SearchPanel({
           onSubmit={(event) => {
             event.preventDefault();
             // Enter searches a new query and opens the chosen result of the current one.
-            if (result && hits[chosen]) void open(hits[chosen]);
+            const chosenHit = flat[chosen];
+            if (hasResults && chosenHit)
+              void open(chosenHit.hitScopeId, chosenHit.hit, chosenHit.query);
             else void search();
           }}
         >
@@ -169,6 +244,21 @@ export function SearchPanel({
         <div className="palette-scopes">
           <fieldset aria-describedby="search-scope-help">
             <legend className="sr-only">{t('検索する Brain', 'Brain to search')}</legend>
+            <label className="palette-scope" data-checked={allBrains}>
+              <input
+                type="radio"
+                name="search-scope"
+                value={ALL_BRAINS}
+                checked={allBrains}
+                disabled={opening}
+                onChange={() => {
+                  invalidate();
+                  setScopeId(ALL_BRAINS);
+                }}
+              />
+              <Icon name="grid" size={16} />
+              {t('すべての Brain', 'All brains')}
+            </label>
             {spaces.map((item) => (
               <label
                 key={item.scopeId}
@@ -203,29 +293,29 @@ export function SearchPanel({
         )}
         <div className="palette-status" role="status" aria-live="polite">
           {searching && t('本文を検索しています…', 'Searching body text…')}
-          {result &&
-            `${t(`${result.hits.length} 件の一致`, `${result.hits.length} matches`)} · ${t(
-              `${result.scannedFiles} ファイルを検索`,
-              `${result.scannedFiles} files searched`,
+          {hasResults &&
+            `${t(`${totalHits} 件の一致`, `${totalHits} matches`)} · ${t(
+              `${totalScanned} ファイルを検索`,
+              `${totalScanned} files searched`,
             )}`}
         </div>
-        {result && (
+        {hasResults && (
           <section
             className="palette-results"
             aria-label={t('本文の検索結果', 'Body text search results')}
           >
-            {(result.incomplete || result.skippedFiles > 0) && (
+            {(incomplete || skippedFiles > 0) && (
               <p className="search-notice">
-                {result.incomplete &&
+                {incomplete &&
                   t(
                     '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。',
                     'These are the results within what could be searched. A limit or unreadable files meant not every note could be checked.',
                   )}
-                {result.skippedFiles > 0 &&
+                {skippedFiles > 0 &&
                   ' ' +
                     t(
-                      `${result.skippedFiles} ファイルをスキップしました。`,
-                      `Skipped ${result.skippedFiles} files.`,
+                      `${skippedFiles} ファイルをスキップしました。`,
+                      `Skipped ${skippedFiles} files.`,
                     )}{' '}
                 {t(
                   '必要に応じて検索語を絞って再検索してください。',
@@ -241,9 +331,9 @@ export function SearchPanel({
                 )}
               </p>
             )}
-            {!result.hits.length && (
+            {totalHits === 0 && (
               <p className="palette-empty">
-                {result.incomplete
+                {incomplete
                   ? t(
                       '検索できた範囲に一致する本文はありません。',
                       'No matching body text within what could be searched.',
@@ -251,20 +341,58 @@ export function SearchPanel({
                   : t('一致する本文はありません。', 'No matching body text.')}
               </p>
             )}
-            {!!result.hits.length && space && (
-              <h3 className="palette-group">
-                <BrainTile space={space} size={18} radius={5} />
-                {space.name}
-                <span>{result.hits.length}</span>
-              </h3>
-            )}
-            <Hits
-              hits={result.hits}
-              query={result.query}
-              chosen={chosen}
-              disabled={opening || !member}
-              onOpen={open}
-            />
+            {allBrains
+              ? allResults.map((entry, index) => (
+                  <section
+                    key={entry.space.scopeId}
+                    className="palette-brain-group"
+                    role="group"
+                    aria-label={entry.space.name}
+                  >
+                    <h3 className="palette-group">
+                      <BrainTile space={entry.space} size={18} radius={5} />
+                      {entry.space.name}
+                      {!entry.error && <span>{entry.result?.hits.length ?? 0}</span>}
+                    </h3>
+                    {entry.error ? (
+                      <p className="search-error" role="alert">
+                        {entry.error}
+                      </p>
+                    ) : entry.result && entry.result.hits.length ? (
+                      <Hits
+                        hits={entry.result.hits}
+                        query={entry.result.query}
+                        chosen={chosen}
+                        baseIndex={baseIndices[index]}
+                        disabled={opening || !member}
+                        onOpen={(hit) => open(entry.space.scopeId, hit, entry.result!.query)}
+                      />
+                    ) : (
+                      entry.result &&
+                      totalHits > 0 && (
+                        <p className="palette-group-empty">{t('該当なし', 'No matches')}</p>
+                      )
+                    )}
+                  </section>
+                ))
+              : result && (
+                  <>
+                    {!!result.hits.length && space && (
+                      <h3 className="palette-group">
+                        <BrainTile space={space} size={18} radius={5} />
+                        {space.name}
+                        <span>{result.hits.length}</span>
+                      </h3>
+                    )}
+                    <Hits
+                      hits={result.hits}
+                      query={result.query}
+                      chosen={chosen}
+                      disabled={opening || !member}
+                      onOpen={(hit) => open(result.scopeId, hit, result.query)}
+                    />
+                  </>
+                )}
           </section>
         )}
         <footer className="palette-footer">
@@ -317,12 +445,14 @@ function Hits({
   hits,
   query,
   chosen,
+  baseIndex = 0,
   disabled,
   onOpen,
 }: {
   hits: SearchHit[];
   query: string;
   chosen: number;
+  baseIndex?: number;
   disabled: boolean;
   onOpen: (hit: SearchHit) => Promise<void>;
 }) {
@@ -334,7 +464,7 @@ function Hits({
           <li key={`${hit.path}:${hit.line}`}>
             <button
               disabled={disabled}
-              aria-current={index === chosen ? 'true' : undefined}
+              aria-current={index + baseIndex === chosen ? 'true' : undefined}
               onClick={() => void onOpen(hit)}
             >
               <span className="search-result-location">

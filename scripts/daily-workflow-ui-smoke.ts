@@ -219,6 +219,9 @@ try {
   await expect(composer).toHaveValue('');
   await composer.fill(teamCodex);
   await chooseScope(page, spaces[0]);
+  // Each brain keeps the AI chosen for it.
+  await expect(composer).toHaveValue(personalClaude);
+  await chooseAgent(page, 'codex');
   await expect(composer).toHaveValue(personalCodex);
   const finalPersonalCodex = `${personalCodex}\n終了直前の追記`;
   await composer.fill(finalPersonalCodex);
@@ -234,6 +237,8 @@ try {
   await chooseAgent(page, 'codex');
   await expect(composer).toHaveValue(teamCodex);
   await chooseScope(page, spaces[0]);
+  await expect(composer).toHaveValue(personalClaude);
+  await chooseAgent(page, 'codex');
   await expect(composer).toHaveValue(finalPersonalCodex);
   await composer.fill('');
   await close();

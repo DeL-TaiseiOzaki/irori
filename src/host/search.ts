@@ -30,7 +30,9 @@ function searchable(space: Space, relative: string) {
 
 /** Search saved local text through the same scope boundaries as the explorer. */
 export class SearchService {
-  private generation = 0;
+  // A newer scan of a KB replaces an older one of the same KB, which shares its
+  // index; scans of different KBs run side by side.
+  private generations = new Map<string, number>();
   constructor(
     private readonly files: FileService,
     private readonly limits = searchLimits,
@@ -75,7 +77,8 @@ export class SearchService {
     narrow?: string,
   ): Promise<KnowledgeSearch> {
     const space = this.files.get(scopeId);
-    const generation = ++this.generation;
+    const generation = (this.generations.get(scopeId) ?? 0) + 1;
+    this.generations.set(scopeId, generation);
     let deadline = performance.now() + this.limits.milliseconds;
     const result: KnowledgeSearch = {
       scopeId,
@@ -86,7 +89,7 @@ export class SearchService {
       incomplete: false,
     };
     const current = () => {
-      if (generation !== this.generation)
+      if (generation !== this.generations.get(scopeId))
         throw Error(t('新しい検索に切り替わりました。', 'A newer search replaced this one.'));
       if (performance.now() >= deadline) {
         result.incomplete = true;

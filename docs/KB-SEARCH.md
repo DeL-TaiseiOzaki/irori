@@ -1,9 +1,22 @@
 # Local KB text search
 
 The sidebar's **KB内を検索** searches saved text in one selected KB from the
-current workspace. The initial selection follows the active KB. The search
+current workspace, or, with the **すべての Brain** chip, every brain of the
+workspace at once. The initial selection follows the active KB. The search
 form saves the current editor through its normal save/conflict handling before
 starting. Querying another KB does not switch the active agent or editor scope.
+
+Cross-brain search runs the same per-brain search concurrently against every
+workspace brain and groups the results under each brain's tile, name and hit
+count, in the workspace's brain order; opening a result switches to that hit's
+own brain the same way a single-brain result does. It is not a merged index:
+each brain is walked and matched independently, so one brain's limit, error or
+incomplete result is shown inside its own group and does not affect the
+others', and the "files changed" notice covers a change in any searched brain.
+A newer scan of a KB (a search, a backlink count or a move preview) replaces an
+older one of the same KB, which shares its index; scans of different KBs run
+side by side, so one brain's backlink count does not cancel another brain's
+search.
 
 Search is a literal, single-line substring search, ignoring letter case. Queries
 are trimmed and limited to 200 characters; regex punctuation is ordinary text.
@@ -177,9 +190,10 @@ The public testing installer remains the earlier 0.1.3 build.
 
 This is on-demand search of saved local text. The index makes a repeat request
 cheap; it does not yet run search or backlinks on every open, and nothing keeps
-the index warm between sessions other than the next request. Cross-KB searching,
-binary document extraction, cloud search, unsaved-buffer search and direct
-line/cursor navigation remain separate work. Existing source/artifact record
-search and explicit identity reconnection remain in
+the index warm between sessions other than the next request. Cross-brain search
+(above) runs the existing per-brain search grouped by brain, not a merged
+index or ranking across brains; binary document extraction, cloud search,
+unsaved-buffer search and direct line/cursor navigation remain separate work.
+Existing source/artifact record search and explicit identity reconnection remain in
 [KNOWLEDGE-NAVIGATION](KNOWLEDGE-NAVIGATION.md). Portable identities, file
 moves/properties and real generated-artifact acceptance remain open D06 work.

@@ -23,7 +23,7 @@ import { Rpc, type Message } from './rpc';
 import type { FileService } from '../host/files';
 import { SessionStore, type SessionBinding } from './sessions';
 import { ConversationStore } from './conversations';
-import { startInput } from '../domain/conversation';
+import { startInput, type Conversation } from '../domain/conversation';
 import { promptWithSkill } from '../domain/skills';
 import { requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
@@ -55,7 +55,10 @@ export class AgentService {
   private sessions: SessionStore;
   private conversations: ConversationStore;
   private resetting = new Set<string>();
-  private requests = new Map<string, { run: Run; reply: (reply: Reply) => void }>();
+  private requests = new Map<
+    string,
+    { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
+  >();
   constructor(
     private files: FileService,
     private emit: (event: AgentEvent) => void,
@@ -95,8 +98,22 @@ export class AgentService {
   session(scopeId: string, agent: AgentId) {
     return this.sessions.status(this.binding(scopeId, agent));
   }
-  conversation(scopeId: string, agent: AgentId) {
-    return this.conversations.read(this.binding(scopeId, agent));
+  /**
+   * The saved conversation and the requests its run is waiting on now. A request
+   * is kept only as status text in the history, so a view opened while it waits
+   * takes the live one from here.
+   */
+  async conversation(scopeId: string, agent: AgentId): Promise<Conversation> {
+    const value = await this.conversations.read(this.binding(scopeId, agent));
+    const requests = [...this.requests.values()]
+      .filter(
+        ({ run }) =>
+          run.binding.scopeId === scopeId &&
+          run.binding.agent === agent &&
+          run.id === value.activeRunId,
+      )
+      .map(({ event }) => event);
+    return { ...value, requests };
   }
   queueMessage(input: StartRun) {
     input = startInput.parse(input);
@@ -235,6 +252,10 @@ export class AgentService {
   }
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
     const event = this.publish(run, type, text, extra);
+    this.record(run, event);
+    return event;
+  }
+  private record(run: Run, event: AgentEvent) {
     if (run.recorded)
       void this.conversations.event(run.binding, event).catch(() => {
         this.publish(
@@ -269,12 +290,15 @@ export class AgentService {
     if (run.cancelled) return Promise.resolve({ allow: false });
     const requestId = randomUUID();
     return new Promise((resolve) => {
-      this.requests.set(requestId, { run, reply: resolve });
-      this.event(run, questions ? 'question' : 'permission', text, {
+      // Registered before it is published, since an answer can arrive at once.
+      const pending = { run, event: undefined as unknown as AgentEvent, reply: resolve };
+      this.requests.set(requestId, pending);
+      pending.event = this.publish(run, questions ? 'question' : 'permission', text, {
         requestId,
         details: JSON.stringify(details, null, 2).slice(0, 24000),
         questions,
       });
+      this.record(run, pending.event);
     });
   }
   respond(id: string, allow: boolean, answers?: AgentAnswers) {

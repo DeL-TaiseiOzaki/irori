@@ -114,6 +114,23 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   visited.push('brain settings sheet');
 
+  // The Overview, as a map and side by side.
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Map of brains' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Brain AIs' })).toBeVisible();
+  await japaneseLeft(page, 'the Overview map');
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Brains side by side' })).toBeVisible();
+  await japaneseLeft(page, 'the Overview columns');
+  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('button', { name: /^Search all brains/ }).click();
+  await expect(page.getByRole('radio', { name: 'All brains', exact: true })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open Research', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Map of brains' })).toHaveCount(0);
+  visited.push('Overview');
+
   // The host speaks the same language: a message it writes arrives in English.
   const hostMessage = await page.evaluate(() =>
     window.irori.openUrl('file:///etc/passwd').then(

@@ -30,7 +30,7 @@ const changeNames = (): Record<string, string> => ({
 });
 
 /** Folders before files, each by name, as a short list with the rest counted. */
-function firstEntries(entries: Entry[], limit: number) {
+export function firstEntries(entries: Entry[], limit: number) {
   const sorted = [...entries].sort(
     (a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name),
   );
