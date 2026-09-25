@@ -119,6 +119,7 @@ import { AgentLog } from './AgentLog';
 import { BrainPanel, type BrainMode } from './BrainPanel';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
+import { BrainSettings } from './BrainSettings';
 import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
 import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
@@ -254,6 +255,7 @@ function App() {
   const [brainMode, setBrainMode] = useState<BrainMode>('files');
   const gitOpen = brainMode === 'changes';
   const [recovering, setRecovering] = useState(false);
+  const [brainSettings, setBrainSettings] = useState(false);
   const [noteAction, setNoteAction] = useState<NoteAction>();
   const [gitReview, setGitReview] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
@@ -528,7 +530,8 @@ function App() {
   async function refreshSpaces() {
     const list = await host.spaces();
     setSpaces(list);
-    setActive((a) => a ?? list[0]);
+    // The brain on show keeps its place but takes its newest declaration.
+    setActive((a) => (a && list.find((space) => space.scopeId === a.scopeId)) ?? a ?? list[0]);
   }
   async function reconcile() {
     const generation = ++reconciliation.current;
@@ -1123,6 +1126,7 @@ function App() {
                   });
                 }}
                 onMaterials={openMaterials}
+                onSettings={() => setBrainSettings(true)}
                 onSearch={() => setSearchOpen(true)}
                 onCreateIn={(space, entry) => {
                   setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
@@ -1660,6 +1664,7 @@ function App() {
                           });
                         }}
                         onMaterials={openMaterials}
+                        onSettings={() => setBrainSettings(true)}
                       />
                     ) : (
                       !doc && (
@@ -2337,6 +2342,20 @@ function App() {
         />
       )}
       {recovering && <CloudRecoveryDialog onClose={() => setRecovering(false)} />}
+      {brainSettings && active && (
+        <BrainSettings
+          key={active.scopeId}
+          space={active}
+          spaces={workspaceSpaces}
+          onClose={() => setBrainSettings(false)}
+          onSaved={(next) => {
+            setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
+            setActive(next);
+            setBrainSettings(false);
+            setStatus(t('Brain の設定を保存しました。', "Saved the brain's settings."));
+          }}
+        />
+      )}
       {noteAction && doc && (
         <NoteActionDialog
           key={`${doc.scopeId}:${doc.path}:${noteAction}`}

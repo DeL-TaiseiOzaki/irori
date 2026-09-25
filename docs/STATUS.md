@@ -10,6 +10,19 @@ belongs to the AI alone. Three questions (default language, your AI's folder,
 where brain identity is stored) are open with the owner and use the ADR's
 defaults meanwhile. The work lands as stacked pull requests.
 
+Brain identity, 2026-09-25: **0.1.40** is prepared on `feat/brain-identity`,
+stacked on the brain views. `.irori/scope.json` gains an optional `appearance`
+(`icon`: a glyph of 24, one or two characters, or an image `.irori/icon-<hash>.<ext>`;
+`color`: one of eight) and `category` becomes optional, following the ADR's
+default for the open question (identity shared through the KB). HostAPI adds
+`updateSpace` (name, category, appearance; validated, atomic, keeping unknown
+fields; refused while the brain's AI, Git or a connection is busy) and
+`saveSpaceIcon`. `BrainSettings.tsx` is the sheet (name, category, previews,
+icon kind and glyph grid, colours), opened from the brain menu and the home.
+`BrainTile` draws glyphs, characters and images everywhere. New
+`brain-settings-ui-smoke`; `space-settings.test.ts` covers the declaration.
+A KB without a category cannot be opened by 0.1.39 and earlier.
+
 UI v5 brain views, 2026-09-25: **0.1.39** is prepared on `feat/ui-v5-brain-views`,
 stacked on the foundation. A brain's views take the stage instead of opening
 dialogs: **Home** (`BrainHome.tsx`, replacing the welcome: identity, today's
