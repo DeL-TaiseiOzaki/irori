@@ -10,6 +10,24 @@ belongs to the AI alone. Three questions (default language, your AI's folder,
 where brain identity is stored) are open with the owner and use the ADR's
 defaults meanwhile. The work lands as stacked pull requests.
 
+UI v5 brain views, 2026-09-25: **0.1.39** is prepared on `feat/ui-v5-brain-views`,
+stacked on the foundation. A brain's views take the stage instead of opening
+dialogs: **Home** (`BrainHome.tsx`, replacing the welcome: identity, today's
+note, new note, terminal, Schema / Knowledge / Contents cards, recent changes
+and runs), the **graph** (`OntologyPanel` in a `StageView`: filters, dotted
+canvas, detail card, legend, entity list behind the table button, index state
+in the bar) and **materials and outputs** (`KnowledgePanel`, two columns). A
+reload no longer switches views; only opening a document does (`show`). The
+link button counts backlinks and lists them in a popover (`Backlinks.tsx`).
+Search is a ⌘K palette with brain chips, arrow-key choice and marked matches.
+Two delegated branches were merged: the Drive connection dialog as a two-column
+sheet (`connections.css`, secondary actions in ⋯ menus) and the Start screen
+(`startup.css`: workspace rows with brain tiles, the brains ↔ workspaces
+diagram, combining brains, adding a brain from a folder or GitHub). The file
+tree stays mounted behind Changes so open folders stay open. Smokes follow the
+views (regions instead of dialogs, the palette's chips, the popover) and
+disambiguate the home's duplicate actions.
+
 UI v5 foundation, 2026-09-25: **0.1.38** is prepared on `feat/ui-v5-foundation`.
 `src/app/tokens.css` carries the canvas's tokens for the hearth, light and dark
 themes (the old role names remain as aliases), Geist and Geist Mono are bundled

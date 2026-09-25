@@ -93,16 +93,6 @@ function SearchPanel(props: ComponentProps<typeof SearchPanelView>) {
     </Suspense>
   );
 }
-const BacklinksPanelView = lazy(() =>
-  import('./SearchPanel').then((m) => ({ default: m.BacklinksPanel })),
-);
-function BacklinksPanel(props: ComponentProps<typeof BacklinksPanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <BacklinksPanelView {...props} />
-    </Suspense>
-  );
-}
 const KnowledgePanelView = lazy(() =>
   import('./KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })),
 );
@@ -119,6 +109,7 @@ import './style.css';
 import './shell.css';
 import './stage.css';
 import './agent-panel.css';
+import './views.css';
 import { Startup, RegisterSpace } from './Startup';
 import { appIcon } from './branding';
 import { Icon } from './Icon';
@@ -127,7 +118,9 @@ import { agentIds, agentNames } from '../domain/types';
 import { AgentLog } from './AgentLog';
 import { BrainPanel, type BrainMode } from './BrainPanel';
 import { BrainTile } from './BrainTile';
-import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu, StageButton } from './NoteBar';
+import { BrainHome } from './BrainHome';
+import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
+import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
 import { StatusBar } from './StatusBar';
@@ -265,9 +258,9 @@ function App() {
   const [gitReview, setGitReview] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitDetailTarget, setGitDetailTarget] = useState<HTMLDivElement | null>(null);
-  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  // What the stage shows: the note, the brain's home, its graph, or its materials.
+  const [view, setView] = useState<'note' | 'home' | 'graph' | 'records'>('note');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [backlinks, setBacklinks] = useState<{ scopeId: string; path: string }>();
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
@@ -275,7 +268,6 @@ function App() {
   const [skill, setSkill] = useState('');
   const [personLines, setPersonLines] = useState(false);
   const [accessSelection, setAccessSelection] = useState<{ owner: string; value: AgentAccess }>();
-  const [ontologyOpen, setOntologyOpen] = useState(false);
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
@@ -465,7 +457,7 @@ function App() {
     void save()
       .then(async (saved) => {
         if (!saved) return;
-        load(await host.dailyNote(scopeId));
+        show(await host.dailyNote(scopeId));
         setRevision((value) => value + 1);
       })
       .catch(report);
@@ -527,6 +519,11 @@ function App() {
           ? t('Google Drive の資料・編集できます', 'Google Drive material · editable')
           : t('この端末に保存済み', 'Saved on this device'),
     );
+  }
+  /** Loads a document the person chose to open, and shows it on the stage. */
+  function show(next: Document, navigation?: Navigation) {
+    load(next, navigation);
+    setView('note');
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -740,7 +737,7 @@ function App() {
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
         const next = await host.read(space.scopeId, entry.path);
         setActive(space);
-        load(next, navigation);
+        show(next, navigation);
       } else await host.openExternal(space.scopeId, entry.path);
       return true;
     } catch (e) {
@@ -923,7 +920,7 @@ function App() {
     if (connecting || !(await save())) return false;
     try {
       if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
-        load(await host.cloudRead(root.scopeId, entry.path));
+        show(await host.cloudRead(root.scopeId, entry.path));
       else await host.openCloudFile(root.scopeId, entry.path);
       return true;
     } catch (error) {
@@ -1019,6 +1016,8 @@ function App() {
     : docSpace && doc
       ? classify(docSpace, doc.path)
       : undefined;
+  // The note's own controls show while the note is what the stage shows.
+  const onNote = !!doc && view === 'note';
   const agentInfo = infos.find((i) => i.id === agent);
   const waiting = !!active && waitingScopes.includes(active.scopeId);
   const instructionFile = (agent === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find(
@@ -1056,7 +1055,7 @@ function App() {
   }
   function openMaterials() {
     void save().then((saved) => {
-      if (saved) setKnowledgeOpen(true);
+      if (saved) setView('records');
     });
   }
   return (
@@ -1113,9 +1112,10 @@ function App() {
                 connections={connections}
                 onOpen={(space, entry) => void open(space, entry)}
                 onRefresh={() => setRevision((value) => value + 1)}
+                onHome={() => setView('home')}
                 onDaily={openDaily}
                 onNewNote={() => newNoteIn(active)}
-                onGraph={() => setOntologyOpen(true)}
+                onGraph={() => setView('graph')}
                 onConnect={() => showConnections(active)}
                 onTrash={() => {
                   void save().then((saved) => {
@@ -1175,19 +1175,27 @@ function App() {
           />
           <Pane id="stage" className="stage-pane" minSize={360}>
             <main id="editor-main" className="stage on-stage" tabIndex={-1}>
-              <div className="stage-top" hidden={gitReview}>
+              <div
+                className="stage-top"
+                hidden={gitReview || view === 'graph' || view === 'records'}
+              >
                 <header className="stage-bar">
-                  {doc?.workspaceId ? (
+                  {onNote && doc?.workspaceId ? (
                     <Crumbs
                       items={[{ icon: 'cloud', label: `${workspace?.name} · Drive` }]}
                       here={doc.path.split('/').at(-1)}
                       title={doc.path}
                     />
-                  ) : doc && docLayer ? (
+                  ) : onNote && doc && docLayer ? (
                     <Crumbs
                       space={docSpace}
                       {...fileCrumbs(docSpace, docLayer, doc.path)}
                       title={doc.path}
+                      onBrain={
+                        docSpace && docSpace.scopeId === active?.scopeId
+                          ? () => setView('home')
+                          : undefined
+                      }
                     />
                   ) : (
                     <Crumbs
@@ -1202,7 +1210,8 @@ function App() {
                         {t('接続を準備中…', 'Preparing connection…')}
                       </small>
                     )}
-                    {doc &&
+                    {onNote &&
+                      doc &&
                       (doc.readOnly ? (
                         <span className="save-state" role="status" title={status}>
                           <Icon name="lock" size={13} />
@@ -1224,15 +1233,47 @@ function App() {
                           {t('保存済み', 'Saved')}
                         </span>
                       ))}
-                    {doc && <span className="stage-divider" aria-hidden="true" />}
-                    {doc && !doc.workspaceId && (
-                      <StageButton
-                        icon="link"
-                        label={t('リンク元', 'Backlinks')}
-                        onClick={() => setBacklinks({ scopeId: doc.scopeId, path: doc.path })}
+                    {onNote && <span className="stage-divider" aria-hidden="true" />}
+                    {onNote && doc && !doc.workspaceId && (
+                      <Backlinks
+                        key={`${doc.scopeId}:${doc.path}`}
+                        scopeId={doc.scopeId}
+                        path={doc.path}
+                        revision={revision}
+                        onOpen={async (hit) => {
+                          const space = spaces.find((item) => item.scopeId === doc.scopeId);
+                          const opened =
+                            space &&
+                            (await open(
+                              space,
+                              {
+                                path: hit.path,
+                                name: hit.path.split('/').at(-1)!,
+                                directory: false,
+                                note: true,
+                                layer: 'Knowledge_Base',
+                              },
+                              // No label — an image, a reference definition — still opens the note
+                              // and says so, since the line is known but the link is not selectable.
+                              {
+                                query: hit.label ?? '',
+                                line: hit.line,
+                                preview: hit.preview,
+                                column: hit.column,
+                                link: true,
+                              },
+                            ));
+                          if (!opened)
+                            throw Error(
+                              t(
+                                'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                                'Could not open the note. Check the note being edited and the run/connection state.',
+                              ),
+                            );
+                        }}
                       />
                     )}
-                    {doc && (
+                    {onNote && doc && (
                       <NoteInfo
                         label={t(
                           'ノートの情報（名前・場所・人の行・記録）',
@@ -1273,7 +1314,7 @@ function App() {
                         <small>{status}</small>
                       </NoteInfo>
                     )}
-                    {doc && (
+                    {onNote && doc && (
                       <NoteMenu>
                         {noteActionsApply(doc) && docLayer === 'Knowledge_Base' && (
                           <>
@@ -1385,7 +1426,7 @@ function App() {
                         )}
                       </NoteMenu>
                     )}
-                    {doc && <span className="stage-divider" aria-hidden="true" />}
+                    {onNote && <span className="stage-divider" aria-hidden="true" />}
                     <AiToggle open={panel} onToggle={() => setPanel((p) => !p)} />
                   </div>
                 </header>
@@ -1461,9 +1502,93 @@ function App() {
               >
                 <Pane id="document" className="document-pane" minSize={180}>
                   <div className="git-detail-slot" ref={setGitDetailTarget} hidden={!gitReview} />
-                  <div className="note-surface" hidden={gitReview}>
-                    {doc ? (
-                      <div className="document-scroll">
+                  {view === 'records' && active && !gitReview && (
+                    <KnowledgePanel
+                      key={active.scopeId}
+                      space={active}
+                      doc={doc}
+                      cloudOwner={active.scopeId}
+                      sourceNames={Object.fromEntries([
+                        ...spaces
+                          .filter((item) => workspace?.scopeIds.includes(item.scopeId))
+                          .map((item) => [item.scopeId, item.name]),
+                        ...(cloudRoot ? [[cloudRoot.scopeId, `${cloudRoot.name} / Drive`]] : []),
+                      ])}
+                      onOpen={async (source) => {
+                        const target = spaces.find(
+                          (item) =>
+                            item.scopeId === source.scopeId &&
+                            workspace?.scopeIds.includes(item.scopeId),
+                        );
+                        const entry: Entry = {
+                          path: source.path,
+                          name: source.path.split('/').at(-1)!,
+                          directory: false,
+                          note: /\.md$/i.test(source.path),
+                          layer: 'Knowledge_Base',
+                        };
+                        if (!target && cloudRoot?.scopeId !== source.scopeId)
+                          throw Error(
+                            t(
+                              'この資料のスペースをワークスペースに追加してから開いてください。',
+                              'Add this material’s space to the workspace before opening it.',
+                            ),
+                          );
+                        const opened = target
+                          ? await open(target, entry)
+                          : await openCloud(cloudRoot!, entry);
+                        if (!opened)
+                          throw Error(
+                            t(
+                              'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
+                              'Could not open the file. Check the note being edited and the run/connection state.',
+                            ),
+                          );
+                        setView('note');
+                      }}
+                      onClose={() => setView('note')}
+                    />
+                  )}
+                  {view === 'graph' && active && !gitReview && (
+                    <Suspense
+                      fallback={
+                        <p className="hint">
+                          {t('オントロジーを開いています…', 'Opening the ontology…')}
+                        </p>
+                      }
+                    >
+                      <OntologyPanel
+                        space={active}
+                        revision={revision}
+                        onClose={() => setView('note')}
+                        onConfigure={() => {
+                          setView('note');
+                          setPanel(true);
+                          const request =
+                            'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
+                          setPrompt((previous) =>
+                            previous ? `${previous}\n\n${request}` : request,
+                          );
+                        }}
+                        onOpen={(relative) => {
+                          setView('note');
+                          void open(active, {
+                            path: relative,
+                            name: relative.split('/').at(-1)!,
+                            directory: false,
+                            note: /\.md$/i.test(relative),
+                            layer: 'Knowledge_Base',
+                          });
+                        }}
+                      />
+                    </Suspense>
+                  )}
+                  <div
+                    className="note-surface"
+                    hidden={gitReview || view === 'graph' || view === 'records'}
+                  >
+                    {doc && (
+                      <div className="document-scroll" hidden={view !== 'note'}>
                         {searchNotice && (
                           <p className="hint" role="status">
                             {searchNotice}
@@ -1511,65 +1636,98 @@ function App() {
                           )}
                         </Suspense>
                       </div>
+                    )}
+                    {active && (!doc || view === 'home') ? (
+                      <BrainHome
+                        space={active}
+                        roots={roots}
+                        git={gitRead.data}
+                        connections={connections}
+                        skills={skills}
+                        daily={!!notesDeclared?.daily}
+                        locked={brainLocked || gitBusy}
+                        revision={revision}
+                        onOpen={(entry) => void open(active, entry)}
+                        onDaily={openDaily}
+                        onNewNote={() => newNoteIn(active)}
+                        onTerminal={() => setTerminalSpace((value) => value ?? active)}
+                        onRefresh={() => setRevision((value) => value + 1)}
+                        onGraph={() => setView('graph')}
+                        onConnect={() => showConnections(active)}
+                        onChanges={() => {
+                          void save().then((saved) => {
+                            if (saved) setBrainMode('changes');
+                          });
+                        }}
+                        onMaterials={openMaterials}
+                      />
                     ) : (
-                      <div className="welcome">
-                        {active ? (
-                          <BrainTile space={active} size={64} radius={18} />
-                        ) : (
-                          <img
-                            className="welcome-mark"
-                            src={appIcon}
-                            alt=""
-                            width="64"
-                            height="64"
-                          />
-                        )}
-                        <h1>
-                          {t('ここから、考えを広げよう。', "Let's expand your thinking from here.")}
-                        </h1>
-                        <p>
-                          {t(
-                            '左のナレッジからノートを開くと、編集を始められます。',
-                            'Open a note from the Knowledge on the left to start editing.',
+                      !doc && (
+                        <div className="welcome">
+                          {active ? (
+                            <BrainTile space={active} size={64} radius={18} />
+                          ) : (
+                            <img
+                              className="welcome-mark"
+                              src={appIcon}
+                              alt=""
+                              width="64"
+                              height="64"
+                            />
                           )}
-                          <br />
-                          {t(
-                            '新しいノートを作ったり、AIと一緒に整理することもできます。',
-                            'You can also create a new note or organize it together with AI.',
-                          )}
-                        </p>
-                        <div className="welcome-actions">
-                          <ArrowFillButton
-                            disabled={!active || running || connecting}
-                            onClick={() => {
-                              setNoteDirectory(defaultNoteDirectory);
-                              setNewNote(true);
-                            }}
-                          >
-                            {t('新しいノートを作成', 'Create a new note')}
-                          </ArrowFillButton>
-                          {notesDeclared?.daily && (
+                          <h1>
+                            {t(
+                              'ここから、考えを広げよう。',
+                              "Let's expand your thinking from here.",
+                            )}
+                          </h1>
+                          <p>
+                            {t(
+                              '左のナレッジからノートを開くと、編集を始められます。',
+                              'Open a note from the Knowledge on the left to start editing.',
+                            )}
+                            <br />
+                            {t(
+                              '新しいノートを作ったり、AIと一緒に整理することもできます。',
+                              'You can also create a new note or organize it together with AI.',
+                            )}
+                          </p>
+                          <div className="welcome-actions">
+                            <ArrowFillButton
+                              disabled={!active || running || connecting}
+                              onClick={() => {
+                                setNoteDirectory(defaultNoteDirectory);
+                                setNewNote(true);
+                              }}
+                            >
+                              {t('新しいノートを作成', 'Create a new note')}
+                            </ArrowFillButton>
+                            {notesDeclared?.daily && (
+                              <button
+                                className="stage-text-button framed"
+                                disabled={!active || running || connecting}
+                                onClick={openDaily}
+                              >
+                                <Icon name="calendar" size={15} />
+                                {t('今日のノート', "Today's note")}
+                              </button>
+                            )}
                             <button
                               className="stage-text-button framed"
-                              disabled={!active || running || connecting}
-                              onClick={openDaily}
+                              onClick={() => setAdd(true)}
                             >
-                              <Icon name="calendar" size={15} />
-                              {t('今日のノート', "Today's note")}
+                              <Icon name="folder" size={15} />
+                              {t('KBフォルダを開く', 'Open a KB folder')}
                             </button>
-                          )}
-                          <button className="stage-text-button framed" onClick={() => setAdd(true)}>
-                            <Icon name="folder" size={15} />
-                            {t('KBフォルダを開く', 'Open a KB folder')}
-                          </button>
+                          </div>
+                          <p className="hint">
+                            {t(
+                              'Markdown ファイルは、あなたのフォルダに保存されます。',
+                              'Markdown files are saved to your folder.',
+                            )}
+                          </p>
                         </div>
-                        <p className="hint">
-                          {t(
-                            'Markdown ファイルは、あなたのフォルダに保存されます。',
-                            'Markdown files are saved to your folder.',
-                          )}
-                        </p>
-                      </div>
+                      )
                     )}
                   </div>
                 </Pane>
@@ -2273,118 +2431,6 @@ function App() {
           onClose={() => setSearchOpen(false)}
         />
       )}
-      {backlinks && (
-        <BacklinksPanel
-          {...backlinks}
-          onOpen={async (hit) => {
-            const space = spaces.find((item) => item.scopeId === backlinks.scopeId);
-            const opened =
-              space &&
-              (await open(
-                space,
-                {
-                  path: hit.path,
-                  name: hit.path.split('/').at(-1)!,
-                  directory: false,
-                  note: true,
-                  layer: 'Knowledge_Base',
-                },
-                // No label — an image, a reference definition — still opens the note
-                // and says so, since the line is known but the link is not selectable.
-                {
-                  query: hit.label ?? '',
-                  line: hit.line,
-                  preview: hit.preview,
-                  column: hit.column,
-                  link: true,
-                },
-              ));
-            if (!opened)
-              throw Error(
-                t(
-                  'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
-                  'Could not open the note. Check the note being edited and the run/connection state.',
-                ),
-              );
-            setBacklinks(undefined);
-          }}
-          onClose={() => setBacklinks(undefined)}
-        />
-      )}
-      {knowledgeOpen && active && (
-        <KnowledgePanel
-          key={active.scopeId}
-          space={active}
-          doc={doc}
-          cloudOwner={active.scopeId}
-          sourceNames={Object.fromEntries([
-            ...spaces
-              .filter((item) => workspace?.scopeIds.includes(item.scopeId))
-              .map((item) => [item.scopeId, item.name]),
-            ...(cloudRoot ? [[cloudRoot.scopeId, `${cloudRoot.name} / Drive`]] : []),
-          ])}
-          onOpen={async (source) => {
-            const target = spaces.find(
-              (item) =>
-                item.scopeId === source.scopeId && workspace?.scopeIds.includes(item.scopeId),
-            );
-            const entry: Entry = {
-              path: source.path,
-              name: source.path.split('/').at(-1)!,
-              directory: false,
-              note: /\.md$/i.test(source.path),
-              layer: 'Knowledge_Base',
-            };
-            if (!target && cloudRoot?.scopeId !== source.scopeId)
-              throw Error(
-                t(
-                  'この資料のスペースをワークスペースに追加してから開いてください。',
-                  'Add this material’s space to the workspace before opening it.',
-                ),
-              );
-            const opened = target ? await open(target, entry) : await openCloud(cloudRoot!, entry);
-            if (!opened)
-              throw Error(
-                t(
-                  'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
-                  'Could not open the file. Check the note being edited and the run/connection state.',
-                ),
-              );
-            setKnowledgeOpen(false);
-          }}
-          onClose={() => setKnowledgeOpen(false)}
-        />
-      )}
-      {ontologyOpen && active && (
-        <Suspense
-          fallback={
-            <p className="hint">{t('オントロジーを開いています…', 'Opening the ontology…')}</p>
-          }
-        >
-          <OntologyPanel
-            space={active}
-            revision={revision}
-            onClose={() => setOntologyOpen(false)}
-            onConfigure={() => {
-              setOntologyOpen(false);
-              setPanel(true);
-              const request =
-                'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
-              setPrompt((previous) => (previous ? `${previous}\n\n${request}` : request));
-            }}
-            onOpen={(relative) => {
-              setOntologyOpen(false);
-              void open(active, {
-                path: relative,
-                name: relative.split('/').at(-1)!,
-                directory: false,
-                note: /\.md$/i.test(relative),
-                layer: 'Knowledge_Base',
-              });
-            }}
-          />
-        </Suspense>
-      )}
       {add && (
         <RegisterSpace
           onCancel={() => setAdd(false)}
@@ -2432,7 +2478,7 @@ function App() {
                     : host.createNote(active!.scopeId, noteName, noteDirectory);
                 })()
                   .then((d) => {
-                    load(d);
+                    show(d);
                     closeNewNote();
                     setNoteName('');
                     setRevision((r) => r + 1);
@@ -2512,7 +2558,7 @@ function App() {
           onClose={() => setTrashOpen(false)}
           onRestored={(next, notice) => {
             setTrashOpen(false);
-            load(next);
+            show(next);
             setStatus(
               notice ??
                 t(

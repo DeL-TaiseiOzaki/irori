@@ -581,3 +581,88 @@ button.save-state > i {
 .terminal-state[data-state='starting'] {
   color: var(--term-muted);
 }
+
+/* Backlinks: the count beside the link, and the list in a popover. */
+.backlinks-count {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.backlinks-popover {
+  width: 380px;
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: auto;
+}
+.backlinks-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.backlinks-heading h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.backlinks-lead {
+  margin: 0 0 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.backlinks-status {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.backlinks-empty {
+  margin: 6px 0;
+}
+.backlinks-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.backlinks-hits button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+  text-align: left;
+  font-weight: 400;
+}
+.backlinks-hits button:hover {
+  background: var(--stage-2);
+}
+.backlink-location {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+}
+.backlink-location strong {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backlink-location small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.backlink-preview {
+  padding-left: 21px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

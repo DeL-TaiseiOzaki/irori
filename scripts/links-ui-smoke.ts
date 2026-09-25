@@ -78,8 +78,10 @@ try {
   // list is open, and going to one of them lands on its link.
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
-  const backlinksButton = page.getByRole('button', { name: 'リンク元', exact: true });
+  // The link button counts the notes that lead here and lists them in a popover.
+  const backlinksButton = page.getByRole('button', { name: /^リンク元/ });
   const backlinks = page.getByRole('dialog', { name: 'リンク元', exact: true });
+  await expect(backlinksButton).toHaveAttribute('aria-label', 'リンク元 1 件');
   await backlinksButton.click();
   await expect(backlinks).toContainText('1 件のリンク');
   const backlink = backlinks.getByRole('button', { name: /wiki\/deep\.md/ });

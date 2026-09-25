@@ -132,7 +132,8 @@ try {
   await expect(picker.locator('option')).toHaveCount(4);
 
   // The reach view names home-relative directories only, never the machine path.
-  await page.getByRole('button', { name: '到達確認' }).click();
+  // The composer's own reach check; the brain's home offers the same one.
+  await page.locator('.agent-panel').getByRole('button', { name: '到達確認' }).click();
   const reach = page.getByRole('dialog', { name: 'スキルの到達' });
   await expect(reach).toContainText('Claude Code');
   await expect(reach).toContainText('読まない。同名が ~/.claude/skills にあり、そちらだけを読む');

@@ -134,7 +134,10 @@ async function writesStayAt(before: Observation) {
 
 try {
   let page = await launch();
-  await page.getByRole('button', { name: 'example.js', exact: true }).click();
+  await page
+    .locator('.brain-panel')
+    .getByRole('button', { name: 'example.js', exact: true })
+    .click();
   const source = page.locator('.document-editor.source .cm-editor');
   const content = source.locator('.cm-content');
   await expect(content).toContainText('function greeting');
@@ -191,14 +194,17 @@ try {
 
   // The same display preference reaches another filename and newly created
   // fenced-code editors inside a Markdown document.
-  await page.getByRole('button', { name: 'config.json', exact: true }).click();
+  await page
+    .locator('.brain-panel')
+    .getByRole('button', { name: 'config.json', exact: true })
+    .click();
   await expect(page.locator('.document-editor.source .cm-content')).toContainText(
     'Japanese 日本語',
   );
   await assistance(page, true);
   await clickToggle(page, false);
   expect(await readFile(path.join(root, 'config.json'), 'utf8')).toBe(json);
-  await page.getByRole('button', { name: 'note', exact: true }).click();
+  await page.locator('.brain-panel').getByRole('button', { name: 'note', exact: true }).click();
   const rich = page.locator('.ProseMirror');
   const code = page.locator('.document-editor.rich .milkdown-code-block .cm-editor');
   await expect(rich).toContainText('The note remains editable');
@@ -223,7 +229,10 @@ try {
   await close();
 
   page = await launch();
-  await page.getByRole('button', { name: 'example.js', exact: true }).click();
+  await page
+    .locator('.brain-panel')
+    .getByRole('button', { name: 'example.js', exact: true })
+    .click();
   await expect(page.locator('.document-editor.source .cm-content')).toContainText(added);
   await assistance(page, false);
   await clickToggle(page, true);
@@ -257,7 +266,10 @@ try {
   const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
   await writeFile(settingsFile, JSON.stringify({ ...stored, editorAssistance: 'invalid' }));
   page = await launch();
-  await page.getByRole('button', { name: 'config.json', exact: true }).click();
+  await page
+    .locator('.brain-panel')
+    .getByRole('button', { name: 'config.json', exact: true })
+    .click();
   await assistance(page, true);
   expect(await readFile(path.join(root, 'config.json'), 'utf8')).toBe(json);
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toBe(markdown);

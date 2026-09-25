@@ -38,20 +38,33 @@ export function Crumbs({
   items,
   here,
   title,
+  onBrain,
 }: {
   space?: Space;
   items: Crumb[];
   here?: string;
   title?: string;
+  /** Shows the brain's home from its crumb. */
+  onBrain?: () => void;
 }) {
   return (
     <nav className="crumbs" aria-label={t('場所', 'Location')} title={title}>
-      {space && (
-        <span className="crumb brain">
-          <BrainTile space={space} size={20} radius={6} ring="stage" />
-          {space.name}
-        </span>
-      )}
+      {space &&
+        (onBrain ? (
+          <button
+            className="crumb brain"
+            title={t('Brain のホーム', "The brain's home")}
+            onClick={onBrain}
+          >
+            <BrainTile space={space} size={20} radius={6} ring="stage" />
+            {space.name}
+          </button>
+        ) : (
+          <span className="crumb brain">
+            <BrainTile space={space} size={20} radius={6} ring="stage" />
+            {space.name}
+          </span>
+        ))}
       {items.map((item, index) => (
         <span key={index} className={`crumb ${item.className ?? ''}`}>
           {(space || index > 0) && <Icon name="chevron" size={12} className="crumb-separator" />}
@@ -66,34 +79,6 @@ export function Crumbs({
         </strong>
       )}
     </nav>
-  );
-}
-
-/** A 30 px icon button on the stage. */
-export function StageButton({
-  icon,
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children?: ReactNode;
-}) {
-  return (
-    <button
-      className="stage-button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon name={icon} size={16} />
-      {children}
-    </button>
   );
 }
 

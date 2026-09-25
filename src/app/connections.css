@@ -1,0 +1,689 @@
+/* Connecting Google Drive to a brain's Contents: a paper sheet with the three
+   steps on the left and the registered folders on the right.
+   Selectors start at .connect-sheet so they win over the older dialog rules. */
+
+.connect-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: none;
+}
+.connect-sheet.connections {
+  width: min(940px, calc(100vw - 48px));
+  height: min(768px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--stage);
+  color: var(--ink);
+  box-shadow: var(--pop);
+  font-size: 13px;
+}
+.connect-sheet h2,
+.connect-sheet h3,
+.connect-sheet p {
+  margin: 0;
+}
+.connect-sheet .mono {
+  font-family: var(--font-mono);
+}
+
+/* Header */
+.connect-sheet .connect-head {
+  height: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 22px;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+.connect-sheet .connect-mark {
+  color: var(--cont-ink);
+}
+.connect-sheet .connect-head h2 {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.connect-sheet .connect-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connect-sheet .connect-title strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+.connect-sheet .connect-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+/* Body: steps and the registered folders */
+.connect-sheet .connect-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.connect-sheet .connect-steps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 26px 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.connect-sheet .connect-registered {
+  width: 352px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--stage-2);
+  box-shadow: inset 1px 0 0 var(--rule);
+}
+.connect-sheet .connect-registered h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.connect-sheet .connect-count {
+  color: var(--ink-3);
+}
+
+/* Messages */
+.connect-sheet .connect-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.connect-sheet .connect-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.connect-sheet .connect-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.connect-sheet .error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.connect-sheet .moved-notice {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--add-wash);
+  color: var(--add-ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.connect-sheet .connect-invalid,
+.connect-sheet .connection-rename small {
+  font-size: 12px;
+  color: var(--del-ink);
+}
+
+/* Steps */
+.connect-sheet .connect-step {
+  display: flex;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+}
+.connect-sheet .step-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.connect-sheet .step-mark {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--ink-2);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.connect-sheet .step-mark.done {
+  background: var(--ink-solid);
+  color: var(--on-ink-solid);
+  box-shadow: none;
+}
+.connect-sheet .step-line {
+  flex: 1;
+  width: 1.5px;
+  background: var(--rule);
+}
+.connect-sheet .step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.connect-sheet .step-body h3 {
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 24px;
+  color: var(--ink);
+}
+
+/* Fields */
+.connect-sheet .connect-fields {
+  display: flex;
+  gap: 10px;
+}
+.connect-sheet .connect-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.connect-sheet .connect-select {
+  position: relative;
+  display: flex;
+}
+.connect-sheet .connect-select > .ui-icon {
+  position: absolute;
+  right: 11px;
+  top: 11px;
+  pointer-events: none;
+  color: var(--ink-3);
+}
+.connect-sheet .connect-field :is(input, select),
+.connect-sheet .account-add input,
+.connect-sheet .connection-rename input {
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+  color: var(--ink);
+  font-size: 13px;
+}
+.connect-sheet .connect-field select {
+  appearance: none;
+  padding-right: 30px;
+}
+
+/* Step 1: accounts */
+.connect-sheet .account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+}
+.connect-sheet .account-avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--stage-3);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.connect-sheet .account-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.connect-sheet .account-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+.connect-sheet .account-line strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.connect-sheet .account-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.connect-sheet .account-state.good {
+  color: var(--add-ink);
+}
+.connect-sheet .account-state.warn {
+  color: var(--warn-ink);
+}
+.connect-sheet .account-state.bad {
+  color: var(--del-ink);
+}
+.connect-sheet .account-state.wait {
+  color: var(--ink-2);
+}
+.connect-sheet .account-row small {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.connect-sheet .account-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.connect-sheet .account-add input {
+  width: 220px;
+  height: 30px;
+  font-size: 12.5px;
+}
+.connect-sheet .account-add button {
+  gap: 6px;
+  color: var(--ink-2);
+}
+
+/* Step 2: the Drive folder */
+.connect-sheet .folder-box {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+}
+.connect-sheet .folder-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.connect-sheet .folder-crumbs > .ui-icon {
+  color: var(--ink-3);
+}
+.connect-sheet .folder-crumbs .stage-button {
+  height: 26px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.connect-sheet .folder-here {
+  padding: 0 6px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.connect-sheet .folder-crumbs .choose-current {
+  margin-left: auto;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.connect-sheet .folder-crumbs .choose-current[aria-pressed='true'] {
+  background: var(--stage-2);
+}
+.connect-sheet .folder-rows {
+  max-height: 252px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.connect-sheet .folder-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 8px 0 14px;
+  box-shadow: inset 0 1px 0 var(--rule);
+}
+.connect-sheet .folder-row.selected {
+  background: var(--stage-2);
+  box-shadow: inset 0 1px 0 var(--rule);
+}
+.connect-sheet .folder-row .folder-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+}
+.connect-sheet .folder-pick input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+.connect-sheet .folder-pick .ui-icon {
+  color: var(--ink-3);
+}
+.connect-sheet .folder-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.connect-sheet .folder-row.selected .folder-pick .ui-icon {
+  color: var(--cont-ink);
+}
+.connect-sheet .folder-row.selected .folder-name {
+  font-weight: 600;
+}
+.connect-sheet .folder-row small {
+  display: inline;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.connect-sheet .folder-row .stage-button {
+  height: 26px;
+  gap: 4px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--ink-2);
+}
+.connect-sheet .folder-note {
+  padding: 12px 14px;
+  box-shadow: inset 0 1px 0 var(--rule);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* Step 3: where it appears in Contents */
+.connect-sheet .attachment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+.connect-sheet .connect-switch {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+/* The real checkbox lies over the drawn track and takes the clicks. */
+.connect-sheet .connect-switch input {
+  position: absolute;
+  z-index: 1;
+  opacity: 0;
+  cursor: pointer;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+}
+.connect-sheet .switch-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--rule-2);
+  transition: background-color 160ms ease;
+}
+.connect-sheet .switch-track::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--stage);
+  transition: transform var(--quick) var(--ease);
+}
+.connect-sheet .connect-switch input:checked + .switch-track {
+  background: var(--ink-solid);
+}
+.connect-sheet .connect-switch input:checked + .switch-track::after {
+  transform: translateX(14px);
+}
+.connect-sheet .connect-switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.connect-sheet .connect-switch input:disabled + .switch-track {
+  opacity: 0.45;
+}
+.connect-sheet .mount-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--stage-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.connect-sheet .mount-preview > .ui-icon {
+  color: var(--ink-3);
+}
+.connect-sheet .mount-preview > .ui-icon:first-child {
+  color: var(--cont-ink);
+}
+.connect-sheet .mount-preview .mono {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.connect-sheet .connect-submit {
+  display: flex;
+  justify-content: flex-end;
+}
+.connect-sheet .connect-submit .solid-button {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* Registered folders */
+.connect-sheet .connection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+  overflow-wrap: anywhere;
+}
+.connect-sheet .connection-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.connect-sheet .connection-head > .ui-icon {
+  color: var(--cont-ink);
+}
+.connect-sheet .connection-head strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.connect-sheet .connection-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 55%;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.connect-sheet .connection-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+.connect-sheet .connection-state[data-state='mounted'] {
+  color: var(--add-ink);
+}
+.connect-sheet .connection-state[data-state='connecting'] {
+  color: var(--warn-ink);
+}
+.connect-sheet .connection-state[data-state='error'] {
+  color: var(--del-ink);
+}
+.connect-sheet .connection-path {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.connect-sheet .connection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.connect-sheet .connect-dot {
+  width: 3px;
+  height: 3px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-3);
+  opacity: 0.8;
+}
+.connect-sheet .connection-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.connect-sheet .connection-pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cont-ink);
+}
+.connect-sheet .connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+.connect-sheet .connection-actions .stage-text-button {
+  height: 30px;
+  padding: 0 13px;
+  font-weight: 500;
+}
+.connect-sheet .connection-actions .stage-text-button.small {
+  height: 28px;
+  padding: 0 10px;
+}
+.connect-sheet .connection-actions .solid-button {
+  height: 28px;
+  padding: 0 11px;
+}
+.connect-sheet .connection-actions .connect-more {
+  margin-left: auto;
+}
+.connect-sheet .connection-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.connect-sheet .connection-confirm .connection-actions {
+  justify-content: flex-end;
+}
+.connect-sheet .connection-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.connect-sheet .connection-rename .connection-actions {
+  justify-content: flex-end;
+}
+.connect-sheet .earlier-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 0 12px;
+  border: 0;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+@media (max-width: 860px) {
+  .connect-sheet .connect-body {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .connect-sheet .connect-steps,
+  .connect-sheet .connect-registered {
+    overflow: visible;
+  }
+  .connect-sheet .connect-registered {
+    width: auto;
+    box-shadow: inset 0 1px 0 var(--rule);
+  }
+}

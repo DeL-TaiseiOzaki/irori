@@ -3,6 +3,7 @@ import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import type { Space } from '../domain/types';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { BrainTile } from './BrainTile';
 import { t } from '../domain/i18n';
 
 const host = window.irori;
@@ -29,6 +30,8 @@ export function SearchPanel({
   const [opening, setOpening] = useState(false);
   const [changed, setChanged] = useState(false);
   const [error, setError] = useState('');
+  // The result the keyboard has chosen; Enter opens it.
+  const [chosen, setChosen] = useState(0);
   const request = useRef(0);
   const queryInput = useRef<HTMLInputElement>(null);
   const member = spaces.some((space) => space.scopeId === scopeId);
@@ -53,6 +56,7 @@ export function SearchPanel({
 
   function invalidate() {
     request.current++;
+    setChosen(0);
     setSearching(false);
     setResult(undefined);
     setError('');
@@ -98,54 +102,38 @@ export function SearchPanel({
     }
   }
 
+  const space = spaces.find((item) => item.scopeId === scopeId);
+  const hits = result?.hits ?? [];
   return (
     <Dialog
       label={t('KB内を検索', 'Search in KB')}
-      className="modal-dialog search-dialog"
+      className="modal-dialog search-palette"
       busy={opening}
       onClose={onClose}
     >
-      <div className="search-heading">
-        <h2>
-          <Icon name="search" size={20} /> {t('KB内を検索', 'Search in KB')}
-        </h2>
-        <button onClick={onClose} disabled={opening}>
-          {t('閉じる', 'Close')}
-        </button>
-      </div>
-      <p className="muted" id="search-scope-help">
-        {t(
-          '選んだローカル KB の本文を検索します。スキーマ・contents・Drive は対象外です。',
-          'Searches the body text of the selected local KB. Schema, contents, and Drive are not included.',
-        )}
-      </p>
-      <form
-        onSubmit={(event) => {
+      <div
+        className="palette chrome"
+        onKeyDown={(event) => {
+          // The results are chosen from the keyboard while the query keeps focus.
+          if (!hits.length || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
           event.preventDefault();
-          void search();
+          setChosen((value) =>
+            event.key === 'ArrowDown'
+              ? Math.min(hits.length - 1, value + 1)
+              : Math.max(0, value - 1),
+          );
         }}
       >
-        <label>
-          {t('検索する KB', 'KB to search')}
-          <select
-            aria-label={t('検索する KB', 'KB to search')}
-            aria-describedby="search-scope-help"
-            value={scopeId}
-            disabled={opening}
-            onChange={(event) => {
-              invalidate();
-              setScopeId(event.target.value);
-            }}
-          >
-            {spaces.map((space) => (
-              <option key={space.scopeId} value={space.scopeId}>
-                {space.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t('本文を検索', 'Search body text')}
+        <form
+          className="palette-query"
+          onSubmit={(event) => {
+            event.preventDefault();
+            // Enter searches a new query and opens the chosen result of the current one.
+            if (result && hits[chosen]) void open(hits[chosen]);
+            else void search();
+          }}
+        >
+          <Icon name="search" size={19} />
           <input
             ref={queryInput}
             type="search"
@@ -154,229 +142,216 @@ export function SearchPanel({
             maxLength={200}
             value={query}
             disabled={opening}
-            placeholder={t('ノート本文の言葉を入力', 'Enter words from the note body')}
+            placeholder={t('Brain の本文を検索…', "Search the brain's notes…")}
             onChange={(event) => {
               invalidate();
               setQuery(event.target.value);
             }}
           />
-        </label>
-        <div className="search-submit">
-          <p className="muted" id="search-query-help">
-            {t(
-              '文字列として検索します。英字の大文字・小文字は区別しません（最大 200 文字）。',
-              'Searches as a literal string, case-insensitive for ASCII letters (up to 200 characters).',
-            )}
-          </p>
           <button
-            className="primary"
+            className="palette-submit"
             type="submit"
             disabled={!member || !query.trim() || searching || opening}
           >
             {searching ? t('検索中…', 'Searching…') : t('検索', 'Search')}
           </button>
+          <button
+            type="button"
+            className="palette-close"
+            aria-label={t('閉じる', 'Close')}
+            title={t('閉じる（esc）', 'Close (esc)')}
+            disabled={opening}
+            onClick={onClose}
+          >
+            esc
+          </button>
+        </form>
+        <div className="palette-scopes">
+          <fieldset aria-describedby="search-scope-help">
+            <legend className="sr-only">{t('検索する Brain', 'Brain to search')}</legend>
+            {spaces.map((item) => (
+              <label
+                key={item.scopeId}
+                className="palette-scope"
+                data-checked={item.scopeId === scopeId}
+              >
+                <input
+                  type="radio"
+                  name="search-scope"
+                  value={item.scopeId}
+                  checked={item.scopeId === scopeId}
+                  disabled={opening}
+                  onChange={() => {
+                    invalidate();
+                    setScopeId(item.scopeId);
+                  }}
+                />
+                <BrainTile space={item} size={16} radius={5} />
+                {item.name}
+              </label>
+            ))}
+          </fieldset>
+          <span className="palette-where" id="search-scope-help">
+            <Icon name="book" size={13} />
+            {t('Knowledge の本文', 'Knowledge text')}
+          </span>
         </div>
-      </form>
-      {error && (
-        <p className="search-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div role="status" aria-live="polite">
-        {searching && <p>{t('本文を検索しています…', 'Searching body text…')}</p>}
-        {result && (
-          <p>
-            {t(`${result.hits.length} 件の一致`, `${result.hits.length} matches`)} ·{' '}
-            {t(`${result.scannedFiles} ファイルを検索`, `${result.scannedFiles} files searched`)}
+        {error && (
+          <p className="search-error" role="alert">
+            {error}
           </p>
         )}
-      </div>
-      {result && (
-        <section aria-label={t('本文の検索結果', 'Body text search results')}>
-          {(result.incomplete || result.skippedFiles > 0) && (
-            <p className="search-notice">
-              {result.incomplete &&
-                t(
-                  '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。',
-                  'These are the results within what could be searched. A limit or unreadable files meant not every note could be checked.',
-                )}
-              {result.skippedFiles > 0 &&
-                ' ' +
+        <div className="palette-status" role="status" aria-live="polite">
+          {searching && t('本文を検索しています…', 'Searching body text…')}
+          {result &&
+            `${t(`${result.hits.length} 件の一致`, `${result.hits.length} matches`)} · ${t(
+              `${result.scannedFiles} ファイルを検索`,
+              `${result.scannedFiles} files searched`,
+            )}`}
+        </div>
+        {result && (
+          <section
+            className="palette-results"
+            aria-label={t('本文の検索結果', 'Body text search results')}
+          >
+            {(result.incomplete || result.skippedFiles > 0) && (
+              <p className="search-notice">
+                {result.incomplete &&
                   t(
-                    `${result.skippedFiles} ファイルをスキップしました。`,
-                    `Skipped ${result.skippedFiles} files.`,
-                  )}{' '}
-              {t(
-                '必要に応じて検索語を絞って再検索してください。',
-                'Narrow the search term and search again if needed.',
-              )}
-            </p>
-          )}
-          {changed && (
-            <p className="search-notice">
-              {t(
-                'KB のファイルが更新されました。最新の内容を確認するには再検索してください。',
-                'Files in the KB have changed. Search again to see the latest content.',
-              )}
-            </p>
-          )}
-          {!result.hits.length && (
-            <p>
-              {result.incomplete
-                ? t(
-                    '検索できた範囲に一致する本文はありません。',
-                    'No matching body text within what could be searched.',
-                  )
-                : t('一致する本文はありません。', 'No matching body text.')}
-            </p>
-          )}
-          <Hits hits={result.hits} disabled={opening || !member} onOpen={open} />
-        </section>
-      )}
+                    '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。',
+                    'These are the results within what could be searched. A limit or unreadable files meant not every note could be checked.',
+                  )}
+                {result.skippedFiles > 0 &&
+                  ' ' +
+                    t(
+                      `${result.skippedFiles} ファイルをスキップしました。`,
+                      `Skipped ${result.skippedFiles} files.`,
+                    )}{' '}
+                {t(
+                  '必要に応じて検索語を絞って再検索してください。',
+                  'Narrow the search term and search again if needed.',
+                )}
+              </p>
+            )}
+            {changed && (
+              <p className="search-notice">
+                {t(
+                  'KB のファイルが更新されました。最新の内容を確認するには再検索してください。',
+                  'Files in the KB have changed. Search again to see the latest content.',
+                )}
+              </p>
+            )}
+            {!result.hits.length && (
+              <p className="palette-empty">
+                {result.incomplete
+                  ? t(
+                      '検索できた範囲に一致する本文はありません。',
+                      'No matching body text within what could be searched.',
+                    )
+                  : t('一致する本文はありません。', 'No matching body text.')}
+              </p>
+            )}
+            {!!result.hits.length && space && (
+              <h3 className="palette-group">
+                <BrainTile space={space} size={18} radius={5} />
+                {space.name}
+                <span>{result.hits.length}</span>
+              </h3>
+            )}
+            <Hits
+              hits={result.hits}
+              query={result.query}
+              chosen={chosen}
+              disabled={opening || !member}
+              onOpen={open}
+            />
+          </section>
+        )}
+        <footer className="palette-footer">
+          <span>
+            <kbd>↑</kbd>
+            <kbd>↓</kbd>
+            {t('選択', 'Select')}
+          </span>
+          <span>
+            <kbd>↵</kbd>
+            {t('検索・開く', 'Search · open')}
+          </span>
+          <span>
+            <kbd>esc</kbd>
+            {t('閉じる', 'Close')}
+          </span>
+          <span className="palette-footer-space" />
+          <small className="muted" id="search-query-help">
+            {t(
+              '文字列として検索（英字の大小は区別しない・最大 200 文字）',
+              'Literal text, ASCII case-insensitive, up to 200 characters',
+            )}
+          </small>
+        </footer>
+      </div>
     </Dialog>
+  );
+}
+
+/** The matched text in a line, marked wherever it occurs (ASCII letters in either case). */
+function Marked({ text, query }: { text: string; query: string }) {
+  const needle = query.toLowerCase();
+  const lower = text.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+  const parts: { text: string; match: boolean }[] = [];
+  let from = 0;
+  for (let at = needle ? lower.indexOf(needle) : -1; at >= 0; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push({ text: text.slice(from, at), match: false });
+    parts.push({ text: text.slice(at, at + needle.length), match: true });
+    from = at + needle.length;
+  }
+  parts.push({ text: text.slice(from), match: false });
+  return (
+    <>
+      {parts.map((part, index) => (part.match ? <mark key={index}>{part.text}</mark> : part.text))}
+    </>
   );
 }
 
 function Hits({
   hits,
+  query,
+  chosen,
   disabled,
   onOpen,
 }: {
   hits: SearchHit[];
+  query: string;
+  chosen: number;
   disabled: boolean;
   onOpen: (hit: SearchHit) => Promise<void>;
 }) {
   return (
     <ul className="search-results">
-      {hits.map((hit) => (
-        <li key={`${hit.path}:${hit.line}`}>
-          <button disabled={disabled} onClick={() => void onOpen(hit)}>
-            <span className="search-result-location">
-              <Icon name="file" />
-              <strong>{hit.path}</strong>
-              <small>{t(`${hit.line} 行目`, `Line ${hit.line}`)}</small>
-            </span>
-            <span className="search-result-preview">{hit.preview}</span>
-          </button>
-        </li>
-      ))}
+      {hits.map((hit, index) => {
+        const slash = hit.path.lastIndexOf('/') + 1;
+        return (
+          <li key={`${hit.path}:${hit.line}`}>
+            <button
+              disabled={disabled}
+              aria-current={index === chosen ? 'true' : undefined}
+              onClick={() => void onOpen(hit)}
+            >
+              <span className="search-result-location">
+                <Icon name="file" size={14} />
+                <span className="search-result-path">
+                  <span className="search-result-folder">{hit.path.slice(0, slash)}</span>
+                  <strong>{hit.path.slice(slash)}</strong>
+                </span>
+                <small>{t(`${hit.line} 行目`, `Line ${hit.line}`)}</small>
+              </span>
+              <span className="search-result-preview">
+                <Marked text={hit.preview} query={query} />
+              </span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
-  );
-}
-
-/** The notes in one KB whose links lead to the note being read. */
-export function BacklinksPanel({
-  scopeId,
-  path,
-  onOpen,
-  onClose,
-}: {
-  scopeId: string;
-  path: string;
-  onOpen: (hit: SearchHit) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [result, setResult] = useState<KnowledgeSearch>();
-  const [opening, setOpening] = useState(false);
-  const [error, setError] = useState('');
-  const request = useRef(0);
-  const finding = !result && !error;
-
-  useEffect(() => {
-    // The list follows the KB: a change starts another look, the older answer is
-    // dropped, and what is shown stays up until the newer one arrives.
-    async function find() {
-      const id = ++request.current;
-      try {
-        const value = await host.backlinks(scopeId, path);
-        if (request.current !== id) return;
-        setResult(value);
-        setError('');
-      } catch (error) {
-        if (request.current !== id) return;
-        setResult(undefined);
-        setError(String(error));
-      }
-    }
-    void find();
-    const stop = host.onEvent((event) => {
-      if (event.type === 'files' && event.scopeId === scopeId) void find();
-    });
-    return () => {
-      stop();
-      request.current++;
-    };
-  }, [scopeId, path]);
-
-  async function open(hit: SearchHit) {
-    if (opening) return;
-    setOpening(true);
-    setError('');
-    try {
-      await onOpen(hit);
-    } catch (error) {
-      setError(String(error));
-    } finally {
-      setOpening(false);
-    }
-  }
-
-  return (
-    <Dialog
-      label={t('リンク元', 'Backlinks')}
-      className="modal-dialog search-dialog"
-      busy={opening}
-      onClose={onClose}
-    >
-      <div className="search-heading">
-        <h2>{t('リンク元', 'Backlinks')}</h2>
-        <button onClick={onClose} disabled={opening}>
-          {t('閉じる', 'Close')}
-        </button>
-      </div>
-      <p className="muted">
-        {t(
-          `${path} にリンクしている、この KB のノートです。`,
-          `Notes in this KB that link to ${path}.`,
-        )}
-      </p>
-      {error && (
-        <p className="search-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div role="status" aria-live="polite">
-        {finding && <p>{t('リンク元を調べています…', 'Looking for backlinks…')}</p>}
-        {result && (
-          <p>
-            {t(`${result.hits.length} 件のリンク`, `${result.hits.length} links`)} ·{' '}
-            {t(`${result.scannedFiles} ノートを確認`, `${result.scannedFiles} notes checked`)}
-          </p>
-        )}
-      </div>
-      {result && (
-        <section aria-label={t('リンク元の一覧', 'List of backlinks')}>
-          {result.incomplete && (
-            <p className="search-notice">
-              {t(
-                '確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。',
-                'These are the results within what could be checked. A limit or unreadable files meant not every note could be checked.',
-              )}
-            </p>
-          )}
-          {!result.hits.length && (
-            <p>
-              {result.incomplete
-                ? t(
-                    '確認できた範囲に、このノートへのリンクはありません。',
-                    'No links to this note within what could be checked.',
-                  )
-                : t('このノートへのリンクはありません。', 'No links to this note.')}
-            </p>
-          )}
-          <Hits hits={result.hits} disabled={opening} onOpen={open} />
-        </section>
-      )}
-    </Dialog>
   );
 }

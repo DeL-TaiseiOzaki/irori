@@ -1,7 +1,7 @@
 /* ObsidianUI Magnet Tabs, adapted to irori's semantic colour tokens. */
 .obsidian-magnet-tabs {
-  --magnet-highlight: var(--ember-pressed);
-  --magnet-marker: var(--ember-ink);
+  --magnet-highlight: var(--stage-2);
+  --magnet-marker: var(--ink);
   display: flex;
   gap: 4px;
   min-width: 0;

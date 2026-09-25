@@ -66,12 +66,13 @@ try {
   await launcher.click();
   const panel = page.getByRole('dialog', { name: 'KB内を検索', exact: true });
   const query = panel.getByLabel('本文を検索', { exact: true });
-  const scope = panel.getByLabel('検索する KB', { exact: true });
+  // The brain to search is one chip each; the brain on show is chosen first.
+  const scope = (name: string) => panel.getByRole('radio', { name, exact: true });
   const submit = panel.getByRole('button', { name: '検索', exact: true });
   const results = panel.getByRole('region', { name: '本文の検索結果', exact: true });
   await expect(query).toBeFocused();
-  await expect(scope.locator('option')).toHaveCount(2);
-  await expect(scope).toHaveValue(space.scopeId);
+  await expect(panel.getByRole('radio')).toHaveCount(2);
+  await expect(scope('検索対象KB')).toBeChecked();
   await query.fill('AutosaveSearchToken');
   await query.press('Enter');
   await expect(results.locator('li')).toHaveCount(1);
@@ -121,7 +122,7 @@ try {
 
   await launcher.click();
   await query.fill('orbital');
-  await scope.selectOption(other.scopeId);
+  await scope('参照KB').check();
   await submit.click();
   await expect(results.locator('li')).toHaveCount(1);
   await expect(results).toContainText('reference.md');
@@ -130,8 +131,8 @@ try {
   await expect(panel).toHaveCount(0);
   await expect(editor).toContainText('ORBITAL in another KB.');
   await launcher.click();
-  await expect(scope).toHaveValue(other.scopeId);
-  await scope.selectOption(space.scopeId);
+  await expect(scope('参照KB')).toBeChecked();
+  await scope('検索対象KB').check();
   await query.fill('ＯＲＢＩＴＡＬ');
   await submit.click();
   await expect(results).toContainText('一致する本文はありません。');
@@ -226,7 +227,7 @@ try {
   await query.fill('pending scope');
   await submit.click();
   await expect.poll(pendingCount).toBe(1);
-  await scope.selectOption(other.scopeId);
+  await scope('参照KB').check();
   await submit.click();
   await expect.poll(pendingCount).toBe(2);
   await release(1, 'Current KB result');
