@@ -1,5 +1,9 @@
 # Layered explorer
 
+> Superseded on 2026-09-25 by [ADR 014](decisions/014-ui-v5.md): each brain (KB)
+> shows its Schema, Knowledge and Contents together in one panel, and the
+> personal/team columns are gone. This page records the earlier layout.
+
 Implemented 2026-09-13, following the user's original irori-extention UI reference (`irori-extention/images/image2.png`). The reference repository and image are not modified.
 
 The workspace's left navigation now has three rows and five panes:

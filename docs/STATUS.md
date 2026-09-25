@@ -1,5 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+UI v5, 2026-09-25: the owner approved the v5 design canvas and asked to switch
+the whole interface to it. [ADR 014](decisions/014-ui-v5.md) records the
+decisions: the brain (one registered KB with its Schema, Knowledge and Contents)
+is the unit, a workspace is any combination of brains, the levels are Overview →
+Brain → Note, each brain's AI is its CLI agent, your AI is the person's own agent
+that hands tasks to brain AIs, brains get an editable icon and colour, and ember
+belongs to the AI alone. The work lands as stacked pull requests starting with
+`feat/ui-v5-foundation`; three questions (default language, your AI's folder,
+where brain identity is stored) are open with the owner and use the ADR's
+defaults meanwhile.
+
 Delivery, 2026-09-26: PR #94 is merged with the owner's go-ahead, and **0.1.37
 is published** as
 [v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1)
