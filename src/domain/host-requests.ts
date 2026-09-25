@@ -11,6 +11,7 @@ import { externalUrl } from './links';
 import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience } from './skills';
+import { brainLook } from './brains';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -133,6 +134,20 @@ export const hostArguments = {
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),
+  updateSpace: z.tuple([
+    id,
+    z
+      .object({
+        name: name.optional(),
+        category: z.enum(['personal', 'team', 'organization']).nullable().optional(),
+        appearance: brainLook.nullable().optional(),
+      })
+      .strict(),
+  ]),
+  saveSpaceIcon: z.tuple([
+    id,
+    z.instanceof(Uint8Array).refine((value) => value.length <= 2 * 1024 * 1024),
+  ]),
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),

@@ -18,6 +18,12 @@ test('a brain looks the same wherever it is shown, and never white by default', 
 });
 
 test('a Latin name gives its capital, and an emoji stays whole', () => {
-  assert.equal(brainAppearance({ scopeId: 'a', name: 'research' }).mark.text, 'R');
-  assert.equal(brainAppearance({ scopeId: 'a', name: '  👩‍🔬 lab' }).mark.text, '👩‍🔬');
+  assert.deepEqual(brainAppearance({ scopeId: 'a', name: 'research' }).mark, {
+    kind: 'text',
+    text: 'R',
+  });
+  assert.deepEqual(brainAppearance({ scopeId: 'a', name: '  👩‍🔬 lab' }).mark, {
+    kind: 'text',
+    text: '👩‍🔬',
+  });
 });

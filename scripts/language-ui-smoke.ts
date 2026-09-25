@@ -106,6 +106,14 @@ try {
   await modes.getByRole('button', { name: 'Files', exact: true }).click();
   visited.push('source control');
 
+  await page.getByRole('button', { name: 'Brain menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Brain settings', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Brain settings' })).toBeVisible();
+  await japaneseLeft(page, 'the brain settings sheet');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  visited.push('brain settings sheet');
+
   // The host speaks the same language: a message it writes arrives in English.
   const hostMessage = await page.evaluate(() =>
     window.irori.openUrl('file:///etc/passwd').then(

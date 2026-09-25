@@ -105,6 +105,7 @@ export function BrainHome({
   onConnect,
   onChanges,
   onMaterials,
+  onSettings,
 }: {
   space: Space;
   roots?: Listing;
@@ -124,6 +125,7 @@ export function BrainHome({
   onConnect: () => void;
   onChanges: () => void;
   onMaterials: () => void;
+  onSettings: () => void;
 }) {
   const [reach, setReach] = useState(false);
   const knowledgeRoot = roots?.entries.some(
@@ -154,13 +156,28 @@ export function BrainHome({
       <header className="home-header">
         <BrainTile space={space} size={64} radius={19} ring="stage" />
         <div className="home-title">
-          <h1>{space.name}</h1>
+          <h1>
+            {space.name}
+            <button
+              className="stage-button home-edit"
+              aria-label={t('Brain の設定', 'Brain settings')}
+              title={t('Brain の設定', 'Brain settings')}
+              disabled={locked}
+              onClick={onSettings}
+            >
+              <Icon name="penLine" size={15} />
+            </button>
+          </h1>
           <div className="home-meta">
-            <span>
-              <Icon name={categoryIcons[space.category]} size={14} />
-              {category}
-            </span>
-            <i />
+            {space.category && (
+              <>
+                <span>
+                  <Icon name={categoryIcons[space.category]} size={14} />
+                  {category}
+                </span>
+                <i />
+              </>
+            )}
             <span className="mono" title={space.root}>
               {space.root}
             </span>

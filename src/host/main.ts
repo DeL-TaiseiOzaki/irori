@@ -15,7 +15,7 @@ import { DraftService } from './drafts';
 import { UpdateService } from './updates';
 import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
-import { ImageService } from './images';
+import { ImageService, imageType } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
@@ -511,6 +511,18 @@ app
         watch(space);
         return space;
       },
+      updateSpace: async (scopeId, change) => {
+        if (agents.busy(scopeId) || cloud.busy || git.busy)
+          throw Error(
+            t(
+              '実行・Git 操作・接続が終わってから Brain の設定を変えてください。',
+              "Change the brain's settings after the run, Git operation and connection finish.",
+            ),
+          );
+        return changeFiles(() => files.update(scopeId, change));
+      },
+      saveSpaceIcon: (scopeId, bytes) =>
+        changeFiles(() => files.saveIcon(scopeId, bytes, imageType(bytes))),
       entries: (...args) => files.entries(...args),
       read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),

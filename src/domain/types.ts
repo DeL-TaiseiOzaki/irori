@@ -14,8 +14,17 @@ export interface ScopeDeclaration {
   schemaVersion: 1;
   scopeId: string;
   name: string;
-  category: Category;
+  /** personal / team / organization; a brain may carry none (ADR 014). */
+  category?: Category;
   contents: string[];
+  /** The brain's tile as everyone who opens the KB sees it. */
+  appearance?: import('./brains').BrainLook;
+}
+/** What the brain settings change in `.irori/scope.json`; `null` removes a field. */
+export interface SpaceChange {
+  name?: string;
+  category?: Category | null;
+  appearance?: import('./brains').BrainLook | null;
 }
 export interface Space extends ScopeDeclaration {
   root: string;
@@ -364,6 +373,10 @@ export interface HostAPI {
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;
+  /** Changes a brain's name, category or look in its `.irori/scope.json`. */
+  updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
+  /** Keeps an image in the brain's `.irori/` as its icon and returns its path. */
+  saveSpaceIcon(scopeId: string, bytes: Uint8Array): Promise<string>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;

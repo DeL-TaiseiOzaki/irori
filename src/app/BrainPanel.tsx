@@ -264,6 +264,7 @@ export function BrainPanel({
   onConnect,
   onTrash,
   onMaterials,
+  onSettings,
   onSearch,
   onCreateIn,
   onEntryAction,
@@ -298,6 +299,8 @@ export function BrainPanel({
   onConnect: () => void;
   onTrash: () => void;
   onMaterials: () => void;
+  /** Opens the sheet for the brain's name, category, icon and colour. */
+  onSettings: () => void;
   onSearch: () => void;
   onCreateIn: (space: Space, entry: Entry) => void;
   onEntryAction: (space: Space, entry: Entry, action: EntryAction) => void;
@@ -411,10 +414,12 @@ export function BrainPanel({
             <BrainTile space={space} size={34} radius={10} />
             <span className="brain-names">
               <strong>{space.name}</strong>
-              <small>
-                <Icon name={categoryIcons[space.category]} size={12} />
-                {category}
-              </small>
+              {space.category && (
+                <small>
+                  <Icon name={categoryIcons[space.category]} size={12} />
+                  {category}
+                </small>
+              )}
             </span>
           </button>
           <Menu.Root modal={false}>
@@ -428,6 +433,10 @@ export function BrainPanel({
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="end" sideOffset={4}>
                 <Menu.Popup className="menu">
+                  <Menu.Item disabled={locked} onClick={onSettings}>
+                    <Icon name="penLine" size={14} />
+                    {t('Brain の設定', 'Brain settings')}
+                  </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
                     {t('資料と成果物', 'Materials and outputs')}

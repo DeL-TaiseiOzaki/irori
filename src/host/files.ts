@@ -4,9 +4,11 @@ import { rewriteNoteReferences } from './note-references';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
+import writeFileAtomic from 'write-file-atomic';
 import { writeLocalFile, writeLocalJson } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
-import type { Category, Document, Entry, Space } from '../domain/types';
+import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
+import { brainLook, iconImagePath } from '../domain/brains';
 import {
   imagesForNoteMove,
   noteFilename,
@@ -30,8 +32,9 @@ const declaration = z.object({
   schemaVersion: z.literal(1),
   scopeId: z.uuid(),
   name: z.string().min(1).max(120),
-  category: z.enum(['personal', 'team', 'organization']),
+  category: z.enum(['personal', 'team', 'organization']).optional(),
   contents: z.array(relative).min(1),
+  appearance: brainLook.optional(),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 /** Where the unsaved text of one document is kept on this device. */
@@ -193,6 +196,51 @@ export class FileService {
       await writeLocalJson(path.join(this.dataDir, 'spaces.json'), this.bindings);
       return s;
     });
+  }
+  /**
+   * Changes a brain's name, category or look in its `.irori/scope.json`, keeping
+   * every other field of the file as written — another tool's or a later
+   * version's included. The write replaces the file atomically.
+   */
+  async update(id: string, change: SpaceChange): Promise<Space> {
+    return this.queue.run(async () => {
+      const s = this.get(id);
+      const meta = await this.metadata(s.root);
+      const raw = JSON.parse(await fs.readFile(meta, 'utf8')) as Record<string, unknown>;
+      if (raw.scopeId !== s.scopeId) throw Error('Scope identity changed');
+      if (change.name !== undefined) raw.name = change.name.trim();
+      for (const key of ['category', 'appearance'] as const) {
+        if (change[key] === null) delete raw[key];
+        else if (change[key] !== undefined) raw[key] = change[key];
+      }
+      const next: Space = { ...declaration.parse(raw), root: s.root };
+      // A file of the KB keeps its own mode; only device records are made private.
+      await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
+      this.spaces = this.spaces.map((item) => (item.scopeId === id ? next : item));
+      // Only the icon the declaration names stays beside it.
+      const icon = next.appearance?.icon?.kind === 'image' ? next.appearance.icon.path : '';
+      for (const name of await fs.readdir(path.dirname(meta)))
+        if (iconImagePath.test(`.irori/${name}`) && `.irori/${name}` !== icon)
+          await fs.rm(path.join(path.dirname(meta), name), { force: true });
+      return next;
+    });
+  }
+  /** Keeps an image as the brain's icon in `.irori/`; the declaration names it on save. */
+  async saveIcon(id: string, bytes: Uint8Array, type: string) {
+    return this.queue.run(async () => {
+      const s = this.get(id);
+      const directory = path.dirname(await this.metadata(s.root));
+      const relative = `.irori/icon-${hash(Buffer.from(bytes)).slice(0, 12)}.${type}`;
+      await writeFileAtomic(path.join(directory, path.basename(relative)), Buffer.from(bytes));
+      return relative;
+    });
+  }
+  /** The KB's own `.irori/scope.json`, refusing a link that leads out of it. */
+  private async metadata(root: string) {
+    const meta = path.join(root, '.irori', 'scope.json');
+    if ((await fs.lstat(meta)).isSymbolicLink() || !within(root, await fs.realpath(meta)))
+      throw Error('Metadata must stay inside the KB');
+    return meta;
   }
   async resolve(id: string, rel: string, allowRoot = false) {
     const s = this.get(id);
