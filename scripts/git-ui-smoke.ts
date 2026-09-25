@@ -17,7 +17,7 @@ async function checkConcurrentReconcile(
   root: string,
   scopeId: string,
 ) {
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   // Hold actual read responses in the main-process fixture, never replacing the renderer's HostAPI.
   await app.evaluate(({ ipcMain }, scopeId) => {
     type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
@@ -225,22 +225,25 @@ try {
   for (const box of await page.getByRole('checkbox').all()) await box.check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page
-    .locator('.layer-pane.my-kb')
+    .getByRole('region', { name: 'Knowledge', exact: true })
     .getByRole('button', { name: 'README', exact: true })
     .click();
-  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 1 行');
+  await page.getByRole('button', { name: /^ノートの情報/ }).click();
+  await expect(page.locator('.note-info')).toContainText('人が書いた・直した行: 1 行');
+  await page.keyboard.press('Escape');
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  const notesView = page.getByRole('button', { name: 'ノート', exact: true });
-  const gitView = page.getByRole('button', { name: 'ソース管理', exact: true });
+  const modes = page.getByRole('group', { name: 'Brain の表示' });
+  const notesView = modes.getByRole('button', { name: 'ファイル', exact: true });
+  const gitView = modes.getByRole('button', { name: /^変更/ });
   await notesView.focus();
   await expect(notesView).toHaveAttribute('tabindex', '0');
   await page.keyboard.press('ArrowRight');
   await expect(gitView).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(gitView).toHaveAttribute('aria-pressed', 'true');
-  let sidebar = page.getByRole('complementary', { name: 'ソース管理' });
+  let sidebar = page.getByRole('region', { name: 'ソース管理' });
   let panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(sidebar).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -318,12 +321,14 @@ try {
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('UI saved 日本語');
   await page.screenshot({ path: 'test-results/irori-git-history.png' });
-  await panel.getByLabel('Git のスペース').selectOption(spaces[1].scopeId);
+  // Changes belong to the brain on show; choosing another brain shows its repository.
+  const rail = page.getByRole('navigation', { name: 'Brain' });
+  await rail.getByRole('button', { name: /^チームKB・AI/ }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText('リモート未設定');
   await panel.getByRole('button', { name: '履歴', exact: true }).click();
   await expect(panel.locator('.git-history-item')).toHaveCount(1);
   await expect(panel.locator('.git-history-item')).toContainText('チームKB initial');
-  await panel.getByLabel('Git のスペース').selectOption(spaces[0].scopeId);
+  await rail.getByRole('button', { name: /^個人KB・AI/ }).click();
   await panel.getByRole('button', { name: 'Push', exact: true }).click();
   await expect(panel.getByRole('region', { name: 'Git 操作の確認' })).toContainText(
     'origin / main',
@@ -389,11 +394,14 @@ try {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
   await page
-    .locator('.layer-pane.my-kb')
+    .getByRole('region', { name: 'Knowledge', exact: true })
     .getByRole('button', { name: 'README', exact: true })
     .click();
-  await page.getByRole('button', { name: 'ソース管理', exact: true }).click();
-  sidebar = page.getByRole('complementary', { name: 'ソース管理' });
+  await page
+    .getByRole('group', { name: 'Brain の表示' })
+    .getByRole('button', { name: /^変更/ })
+    .click();
+  sidebar = page.getByRole('region', { name: 'ソース管理' });
   panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(panel.getByRole('textbox', { name: 'commit メッセージ' })).toHaveValue(
     'Unfinished merge message',
@@ -413,9 +421,12 @@ try {
     'Native content changed while irori was closed\n',
   );
   await page.screenshot({ path: 'test-results/irori-git-conflict.png' });
-  await expect(panel.getByRole('button', { name: 'Git 画面を閉じる' })).toBeDisabled();
+  // An unresolved merge keeps the Changes view and the brain in place.
+  await expect(page.getByRole('button', { name: 'ファイル', exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
-  await expect(panel.getByLabel('Git のスペース')).toBeDisabled();
+  await expect(
+    page.getByRole('navigation', { name: 'Brain' }).getByRole('button', { name: /^チームKB・AI/ }),
+  ).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(sidebar).toBeVisible();
   await writeFile(path.join(root, 'README.md'), 'External conflict working copy\n');
@@ -470,12 +481,12 @@ try {
   const bounds = await sidebar.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1024);
-  await panel.getByRole('button', { name: 'Git 画面を閉じる' }).click();
+  await page.getByRole('button', { name: 'ファイル', exact: true }).click();
   await expect(sidebar).toHaveCount(0);
   await expect(page.locator('.document-editor')).toContainText('Combined');
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
-  await page.getByRole('button', { name: 'スペースを追加', exact: true }).click();
+  await page.getByRole('button', { name: 'Brain を追加', exact: true }).click();
   await page.getByRole('button', { name: 'GitHub から取得', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'GitHub リポジトリ URL' })

@@ -148,7 +148,7 @@ try {
       });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   };
-  for (const theme of ['light', 'dark']) {
+  for (const theme of ['hearth', 'light', 'dark']) {
     await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
     const surface = await page
       .locator('.connections')
@@ -195,7 +195,9 @@ try {
   await page.getByRole('button', { name: '連携確認 を編集', exact: true }).click();
   await page.getByLabel('ワークスペース名').fill('連携確認・更新');
   await page.getByRole('button', { name: '変更を保存して開く' }).click();
-  await expect(page.getByRole('button', { name: 'クラウド接続', exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }),
+  ).toBeEnabled();
   await expect(page.getByText('接続を準備中…', { exact: true })).toHaveCount(0);
   expect(
     await page.evaluate(
@@ -240,7 +242,7 @@ try {
     .getByRole('dialog', { name: 'クラウド接続' })
     .getByRole('button', { name: '閉じる', exact: true })
     .click();
-  await page.locator('.workspace-switch').click();
+  await page.getByRole('button', { name: 'ワークスペースを選択', exact: true }).click();
   await page.getByRole('button', { name: '連携確認・更新 の登録を削除', exact: true }).click();
   await expect(page.locator('.workspace-card')).toHaveCount(0);
   expect(JSON.parse(await readFile(path.join(files.dataDir, 'workspaces.json'), 'utf8'))).toEqual(

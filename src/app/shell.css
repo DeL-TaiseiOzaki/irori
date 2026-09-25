@@ -1,0 +1,624 @@
+/* The workspace shell: the rail, the islands on the graphite backdrop, the
+   status bar, and the chrome's own controls and menus (ADR 014). */
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--tx);
+}
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.islands {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 8px 0 0;
+}
+.brain-pane,
+.stage-pane,
+.assistant-pane,
+.document-panes,
+.document-pane,
+.terminal-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The pane library wraps each classed element in its own [data-panel] element. */
+.brain-pane > *,
+.stage-pane > main,
+.assistant-pane > .agent-panel {
+  flex: 1;
+  min-height: 0;
+}
+/* The gap between islands is the handle; it shows itself when reached. */
+.island-handle {
+  position: relative;
+  width: 8px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  outline: none;
+}
+.island-handle::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 2px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 2px;
+  background: var(--hair-3);
+  opacity: 0;
+  transition: opacity var(--medium) ease;
+}
+.island-handle:hover::after,
+.island-handle[data-separator='active']::after,
+.island-handle:focus-visible::after {
+  opacity: 1;
+}
+
+/* A brain's mark. */
+.brain-tile {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jp);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.brain-tile.ring-panel {
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.brain-tile.ring-stage {
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.brain-tile.ring-active {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--solid);
+}
+
+/* The rail. */
+.rail {
+  position: relative;
+  z-index: 20;
+  width: 64px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0 12px;
+}
+.rail button {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  color: var(--rail-tx);
+}
+.rail-button,
+.rail-home {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.rail-home img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: block;
+}
+.rail .rail-button:hover:not(:disabled),
+.rail .rail-home:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--tx);
+}
+.rail-overview {
+  border-radius: 12px;
+}
+.rail-slot {
+  position: relative;
+  width: 64px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rail-home + .rail-slot {
+  height: 46px;
+  margin-top: 6px;
+}
+.rail-rule {
+  width: 22px;
+  height: 1px;
+  background: var(--hair-2);
+  margin: 6px 0;
+}
+.rail .rail-brain {
+  position: relative;
+  display: flex;
+  border-radius: 12px;
+}
+.rail .rail-brain:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.rail .rail-brain .brain-tile {
+  z-index: 1;
+}
+.rail-bar {
+  position: absolute;
+  left: 0;
+  top: 13px;
+  width: 3px;
+  height: 22px;
+  border-radius: 0 3px 3px 0;
+  background: var(--solid);
+}
+/* A brain whose AI works: a ring turns around its tile. */
+.rail-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rail-ring > span {
+  position: absolute;
+  left: -50%;
+  top: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 230deg, var(--ember) 360deg);
+  animation: irori-spin 1.8s linear infinite;
+}
+.rail-ring::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 14px;
+  background: var(--bg);
+}
+/* A brain whose AI waits for the person: an ember dot that breathes. */
+.rail-dot {
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ember);
+  box-shadow: 0 0 0 2.5px var(--bg);
+}
+.rail-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: irori-halo 2.2s ease-out infinite;
+}
+.rail-label {
+  position: absolute;
+  left: 58px;
+  top: 9px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: var(--solid);
+  color: var(--on-solid);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--label-shadow);
+  z-index: 60;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 160ms ease,
+    transform 220ms var(--ease);
+  pointer-events: none;
+}
+.rail-slot:hover .rail-label,
+.rail-slot:focus-within .rail-label {
+  opacity: 1;
+  transform: none;
+}
+.rail-label-state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+.rail-label-state > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tx-3);
+}
+[data-ai='running'] .rail-label-state > i,
+[data-ai='waiting'] .rail-label-state > i {
+  background: var(--ember);
+}
+.rail .rail-add {
+  margin-top: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--hair-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tx-3);
+}
+.rail .rail-add:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: var(--hair-3);
+  color: var(--tx);
+}
+.rail-spacer {
+  flex: 1;
+}
+.rail-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cont);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* The status bar. */
+.status-bar {
+  height: 28px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 14px;
+  font-size: 11.5px;
+  color: var(--tx-3);
+  white-space: nowrap;
+}
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--tx-2);
+}
+.status-bar button.status-item {
+  background: none;
+  box-shadow: none;
+  font-weight: 400;
+}
+.status-bar button.status-item:hover:not(:disabled),
+.status-bar button.status-item[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--tx);
+}
+.status-item:first-child {
+  margin-left: -8px;
+}
+.status-item.plain {
+  padding: 0;
+}
+.status-item.uploads {
+  color: var(--cont);
+}
+.status-message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-summary {
+  gap: 10px;
+}
+.ai-summary > .ui-icon {
+  color: var(--ember);
+}
+.ai-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ai-count > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ember);
+}
+.ai-count.waiting {
+  color: var(--ember-2);
+}
+.status-version {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+/* Controls on the chrome. */
+.icon-button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 9px;
+  color: var(--tx-3);
+  background: none;
+  box-shadow: none;
+}
+:where(.chrome) .icon-button {
+  background: none;
+  box-shadow: none;
+}
+:where(.chrome) .icon-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--tx);
+}
+:where(.chrome) .icon-button.framed {
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+:where(.chrome) .icon-button[aria-pressed='true'] {
+  background: var(--ember-soft);
+  color: var(--ember-2);
+}
+.panel-button,
+.ember-button,
+.solid-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.ember-button {
+  background: var(--ember);
+  color: var(--on-ember);
+  box-shadow: none;
+  font-weight: 600;
+}
+.ember-button:hover {
+  background: var(--ember);
+  filter: brightness(1.08);
+}
+
+/* Menus and popovers opened from the chrome. */
+.menu {
+  min-width: 210px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--pop);
+  font-size: 12.5px;
+  outline: none;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--medium) ease,
+    transform var(--medium) var(--ease);
+}
+.menu[data-starting-style],
+.menu[data-ending-style] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+.menu [role='menuitem'],
+.menu [role='menuitemradio'],
+.menu [role='menuitemcheckbox'] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: default;
+  outline: none;
+  white-space: nowrap;
+}
+.menu [role='menuitem'] > .ui-icon,
+.menu [role='menuitemradio'] > .ui-icon:first-child,
+.menu [role='menuitemcheckbox'] > .ui-icon:first-child {
+  color: var(--tx-3);
+}
+.menu [data-highlighted] {
+  background: var(--raised-2);
+}
+.menu [data-disabled] {
+  opacity: 0.45;
+}
+.menu .menu-check {
+  margin-left: auto;
+  display: flex;
+}
+.menu-separator {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--hair-2);
+}
+.menu.on-stage {
+  background: var(--card);
+  color: var(--ink);
+}
+.menu.on-stage [data-highlighted] {
+  background: var(--stage-2);
+}
+.menu.on-stage [role='menuitem'] > .ui-icon,
+.menu.on-stage [role='menuitemradio'] > .ui-icon:first-child,
+.menu.on-stage [role='menuitemcheckbox'] > .ui-icon:first-child {
+  color: var(--ink-3);
+}
+.menu.on-stage .menu-separator {
+  background: var(--rule);
+}
+
+/* Settings from the rail. */
+.settings-popover {
+  width: 316px;
+  max-height: min(640px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--pop);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  outline: none;
+  transition:
+    opacity var(--medium) ease,
+    transform var(--medium) var(--ease);
+}
+.settings-popover[data-starting-style],
+.settings-popover[data-ending-style] {
+  opacity: 0;
+  transform: translateX(-6px);
+}
+.settings-popover h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.settings-popover h3,
+.settings-choices legend {
+  margin: 0 0 7px;
+  padding: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tx-3);
+}
+.settings-choices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.settings-choices > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.settings-choices.markdown-font > div {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.settings-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: var(--tx-2);
+  cursor: pointer;
+  transition:
+    background-color var(--quick) ease,
+    color var(--quick) ease;
+}
+.settings-choice:hover {
+  background: var(--raised);
+  color: var(--tx);
+}
+.settings-choice[data-checked='true'] {
+  background: var(--raised-2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+/* The radio covers its whole choice, so a click anywhere on it chooses. */
+.settings-choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-choice:has(input:focus-visible) {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+.settings-choice > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.font-swatch {
+  width: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--tx);
+}
+.font-system {
+  font-family: var(--markdown-font-system);
+}
+.font-sans {
+  font-family: var(--markdown-font-sans);
+}
+.font-rounded {
+  font-family: var(--markdown-font-rounded);
+}
+.font-serif {
+  font-family: var(--markdown-font-serif);
+}
+.font-textbook {
+  font-family: var(--markdown-font-textbook);
+}
+.font-mono {
+  font-family: var(--markdown-font-mono);
+}
+.settings-popover button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  font-size: 12.5px;
+}
+.settings-popover button:hover:not(:disabled) {
+  background: var(--raised-2);
+}
+.settings-link {
+  align-self: flex-start;
+}
+.settings-updates .update-notice {
+  color: var(--tx-2);
+}

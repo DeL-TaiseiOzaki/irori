@@ -105,7 +105,7 @@ try {
   await expect(page.getByRole('button', { name: 'note', exact: true })).toBeVisible();
   // No separate Drive frame: Drive folders are part of a KB's materials.
   await expect(page.getByRole('region', { name: 'ワークスペースの Google Drive' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
+  await page.getByRole('button', { name: '既存KB のクラウド接続', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
   await expect(dialog.getByRole('heading', { name: '既存KB のクラウド接続' })).toBeVisible();
   const moving = dialog.locator('.earlier-connections');
@@ -135,15 +135,16 @@ try {
     ),
   ).toEqual([]);
   await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
-  await expect(page.locator('.layer-pane.my-contents')).toContainText('資料 1');
+  await expect(page.getByRole('region', { name: 'Contents', exact: true })).toContainText('資料 1');
 
   // Preparing an upload now offers the KB's Drive folders.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Preserved note');
-  await page.getByRole('button', { name: '参照に追加', exact: true }).click();
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
-  await expect(page.getByLabel('選択した参照資料', { exact: true })).toContainText('note.md');
-  await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
+  await page.getByRole('button', { name: '参照に追加', exact: true }).click();
+  await expect(page.locator('.context-chip.reference')).toContainText('note.md');
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   const records = page.getByRole('dialog', { name: '資料と成果物' });
   await records.locator('summary').first().click();
   await records.getByRole('button', { name: '保持版を見る', exact: true }).click();
@@ -172,7 +173,8 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Drive workspace' }).click();
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '資料と成果物' })).toContainText(
     '送信待ち・端末に保持',
   );
@@ -180,12 +182,12 @@ try {
     .getByRole('dialog', { name: '資料と成果物' })
     .getByRole('button', { name: '閉じる', exact: true })
     .click();
-  await page.getByRole('button', { name: 'クラウド接続', exact: true }).click();
+  await page.getByRole('button', { name: '既存KB のクラウド接続', exact: true }).click();
   await expect(page.getByRole('dialog').locator('.connection-card')).toHaveCount(2);
   await page.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
   // A workspace that still holds connections of its own can be removed; only its
   // records go.
-  await page.locator('.workspace-switch').click();
+  await page.getByRole('button', { name: 'ワークスペースを選択', exact: true }).click();
   await page.getByRole('button', { name: 'Older workspace の登録を削除', exact: true }).click();
   await expect(page.locator('.workspace-card').filter({ hasText: 'Older workspace' })).toHaveCount(
     0,

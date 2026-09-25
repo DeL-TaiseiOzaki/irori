@@ -89,9 +89,16 @@ async function close() {
   await app!.close();
   app = undefined;
 }
-const toggle = (page: Page) => page.getByRole('button', { name: 'コード支援', exact: true });
+// Code assistance is a checkbox in the note's menu, which stays open after it.
+const toggle = (page: Page) => page.getByRole('menuitemcheckbox', { name: 'コード支援' });
+async function inMenu(page: Page, act: () => Promise<void>) {
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await act();
+  await page.keyboard.press('Escape');
+  await expect(toggle(page)).toHaveCount(0);
+}
 async function assistance(page: Page, enabled: boolean) {
-  await expect(toggle(page)).toHaveAttribute('aria-pressed', String(enabled));
+  await inMenu(page, () => expect(toggle(page)).toHaveAttribute('aria-checked', String(enabled)));
   await expect(page.locator('.document-editor')).toHaveAttribute(
     'data-editor-assistance',
     enabled ? 'on' : 'off',
@@ -106,7 +113,7 @@ async function assistance(page: Page, enabled: boolean) {
   }
 }
 async function clickToggle(page: Page, enabled: boolean) {
-  await toggle(page).click();
+  await inMenu(page, () => toggle(page).click());
   await assistance(page, enabled);
 }
 async function expectSelection(content: Locator, expected: string) {
@@ -158,7 +165,7 @@ try {
   const added = '// unsaved assistance fixture 日本語';
   await page.keyboard.insertText(`\n${added}`);
   await expect(page.locator('.error[role="alert"]')).toContainText('Fixture note save held');
-  await expect(page.locator('.doc-toolbar')).toContainText('保存待ち');
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeVisible();
   await page.keyboard.press('Shift+Home');
   await expectSelection(content, added);
   const dirtyWrites = await observation();
@@ -176,8 +183,8 @@ try {
   await rejectSave(false);
   await content.press('ControlOrMeta+Shift+z');
   await expect(content).toContainText(added);
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   await expect.poll(() => readFile(path.join(root, 'example.js'), 'utf8')).toContain(added);
   await expect(source).toHaveAttribute('data-fixture-identity', 'source-original');
   await page.locator('.error').getByRole('button', { name: '閉じる', exact: true }).click();
@@ -230,9 +237,9 @@ try {
   await rename(settingsFile, backup);
   await mkdir(settingsFile);
   try {
-    await toggle(page).click();
+    await inMenu(page, () => toggle(page).click());
     await expect(page.locator('.error[role="alert"]')).toBeVisible();
-    await expect(toggle(page)).toBeEnabled();
+    await inMenu(page, () => expect(toggle(page)).toBeEnabled());
     await assistance(page, true);
   } finally {
     await rm(settingsFile, { recursive: true, force: true });

@@ -1,5 +1,37 @@
 # Implementation status — notes, native agents and connection onboarding
 
+UI v5, 2026-09-25: the owner approved the v5 design canvas and asked to switch
+the whole interface to it. [ADR 014](decisions/014-ui-v5.md) records the
+decisions: the brain (one registered KB with its Schema, Knowledge and Contents)
+is the unit, a workspace is any combination of brains, the levels are Overview →
+Brain → Note, each brain's AI is its CLI agent, your AI is the person's own agent
+that hands tasks to brain AIs, brains get an editable icon and colour, and ember
+belongs to the AI alone. Three questions (default language, your AI's folder,
+where brain identity is stored) are open with the owner and use the ADR's
+defaults meanwhile. The work lands as stacked pull requests.
+
+UI v5 foundation, 2026-09-25: **0.1.38** is prepared on `feat/ui-v5-foundation`.
+`src/app/tokens.css` carries the canvas's tokens for the hearth, light and dark
+themes (the old role names remain as aliases), Geist and Geist Mono are bundled
+as variable woff2, and the theme setting gains `hearth`, which the system choice
+shows in a light desktop. The five-pane `LayerExplorer` is replaced by a 64 px
+rail (`Rail.tsx`: brains in workspace order with running and waiting states,
+the Overview's reserved place, add, search, settings) and one brain panel
+(`BrainPanel.tsx`: header, search, Files | Changes, and resizable Schema,
+Knowledge and Contents sections with Drive upload and read-only badges). The
+stage carries a crumb bar (`NoteBar.tsx`) with the save state, backlinks, the
+note's details (location, human lines) and its menu (rename and move, delete,
+Drive actions, reload, save, table or source, code assistance, materials); the
+terminal is a drawer at its foot. The AI panel shows the brain's Schema line,
+steps as a timeline (`AgentLog.tsx`), permission cards and a composer with
+brain-tiled references and **＋ 参照**. Git's Changes view serves the brain on show,
+with numbered diff cards on the stage. Settings (theme, Markdown font, language,
+updates, pending-upload recovery) moved to the rail; Ctrl+K opens search and
+Ctrl+` the terminal. Brain tiles use the name's initial on a colour derived
+from the scope ID until identity becomes editable. Every Electron UI smoke that
+selected by the old structure was rewritten; `layers-ui-smoke` now proves the
+rail and brain panel.
+
 Delivery, 2026-09-26: PR #94 is merged with the owner's go-ahead, and **0.1.37
 is published** as
 [v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1)

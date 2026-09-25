@@ -456,7 +456,9 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
-  await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+  // Reload lives in the note's menu.
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '再読み込み', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit after saving');
   await expect
     .poll(() =>
@@ -467,7 +469,7 @@ try {
         ),
     )
     .toBe(true);
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
   await expect(
     page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
   ).toHaveCount(4);
