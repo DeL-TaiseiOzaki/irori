@@ -6,7 +6,7 @@
 
 **ノートから、次の仕事へ。**
 
-ノートを書き、その続きをローカルの CLI エージェントと進める、知識のためのデスクトップ IDE/ADE。
+知識を書きためるノートと、その続きを進めるローカルの AI エージェントを、ひとつの画面にまとめたデスクトップアプリです。
 
 **日本語** | [English](README.en.md)
 
@@ -17,79 +17,96 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#ダウンロード)
 
-[ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) ・
+[ダウンロード](https://del-taiseiozaki.github.io/irori/) ・
 [リリースノート](https://github.com/DeL-TaiseiOzaki/irori/releases) ・
-[ドキュメント](#ドキュメント) ・
-[Issues](https://github.com/DeL-TaiseiOzaki/irori/issues)
+[はじめかた](#はじめかた) ・
+[フィードバック](#フィードバック) ・
+[開発に参加する](#開発に参加する)
 
-<img src="website/public/app-preview.png" alt="irori の開発画面。左にスペースとノート一覧、中央に日本語のノート、右に Codex を選択した AI パネル。" width="860">
-
-<sub>実際の開発画面です。表示内容は検証用のサンプルです。</sub>
+<img src="docs/images/readme/ja-note-and-ai.png" alt="irori の画面。左に Brain のファイル（Schema・Knowledge・Contents）、中央にノート、右に AI パネル。" width="860">
 
 </div>
 
 ---
 
+irori は、Markdown のノートを中心に仕事を進めるための **知識の IDE / ADE** です。
+
+ノートを置いたフォルダを **Brain**（知識ベース）として開くと、ノートの編集、資料の閲覧、Git での記録、Google Drive の資料までをひとつの画面で扱えます。そのうえで、パソコンに入っている **Claude Code・Codex・OpenCode・Pi** を、その Brain の中でそのまま動かし、ノートの続きを頼めます。
+
+ノートはいつでも手元のフォルダにある普通の Markdown ファイルです。AI は各 CLI の認証と設定をそのまま使うため、irori 独自のアカウントや API キーは要りません。
+
 ## ダウンロード
 
-配布の入口は **[ダウンロードサイト](https://del-taiseiozaki.github.io/irori/)** です。ブラウザで動くアプリではなく、パソコンにインストールして使います。
+**[ダウンロードサイト](https://del-taiseiozaki.github.io/irori/)** からインストーラーを入手してください。
 
-| プラットフォーム | 状態 | 取得先 |
-| --- | --- | --- |
-| **Windows 11 x64** | 検証版 preview（配布用署名なし） | [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) の Windows 用インストーラー .exe |
-| **macOS（Apple Silicon）** | 検証版 preview（配布用署名なし） | [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/) の Mac 用ディスクイメージ .dmg |
-| Linux | 配布予定なし | [ソースから実行](#ソースから実行) |
+| プラットフォーム | ファイル |
+| --- | --- |
+| **Windows 11**（x64） | インストーラー `.exe` |
+| **macOS**（Apple Silicon） | ディスクイメージ `.dmg` |
 
-- 公開中の版、各ファイルのサイズと SHA-256 は、[リリース一覧](https://github.com/DeL-TaiseiOzaki/irori/releases) の最新プレリリースにあるリリースノートと、添付の `SHA256SUMS.txt` にあります。
-- 配布用の署名がないため、Windows は発行元を確認できない旨の警告を表示します。**Mac は初回起動が拒否されます。** 「システム設定 → プライバシーとセキュリティ」で irori のブロック通知の横の「このまま開く」を一度押してください。2 回目からは通常どおり開けます。
-- Windows は AMD Ryzen・Intel の **x64 向け**で、Windows ARM 版ではありません。Mac は **Apple Silicon（M シリーズ）専用**です。Intel Mac には対応しません。
-- Windows 11 / macOS 実機でのインストール・IME・CLI 連携の受け入れ確認は継続中です。まずは使い捨ての KB フォルダやコピーでお試しください。
-- 0.1.29 以降をインストールしたアプリは、新しい版を自分で見つけて案内し、「更新して再起動」を押すだけで更新します。再ダウンロードや再インストールは要りません（[UPDATES](docs/UPDATES.md)）。0.1.28 以前からは、一度だけダウンロードサイトから入れ直してください。main に入ったアプリの変更は検証版として速やかに公開し、1 時間を超えて未公開のままなら自動チェックが知らせます（[DISTRIBUTION](docs/DISTRIBUTION.md)）。
+- 現在は **検証版（preview）** で、配布用の署名はありません。
+  - Windows では「発行元を確認できません」という警告が出ます。
+  - Mac では初回の起動が止められます。「システム設定 → プライバシーとセキュリティ」で「このまま開く」を一度押してください。
+- 一度入れれば、新しい版が出たときにアプリが知らせてくれます。「更新して再起動」を押すだけで更新できます。
+- Windows ARM 版と Intel Mac には対応していません。Linux ではソースから実行できます（[開発ガイド](docs/DEVELOPMENT.md)）。
 
-インストール後に必要なもの:
+## はじめかた
 
-1. Git — ノートの履歴と共有に使います。Windows は [Git for Windows](https://git-scm.com/downloads/win)、Mac は [Git for macOS](https://git-scm.com/downloads/mac)。
-2. 使いたい CLI（`claude` / `codex` / `opencode` / `pi`）を各サービスの手順でインストールし、ログインしておきます。AI の利用には各サービスの利用条件・料金が適用されます。ノート編集だけなら CLI の設定は不要です。
-3. ノートを置く KB フォルダ（新規フォルダ、または既存の Git チェックアウト）。
+1. **準備する。** [Git](https://git-scm.com/downloads) を入れます。AI を使う場合は、使いたい CLI（`claude` / `codex` / `opencode` / `pi`）もインストールしてログインしておきます。ノートを書くだけなら CLI は要りません。
+2. **Brain を追加する。** 起動画面の **KBフォルダを開く** で手元のフォルダを選ぶか、**GitHub から取得** でリポジトリをクローンします。既存のファイルは移動しません。
+3. **ワークスペースを作る。** 使う Brain にチェックを入れて **ワークスペースを作成** を押します。個人・チーム・組織の Brain を自由に組み合わせられます。
+4. **書いて、頼む。** ノートを開いて書き、右上の **AIに相談** から AI に続きを依頼します。AI が許可を求めたときは、パネルに確認が表示されます。
 
-## irori とは
+## 主な機能
 
-- **ノートを書く。** 見たまま編集できる Markdown エディタ。自動保存、`_assets/` への画像貼り付け、Cmd/Ctrl+S での選択・undo 維持。Markdown ファイルが常に正本です。KB が `.irori/notes.json` で場所とテンプレートを宣言すれば、**今日のノート**が決まった場所に決まった形で開きます。
-- **AI と続きを進める。** Claude Code・Codex・OpenCode・Pi を、選んだ作業場所でそのまま起動。インストール済み CLI と、その認証・設定をそのまま使います。irori は独自の API キーを要求しません。
-- **資料をそのまま見る。** PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えずステージ上で表示します（表示のみ。編集は外部アプリで）。
-- **知識のつながりを見る。** CSV を表とグラフで見渡し、宣言済みオントロジーを階層／サブグラフとして表示して、つながるノートへ移動できます。
-- **手元に残る。** ノートは選んだフォルダの Markdown のまま。Git 操作、Google Drive 接続（フォルダの編集・追加に対応した試験実装）、内蔵ターミナルはすべてアプリの中から扱えます。
+**Brain とワークスペース**
+- Brain は **Schema**（AI への指示やスキル）・**Knowledge**（ノート）・**Contents**（資料）の 3 つの層で整理されます。
+- **全体** 画面で、ワークスペース内の Brain を地図または並列で見渡せます。検索もすべての Brain をまたいでできます。
+- Brain ごとに名前・分類・アイコン・色を設定できます。
 
-## 使い方
+**ノート**
+- 見たまま編集できる Markdown エディタです。自動で保存し、画像を貼り付けるとノートの隣の `_assets/` に入ります。
+- 相対リンクをたどったり、参照元（バックリンク）を一覧したりできます。名前や場所を変えると、リンクも一緒に書き換わります。
+- **今日のノート** を、決めた場所とテンプレートで開けます。
+- CSV は表で表示できます。オントロジーは階層やグラフとして表示できます。
 
-1. 起動して **ワークスペースを選択**。**KBフォルダを開く** で既存のフォルダやチェックアウトを名前付きで登録します。**登録して開く** が `.irori/scope.json` を作成し、`/contents/` を `.gitignore` に追加します。既存の Markdown は移動しません。
-2. ノートを開くか **ノートを作成**。ドキュメント表示のまま編集でき、画像はノート隣の `_assets/` に入ります。
-3. **AIに相談** でハーネスを選び、指示を送信。実行中の要求・質問はパネルに表示され、**停止** でプロセスツリーを停止します。次の指示は **送信待ちに追加** で予約でき、会話は再起動後も復元されます（再開は明示操作）。
-4. **ソース管理**（変更と履歴）で差分確認・ステージング・コミット。取得／受信／統合は明示的な確認付きで、自動 stash・hard reset・force push は行いません。
-5. **クラウド接続**（または KB の資料欄の **接続**）で Google アカウントと Drive フォルダを登録し、KB の資料（contents）につなぎます。登録したフォルダは個人／チームの資料欄に表示され、irori やその KB で動くエージェントから編集・ノート追加ができ、保存した変更は自動で Google Drive へ送信されます（接続ごとに読み取り専用にもできます）。Windows でのマウントには [WinFsp](https://winfsp.dev/rel/) が必要です。Mac は macOS の NFS マウントを使うため、追加のインストールは不要です。
-6. 画面下の **ターミナル** で、その KB のフォルダからシェルを起動できます。
-7. サイドバー上部の表示設定で、テーマ・Markdown フォント・表示言語（**日本語** / **English**）を選べます。サイドバーの各枠（Schema・ナレッジ・資料）は境界をドラッグして大きさを変えられ、どちらもこの端末に保存されます。
+**AI エージェント**
+- **Brain の AI**：Claude Code・Codex・OpenCode・Pi を、その Brain の Schema を読み込んだ状態で起動します。複数の Brain の AI を同時に動かせます。
+- **あなたの AI**：Brain をまたぐ仕事を頼めます。依頼を Brain ごとに分けて各 Brain の AI に渡し、結果をまとめて報告します（現在は Claude Code に対応）。
+- 許可の扱いは各 CLI の設定に従います。Claude Code と Codex では、標準（必要なときに承認）かフルアクセスかを選べます。
+- AI への指示は送信待ちとして予約でき、会話は再起動しても残ります。
 
-CLI 側のルール・設定・スキル・MCP の探索は各プロバイダの責任範囲です。ただし KB の `.agents/skills/` にあるスキルは、作成欄で選ぶと irori が依頼と一緒にどのハーネスにも渡します。irori が複数チームの指示をまとめて混ぜることはありません。登録は所有境界であり、OS サンドボックスではありません。
+**資料**
+- PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。
+- Google Drive のフォルダを Brain の Contents として接続できます。irori からも、その Brain の AI からも編集でき、変更は Drive に送られます。Windows では [WinFsp](https://winfsp.dev/rel/) が必要です。
 
-## 現在のステータス
+**記録と道具**
+- **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。
+- Brain のフォルダで開く内蔵ターミナルがあります。
+- テーマ（システムに合わせる・いろり・ライト・ダーク）、Markdown のフォント、表示言語（日本語 / English）を切り替えられます。
 
-公開中の配布物は **Windows x64 と macOS arm64 の、配布用署名がない検証版（preview）** です。完成版リリースではありません。
+<div align="center">
+<img src="docs/images/readme/ja-overview.png" alt="全体画面。あなたの AI と、チーム・組織に分かれた 3 つの Brain を地図で表示している。" width="860">
+</div>
 
-確認待ち・未実装の主な項目:
+## 現在の状態
 
-- Windows 11 / macOS 実機での受け入れ（インストール、IME、CLI 連携、GitHub 同期）
-- 実アカウントでの Google 同意・ネイティブマウント・Drive への書き込みの実機確認
-- OpenCode / Pi の実モデルターン受け入れ（ネイティブ制御テストは通過済み）
-- 配布用の署名（Windows 署名と Apple の Developer ID 署名・notarization）、規模・性能、Markdown 保存範囲の拡大、端末をまたぐ履歴共有
+irori は **検証版（preview）** です。main に入った変更は検証版としてすぐに公開しています。
 
-判定済み・暫定・未着手の区別は [ACCEPTANCE](docs/ACCEPTANCE.md)、現在地は [STATUS](docs/STATUS.md)、配布の証跡は [CHECKPOINT](docs/CHECKPOINT.md) にあります。
+- Windows 11 / macOS の実機での受け入れ確認（インストール、日本語入力、CLI 連携、Google Drive）を続けています。まずは使い捨てのフォルダやコピーでお試しください。
+- 配布用の署名（Windows の署名、Apple の Developer ID・notarization）は未対応です。
 
-## ソースから実行
+詳しい進み具合は [STATUS](docs/STATUS.md)、確認済みの範囲は [ACCEPTANCE](docs/ACCEPTANCE.md) にあります。
 
-開発者向けの手順です。利用するだけならインストーラーを使ってください。
+## フィードバック
 
-必要環境: Node.js **24.15+（24.x）または 26+**、npm、デスクトップセッション。Pi は 0.85+ が必要で、ネイティブ制御の確認には OpenCode 1.18.30 / Pi 0.85.1 を使用しました（[ハーネス互換性](docs/HARNESSES.md)）。
+- 不具合の報告や要望は [GitHub Issues](https://github.com/DeL-TaiseiOzaki/irori/issues) へお願いします。
+- 報告には、画面に表示されているバージョン・OS・実際のメッセージを添えてください。
+- ノートの本文、認証情報、OAuth の URL は載せないでください。
+
+## 開発に参加する
+
+ソースからの実行、検証の手順、設計の記録は **[開発ガイド（docs/DEVELOPMENT.md）](docs/DEVELOPMENT.md)** にまとめています。
 
 ```sh
 git clone https://github.com/DeL-TaiseiOzaki/irori.git
@@ -100,66 +117,14 @@ npm run build
 npm start
 ```
 
-`setup:electron` は固定版 Electron を取得します（npm のライフサイクルスクリプトを無効化している場合にも有効）。Windows・macOS も同じコマンドを各自のチェックアウトで実行します。
+- Node.js 24.15 以上（24.x）または 26 以上が必要です。
+- コントリビューターの取り決めは [AGENTS.md](AGENTS.md) にあります。
+- 開発を引き継ぐ場合は [HANDOFF](docs/HANDOFF.md) から始めてください。
 
-- **root ユーザーの Linux コンテナ**では、ビルド後に `npm run start:container` を使います。Chromium の OS サンドボックスを無効化する明示的なコマンドで、エージェントの権限方針は変更しません。通常のデスクトップでは非 root ユーザーで `npm start` を使ってください。
-- **GUI が実際に見えること**が前提です。SSH やコンテナのシェルだけでは Electron のウィンドウは表示されません。Linux VM で試す場合は `npm run preview:vm`（[VM プレビュー](docs/VM-PREVIEW.md)）、ヘッドレス確認は `xvfb-run -a npm run test:ui` を使います。
-- システムの Node が 20 のままだと `npm ci` が engine 警告を出しますが、以降の npm スクリプトは固定版 Node 24 を使います。Vite のチャンクサイズ警告もビルド失敗ではありません。
+## 関連プロジェクト
 
-### 配布サイトのプレビュー
-
-```sh
-npm run dev:website      # ローカルプレビュー
-npm run build:website    # dist-website/ に静的出力
-```
-
-`website/` が配布の入口です。デスクトップアプリをブラウザで動かすものではありません。公開手順は [DISTRIBUTION](docs/DISTRIBUTION.md) にあります。
-
-### 検証
-
-```sh
-npm run build
-npm test
-# 実際の Electron。Linux CI では先に xvfb-run -a が必要:
-npm run test:ui
-# 実アカウントと使い捨て KB を使用。ネイティブアカウントの利用枠を消費します:
-npm run test:agents
-npm run test:lifecycle
-# 両プロバイダを実際の UI で（POSIX の例）:
-IRORI_UI_REAL_AGENTS=1 xvfb-run -a npm run test:ui
-```
-
-PowerShell では `$env:IRORI_UI_REAL_AGENTS="1"` を設定してからデスクトップで `npm run test:ui` を実行します。詳細な証跡は Git 管理外の `test-results/` に出力され、使い捨てディレクトリのみを変更します。
-
-## 実装境界
-
-- React レンダラー → 型付き・検証済みの `HostAPI` → Electron preload/main。レンダラーからの Node アクセス、生 IPC の公開、リモートページ遷移、ドキュメント内スクリプト実行は行いません。認証付きループバックの rclone サービスはホストのみが制御します。
-- ドキュメント編集は Milkdown Crepe、その他のテキスト／CSV ソースは CodeMirror 6。Markdown が正本で、未対応ブロックは文字列のまま保持されます。
-- PDF・Office・画像の表示は、ホストが拡張子と 100 MiB の上限を確かめたバイト列だけを渡し、サンドボックス化されたレンダラーで pdf.js・docx-preview・pptx-to-html・SheetJS が描画します。Office の出力はスクリプト・フレーム・外部 URL を取り除いてから表示します（[ビューアーのライブラリ](docs/libraries/file-viewers.md)）。
-- Node の `FileService` が正規化パス、スコープ所有権、可搬 UUID 宣言、ローカルのバインディング／下書き／バックアップ、遅延ディレクトリ列挙、ウォッチャ、版を意識した書き込みを担当します。
-- Codex はネイティブ app-server JSONL、Claude は Claude Agent SDK が未改変の `claude` 実行ファイルを制御します。セッションハンドルと表示履歴・保留メッセージは、スコープ UUID・プロバイダ・正規化チェックアウトルートに紐づけて端末データに保存されます。復元に失敗してもハンドルを保持し、黙って新しい会話に切り替えることはありません。
-- 端末データは Electron 標準の `userData`（テストは `IRORI_DATA_DIR` で上書き）。ワークスペース選択、アカウントメタデータ、rclone 資格情報、クラウドバインディングはそこに残り、既存の `contents` のバイト列はセットアップで移動・削除されません。
-
-設計判断は [ホスト決定 ADR 001](docs/decisions/001-initial-host.md) と [リリース・ワークスペース決定 ADR 002](docs/decisions/002-release-and-workspace.md) を参照してください。
-
-## ドキュメント
-
-| 目的 | ドキュメント |
-| --- | --- |
-| 配布と公開手順 | [DISTRIBUTION](docs/DISTRIBUTION.md) / [UPDATES](docs/UPDATES.md) / [PACKAGING](docs/PACKAGING.md) / [RELEASE-PLAN](docs/RELEASE-PLAN.md) |
-| 現在地と受け入れ範囲 | [STATUS](docs/STATUS.md) / [ACCEPTANCE](docs/ACCEPTANCE.md) / [CHECKPOINT](docs/CHECKPOINT.md) |
-| 日々の編集と記録 | [DAILY-WORKFLOW](docs/DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](docs/EDITING-AND-RECORDS.md) / [EDITOR-ASSISTANCE](docs/EDITOR-ASSISTANCE.md) / [RECOVERY-AND-NOTE-TOOLS](docs/RECOVERY-AND-NOTE-TOOLS.md) |
-| エージェントと会話 | [HARNESSES](docs/HARNESSES.md) / [CONVERSATIONS](docs/CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](docs/WORKSPACE-CONNECTIONS.md) |
-| Git とクラウド | [GIT](docs/GIT.md) / [CLOUD-SETUP](docs/CLOUD-SETUP.md) / [WORKSPACE-DRIVE](docs/WORKSPACE-DRIVE.md) / [DISTRIBUTOR-GOOGLE](docs/DISTRIBUTOR-GOOGLE.md) |
-| 画面と知識の表示 | [UI-DESIGN](docs/UI-DESIGN.md) / [LAYERED-EXPLORER](docs/LAYERED-EXPLORER.md) / [ONTOLOGY](docs/ONTOLOGY.md) / [KB-SEARCH](docs/KB-SEARCH.md) / [NOTE-LINKS](docs/NOTE-LINKS.md) / [KNOWLEDGE-NAVIGATION](docs/KNOWLEDGE-NAVIGATION.md) / [TERMINAL](docs/TERMINAL.md) |
-| 開発環境 | [VM-PREVIEW](docs/VM-PREVIEW.md) / [互換性マトリクス](docs/compatibility/MATRIX.md) / [計測](docs/measurements/2026-09-12.md) |
-
-開発を引き継ぐ場合は [HANDOFF](docs/HANDOFF.md) と [継続プロンプト](docs/HANDOFF-PROMPT.md) から始めてください。コントリビューターの取り決めは [AGENTS.md](AGENTS.md) にあります。
-
-## 不具合の報告
-
-[GitHub Issues](https://github.com/DeL-TaiseiOzaki/irori/issues) に、表示されているバージョン・OS・実際のメッセージを添えてお知らせください。ノートの本文、認証情報、OAuth の URL は載せないでください。
+- [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete)：irori で使う Brain（知識ベース）のおすすめテンプレートです。
 
 ## ライセンス
 
-[MIT License](LICENSE)。依存ライブラリはそれぞれの条件に従います（[THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)）。
+[MIT License](LICENSE)。依存ライブラリはそれぞれのライセンスに従います（[THIRD_PARTY_NOTICES](docs/THIRD_PARTY_NOTICES.md)）。
