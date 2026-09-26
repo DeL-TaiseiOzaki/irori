@@ -1,7 +1,9 @@
 # irori continuation handoff
 
-Current development, 2026-09-26 (evening): **0.1.45 adds file viewers** on
-`feat/file-viewers`. PDF, Word (`.docx`), PowerPoint (`.pptx`), spreadsheets
+Current development, 2026-09-26 (evening): **0.1.45 is published** with file
+viewers as
+[v0.1.45-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.45-preview.1)
+(#107). PDF, Word (`.docx`), PowerPoint (`.pptx`), spreadsheets
 (`.xlsx/.xlsm/.xls/.ods`) and images open on the stage, view only, instead of in
 the external application. STATUS has the design; the libraries and their limits
 are in [file viewer libraries](libraries/file-viewers.md).
