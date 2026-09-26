@@ -1,7 +1,10 @@
 # Your AI: session root, brain sub-agents, observation and permissions (spike)
 
 Date: 2026-09-25. Status: research for UI v5 phase 5 ([ADR 014](../decisions/014-ui-v5.md),
-decision 5). Nothing here is implemented. No model inference was run: the
+decision 5). Implemented in 0.1.42 for Claude Code; the real-provider checks
+below ran on 2026-09-26 and their results are in [YOUR-AI](../YOUR-AI.md). One
+finding changed the design: a background sub-agent's edits are refused without
+a prompt, so hand-offs are forced to the foreground. No model inference was run: the
 evidence is irori's source, the installed Claude Agent SDK's type declarations,
 the installed CLIs' `--help` / `features list` output, the Codex app-server
 protocol bindings generated from the installed binary, and official

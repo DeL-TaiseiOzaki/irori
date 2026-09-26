@@ -176,6 +176,11 @@ export const hostArguments = {
   startQueuedMessage: z.tuple([id, z.enum(agentIds), id]),
   resetAgentSession: z.tuple([id, z.enum(agentIds)]),
   start: z.tuple([startInput]),
+  yourAi: z.tuple([]),
+  createYourAi: z.tuple([]),
+  yourAiEntries: z.tuple([path]),
+  yourAiRead: z.tuple([path]),
+  yourAiBrains: z.tuple([z.array(id).max(50)]),
   cancel: z.union([z.tuple([]), z.tuple([id])]),
   respond: z.tuple([
     id,

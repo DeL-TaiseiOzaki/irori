@@ -19,6 +19,13 @@ waits on, which the saved history keeps only as text, so a request stays
 answerable after switching brains, from the Overview, or after reopening the
 panel. The Overview sends and queues with the brain's default access mode.
 
+Request ends, 2026-09-26 (0.1.42): the host announces each request that ends
+(answered in any view, declined, or cancelled with its run) with an event naming
+it; that event is never shown or saved. Views stop offering a request on that
+event or on its run's end, not because a later event of the run arrived: a tool
+call's message can arrive after the request it raised, and your AI's
+sub-agents in other brains keep working meanwhile ([YOUR-AI](YOUR-AI.md)).
+
 ## User behavior
 
 The AI panel restores its recent display history and accepted pending instructions after restarting irori. Storage belongs to the device, exact canonical checkout, KB scope UUID and selected CLI. Copies or another provider do not inherit a conversation. Existing native session handles continue to use their original independent store.

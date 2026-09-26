@@ -16,6 +16,8 @@ export const messageInput = z.object({
   skill: skillName.optional(),
   /** Tell the agent which lines of the note the person wrote or revised. */
   personLines: z.boolean().optional(),
+  /** Brains handed to your AI; refused for a brain's own AI. */
+  brains: z.array(z.uuid()).max(50).optional(),
 });
 export const startInput = messageInput.extend({ scopeId: z.uuid(), agent: z.enum(agentIds) });
 export const queuedMessage = messageInput.extend({ id: z.uuid() });

@@ -19,6 +19,8 @@ import { ImageService, imageType } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
+import { YourAiService } from './you';
+import { brainAgentNames } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkspaceCloudStorage } from '../cloud/storage';
@@ -107,11 +109,15 @@ app
     const authorship = new AuthorshipStore(files.dataDir, (ref) =>
       git.noted(ref.scopeId, ref.path),
     );
+    // Your AI's folder is the device's, not a KB's: its record is read before any run.
+    const you = new YourAiService(files.dataDir);
+    await you.load();
     const agents = new AgentService(
       files,
       (event) => emit({ type: 'agent', event }),
       knowledge,
       authorship,
+      you,
     );
     let fileMutations = 0;
     const git = new GitService(
@@ -569,6 +575,23 @@ app
         return agents.startQueued(...args, canStartAgent);
       },
       resetAgentSession: (...args) => agents.resetSession(...args),
+      yourAi: () => you.status(),
+      createYourAi: () => you.create(),
+      yourAiEntries: (rel) => you.entries(rel),
+      yourAiRead: (rel) => you.read(rel),
+      yourAiBrains: async (scopeIds) => {
+        const names = brainAgentNames(files.list());
+        const brains = scopeIds.map((scopeId) => files.get(scopeId));
+        const defined = await you.defined(brains.map((brain) => names.get(brain.scopeId)!));
+        return brains.map((brain) => ({
+          scopeId: brain.scopeId,
+          name: brain.name,
+          category: brain.category,
+          agent: names.get(brain.scopeId)!,
+          root: brain.root,
+          defined: defined.has(names.get(brain.scopeId)!),
+        }));
+      },
       start: (input) => {
         canStartAgent();
         return agents.startAccepted(input);

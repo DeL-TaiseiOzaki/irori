@@ -117,6 +117,9 @@ try {
   // The Overview, as a map and side by side.
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Map of brains' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Your AI' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up your AI' })).toBeVisible();
+  await page.getByRole('button', { name: 'Brain AIs', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'Brain AIs' })).toBeVisible();
   await japaneseLeft(page, 'the Overview map');
   await page.getByRole('button', { name: 'Columns', exact: true }).click();

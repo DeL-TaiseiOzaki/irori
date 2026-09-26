@@ -871,3 +871,113 @@
   color: var(--tx-3);
   font-style: italic;
 }
+
+/* Your AI's hand-offs: one list per run, each brain's report below it. */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--raised);
+  list-style: none;
+}
+.task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+.task.waiting {
+  background: var(--ember-soft);
+  box-shadow: inset 0 0 0 1px var(--ember-line);
+}
+.task-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.task-text small {
+  color: var(--tx-3);
+  font-size: 11px;
+}
+.task-text > span {
+  overflow-wrap: anywhere;
+}
+.task-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.task-state > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.task-state.working,
+.task-state.waiting {
+  color: var(--ember);
+  font-weight: 600;
+}
+.task-state.waiting > i {
+  background: var(--ember);
+  box-shadow: none;
+}
+.task-state .spin {
+  animation: irori-spin 1.1s linear infinite;
+}
+.message.report {
+  margin-left: 6px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--hair-2);
+}
+.message.report.failed {
+  border-left-color: var(--ember-line);
+}
+.report-from {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.request-brain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tx-2);
+  font-size: 11.5px;
+}
+.step-brain {
+  flex: none;
+}
+.agent-held {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ember-soft);
+  color: var(--tx-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.agent-held > .ui-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ember);
+}
