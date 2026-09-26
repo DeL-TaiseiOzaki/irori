@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+Current development, 2026-09-26 (night): **0.1.46 is published** as
+[v0.1.46-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.46-preview.1)
+(#110). Clone, fetch, pull and push against `https://github.com` fall back to the
+GitHub CLI's sign-in when Git's own credentials are refused. Git failures show
+their redacted output under 詳細. STATUS has the details. The owner's own
+private-repository clone from the installed Mac app is the open confirmation.
+
 Current development, 2026-09-26 (evening): **0.1.45 is published** with file
 viewers as
 [v0.1.45-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.45-preview.1)

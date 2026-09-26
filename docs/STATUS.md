@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+GitHub clone authentication, 2026-09-26: #110 (**0.1.46**) is merged at the
+owner's word and published as
+[v0.1.46-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.46-preview.1)
+by release run `36238298132` from main's CI run `36237777808` (source `c1bdeb9`).
+The release carries Windows 201,433,600 bytes, Mac 168,949,896 bytes and
+`irori-0.1.46-full.nupkg` 200,795,381 bytes. The owner could not clone a private
+repository after `gh auth login`: Git uses gh only after `gh auth setup-git`.
+`GitProcess.run` (`src/git/process.ts`) now retries a network operation that
+`https://github.com` refused (authentication, or "repository not found") once
+with `-c credential.https://github.com.helper=` followed by gh's
+`auth git-credential` helper, found on irori's child PATH. The empty value clears
+other helpers for that host only, so a stale keychain entry cannot answer first.
+Nothing is written to Git configuration. `GitError` appends Git's last lines
+after a blank line, with URL credentials, GitHub tokens, `password=`/`token=`
+values and the home directory removed. The renderer's `ErrorMessage` folds them
+under 詳細, and `errorText` replaces `String(e)`, so messages no longer read
+"Error: Error:". A failed clone removes the empty folder it made. The
+registration dialog's empty preview is hidden. Tests: `tests/git-github-cli.test.ts`
+(stand-in git/gh; real Git for helper precedence) and a failed clone first in
+`git-ui-smoke`. On #110's CI, `git-ui-smoke`'s conflict resolution step (untouched)
+and the Windows `test:package` autosave poll each failed once; unchanged reruns
+passed, and three local `git-ui-smoke` runs passed. Not yet tried against a real
+private repository from an installed app.
+
 Delivery, 2026-09-26: #107 (file viewers) is merged with the owner's go-ahead,
 and **0.1.45 is published** as
 [v0.1.45-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.45-preview.1)
