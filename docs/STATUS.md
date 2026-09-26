@@ -1,5 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Conflict re-read, 2026-09-26: **0.1.44** is prepared on `fix/git-resolve-reread`.
+A refused **統合内容を保存して解決** (the conflicted file changed on disk) now reads the
+conflict again at once (`GitPanel.resolveConflict`). Before, a conflicted file's
+status stayed `UU`, so only the file watcher's event refreshed the conflict's
+version; when that event came late, the second attempt was refused too. This is
+what failed `git-ui-smoke` twice on CI (#103's first run and `main` CI
+`36211591365`), each time passing on a rerun.
+
 UI v5 motion, 2026-09-26: **0.1.43** is prepared on `feat/ui-v5-motion`, stacked
 on your AI. Levels move with a zoom (`goToLevel`, 560 ms from the Overview into a
 brain around the clicked brain, reversed going back, none under reduced motion);

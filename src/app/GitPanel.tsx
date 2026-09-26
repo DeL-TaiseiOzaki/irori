@@ -481,7 +481,17 @@ function RepositoryPanel({
   async function resolveConflict(text: string | null) {
     if (!selection || !conflict) return;
     const acknowledged = storedResolution.snapshot().record?.revision;
-    const value = await host.gitResolve(space.scopeId, selection.path, text, conflict.version);
+    let value: GitStatus;
+    try {
+      value = await host.gitResolve(space.scopeId, selection.path, text, conflict.version);
+    } catch (error) {
+      // The file may have changed underneath. A conflicted file's status stays
+      // the same, so read the conflict itself again now: the next attempt then
+      // compares with what is on disk, not with a file event still on its way.
+      const fresh = await host.gitConflict(space.scopeId, selection.path).catch(() => undefined);
+      if (fresh && alive.current && fresh.path === selection.path) setConflict(fresh);
+      throw error;
+    }
     if (!(await storedResolution.clear(acknowledged)))
       throw Error(
         t(
