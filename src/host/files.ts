@@ -19,6 +19,7 @@ import {
 } from '../domain/note-operations';
 import { defaultNoteDirectory } from '../domain/notes';
 import { t } from '../domain/i18n';
+import { textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
 const relative = z
   .string()
   .min(1)
@@ -40,7 +41,7 @@ export const hash = (text: string | Buffer) => createHash('sha256').update(text)
 /** Where the unsaved text of one document is kept on this device. */
 export const draftFile = (dataDir: string, scopeId: string, rel: string) =>
   path.join(dataDir, `draft-${hash(scopeId + '\0' + rel)}.json`);
-export const textFilePattern = /\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i;
+export { textFilePattern };
 export const textFileByteLimit = 2 * 1024 * 1024;
 export async function readTextDocument(
   filename: string,
@@ -54,6 +55,33 @@ export async function readTextDocument(
   const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
   return { scopeId, path: rel, text, hash: hash(bytes) };
+}
+const tooLarge = () =>
+  Error(
+    t(
+      '100 MiB を超えるファイルは外部アプリで開いてください。',
+      'Open files larger than 100 MiB in an external app.',
+    ),
+  );
+/**
+ * A file the renderer opens: text for the editor, or, for a format irori shows with a
+ * viewer, an empty text whose version is the file's size and modification time. The
+ * viewer reads the bytes itself; reading them here as well would only be discarded.
+ */
+export async function readDocument(filename: string, scopeId: string, rel: string) {
+  const viewer = viewerKind(rel);
+  if (!viewer) return readTextDocument(filename, scopeId, rel);
+  const stat = await fs.stat(filename);
+  if (!stat.isFile()) throw Error(t('ファイルではありません。', 'This is not a file.'));
+  if (stat.size > viewerByteLimit) throw tooLarge();
+  const version = hash(`${stat.size}:${stat.mtimeMs}`);
+  return { scopeId, path: rel, text: '', hash: version, viewer } satisfies Document;
+}
+/** The bytes of a file irori shows with a viewer, under the same limit as its document. */
+export async function readViewerBytes(filename: string, rel: string) {
+  if (!viewerKind(rel)) throw Error('Use the external application for this file format');
+  if ((await fs.stat(filename)).size > viewerByteLimit) throw tooLarge();
+  return new Uint8Array(await fs.readFile(filename));
 }
 export class FileService {
   cloud?: {
@@ -315,8 +343,9 @@ export class FileService {
     if (classify(this.get(id), rel) === 'contents' && this.cloud?.document)
       return this.cloud.document(id, rel);
     const filename = await this.resolve(id, rel);
-    const doc = await readTextDocument(filename, id, rel);
+    const doc = await readDocument(filename, id, rel);
     if (classify(this.get(id), rel) === 'contents') return { ...doc, readOnly: true };
+    if (doc.viewer) return doc;
     try {
       doc.draft = z
         .object({ text: z.string(), baseHash: z.string() })

@@ -52,11 +52,15 @@ import type {
   WorkspaceProfile,
   CloudRoot,
 } from '../domain/types';
+import { opensInIrori } from '../domain/viewers';
 const Editor = lazy(() =>
   import('../editor/Editor').then((module) => ({ default: module.Editor })),
 );
 const CsvPreview = lazy(() =>
   import('./CsvPreview').then((module) => ({ default: module.CsvPreview })),
+);
+const FileViewer = lazy(() =>
+  import('./FileViewer').then((module) => ({ default: module.FileViewer })),
 );
 const OntologyPanel = lazy(() =>
   import('./OntologyPanel').then((module) => ({ default: module.OntologyPanel })),
@@ -528,7 +532,7 @@ function App() {
   // Who typed which line of the open note. A Drive file is outside the KB's Git
   // history and has no record; a failure here leaves the note unmarked rather than unopenable.
   useEffect(() => {
-    if (!doc || doc.workspaceId || doc.cloud) return setAuthorship(undefined);
+    if (!doc || doc.workspaceId || doc.cloud || doc.viewer) return setAuthorship(undefined);
     let current = true;
     const { scopeId, path, text } = doc;
     void host
@@ -612,11 +616,13 @@ function App() {
     );
     setEditorKey((k) => k + 1);
     setStatus(
-      next.readOnly
-        ? t('クラウド資料・読み取り専用', 'Cloud material · Read-only')
-        : next.cloud
-          ? t('Google Drive の資料・編集できます', 'Google Drive material · editable')
-          : t('この端末に保存済み', 'Saved on this device'),
+      next.viewer
+        ? t('表示のみ・irori では編集しません', 'View only · irori does not edit this file')
+        : next.readOnly
+          ? t('クラウド資料・読み取り専用', 'Cloud material · Read-only')
+          : next.cloud
+            ? t('Google Drive の資料・編集できます', 'Google Drive material · editable')
+            : t('この端末に保存済み', 'Saved on this device'),
     );
   }
   /** Loads a document the person chose to open, and shows it on the stage. */
@@ -852,7 +858,7 @@ function App() {
         );
         return false;
       }
-      if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path)) {
+      if (opensInIrori(entry.path)) {
         const next = await host.read(space.scopeId, entry.path);
         setActive(space);
         show(next, navigation);
@@ -1155,8 +1161,7 @@ function App() {
     }
     if (connecting || !(await save())) return false;
     try {
-      if (/\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i.test(entry.path))
-        show(await host.cloudRead(root.scopeId, entry.path));
+      if (opensInIrori(entry.path)) show(await host.cloudRead(root.scopeId, entry.path));
       else await host.openCloudFile(root.scopeId, entry.path);
       return true;
     } catch (error) {
@@ -1531,7 +1536,12 @@ function App() {
                     )}
                     {onNote &&
                       doc &&
-                      (doc.readOnly ? (
+                      (doc.viewer ? (
+                        <span className="save-state" role="status" title={status}>
+                          <Icon name="file" size={13} />
+                          {t('表示のみ', 'View only')}
+                        </span>
+                      ) : doc.readOnly ? (
                         <span className="save-state" role="status" title={status}>
                           <Icon name="lock" size={13} />
                           {t('読み取り専用', 'Read-only')}
@@ -1683,7 +1693,7 @@ function App() {
                             {t('保存', 'Save')}
                           </Menu.Item>
                         )}
-                        {(/\.csv$/i.test(doc.path) || mode !== 'table') && (
+                        {!doc.viewer && (/\.csv$/i.test(doc.path) || mode !== 'table') && (
                           <Menu.Separator className="menu-separator" />
                         )}
                         {/\.csv$/i.test(doc.path) && (
@@ -1707,7 +1717,7 @@ function App() {
                             </Menu.RadioItem>
                           </Menu.RadioGroup>
                         )}
-                        {mode !== 'table' && (
+                        {mode !== 'table' && !doc.viewer && (
                           <Menu.CheckboxItem
                             checked={editorAssistance}
                             disabled={savingAssistance}
@@ -1920,7 +1930,21 @@ function App() {
                             </p>
                           }
                         >
-                          {mode === 'table' ? (
+                          {doc.viewer ? (
+                            <FileViewer
+                              key={editorKey}
+                              doc={{ ...doc, viewer: doc.viewer }}
+                              load={(scopeId, path) => host.viewerBytes(scopeId, path)}
+                              onExternal={() =>
+                                void (
+                                  doc.workspaceId
+                                    ? host.openCloudFile(doc.workspaceId, doc.path)
+                                    : host.openExternal(doc.scopeId, doc.path)
+                                ).catch(report)
+                              }
+                              onLink={(url) => void host.openUrl(url).catch(report)}
+                            />
+                          ) : mode === 'table' ? (
                             <CsvPreview key={editorKey} text={buffer} />
                           ) : (
                             <Editor

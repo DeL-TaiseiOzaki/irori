@@ -1,6 +1,12 @@
 # irori continuation handoff
 
-Current development, 2026-09-26: **the interface is switching to v5.** The owner
+Current development, 2026-09-26 (evening): **0.1.45 adds file viewers** on
+`feat/file-viewers`. PDF, Word (`.docx`), PowerPoint (`.pptx`), spreadsheets
+(`.xlsx/.xlsm/.xls/.ods`) and images open on the stage, view only, instead of in
+the external application. STATUS has the design; the libraries and their limits
+are in [file viewer libraries](libraries/file-viewers.md).
+
+Current development, 2026-09-26: **the interface switched to v5.** The owner
 approved the v5 design canvas on 2026-09-25 and asked for the whole interface to
 switch to it, keeping every capability ([ADR 014](decisions/014-ui-v5.md), which
 also records the owner's answers). The work went in six stages:

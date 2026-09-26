@@ -6,7 +6,7 @@ import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
-import { FileService } from './files';
+import { FileService, readViewerBytes } from './files';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
@@ -533,6 +533,12 @@ app
       read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),
       readImage: (...args) => images.read(...args),
+      viewerBytes: async (id, rel) => {
+        if (files.list().some((space) => space.scopeId === id))
+          return readViewerBytes(await files.resolve(id, rel), rel);
+        await cloud.workspaceRoot(id);
+        return readViewerBytes(await cloud.resolve(id, rel), rel);
+      },
       save: (doc) =>
         changeFiles(async () => {
           // A workspace's Drive files belong to no KB: the cloud service saves them.

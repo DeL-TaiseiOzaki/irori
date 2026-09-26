@@ -1,0 +1,55 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 6 0 R /Resources << /Font << /F2 9 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 71 >>
+stream
+BT /F1 28 Tf 72 700 Td <8CC7659930D330E530FC30A230FC306E8A669A13> Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 55 >>
+stream
+BT /F2 24 Tf 72 700 Td (Second page in Helvetica) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiMin-W3 /Encoding /UniJIS-UCS2-H /DescendantFonts [8 0 R] >>
+endobj
+8 0 obj
+<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiMin-W3 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 10 0 R >>
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+10 0 obj
+<< /Type /FontDescriptor /FontName /HeiseiMin-W3 /Flags 6 /FontBBox [-123 -257 1001 910] /ItalicAngle 0 /Ascent 723 /Descent -241 /CapHeight 709 /StemV 69 >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000373 00000 n 
+0000000494 00000 n 
+0000000599 00000 n 
+0000000722 00000 n 
+0000000897 00000 n 
+0000000967 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+1141
+%%EOF

@@ -9,7 +9,7 @@ import { Rclone, type RcloneAPI } from './rclone';
 import { cloudDeclaration, entryNameError, mountNameError, nameKey } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
 import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
-import { draftFile, hash, readTextDocument, textFileByteLimit } from '../host/files';
+import { draftFile, hash, readDocument, textFileByteLimit } from '../host/files';
 import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type { WriteTarget } from './outbox';
@@ -1032,15 +1032,19 @@ export class CloudService {
     await this.rpc.call('vfs/refresh', { fs: mounted.filesystem, dir }).catch(() => {});
     return true;
   }
-  /** A text file in a Drive connection, with whether it may be edited and any kept draft. */
+  /**
+   * A file in a Drive connection, with whether it may be edited and any kept draft.
+   * A format irori shows with a viewer opens view-only, without a draft.
+   */
   async document(scopeId: string, rel: string): Promise<Document> {
     const root = await this.files.get(scopeId);
     this.roots.set(scopeId, root.root);
-    const doc = await readTextDocument(await this.resolve(scopeId, rel), scopeId, rel);
+    const doc = await readDocument(await this.resolve(scopeId, rel), scopeId, rel);
     const writable = this.writable(scopeId, rel);
-    const draft = writable
-      ? await readLocalJson(draftFile(this.files.dataDir, scopeId, rel), null)
-      : null;
+    const draft =
+      writable && !doc.viewer
+        ? await readLocalJson(draftFile(this.files.dataDir, scopeId, rel), null)
+        : null;
     return {
       ...doc,
       readOnly: !writable,
