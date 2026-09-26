@@ -1,217 +1,209 @@
 # irori — Continuation prompt
 
-Updated 2026-09-26, while the UI v5 switch was being finished. Give this file
-to the next agent, or copy its contents into a new session. Inspect current
-files and Git state before acting; later work takes precedence over this file.
+Updated 2026-09-26, after the UI v5 switch was merged. Give this file to the
+next agent, or copy its contents into a new session. Inspect current files and
+Git state before acting; later work takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`. At this update, **0.1.41**
-(UI v5 stages 1–4) was published and the download page in step. Two stacked pull
-requests were waiting for the owner's merge words:
+Take over **irori** development from current `main`. The whole interface now
+follows the v5 design. The owner's words "全部マージして" merged #103 (your AI,
+0.1.42), #104 (motion and finish, 0.1.43) and #96. **0.1.43** is published from
+that `main`, with 0.1.42 folded in; check
+[STATUS](STATUS.md) for its publication record before assuming it. Nothing else
+was waiting to be merged.
 
-- #103, your AI (0.1.42);
-- #104, motion and finish (0.1.43).
+The owner's reports come first. None of the Drive work of 0.1.31–0.1.37 has been
+tried on their Windows 11 device yet, and neither has the v5 interface.
+Otherwise take a bounded next change with executable acceptance checks and
+carry it through implementation and verification. The open v5 follow-ups are
+listed in [HANDOFF](HANDOFF.md):
 
-Once they are merged, publish 0.1.43 as [DISTRIBUTION](DISTRIBUTION.md) describes.
-Then choose a bounded next change with executable acceptance checks and carry it
-through implementation and verification. [HANDOFF](HANDOFF.md) lists the open v5
-follow-ups. For v5, read [ADR 014](decisions/014-ui-v5.md), the newest
-[STATUS](STATUS.md) entries and [YOUR-AI](YOUR-AI.md).
+- Codex for your AI;
+- your AI's work shown in a brain's own panel;
+- holding only the brains a hand-off reaches;
+- with the owner, what your AI should typically ask of the brains.
 
 Work in the independent `irori/` repository inside the `KB_design/` workspace.
 The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
 `.agents/`, `scripts/`, research and initial specifications — are versioned as
-the private repository **`irori-workspace`** since 2026-09-21; it ignores the
-three product repositories and `references/`, and its changes follow the same
-branch and pull request rule. `irori-extention` ended development on 2026-09-18
-and is kept as the readable record of how the layer model was worked out;
-`irori-templete` is the recommended main-KB repository template.
+the private repository **`irori-workspace`**; it ignores the three product
+repositories and `references/`, and its changes follow the same branch and pull
+request rule. `irori-extention` ended development on 2026-09-18 and is kept as
+the readable record of how the layer model was worked out; `irori-templete` is
+the recommended main-KB repository template.
 
 Respond to the user in Japanese. Write code, identifiers, technical documents
-and commit messages in English. The user prefers simple, minimal code and asks
-for unnecessary parts to be cut. Every new feature starts on a dedicated branch
-and reaches `main` through a pull request. Development, verification,
-feature-branch commit/push and PR creation are authorized; merging needs the
-owner's own words, naming the pull request. Real Claude Code runs for your AI's
-acceptance (`npm run test:your-ai`) were authorized on 2026-09-26. New user
-directions override this file.
+and commit messages in English; interface text is bilingual through
+`t('日本語', 'English')` ([ADR 011](decisions/011-interface-language.md)). The
+user prefers simple, minimal code and asks for unnecessary parts to be cut.
+Every new feature starts on a dedicated branch and reaches `main` through a pull
+request. Development, verification, feature-branch commit/push and PR creation
+are authorized. Merging needs the owner's own words, naming the pull request.
+Real Claude Code runs for your AI's acceptance (`npm run test:your-ai`) were
+authorized on 2026-09-26. New user directions override this file.
 
 ## Read first
 
 The [contributor contract](../AGENTS.md), then [STATUS](STATUS.md), which is
-newest-first and carries the verification evidence for everything below. Then
-select for the task: [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)
-for agent access, Drive write policy and VS Code extension compatibility,
-[AUDIT-2026-09-22](AUDIT-2026-09-22.md) for the open-work table,
-[real native acceptance](REAL-AGENT-ACCEPTANCE-2026-09-23.md),
-[VS Code compatibility evidence](research/VSCODE-EXTENSION-COMPATIBILITY-2026-09-23.md),
-[EDITOR-ASSISTANCE](EDITOR-ASSISTANCE.md), [ADR 006](decisions/006-person-lines.md)
-for authorship, [ADR 007](decisions/007-obsidian-ui.md) for the ObsidianUI
-controls, [ADR 008](decisions/008-graph-index-module.md) for the graph index
-module, [ADR 005](decisions/005-host-and-references.md) for the product
-directions, [ADR 002](decisions/002-release-and-workspace.md) for confirmed
-product scope, [ACCEPTANCE](ACCEPTANCE.md) for the requirement matrix,
-[DISTRIBUTION](DISTRIBUTION.md) for the publish rule, and the per-area note
-matching the change — [ONTOLOGY](ONTOLOGY.md), [PACKAGING](PACKAGING.md),
+newest-first and carries the verification evidence for everything below. For
+the interface: [ADR 014](decisions/014-ui-v5.md) (v5 decisions and the owner's
+answers), the v5 section of [UI-DESIGN](UI-DESIGN.md) and [YOUR-AI](YOUR-AI.md). For
+Drive work: [ADR 012](decisions/012-drive-editing.md) (editing Drive folders in
+place, and what is not included), [ADR 013](decisions/013-drive-folders-in-kbs.md)
+(Drive folders belong to KBs; it supersedes ADR 002 Q02's workspace-owned
+connections), [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md) and [CLOUD-SETUP](CLOUD-SETUP.md).
+Otherwise select for the task: [ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
+[ADR 010](decisions/010-in-app-updates.md) and [UPDATES](UPDATES.md),
+[ADR 011](decisions/011-interface-language.md), [AUDIT-2026-09-22](AUDIT-2026-09-22.md),
+[ACCEPTANCE](ACCEPTANCE.md), [DISTRIBUTION](DISTRIBUTION.md) for the publish
+rule, and the per-area notes ([ONTOLOGY](ONTOLOGY.md), [PACKAGING](PACKAGING.md),
 [AUTHORSHIP](AUTHORSHIP.md), [HARNESSES](HARNESSES.md), [GIT](GIT.md),
-[NOTE-LINKS](NOTE-LINKS.md), [KB-SEARCH](KB-SEARCH.md), [SKILLS](SKILLS.md),
-[CLOUD-SETUP](CLOUD-SETUP.md) and the rest.
+[NOTE-LINKS](NOTE-LINKS.md), [KB-SEARCH](KB-SEARCH.md), [SKILLS](SKILLS.md) and
+the rest).
 
-`references/` in the workspace parent holds **orca**, **claudian**, **VS Code**
-and **evoagent** (arXiv 2406.14228 and its code) as reading material. Nothing
-in it is imported, vendored or built. What was taken from EvoAgent is in the
-workspace's `_research/ontology-evolution-2026-09-22/`.
+## What landed on 2026-09-26
 
-## What landed on 2026-09-23
+- **#97–#101 (0.1.38–0.1.41, published as 0.1.41)** — the v5 interface:
+  - the rail of brains, one panel per brain (Schema / Knowledge / Contents), the
+    stage and the AI panel;
+  - brain home, graph and materials as stage views, the ⌘K palette, the Drive
+    sheet and Start;
+  - brain identity (name, category, icon, colour in `.irori/scope.json`);
+  - the Overview (map and columns), brain AIs running side by side, and search
+    across all brains;
+  - the your-AI spike.
+- **#103 (0.1.42)** — your AI, handing work to one Claude Code sub-agent per
+  brain, with irori keeping writes in bounds; request ends announced by the
+  host.
+- **#104 (0.1.43)** — the zoom between levels, sheet and request motion, finish
+  against the canvas, and one shared backlinks scan.
 
-- **#73 (0.1.26)** — the recovery audit's fixes: note moves keep references and
-  person lines, graph index regeneration survives broken or oversized modules,
-  a vanished mount no longer blocks closing, and new Drive preparations bind
-  the exact account and shared drive.
-- **#75 (0.1.27)** — the composer offers each native CLI's real access modes
-  (native/default or explicit full access for Codex, Claude and OpenCode; Pi
-  native only). Queued instructions keep their mode; changing mode starts a
-  fresh native session. Retained Drive preparations can be restored as new
-  local files after their workspace or connection is removed. The real native
-  trials and the lifecycle script's stricter gate checks came with it.
-- **#76 (0.1.28)** — **コード支援 ON / OFF** in the document toolbar switches
-  syntax coloring, line numbers, folding, bracket assistance and completions
-  together, in source files and Markdown code blocks. A device setting, default
-  on; switching keeps text, selection and Undo, and writes nothing to the note.
-  A VS Code Codex session left it uncommitted; a Claude session finished it and
-  fixed two timing faults in its UI suite.
-- **#74, #77, #78** — the 0.1.26 and 0.1.28 notes, download manifests and records.
-- **#79** — this handoff, rewritten on the 0.1.28 basis.
-- **#80 (0.1.29)** — in-app updates with one button ([ADR 010](decisions/010-in-app-updates.md),
-  [UPDATES](UPDATES.md)). An installed irori checks by itself 10 seconds after
-  start and hourly; **更新して再起動** downloads over HTTPS, verifies size and
-  `SHA256SUMS.txt`, and restarts through the window's shutdown. Windows applies
-  Squirrel's `irori-<version>-full.nupkg` with the installed `Update.exe`; the Mac
-  swaps in the bundle from the published disk image after `codesign`, identifier
-  and version checks. Releases now publish the `.nupkg`, and the drift check
-  requires it from 0.1.29. The same PR fixed the light-theme
-  **端末の送信準備を復元** button.
-- **#81** — the Windows update smoke waits for file locks; **#82** — the 0.1.29
-  download manifest.
+## What landed on 2026-09-25
+
+- **#86 (0.1.31)** — dialog panels take the theme's surface and text (the dark
+  theme measured 1.26:1 before); an opened Drive folder can itself be chosen
+  as the connection.
+- **#87 (0.1.32)** — the explorer's rows and personal/team split resize and are
+  kept per device; layout keys may be 160 characters (the three-pane workspace
+  key is 67 and was never saved); the sidebar fills its pane.
+- **#88 (0.1.33)** — **日本語 / English** in the display settings, applied live;
+  about 1,100 `t()` calls across renderer and host; `language-ui-smoke` fails
+  on any Japanese interface text in English.
+- **#90 (0.1.34)** — on Windows, rclone mounts a Drive folder through WinFsp
+  onto a folder whose volume has no DOS name, so `fs.realpath` fails with
+  `UNKNOWN` for every path inside it (nodejs/node#50019).
+  `CloudService.resolve` checks components with `lstat` instead. The setup line
+  shows only when mounting is unavailable.
+- **#91 (0.1.35)** — editable Drive folders ([ADR 012](decisions/012-drive-editing.md)):
+  per-connection `access`, the `drive` scope with **書き込みを許可** to sign an
+  older account in again, rclone's write cache, a per-mount `description`,
+  in-place saves, pending uploads (`vfs/stats`) and a quit prompt, notes added
+  from the sidebar, **フォルダを開く**.
+- **#92 (0.1.36)** — rename/move/delete through the mount
+  (`CloudEntryActions.tsx`), images in Drive notes, a save-time Drive version
+  check (`operations/stat` MD5 against the editor's starting bytes; skipped for
+  items in `vfs/queue`; `vfs/refresh` on conflict; 5 s bound; open Drive
+  documents re-read every 25 s), upload failure reasons classified from
+  rclone's stderr (`src/cloud/upload-errors.ts`, path and category only), and
+  `leavePending` so a folder whose uploads keep failing can still be
+  disconnected or made read-only. Written as four parallel delegated branches
+  (three on Fable) and merged by the lead.
+- **#94 (0.1.37)** — the separate Google Drive frame is gone; Drive folders
+  belong to KBs ([ADR 013](decisions/013-drive-folders-in-kbs.md)). The header
+  **クラウド接続** opens the open KB's connections; older workspace connections
+  are moved with **この KB に移す** (`CloudService.moveConnection`, same mount
+  ID); removing a workspace unregisters its own connections.
+- **#89, #93, #95** — download manifests and records for 0.1.33, 0.1.36, 0.1.37.
 
 ## Delivery state
 
-Version **0.1.30** (PR #84: a newer release's own assets endpoint when the list
-omits its files; releases published from a draft) is published as
-[v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1)
-through release run 35851726103 from main run 35850884875 (source `2814b93`).
-Before it, version **0.1.29** was published as
-[v0.1.29-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.29-preview.1)
-through release run 35845216421 from main run 35843823360 (source `93951b9`).
-The downloads are 198,619,136 bytes (Windows x64) and 166,268,652 (Mac arm64),
-plus the 197,978,744-byte `irori-0.1.29-full.nupkg`. The download page was
-deployed (Pages 35845928596) and all three files matched `SHA256SUMS.txt` when
-downloaded anonymously. Right after publication GitHub's release list served
-stale asset lists; STATUS records what was observed. Confirm that the release
-list, with the app's `Accept` and `X-GitHub-Api-Version` headers, names all six
-files and that a `release-sync.yml` drift run passes.
+**0.1.37** is published as
+[v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1)
+through release run 36091671804 from main run 36091077153 (source `5270ac9`):
+Windows 198,651,392 bytes, Mac 166,238,512 bytes and the 198,011,147-byte
+`irori-0.1.37-full.nupkg`. Pages 36092377034 deployed the download page;
+anonymous downloads matched `SHA256SUMS.txt`; the public release list, read with
+the app's headers, named all six files; drift run 36092502782 passed. 0.1.33
+and 0.1.36 were published earlier the same day (STATUS has their runs);
+0.1.31, 0.1.32, 0.1.34 and 0.1.35 were not published on their own.
 
-An installed 0.1.28 or earlier cannot update itself: the owner installs 0.1.30
-once by hand. The first real in-app update, 0.1.30 to the next published
-version, is device evidence still owed on Windows 11 and macOS 26, including
-the Mac's App Management response to the bundle swap.
-
-The 0.1.29 branch passed the production build, formatting, 251 tests (244
-passed, seven environment-gated skips: no local rclone, OpenCode or Pi binary,
-and a case-sensitive filesystem) and all fifteen Electron UI suites. Its CI ran
-the new `test:update-package` on real Windows and macOS runners. 0.1.28 was
-published earlier the same day (release run 35761285128).
+The owner's first steps after updating in-app to 0.1.37: **書き込みを許可** on
+the account (Google asks for the `drive` scope), **編集できるようにする** on each
+connection to edit (older declarations stay read-only), and **この KB に移す**
+for the connection they made to the workspace earlier (KB-contents-mock is
+connected twice, so that only unregisters the workspace's copy).
 
 Every branch adds to the top of `docs/STATUS.md` and advances the version, so
-parallel branches conflict there; the one merged second takes the next free
-version and rewrites its notes. GitHub does not retarget a stacked pull request
-here (`gh pr edit <n> --base main`). Several sessions, including Codex in VS
-Code, work in this repository at once: work in a worktree under
-`KB_design/.local/worktrees/`, and leave the shared checkout on `main`. The
-worktrees left there by the 2026-09-23 branches are all merged and clean.
+parallel branches conflict there; stack a later branch on an earlier one and
+retarget it with `gh pr edit <n> --base main` once the earlier one merges.
+Several sessions, including Codex in VS Code, work in this repository at once:
+work in a worktree under `KB_design/.local/worktrees/`, and leave the shared
+checkout on `main`.
 
 ## Owner decisions in force
 
+- **Drive (ADR 012, ADR 013).** Materials in a KB's `contents` are edited and
+  added to from irori; a Drive connection is editable unless it is set
+  read-only, and every Drive folder belongs to a KB. A workspace without a KB
+  does not use Drive. ADR 009's third Drive mode, approval before each delivery,
+  is not implemented: editing goes through the mount and the preparation
+  outbox remains for keeping a version to send later. Ask the owner before
+  adding that mode.
 - **Access (ADR 009).** People choose whether writes are allowed. Native agent
   execution exposes each provider's actual modes, keeps native approvals by
-  default and needs an explicit choice for full access. Drive write policy is a
-  separate per-connection choice — read-only, approval before delivery, or
-  delivery without each approval — and native full access grants none of it.
-  Existing connections stay read-only until the writable capability, re-consent,
-  delivery checks and interruption recovery exist; do not show a write selector
-  that cannot enforce its mode.
-- **Capabilities.** The requirement is what an ordinary native CLI agent can do,
-  including its file and command tools, through irori. Syntax coloring,
-  completion, diagnostics and run buttons are separate conveniences, shown or
-  hidden by one button; they are never a reason to restrict the agent.
-- **Extensions.** The target is VS Code extension compatibility, not an
-  irori-specific plugin API. The research recommends a pinned Code-OSS desktop
-  workbench; the owner has not approved replacing the current shell.
-- **Graph index (ADR 008).** A module the knowledge base carries,
-  `Knowledge_Base/ontology/`, generated deterministically by irori from pages'
-  `type`, `title` and `relations` as CSV node and edge tables, committed by the
-  person. The graph draws `relations` only; body links stay reachable through
-  リンク元 and search.
-- **Authorship (ADR 006).** Only the person's lines are recorded, one mark per
-  line; sharing is Git AI Standard `h_` entries only. Codex is not told at edit
-  time.
+  default and needs an explicit choice for full access.
+- **Language (ADR 011).** Japanese stays the default and the source text.
+- **Capabilities, extensions, graph index, authorship.** Unchanged from
+  ADR 009, ADR 008 and ADR 006: ordinary native CLI capabilities through irori;
+  VS Code extension compatibility as the target, with replacing the shell not
+  approved; the graph index generated deterministically from pages; only the
+  person's lines recorded.
 
 ## Next work, in the order the evidence supports
 
-1. **D04 — writable Drive delivery.** Add the explicit writable capability and
-   re-consent, the per-connection write policy of ADR 009, and connect a
-   verified account and shared drive to the transport. Test independently
-   confirmed remote bytes and interruption/restart recovery with local rclone
-   first; real Google acceptance needs the owner's device and account.
-2. **VS Code compatibility, next bounded slice** (the research note's §"Next
-   bounded slice"): package the probe as a VSIX and install, disable and
-   re-enable it through the chosen host, with unchanged licence-checked theme and
-   language-server samples; then one irori bridge that opens a disposable KB in
-   a rich Markdown editor and shows an extension's edit without overwriting
-   unsaved work. How much of the current shell to keep is the owner's decision.
-3. **Codex structured questions.** The native default mode has no
-   `request_user_input` (`default_mode_request_user_input` is under development
-   and off). Find a supported plan-mode route and its UI; do not enable an
-   experimental feature or change the native default.
-4. **Pi and OpenCode real-model acceptance**, once the owner sets up their native
-   accounts. Neither has a configured model here; do not log in, copy
-   credentials or change model defaults.
-5. **Device acceptance** (D03/D05, D07–D10): Windows/Mac consent, mount and
-   reconnect, installed-device IME (including the code-assistance switch),
-   performance, credential storage, signing, upgrade and rollback.
-6. **D06 provenance** and **evidence for the template's vocabulary review in
-   use** over some weeks on a real knowledge base.
+1. **Owner's Drive trial on Windows 11, then the Mac.** Expect reports about
+   the WinFsp mount, signing in again with the `drive` scope, writable mounts,
+   saving, conflicts, upload failure reasons, rename/move/delete, image paste
+   and moving the workspace connection. The UI smoke fixtures cannot model a
+   mount, so the new sidebar menu and dialogs have only been exercised through
+   service tests; reproduce reported problems with `tests/fixtures/cloud.ts`
+   (`mountedFixture`) where possible.
+2. **Drive gaps listed in ADR 012.** Knowledge records keep a moved Drive
+   file's old path; a deleted Drive folder's files go to Drive's trash one by
+   one (`operations/purge` would trash the folder as one item but bypasses the
+   VFS); merging a version changed in Drive with the draft beyond the existing
+   side-by-side view.
+3. **Host errors reach the interface as `Error: Error: …`** (the host sends
+   `String(error)` and the preload wraps it again). Small, visible, untested.
+4. **VS Code compatibility, next bounded slice**, as in the research note.
+5. **Codex structured questions**, **Pi and OpenCode real-model acceptance**
+   once the owner sets up those accounts, **device acceptance** (D03/D05,
+   D07–D10) and **D06 provenance**, as before.
 
 ## Authorization and protected state
 
 - Development, verification, feature-branch commit/push and PR creation are
-  authorized and need no further asking. Merging needs the owner's own words
-  in the current session; words from an earlier session do not carry over.
+  authorized and need no further asking. Merging needs the owner's own words in
+  the current session; words from an earlier session do not carry over.
   Publishing a preview after an authorized merge is covered by standing
   authorization; signing identities, notarization, a non-preview release, a new
   platform and account changes are not.
-- Real provider model tests need explicit agent-execution authorization. On
-  2026-09-23 the owner authorized native acceptance with existing accounts
-  (ADR 009); it covers no login, account or model-default change. Confirm it
-  still stands before consuming allowances. Do not run `test:agents`,
-  `test:lifecycle` or `IRORI_UI_REAL_AGENTS=1` without it,
-  and do not bypass native authentication to make a test pass. Protocol
-  fixtures are not model-turn acceptance.
+- Real provider model tests need explicit agent-execution authorization;
+  confirm it before consuming allowances. Do not run `test:agents`,
+  `test:lifecycle` or `IRORI_UI_REAL_AGENTS=1` without it, and do not bypass
+  native authentication to make a test pass.
 - Distributor Google configuration is already in repository secrets
-  `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET`. Do not ask for
-  registration again or retrieve their values. Mounts remain read-only.
+  `IRORI_GOOGLE_CLIENT_ID` and `IRORI_GOOGLE_CLIENT_SECRET`, and the owner has
+  declared the Drive permissions in the Google project. Do not ask for
+  registration again or retrieve their values.
 - Keep filesystem and process work behind `src/domain/types.ts`'s `HostAPI`.
-  Document content receives no raw IPC, Node or shell access. irori writes no
-  agent configuration into a user's KB; `tests/harnesses.test.ts` and
-  `scripts/real-agents.ts` assert it by hashing the schema layer across a turn.
-  The graph index is the one file set irori writes into the knowledge layer on
-  the person's request, through `FileService.writeGenerated`.
+  Document content receives no raw IPC, Node or shell access. Never pass raw
+  rclone output to the interface. Inside a Drive mount never use `realpath`,
+  and never replace a file through a temporary file and rename.
 - Use disposable KBs for mutation tests. Preserve `.local/vm-preview/samples`
-  and `.local/vm-preview/device`: they are user data, and the VM preview may
-  still be running older code.
-- Keep credentials, private notes, provider transcripts and device paths out of
-  tracked evidence.
+  and `.local/vm-preview/device`. Keep credentials, private notes, provider
+  transcripts and device paths out of tracked evidence.
 
 ## Commands
 
@@ -229,22 +221,18 @@ env -u IRORI_UI_REAL_AGENTS xvfb-run -a npm run test:ui
 npm run build:website && xvfb-run -a npm run test:website
 ```
 
-`npm run setup:cloud` fetches the ignored local rclone tool if it is missing.
 **Never run `npm run package`, `make` or `test:package` in a worktree whose
-`node_modules` is a symlink to this checkout's**: Forge then works on the shared
-tree, empties `node_modules/.bin`, rebuilds node-pty for Electron and deletes
-other platforms' prebuilds and the Agent SDK's platform packages. To package in a
-worktree, give it a real copy instead (`cp -a` of the checkout's
-`node_modules` takes seconds), and `npm prune` the copy when the shared tree
-holds another branch's extra packages. Other sessions may hold the shared
-checkout on their own branch; work in your own worktree.
-`git-ui-smoke` is timing-sensitive under load in this container and has failed
-intermittently on `未解決 0 件`; rerun it alone before treating that as a
-regression. Never run `npm test` alongside `npm run test:ui`. See
-[PACKAGING](PACKAGING.md) for native package checks, and preserve the documented
-Windows node-pty prebuild configuration and the unpacked native helpers.
+`node_modules` is a symlink to this checkout's**; give such a worktree a real
+copy (`cp -a`) first. `git-ui-smoke` is timing-sensitive and has failed
+intermittently on `未解決 0 件`, locally and in CI; the Windows package job has
+failed once on the packaged app's first heading. Rerun the failed job alone
+before treating either as a regression. Never run `npm test` alongside
+`npm run test:ui`. See [PACKAGING](PACKAGING.md) for native package checks.
 
 A pull request that changes what ships — as `scripts/release-policy.ts` decides,
 naming only what does *not* ship — must advance `package.json` and
 `package-lock.json` past the latest published preview and add
 `docs/releases/<version>-preview.1.md` with its `# ` title. CI enforces it.
+Publishing follows [DISTRIBUTION](DISTRIBUTION.md): wait for main's CI of the
+merge, dispatch `release.yml` with that run id, then the manifest PR,
+`website.yml`, an anonymous checksum check and a `release-sync.yml` drift run.

@@ -12,20 +12,34 @@ also records the owner's answers). The work went in six stages:
   record #102). This covers the rail and brain panel, the brain views, brain
   identity, the Overview with brain AIs side by side, and search across brains.
   0.1.38–0.1.40 were never published on their own.
-- **Open, stacked:** #103 (0.1.42) adds **your AI** (`docs/YOUR-AI.md`). It also
-  fixes a 0.1.41 bug where a permission request could show as ended. #104
-  (0.1.43), on top of it, adds the zoom between levels and the finish against the
-  canvas; `scripts/ui-screens.ts` captures the screens. Merging each needs the
-  owner's own words naming it. When they land, publish once as 0.1.43 (0.1.42
-  folded in, as 0.1.13 and 0.1.38–0.1.40 were), then update the download page.
-- **Stale:** #96 (another session's 0.1.37 handoff) predates all of this, and it
-  edits the top of this file too. The owner was asked whether to close or update
-  it.
+- **Merged on 2026-09-26** at the owner's word ("全部マージして"):
+  - #103 (0.1.42), **your AI** (`docs/YOUR-AI.md`). It also fixes a 0.1.41 bug
+    where a permission request could show as ended.
+  - #104 (0.1.43), the zoom between levels and the finish against the canvas
+    (`scripts/ui-screens.ts` captures the screens). It also shares one backlinks
+    scan between the count and the list.
+  - #96, the 0.1.37 handoff; its section follows.
+- **To publish:** 0.1.43, with 0.1.42 folded in as 0.1.13 and 0.1.38–0.1.40 were.
+  The publication record gives the runs.
 - **Later:** Codex for your AI; your AI's work shown in a brain's own AI panel;
   holding only the brains a hand-off reaches; and, with the owner, what your AI
   should typically ask of the brains.
 
 The paragraphs below predate v5.
+
+Current development, 2026-09-25: **0.1.37 is published** as
+[v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1);
+nothing is open. One session delivered 0.1.31–0.1.37 from the owner's reports
+and requests: readable dialogs and choosing an opened Drive folder (#86),
+resizable explorer rows (#87), an English/Japanese interface ([ADR 011](decisions/011-interface-language.md), #88),
+the Windows WinFsp `realpath` failure (#90), editable Drive folders
+([ADR 012](decisions/012-drive-editing.md), #91), rename/move/delete, images,
+a save-time Drive version check and upload failure reasons (#92), and Drive
+folders belonging to KBs with the separate Drive frame removed
+([ADR 013](decisions/013-drive-folders-in-kbs.md), #94). 0.1.33 and 0.1.36 were
+published on the way. None of the Drive work has been tried on the owner's
+Windows 11 or macOS devices yet; see [HANDOFF-PROMPT](HANDOFF-PROMPT.md) for the
+owner's first steps after updating and the next work.
 
 Current development, 2026-09-23 (night): **0.1.30 is published** as
 [v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1).

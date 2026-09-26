@@ -1,6 +1,6 @@
 # 013 — Google Drive folders belong to KBs
 
-Date: 2026-09-26. Status: owner decision; implemented for 0.1.37. Supersedes
+Date: 2026-09-25. Status: owner decision; implemented for 0.1.37. Supersedes
 the part of [ADR 002](002-release-and-workspace.md) Q02 that made new Drive
 connections belong to a workspace.
 
