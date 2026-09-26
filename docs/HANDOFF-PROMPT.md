@@ -8,10 +8,9 @@ Git state before acting; later work takes precedence over this file.
 
 Take over **irori** development from current `main`. The whole interface now
 follows the v5 design. The owner's words "全部マージして" merged #103 (your AI,
-0.1.42), #104 (motion and finish, 0.1.43) and #96. **0.1.43** is published from
-that `main`, with 0.1.42 folded in; check
-[STATUS](STATUS.md) for its publication record before assuming it. Nothing else
-was waiting to be merged.
+0.1.42), #104 (motion and finish, 0.1.43) and #96; #105 (0.1.44) followed.
+**0.1.44** is published with 0.1.42 and 0.1.43 folded in; [STATUS](STATUS.md)
+has the publication record. Nothing else was waiting to be merged.
 
 The owner's reports come first. None of the Drive work of 0.1.31–0.1.37 has been
 tried on their Windows 11 device yet, and neither has the v5 interface.

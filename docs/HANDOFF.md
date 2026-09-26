@@ -19,8 +19,10 @@ also records the owner's answers). The work went in six stages:
     (`scripts/ui-screens.ts` captures the screens). It also shares one backlinks
     scan between the count and the list.
   - #96, the 0.1.37 handoff; its section follows.
-- **To publish:** 0.1.43, with 0.1.42 folded in as 0.1.13 and 0.1.38–0.1.40 were.
-  The publication record gives the runs.
+- **Published:** [v0.1.44-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.44-preview.1)
+  carries all of it, 0.1.42 and 0.1.43 folded in. #105 (0.1.44) re-reads a
+  conflict when its resolution is refused; `git-ui-smoke` had failed on CI
+  without it. STATUS gives the runs.
 - **Later:** Codex for your AI; your AI's work shown in a brain's own AI panel;
   holding only the brains a hand-off reaches; and, with the owner, what your AI
   should typically ask of the brains.
