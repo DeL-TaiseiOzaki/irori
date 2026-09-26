@@ -11,7 +11,7 @@ Within `KB_design`, follow the [workspace contract](../AGENTS.md); shared agent
 skills and runtime configuration live at the workspace root. Load only the
 context needed for the task:
 
-- Setup and current features: [README](README.md).
+- Current features: [README](README.md); running from source and verification: [development guide](docs/DEVELOPMENT.md).
 - Resuming development or checking completion: [STATUS](docs/STATUS.md),
   [HANDOFF](docs/HANDOFF.md) and the actual Git diff.
 - Host or architecture changes: [initial host decision](docs/decisions/001-initial-host.md).
