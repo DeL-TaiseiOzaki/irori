@@ -7,6 +7,7 @@ import {
   type QueuedMessage,
 } from '../domain/conversation';
 import { requestEnded } from './AgentLog';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 
@@ -47,7 +48,9 @@ export function useBrainAi(scopeId: string, agent: AgentId, refresh = 0): BrainA
             error: '',
           }),
       )
-      .catch((error) => current && setState((previous) => ({ ...previous, error: String(error) })));
+      .catch(
+        (error) => current && setState((previous) => ({ ...previous, error: errorText(error) })),
+      );
     const stop = host.onEvent((event) => {
       if (event.type !== 'agent') return;
       const incoming = event.event;

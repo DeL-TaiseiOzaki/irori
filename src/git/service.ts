@@ -45,7 +45,6 @@ const stale = () =>
   );
 
 export class GitService {
-  private process = new GitProcess();
   private queues = new Map<string, Promise<unknown>>();
   private pending = 0;
   private fetched = new Map<string, string>();
@@ -53,6 +52,7 @@ export class GitService {
     private files: FileService,
     private canMutate: () => boolean = () => true,
     private authorship?: Pick<AuthorshipStore, 'view'>,
+    private process = new GitProcess(),
   ) {}
   get busy() {
     return this.pending > 0;
@@ -1141,11 +1141,22 @@ export class GitService {
           { network: true },
         );
       } catch (error) {
+        // Git empties a destination that existed before the clone, so the folder irori
+        // created is removed only while it is still empty; anything left in it is kept.
+        const kept = await fs.rmdir(destination).then(
+          () => false,
+          () => true,
+        );
+        if (!kept) throw error;
+        const [advice, ...detail] = (error as Error).message.split('\n\n');
         throw Error(
-          `${(error as Error).message} ${t(
-            '取得途中のフォルダが残っている場合は保持しています。再試行時は別のフォルダ名を選択してください。',
-            'A partially cloned folder, if any, is kept. Choose a different folder name when retrying.',
-          )}`,
+          [
+            `${advice}\n${t(
+              '取得途中のフォルダを保持しています。再試行時は別のフォルダ名を選択してください。',
+              'The partially cloned folder is kept. Choose a different folder name when retrying.',
+            )}`,
+            ...detail,
+          ].join('\n\n'),
         );
       }
       const notice = await this.fetchNotes({ root: destination }, 'origin');

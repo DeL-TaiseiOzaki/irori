@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { parseCsv } from '../domain/ontology';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 export function CsvPreview({ text }: { text: string }) {
   const [page, setPage] = useState(0);
@@ -8,7 +9,7 @@ export function CsvPreview({ text }: { text: string }) {
     try {
       return { table: parseCsv(text) };
     } catch (error) {
-      return { error: String(error) };
+      return { error: errorText(error) };
     }
   }, [text]);
   if (!result.table)

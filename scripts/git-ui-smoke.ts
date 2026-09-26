@@ -200,6 +200,14 @@ git(
   `url.${cloneRemote}.insteadOf`,
   'https://github.com/irori-fixture/catalog.git',
 );
+git(
+  base,
+  'config',
+  '--file',
+  globalConfig,
+  `url.${path.join(base, 'missing.git')}.insteadOf`,
+  'https://github.com/irori-fixture/missing.git',
+);
 const env = {
   ...process.env,
   IRORI_DATA_DIR: files.dataDir,
@@ -488,11 +496,31 @@ try {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await page.getByRole('button', { name: 'Brain を追加', exact: true }).click();
   await page.getByRole('button', { name: 'GitHub から取得', exact: true }).click();
+  const registration = page.getByRole('form', { name: 'スペース登録' });
+  // Nothing to preview yet, so no empty panel sits under the form.
+  await expect(registration.locator('.repository-preview')).toBeHidden();
+  await page
+    .getByRole('textbox', { name: 'GitHub リポジトリ URL' })
+    .fill('https://github.com/irori-fixture/missing.git');
+  await page.getByRole('textbox', { name: '保存先の親フォルダ' }).fill(base);
+  await page.getByRole('textbox', { name: '新しいフォルダ名' }).fill('取得した KB');
+  await page.getByRole('button', { name: 'リポジトリを取得', exact: true }).click();
+  // A failed clone gives advice once, folds Git's own output, and leaves no folder behind.
+  const failure = registration.getByRole('alert');
+  await expect(failure.locator('p')).toHaveText(
+    '接続先・ネットワーク・アクセス権を確認してから再試行してください。',
+  );
+  await expect(failure).not.toContainText('Error:');
+  await expect(failure).not.toContainText('保持');
+  await expect(failure.locator('pre')).toBeHidden();
+  await failure.getByText('詳細', { exact: true }).click();
+  await expect(failure.locator('pre')).toContainText('missing.git');
+  await expect(failure.locator('pre')).not.toContainText('Cloning into');
+  await expect(readFile(path.join(base, '取得した KB'))).rejects.toMatchObject({ code: 'ENOENT' });
+  // The same folder name works on the next attempt.
   await page
     .getByRole('textbox', { name: 'GitHub リポジトリ URL' })
     .fill('https://github.com/irori-fixture/catalog.git');
-  await page.getByRole('textbox', { name: '保存先の親フォルダ' }).fill(base);
-  await page.getByRole('textbox', { name: '新しいフォルダ名' }).fill('取得した KB');
   await page.getByRole('button', { name: 'リポジトリを取得', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'KBフォルダ', exact: true })).toHaveValue(
     path.join(base, '取得した KB'),
@@ -528,6 +556,7 @@ try {
           'successful conflict resolution acknowledges and durably clears its draft',
           'editor refresh after source control closes',
           '1024px sidebar bounds',
+          'a failed clone folds redacted Git output under one advice line and removes its empty folder',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
           "a collaborator's h_ line in refs/notes/ai counts for the open note, a commit names the lines typed here as the committer's, and Push carries the ref",
         ],

@@ -4,6 +4,7 @@ import { noteFilename, type TrashedNote } from '../domain/note-operations';
 import type { LinkUpdate } from '../domain/note-links';
 import { Dialog } from './Dialog';
 import { displayLocale, t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 
@@ -74,7 +75,7 @@ export function NoteActionDialog({
         if (current) setReferring(value);
       },
       (error) => {
-        if (current) setReferring({ error: String(error) });
+        if (current) setReferring({ error: errorText(error) });
       },
     );
     return () => {
@@ -119,7 +120,7 @@ export function NoteActionDialog({
       }
       close();
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setBusy(false);
       onBusyChange(false);
@@ -257,7 +258,7 @@ export function TrashNotes({
         if (current) setNotes(notes);
       })
       .catch((error) => {
-        if (current) setError(String(error));
+        if (current) setError(errorText(error));
       })
       .finally(() => {
         if (current) setLoading(false);
@@ -274,7 +275,7 @@ export function TrashNotes({
       setNotes((notes) => notes.filter((note) => note.id !== id));
       onRestored(doc, doc.notice);
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setBusy(false);
     }
