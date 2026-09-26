@@ -261,6 +261,19 @@ try {
   expect(
     JSON.parse(await readFile(path.join(spaces[0].root, '.irori/scope.json'), 'utf8')).scopeId,
   ).toBe(spaces[0].scopeId);
+  // Opening another workspace after removing the one that was open does not look up
+  // the removed workspace: it has no connections left to close. (個人KB's declaration
+  // is still the malformed fixture, which is reported on its own.)
+  await page.getByRole('checkbox', { name: 'チームKB' }).check();
+  await page.getByRole('textbox', { name: 'ワークスペース名' }).fill('残った Brain');
+  await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'ノートを作成', exact: true })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(
+    (await page.getByRole('alert').allTextContents()).filter((text) =>
+      text.includes('cloud owner'),
+    ),
+  ).toEqual([]);
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/cloud-ui-smoke.json',
@@ -282,6 +295,7 @@ try {
           'provider folder IDs preserved',
           'restart persistence',
           'workspace edit and removal preserving scopes',
+          'opening another workspace after removing the open one reports no unknown cloud owner',
           'cloud rename and removal preserving provider identity',
           'account removal refuses referenced accounts',
           'one malformed scope does not stop another scope reconnecting',

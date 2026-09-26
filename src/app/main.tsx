@@ -1115,7 +1115,13 @@ function App() {
       // Drive folders belong to KBs; a workspace's own connections from before
       // that are moved into a KB from its connection dialog, and are not mounted.
       const nextIds = available.map((space) => space.scopeId);
-      for (const previousId of workspace ? [...workspace.scopeIds, workspace.id] : []) {
+      // A workspace removed on the start screen took its own connections with it,
+      // and its ID no longer names anything the host can look up.
+      const previousKept =
+        !!workspace && (await host.workspaces()).some((item) => item.id === workspace.id);
+      for (const previousId of workspace
+        ? [...workspace.scopeIds, ...(previousKept ? [workspace.id] : [])]
+        : []) {
         if (
           (previousId === workspace?.id || !nextIds.includes(previousId)) &&
           (previousId === workspace?.id || spaces.some((space) => space.scopeId === previousId))

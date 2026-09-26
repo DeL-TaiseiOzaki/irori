@@ -253,6 +253,10 @@ function RepositoryPanel({
       (!storedResolution.ready || storedResolution.pending || !!storedResolution.error));
   const confirmationVersion = useRef('');
   const conflictDirty = !!conflict && resolution !== (conflict.working ?? '');
+  // A refresh of the conflict on screen keeps it resolvable: the host compares
+  // versions, so a click is never lost to a brief re-read. Only a conflict that is
+  // not the selected file's (still loading, or another file's) cannot be resolved.
+  const conflictShown = !!conflict && conflict.path === selection?.path;
   const reviewing = tab === 'history' ? !!commit : !!selection;
   useEffect(() => {
     onReviewChange(reviewing);
@@ -347,7 +351,7 @@ function RepositoryPanel({
   useEffect(() => {
     if (tab !== 'changes') {
       // Leaving the changes view discards its in-flight read, so the flag that
-      // reports one must not survive: it also disables the conflict actions.
+      // reports one (aria-busy) must not survive.
       reads.current++;
       shownReview.current = '';
       reviewInFlight.current = undefined;
@@ -483,6 +487,11 @@ function RepositoryPanel({
   async function resolveConflict(text: string | null) {
     if (!selection || !conflict) return;
     const acknowledged = storedResolution.snapshot().record?.revision;
+    // A re-read of this conflict still in flight would describe the file before this
+    // resolution. Drop it; the status refresh that follows reads the file again.
+    reads.current++;
+    reviewInFlight.current = undefined;
+    setLoadingReview(false);
     let value: GitStatus;
     try {
       value = await host.gitResolve(space.scopeId, selection.path, text, conflict.version);
@@ -1130,7 +1139,7 @@ function RepositoryPanel({
                         )}
                         {(conflict.ours === undefined || conflict.theirs === undefined) && (
                           <button
-                            disabled={busy || loadingReview || draftBlocked}
+                            disabled={busy || !conflictShown || draftBlocked}
                             onClick={() =>
                               void perform(
                                 () => resolveConflict(null),
@@ -1146,7 +1155,7 @@ function RepositoryPanel({
                         )}
                         <button
                           className="primary"
-                          disabled={busy || loadingReview || draftBlocked}
+                          disabled={busy || !conflictShown || draftBlocked}
                           onClick={() =>
                             void perform(
                               () => resolveConflict(resolution),

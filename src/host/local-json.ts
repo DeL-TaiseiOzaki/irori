@@ -27,3 +27,30 @@ export async function readLocalJson(filename: string, fallback: unknown) {
     throw error;
   }
 }
+
+const busyCodes = ['EPERM', 'EACCES', 'EBUSY'];
+/**
+ * Moves a finished temporary file over the one it replaces. Windows refuses the
+ * replacement for a moment while another process holds the target open (a file
+ * watcher, the search indexer, antivirus), so there a refusal is retried briefly
+ * instead of failing the save.
+ */
+export async function replaceFile(
+  temporary: string,
+  target: string,
+  {
+    platform = process.platform,
+    rename = fs.rename as (from: string, to: string) => Promise<void>,
+  }: { platform?: NodeJS.Platform; rename?: (from: string, to: string) => Promise<void> } = {},
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await rename(temporary, target);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (platform !== 'win32' || attempt >= 7 || !busyCodes.includes(code)) throw error;
+      // 25 ms doubling: about three seconds in all.
+      await new Promise((resolve) => setTimeout(resolve, 25 * 2 ** attempt));
+    }
+  }
+}

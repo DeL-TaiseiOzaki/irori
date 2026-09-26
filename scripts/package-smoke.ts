@@ -448,13 +448,28 @@ try {
   await page.keyboard.press('ControlOrMeta+Shift+z');
   await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit');
   await page.keyboard.insertText(' after saving');
-  await expect
-    .poll(async () =>
-      (await readFile(path.join(root, 'note.md'), 'utf8')).includes(
-        'Continuous packaged edit after saving',
-      ),
-    )
-    .toBe(true);
+  try {
+    await expect
+      .poll(async () =>
+        (await readFile(path.join(root, 'note.md'), 'utf8')).includes(
+          'Continuous packaged edit after saving',
+        ),
+      )
+      .toBe(true);
+  } catch (error) {
+    // This autosave once missed its five seconds on a Windows runner and left no
+    // clue; say what the file, the editor and any message showed.
+    console.log(
+      'note.md on disk:',
+      JSON.stringify(await readFile(path.join(root, 'note.md'), 'utf8')),
+    );
+    console.log('Editor text:', JSON.stringify(await page.locator('.ProseMirror').innerText()));
+    console.log(
+      'Messages:',
+      JSON.stringify(await page.locator('[role="status"], [role="alert"]').allTextContents()),
+    );
+    throw error;
+  }
   await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
   // Reload lives in the note's menu.
   await page.getByRole('button', { name: /^その他（/ }).click();

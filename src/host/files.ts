@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import writeFileAtomic from 'write-file-atomic';
-import { writeLocalFile, writeLocalJson } from './local-json';
+import { replaceFile, writeLocalFile, writeLocalJson } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
 import { brainLook, iconImagePath } from '../domain/brains';
@@ -411,7 +411,7 @@ export class FileService {
           }
           if (hash(await fs.readFile(filename)) !== doc.hash)
             throw Error('CONFLICT: File changed during save');
-          await fs.rename(temp, filename);
+          await replaceFile(temp, filename);
         } finally {
           await fs.rm(temp, { force: true });
         }
@@ -620,7 +620,7 @@ export class FileService {
                 'CONFLICT: The output file has changed.',
               ),
             );
-          await fs.rename(temp, filename);
+          await replaceFile(temp, filename);
         } finally {
           await fs.rm(temp, { force: true });
         }
