@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-26: #107 (file viewers) is merged with the owner's go-ahead,
+and **0.1.45 is published** as
+[v0.1.45-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.45-preview.1)
+by release run `36233968176` from main's CI run `36233474364` (source `6e63563`).
+The release carries Windows 201,434,624 bytes, Mac 168,938,194 bytes and
+`irori-0.1.45-full.nupkg` 200,795,242 bytes. #107's first CI run failed once in
+`links-ui-smoke`: the reference scan hit its time budget on the runner and
+reported "not every note was checked". That suite does not touch the viewers.
+An unchanged rerun passed.
+
 File viewers, 2026-09-26: **0.1.45** is prepared on `feat/file-viewers`. The
 owner asked to be able to see at least PDF, PPTX, DOCX and XLSX. Files with a
 viewer (`src/domain/viewers.ts`: PDF, Word `.docx`, PowerPoint `.pptx`,
