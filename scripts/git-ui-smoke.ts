@@ -438,8 +438,42 @@ try {
   await page.keyboard.press('Escape');
   await expect(sidebar).toBeVisible();
   await writeFile(path.join(root, 'README.md'), 'External conflict working copy\n');
+  // A refused resolution reads the conflict again at once, and again after the status
+  // refresh that follows; that second read briefly disables the resolve button. Count
+  // the host's completed conflict reads, so the next click cannot land while it is
+  // disabled (which on a loaded runner silently lost the click).
+  await app.evaluate(({ ipcMain }) => {
+    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+    const original = (
+      ipcMain as unknown as { _invokeHandlers: Map<string, Handler> }
+    )._invokeHandlers.get('irori')!;
+    const reads = { original, conflicts: 0 };
+    (globalThis as unknown as { conflictReads: typeof reads }).conflictReads = reads;
+    ipcMain.removeHandler('irori');
+    ipcMain.handle('irori', async (event, method, ...args) => {
+      const result = await original(event, method, ...args);
+      if (method === 'gitConflict') reads.conflicts++;
+      return result;
+    });
+  });
   await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
   await expect(panel.getByRole('alert')).toContainText('確認後');
+  await expect
+    .poll(() =>
+      app.evaluate(
+        () =>
+          (globalThis as unknown as { conflictReads: { conflicts: number } }).conflictReads
+            .conflicts,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+  await app.evaluate(({ ipcMain }) => {
+    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+    const { original } = (globalThis as unknown as { conflictReads: { original: Handler } })
+      .conflictReads;
+    ipcMain.removeHandler('irori');
+    ipcMain.handle('irori', original);
+  });
   await expect(page.getByRole('region', { name: 'Git の差分' })).toHaveAttribute(
     'aria-busy',
     'false',
