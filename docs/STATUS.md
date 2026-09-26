@@ -1,5 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+File viewers, 2026-09-26: **0.1.45** is prepared on `feat/file-viewers`. The
+owner asked to be able to see at least PDF, PPTX, DOCX and XLSX. Files with a
+viewer (`src/domain/viewers.ts`: PDF, Word `.docx`, PowerPoint `.pptx`,
+spreadsheets `.xlsx/.xlsm/.xls/.ods`, images) now open on the stage instead of in
+the external application. `host.read`/`cloudRead` return them as a view-only
+`Document` (`viewer` set, empty text, version from size and mtime, so the
+existing reconcile reloads a changed file), and the new `viewerBytes` HostAPI
+method hands the bytes over after the same scope/Drive resolution, an extension
+check and a 100 MiB limit. The renderer draws them with pdf.js, docx-preview,
+@jvmr/pptx-to-html and SheetJS 0.20.3 (from SheetJS's CDN; npm's `xlsx` is the
+vulnerable 0.18.5), each loaded lazily (`src/app/FileViewer.tsx`,
+`src/app/viewers/`). pdf.js's CMaps, standard fonts and decoders are bundled as
+lazy chunks because the CSP refuses fetch; Office markup is neutralized
+(`safe-dom.ts`) and rendered in shadow roots. The notices generator now also
+copies licence files from package subfolders the bundle used (pdf.js fonts and
+wasm). Details and limits: [file viewer libraries](libraries/file-viewers.md).
+Tests: `tests/viewers.test.ts`, a Drive case in `connections.test.ts`, and
+`viewers-ui-smoke` with fixtures in `tests/fixtures/viewers/`.
+
 Delivery, 2026-09-26: #103, #104, #96 and #105 are merged with the owner's
 go-ahead, and **0.1.44 is published** as
 [v0.1.44-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.44-preview.1)

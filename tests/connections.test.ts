@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 import { mountNameError } from '../src/domain/connections';
 import { within } from '../src/domain/scopes';
 import { WorkspaceService, inspectRepository, githubRepository } from '../src/host/workspaces';
-import { FileService } from '../src/host/files';
+import { FileService, readViewerBytes } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
 import { CloudAccounts } from '../src/cloud/accounts';
 import { WorkspaceCloudStorage } from '../src/cloud/storage';
@@ -309,6 +309,18 @@ test('A workspace Drive document saves through the cloud service with its own dr
   assert.equal(saved.text, '# Shared\n\nSaved\n');
   assert.equal(saved.draft, undefined);
   assert.equal(await readFile(path.join(target, 'note.md'), 'utf8'), '# Shared\n\nSaved\n');
+  // A Word file in the same folder opens for a viewer, with its bytes through the mount.
+  const word = await readFile('tests/fixtures/viewers/sample.docx');
+  await writeFile(path.join(target, 'memo.docx'), word);
+  const memo = await cloud.read(workspace.id, 'contents/資料/memo.docx');
+  assert.equal(memo.viewer, 'word');
+  assert.equal(memo.text, '');
+  assert.equal(memo.workspaceId, workspace.id);
+  assert.equal(memo.draft, undefined);
+  assert.deepEqual(
+    Buffer.from(await readViewerBytes(await cloud.resolve(workspace.id, memo.path), memo.path)),
+    word,
+  );
 });
 
 test('A new sign-in asks for write access, and an older account signs in again keeping its name', async (t) => {

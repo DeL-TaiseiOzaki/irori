@@ -57,6 +57,8 @@ export interface Document {
   /** The file is inside a Google Drive connection rather than in the KB's own files. */
   cloud?: boolean;
   draft?: { text: string; baseHash: string };
+  /** Shown by a viewer rather than edited: `text` is empty and the bytes come from `viewerBytes`. */
+  viewer?: import('./viewers').ViewerKind;
 }
 export interface Question {
   id: string;
@@ -414,6 +416,8 @@ export interface HostAPI {
   skillReach(scopeId: string): Promise<import('./skill-reach').SkillReach>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
   readImage(scopeId: string, note: string, url: string): Promise<string>;
+  /** The bytes of a file a viewer shows (PDF, Office, image), in a KB or a Drive workspace. */
+  viewerBytes(scopeId: string, path: string): Promise<Uint8Array>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
   createNote(scopeId: string, name: string, directory?: string): Promise<Document>;

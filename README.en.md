@@ -58,6 +58,7 @@ After installing you also need:
 
 - **Write notes.** A what-you-see Markdown editor with autosave, image paste into `_assets/`, and Cmd/Ctrl+S that keeps your selection and undo history. The Markdown file is always authoritative.
 - **Continue with an agent.** Claude Code, Codex, OpenCode and Pi run in the workspace you selected, using the installed CLI with its own authentication and configuration. irori never asks for its own API key.
+- **Read materials in place.** PDF, Word (.docx), PowerPoint (.pptx), spreadsheets such as Excel (.xlsx/.xlsm/.xls/.ods) and images open on the stage without switching to another app (view only; edit them in their own app).
 - **See how knowledge connects.** Browse CSV as a table and a graph, view a declared ontology as a hierarchy or subgraph, and jump to the linked notes.
 - **Keep everything local.** Notes stay as Markdown in the folder you chose. Git operations, a read-only Google Drive connection preview and an integrated terminal are available inside the app.
 
@@ -135,6 +136,7 @@ On PowerShell, set `$env:IRORI_UI_REAL_AGENTS="1"` and run `npm run test:ui` on 
 
 - React renderer → typed, validated `HostAPI` → Electron preload/main. No renderer Node access, raw IPC export, remote page navigation or document script execution. The host alone controls a private authenticated loopback rclone service.
 - Milkdown Crepe for the document editor, CodeMirror 6 for other text and CSV source. Markdown is authoritative; unsupported blocks stay literal in the document.
+- PDF, Office and image viewing: the host hands over only the bytes of a file whose extension has a viewer, up to 100 MiB, and pdf.js, docx-preview, pptx-to-html and SheetJS draw it in the sandboxed renderer. Office output is stripped of scripts, frames and external URLs before it is shown ([viewer libraries](docs/libraries/file-viewers.md)).
 - A Node `FileService` owns canonical paths, scope ownership, portable UUID declarations, local bindings/drafts/backups, bounded lazy directory listing, watchers and version-aware writes.
 - Codex uses the native app-server JSONL protocol; the Claude Agent SDK controls the installed unmodified `claude` binary. Session handles and bounded display history / pending messages persist in device data, bound to scope UUID, provider and canonical checkout root. A failed resume keeps the handle instead of silently starting a new conversation.
 - Device data lives in Electron's standard `userData` (override with `IRORI_DATA_DIR` for tests): workspace selections, account metadata, rclone credentials and cloud bindings. Existing `contents` bytes are never moved or deleted by setup.

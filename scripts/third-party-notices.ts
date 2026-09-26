@@ -12,21 +12,37 @@ export function thirdPartyNotices(fileName = 'third-party-notices.txt'): Plugin 
     name: 'third-party-notices',
     generateBundle() {
       const directories = new Set<string>();
+      // Data a package keeps in a folder of its own, such as pdf.js's fonts and decoders,
+      // can carry its own licences there; the folders modules came from, per package.
+      const folders = new Map<string, Set<string>>();
       for (const id of this.getModuleIds()) {
         // Virtual modules start with \0; a package's directory is the last node_modules entry.
         const directory = /^[^\0].*\/node_modules\/(@[^/]+\/)?[^@/][^/]*(?=\/)/.exec(id)?.[0];
-        if (directory) directories.add(directory);
+        if (!directory) continue;
+        directories.add(directory);
+        const folder = path.dirname(id.replace(/\?.*$/, ''));
+        if (folder !== directory)
+          folders.set(directory, (folders.get(directory) ?? new Set()).add(folder));
       }
+      const licences = (folder: string, prefix = '') =>
+        readdirSync(folder, { withFileTypes: true })
+          .filter(
+            (entry) => entry.isFile() && /^(licen[cs]e|notice|copying)([._-]|$)/i.test(entry.name),
+          )
+          .map(
+            (entry) =>
+              `${prefix}${entry.name}:\n\n${readFileSync(path.join(folder, entry.name), 'utf8').trim()}`,
+          );
       const entries = [...directories].map((directory) => {
         const { name, version, license } = JSON.parse(
           readFileSync(path.join(directory, 'package.json'), 'utf8'),
         );
-        const files = readdirSync(directory, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && /^(licen[cs]e|notice|copying)\b/i.test(entry.name))
-          .map(
-            (entry) =>
-              `${entry.name}:\n\n${readFileSync(path.join(directory, entry.name), 'utf8').trim()}`,
-          );
+        const files = [
+          ...licences(directory),
+          ...[...(folders.get(directory) ?? [])]
+            .sort()
+            .flatMap((folder) => licences(folder, `${path.relative(directory, folder)}/`)),
+        ];
         const declared = typeof license === 'string' ? license : 'see package.json';
         return [`${name}@${version} (${declared})`, ...files].join('\n\n');
       });

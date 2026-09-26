@@ -162,6 +162,7 @@ export const hostArguments = {
     z.instanceof(Uint8Array).refine((value) => value.length <= 20 * 1024 * 1024),
   ]),
   readImage: z.tuple([id, path, path]),
+  viewerBytes: z.tuple([id, path]),
   save: z.tuple([document]),
   draft: z.tuple([document]),
   createNote: z.tuple([id, z.string().max(120), path.optional()]),
