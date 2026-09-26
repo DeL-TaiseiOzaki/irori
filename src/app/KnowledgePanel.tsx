@@ -10,6 +10,7 @@ import type {
   SourceRef,
 } from '../domain/knowledge';
 import { displayLocale, t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 const host = window.irori;
 // Names are functions so that they are read in the language of each render.
 const stateNames: Record<PendingWrite['state'], () => string> = {
@@ -82,7 +83,7 @@ export function KnowledgePanel({
     }
   }
   useEffect(() => {
-    void refresh().catch((e) => setError(String(e)));
+    void refresh().catch((e) => setError(errorText(e)));
   }, [space.scopeId, cloudOwner]);
   useEffect(() => {
     if (!runTarget) return;
@@ -149,7 +150,7 @@ export function KnowledgePanel({
       await refresh();
       setNotice(message);
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setBusy(false);
     }

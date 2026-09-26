@@ -10,6 +10,7 @@ import { useResource } from './useResource';
 import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
 import { t } from '../domain/i18n';
+import { ErrorMessage, errorText } from './ErrorMessage';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
@@ -48,7 +49,7 @@ export function RegisterSpace({
         if (!name) setName(cloneName);
       } else onRegistered(await host.register(folder, name, category));
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -112,7 +113,7 @@ export function RegisterSpace({
                       .then((value) => {
                         if (value) setParent(value);
                       })
-                      .catch((e) => setError(String(e)))
+                      .catch((e) => setError(errorText(e)))
                   }
                 >
                   {t('選択', 'Choose')}
@@ -131,8 +132,8 @@ export function RegisterSpace({
             </label>
             <p className="muted">
               {t(
-                '選んだ保存先に新しいフォルダを作成します。Git の既存の認証設定を使用します。',
-                'Creates a new folder at the chosen destination. Uses your existing Git authentication settings.',
+                '選んだ保存先に新しいフォルダを作成します。Git の既存の認証設定を使用し、GitHub CLI（gh）にログイン済みならその認証でも再試行します。',
+                'Creates a new folder at the chosen destination. Uses your existing Git authentication settings, and retries with the GitHub CLI (gh) if you are signed in to it.',
               )}
             </p>
           </>
@@ -163,7 +164,7 @@ export function RegisterSpace({
                         if (!name) setName(value.split(/[/\\]/).at(-1) ?? 'My KB');
                       }
                     })
-                    .catch((e) => setError(String(e)))
+                    .catch((e) => setError(errorText(e)))
                 }
               >
                 {t('選択', 'Choose')}
@@ -235,7 +236,7 @@ export function RegisterSpace({
             </p>
           </>
         )}
-        {issue && <p role="alert">{issue}</p>}
+        {issue && <ErrorMessage text={issue} />}
         {busy && (
           <p role="status">
             {cloneMode && !folder
@@ -355,7 +356,7 @@ export function Startup({
     void host
       .workspaces()
       .then(setProfiles)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
   }, []);
   async function save() {
     setBusy(true);
@@ -365,7 +366,7 @@ export function Startup({
       setProfiles(await host.workspaces());
       onOpen(saved);
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -378,7 +379,7 @@ export function Startup({
       setProfiles(await host.workspaces());
       if (editing === profile.id) setEditing(undefined);
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -615,7 +616,7 @@ export function Startup({
           onRegistered={(space) => {
             setSelected((value) => [...value, space.scopeId]);
             setAdding(undefined);
-            void refresh().catch((e) => setError(String(e)));
+            void refresh().catch((e) => setError(errorText(e)));
           }}
         />
       )}

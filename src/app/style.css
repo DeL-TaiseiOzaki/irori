@@ -213,6 +213,30 @@ body {
   margin: 6px 0;
   font-size: 12px;
 }
+/* Nothing to preview yet: no empty panel under the form. */
+.repository-preview:empty {
+  display: none;
+}
+/* An error's advice, with a tool's own output folded beneath it. */
+.error-message p {
+  margin: 0;
+  white-space: pre-line;
+}
+.error-message details {
+  margin-top: 6px;
+}
+.error-message summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.error-message pre {
+  max-height: 160px;
+  overflow: auto;
+  margin: 6px 0 0;
+  font: 11px/1.6 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* Dialogs are paper sheets whichever surface opened them. */
 .modal-dialog {
   border: 0;

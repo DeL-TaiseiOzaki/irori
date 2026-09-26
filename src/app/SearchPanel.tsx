@@ -5,6 +5,7 @@ import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { BrainTile } from './BrainTile';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 /** The chip and `scopeId` value that searches every brain, grouping the results by brain. */
@@ -114,7 +115,7 @@ export function SearchPanel({
           spaces.map((space) =>
             host.search(space.scopeId, query).then(
               (result) => ({ space, result }),
-              (error: unknown) => ({ space, error: String(error) }),
+              (error: unknown) => ({ space, error: errorText(error) }),
             ),
           ),
         );
@@ -124,7 +125,7 @@ export function SearchPanel({
         if (request.current === id) setResult(value);
       }
     } catch (error) {
-      if (request.current === id) setError(String(error));
+      if (request.current === id) setError(errorText(error));
     } finally {
       if (request.current === id) setSearching(false);
     }
@@ -137,7 +138,7 @@ export function SearchPanel({
     try {
       await onOpen(hitScopeId, hit, searchedQuery);
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setOpening(false);
     }

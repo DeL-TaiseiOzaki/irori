@@ -7,6 +7,7 @@ import { useResource } from './useResource';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon, type IconName } from './Icon';
+import { errorText } from './ErrorMessage';
 import './connections.css';
 const host = window.irori;
 // States are looked up inside render so they resolve in the current language.
@@ -160,7 +161,7 @@ export function Connections({
     try {
       await fn();
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
     } finally {
       setRevision((v) => v + 1);
       setBusy(false);

@@ -15,6 +15,7 @@ import { t } from '../domain/i18n';
 import { BrainTile, glyphs } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 type IconKind = 'glyph' | 'text' | 'image';
@@ -176,7 +177,7 @@ export function BrainSettings({
       });
       onSaved(next);
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setSaving(false);
     }
@@ -341,7 +342,7 @@ export function BrainSettings({
                   aria-label={t('アイコンの画像', 'Icon image')}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void pick(file).catch((error) => setError(String(error)));
+                    if (file) void pick(file).catch((error) => setError(errorText(error)));
                   }}
                 />
                 <small>

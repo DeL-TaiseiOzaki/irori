@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import type { HostAPI } from '../domain/types';
 import type { UpdateCheck, UpdateState, UpdateTarget } from '../domain/updates';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 import './update-notice.css';
 
 export type UpdateHost = Pick<
@@ -16,7 +17,7 @@ export type UpdateHost = Pick<
 >;
 
 const megabytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
-const message = (error: unknown) => String(error).replace(/^(?:Error: )+/, '');
+const message = errorText;
 
 /** What the host knows about updates, including a check irori made by itself. */
 export function useUpdateState(host: UpdateHost) {

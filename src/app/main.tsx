@@ -131,6 +131,7 @@ import { Settings } from './Settings';
 import { Overview, type OverviewView } from './Overview';
 import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
+import { errorText } from './ErrorMessage';
 const host = window.irori;
 function SessionControls({
   scopeId,
@@ -157,7 +158,7 @@ function SessionControls({
         if (current) setSession(value);
       })
       .catch((error) => {
-        if (current) setSession({ state: 'unavailable', detail: String(error) });
+        if (current) setSession({ state: 'unavailable', detail: errorText(error) });
       });
     return () => {
       current = false;
@@ -511,7 +512,7 @@ function App() {
           return;
         }
       })().catch((error) => {
-        if (current) setConversationError(String(error));
+        if (current) setConversationError(errorText(error));
       });
     return () => {
       current = false;
@@ -553,7 +554,7 @@ function App() {
   const organizing = useRef(false);
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
-  const report = (e: unknown) => setError(String(e));
+  const report = (e: unknown) => setError(errorText(e));
   function openDaily() {
     if (!active) return;
     const scopeId = active.scopeId;

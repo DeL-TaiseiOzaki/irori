@@ -9,6 +9,7 @@ import { MagnetTabs } from './obsidian/MagnetTabs';
 import { Icon } from './Icon';
 import { useDraft } from './useDraft';
 import { displayLocale, t } from '../domain/i18n';
+import { ErrorMessage, errorText } from './ErrorMessage';
 import './git-panel.css';
 const host = window.irori;
 // A function so each entry is read in the language of the current render.
@@ -290,7 +291,8 @@ function RepositoryPanel({
         if (!cancelled && generation === statusReads.current) accept(value);
       })
       .catch((e) => {
-        if (!cancelled && generation === statusReads.current && alive.current) setError(String(e));
+        if (!cancelled && generation === statusReads.current && alive.current)
+          setError(errorText(e));
       });
     return () => {
       cancelled = true;
@@ -327,12 +329,12 @@ function RepositoryPanel({
       if (value) accept(value);
       if (alive.current) setNotice(value?.notice ? `${success} ${value.notice}` : success);
     } catch (e) {
-      if (alive.current) setError(String(e));
+      if (alive.current) setError(errorText(e));
       // A failed command may still change Git state (for example a merge conflict).
       try {
         accept(await host.gitStatus(space.scopeId));
       } catch (e) {
-        if (alive.current) setError(String(e));
+        if (alive.current) setError(errorText(e));
       }
     } finally {
       if (alive.current) {
@@ -405,7 +407,7 @@ function RepositoryPanel({
         });
     void fetch
       .catch((e) => {
-        if (generation === reads.current && alive.current) setError(String(e));
+        if (generation === reads.current && alive.current) setError(errorText(e));
       })
       .finally(() => {
         if (generation !== reads.current || !alive.current) return;
@@ -432,7 +434,7 @@ function RepositoryPanel({
       const patch = await host.gitCommitDiff(space.scopeId, value.oid);
       if (generation === commitReads.current && alive.current) setCommitPatch(patch);
     } catch (e) {
-      if (generation === commitReads.current && alive.current) setError(String(e));
+      if (generation === commitReads.current && alive.current) setError(errorText(e));
     }
   }
   if (!status)
@@ -590,7 +592,9 @@ function RepositoryPanel({
                   <Menu.Item
                     disabled={busy}
                     onClick={() =>
-                      void host.gitOpenRepository(space.scopeId).catch((e) => setError(String(e)))
+                      void host
+                        .gitOpenRepository(space.scopeId)
+                        .catch((e) => setError(errorText(e)))
                     }
                   >
                     {t('GitHub を開く', 'Open on GitHub')}
@@ -713,11 +717,7 @@ function RepositoryPanel({
           },
         ]}
       />
-      {error && (
-        <p className="git-notice error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorMessage className="git-notice error" text={error} />}
       {(notice || busy) && (
         <p className="git-notice" role="status">
           {busy ? t('Git 操作を実行中…', 'Running Git operation…') : notice}

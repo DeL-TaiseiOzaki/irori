@@ -4,6 +4,7 @@ import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 
@@ -34,7 +35,7 @@ function BacklinksList({
     try {
       await onOpen(hit);
     } catch (error) {
-      setOpenError(String(error));
+      setOpenError(errorText(error));
     } finally {
       setOpening(false);
     }

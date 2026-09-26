@@ -5,6 +5,7 @@ import { entryNameError } from '../domain/connections';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 export const entryActions = ['rename', 'move', 'delete'] as const;
@@ -147,7 +148,7 @@ export function CloudEntryDialog({
       }
       onClose();
     } catch (error) {
-      setError(String(error));
+      setError(errorText(error));
     } finally {
       setBusy(false);
       onBusyChange(false);

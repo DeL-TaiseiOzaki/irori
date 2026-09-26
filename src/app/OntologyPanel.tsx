@@ -18,6 +18,7 @@ import { selectSubgraph, type OntologyView } from '../domain/ontology';
 import type { GraphIndexStatus } from '../domain/graph-index';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 function Graph({
   view,
@@ -401,7 +402,7 @@ export function OntologyPanel({
       );
       setRefresh((value) => value + 1);
     } catch (error) {
-      setFailure(String(error));
+      setFailure(errorText(error));
     } finally {
       setBusy(false);
     }

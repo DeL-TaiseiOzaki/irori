@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type DependencyList } from 'react';
+import { errorText } from './ErrorMessage';
 
 // For reads only. Dependencies identify the resource, so old requests cannot update a new one.
 // refresh rereads that same resource without hiding its current data.
@@ -22,7 +23,7 @@ export function useResource<T>(
           setResult((previous) => ({
             request,
             data: previous.request === request ? previous.data : undefined,
-            error: String(error),
+            error: errorText(error),
           }));
       } finally {
         // Wait for the current read to finish before scheduling another poll.

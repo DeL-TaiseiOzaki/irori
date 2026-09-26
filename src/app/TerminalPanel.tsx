@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 import type { Space, TerminalEvent, TerminalSession, TerminalShell } from '../domain/types';
 import { Icon } from './Icon';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 
 const host = window.irori;
 
@@ -31,7 +32,7 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
   const [running, setRunning] = useState(false);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState('');
-  const report = (error: unknown) => setError(String(error));
+  const report = (error: unknown) => setError(errorText(error));
 
   useEffect(() => {
     let disposed = false;
