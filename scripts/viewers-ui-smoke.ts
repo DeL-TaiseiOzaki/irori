@@ -126,7 +126,9 @@ try {
 
   expect(alerts).toEqual([]);
   expect(errors).toEqual([]);
-  console.log('viewers UI smoke passed');
+  console.log(
+    'Viewers UI passed: Japanese PDF with a bundled CMap and its text layer, zoom, Word pages and links, slides, sheet values, merges, paging and sheets, an image reloaded after a change, and no script or unsafe link carried into the page. No provider calls.',
+  );
 } finally {
   await app.close();
   await rm(base, { recursive: true, force: true });
