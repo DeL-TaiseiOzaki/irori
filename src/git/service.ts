@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FileService, hash } from '../host/files';
+import { replaceFile } from '../host/local-json';
 import { githubRepository } from '../host/workspaces';
 import { classify, owner, within } from '../domain/scopes';
 import { lineRanges } from '../domain/knowledge';
@@ -1032,7 +1033,7 @@ export class GitService {
           .catch(() => 0o644);
         try {
           await fs.writeFile(temp, text, { flag: 'wx', mode });
-          await fs.rename(temp, filename);
+          await replaceFile(temp, filename);
         } finally {
           await fs.rm(temp, { force: true });
         }

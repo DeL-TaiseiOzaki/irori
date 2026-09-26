@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dispatchHost, hostArguments, type HostHandlers } from '../src/domain/host-requests';
 import { hostBridge, type HostRequests } from '../src/domain/host-bridge';
 import { SerialQueue } from '../src/host/serial-queue';
-import { readLocalJson, writeLocalJson } from '../src/host/local-json';
+import { readLocalJson, replaceFile, writeLocalJson } from '../src/host/local-json';
 
 test('Host requests reject unknown/prototype methods and invalid arguments before invoking handlers', async () => {
   const calls: unknown[] = [];
@@ -95,4 +95,43 @@ test('Device metadata remains private and complete after concurrent writes and a
     await assert.rejects(writeLocalJson(link, { changed: true }), /regular file/);
     await assert.rejects(readLocalJson(file, []));
   }
+});
+
+test('A save retries a replacement Windows briefly refuses, and nothing else', async () => {
+  const refusing = (codes: string[]) => {
+    const calls: string[] = [];
+    return {
+      calls,
+      rename: async (from: string, to: string) => {
+        calls.push(`${from}>${to}`);
+        const code = codes.shift();
+        if (code) throw Object.assign(Error(code), { code });
+      },
+    };
+  };
+  const busy = refusing(['EPERM', 'EBUSY', 'EACCES']);
+  await replaceFile('a.tmp', 'a.md', { platform: 'win32', rename: busy.rename });
+  assert.equal(busy.calls.length, 4);
+  // Elsewhere a refusal is real, and so is any other error on Windows.
+  const posix = refusing(['EPERM']);
+  await assert.rejects(replaceFile('a.tmp', 'a.md', { platform: 'linux', rename: posix.rename }), {
+    code: 'EPERM',
+  });
+  assert.equal(posix.calls.length, 1);
+  const missing = refusing(['ENOENT']);
+  await assert.rejects(
+    replaceFile('a.tmp', 'a.md', { platform: 'win32', rename: missing.rename }),
+    {
+      code: 'ENOENT',
+    },
+  );
+  assert.equal(missing.calls.length, 1);
+  // A file held open for good still fails, after about three seconds.
+  const held = refusing(Array(20).fill('EBUSY'));
+  const started = Date.now();
+  await assert.rejects(replaceFile('a.tmp', 'a.md', { platform: 'win32', rename: held.rename }), {
+    code: 'EBUSY',
+  });
+  assert.equal(held.calls.length, 8);
+  assert.ok(Date.now() - started < 5000);
 });
