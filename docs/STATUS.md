@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Stray errors, 2026-09-27: #112 (**0.1.47**) is merged at the owner's word and
+published as
+[v0.1.47-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.47-preview.1)
+by release run `36251799999` from main's CI run `36251195816` (source `e97e88e`).
+The release carries Windows 201,437,696 bytes, Mac 168,944,269 bytes and
+`irori-0.1.47-full.nupkg` 200,796,944 bytes. The owner's 0.1.46 clone of the
+private mock KB worked, but the error bar showed "Unknown or ambiguous cloud owner".
+Reproduced in Electron with the real repository (clone → open → remove that
+workspace on the start screen → open another). `openWorkspace` asked
+`cloudConnections` for the removed workspace's ID. It now skips that ID once the
+host no longer lists it (removal already unregisters its connections). The
+missing-owner error and an unreadable `.irori/cloud-mounts.json` now have wording
+a person can act on. `git-ui-smoke`'s intermittent failure at the
+refused-then-retried resolution was traced to a lost click. The resolve buttons
+were disabled during any conflict re-read. `GitPanel` now keeps them enabled
+while the conflict on screen is the selected file's (the host's version check
+still refuses a stale one). Resolving drops a re-read in flight, which otherwise
+reported the resolved file as changed. The smoke holds that re-read open to
+prove both. Windows `test:package` once missed its autosave wait (about 1 in 60
+runs, no detail). `replaceFile` (`src/host/local-json.ts`) now retries a temp-file
+rename that Windows refuses with `EPERM`/`EACCES`/`EBUSY` for about 3 s; it is
+used by note save, note move and conflict resolution. That is the likely cause,
+not a proven one: 40 loaded Linux packaged runs never reproduced it. `package-smoke`
+prints the file, the editor text and any messages if it recurs.
+
 GitHub clone authentication, 2026-09-26: #110 (**0.1.46**) is merged at the
 owner's word and published as
 [v0.1.46-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.46-preview.1)
