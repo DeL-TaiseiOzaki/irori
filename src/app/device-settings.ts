@@ -76,7 +76,7 @@ const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)');
  */
 export function applyTheme(theme: DeviceSettings['theme'] = current.theme) {
   document.documentElement.dataset.theme =
-    theme === 'system' ? (systemDark().matches ? 'dark' : 'light') : theme;
+    theme === 'system' ? (systemDark().matches ? 'dark' : 'hearth') : theme;
 }
 
 /** Applies the reader's type choice only to rendered Markdown through CSS. */

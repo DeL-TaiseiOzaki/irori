@@ -14,8 +14,17 @@ export interface ScopeDeclaration {
   schemaVersion: 1;
   scopeId: string;
   name: string;
-  category: Category;
+  /** personal / team / organization; a brain may carry none (ADR 014). */
+  category?: Category;
   contents: string[];
+  /** The brain's tile as everyone who opens the KB sees it. */
+  appearance?: import('./brains').BrainLook;
+}
+/** What the brain settings change in `.irori/scope.json`; `null` removes a field. */
+export interface SpaceChange {
+  name?: string;
+  category?: Category | null;
+  appearance?: import('./brains').BrainLook | null;
 }
 export interface Space extends ScopeDeclaration {
   root: string;
@@ -56,6 +65,15 @@ export interface Question {
   multiple?: boolean;
 }
 export type AgentAnswers = Record<string, string | string[]>;
+/**
+ * Work your AI handed to a brain's sub-agent: which brain, which hand-off (the
+ * delegation's tool call), and how far it is.
+ */
+export interface Delegate {
+  scopeId: string;
+  task: string;
+  state: 'started' | 'working' | 'reported' | 'failed';
+}
 export interface AgentEvent {
   scopeId?: string;
   agent?: AgentId;
@@ -67,6 +85,13 @@ export interface AgentEvent {
   questions?: Question[];
   details?: string;
   outcome?: 'completed' | 'failed' | 'cancelled';
+  /** Set on your AI's events that belong to a brain's sub-agent. */
+  delegate?: Delegate;
+  /**
+   * The request this event ends — answered, declined or cancelled — so every
+   * view stops offering it. Such an event is shown nowhere and never saved.
+   */
+  resolved?: string;
 }
 export interface AgentInfo {
   id: AgentId;
@@ -189,11 +214,20 @@ export interface StartRun {
   skill?: string;
   /** Tell the agent which lines of the note the person wrote or revised. */
   personLines?: boolean;
+  /** Brains handed to your AI for this request; only your AI's runs take them. */
+  brains?: string[];
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
+/** Hearth is graphite chrome with a paper stage; system picks hearth or dark with the desktop. */
+export const themes = ['system', 'hearth', 'light', 'dark'] as const;
+export type Theme = (typeof themes)[number];
+/** What the operating system is told: its window frame sits beside the rail's graphite. */
+export function nativeThemeSource(theme: Theme): 'system' | 'light' | 'dark' {
+  return theme === 'hearth' ? 'dark' : theme;
+}
 export interface DeviceSettings {
-  theme: 'system' | 'light' | 'dark';
+  theme: Theme;
   /** The interface language; Japanese unless the reader chose otherwise. */
   language: import('./i18n').Language;
   markdownFont: MarkdownFont;
@@ -357,6 +391,10 @@ export interface HostAPI {
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;
+  /** Changes a brain's name, category or look in its `.irori/scope.json`. */
+  updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
+  /** Keeps an image in the brain's `.irori/` as its icon and returns its path. */
+  saveSpaceIcon(scopeId: string, bytes: Uint8Array): Promise<string>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
@@ -403,6 +441,14 @@ export interface HostAPI {
   startQueuedMessage(scopeId: string, agent: AgentId, id: string): Promise<string>;
   resetAgentSession(scopeId: string, agent: AgentId): Promise<void>;
   start(input: StartRun): Promise<string>;
+  /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
+  yourAi(): Promise<import('./you').YourAi>;
+  /** Writes the starter into an absent or empty folder; never over existing files. */
+  createYourAi(): Promise<import('./you').YourAi>;
+  yourAiEntries(path: string): Promise<import('./you').YourAiEntry[]>;
+  yourAiRead(path: string): Promise<{ path: string; text: string }>;
+  /** The sub-agent each brain gets from your AI, and whether its definition exists. */
+  yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
   /** Stops the run in one space, or every run when no space is named. */
   cancel(scopeId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;

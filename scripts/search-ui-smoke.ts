@@ -62,16 +62,18 @@ try {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nAutosaveSearchToken\n');
-  const launcher = page.getByRole('button', { name: 'KB内を検索', exact: true });
+  const launcher = page.getByRole('button', { name: /^検索（/ });
   await launcher.click();
   const panel = page.getByRole('dialog', { name: 'KB内を検索', exact: true });
   const query = panel.getByLabel('本文を検索', { exact: true });
-  const scope = panel.getByLabel('検索する KB', { exact: true });
+  // The brain to search is one chip each; the brain on show is chosen first.
+  const scope = (name: string) => panel.getByRole('radio', { name, exact: true });
   const submit = panel.getByRole('button', { name: '検索', exact: true });
   const results = panel.getByRole('region', { name: '本文の検索結果', exact: true });
   await expect(query).toBeFocused();
-  await expect(scope.locator('option')).toHaveCount(2);
-  await expect(scope).toHaveValue(space.scopeId);
+  // One radio per brain plus the "all brains" chip; the active KB is chosen first.
+  await expect(panel.getByRole('radio')).toHaveCount(3);
+  await expect(scope('検索対象KB')).toBeChecked();
   await query.fill('AutosaveSearchToken');
   await query.press('Enter');
   await expect(results.locator('li')).toHaveCount(1);
@@ -121,7 +123,7 @@ try {
 
   await launcher.click();
   await query.fill('orbital');
-  await scope.selectOption(other.scopeId);
+  await scope('参照KB').check();
   await submit.click();
   await expect(results.locator('li')).toHaveCount(1);
   await expect(results).toContainText('reference.md');
@@ -130,8 +132,8 @@ try {
   await expect(panel).toHaveCount(0);
   await expect(editor).toContainText('ORBITAL in another KB.');
   await launcher.click();
-  await expect(scope).toHaveValue(other.scopeId);
-  await scope.selectOption(space.scopeId);
+  await expect(scope('参照KB')).toBeChecked();
+  await scope('検索対象KB').check();
   await query.fill('ＯＲＢＩＴＡＬ');
   await submit.click();
   await expect(results).toContainText('一致する本文はありません。');
@@ -139,6 +141,37 @@ try {
   await submit.click();
   await expect(results.locator('li')).toHaveCount(1);
   await expect(results).toContainText('Literal a.*b example.');
+
+  // Cross-brain search: one query against every brain, grouped by brain with a
+  // BrainTile, name and hit count per group.
+  await scope('すべての Brain').check();
+  await query.fill('orbital');
+  await submit.click();
+  await expect(results.locator('li')).toHaveCount(2);
+  const targetGroup = results.getByRole('group', { name: '検索対象KB', exact: true });
+  const referenceGroup = results.getByRole('group', { name: '参照KB', exact: true });
+  await expect(targetGroup).toContainText('notes/body.md');
+  await expect(referenceGroup).toContainText('reference.md');
+  await expect(referenceGroup).toContainText('ORBITAL in another KB.');
+  await expect(targetGroup.locator('h3.palette-group > span:not(.brain-tile)')).toHaveText('1');
+  await expect(referenceGroup.locator('h3.palette-group > span:not(.brain-tile)')).toHaveText('1');
+  // The keyboard choice moves across every group in display order.
+  await query.press('ArrowDown');
+  await expect(referenceGroup.locator('button[aria-current="true"]')).toHaveCount(1);
+  await query.press('Enter');
+  await expect(panel).toHaveCount(0);
+  await expect(editor).toContainText('ORBITAL in another KB.');
+  await launcher.click();
+  // Opening a hit switches the active brain; the panel still preselects it, not "all".
+  await expect(scope('参照KB')).toBeChecked();
+  await scope('すべての Brain').check();
+  await query.fill('ＯＲＢＩＴＡＬ');
+  await submit.click();
+  await expect(results).toContainText('一致する本文はありません。');
+  await scope('検索対象KB').check();
+  await query.fill('a.*b');
+  await submit.click();
+  await expect(results.locator('li')).toHaveCount(1);
 
   // Real files exercise incomplete search and refresh notices; the index records the
   // oversized file as unreadable and the walk reports it on every request.
@@ -226,7 +259,7 @@ try {
   await query.fill('pending scope');
   await submit.click();
   await expect.poll(pendingCount).toBe(1);
-  await scope.selectOption(other.scopeId);
+  await scope('参照KB').check();
   await submit.click();
   await expect.poll(pendingCount).toBe(2);
   await release(1, 'Current KB result');
@@ -269,7 +302,12 @@ try {
     ipcMain.handle('irori', fixture.original);
   });
 
-  // An unresolved external edit still blocks search's preflight save.
+  // An unresolved external edit still blocks search's preflight save. The panel
+  // shows one brain at a time, so the search target's brain is chosen first.
+  await page
+    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('button', { name: /^検索対象KB・AI/ })
+    .click();
   await page.getByRole('button', { name: 'editing', exact: true }).click();
   await expect(editor).toContainText('AutosaveSearchToken');
   await editor.click();

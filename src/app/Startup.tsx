@@ -4,23 +4,27 @@ import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
 import { appIcon, appVersion } from './branding';
+import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
 import { t } from '../domain/i18n';
+import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
   onRegistered,
   onCancel,
+  mode = 'folder',
 }: {
   onRegistered: (space: Space) => void;
   onCancel: () => void;
+  mode?: 'folder' | 'clone';
 }) {
   const [folder, setFolder] = useState(''),
     [name, setName] = useState(''),
     [category, setCategory] = useState<Category>('personal');
-  const [cloneMode, setCloneMode] = useState(false),
+  const [cloneMode, setCloneMode] = useState(mode === 'clone'),
     [url, setUrl] = useState(''),
     [parent, setParent] = useState(''),
     [cloneName, setCloneName] = useState('');
@@ -52,7 +56,7 @@ export function RegisterSpace({
   return (
     <Dialog label={t('スペース登録', 'Register space')} busy={busy} onClose={onCancel}>
       <form
-        className="modal"
+        className="modal register-space"
         aria-label={t('スペース登録', 'Register space')}
         onSubmit={(e) => {
           e.preventDefault();
@@ -257,6 +261,80 @@ export function RegisterSpace({
   );
 }
 
+type Brain = Pick<Space, 'scopeId' | 'name'>;
+
+/** An example for a first launch, before any workspace combines brains. */
+function sampleDiagram() {
+  const brain = (id: string, name: string) => ({ scopeId: `sample-${id}`, name });
+  const brains = [
+    brain('notes', t('ノート', 'Notes')),
+    brain('team', t('チーム', 'Team')),
+    brain('research', t('研究', 'Research')),
+    brain('thesis', t('論文', 'Thesis')),
+  ];
+  const ids = (...indexes: number[]) => indexes.map((i) => brains[i].scopeId);
+  return {
+    brains,
+    groups: [
+      { name: t('仕事', 'Work'), scopeIds: ids(0, 1, 2) },
+      { name: t('論文執筆', 'Thesis writing'), scopeIds: ids(0, 2, 3) },
+    ],
+  };
+}
+
+/**
+ * Brains above, workspaces below: one brain can belong to several workspaces.
+ * Drawn in a 480 × 330 box; the whole drawing scales with the column.
+ */
+function Diagram({ spaces, profiles }: { spaces: Space[]; profiles: WorkspaceProfile[] }) {
+  const shown = profiles
+    .filter((profile) => profile.scopeIds.some((id) => spaces.some((s) => s.scopeId === id)))
+    .slice(0, 2);
+  const inGroup = (space: Brain) => shown.some((group) => group.scopeIds.includes(space.scopeId));
+  const {
+    brains,
+    groups,
+  }: { brains: Brain[]; groups: Pick<WorkspaceProfile, 'name' | 'scopeIds'>[] } = shown.length
+    ? {
+        brains: [...spaces.filter(inGroup), ...spaces.filter((s) => !inGroup(s))].slice(0, 6),
+        groups: shown,
+      }
+    : sampleDiagram();
+  const brainX = (i: number) => 240 + (i - (brains.length - 1) / 2) * 70;
+  const groupX = (i: number) => (groups.length === 1 ? 240 : 120 + i * 240);
+  return (
+    <svg className="start-diagram" viewBox="0 0 480 330" aria-hidden="true">
+      {groups.map((group, g) =>
+        brains.map(
+          (brain, b) =>
+            group.scopeIds.includes(brain.scopeId) && (
+              <g key={`${g}-${brain.scopeId}`} className={g ? 'secondary' : 'primary'}>
+                <path d={`M${groupX(g)} 240 C${groupX(g)} 172 ${brainX(b)} 164 ${brainX(b)} 98`} />
+                <circle cx={brainX(b)} cy={98} r={3} />
+              </g>
+            ),
+        ),
+      )}
+      {brains.map((brain, b) => (
+        <foreignObject key={brain.scopeId} x={brainX(b) - 36} y={28} width={72} height={80}>
+          <div className="start-diagram-brain">
+            <BrainTile space={brain} size={52} radius={15} />
+            <small>{brain.name}</small>
+          </div>
+        </foreignObject>
+      ))}
+      {groups.map((group, g) => (
+        <foreignObject key={g} x={groupX(g) - 100} y={240} width={200} height={44}>
+          <div className={`start-diagram-workspace ${g ? '' : 'primary'}`}>
+            <span>{group.name}</span>
+            <small>{group.scopeIds.length}</small>
+          </div>
+        </foreignObject>
+      ))}
+    </svg>
+  );
+}
+
 export function Startup({
   spaces,
   refresh,
@@ -269,7 +347,7 @@ export function Startup({
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
     [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState(t('マイワークスペース', 'My workspace')),
-    [adding, setAdding] = useState(false),
+    [adding, setAdding] = useState<'folder' | 'clone'>(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string>();
@@ -305,208 +383,174 @@ export function Startup({
       setBusy(false);
     }
   }
+  const toggle = (id: string, on: boolean) =>
+    setSelected((value) => (on ? [...value, id] : value.filter((item) => item !== id)));
+  const unavailable = profiles
+    .find((profile) => profile.id === editing)
+    ?.scopeIds.filter((id) => !spaces.some((space) => space.scopeId === id));
   return (
-    <div className="startup">
-      <aside className="startup-intro">
-        <div className="brand">
+    <div className="start">
+      <section className="start-intro chrome">
+        <div className="start-brand">
           <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
-          irori<span className="preview">{appVersion} Preview</span>
+          <span>irori</span>
+          <small>{appVersion} Preview</small>
         </div>
-        <UpdateNotice host={host} />
-        <CloudRecovery />
-        <div className="intro-content">
-          <h2>
-            {t('手元のノートと、', 'Your notes,')}
-            <br />
-            {t('チームの資料を。', "and your team's materials.")}
-          </h2>
-          <p>
-            {t('リポジトリとクラウドをつないで、', 'Connect repositories and the cloud,')}
-            <br />
-            {t('知識を育てる作業場。', 'a workspace where knowledge grows.')}
-          </p>
-          <div className="intro-layer">
-            <Icon name="schema" />
-            <span>
-              Schema<small>{t('エージェントのルール', 'Agent rules')}</small>
-            </span>
-          </div>
-          <div className="intro-layer">
-            <Icon name="book" />
-            <span>
-              Knowledge Base<small>{t('書いて、育てるノート', 'Notes you write and grow')}</small>
-            </span>
-          </div>
-          <div className="intro-layer">
-            <Icon name="cloud" />
-            <span>
-              Contents<small>{t('つながる資料とソース', 'Connected materials and sources')}</small>
-            </span>
-          </div>
-        </div>
-        <p className="intro-footnote">
-          {t('あなたのファイル。あなたのワークスペース。', 'Your files. Your workspace.')}
-        </p>
-      </aside>
-      <div className="startup-content">
-        <h1>{t('ワークスペースを選択', 'Choose a workspace')}</h1>
-        <p className="startup-lead">
-          {t(
-            '保存した環境を開くか、スペースを組み合わせて新しく始めましょう。',
-            'Open a saved environment, or combine spaces to start something new.',
-          )}
-        </p>
-        {profiles.length > 0 && (
-          <section>
-            <h2>{t('登録済みのワークスペース', 'Registered workspaces')}</h2>
-            <div className="workspace-cards">
-              {profiles.map((profile) => {
-                const available = profile.scopeIds.filter((id) =>
-                  spaces.some((space) => space.scopeId === id),
-                );
-                return (
-                  <div key={profile.id}>
-                    <button
-                      className="workspace-card"
-                      key={profile.id}
-                      disabled={busy}
-                      onClick={() => onOpen(profile)}
-                    >
-                      <Icon name="grid" size={22} />
+        <h1>
+          {t('ノートから、', 'From your notes,')}
+          <br />
+          {t('次の仕事へ。', "to what's next.")}
+        </h1>
+        <Diagram spaces={spaces} profiles={profiles} />
+        <footer className="start-footer">
+          <UpdateNotice host={host} />
+          <CloudRecovery />
+        </footer>
+      </section>
+      <main className="start-main chrome">
+        <h2>{t('ワークスペースを選択', 'Choose a workspace')}</h2>
+        {profiles.length > 0 ? (
+          <div className="start-workspaces">
+            {profiles.map((profile) => {
+              const members = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+              const missing = profile.scopeIds.length - members.length;
+              return (
+                <div
+                  key={profile.id}
+                  className="start-workspace"
+                  data-editing={editing === profile.id || undefined}
+                >
+                  <button
+                    className="workspace-card"
+                    disabled={busy}
+                    onClick={() => onOpen(profile)}
+                  >
+                    <span className="start-stack">
+                      {members.map((space) => (
+                        <BrainTile key={space.scopeId} space={space} size={30} radius={9} />
+                      ))}
+                    </span>
+                    <span className="start-workspace-text">
                       <strong>{profile.name}</strong>
-                      <span>
-                        {t(
-                          `${available.length} スペース`,
-                          `${available.length} space${available.length === 1 ? '' : 's'}`,
-                        )}
-                        {available.length !== profile.scopeIds.length &&
-                          t(
-                            ` · ${profile.scopeIds.length - available.length} 件は利用できません`,
-                            ` · ${profile.scopeIds.length - available.length} unavailable`,
-                          )}
-                      </span>
-                      <Icon name="arrow" className="workspace-arrow" />
-                    </button>
-                    <div className="actions">
-                      <button
-                        disabled={busy}
-                        aria-label={t(`${profile.name} を編集`, `Edit ${profile.name}`)}
-                        onClick={() => {
-                          setEditing(profile.id);
-                          setName(profile.name);
-                          setSelected(profile.scopeIds);
-                          setError('');
-                        }}
-                      >
-                        {t('編集', 'Edit')}
-                      </button>
-                      <button
-                        disabled={busy}
-                        aria-label={t(
-                          `${profile.name} の登録を削除`,
-                          `Remove ${profile.name} registration`,
-                        )}
-                        onClick={() => void remove(profile)}
-                      >
-                        {t('登録を削除', 'Remove registration')}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="muted">
+                      <small>
+                        {members.map((space) => space.name).join(t('・', ' · '))}
+                        {missing > 0 &&
+                          (members.length ? t('・', ' · ') : '') +
+                            t(`${missing} 件は利用できません`, `${missing} unavailable`)}
+                      </small>
+                    </span>
+                    <span className="start-open">
+                      <Icon name="arrow" size={17} strokeWidth={2.2} />
+                    </span>
+                  </button>
+                  <button
+                    className="start-icon-button"
+                    disabled={busy}
+                    title={t('編集', 'Edit')}
+                    aria-label={t(`${profile.name} を編集`, `Edit ${profile.name}`)}
+                    onClick={() => {
+                      setEditing(profile.id);
+                      setName(profile.name);
+                      setSelected(profile.scopeIds);
+                      setError('');
+                    }}
+                  >
+                    <Icon name="squarePen" />
+                  </button>
+                  <button
+                    className="start-icon-button"
+                    disabled={busy}
+                    title={t('登録を削除', 'Remove registration')}
+                    aria-label={t(
+                      `${profile.name} の登録を削除`,
+                      `Remove ${profile.name} registration`,
+                    )}
+                    onClick={() => void remove(profile)}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              );
+            })}
+            <p className="start-note">
               {t(
                 'KBフォルダ・ノートは残ります。Drive 接続がある場合は、接続の登録解除後にワークスペースを削除できます。',
                 'The KB folder and notes remain. If there is a Drive connection, you can delete the workspace after unregistering the connection.',
               )}
             </p>
-          </section>
+          </div>
+        ) : (
+          <p className="start-note">
+            {t(
+              'まだワークスペースはありません。Brain を組み合わせて作成します。',
+              'No workspaces yet. Combine brains to create one.',
+            )}
+          </p>
         )}
-        <section>
-          <h2>
+        <hr />
+        <section aria-labelledby="start-combine">
+          <h3 id="start-combine">
             {editing
               ? t('ワークスペースを編集', 'Edit workspace')
-              : t('新しい組み合わせで開く', 'Open a new combination')}
-          </h2>
+              : t('Brain を選んで組み合わせる', 'Combine brains')}
+          </h3>
           {editing && (
-            <p className="muted">
+            <p className="start-note">
               {t(
-                '下で名前とスペースの組み合わせを変更して保存できます。利用できないスペースも登録を保持できます。',
-                'Change the name and combination of spaces below and save. Unavailable spaces can keep their registration too.',
+                '下で名前と Brain の組み合わせを変更して保存できます。利用できない Brain も登録を保持できます。',
+                'Change the name and combination of brains below and save. Unavailable brains can keep their registration too.',
               )}
             </p>
           )}
-          <div className="startup-spaces">
-            {profiles
-              .find((profile) => profile.id === editing)
-              ?.scopeIds.filter((id) => !spaces.some((space) => space.scopeId === id))
-              .map((id) => (
-                <label key={id}>
-                  <input
-                    type="checkbox"
-                    disabled={busy}
-                    checked={selected.includes(id)}
-                    onChange={(e) =>
-                      setSelected((value) =>
-                        e.target.checked ? [...value, id] : value.filter((item) => item !== id),
-                      )
-                    }
-                  />
-                  <span>
-                    {t(
-                      '利用できないスペース（登録を保持）',
-                      'Unavailable space (registration kept)',
-                    )}
-                    <small>{id}</small>
-                  </span>
-                </label>
-              ))}
-            {spaces.map((space) => (
-              <label key={space.scopeId}>
-                <input
-                  type="checkbox"
+          <div className="start-library">
+            {unavailable?.map((id) => (
+              <label key={id} className="start-chip unavailable" title={id}>
+                <Check
+                  checked={selected.includes(id)}
                   disabled={busy}
-                  checked={selected.includes(space.scopeId)}
-                  onChange={(e) =>
-                    setSelected((value) =>
-                      e.target.checked
-                        ? [...value, space.scopeId]
-                        : value.filter((id) => id !== space.scopeId),
-                    )
-                  }
+                  onChange={(on) => toggle(id, on)}
                 />
                 <span>
-                  <strong>{space.name}</strong>
-                  <small>{space.root}</small>
+                  {t('利用できない Brain（登録を保持）', 'Unavailable brain (registration kept)')}
+                  <small>{id}</small>
                 </span>
               </label>
             ))}
-          </div>
-          <button disabled={busy} onClick={() => setAdding(true)}>
-            <Icon name="plus" /> {t('KBフォルダを開く', 'Open a KB folder')}
-          </button>
-          <p className="muted">
-            {t(
-              'クローン済みのリポジトリや既存フォルダを追加できます。クラウドのアカウント・フォルダは、開いた後に「クラウド接続」から登録します。',
-              'You can add an already-cloned repository or an existing folder. Register cloud accounts and folders from "Cloud connection" after opening.',
+            {spaces.map((space) => (
+              <label key={space.scopeId} className="start-chip" title={space.root}>
+                <Check
+                  checked={selected.includes(space.scopeId)}
+                  disabled={busy}
+                  onChange={(on) => toggle(space.scopeId, on)}
+                />
+                <BrainTile space={space} size={24} radius={7} />
+                <span>{space.name}</span>
+              </label>
+            ))}
+            {!spaces.length && (
+              <p className="start-note">
+                {t('Brain はまだありません。下で追加します。', 'No brains yet. Add one below.')}
+              </p>
             )}
-          </p>
+          </div>
           <form
-            className="actions"
+            className="start-create"
             onSubmit={(e) => {
               e.preventDefault();
               void save();
             }}
           >
-            <input
-              aria-label={t('ワークスペース名', 'Workspace name')}
-              placeholder={t('ワークスペース名', 'Workspace name')}
-              value={name}
-              required
-              disabled={busy}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <label className="start-name">
+              <span>{t('名前', 'Name')}</span>
+              <input
+                aria-label={t('ワークスペース名', 'Workspace name')}
+                placeholder={t('ワークスペース名', 'Workspace name')}
+                value={name}
+                required
+                disabled={busy}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
             <ArrowFillButton type="submit" disabled={busy}>
               {editing
                 ? spaces.some((space) => selected.includes(space.scopeId))
@@ -519,6 +563,7 @@ export function Startup({
             {editing && (
               <button
                 type="button"
+                className="start-text-button"
                 disabled={busy}
                 onClick={() => {
                   setEditing(undefined);
@@ -531,18 +576,72 @@ export function Startup({
             )}
           </form>
         </section>
+        <hr />
+        <section aria-labelledby="start-add">
+          <h3 id="start-add">{t('Brain を追加', 'Add brain')}</h3>
+          <div className="start-add">
+            <button disabled={busy} onClick={() => setAdding('folder')}>
+              <span className="start-add-icon">
+                <Icon name="folderOpen" size={20} />
+              </span>
+              <span>
+                <strong>{t('KBフォルダを開く', 'Open a KB folder')}</strong>
+                <small>{t('既存のフォルダ・チェックアウト', 'Existing folder or checkout')}</small>
+              </span>
+            </button>
+            <button disabled={busy} onClick={() => setAdding('clone')}>
+              <span className="start-add-icon">
+                <Icon name="download" size={20} />
+              </span>
+              <span>
+                <strong>{t('GitHub から取得', 'Clone from GitHub')}</strong>
+                <small>{t('リポジトリをクローン', 'Clone a repository')}</small>
+              </span>
+            </button>
+          </div>
+          <p className="start-note">
+            {t(
+              'クラウドのフォルダは、開いた後に Brain の Contents から接続します。',
+              "Connect cloud folders from a brain's Contents after opening.",
+            )}
+          </p>
+        </section>
         {error && <p role="alert">{error}</p>}
-      </div>
+      </main>
       {adding && (
         <RegisterSpace
-          onCancel={() => setAdding(false)}
+          mode={adding}
+          onCancel={() => setAdding(undefined)}
           onRegistered={(space) => {
             setSelected((value) => [...value, space.scopeId]);
-            setAdding(false);
+            setAdding(undefined);
             void refresh().catch((e) => setError(String(e)));
           }}
         />
       )}
     </div>
+  );
+}
+
+/** A real checkbox drawn as the canvas's rounded box. */
+function Check({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <span className="start-check">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <Icon name="check" size={12} strokeWidth={3} />
+    </span>
   );
 }

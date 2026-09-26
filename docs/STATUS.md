@@ -1,5 +1,136 @@
 # Implementation status — notes, native agents and connection onboarding
 
+UI v5 motion, 2026-09-26: **0.1.43** is prepared on `feat/ui-v5-motion`, stacked
+on your AI. Levels move with a zoom (`goToLevel`, 560 ms from the Overview into a
+brain around the clicked brain, reversed going back, none under reduced motion);
+sheets rise over a fading backdrop; a permission request arrives with an
+overshoot. A screen-capture script (`scripts/ui-screens.ts`) produced the main
+screens in hearth/ja, dark/en and light/ja for comparison with the canvas, which
+led to: Schema files keeping their `.md` in the tree, the home's Schema card
+listing instruction files first, a house on the home crumb, the graph fitting at
+most at 1:1, and the Overview using the chrome button look and a two-line header
+for your AI. The Overview smoke checks the zoom and its absence under reduced
+motion. This completes the six stages of the v5 plan.
+
+Your AI, 2026-09-26: **0.1.42** is prepared on `feat/your-ai`. Your AI is the
+person's own Claude Code agent, run from `~/irori/you` (device record
+`your-ai.json`, id reused for its conversations), set up from the Overview with
+an irori-written starter (`AGENTS.md`, the `brain-agents` skill, an empty
+`.claude/agents/`). A request carries the workspace's free brains (`brains` on
+`StartRun`); the host resolves their folders as `additionalDirectories`, names
+each brain's sub-agent (`brainAgentNames`) in a preamble, holds those brains for
+the run (`busy`), and keeps writes in bounds with a `PreToolUse` rule
+(`src/agents/delegation.ts`). Hand-offs are forced to the foreground, since a
+background sub-agent's edits are refused without a prompt. Events carry
+`delegate` (hand-off start, sub-agent steps and requests via `canUseTool`'s
+`agentID`, the `task_notification` report). The host now announces the end of
+every request (`resolved`), and every view uses that instead of "a later event
+arrived", which also fixes Claude Code brain runs where the tool-call message
+came after its request. Renderer: the Overview's island has **あなたの AI | Brain
+の AI**, the map has the hearth orb with hand-off lines and sparks, and the Your
+AI screen shows the folder and each brain's definition. Tests:
+`tests/your-ai.test.ts`, a Claude protocol fixture
+(`tests/fixtures/claude-your-ai.mjs`), `your-ai-ui-smoke`, and the opt-in real
+run `npm run test:your-ai`, which passed with Claude Code 2.1.280 on 2026-09-26
+(see [YOUR-AI](YOUR-AI.md)).
+
+Delivery, 2026-09-26: PRs #97–#101 are merged with the owner's go-ahead, and
+**0.1.41 is published** as
+[v0.1.41-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.41-preview.1)
+by release run `36155578107` from main's CI run `36154273703` (source `a49c1a4`),
+which passed first time. It carries the whole v5 switch: 0.1.38, 0.1.39 and
+0.1.40 were not published on their own, and the 0.1.41 notes cover everything
+since 0.1.37. The release carries Windows 198,837,248 bytes, Mac 166,474,608
+bytes and `irori-0.1.41-full.nupkg` 198,197,251 bytes. The hourly drift check
+failed once while the stack was being merged (main held 0.1.39 for more than an
+hour while the owner's answers were pending).
+
+UI v5, 2026-09-25: the owner approved the v5 design canvas and asked to switch
+the whole interface to it. [ADR 014](decisions/014-ui-v5.md) records the
+decisions: the brain (one registered KB with its Schema, Knowledge and Contents)
+is the unit, a workspace is any combination of brains, the levels are Overview →
+Brain → Note, each brain's AI is its CLI agent, your AI is the person's own agent
+that hands tasks to brain AIs, brains get an editable icon and colour, and ember
+belongs to the AI alone. The owner answered the three questions (default language, your AI's
+folder, where brain identity is stored) on 2026-09-26 with the defaults the ADR
+used. The work lands as stacked pull requests.
+
+UI v5 Overview, 2026-09-25: **0.1.41** is prepared on `feat/overview`, stacked
+on brain identity. The renderer no longer holds the brain on show while its AI
+runs or has a queue: another brain can be chosen and run its own AI (the host
+already allowed one run per scope). A brain keeps the AI chosen for it. A queue
+goes on when its brain's run completes even while another brain or the
+Overview is on show (`sendNextQueued`); a stopped or failed run still pauses
+it. The conversation snapshot carries the requests a run waits on now
+(`Conversation.requests`, `withRequests`), since saved history keeps them only
+as text, so a request can be answered after switching brains or from the
+Overview. The rail's **全体** opens the Overview (`Overview.tsx`,
+`overview.css`): a map (deterministic rows by category in `domain/overview.ts`,
+reference lines from run records whose sources belong to another workspace
+brain) with a **Brain の AI** island (state, request cards, stop, resume, and a
+composer that sends or queues to a chosen brain), and a side-by-side view (AI /
+Schema / Knowledge / Contents per brain). The ⌘K palette gains **すべての Brain**,
+grouped by brain; the search host now supersedes a scan only within the same KB,
+so scans of different KBs run side by side. The workspace cannot be left while
+any brain's AI runs. New `overview-ui-smoke` (two fixture runs at once,
+switching during a run, a background queue, answering, stop/resume, sending and
+queueing from the Overview); unit tests for the layout, the reference lines, two
+brains' runs with live requests and per-KB scans. Your AI (the hearth of the map)
+is phase 5.
+
+Brain identity, 2026-09-25: **0.1.40** is prepared on `feat/brain-identity`,
+stacked on the brain views. `.irori/scope.json` gains an optional `appearance`
+(`icon`: a glyph of 24, one or two characters, or an image `.irori/icon-<hash>.<ext>`;
+`color`: one of eight) and `category` becomes optional, following the ADR's
+default for the open question (identity shared through the KB). HostAPI adds
+`updateSpace` (name, category, appearance; validated, atomic, keeping unknown
+fields; refused while the brain's AI, Git or a connection is busy) and
+`saveSpaceIcon`. `BrainSettings.tsx` is the sheet (name, category, previews,
+icon kind and glyph grid, colours), opened from the brain menu and the home.
+`BrainTile` draws glyphs, characters and images everywhere. New
+`brain-settings-ui-smoke`; `space-settings.test.ts` covers the declaration.
+A KB without a category cannot be opened by 0.1.39 and earlier.
+
+UI v5 brain views, 2026-09-25: **0.1.39** is prepared on `feat/ui-v5-brain-views`,
+stacked on the foundation. A brain's views take the stage instead of opening
+dialogs: **Home** (`BrainHome.tsx`, replacing the welcome: identity, today's
+note, new note, terminal, Schema / Knowledge / Contents cards, recent changes
+and runs), the **graph** (`OntologyPanel` in a `StageView`: filters, dotted
+canvas, detail card, legend, entity list behind the table button, index state
+in the bar) and **materials and outputs** (`KnowledgePanel`, two columns). A
+reload no longer switches views; only opening a document does (`show`). The
+link button counts backlinks and lists them in a popover (`Backlinks.tsx`).
+Search is a ⌘K palette with brain chips, arrow-key choice and marked matches.
+Two delegated branches were merged: the Drive connection dialog as a two-column
+sheet (`connections.css`, secondary actions in ⋯ menus) and the Start screen
+(`startup.css`: workspace rows with brain tiles, the brains ↔ workspaces
+diagram, combining brains, adding a brain from a folder or GitHub). The file
+tree stays mounted behind Changes so open folders stay open. Smokes follow the
+views (regions instead of dialogs, the palette's chips, the popover) and
+disambiguate the home's duplicate actions.
+
+UI v5 foundation, 2026-09-25: **0.1.38** is prepared on `feat/ui-v5-foundation`.
+`src/app/tokens.css` carries the canvas's tokens for the hearth, light and dark
+themes (the old role names remain as aliases), Geist and Geist Mono are bundled
+as variable woff2, and the theme setting gains `hearth`, which the system choice
+shows in a light desktop. The five-pane `LayerExplorer` is replaced by a 64 px
+rail (`Rail.tsx`: brains in workspace order with running and waiting states,
+the Overview's reserved place, add, search, settings) and one brain panel
+(`BrainPanel.tsx`: header, search, Files | Changes, and resizable Schema,
+Knowledge and Contents sections with Drive upload and read-only badges). The
+stage carries a crumb bar (`NoteBar.tsx`) with the save state, backlinks, the
+note's details (location, human lines) and its menu (rename and move, delete,
+Drive actions, reload, save, table or source, code assistance, materials); the
+terminal is a drawer at its foot. The AI panel shows the brain's Schema line,
+steps as a timeline (`AgentLog.tsx`), permission cards and a composer with
+brain-tiled references and **＋ 参照**. Git's Changes view serves the brain on show,
+with numbered diff cards on the stage. Settings (theme, Markdown font, language,
+updates, pending-upload recovery) moved to the rail; Ctrl+K opens search and
+Ctrl+` the terminal. Brain tiles use the name's initial on a colour derived
+from the scope ID until identity becomes editable. Every Electron UI smoke that
+selected by the old structure was rewritten; `layers-ui-smoke` now proves the
+rail and brain panel.
+
 Delivery, 2026-09-25: PR #94 is merged with the owner's go-ahead, and **0.1.37
 is published** as
 [v0.1.37-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.37-preview.1)

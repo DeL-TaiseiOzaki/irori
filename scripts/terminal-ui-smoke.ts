@@ -20,7 +20,10 @@ try {
   const page = await app.firstWindow();
   await page.getByRole('checkbox', { name: /端末のKB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'ターミナル', exact: true }).click();
+  await page
+    .locator('.status-bar')
+    .getByRole('button', { name: 'ターミナル', exact: true })
+    .click();
   const panel = page.getByRole('region', { name: '端末のKB のターミナル' });
   await expect(panel.locator('.terminal-state')).toHaveText('実行中');
   await panel.locator('.xterm-helper-textarea').focus();
@@ -37,9 +40,13 @@ try {
     .toContain('画面から保存');
   await page.setViewportSize({ width: 1000, height: 720 });
   await expect(panel).toBeVisible();
-  const footer = await page.locator('main > footer').boundingBox();
+  const footer = await page.locator('.status-bar').boundingBox();
   expect(footer!.y + footer!.height).toBeLessThanOrEqual(720);
-  await expect(page.locator('.workspace-switch')).toBeDisabled();
+  const home = page.getByRole('button', { name: 'ワークスペースを選択', exact: true });
+  await expect(home).toBeDisabled();
+  await expect(
+    page.locator('.status-bar').getByRole('button', { name: 'ターミナル', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-terminal.png' });
   await panel.getByRole('button', { name: 'プロセスを終了', exact: true }).click();
@@ -49,7 +56,13 @@ try {
   await expect(panel.locator('.terminal-state')).toHaveText('実行中');
   await panel.getByRole('button', { name: 'ターミナルを終了して閉じる' }).click();
   await expect(panel).toHaveCount(0);
-  await expect(page.locator('.workspace-switch')).toBeEnabled();
+  await expect(home).toBeEnabled();
+  // Ctrl+` opens the drawer and closes it again, from inside the terminal too.
+  await page.keyboard.press('Control+Backquote');
+  await expect(panel.locator('.terminal-state')).toHaveText('実行中');
+  await panel.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.press('Control+Backquote');
+  await expect(panel).toHaveCount(0);
   console.log(
     'Terminal UI passed: detected native shell, actual keyboard input/Japanese file, resize, stop/reopen and cleanup. No model inference.',
   );

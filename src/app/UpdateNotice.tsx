@@ -18,15 +18,11 @@ export type UpdateHost = Pick<
 const megabytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
 const message = (error: unknown) => String(error).replace(/^(?:Error: )+/, '');
 
-export function UpdateNotice({ host }: { host: UpdateHost }) {
-  // What the host knows, including a check irori made by itself, and the person's own check.
+/** What the host knows about updates, including a check irori made by itself. */
+export function useUpdateState(host: UpdateHost) {
   const [state, setState] = useState<UpdateState>({ install: { phase: 'idle' } });
-  const [checked, setChecked] = useState<UpdateCheck>();
-  const [busy, setBusy] = useState<'' | 'check' | 'open' | 'update'>('');
-  const [error, setError] = useState('');
-  const alive = useRef(true);
   useEffect(() => {
-    alive.current = true;
+    let alive = true;
     let heard = false;
     const stop = host.onEvent((event) => {
       if (event.type !== 'update') return;
@@ -35,15 +31,36 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
     });
     void host.updateState().then(
       (value) => {
-        if (alive.current && !heard) setState(value);
+        if (alive && !heard) setState(value);
       },
       () => {},
     );
     return () => {
-      alive.current = false;
+      alive = false;
       stop();
     };
   }, [host]);
+  return state;
+}
+
+/** Whether an update waits for the person: found, downloading, or ready to restart into. */
+export function updateWaiting(state: UpdateState) {
+  return state.check?.status === 'available' || state.install.phase !== 'idle';
+}
+
+export function UpdateNotice({ host }: { host: UpdateHost }) {
+  const state = useUpdateState(host);
+  // The person's own check, beside what the host knows.
+  const [checked, setChecked] = useState<UpdateCheck>();
+  const [busy, setBusy] = useState<'' | 'check' | 'open' | 'update'>('');
+  const [error, setError] = useState('');
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   async function run(kind: 'check' | 'open' | 'update', action: () => Promise<void>) {
     if (busy) return;
     setBusy(kind);

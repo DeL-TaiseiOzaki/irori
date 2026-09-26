@@ -132,7 +132,8 @@ try {
   await expect(picker.locator('option')).toHaveCount(4);
 
   // The reach view names home-relative directories only, never the machine path.
-  await page.getByRole('button', { name: '到達確認' }).click();
+  // The composer's own reach check; the brain's home offers the same one.
+  await page.locator('.agent-panel').getByRole('button', { name: '到達確認' }).click();
   const reach = page.getByRole('dialog', { name: 'スキルの到達' });
   await expect(reach).toContainText('Claude Code');
   await expect(reach).toContainText('読まない。同名が ~/.claude/skills にあり、そちらだけを読む');
@@ -171,12 +172,12 @@ try {
   expect(sent.indexOf('Only ever append.')).toBeLessThan(sent.indexOf('sort out yesterday'));
 
   // Skills belong to the space that declares them; switching must not carry them over.
-  const knowledge = page.getByRole('region', { name: '個人のナレッジ' });
-  await knowledge.getByRole('button', { name: '素のKB', exact: true }).click();
+  const rail = page.getByRole('navigation', { name: 'Brain' });
+  await rail.getByRole('button', { name: /^素のKB・AI/ }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveCount(0);
   await expect(page.getByText('読み込めないスキル')).toHaveCount(0);
   await expect(page.getByText('退役しました')).toHaveCount(0);
-  await knowledge.getByRole('button', { name: 'スキル検証', exact: true }).click();
+  await rail.getByRole('button', { name: /^スキル検証・AI/ }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveValue('');
 } catch (error) {
   await (

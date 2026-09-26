@@ -96,8 +96,9 @@ try {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.type(' saved before navigation');
-  await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
-  let panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
+  let panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   const search = () => panel.getByLabel('資料・成果物の記録を検索');
   await search().fill('ＲＥＰＯＲＴ.ＰＰＴＸ');
   await expect(panel.locator('details')).toHaveCount(1);
@@ -166,8 +167,9 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Record workspace' }).click();
   await page.getByRole('button', { name: '移動先', exact: true }).click();
-  await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
-  panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
+  panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
   await panel.locator('summary').click();
   await panel
@@ -185,13 +187,14 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-source-navigation.png' });
   await panel.getByRole('button', { name: '閉じる', exact: true }).click();
-  await page.locator('.workspace-switch').click();
+  await page.getByRole('button', { name: 'ワークスペースを選択', exact: true }).click();
   await page.getByRole('button', { name: 'Record workspace を編集', exact: true }).click();
   await page.getByRole('checkbox', { name: /参照KB/ }).check();
   await page.getByRole('button', { name: '変更を保存して開く', exact: true }).click();
   await page.getByRole('button', { name: '移動先', exact: true }).click();
-  await page.getByRole('button', { name: '資料と成果物', exact: true }).click();
-  panel = page.getByRole('dialog', { name: '資料と成果物', exact: true });
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
+  panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
   await panel.locator('summary').click();
   await panel

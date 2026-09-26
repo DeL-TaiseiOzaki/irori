@@ -15,10 +15,10 @@ function token(name: string, fallback: string) {
 
 function terminalTheme() {
   return {
-    background: token('--term-bg', '#202627'),
-    foreground: token('--term-text', '#e0e5e1'),
-    cursor: token('--ember-on-nav', '#d8b57a'),
-    selectionBackground: token('--term-rule', '#465550'),
+    background: token('--term', '#0a0b0d'),
+    foreground: token('--term-tx', '#d5dad7'),
+    cursor: token('--term-tx', '#d5dad7'),
+    selectionBackground: '#3a4046',
   };
 }
 
@@ -38,7 +38,7 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
     let current: TerminalSession | undefined;
     const early: TerminalEvent[] = [];
     const term = new Terminal({
-      fontFamily: 'Cascadia Mono, Menlo, Consolas, monospace',
+      fontFamily: "'Geist Mono', 'Cascadia Mono', Menlo, Consolas, monospace",
       fontSize: 13,
       cursorBlink: true,
       scrollback: 3000,
@@ -52,6 +52,8 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
       term.options.theme = terminalTheme();
     };
     scheme.addEventListener('change', repaint);
+    const themeChoice = new MutationObserver(repaint);
+    themeChoice.observe(document.documentElement, { attributeFilter: ['data-theme'] });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container.current!);
@@ -115,6 +117,7 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
     return () => {
       disposed = true;
       scheme.removeEventListener('change', repaint);
+      themeChoice.disconnect();
       unsubscribe();
       observer.disconnect();
       input.dispose();
@@ -151,7 +154,10 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
             </option>
           ))}
         </select>
-        <span className="terminal-state">
+        <span
+          className="terminal-state"
+          data-state={starting ? 'starting' : running ? 'running' : 'exited'}
+        >
           {starting
             ? t('起動中…', 'Starting…')
             : running

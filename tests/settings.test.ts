@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { SettingsService } from '../src/host/settings';
 import { hostArguments } from '../src/domain/host-requests';
-import { markdownFonts } from '../src/domain/types';
+import { markdownFonts, nativeThemeSource } from '../src/domain/types';
 
 const defaults = {
   theme: 'system',
@@ -127,4 +127,14 @@ test('the request validator bounds what a renderer may store', () => {
   assert.equal(save.safeParse([{ skillAudiences: { kb: {} } }]).success, true);
   assert.equal(save.safeParse([{ skillAudiences: { kb: { role: 'a b' } } }]).success, false);
   assert.equal(save.safeParse([{ skillAudiences: { kb: { project: '../x' } } }]).success, false);
+});
+
+test('the hearth theme is a choice of its own, and its window frame is dark', async () => {
+  const { dir, settings } = await service();
+  await settings.save({ theme: 'hearth' });
+  assert.equal((await new SettingsService(dir).read()).theme, 'hearth');
+  assert.equal(hostArguments.saveDeviceSettings.safeParse([{ theme: 'hearth' }]).success, true);
+  assert.equal(nativeThemeSource('hearth'), 'dark');
+  assert.equal(nativeThemeSource('system'), 'system');
+  assert.equal(nativeThemeSource('light'), 'light');
 });

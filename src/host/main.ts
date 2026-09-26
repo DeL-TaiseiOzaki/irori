@@ -15,10 +15,12 @@ import { DraftService } from './drafts';
 import { UpdateService } from './updates';
 import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
-import { ImageService } from './images';
+import { ImageService, imageType } from './images';
 import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
+import { YourAiService } from './you';
+import { brainAgentNames } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkspaceCloudStorage } from '../cloud/storage';
@@ -31,7 +33,7 @@ import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkillReach, readSkills } from './skills';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
-import type { HostEvent, Space } from '../domain/types';
+import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
 import type { GoogleOAuth } from '../cloud/oauth';
 declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
 let window: BrowserWindow | undefined;
@@ -57,7 +59,7 @@ app
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
     const device = await settings.read();
-    nativeTheme.themeSource = device.theme;
+    nativeTheme.themeSource = nativeThemeSource(device.theme);
     // Dialogs and messages the host writes follow the reader's language too.
     setLanguage(device.language);
     const search = new SearchService(files);
@@ -107,11 +109,15 @@ app
     const authorship = new AuthorshipStore(files.dataDir, (ref) =>
       git.noted(ref.scopeId, ref.path),
     );
+    // Your AI's folder is the device's, not a KB's: its record is read before any run.
+    const you = new YourAiService(files.dataDir);
+    await you.load();
     const agents = new AgentService(
       files,
       (event) => emit({ type: 'agent', event }),
       knowledge,
       authorship,
+      you,
     );
     let fileMutations = 0;
     const git = new GitService(
@@ -390,7 +396,7 @@ app
       deviceSettings: () => settings.read(),
       saveDeviceSettings: async (patch) => {
         const next = await settings.save(patch);
-        nativeTheme.themeSource = next.theme;
+        nativeTheme.themeSource = nativeThemeSource(next.theme);
         setLanguage(next.language);
         return next;
       },
@@ -511,6 +517,18 @@ app
         watch(space);
         return space;
       },
+      updateSpace: async (scopeId, change) => {
+        if (agents.busy(scopeId) || cloud.busy || git.busy)
+          throw Error(
+            t(
+              '実行・Git 操作・接続が終わってから Brain の設定を変えてください。',
+              "Change the brain's settings after the run, Git operation and connection finish.",
+            ),
+          );
+        return changeFiles(() => files.update(scopeId, change));
+      },
+      saveSpaceIcon: (scopeId, bytes) =>
+        changeFiles(() => files.saveIcon(scopeId, bytes, imageType(bytes))),
       entries: (...args) => files.entries(...args),
       read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),
@@ -557,6 +575,23 @@ app
         return agents.startQueued(...args, canStartAgent);
       },
       resetAgentSession: (...args) => agents.resetSession(...args),
+      yourAi: () => you.status(),
+      createYourAi: () => you.create(),
+      yourAiEntries: (rel) => you.entries(rel),
+      yourAiRead: (rel) => you.read(rel),
+      yourAiBrains: async (scopeIds) => {
+        const names = brainAgentNames(files.list());
+        const brains = scopeIds.map((scopeId) => files.get(scopeId));
+        const defined = await you.defined(brains.map((brain) => names.get(brain.scopeId)!));
+        return brains.map((brain) => ({
+          scopeId: brain.scopeId,
+          name: brain.name,
+          category: brain.category,
+          agent: names.get(brain.scopeId)!,
+          root: brain.root,
+          defined: defined.has(names.get(brain.scopeId)!),
+        }));
+      },
       start: (input) => {
         canStartAgent();
         return agents.startAccepted(input);

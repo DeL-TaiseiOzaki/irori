@@ -1,6 +1,8 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
+import { classify } from '../domain/scopes';
+import { Crumbs } from './NoteBar';
 import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
 import { Menu } from '@base-ui/react/menu';
 import { MagnetTabs } from './obsidian/MagnetTabs';
@@ -19,34 +21,138 @@ const stateNames = (): Record<string, string> => ({
   U: t('競合', 'Conflict'),
 });
 
-function Patch({ text }: { text: string }) {
+type PatchRow = {
+  kind: 'hunk' | 'add' | 'del' | 'context' | 'note';
+  old?: number;
+  new?: number;
+  text: string;
+};
+type PatchFile = { path: string; rows: PatchRow[]; added: number; removed: number };
+
+/** A path as Git writes it in a patch: quoted with octal bytes when not plain ASCII. */
+function gitPath(written: string) {
+  if (written === '/dev/null') return '';
+  let value = written;
+  if (value.startsWith('"') && value.endsWith('"')) {
+    const bytes: number[] = [];
+    const inner = value.slice(1, -1);
+    for (let i = 0; i < inner.length; i++) {
+      if (inner[i] !== '\\') {
+        bytes.push(...new TextEncoder().encode(inner[i]));
+        continue;
+      }
+      const octal = /^[0-7]{3}/.exec(inner.slice(i + 1));
+      if (octal) {
+        bytes.push(parseInt(octal[0], 8));
+        i += 3;
+      } else {
+        const next = inner[++i];
+        bytes.push(
+          ({ n: 10, t: 9, '"': 34, '\\': 92 } as Record<string, number>)[next] ??
+            next.charCodeAt(0),
+        );
+      }
+    }
+    value = new TextDecoder().decode(new Uint8Array(bytes));
+  }
+  return value.replace(/^[ab]\//, '');
+}
+
+/** Splits a patch into its files, numbering each line on the old and the new side. */
+function parsePatch(text: string) {
+  const header: string[] = [];
+  const files: PatchFile[] = [];
+  let file: PatchFile | undefined;
+  let before = 0;
+  let after = 0;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      file = { path: '', rows: [], added: 0, removed: 0 };
+      files.push(file);
+      continue;
+    }
+    // Before any file, `git show` writes the commit it describes.
+    if (!file) {
+      header.push(line);
+      continue;
+    }
+    // The new side names the file; a deleted file is named by its old side.
+    if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+      const named = gitPath(line.slice(4));
+      if (named && (line.startsWith('+++ ') || !file.path)) file.path = named;
+      continue;
+    }
+    if (/^(index |new file|deleted file|similarity|rename |old mode|new mode)/.test(line)) continue;
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      before = Number(hunk[1]);
+      after = Number(hunk[2]);
+      file.rows.push({ kind: 'hunk', text: line });
+    } else if (line.startsWith('+')) {
+      file.rows.push({ kind: 'add', new: after++, text: line.slice(1) });
+      file.added++;
+    } else if (line.startsWith('-')) {
+      file.rows.push({ kind: 'del', old: before++, text: line.slice(1) });
+      file.removed++;
+    } else if (line.startsWith(' ')) {
+      file.rows.push({ kind: 'context', old: before++, new: after++, text: line.slice(1) });
+    } else if (line) file.rows.push({ kind: 'note', text: line });
+  }
+  return { header: header.join('\n').trim(), files };
+}
+
+/** A diff as cards: one per file, with line numbers on both sides and washed changes. */
+function Patch({ text, path }: { text: string; path?: string }) {
+  const { header, files } = parsePatch(text);
   return (
-    <pre className="git-patch" tabIndex={0} aria-label={t('差分', 'Diff')}>
-      {text.split('\n').map((line, i) => (
-        <span
-          key={i}
-          className={
-            line.startsWith('+')
-              ? 'addition'
-              : line.startsWith('-')
-                ? 'deletion'
-                : line.startsWith('@@')
-                  ? 'hunk'
-                  : ''
-          }
-        >
-          {line}
-          {'\n'}
-        </span>
+    <div className="git-patch" tabIndex={0} aria-label={t('差分', 'Diff')}>
+      {header && <pre className="git-commit-header">{header}</pre>}
+      {!files.length && !header && (
+        <p className="git-empty">{t('差分はありません。', 'There is no difference.')}</p>
+      )}
+      {files.map((file, index) => (
+        <section className="diff-card" key={index}>
+          <header>
+            <Icon name="file" size={14} />
+            <span className="diff-path">{file.path || path}</span>
+            <span className="diff-count added">+{file.added}</span>
+            <span className="diff-count removed">−{file.removed}</span>
+          </header>
+          <div className="diff-rows">
+            {file.rows.map((row, i) => (
+              <div key={i} className={`diff-row ${row.kind}`}>
+                <span className="diff-number">{row.old ?? ''}</span>
+                <span className="diff-number">{row.new ?? ''}</span>
+                <span className="diff-mark">
+                  {row.kind === 'add' ? '+' : row.kind === 'del' ? '−' : ''}
+                </span>
+                <span className="diff-text">{row.text}</span>
+              </div>
+            ))}
+          </div>
+        </section>
       ))}
-    </pre>
+    </div>
   );
 }
 
+/** The layer's icon for a changed path, so a Schema change reads as one at a glance. */
+function layerIcon(space: Space, path: string) {
+  return ({ schema: 'schema', Knowledge_Base: 'book', contents: 'cloud' } as const)[
+    classify(space, path)
+  ];
+}
+
+/** The folder part shown dimmed before the name, without the Knowledge layer's own root. */
+function shortFolder(space: Space, folder: string) {
+  return classify(space, folder + 'x') === 'Knowledge_Base' && folder.startsWith('Knowledge_Base/')
+    ? folder.slice('Knowledge_Base/'.length)
+    : folder;
+}
+
+/** The Changes view of the brain on show: its repository, commits and diffs. */
 export function GitPanel({
-  spaces,
-  initialScope,
-  onClose,
+  space,
   onChanged,
   detailTarget,
   onReviewChange,
@@ -54,9 +160,7 @@ export function GitPanel({
   revision,
   beforeAction,
 }: {
-  spaces: Space[];
-  initialScope: string;
-  onClose: () => void;
+  space: Space;
   onChanged: () => void;
   detailTarget: HTMLElement | null;
   onReviewChange: (reviewing: boolean) => void;
@@ -64,52 +168,19 @@ export function GitPanel({
   revision: number;
   beforeAction: () => Promise<boolean>;
 }) {
-  const [scopeId, setScopeId] = useState(initialScope),
-    [busy, setBusy] = useState(false);
   return (
-    <aside className="git-sidebar" aria-label={t('ソース管理', 'Source control')}>
-      <div className="git-sidebar-heading">
-        <div>
-          <Icon name="branch" size={17} />
-          <strong>{t('ソース管理', 'Source control')}</strong>
-        </div>
-        <button
-          aria-label={t('Git 画面を閉じる', 'Close Git view')}
-          disabled={busy}
-          onClick={onClose}
-        >
-          <Icon name="close" />
-        </button>
-      </div>
-      <label>
-        <span className="git-sr-only">{t('リポジトリ', 'Repository')}</span>
-        <select
-          aria-label={t('Git のスペース', 'Git space')}
-          value={scopeId}
-          disabled={busy}
-          onChange={(e) => setScopeId(e.target.value)}
-        >
-          {spaces.map((s) => (
-            <option key={s.scopeId} value={s.scopeId}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="git-sidebar" role="region" aria-label={t('ソース管理', 'Source control')}>
       <RepositoryPanel
-        key={scopeId}
-        space={spaces.find((s) => s.scopeId === scopeId)!}
-        onBusy={(value) => {
-          setBusy(value);
-          onBusyChange(value);
-        }}
+        key={space.scopeId}
+        space={space}
+        onBusy={onBusyChange}
         onChanged={onChanged}
         detailTarget={detailTarget}
         onReviewChange={onReviewChange}
         externalRevision={revision}
         beforeAction={beforeAction}
       />
-    </aside>
+    </div>
   );
 }
 
@@ -424,11 +495,13 @@ function RepositoryPanel({
   return (
     <>
       <div className="git-repository-bar">
-        <div>
-          <span>
-            <Icon name="branch" /> {status.branch ?? 'detached HEAD'}
-          </span>
-          <small
+        <div className="git-branch">
+          <Icon name="branch" size={14} />
+          <strong>{status.branch ?? 'detached HEAD'}</strong>
+          <Icon name="arrow" size={12} className="git-arrow" />
+          <span className="git-remote">{remoteLabel}</span>
+          <span
+            className="git-ahead"
             title={t(
               '取得済みのリモート履歴との比較',
               'Compared with the last fetched remote history',
@@ -436,25 +509,111 @@ function RepositoryPanel({
           >
             {status.ahead === undefined
               ? t('未取得', 'Not fetched')
-              : `↑ ${status.ahead} ↓ ${status.behind}`}
-          </small>
+              : `↑${status.ahead} ↓${status.behind}`}
+          </span>
         </div>
-        <div className="git-remote">
-          <small>{remoteLabel}</small>
-          {status.remote && status.remote.fetchLabel !== status.remote.label && (
-            <small>
-              {t('受信元', 'Fetches from')}: {status.remote.fetchLabel}
-            </small>
-          )}
-          <small className="git-sr-only">
-            {status.ahead === undefined
-              ? t('受信先の履歴は未取得です', 'The incoming history has not been fetched yet')
-              : t(
-                  `送信待ち ${status.ahead} commit ・ 受信待ち ${status.behind} commit（取得済みの履歴）`,
-                  `${status.ahead} commit to send, ${status.behind} commit to receive (last fetched history)`,
+        {status.remote && status.remote.fetchLabel !== status.remote.label && (
+          <small>
+            {t('受信元', 'Fetches from')}: {status.remote.fetchLabel}
+          </small>
+        )}
+        <small className="git-sr-only">
+          {status.ahead === undefined
+            ? t('受信先の履歴は未取得です', 'The incoming history has not been fetched yet')
+            : t(
+                `送信待ち ${status.ahead} commit ・ 受信待ち ${status.behind} commit（取得済みの履歴）`,
+                `${status.ahead} commit to send, ${status.behind} commit to receive (last fetched history)`,
+              )}
+        </small>
+      </div>
+      <div className="git-toolbar" ref={menuHost}>
+        <button
+          className="icon-button framed"
+          aria-label={t('更新', 'Refresh')}
+          title={t('更新', 'Refresh')}
+          disabled={busy || conflictDirty || draftBlocked}
+          onClick={() =>
+            void perform(async () => {
+              if (tab === 'history') await loadHistory();
+              return host.gitStatus(space.scopeId);
+            })
+          }
+        >
+          <Icon name="refresh" size={14} />
+        </button>
+        {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
+        <Menu.Root modal={false}>
+          <Menu.Trigger
+            className="icon-button framed git-more-actions"
+            aria-label={t('その他の Git 操作', 'More Git actions')}
+            title={t('その他の Git 操作', 'More Git actions')}
+          >
+            <Icon name="more" size={15} />
+          </Menu.Trigger>
+          {/* The menu stays inside the Changes view so it is grouped with what it acts on. */}
+          <Menu.Portal container={menuHost}>
+            <Menu.Positioner side="bottom" align="start" sideOffset={6}>
+              <Menu.Popup className="menu git-menu">
+                <Menu.Item
+                  disabled={busy || conflictDirty || draftBlocked || !canSync}
+                  onClick={() =>
+                    void perform(
+                      () => host.gitSync(space.scopeId, 'fetch', status.version),
+                      t(
+                        'リモートの状態を取得しました。ノートは変更していません。',
+                        'Fetched the remote state. Your notes were not changed.',
+                      ),
+                    )
+                  }
+                >
+                  Fetch
+                </Menu.Item>
+                <Menu.Item
+                  disabled={
+                    busy || !canSync || !!status.changes.length || status.operation !== 'none'
+                  }
+                  onClick={() => confirm('merge')}
+                >
+                  {t('履歴を統合', 'Merge history')}
+                </Menu.Item>
+                {status.remote?.repository && (
+                  <Menu.Item
+                    disabled={busy}
+                    onClick={() =>
+                      void host.gitOpenRepository(space.scopeId).catch((e) => setError(String(e)))
+                    }
+                  >
+                    {t('GitHub を開く', 'Open on GitHub')}
+                  </Menu.Item>
                 )}
-          </small>
-        </div>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+        <button
+          className="panel-button git-pull"
+          disabled={
+            busy ||
+            conflictDirty ||
+            !canSync ||
+            !!status.changes.length ||
+            status.operation !== 'none'
+          }
+          onClick={() => confirm('pull')}
+        >
+          <Icon name="down" size={14} />
+          Pull
+        </button>
+        <button
+          className="solid-button git-push"
+          disabled={
+            busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
+          }
+          onClick={() => confirm('push')}
+        >
+          <Icon name="up" size={14} />
+          Push
+        </button>
       </div>
       <form
         className="git-commit-form"
@@ -478,23 +637,21 @@ function RepositoryPanel({
           );
         }}
       >
-        <label>
-          <span className="git-sr-only">{t('commit メッセージ', 'Commit message')}</span>
-          <input
-            aria-label={t('commit メッセージ', 'Commit message')}
-            value={message}
-            onChange={(e) => messageDraft.setText(e.target.value)}
-            placeholder={t('メッセージを入力してコミット', 'Enter a message and commit')}
-            maxLength={10000}
-            disabled={busy || !messageDraft.ready}
-            required
-          />
-        </label>
+        <input
+          aria-label={t('commit メッセージ', 'Commit message')}
+          value={message}
+          onChange={(e) => messageDraft.setText(e.target.value)}
+          placeholder={t('メッセージを入力してコミット', 'Enter a message and commit')}
+          maxLength={10000}
+          disabled={busy || !messageDraft.ready}
+          required
+        />
         <button
           aria-label={t('コミット', 'Commit')}
-          className="primary"
+          className="solid-button"
           disabled={busy || !canCommit || !message.trim()}
         >
+          <Icon name="check" size={14} />
           {t('コミット', 'Commit')}
           {staged.length ? ` (${staged.length})` : ''}
         </button>
@@ -514,118 +671,38 @@ function RepositoryPanel({
           {t('下書きをこの端末に保存中…', 'Saving the draft on this device…')}
         </p>
       )}
-      <div className="git-toolbar" ref={menuHost}>
-        {/* One pressed view at a time, with the group's own roving focus. */}
-        <MagnetTabs
-          className="git-tabs"
-          label={t('Git の表示', 'Git view')}
-          value={tab}
-          onValueChange={(selected) => {
-            setTab(selected);
-            if (selected === 'history') void perform(() => loadHistory());
-          }}
-          options={[
-            {
-              value: 'changes',
-              label: (
-                <>
-                  {t('変更', 'Changes')}{' '}
-                  <span className="git-tab-count">{status.changes.length}</span>
-                </>
-              ),
-              disabled: busy || conflictDirty || draftBlocked,
-            },
-            {
-              value: 'history',
-              label: t('履歴', 'History'),
-              disabled: busy || conflictDirty || draftBlocked,
-            },
-          ]}
-        />
-        <div className="actions">
-          <button
-            disabled={busy || conflictDirty || draftBlocked}
-            onClick={() =>
-              void perform(async () => {
-                if (tab === 'history') await loadHistory();
-                return host.gitStatus(space.scopeId);
-              })
-            }
-          >
-            <Icon name="refresh" /> {t('更新', 'Refresh')}
-          </button>
-          {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
-          <Menu.Root modal={false}>
-            <Menu.Trigger
-              className="git-more-actions"
-              aria-label={t('その他の Git 操作', 'More Git actions')}
-            >
-              {t('その他', 'More')}
-            </Menu.Trigger>
-            {/* The menu stays inside the source-control aside so it is grouped
-                with the panel it acts on. */}
-            <Menu.Portal container={menuHost}>
-              <Menu.Positioner side="bottom" align="start" sideOffset={6}>
-                <Menu.Popup className="git-menu">
-                  <Menu.Item
-                    disabled={busy || conflictDirty || draftBlocked || !canSync}
-                    onClick={() =>
-                      void perform(
-                        () => host.gitSync(space.scopeId, 'fetch', status.version),
-                        t(
-                          'リモートの状態を取得しました。ノートは変更していません。',
-                          'Fetched the remote state. Your notes were not changed.',
-                        ),
-                      )
-                    }
-                  >
-                    Fetch
-                  </Menu.Item>
-                  <Menu.Item
-                    disabled={
-                      busy || !canSync || !!status.changes.length || status.operation !== 'none'
-                    }
-                    onClick={() => confirm('merge')}
-                  >
-                    {t('履歴を統合', 'Merge history')}
-                  </Menu.Item>
-                  {status.remote?.repository && (
-                    <Menu.Item
-                      disabled={busy}
-                      onClick={() =>
-                        void host.gitOpenRepository(space.scopeId).catch((e) => setError(String(e)))
-                      }
-                    >
-                      {t('GitHub を開く', 'Open on GitHub')}
-                    </Menu.Item>
-                  )}
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
-          <button
-            disabled={
-              busy ||
-              conflictDirty ||
-              !canSync ||
-              !!status.changes.length ||
-              status.operation !== 'none'
-            }
-            onClick={() => confirm('pull')}
-          >
-            Pull
-          </button>
-          <button
-            className="primary"
-            disabled={
-              busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
-            }
-            onClick={() => confirm('push')}
-          >
-            Push
-          </button>
-        </div>
-      </div>
+      {/* One pressed view at a time, with the group's own roving focus. */}
+      <MagnetTabs
+        className="git-tabs"
+        label={t('Git の表示', 'Git view')}
+        value={tab}
+        onValueChange={(selected) => {
+          setTab(selected);
+          if (selected === 'history') void perform(() => loadHistory());
+        }}
+        options={[
+          {
+            value: 'changes',
+            label: (
+              <>
+                {t('変更', 'Changes')}{' '}
+                <span className="git-tab-count">{status.changes.length}</span>
+              </>
+            ),
+            disabled: busy || conflictDirty || draftBlocked,
+          },
+          {
+            value: 'history',
+            label: (
+              <>
+                <Icon name="history" size={13} />
+                {t('履歴', 'History')}
+              </>
+            ),
+            disabled: busy || conflictDirty || draftBlocked,
+          },
+        ]}
+      />
       {error && (
         <p className="git-notice error" role="alert">
           {error}
@@ -709,71 +786,80 @@ function RepositoryPanel({
                       : t('変更はありません。', 'There are no changes.')}
                   </p>
                 )}
-                {group.entries.map((entry) => (
-                  <div className="git-file-row" key={entry.path}>
-                    <button
-                      className="git-file"
-                      aria-pressed={
-                        selection?.path === entry.path && selection.staged === group.staged
-                      }
-                      disabled={busy || conflictDirty || draftBlocked}
-                      onClick={() => {
-                        setError('');
-                        setSelection({ path: entry.path, staged: group.staged });
-                      }}
-                      title={entry.path}
-                    >
-                      <span
-                        className={
-                          entry.conflict ? 'git-file-state conflict-state' : 'git-file-state'
+                {group.entries.map((entry) => {
+                  const folder = entry.path.includes('/')
+                    ? entry.path.slice(0, entry.path.lastIndexOf('/') + 1)
+                    : '';
+                  const state = entry.conflict ? 'U' : group.staged ? entry.index : entry.worktree;
+                  return (
+                    <div className="git-file-row" key={entry.path}>
+                      <button
+                        className="git-file"
+                        aria-pressed={
+                          selection?.path === entry.path && selection.staged === group.staged
+                        }
+                        disabled={busy || conflictDirty || draftBlocked}
+                        onClick={() => {
+                          setError('');
+                          setSelection({ path: entry.path, staged: group.staged });
+                        }}
+                        title={entry.path}
+                      >
+                        <Icon
+                          name={layerIcon(space, entry.path)}
+                          size={14}
+                          className={`git-layer ${classify(space, entry.path)}`}
+                        />
+                        <span className="git-path">
+                          <span className="git-folder">{shortFolder(space, folder)}</span>
+                          {entry.path.slice(folder.length)}
+                        </span>
+                        <span className={`git-file-state state-${state === '?' ? 'new' : state}`}>
+                          {entry.conflict
+                            ? t('競合', 'Conflict')
+                            : (stateNames()[state] ?? t('変更', 'Modified'))}
+                        </span>
+                        {entry.blocked && <small>{t('対象外', 'Excluded')}</small>}
+                      </button>
+                      <button
+                        className="git-stage-file"
+                        aria-label={
+                          group.staged
+                            ? t(`${entry.path} をステージから外す`, `Unstage ${entry.path}`)
+                            : t(`${entry.path} をステージする`, `Stage ${entry.path}`)
+                        }
+                        title={
+                          group.staged
+                            ? t('ステージから外す', 'Unstage')
+                            : t('変更全体をステージ', 'Stage the whole change')
+                        }
+                        disabled={
+                          busy ||
+                          conflictDirty ||
+                          entry.conflict ||
+                          status.operation === 'other' ||
+                          (!group.staged && !!entry.blocked)
+                        }
+                        onClick={() =>
+                          void perform(
+                            () =>
+                              host.gitStageMany(
+                                space.scopeId,
+                                [entry.path],
+                                !group.staged,
+                                status.version,
+                              ),
+                            group.staged
+                              ? t('ステージから外しました。', 'Unstaged.')
+                              : t('ステージに追加しました。', 'Staged.'),
+                          )
                         }
                       >
-                        {entry.conflict
-                          ? t('競合', 'Conflict')
-                          : (stateNames()[group.staged ? entry.index : entry.worktree] ??
-                            t('変更', 'Modified'))}
-                      </span>
-                      <span>{entry.path}</span>
-                      {entry.blocked && <small>{t('対象外', 'Excluded')}</small>}
-                    </button>
-                    <button
-                      className="git-stage-file"
-                      aria-label={
-                        group.staged
-                          ? t(`${entry.path} をステージから外す`, `Unstage ${entry.path}`)
-                          : t(`${entry.path} をステージする`, `Stage ${entry.path}`)
-                      }
-                      title={
-                        group.staged
-                          ? t('ステージから外す', 'Unstage')
-                          : t('変更全体をステージ', 'Stage the whole change')
-                      }
-                      disabled={
-                        busy ||
-                        conflictDirty ||
-                        entry.conflict ||
-                        status.operation === 'other' ||
-                        (!group.staged && !!entry.blocked)
-                      }
-                      onClick={() =>
-                        void perform(
-                          () =>
-                            host.gitStageMany(
-                              space.scopeId,
-                              [entry.path],
-                              !group.staged,
-                              status.version,
-                            ),
-                          group.staged
-                            ? t('ステージから外しました。', 'Unstaged.')
-                            : t('ステージに追加しました。', 'Staged.'),
-                        )
-                      }
-                    >
-                      {group.staged ? '−' : '+'}
-                    </button>
-                  </div>
-                ))}
+                        <Icon name={group.staged ? 'minus' : 'plus'} size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
               </section>
             ))}
           </>
@@ -800,7 +886,11 @@ function RepositoryPanel({
               </button>
             ))}
             {more && (
-              <button disabled={busy} onClick={() => void perform(() => loadHistory(true))}>
+              <button
+                className="git-more-history"
+                disabled={busy}
+                onClick={() => void perform(() => loadHistory(true))}
+              >
                 {t('以前の履歴を表示', 'Show earlier history')}
               </button>
             )}
@@ -815,262 +905,275 @@ function RepositoryPanel({
             aria-label={t('Git の差分', 'Git diff')}
             aria-busy={loadingReview}
           >
-            <div className="git-review-navigation">
-              <button
-                disabled={busy || conflictDirty || draftBlocked}
-                onClick={() => {
-                  reads.current++;
-                  commitReads.current++;
-                  setSelection(undefined);
-                  setCommit(undefined);
-                }}
-              >
-                {t('ノートに戻る', 'Back to the note')}
-              </button>
-            </div>
-            {tab === 'history' ? (
-              commit ? (
-                <>
-                  <h3>{commit.subject}</h3>
-                  <Patch text={commitPatch || t('差分を読み込み中…', 'Loading the diff…')} />
-                </>
-              ) : (
-                <div className="git-empty">
-                  <Icon name="history" size={32} />
-                  <h2>{t('ノートが変わった道筋を読む', 'Read how the notes have changed')}</h2>
-                  <p>
-                    {t(
-                      'commit を選ぶと、その時点の変更を確認できます。',
-                      'Choose a commit to see the changes at that point.',
-                    )}
-                  </p>
-                </div>
-              )
-            ) : !selection ? (
-              <div className="git-empty">
-                <Icon name="branch" size={32} />
-                <h2>{t('共有する変更を選ぶ', 'Choose a change to share')}</h2>
-                <p>
-                  {t(
-                    '差分を確認し、まとめて、またはファイルごとに commit 対象へ追加できます。',
-                    'Review the diff and add it to the commit, either all at once or file by file.',
-                  )}
-                  <br />
-                  {t(
-                    'commit はこの端末の履歴に保存されます。',
-                    'A commit is saved to this device’s history.',
-                  )}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="git-detail-heading">
-                  <h3>{selection.path}</h3>
-                  <span>
+            <header className="stage-bar">
+              <Crumbs
+                space={space}
+                items={[
+                  { icon: 'branch', label: t('変更', 'Changes') },
+                  ...(tab === 'history'
+                    ? [{ icon: 'history' as const, label: t('履歴', 'History') }]
+                    : []),
+                ]}
+                here={tab === 'history' ? commit?.subject : selection?.path.split('/').at(-1)}
+              />
+              <div className="stage-actions git-review-navigation">
+                {tab === 'changes' && selection && (
+                  <span className={`diff-kind ${chosen?.conflict ? 'conflict' : ''}`}>
                     {chosen?.conflict
                       ? t('競合', 'Conflict')
                       : selection.staged
                         ? t('commit に含まれる差分', 'Diff included in the commit')
                         : t('作業ファイルの差分', 'Diff of the working file')}
                   </span>
+                )}
+                {selection && diff && !chosen?.conflict && (
+                  <button
+                    className="stage-text-button framed"
+                    disabled={
+                      busy ||
+                      status.operation === 'other' ||
+                      (!selection.staged && !!chosen?.blocked)
+                    }
+                    onClick={() =>
+                      void perform(
+                        () =>
+                          host.gitStage(
+                            space.scopeId,
+                            selection.path,
+                            !selection.staged,
+                            diff.version,
+                          ),
+                        selection.staged
+                          ? t(
+                              'commit 対象から外しました。ファイルの内容は保持しています。',
+                              'Removed from the commit. The file content is kept.',
+                            )
+                          : t('commit 対象に追加しました。', 'Added to the commit.'),
+                      )
+                    }
+                  >
+                    <Icon name={selection.staged ? 'minus' : 'plus'} size={14} />
+                    {selection.staged
+                      ? t('commit 対象から外す', 'Remove from commit')
+                      : t('commit 対象に追加', 'Add to commit')}
+                  </button>
+                )}
+                <button
+                  className="stage-text-button"
+                  disabled={busy || conflictDirty || draftBlocked}
+                  onClick={() => {
+                    reads.current++;
+                    commitReads.current++;
+                    setSelection(undefined);
+                    setCommit(undefined);
+                  }}
+                >
+                  <Icon name="back" size={14} />
+                  {t('ノートに戻る', 'Back to the note')}
+                </button>
+              </div>
+            </header>
+            <div className="git-detail-body">
+              {tab === 'history' ? (
+                commit ? (
+                  commitPatch ? (
+                    <Patch text={commitPatch} />
+                  ) : (
+                    <p className="git-empty">{t('差分を読み込み中…', 'Loading the diff…')}</p>
+                  )
+                ) : (
+                  <div className="git-empty">
+                    <Icon name="history" size={32} />
+                    <h2>{t('ノートが変わった道筋を読む', 'Read how the notes have changed')}</h2>
+                    <p>
+                      {t(
+                        'commit を選ぶと、その時点の変更を確認できます。',
+                        'Choose a commit to see the changes at that point.',
+                      )}
+                    </p>
+                  </div>
+                )
+              ) : !selection ? (
+                <div className="git-empty">
+                  <Icon name="branch" size={32} />
+                  <h2>{t('共有する変更を選ぶ', 'Choose a change to share')}</h2>
+                  <p>
+                    {t(
+                      '差分を確認し、まとめて、またはファイルごとに commit 対象へ追加できます。',
+                      'Review the diff and add it to the commit, either all at once or file by file.',
+                    )}
+                    <br />
+                    {t(
+                      'commit はこの端末の履歴に保存されます。',
+                      'A commit is saved to this device’s history.',
+                    )}
+                  </p>
                 </div>
-                {conflict ? (
-                  <>
-                    {storedResolution.ready &&
-                      storedResolution.record?.text != null &&
-                      resolutionDraft.current?.path !== conflict.path && (
-                        <div
-                          className="git-notice git-warning"
-                          role="region"
-                          aria-label={t('統合の下書きの復元', 'Restore the merge draft')}
+              ) : conflict ? (
+                <>
+                  {storedResolution.ready &&
+                    storedResolution.record?.text != null &&
+                    resolutionDraft.current?.path !== conflict.path && (
+                      <div
+                        className="git-notice git-warning"
+                        role="region"
+                        aria-label={t('統合の下書きの復元', 'Restore the merge draft')}
+                      >
+                        <p>
+                          {storedResolution.record.baseVersion === conflict.version
+                            ? t(
+                                'この端末に未完了の統合の下書きがあります。',
+                                'This device has an unfinished merge draft.',
+                              )
+                            : t(
+                                '保存後に Git の状態が変わっています。現在の内容と下書きを比較してから編集に戻してください。',
+                                'The Git state changed after this was saved. Compare the current content with the draft before restoring it.',
+                              )}
+                        </p>
+                        <details>
+                          <summary>{t('保存済みの下書きを確認', 'View the saved draft')}</summary>
+                          <pre>
+                            {storedResolution.record.text || t('（空の内容）', '(empty content)')}
+                          </pre>
+                        </details>
+                        <button
+                          disabled={busy || draftBlocked}
+                          onClick={() => {
+                            const text = storedResolution.record!.text!;
+                            resolutionDraft.current = { path: conflict.path, text };
+                            setResolution(text);
+                            storedResolution.setText(text, conflict.version);
+                          }}
                         >
-                          <p>
-                            {storedResolution.record.baseVersion === conflict.version
-                              ? t(
-                                  'この端末に未完了の統合の下書きがあります。',
-                                  'This device has an unfinished merge draft.',
-                                )
-                              : t(
-                                  '保存後に Git の状態が変わっています。現在の内容と下書きを比較してから編集に戻してください。',
-                                  'The Git state changed after this was saved. Compare the current content with the draft before restoring it.',
-                                )}
-                          </p>
-                          <details>
-                            <summary>{t('保存済みの下書きを確認', 'View the saved draft')}</summary>
-                            <pre>
-                              {storedResolution.record.text || t('（空の内容）', '(empty content)')}
-                            </pre>
-                          </details>
+                          {t('下書きを編集に戻す', 'Restore the draft to editing')}
+                        </button>
+                      </div>
+                    )}
+                  <div className="git-conflict-versions">
+                    {[
+                      {
+                        id: 'base',
+                        label: t('共通の元データ', 'Common ancestor'),
+                        value: conflict.base,
+                      },
+                      {
+                        id: 'ours',
+                        label: t('このブランチ', 'This branch'),
+                        value: conflict.ours,
+                      },
+                      {
+                        id: 'theirs',
+                        label: t('取り込むブランチ', 'Incoming branch'),
+                        value: conflict.theirs,
+                      },
+                    ].map((v) => (
+                      <details key={v.id} open={v.id !== 'base'}>
+                        <summary>
+                          {v.label}
+                          {v.value === undefined ? t('（ファイルなし）', '(no file)') : ''}
+                        </summary>
+                        <pre>
+                          {v.value ??
+                            t('この版にはファイルがありません。', 'This version has no file.')}
+                        </pre>
+                      </details>
+                    ))}
+                  </div>
+                  {conflict.editable ? (
+                    <div className="git-resolution">
+                      <label>
+                        {t('統合する内容', 'Merged content')}
+                        <textarea
+                          aria-label={t('統合する内容', 'Merged content')}
+                          value={resolution}
+                          disabled={busy || !storedResolution.ready}
+                          onChange={(e) => {
+                            resolutionDraft.current = {
+                              path: conflict.path,
+                              text: e.target.value,
+                            };
+                            setResolution(e.target.value);
+                            storedResolution.setText(e.target.value, conflict.version);
+                          }}
+                          spellCheck={false}
+                        />
+                      </label>
+                      <p className="muted">
+                        {t(
+                          '競合マーカーを取り除き、両方の変更を確認してください。解決前の内容はこの端末に保持します。',
+                          'Remove the conflict markers and review both changes. The pre-resolution content is kept on this device.',
+                        )}
+                      </p>
+                      <div className="actions">
+                        {conflictDirty && (
                           <button
-                            disabled={busy || draftBlocked}
+                            disabled={busy}
                             onClick={() => {
-                              const text = storedResolution.record!.text!;
+                              const text = conflict.working ?? '';
                               resolutionDraft.current = { path: conflict.path, text };
                               setResolution(text);
                               storedResolution.setText(text, conflict.version);
                             }}
                           >
-                            {t('下書きを編集に戻す', 'Restore the draft to editing')}
+                            {t('統合の編集を戻す', 'Revert the merge edit')}
                           </button>
-                        </div>
-                      )}
-                    <div className="git-conflict-versions">
-                      {[
-                        {
-                          id: 'base',
-                          label: t('共通の元データ', 'Common ancestor'),
-                          value: conflict.base,
-                        },
-                        {
-                          id: 'ours',
-                          label: t('このブランチ', 'This branch'),
-                          value: conflict.ours,
-                        },
-                        {
-                          id: 'theirs',
-                          label: t('取り込むブランチ', 'Incoming branch'),
-                          value: conflict.theirs,
-                        },
-                      ].map((v) => (
-                        <details key={v.id} open={v.id !== 'base'}>
-                          <summary>
-                            {v.label}
-                            {v.value === undefined ? t('（ファイルなし）', '(no file)') : ''}
-                          </summary>
-                          <pre>
-                            {v.value ??
-                              t('この版にはファイルがありません。', 'This version has no file.')}
-                          </pre>
-                        </details>
-                      ))}
-                    </div>
-                    {conflict.editable ? (
-                      <div className="git-resolution">
-                        <label>
-                          {t('統合する内容', 'Merged content')}
-                          <textarea
-                            aria-label={t('統合する内容', 'Merged content')}
-                            value={resolution}
-                            disabled={busy || !storedResolution.ready}
-                            onChange={(e) => {
-                              resolutionDraft.current = {
-                                path: conflict.path,
-                                text: e.target.value,
-                              };
-                              setResolution(e.target.value);
-                              storedResolution.setText(e.target.value, conflict.version);
-                            }}
-                            spellCheck={false}
-                          />
-                        </label>
-                        <p className="muted">
-                          {t(
-                            '競合マーカーを取り除き、両方の変更を確認してください。解決前の内容はこの端末に保持します。',
-                            'Remove the conflict markers and review both changes. The pre-resolution content is kept on this device.',
-                          )}
-                        </p>
-                        <div className="actions">
-                          {conflictDirty && (
-                            <button
-                              disabled={busy}
-                              onClick={() => {
-                                const text = conflict.working ?? '';
-                                resolutionDraft.current = { path: conflict.path, text };
-                                setResolution(text);
-                                storedResolution.setText(text, conflict.version);
-                              }}
-                            >
-                              {t('統合の編集を戻す', 'Revert the merge edit')}
-                            </button>
-                          )}
-                          {(conflict.ours === undefined || conflict.theirs === undefined) && (
-                            <button
-                              disabled={busy || loadingReview || draftBlocked}
-                              onClick={() =>
-                                void perform(
-                                  () => resolveConflict(null),
-                                  t(
-                                    '削除として解決しました。commit で統合を完了できます。',
-                                    'Resolved as a deletion. Commit to complete the merge.',
-                                  ),
-                                )
-                              }
-                            >
-                              {t('削除として解決', 'Resolve as deleted')}
-                            </button>
-                          )}
+                        )}
+                        {(conflict.ours === undefined || conflict.theirs === undefined) && (
                           <button
-                            className="primary"
                             disabled={busy || loadingReview || draftBlocked}
                             onClick={() =>
                               void perform(
-                                () => resolveConflict(resolution),
+                                () => resolveConflict(null),
                                 t(
-                                  '統合内容を保存し、commit 対象に追加しました。',
-                                  'Saved the merged content and added it to the commit.',
+                                  '削除として解決しました。commit で統合を完了できます。',
+                                  'Resolved as a deletion. Commit to complete the merge.',
                                 ),
                               )
                             }
                           >
-                            {t('統合内容を保存して解決', 'Save and resolve')}
+                            {t('削除として解決', 'Resolve as deleted')}
                           </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p role="status">{conflict.detail}</p>
-                    )}
-                  </>
-                ) : diff ? (
-                  <>
-                    <Patch text={diff.patch} />
-                    <div className="git-diff-actions">
-                      <p className="muted">
-                        {selection.staged
-                          ? t(
-                              '表示中の差分が次の commit に含まれます。',
-                              'The diff shown will be included in the next commit.',
-                            )
-                          : t(
-                              '追加すると、このファイルの保存済みの変更全体が対象になります。',
-                              'Adding it includes this file’s entire saved change.',
-                            )}
-                      </p>
-                      <button
-                        disabled={
-                          busy ||
-                          !!chosen?.conflict ||
-                          status.operation === 'other' ||
-                          (!selection.staged && !!chosen?.blocked)
-                        }
-                        onClick={() =>
-                          void perform(
-                            () =>
-                              host.gitStage(
-                                space.scopeId,
-                                selection.path,
-                                !selection.staged,
-                                diff.version,
+                        )}
+                        <button
+                          className="primary"
+                          disabled={busy || loadingReview || draftBlocked}
+                          onClick={() =>
+                            void perform(
+                              () => resolveConflict(resolution),
+                              t(
+                                '統合内容を保存し、commit 対象に追加しました。',
+                                'Saved the merged content and added it to the commit.',
                               ),
-                            selection.staged
-                              ? t(
-                                  'commit 対象から外しました。ファイルの内容は保持しています。',
-                                  'Removed from the commit. The file content is kept.',
-                                )
-                              : t('commit 対象に追加しました。', 'Added to the commit.'),
-                          )
-                        }
-                      >
-                        {selection.staged
-                          ? t('commit 対象から外す', 'Remove from commit')
-                          : t('commit 対象に追加', 'Add to commit')}
-                      </button>
+                            )
+                          }
+                        >
+                          {t('統合内容を保存して解決', 'Save and resolve')}
+                        </button>
+                      </div>
                     </div>
-                  </>
-                ) : (
-                  <p className="git-empty">{t('差分を読み込み中…', 'Loading the diff…')}</p>
-                )}
-              </>
-            )}
+                  ) : (
+                    <p role="status">{conflict.detail}</p>
+                  )}
+                </>
+              ) : diff ? (
+                <>
+                  <Patch text={diff.patch} path={selection.path} />
+                  <p className="muted git-diff-note">
+                    {selection.staged
+                      ? t(
+                          '表示中の差分が次の commit に含まれます。',
+                          'The diff shown will be included in the next commit.',
+                        )
+                      : t(
+                          '追加すると、このファイルの保存済みの変更全体が対象になります。',
+                          'Adding it includes this file’s entire saved change.',
+                        )}
+                  </p>
+                </>
+              ) : (
+                <p className="git-empty">{t('差分を読み込み中…', 'Loading the diff…')}</p>
+              )}
+            </div>
           </section>,
           detailTarget,
         )}

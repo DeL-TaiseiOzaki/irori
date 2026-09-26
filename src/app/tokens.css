@@ -1,0 +1,423 @@
+/* irori v5 design tokens (ADR 014). The values are the approved canvas's own;
+   every colour in the renderer resolves through one of these roles.
+
+   Themes: hearth (graphite chrome, paper stage) is the canvas default and the
+   system choice in a light desktop; light is paper throughout; dark is graphite
+   throughout. The renderer writes the resolved theme into data-theme. */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root,
+:root[data-theme='hearth'] {
+  color-scheme: dark;
+  --chrome-scheme: dark;
+  --stage-scheme: light;
+
+  /* chrome */
+  --bg: #0c0d0f;
+  --rail-tx: #8d939a;
+  --panel: #15171a;
+  --raised: #1d2024;
+  --raised-2: #262a2f;
+  --field: #101214;
+  --hair: rgba(255, 255, 255, 0.07);
+  --hair-2: rgba(255, 255, 255, 0.13);
+  --hair-3: rgba(255, 255, 255, 0.24);
+  --tx: #f0eee8;
+  --tx-2: #aab0b7;
+  --tx-3: #838990;
+  --solid: #f0eee8;
+  --on-solid: #141619;
+
+  /* the AI's flame */
+  --ember: #ff8b3d;
+  --ember-2: #ffa766;
+  --ember-soft: rgba(255, 139, 61, 0.13);
+  --ember-line: rgba(255, 139, 61, 0.45);
+  --ember-glow: rgba(255, 139, 61, 0.2);
+  --ember-halo: rgba(255, 139, 61, 0.5);
+  --on-ember: #1e1006;
+
+  /* layers, on the chrome */
+  --schema: #b8abff;
+  --know: #f0eee8;
+  --cont: #72d4c4;
+  --cont-soft: rgba(114, 212, 196, 0.12);
+
+  /* the stage */
+  --stage: #f6f4ef;
+  --stage-2: #eeebe4;
+  --stage-3: #e2ded6;
+  --card: #fffefb;
+  --rule: rgba(24, 26, 30, 0.1);
+  --rule-2: rgba(24, 26, 30, 0.17);
+  --ink: #1a1d21;
+  --ink-2: #4a5058;
+  --ink-3: #646a73;
+  --schema-ink: #5a47c6;
+  --know-ink: #1a1d21;
+  --cont-ink: #0c7a6c;
+  --ember-ink: #b0541a;
+  --ink-solid: #1a1d21;
+  --on-ink-solid: #f6f4ef;
+  --add-ink: #1d6a41;
+  --add-wash: #e2f2e7;
+  --del-ink: #a2392b;
+  --del-wash: #fbe7e3;
+  --warn-ink: #73500f;
+  --warn-wash: #fff1d8;
+  --term: #0a0b0d;
+  --term-tx: #d5dad7;
+
+  --shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 0 rgba(255, 255, 255, 0.035) inset,
+    0 14px 36px rgba(0, 0, 0, 0.34);
+  --stage-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 54px rgba(0, 0, 0, 0.5);
+  --pop: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 30px 80px rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 0 0 1px rgba(24, 26, 30, 0.07), 0 1px 2px rgba(24, 26, 30, 0.04);
+  --label-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(6, 7, 8, 0.6);
+
+  /* brain colours: a calm set with no orange, which belongs to the AI */
+  --t-stone: #2b2e33;
+  --t-stone-fg: #e7e4dd;
+  --t-ai: #232d42;
+  --t-ai-fg: #c7d5f6;
+  --t-koke: #26332b;
+  --t-koke-fg: #cde2c5;
+  --t-seiji: #1f3431;
+  --t-seiji-fg: #bde6dc;
+  --t-fuji: #2d2842;
+  --t-fuji-fg: #dad0f8;
+  --t-sakura: #3b2a32;
+  --t-sakura-fg: #f4d1dd;
+  --t-suna: #36302a;
+  --t-suna-fg: #ecdcc4;
+  --t-shiro: #e9e6df;
+  --t-shiro-fg: #1a1d21;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --chrome-scheme: light;
+  --stage-scheme: light;
+  --bg: #e7e5e0;
+  --rail-tx: #5b616a;
+  --panel: #f8f7f4;
+  --raised: #efede8;
+  --raised-2: #e5e2dc;
+  --field: #ffffff;
+  --hair: rgba(24, 26, 30, 0.08);
+  --hair-2: rgba(24, 26, 30, 0.15);
+  --hair-3: rgba(24, 26, 30, 0.26);
+  --tx: #1a1d21;
+  --tx-2: #4a5058;
+  --tx-3: #646a73;
+  --solid: #1a1d21;
+  --on-solid: #f8f7f4;
+  --ember: #f07a2a;
+  --ember-2: #b0541a;
+  --ember-soft: rgba(240, 122, 42, 0.12);
+  --ember-line: rgba(210, 98, 28, 0.42);
+  --ember-glow: rgba(240, 122, 42, 0.18);
+  --ember-halo: rgba(240, 122, 42, 0.45);
+  --on-ember: #1e1006;
+  --schema: #5a47c6;
+  --know: #1a1d21;
+  --cont: #0c7a6c;
+  --cont-soft: rgba(12, 122, 108, 0.1);
+  --stage: #ffffff;
+  --stage-2: #f4f2ed;
+  --stage-3: #e8e5de;
+  --card: #ffffff;
+  --rule: rgba(24, 26, 30, 0.1);
+  --rule-2: rgba(24, 26, 30, 0.17);
+  --ink: #1a1d21;
+  --ink-2: #4a5058;
+  --ink-3: #646a73;
+  --schema-ink: #5a47c6;
+  --know-ink: #1a1d21;
+  --cont-ink: #0c7a6c;
+  --ember-ink: #b0541a;
+  --ink-solid: #1a1d21;
+  --on-ink-solid: #ffffff;
+  --add-ink: #1d6a41;
+  --add-wash: #e2f2e7;
+  --del-ink: #a2392b;
+  --del-wash: #fbe7e3;
+  --term: #15181b;
+  --term-tx: #d5dad7;
+  --shadow: 0 0 0 1px rgba(24, 26, 30, 0.06), 0 8px 24px rgba(40, 36, 28, 0.07);
+  --stage-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 12px 36px rgba(40, 36, 28, 0.11);
+  --pop: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 30px 80px rgba(30, 26, 20, 0.24);
+  --card-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 1px 2px rgba(24, 26, 30, 0.04);
+  --label-shadow: 0 10px 30px rgba(30, 26, 20, 0.2);
+  --scrim: rgba(40, 38, 34, 0.34);
+  --t-stone: #e3e0d9;
+  --t-stone-fg: #2a2d31;
+  --t-ai: #dae2f4;
+  --t-ai-fg: #26375f;
+  --t-koke: #dce8d7;
+  --t-koke-fg: #2f4a34;
+  --t-seiji: #d4ebe5;
+  --t-seiji-fg: #1f4d44;
+  --t-fuji: #e5ddf7;
+  --t-fuji-fg: #44376f;
+  --t-sakura: #f5dee6;
+  --t-sakura-fg: #6b2f46;
+  --t-suna: #eee5d5;
+  --t-suna-fg: #5a4a2f;
+  --t-shiro: #ffffff;
+  --t-shiro-fg: #1a1d21;
+}
+
+/* Dark keeps the hearth's chrome and darkens the stage. */
+:root[data-theme='dark'] {
+  --stage-scheme: dark;
+  --stage: #1b1e22;
+  --stage-2: #23272c;
+  --stage-3: #2d3137;
+  --card: #202328;
+  --rule: rgba(255, 255, 255, 0.08);
+  --rule-2: rgba(255, 255, 255, 0.15);
+  --ink: #eeece6;
+  --ink-2: #b3b8bf;
+  --ink-3: #8d939b;
+  --schema-ink: #b8abff;
+  --know-ink: #eeece6;
+  --cont-ink: #72d4c4;
+  --ember-ink: #ffa766;
+  --ink-solid: #eeece6;
+  --on-ink-solid: #1b1e22;
+  --add-ink: #86d7a3;
+  --add-wash: rgba(80, 190, 120, 0.14);
+  --del-ink: #ff9f8e;
+  --del-wash: rgba(240, 100, 80, 0.15);
+  --warn-ink: #e6c07a;
+  --warn-wash: #2e2717;
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* Names from before v5, kept for components that still read them. Each one
+   resolves to a v5 role, so the whole renderer follows one palette. */
+:root {
+  --paper: var(--stage);
+  --surface: var(--card);
+  --surface-sunken: var(--stage-2);
+  --surface-panel: var(--stage-2);
+  --surface-inset: var(--stage-3);
+  --surface-selected: var(--stage-3);
+  --muted: var(--ink-2);
+  --ink-faint: var(--ink-3);
+  --rule-soft: var(--rule);
+  --rule-strong: var(--rule-2);
+  --rule-hover: var(--ink-3);
+  --nav: var(--panel);
+  --nav-raised: var(--raised);
+  --nav-rule: var(--hair-2);
+  --nav-control: var(--raised-2);
+  --nav-hover: var(--raised);
+  --nav-border: var(--hair-2);
+  --nav-border-hover: var(--hair-3);
+  --nav-text: var(--tx);
+  --nav-text-strong: var(--tx);
+  --nav-muted: var(--tx-2);
+  --nav-chip: var(--raised-2);
+  --nav-chip-text: var(--tx);
+  --nav-scrollbar: var(--hair-3);
+  --nav-selected: var(--raised-2);
+  --nav-selected-text: var(--tx);
+  --ember-border: var(--ember-line);
+  --ember-wash: var(--ember-soft);
+  --ember-pressed: var(--ember-soft);
+  --ember-on-nav: var(--ember-2);
+  --focus-ring: var(--ember);
+  --accent-control: var(--ink-solid);
+  --danger: var(--del-ink);
+  --danger-strong: var(--del-ink);
+  --danger-surface: var(--del-wash);
+  --danger-wash: var(--del-wash);
+  --danger-on-nav: #ffb4a2;
+  --added: var(--add-ink);
+  --added-wash: var(--add-wash);
+  --hunk: var(--ink-3);
+  --hunk-wash: var(--stage-2);
+  --state-ink: var(--ink-2);
+  --term-bg: var(--term);
+  --term-text: var(--term-tx);
+  --term-muted: rgba(213, 218, 215, 0.62);
+  --term-rule: rgba(255, 255, 255, 0.12);
+  --term-control: rgba(255, 255, 255, 0.06);
+  --term-control-border: rgba(255, 255, 255, 0.14);
+  --backdrop: var(--scrim);
+  --shadow-toggle: var(--card-shadow);
+  --shadow-sheet: var(--pop);
+  --shadow-modal: var(--pop);
+  --shadow-panel: var(--shadow);
+
+  /* type */
+  --font-ui:
+    'Geist', 'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, system-ui,
+    sans-serif;
+  --font-jp:
+    'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, 'Geist', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --quick: 140ms;
+  --medium: 200ms;
+  --slow: 320ms;
+
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--tx);
+  background: var(--bg);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Surfaces that sit on the paper stage carry its scheme, so native controls
+   and scrollbars there are light in the hearth theme. */
+.on-stage {
+  color-scheme: var(--stage-scheme);
+}
+
+@keyframes irori-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@keyframes irori-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes irori-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
+@keyframes irori-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes irori-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes irori-halo {
+  0% {
+    box-shadow: 0 0 0 0 var(--ember-halo);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@keyframes irori-shimmer {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+@keyframes irori-lift {
+  0% {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+}
+@keyframes irori-glow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px var(--ember-line),
+      0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px var(--ember-line),
+      0 0 28px 2px var(--ember-glow);
+  }
+}
+
+/* Every ambient loop and transition stops for a reader who asks for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Thin scrollbars that take the surface's own hairline colour. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background: var(--hair-2) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--hair-3);
+}
+.on-stage ::-webkit-scrollbar-thumb {
+  background-color: var(--rule-2);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}

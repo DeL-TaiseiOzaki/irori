@@ -65,8 +65,8 @@ try {
   await page.getByRole('checkbox', { name: /知識の地図/ }).check();
   await page.getByRole('checkbox', { name: /知識の束/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  let panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  let panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel.locator('.react-flow__node')).toHaveCount(4);
   await expect(panel.locator('.react-flow__edge')).toHaveCount(5);
   await panel.getByLabel('サブグラフ', { exact: true }).selectOption('調査');
@@ -84,32 +84,41 @@ try {
   await page.screenshot({ path: 'test-results/irori-ontology.png' });
   await panel.getByRole('button', { name: '関連ノートを開く' }).click();
   await expect(page.locator('.ProseMirror')).toContainText('知識をつなぐ');
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  panel = page.getByRole('region', { name: 'オントロジー', exact: true });
+  // The entity list and the CSV files open from the graph's table button.
+  await panel.getByRole('button', { name: 'エンティティとノートの一覧', exact: true }).click();
   await panel.getByRole('button', { name: 'エンティティ CSV を開く' }).click();
   await expect(page.getByRole('region', { name: 'CSV の表', exact: true })).toContainText(
     'keep, this',
   );
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   expect(await readFile(path.join(root, fixture.declaration.entities.path), 'utf8')).toBe(
     fixture.entities,
   );
-  await page.getByRole('button', { name: 'ソース', exact: true }).click();
+  // Table and source are the note's views, chosen from its menu.
+  const view = async (name: string) => {
+    await page.getByRole('button', { name: /^その他（/ }).click();
+    await page.getByRole('menuitemradio', { name, exact: true }).click();
+  };
+  await view('ソース');
   await page.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.type('new,New entity,,root,New group,preserved\r\n');
-  await page.getByRole('button', { name: '表', exact: true }).click();
+  await view('表');
   await expect(page.getByRole('region', { name: 'CSV の表', exact: true })).toContainText(
     'New entity',
   );
-  await expect(page.getByRole('button', { name: 'オントロジー', exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }),
+  ).toBeDisabled();
   await page.getByRole('button', { name: /^保存/ }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   const saved = await readFile(path.join(root, fixture.declaration.entities.path), 'utf8');
   expect(saved.startsWith(fixture.entities)).toBe(true);
   expect(saved).toContain('new,New entity');
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel.locator('.react-flow__node')).toHaveCount(5);
   await writeFile(
     path.join(root, fixture.declaration.entities.path),
@@ -136,14 +145,19 @@ try {
   await expect(panel.locator('.react-flow__node')).toHaveCount(5);
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'オントロジー', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  await page.getByRole('button', { name: '構築・表示設定をエージェントに相談' }).click();
+  await expect(
+    page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }),
+  ).toBeFocused();
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'AI に相談', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toHaveValue(/\.irori\/ontology.json/);
   // The bundle KB: no declaration, so the panel offers to generate the graph index.
-  await page.getByRole('button', { name: '知識の束', exact: true }).first().click();
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await page
+    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('button', { name: /^知識の束・AI/ })
+    .click();
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel).toContainText('グラフ索引を作成できます');
   await panel.getByRole('button', { name: 'グラフ索引を作成', exact: true }).click();
   const freshness = panel.getByRole('status').filter({ hasText: 'グラフ索引' });
@@ -196,6 +210,7 @@ try {
     expect(await readFile(relationsPath, 'utf8')).toBe(correctRelations);
   }
   // The CSV stays portable NFC; opening uses the actual decomposed name on disk.
+  await panel.getByRole('button', { name: 'エンティティとノートの一覧', exact: true }).click();
   await panel
     .getByRole('button', {
       name: 'Knowledge_Base/entities/サービス.md'.normalize('NFD'),
@@ -203,8 +218,8 @@ try {
     })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('サービス');
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
-  panel = page.getByRole('dialog', { name: 'オントロジー', exact: true });
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await panel.locator('.react-flow__node').filter({ hasText: '監視' }).click();
   await expect(panel.getByRole('button', { name: '関連ノートを開く' })).toBeVisible();
   await page.screenshot({ path: 'test-results/irori-graph-index.png' });
@@ -216,7 +231,7 @@ try {
   );
   await crashed;
   console.log(
-    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, dialog keyboard handling, graph index generation/update/repair, declared-pair protection and decomposed note names. No provider calls.',
+    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, stage view keyboard handling, graph index generation/update/repair, declared-pair protection and decomposed note names. No provider calls.',
   );
 } finally {
   await app.close();

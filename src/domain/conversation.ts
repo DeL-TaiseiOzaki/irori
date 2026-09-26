@@ -16,6 +16,8 @@ export const messageInput = z.object({
   skill: skillName.optional(),
   /** Tell the agent which lines of the note the person wrote or revised. */
   personLines: z.boolean().optional(),
+  /** Brains handed to your AI; refused for a brain's own AI. */
+  brains: z.array(z.uuid()).max(50).optional(),
 });
 export const startInput = messageInput.extend({ scopeId: z.uuid(), agent: z.enum(agentIds) });
 export const queuedMessage = messageInput.extend({ id: z.uuid() });
@@ -25,6 +27,34 @@ export interface Conversation {
   queued: QueuedMessage[];
   truncated: boolean;
   activeRunId?: string;
+  /** Permissions and questions the active run is waiting on now. */
+  requests?: AgentEvent[];
+}
+
+/** The last index whose item matches, or -1. */
+export function lastIndex<T>(items: T[], match: (item: T) => boolean) {
+  for (let index = items.length - 1; index >= 0; index--) if (match(items[index])) return index;
+  return -1;
+}
+
+/**
+ * The saved history with the live requests in place of their status lines, so
+ * a waiting run can be answered from any view that opens it.
+ */
+export function withRequests(conversation: Conversation) {
+  let events = conversation.events;
+  for (const request of conversation.requests ?? []) {
+    const index = lastIndex(
+      events,
+      (event) =>
+        event.runId === request.runId && event.type === 'status' && event.text === request.text,
+    );
+    events =
+      index < 0
+        ? [...events, request]
+        : [...events.slice(0, index), request, ...events.slice(index + 1)];
+  }
+  return events;
 }
 
 export function appendConversationEvent(events: AgentEvent[], event: AgentEvent) {

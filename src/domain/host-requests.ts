@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, markdownFonts } from './types';
+import { agentIds, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
@@ -11,6 +11,7 @@ import { externalUrl } from './links';
 import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience } from './skills';
+import { brainLook } from './brains';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -36,7 +37,7 @@ export const hostArguments = {
   deviceSettings: z.tuple([]),
   saveDeviceSettings: z.tuple([
     z.object({
-      theme: z.enum(['system', 'light', 'dark']).optional(),
+      theme: z.enum(themes).optional(),
       language: z.enum(languages).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       editorAssistance: z.boolean().optional(),
@@ -133,6 +134,20 @@ export const hostArguments = {
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),
+  updateSpace: z.tuple([
+    id,
+    z
+      .object({
+        name: name.optional(),
+        category: z.enum(['personal', 'team', 'organization']).nullable().optional(),
+        appearance: brainLook.nullable().optional(),
+      })
+      .strict(),
+  ]),
+  saveSpaceIcon: z.tuple([
+    id,
+    z.instanceof(Uint8Array).refine((value) => value.length <= 2 * 1024 * 1024),
+  ]),
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
@@ -161,6 +176,11 @@ export const hostArguments = {
   startQueuedMessage: z.tuple([id, z.enum(agentIds), id]),
   resetAgentSession: z.tuple([id, z.enum(agentIds)]),
   start: z.tuple([startInput]),
+  yourAi: z.tuple([]),
+  createYourAi: z.tuple([]),
+  yourAiEntries: z.tuple([path]),
+  yourAiRead: z.tuple([path]),
+  yourAiBrains: z.tuple([z.array(id).max(50)]),
   cancel: z.union([z.tuple([]), z.tuple([id])]),
   respond: z.tuple([
     id,

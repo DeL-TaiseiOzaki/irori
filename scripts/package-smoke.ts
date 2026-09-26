@@ -456,7 +456,9 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
-  await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+  // Reload lives in the note's menu.
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '再読み込み', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit after saving');
   await expect
     .poll(() =>
@@ -467,12 +469,15 @@ try {
         ),
     )
     .toBe(true);
-  await page.getByRole('button', { name: 'オントロジー', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
   await expect(
-    page.getByRole('dialog', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
+    page.getByRole('region', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
   ).toHaveCount(4);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'ターミナル', exact: true }).click();
+  await page
+    .locator('.status-bar')
+    .getByRole('button', { name: 'ターミナル', exact: true })
+    .click();
   const terminal = page.getByRole('region', { name: '配布検証 のターミナル' });
   await expect(terminal.locator('.terminal-state')).toHaveText('実行中', { timeout: 15000 });
   await terminal.locator('.xterm-helper-textarea').focus();

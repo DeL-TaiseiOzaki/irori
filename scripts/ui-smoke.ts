@@ -57,6 +57,13 @@ const sampler = setInterval(() => {
 }, 500);
 const page = await app.firstWindow();
 page.on('pageerror', (error) => errors.push(String(error)));
+// Display choices live in the rail's settings, which stay open for several choices.
+const openSettings = () => page.getByRole('button', { name: /^設定（/ }).click();
+async function choose(theme: string) {
+  await openSettings();
+  await page.getByRole('radio', { name: theme, exact: true }).check();
+  await page.keyboard.press('Escape');
+}
 try {
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
   await expect
@@ -133,33 +140,33 @@ try {
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await expect(page.getByRole('button', { name: '新しいノートを作成', exact: true })).toBeVisible();
-  await page.screenshot({ path: 'test-results/obsidian-workspace-light.png', fullPage: true });
-  await page.getByLabel(/表示設定/).click();
-  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  // The workspace opens on the first brain's home.
+  await expect(page.getByRole('button', { name: 'ノートを作成', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/obsidian-workspace-hearth.png', fullPage: true });
+  await choose('ダーク');
   await page.screenshot({
     path: 'test-results/obsidian-workspace-dark.png',
     fullPage: true,
     animations: 'disabled',
   });
-  await page.getByLabel(/表示設定/).click();
-  await page.getByRole('menuitemradio', { name: 'ライト', exact: true }).click();
+  await choose('ライト');
+  await page.screenshot({ path: 'test-results/obsidian-workspace-light.png', fullPage: true });
   await page.getByRole('button', { name: '日本語 note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('顧客インタビュー');
   await expect(page.locator('.ProseMirror table.children')).toBeVisible();
   // The reader's own light/dark choice, applied at once and kept for next launch.
   const dark = () => page.evaluate(() => document.documentElement.dataset.theme === 'dark');
   await expect.poll(dark).toBe(false);
-  await page.getByLabel(/表示設定/).click();
-  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  await choose('ダーク');
   await expect.poll(dark).toBe(true);
   // The rendered note typeface changes without replacing the editor and is
   // kept in the same device record as the theme and pane sizes.
-  await page.getByLabel(/表示設定/).click();
+  await openSettings();
   for (const name of ['システム', '丸ゴシック', '教科書体'])
-    await expect(page.getByRole('menuitemradio', { name, exact: true })).toBeVisible();
-  await page.screenshot({ path: 'test-results/irori-font-menu.png', fullPage: true });
-  await page.getByRole('menuitemradio', { name: '教科書体', exact: true }).click();
+    await expect(page.getByRole('radio', { name, exact: true })).toBeAttached();
+  await page.screenshot({ path: 'test-results/irori-settings.png', fullPage: true });
+  await page.getByRole('radio', { name: '教科書体', exact: true }).check();
+  await page.keyboard.press('Escape');
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.markdownFont))
     .toBe('textbook');
@@ -168,17 +175,18 @@ try {
       page.locator('.ProseMirror').evaluate((element) => getComputedStyle(element).fontFamily),
     )
     .toContain('UD Digi Kyokasho N-R');
-  await page.getByLabel(/表示設定/).click();
-  await page.getByRole('menuitemradio', { name: 'システムに合わせる', exact: true }).click();
+  await choose('システムに合わせる');
   await expect.poll(dark).toBe(false);
-  await page.getByLabel(/表示設定/).click();
-  await page.getByRole('menuitemradio', { name: 'ダーク', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe('hearth');
+  await choose('ダーク');
   await expect.poll(dark).toBe(true);
   // Pane sizes are the reader's too, and the device record keeps both.
   const paneWidth = () =>
-    page.locator('.explorer-pane').evaluate((element) => element.getBoundingClientRect().width);
+    page.locator('.brain-pane').evaluate((element) => element.getBoundingClientRect().width);
   const startWidth = await paneWidth();
-  const handle = page.getByRole('separator', { name: 'サイドバーの幅', exact: true });
+  const handle = page.getByRole('separator', { name: 'Brain パネルの幅', exact: true });
   const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
@@ -187,7 +195,7 @@ try {
   await expect.poll(paneWidth).toBeGreaterThan(startWidth + 40);
   chosenWidth = await paneWidth();
   // Opening a rich document is not itself an edit.
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   if ((await readFile(path.join(kb, '日本語 note.md'), 'utf8')) !== input)
     throw Error('No-op changed Markdown bytes');
   await page.locator('.ProseMirror').evaluate((element) => {
@@ -197,8 +205,8 @@ try {
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('リッチ編集を保存します。');
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   if (
     !(await readFile(path.join(kb, '日本語 note.md'), 'utf8')).includes('リッチ編集を保存します。')
   )
@@ -209,8 +217,8 @@ try {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUIで編集しました。\n');
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   // ProseMirror groups adjacent edits within its default 500 ms newGroupDelay.
   // Separate setup typing from the edit under test; saving does not close history.
   // Keep the following edit/save/undo immediate to catch the 200 ms listener race.
@@ -231,7 +239,7 @@ try {
   const beforeSave = await selection();
   expect(beforeSave.focused).toBe(true);
   await page.keyboard.press('ControlOrMeta+s');
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   expect(await selection()).toEqual(beforeSave);
   await expect(editor).toHaveAttribute('data-lifecycle', 'original');
   await page.keyboard.press('ControlOrMeta+z');
@@ -279,8 +287,8 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('互換編集');
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   const compatible = await readFile(path.join(kb, '互換.md'), 'utf8');
   if (
     !compatible.startsWith('\ufeff---\r\n# Keep this comment\r\nunknown: yes\r\n---') ||
@@ -483,7 +491,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       await expect
         .poll(() =>
           window
-            .locator('.explorer-pane')
+            .locator('.brain-pane')
             .evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBeGreaterThan(chosenWidth - 12);

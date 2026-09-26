@@ -1,0 +1,668 @@
+/* The paper stage: the crumb bar, the note, banners and the terminal drawer. */
+
+.stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  border-radius: 14px;
+  background: var(--stage);
+  color: var(--ink);
+  box-shadow: var(--stage-shadow);
+}
+.stage:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: -3px;
+}
+.stage-top {
+  flex: none;
+}
+.stage-top[hidden],
+.note-surface[hidden],
+.git-detail-slot[hidden] {
+  display: none;
+}
+.skip-to-editor {
+  position: fixed;
+  left: 16px;
+  top: -80px;
+  padding: 12px 18px;
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  z-index: 110;
+}
+.skip-to-editor:focus {
+  top: 16px;
+}
+
+/* The crumb bar. */
+.stage-bar {
+  height: 50px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 18px;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+.crumbs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+/* Folders give way first, then the name, each ending in an ellipsis. */
+.crumb.folder {
+  flex: 0 100 auto;
+  min-width: 24px;
+}
+.crumb.here {
+  flex: 0 1 auto;
+  min-width: 40px;
+}
+.crumb-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crumb.brain {
+  gap: 8px;
+  color: var(--ink-2);
+  flex: none;
+}
+.crumb.layer {
+  color: var(--ink-2);
+  flex: none;
+}
+.crumb.layer.schema > .ui-icon:not(.crumb-separator) {
+  color: var(--schema-ink);
+}
+.crumb.layer.contents > .ui-icon:not(.crumb-separator) {
+  color: var(--cont-ink);
+}
+.crumb.here {
+  color: var(--ink);
+  font-weight: 600;
+}
+.crumb-separator {
+  color: var(--ink-3);
+  opacity: 0.6;
+  flex: none;
+}
+.stage-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.stage-note {
+  color: var(--ink-3);
+  font-size: 12px;
+  padding: 0 6px;
+}
+.stage-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--rule);
+}
+.save-state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.save-state > .ui-icon {
+  color: var(--add-ink);
+}
+button.save-state {
+  padding: 0 9px;
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+button.save-state:hover:not(:disabled) {
+  background: var(--stage-2);
+  color: var(--ink);
+}
+button.save-state > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.stage-button {
+  height: 30px;
+  min-width: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.stage-button:hover:not(:disabled),
+.stage-button[data-popup-open] {
+  background: var(--stage-2);
+  color: var(--ink);
+}
+.stage-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.stage-text-button.framed {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--card-shadow);
+}
+.stage-text-button:hover:not(:disabled) {
+  background: var(--stage-2);
+  color: var(--ink);
+}
+.ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--ember);
+  color: var(--on-ember);
+  box-shadow: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ai-toggle:hover {
+  background: var(--ember);
+  filter: brightness(1.08);
+}
+.ai-toggle.open {
+  padding: 0 11px;
+  background: var(--stage-2);
+  color: var(--ember-ink);
+}
+.ai-toggle.open:hover {
+  background: var(--stage-3);
+  filter: none;
+}
+.stage-popover {
+  width: 320px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--pop);
+  font-size: 12.5px;
+  outline: none;
+  transition:
+    opacity var(--medium) ease,
+    transform var(--medium) var(--ease);
+}
+.stage-popover[data-starting-style],
+.stage-popover[data-ending-style] {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.note-info h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.note-info dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 10px;
+}
+.note-info dt {
+  color: var(--ink-3);
+}
+.note-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.note-info .authorship {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+.note-info small {
+  color: var(--ink-3);
+}
+
+/* Banners under the crumb bar. */
+.stage .hint {
+  margin: 0;
+  padding: 8px 24px;
+}
+.hint button,
+.error button {
+  margin-left: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.error {
+  margin: 10px 18px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--del-wash);
+  color: var(--del-ink);
+  overflow-wrap: anywhere;
+}
+.conflict {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 18px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
+}
+.conflict > strong {
+  flex-basis: 100%;
+}
+.versions {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.versions label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+.versions pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: 12px/1.6 var(--font-mono);
+  white-space: pre-wrap;
+}
+
+/* The note. */
+.note-surface,
+.git-detail-slot {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.document-scroll {
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.document-editor {
+  max-width: 696px;
+  margin: 0 auto;
+  padding: 40px 0 90px;
+  min-height: 100%;
+}
+.image-errors {
+  overflow-wrap: anywhere;
+}
+.document-editor .milkdown {
+  background: transparent;
+  /* Crepe ships its own palette; every role maps onto irori's tokens so the
+     editor follows the same theme as the stage around it. */
+  --crepe-color-background: var(--stage);
+  --crepe-color-on-background: var(--ink);
+  --crepe-color-surface: var(--card);
+  --crepe-color-surface-low: var(--stage-2);
+  --crepe-color-on-surface: var(--ink);
+  --crepe-color-on-surface-variant: var(--ink-2);
+  --crepe-color-outline: var(--rule-2);
+  --crepe-color-primary: var(--ink);
+  --crepe-color-secondary: var(--stage-3);
+  --crepe-color-on-secondary: var(--ink);
+  --crepe-color-inverse: var(--ink-solid);
+  --crepe-color-on-inverse: var(--on-ink-solid);
+  --crepe-color-inline-code: var(--del-ink);
+  --crepe-color-error: var(--del-ink);
+  --crepe-color-hover: var(--stage-2);
+  --crepe-color-selected: var(--stage-3);
+  --crepe-color-inline-area: var(--stage-2);
+  --crepe-shadow-1: var(--card-shadow);
+  --crepe-shadow-2: var(--pop);
+  --crepe-font-default: inherit;
+  --crepe-font-title: inherit;
+}
+.document-editor .milkdown .ProseMirror {
+  padding: 16px 48px;
+  min-height: 450px;
+  font-family: var(--markdown-font);
+  font-size: 16px;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.document-editor .milkdown .ProseMirror h1 {
+  font-size: 32px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-feature-settings: 'palt';
+}
+.document-editor .milkdown .ProseMirror h2 {
+  font-size: 20px;
+  line-height: 1.45;
+  font-weight: 700;
+  font-feature-settings: 'palt';
+}
+.document-editor .milkdown .ProseMirror h3 {
+  font-feature-settings: 'palt';
+}
+.document-editor .milkdown .ProseMirror a {
+  color: var(--ink);
+  text-decoration-color: var(--rule-2);
+  text-underline-offset: 4px;
+}
+.document-editor .literal-block {
+  white-space: pre-wrap;
+  font: 13px/1.7 var(--font-mono);
+  background: var(--stage-2);
+  border-left: 3px solid var(--rule-2);
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+}
+.document-editor.source {
+  padding: 15px 25px 60px;
+  max-width: 100%;
+}
+.cm-editor {
+  min-height: 450px;
+  font-size: 13.5px;
+  line-height: 1.8;
+  background: var(--stage);
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+/* A line the person wrote or revised is marked at the edge of the source view.
+   Other lines carry no mark: an absent mark is not a claim that an agent wrote
+   them, and marking every line would say nothing. */
+.cm-authorship {
+  width: 3px;
+  padding: 0;
+}
+.cm-authorship .cm-gutterElement.cm-authored-person {
+  background: var(--ink-2);
+}
+.cm-gutters {
+  background: var(--stage-2) !important;
+  border-right: 0 !important;
+}
+
+/* Before a note is open. */
+.welcome {
+  margin: auto;
+  padding: 40px 28px;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.welcome-mark {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 16px;
+}
+.welcome h1 {
+  margin: 26px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  font-feature-settings: 'palt';
+}
+.welcome p {
+  color: var(--ink-2);
+  line-height: 1.9;
+  font-size: 13.5px;
+}
+.welcome .hint {
+  padding: 0;
+  color: var(--ink-3);
+}
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+
+/* The terminal: a drawer at the stage's foot. */
+.drawer-handle {
+  position: relative;
+  height: 8px;
+  flex-shrink: 0;
+  background: var(--term);
+  cursor: row-resize;
+  outline: none;
+}
+.drawer-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.drawer-handle:hover::after,
+.drawer-handle[data-separator='active']::after,
+.drawer-handle:focus-visible::after {
+  background: rgba(255, 255, 255, 0.34);
+}
+.terminal-panel {
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--term);
+  color: var(--term-tx);
+  color-scheme: dark;
+}
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 8px 16px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+}
+.terminal-toolbar strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.terminal-toolbar select,
+.terminal-toolbar button {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--term-tx);
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+}
+.terminal-toolbar button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+.terminal-toolbar button:last-child {
+  width: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  box-shadow: none;
+}
+.terminal-state {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7fd4b8;
+}
+.terminal-state::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.terminal-panel .error {
+  margin: 0 12px 6px;
+}
+.terminal-screen {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 16px 8px;
+}
+.terminal-screen .xterm {
+  height: 100%;
+}
+.terminal-state[data-state='exited'],
+.terminal-state[data-state='starting'] {
+  color: var(--term-muted);
+}
+
+/* Backlinks: the count beside the link, and the list in a popover. */
+.backlinks-count {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.backlinks-popover {
+  width: 380px;
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: auto;
+}
+.backlinks-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.backlinks-heading h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.backlinks-lead {
+  margin: 0 0 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.backlinks-status {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.backlinks-empty {
+  margin: 6px 0;
+}
+.backlinks-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.backlinks-hits button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+  text-align: left;
+  font-weight: 400;
+}
+.backlinks-hits button:hover {
+  background: var(--stage-2);
+}
+.backlink-location {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+}
+.backlink-location strong {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backlink-location small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.backlink-preview {
+  padding-left: 21px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

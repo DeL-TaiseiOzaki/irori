@@ -2,12 +2,12 @@ import path from 'node:path';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
-import { markdownFonts, type DeviceSettings } from '../domain/types';
+import { markdownFonts, themes, type DeviceSettings } from '../domain/types';
 import { skillAudience } from '../domain/skills';
 import { languages } from '../domain/i18n';
 
 const settings = z.object({
-  theme: z.enum(['system', 'light', 'dark']).default('system'),
+  theme: z.enum(themes).default('system'),
   language: z.enum(languages).default('ja'),
   markdownFont: z.enum(markdownFonts).default('sans'),
   editorAssistance: z.boolean().default(true),

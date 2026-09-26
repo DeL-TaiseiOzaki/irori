@@ -4,6 +4,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
+
+/** The note's human-line count, read from its details popover. */
+async function authorship(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: /^ノートの情報/ }).click();
+  const text = (await page.locator('.note-info').textContent()) ?? '';
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.note-info')).toHaveCount(0);
+  return text;
+}
 if (process.platform === 'win32') {
   console.log(
     'Harness UI executable fixtures are POSIX only; native Windows acceptance remains open.',
@@ -202,13 +211,13 @@ try {
   await page.getByRole('button', { name: 'note', exact: true }).click();
   const editor = page.locator('.ProseMirror');
   await expect(editor).toContainText('Fixture OpenCode edit');
-  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 1 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 1 行');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('自分で書いた一文です。');
-  await page.getByRole('button', { name: '保存 •', exact: true }).click();
-  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 2 行');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
   await app.close();
   app = await launch();
@@ -218,7 +227,7 @@ try {
   // The record outlives the process that observed it, and a note with such lines
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await expect(page.locator('.hint.authorship')).toContainText('人が書いた・直した行: 2 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
   await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not

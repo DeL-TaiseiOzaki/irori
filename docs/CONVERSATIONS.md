@@ -10,6 +10,22 @@ real-model evidence. An application restart still leaves pending work paused.
 
 Source continuation after Windows preview 0.1.3, 2026-09-14. The published installer is unchanged until a separately verified preview is published.
 
+Parallel brains, 2026-09-25 (0.1.41): each brain's AI runs on its own; the
+panel no longer holds the brain on show while a run or a queue is in progress.
+A queue whose brain is not on show goes on when that brain's run completes, as
+it does on show; a stopped or failed run still pauses it. The conversation
+snapshot also carries the permission and question requests the active run
+waits on, which the saved history keeps only as text, so a request stays
+answerable after switching brains, from the Overview, or after reopening the
+panel. The Overview sends and queues with the brain's default access mode.
+
+Request ends, 2026-09-26 (0.1.42): the host announces each request that ends
+(answered in any view, declined, or cancelled with its run) with an event naming
+it; that event is never shown or saved. Views stop offering a request on that
+event or on its run's end, not because a later event of the run arrived: a tool
+call's message can arrive after the request it raised, and your AI's
+sub-agents in other brains keep working meanwhile ([YOUR-AI](YOUR-AI.md)).
+
 ## User behavior
 
 The AI panel restores its recent display history and accepted pending instructions after restarting irori. Storage belongs to the device, exact canonical checkout, KB scope UUID and selected CLI. Copies or another provider do not inherit a conversation. Existing native session handles continue to use their original independent store.

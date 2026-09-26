@@ -21,6 +21,13 @@ const storedEvent = z.object({
   text: z.string(),
   details: z.string().optional(),
   outcome: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  delegate: z
+    .object({
+      scopeId: z.string(),
+      task: z.string(),
+      state: z.enum(['started', 'working', 'reported', 'failed']),
+    })
+    .optional(),
 });
 const recordSchema = z
   .object({
@@ -112,6 +119,7 @@ export class ConversationStore {
       text: incoming.text,
       details: incoming.details?.slice(0, 24000),
       outcome: incoming.outcome,
+      delegate: incoming.delegate,
     });
     value.events = appendConversationEvent(value.events, event) as Record['events'];
     const last = value.events.at(-1)!;

@@ -1,18 +1,28 @@
 # irori — Continuation prompt
 
-Updated 2026-09-25, after v0.1.37-preview.1 was published and the records
-merged. Give this file to the next agent, or copy its contents into a new
-session. Inspect current files and Git state before acting; later work takes
-precedence over this file.
+Updated 2026-09-26, after the UI v5 switch was merged. Give this file to the
+next agent, or copy its contents into a new session. Inspect current files and
+Git state before acting; later work takes precedence over this file.
 
 ## Task
 
-Take over **irori** development from current `main`, which had **0.1.37**
-published and the download page in step when this was written. Nothing is
-waiting to be merged. The owner is about to try the Google Drive work on their
-Windows 11 device; their reports come first. Otherwise choose a bounded next
-change with executable acceptance checks and carry it through implementation
-and verification.
+Take over **irori** development from current `main`. The whole interface now
+follows the v5 design. The owner's words "全部マージして" merged #103 (your AI,
+0.1.42), #104 (motion and finish, 0.1.43) and #96. **0.1.43** is published from
+that `main`, with 0.1.42 folded in; check
+[STATUS](STATUS.md) for its publication record before assuming it. Nothing else
+was waiting to be merged.
+
+The owner's reports come first. None of the Drive work of 0.1.31–0.1.37 has been
+tried on their Windows 11 device yet, and neither has the v5 interface.
+Otherwise take a bounded next change with executable acceptance checks and
+carry it through implementation and verification. The open v5 follow-ups are
+listed in [HANDOFF](HANDOFF.md):
+
+- Codex for your AI;
+- your AI's work shown in a brain's own panel;
+- holding only the brains a hand-off reaches;
+- with the owner, what your AI should typically ask of the brains.
 
 Work in the independent `irori/` repository inside the `KB_design/` workspace.
 The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
@@ -29,13 +39,16 @@ and commit messages in English; interface text is bilingual through
 user prefers simple, minimal code and asks for unnecessary parts to be cut.
 Every new feature starts on a dedicated branch and reaches `main` through a pull
 request. Development, verification, feature-branch commit/push and PR creation
-are authorized; merging needs the owner's own words. New user directions
-override this file.
+are authorized. Merging needs the owner's own words, naming the pull request.
+Real Claude Code runs for your AI's acceptance (`npm run test:your-ai`) were
+authorized on 2026-09-26. New user directions override this file.
 
 ## Read first
 
 The [contributor contract](../AGENTS.md), then [STATUS](STATUS.md), which is
 newest-first and carries the verification evidence for everything below. For
+the interface: [ADR 014](decisions/014-ui-v5.md) (v5 decisions and the owner's
+answers), the v5 section of [UI-DESIGN](UI-DESIGN.md) and [YOUR-AI](YOUR-AI.md). For
 Drive work: [ADR 012](decisions/012-drive-editing.md) (editing Drive folders in
 place, and what is not included), [ADR 013](decisions/013-drive-folders-in-kbs.md)
 (Drive folders belong to KBs; it supersedes ADR 002 Q02's workspace-owned
@@ -48,6 +61,23 @@ rule, and the per-area notes ([ONTOLOGY](ONTOLOGY.md), [PACKAGING](PACKAGING.md)
 [AUTHORSHIP](AUTHORSHIP.md), [HARNESSES](HARNESSES.md), [GIT](GIT.md),
 [NOTE-LINKS](NOTE-LINKS.md), [KB-SEARCH](KB-SEARCH.md), [SKILLS](SKILLS.md) and
 the rest).
+
+## What landed on 2026-09-26
+
+- **#97–#101 (0.1.38–0.1.41, published as 0.1.41)** — the v5 interface:
+  - the rail of brains, one panel per brain (Schema / Knowledge / Contents), the
+    stage and the AI panel;
+  - brain home, graph and materials as stage views, the ⌘K palette, the Drive
+    sheet and Start;
+  - brain identity (name, category, icon, colour in `.irori/scope.json`);
+  - the Overview (map and columns), brain AIs running side by side, and search
+    across all brains;
+  - the your-AI spike.
+- **#103 (0.1.42)** — your AI, handing work to one Claude Code sub-agent per
+  brain, with irori keeping writes in bounds; request ends announced by the
+  host.
+- **#104 (0.1.43)** — the zoom between levels, sheet and request motion, finish
+  against the canvas, and one shared backlinks scan.
 
 ## What landed on 2026-09-25
 

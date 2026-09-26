@@ -78,8 +78,10 @@ try {
   // list is open, and going to one of them lands on its link.
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
-  const backlinksButton = page.getByRole('button', { name: 'リンク元', exact: true });
+  // The link button counts the notes that lead here and lists them in a popover.
+  const backlinksButton = page.getByRole('button', { name: /^リンク元/ });
   const backlinks = page.getByRole('dialog', { name: 'リンク元', exact: true });
+  await expect(backlinksButton).toHaveAttribute('aria-label', 'リンク元 1 件');
   await backlinksButton.click();
   await expect(backlinks).toContainText('1 件のリンク');
   const backlink = backlinks.getByRole('button', { name: /wiki\/deep\.md/ });
@@ -126,13 +128,14 @@ try {
   await writeFile(path.join(root, 'metadata.md'), metadata);
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
-  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '名前・場所', exact: true }).click();
   const move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
   await expect(move).toContainText('参照元 3 件のノートにある 4 件のリンク');
   await move.getByLabel('ノート名', { exact: true }).fill('到着');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
-  const status = page.locator('.doc-toolbar');
+  const status = page.locator('.status-message');
   await expect(status).toContainText('参照元 3 件のノートの 4 件のリンクを更新しました。');
   expect(await readFile(path.join(root, 'metadata.md'), 'utf8')).toBe(
     metadata.replaceAll('arrival.md', '到着.md'),
@@ -155,12 +158,13 @@ try {
   await expect(editor).toContainText('深いページ');
   await editor.getByRole('link', { name: '上の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
   await expect(editor).toContainText('到着点');
-  await expect(page.locator('.document-location')).toContainText('到着.md');
+  await expect(page.locator('.crumbs')).toHaveAttribute('title', /到着\.md$/);
 
   // Moving a page into a folder rewrites its own links so they still lead where they did.
   await page.getByRole('button', { name: 'topic', exact: true }).click();
   await expect(editor).toContainText('出発点');
-  await page.getByRole('button', { name: '名前・場所', exact: true }).click();
+  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('menuitem', { name: '名前・場所', exact: true }).click();
   await expect(move).toContainText('このノートを参照するリンクはありません。');
   await move.getByLabel('移動先フォルダ', { exact: true }).fill('wiki');
   await move.getByRole('button', { name: '変更する', exact: true }).click();

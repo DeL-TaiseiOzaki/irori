@@ -1,0 +1,415 @@
+/* One brain: its header, search, Files | Changes, and the three layers. */
+
+.brain-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--shadow);
+}
+.brain-empty {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  color: var(--tx-2);
+}
+.brain-empty p {
+  margin: 0;
+}
+.brain-header {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 10px 12px 14px;
+}
+.brain-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.brain-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.brain-names strong {
+  font-family: var(--font-jp);
+  font-size: 15px;
+  font-weight: 700;
+  font-feature-settings: 'palt';
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brain-names small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--tx-3);
+}
+.brain-panel .brain-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 7px 0 10px;
+  border-radius: 9px;
+  background: var(--field);
+  border: 1px solid var(--hair);
+  box-shadow: none;
+  color: var(--tx-3);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+.brain-panel .brain-search:hover {
+  background: var(--field);
+  border-color: var(--hair-3);
+}
+.brain-search > span {
+  flex: 1;
+  text-align: left;
+}
+kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--hair-2);
+  color: var(--tx-3);
+}
+
+/* Files | Changes: a segmented pair on the field colour. */
+.brain-modes {
+  --magnet-highlight: transparent;
+  gap: 3px !important;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.brain-modes .obsidian-magnet-tab,
+.git-tabs .obsidian-magnet-tab {
+  flex: 1;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.brain-modes .obsidian-magnet-tab[aria-pressed='true'],
+.brain-modes .obsidian-magnet-tab:hover:not(:disabled) {
+  color: var(--tx);
+}
+.brain-modes .obsidian-magnet-marker {
+  inset: 0;
+  height: auto;
+  border-radius: 8px;
+  background: var(--raised-2);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.brain-modes .count {
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--solid);
+  color: var(--on-solid);
+  font-size: 10.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The three layers, each folding to its heading and sized by the reader. */
+.brain-sections {
+  flex: 1;
+  min-height: 0;
+}
+.brain-section-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.brain-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 4px;
+}
+.section-handle {
+  position: relative;
+  height: 1px;
+  margin: 0 8px;
+  background: var(--hair);
+  cursor: row-resize;
+  outline: none;
+}
+.section-handle::after {
+  content: '';
+  position: absolute;
+  inset: -3px 0;
+}
+.section-handle:hover,
+.section-handle[data-separator='active'],
+.section-handle:focus-visible {
+  background: var(--hair-3);
+}
+.section-heading {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 6px;
+}
+.brain-panel .section-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.brain-panel .section-toggle:hover {
+  background: var(--raised);
+}
+.section-toggle > span {
+  color: var(--tx);
+}
+.brain-section.schema .layer-icon {
+  color: var(--schema);
+}
+.brain-section.Knowledge_Base .layer-icon {
+  color: var(--know);
+}
+.brain-section.contents .layer-icon {
+  color: var(--cont);
+}
+.brain-panel .section-action {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+}
+.brain-panel .section-action:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--tx);
+}
+.section-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 6px 10px;
+}
+.contents-root-name {
+  display: block;
+  padding: 6px 10px 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx-3);
+}
+
+/* The tree. */
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tree-item {
+  position: relative;
+}
+.brain-panel .tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 28px;
+  padding-right: 8px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+.brain-panel .tree-row:hover {
+  background: var(--raised);
+  color: var(--tx);
+}
+.brain-panel .tree-row.selected {
+  background: var(--raised-2);
+  color: var(--tx);
+  font-weight: 500;
+}
+.tree-row.muted {
+  color: var(--tx-3);
+}
+.tree-chevron {
+  width: 12px;
+  flex: none;
+  color: var(--tx-3);
+}
+.tree-icon {
+  color: var(--tx-3);
+}
+.tree-icon.drive {
+  color: var(--cont);
+}
+.brain-section.schema .tree-row.selected .tree-icon {
+  color: var(--schema);
+}
+.brain-section.Knowledge_Base .tree-row.selected .tree-icon {
+  color: var(--know);
+}
+.brain-section.contents .tree-row.selected .tree-icon {
+  color: var(--cont);
+}
+.filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-empty,
+.tree-error {
+  display: block;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--tx-3);
+}
+.tree-error {
+  color: var(--danger-on-nav);
+}
+.badge {
+  flex: none;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--raised-2);
+  color: var(--tx-3);
+}
+.drive-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--tx-3);
+}
+.drive-badge.pending {
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--cont-soft);
+  color: var(--cont);
+  font-size: 11px;
+  font-weight: 600;
+}
+.drive-badge-arrow {
+  display: flex;
+  height: 12px;
+  overflow: hidden;
+}
+.drive-badge-arrow > .ui-icon {
+  animation: irori-lift 1.5s ease-out infinite;
+}
+/* A row's own actions sit over its right end when reached. */
+.tree-item:has(> .tree-action) > .tree-row {
+  padding-right: 34px;
+}
+.tree-item:has(> .tree-action + .tree-action) > .tree-row {
+  padding-right: 60px;
+}
+.brain-panel .tree-action {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  opacity: 0;
+}
+.brain-panel .tree-action + .tree-action {
+  right: 28px;
+}
+.tree-item:hover > .tree-action,
+.tree-action:focus-visible,
+.tree-action[data-popup-open] {
+  opacity: 1;
+}
+.brain-panel .tree-action:hover {
+  background: var(--raised-2);
+  color: var(--tx);
+}
+.entry-menu {
+  min-width: 150px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--pop);
+  font-size: 12.5px;
+}
+.entry-menu [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  outline: none;
+}
+.entry-menu [role='menuitem'][data-highlighted] {
+  background: var(--raised-2);
+}
+
+/* Changes take the place of the files. */
+.brain-changes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.brain-files {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.brain-files[hidden] {
+  display: none;
+}
