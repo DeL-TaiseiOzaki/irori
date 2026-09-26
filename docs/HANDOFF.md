@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+Current development, 2026-09-27: **0.1.47 is published** as
+[v0.1.47-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.47-preview.1)
+(#112). It fixes:
+- the stray "Unknown or ambiguous cloud owner" after removing the open workspace;
+- clicks on the conflict resolve buttons that were lost during a re-read;
+- Windows saves that failed while another program briefly held the file.
+
+The Windows autosave fix is the likely one but unproven; watch `package-smoke`'s
+new diagnostics if that check fails again. STATUS has the details.
+
 Current development, 2026-09-26 (night): **0.1.46 is published** as
 [v0.1.46-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.46-preview.1)
 (#110). Clone, fetch, pull and push against `https://github.com` fall back to the
