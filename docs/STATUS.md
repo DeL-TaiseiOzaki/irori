@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Delivery, 2026-09-26: #103, #104, #96 and #105 are merged with the owner's
+go-ahead, and **0.1.44 is published** as
+[v0.1.44-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.44-preview.1)
+by release run `36212990477` from main's CI run `36212468170` (source `f31164d`).
+It carries your AI (0.1.42), the motion and finish (0.1.43) and the conflict
+re-read (0.1.44); 0.1.42 and 0.1.43 were not published on their own. The
+release was published with 0.1.44's first notes, which described only the fix.
+Its title and notes were then replaced with this repository's notes covering
+everything since 0.1.41; the "Exact package" section was kept.
+
+The release carries Windows 198,849,536 bytes, Mac 166,497,490 bytes and
+`irori-0.1.44-full.nupkg` 198,210,248 bytes. Main CI on `8511b90`
+(`36211591365`) had failed twice in `git-ui-smoke`, which is what #105 fixes. The
+hourly drift check failed while main held unreleased changes.
+
 Conflict re-read, 2026-09-26: **0.1.44** is prepared on `fix/git-resolve-reread`.
 A refused **統合内容を保存して解決** (the conflicted file changed on disk) now reads the
 conflict again at once (`GitPanel.resolveConflict`). Before, a conflicted file's
