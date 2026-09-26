@@ -439,21 +439,21 @@ try {
   await expect(sidebar).toBeVisible();
   await writeFile(path.join(root, 'README.md'), 'External conflict working copy\n');
   // A refused resolution reads the conflict again at once, and again after the status
-  // refresh that follows; that second read briefly disables the resolve button. Count
-  // the host's completed conflict reads, so the next click cannot land while it is
-  // disabled (which on a loaded runner silently lost the click).
+  // refresh that follows. Hold that second read so it is still in flight when the
+  // person resolves: the button stays usable (a click was once lost to it being
+  // disabled), and the held read, answered late, does not report the resolved file.
   await app.evaluate(({ ipcMain }) => {
     type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
     const original = (
       ipcMain as unknown as { _invokeHandlers: Map<string, Handler> }
     )._invokeHandlers.get('irori')!;
-    const reads = { original, conflicts: 0 };
-    (globalThis as unknown as { conflictReads: typeof reads }).conflictReads = reads;
+    const fixture = { original, reads: 0, held: [] as (() => void)[] };
+    (globalThis as unknown as { conflictReads: typeof fixture }).conflictReads = fixture;
     ipcMain.removeHandler('irori');
     ipcMain.handle('irori', async (event, method, ...args) => {
-      const result = await original(event, method, ...args);
-      if (method === 'gitConflict') reads.conflicts++;
-      return result;
+      if (method !== 'gitConflict' || ++fixture.reads < 2) return original(event, method, ...args);
+      await new Promise<void>((resolve) => fixture.held.push(resolve));
+      return original(event, method, ...args);
     });
   });
   await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
@@ -462,30 +462,39 @@ try {
     .poll(() =>
       app.evaluate(
         () =>
-          (globalThis as unknown as { conflictReads: { conflicts: number } }).conflictReads
-            .conflicts,
+          (globalThis as unknown as { conflictReads: { held: unknown[] } }).conflictReads.held
+            .length,
       ),
     )
-    .toBeGreaterThanOrEqual(2);
-  await app.evaluate(({ ipcMain }) => {
-    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
-    const { original } = (globalThis as unknown as { conflictReads: { original: Handler } })
-      .conflictReads;
-    ipcMain.removeHandler('irori');
-    ipcMain.handle('irori', original);
-  });
-  await expect(page.getByRole('region', { name: 'Git の差分' })).toHaveAttribute(
-    'aria-busy',
-    'false',
-  );
+    .toBe(1);
+  const review = page.getByRole('region', { name: 'Git の差分' });
+  await expect(review).toHaveAttribute('aria-busy', 'true');
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
     '# Combined\n\nLocal 日本語\nPeer 日本語\n',
   );
   expect(await readFile(path.join(root, 'README.md'), 'utf8')).toBe(
     'External conflict working copy\n',
   );
-  await panel.getByRole('button', { name: '統合内容を保存して解決' }).click();
+  const resolve = panel.getByRole('button', { name: '統合内容を保存して解決' });
+  await expect(resolve).toBeEnabled();
+  await resolve.click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 0 件');
+  await app.evaluate(({ ipcMain }) => {
+    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+    const fixture = (
+      globalThis as unknown as { conflictReads: { original: Handler; held: (() => void)[] } }
+    ).conflictReads;
+    ipcMain.removeHandler('irori');
+    ipcMain.handle('irori', fixture.original);
+    for (const release of fixture.held.splice(0)) release();
+  });
+  // Host replies arrive in order, so this round trip follows the released read's answer.
+  await page.evaluate(async (scopeId) => {
+    await window.irori.gitStatus(scopeId);
+    await new Promise(requestAnimationFrame);
+  }, spaces[0].scopeId);
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(review).toHaveAttribute('aria-busy', 'false');
   await expect
     .poll(() =>
       page.evaluate(
@@ -585,6 +594,7 @@ try {
           'fetch and divergent receive refusal',
           'native merge, both conflict versions, manual resolution and merge commit',
           'dirty conflict blocks closing, repository switching and returning to the note',
+          'a conflict stays resolvable while it is re-read, and the late re-read reports nothing',
           'unsent commit message and conflict resolution draft survive a full Electron restart',
           'stale conflict draft restores only explicitly and never overwrites the native file until resolution',
           'successful conflict resolution acknowledges and durably clears its draft',
