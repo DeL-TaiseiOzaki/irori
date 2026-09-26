@@ -327,11 +327,23 @@ export class CloudService {
     return filename;
   }
   async declarations(scopeId: string): Promise<CloudAttachment[]> {
-    const records = z
-      .array(cloudDeclaration)
-      .max(100)
-      .parse(await readLocalJson(await this.declarationFile(scopeId), []));
     const space = await this.files.get(scopeId);
+    let records: CloudAttachment[];
+    try {
+      records = z
+        .array(cloudDeclaration)
+        .max(100)
+        .parse(await readLocalJson(await this.declarationFile(scopeId), []));
+    } catch (error) {
+      // Parser output names positions and schema paths, not what the person can do.
+      if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
+      throw Error(
+        t(
+          `「${space.name}」の Drive 接続の記録（.irori/cloud-mounts.json）を読み取れません。Git の履歴から戻すか、ファイルを修正してください。`,
+          `Cannot read the Drive connection record (.irori/cloud-mounts.json) of "${space.name}". Restore it from the Git history or fix the file.`,
+        ),
+      );
+    }
     const ids = new Set<string>();
     const paths = new Set<string>();
     for (const record of records) {

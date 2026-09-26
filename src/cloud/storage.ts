@@ -2,6 +2,7 @@ import { mkdir, lstat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import type { CloudRoot } from '../domain/types';
 import { within } from '../domain/scopes';
+import { t } from '../domain/i18n';
 import type { FileService } from '../host/files';
 import type { WorkspaceService } from '../host/workspaces';
 
@@ -37,7 +38,13 @@ export class WorkspaceCloudStorage implements CloudStorage {
   }
   async get(id: string) {
     const matches = (await this.list()).filter((item) => item.scopeId === id);
-    if (matches.length !== 1) throw Error('Unknown or ambiguous cloud owner');
+    if (matches.length !== 1)
+      throw Error(
+        t(
+          'Drive 接続の持ち主（Brain またはワークスペース）が見つからないか、重複しています。',
+          'The owner of the Drive connection (a brain or workspace) is missing or ambiguous.',
+        ),
+      );
     const root = matches[0];
     if (root.workspace) {
       const base = await realpath(this.dataDir);

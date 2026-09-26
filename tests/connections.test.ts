@@ -1124,3 +1124,28 @@ test('Connection limit rejects additions before writing an unreadable declaratio
   await assert.rejects(cloud.add({ ...input, name: 'Overflow' }), /100件/);
   assert.equal((await cloud.declarations(space.scopeId)).length, 100);
 });
+
+test('Unreadable Drive records and unknown owners are reported in words a person can act on', async (t) => {
+  const { files, space } = await fixture(t);
+  const workspaces = new WorkspaceService(files);
+  const removed = await workspaces.save('Removed', [space.scopeId]);
+  await workspaces.remove(removed.id);
+  const cloud = new CloudService(
+    new WorkspaceCloudStorage(files, workspaces),
+    async () => {},
+    new FixtureRclone(),
+  );
+  await assert.rejects(cloud.connections(removed.id), (error: Error) => {
+    assert.match(error.message, /見つからないか、重複/);
+    return true;
+  });
+  const declaration = path.join(space.root, '.irori/cloud-mounts.json');
+  for (const text of ['{ malformed', JSON.stringify([{ name: 'missing fields' }])]) {
+    await writeFile(declaration, text);
+    await assert.rejects(cloud.connections(space.scopeId), (error: Error) => {
+      assert.match(error.message, /「Personal」の Drive 接続の記録（\.irori\/cloud-mounts\.json）/);
+      assert.doesNotMatch(error.message, /SyntaxError|position|expected/i);
+      return true;
+    });
+  }
+});
