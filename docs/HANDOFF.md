@@ -1,5 +1,32 @@
 # irori continuation handoff
 
+Current development, 2026-09-26: **the interface is switching to v5.** The owner
+approved the v5 design canvas on 2026-09-25 and asked for the whole interface to
+switch to it, keeping every capability ([ADR 014](decisions/014-ui-v5.md), which
+also records the owner's answers). The work went in six stages:
+
+- **Published:** stages 1–4 and the your-AI spike (#97–#101) are merged and
+  published together as
+  [v0.1.41-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.41-preview.1)
+  (release run `36155578107` from main CI `36154273703`, source `a49c1a4`,
+  record #102). This covers the rail and brain panel, the brain views, brain
+  identity, the Overview with brain AIs side by side, and search across brains.
+  0.1.38–0.1.40 were never published on their own.
+- **Open, stacked:** #103 (0.1.42) adds **your AI** (`docs/YOUR-AI.md`). It also
+  fixes a 0.1.41 bug where a permission request could show as ended. #104
+  (0.1.43), on top of it, adds the zoom between levels and the finish against the
+  canvas; `scripts/ui-screens.ts` captures the screens. Merging each needs the
+  owner's own words naming it. When they land, publish once as 0.1.43 (0.1.42
+  folded in, as 0.1.13 and 0.1.38–0.1.40 were), then update the download page.
+- **Stale:** #96 (another session's 0.1.37 handoff) predates all of this, and it
+  edits the top of this file too. The owner was asked whether to close or update
+  it.
+- **Later:** Codex for your AI; your AI's work shown in a brain's own AI panel;
+  holding only the brains a hand-off reaches; and, with the owner, what your AI
+  should typically ask of the brains.
+
+The paragraphs below predate v5.
+
 Current development, 2026-09-23 (night): **0.1.30 is published** as
 [v0.1.30-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.30-preview.1).
 It reads a newer release's own file list when GitHub's release list omits it

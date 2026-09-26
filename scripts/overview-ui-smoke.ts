@@ -180,8 +180,20 @@ try {
   await expect(columns).toBeVisible();
   await page.getByRole('button', { name: '地図', exact: true }).click();
   await map.getByRole('button', { name: 'Product を開く' }).click();
+  // The Overview zooms away around the brain while the brain settles in.
+  await expect(page.locator('.islands.level-enter')).toHaveCount(1);
   await expect(page.locator('.brain-names strong')).toHaveText('Product');
   await expect(map).toHaveCount(0);
+  await expect(page.locator('.islands.level-enter')).toHaveCount(0);
+  // Asked for less motion, the levels change at once.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await rail.getByRole('button', { name: '全体', exact: true }).click();
+  await expect(map).toBeVisible();
+  expect(await page.locator('.islands.level-exit, .overview.level-return').count()).toBe(0);
+  await map.getByRole('button', { name: 'Product を開く' }).click();
+  expect(await page.locator('.overview.level-leave, .islands.level-enter').count()).toBe(0);
+  await expect(map).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // A result found from the Overview opens in its own brain.
   await rail.getByRole('button', { name: '全体', exact: true }).click();

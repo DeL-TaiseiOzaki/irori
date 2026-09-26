@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import { t } from '../domain/i18n';
@@ -7,54 +7,34 @@ import { useResource } from './useResource';
 
 const host = window.irori;
 
-/** The notes of this KB whose links lead to `path`, kept current while shown. */
+/**
+ * The notes of this KB whose links lead to `path`. The list shows the same scan
+ * as the count on the button: one look at the KB, so neither answer cancels
+ * the other, and it follows the KB's changes with the count.
+ */
 function BacklinksList({
-  scopeId,
   path,
+  result,
+  error: failure,
   onOpen,
 }: {
-  scopeId: string;
   path: string;
+  result?: KnowledgeSearch;
+  error?: string;
   onOpen: (hit: SearchHit) => Promise<void>;
 }) {
-  const [result, setResult] = useState<KnowledgeSearch>();
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState('');
-  const request = useRef(0);
+  const [openError, setOpenError] = useState('');
+  const error = openError || (result ? '' : (failure ?? ''));
   const finding = !result && !error;
-  useEffect(() => {
-    // The list follows the KB: a change starts another look, the older answer is
-    // dropped, and what is shown stays up until the newer one arrives.
-    async function find() {
-      const id = ++request.current;
-      try {
-        const value = await host.backlinks(scopeId, path);
-        if (request.current !== id) return;
-        setResult(value);
-        setError('');
-      } catch (error) {
-        if (request.current !== id) return;
-        setResult(undefined);
-        setError(String(error));
-      }
-    }
-    void find();
-    const stop = host.onEvent((event) => {
-      if (event.type === 'files' && event.scopeId === scopeId) void find();
-    });
-    return () => {
-      stop();
-      request.current++;
-    };
-  }, [scopeId, path]);
   async function open(hit: SearchHit) {
     if (opening) return;
     setOpening(true);
-    setError('');
+    setOpenError('');
     try {
       await onOpen(hit);
     } catch (error) {
-      setError(String(error));
+      setOpenError(String(error));
     } finally {
       setOpening(false);
     }
@@ -134,10 +114,11 @@ export function Backlinks({
   onOpen: (hit: SearchHit) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const count = useResource(() => host.backlinks(scopeId, path), [scopeId, path], {
+  const read = useResource(() => host.backlinks(scopeId, path), [scopeId, path], {
     refresh: revision,
     delay: 300,
-  }).data?.hits.length;
+  });
+  const count = read.data?.hits.length;
   const label =
     count === undefined
       ? t('リンク元', 'Backlinks')
@@ -158,8 +139,9 @@ export function Backlinks({
               </Popover.Close>
             </div>
             <BacklinksList
-              scopeId={scopeId}
               path={path}
+              result={read.data}
+              error={read.error}
               onOpen={async (hit) => {
                 await onOpen(hit);
                 setOpen(false);

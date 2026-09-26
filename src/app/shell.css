@@ -647,3 +647,48 @@
   object-fit: cover;
   display: block;
 }
+
+/* The zoom between levels: the Overview grows away around the chosen brain
+   while the brain's islands settle in, and returns the other way. */
+.app-body > .overview.level-leave {
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+  animation: level-leave 420ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes level-leave {
+  to {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+}
+.islands.level-enter {
+  animation: level-enter 480ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+@keyframes level-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.islands.level-exit {
+  z-index: 2;
+  visibility: visible;
+  pointer-events: none;
+  animation: level-exit 320ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes level-exit {
+  to {
+    opacity: 0;
+    transform: scale(0.93);
+  }
+}
+.app-body > .overview.level-return {
+  animation: level-return 480ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+}
+@keyframes level-return {
+  from {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}

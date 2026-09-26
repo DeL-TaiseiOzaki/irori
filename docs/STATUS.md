@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+UI v5 motion, 2026-09-26: **0.1.43** is prepared on `feat/ui-v5-motion`, stacked
+on your AI. Levels move with a zoom (`goToLevel`, 560 ms from the Overview into a
+brain around the clicked brain, reversed going back, none under reduced motion);
+sheets rise over a fading backdrop; a permission request arrives with an
+overshoot. A screen-capture script (`scripts/ui-screens.ts`) produced the main
+screens in hearth/ja, dark/en and light/ja for comparison with the canvas, which
+led to: Schema files keeping their `.md` in the tree, the home's Schema card
+listing instruction files first, a house on the home crumb, the graph fitting at
+most at 1:1, and the Overview using the chrome button look and a two-line header
+for your AI. The Overview smoke checks the zoom and its absence under reduced
+motion. This completes the six stages of the v5 plan.
+
 Your AI, 2026-09-26: **0.1.42** is prepared on `feat/your-ai`. Your AI is the
 person's own Claude Code agent, run from `~/irori/you` (device record
 `your-ai.json`, id reused for its conversations), set up from the Overview with

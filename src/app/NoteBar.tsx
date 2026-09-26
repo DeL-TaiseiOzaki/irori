@@ -37,12 +37,15 @@ export function Crumbs({
   space,
   items,
   here,
+  hereIcon,
   title,
   onBrain,
 }: {
   space?: Space;
   items: Crumb[];
   here?: string;
+  /** An icon before the last crumb, such as the house of a brain's home. */
+  hereIcon?: IconName;
   title?: string;
   /** Shows the brain's home from its crumb. */
   onBrain?: () => void;
@@ -75,6 +78,7 @@ export function Crumbs({
       {here && (
         <strong className="crumb here" aria-current="page">
           <Icon name="chevron" size={12} className="crumb-separator" />
+          {hereIcon && <Icon name={hereIcon} size={14} strokeWidth={1.9} />}
           <span className="crumb-label">{here}</span>
         </strong>
       )}

@@ -270,6 +270,34 @@ function App() {
   // The workspace's level: every brain at once, or the brain on show.
   // The Your AI screen is a level of its own beside the Overview.
   const [level, setLevel] = useState<'overview' | 'brain' | 'you'>('brain');
+  const levelNow = useRef(level);
+  levelNow.current = level;
+  // Moving between the Overview and a brain is a zoom: the Overview grows away
+  // around the chosen brain while the brain's islands settle in, and back.
+  const [scene, setScene] = useState<{
+    leaving: 'overview' | 'brain';
+    origin?: { x: number; y: number };
+  }>();
+  const sceneTimer = useRef<number | undefined>(undefined);
+  function goToLevel(next: 'overview' | 'brain' | 'you', origin?: { x: number; y: number }) {
+    const from = levelNow.current;
+    if (from === next) return;
+    window.clearTimeout(sceneTimer.current);
+    const moving = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (moving && from === 'overview' && next === 'brain') {
+      const box = document.querySelector('.app-body > .overview')?.getBoundingClientRect();
+      setScene({
+        leaving: 'overview',
+        origin: origin && box ? { x: origin.x - box.left, y: origin.y - box.top } : undefined,
+      });
+      sceneTimer.current = window.setTimeout(() => setScene(undefined), 560);
+    } else if (moving && from === 'brain' && next === 'overview') {
+      setScene({ leaving: 'brain' });
+      sceneTimer.current = window.setTimeout(() => setScene(undefined), 480);
+    } else setScene(undefined);
+    levelNow.current = next;
+    setLevel(next);
+  }
   const [overviewView, setOverviewView] = useState<OverviewView>('map');
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
@@ -595,7 +623,7 @@ function App() {
   function show(next: Document, navigation?: Navigation) {
     load(next, navigation);
     setView('note');
-    setLevel('brain');
+    goToLevel('brain');
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -1051,7 +1079,7 @@ function App() {
       ),
       'brain-agents',
     );
-    setLevel('overview');
+    goToLevel('overview');
   }
   /** Resumes a brain's queue from the Overview. */
   async function resumeQueue(scopeId: string) {
@@ -1066,6 +1094,7 @@ function App() {
     setSources([]);
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
     setWorkspace(profile);
+    setScene(undefined);
     setLevel('brain');
     setActive(available[0]);
     setDoc(undefined);
@@ -1241,13 +1270,16 @@ function App() {
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
     if (!workspaceSpaces.length) return;
-    setLevel('overview');
+    goToLevel('overview');
   }
   /** Shows a brain, from the rail or the Overview: its note, or its AI panel. */
-  async function enterBrain(space: Space, options: { ai?: boolean; entry?: Entry } = {}) {
+  async function enterBrain(
+    space: Space,
+    options: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } } = {},
+  ) {
     const selected = options.entry ? await open(space, options.entry) : await selectSpace(space);
     if (!selected) return;
-    setLevel('brain');
+    goToLevel('brain', options.origin);
     if (options.ai) setPanel(true);
   }
   function leaveWorkspace() {
@@ -1310,8 +1342,15 @@ function App() {
           }}
           settings={<Settings onRecover={() => setRecovering(true)} onError={report} />}
         />
-        {level === 'overview' && workspace && (
+        {(level === 'overview' || scene?.leaving === 'overview') && workspace && (
           <Overview
+            scene={
+              scene?.leaving === 'overview'
+                ? { kind: 'leave', origin: scene.origin }
+                : scene?.leaving === 'brain'
+                  ? { kind: 'return' }
+                  : undefined
+            }
             workspace={workspace}
             spaces={workspaceSpaces}
             view={overviewView}
@@ -1334,7 +1373,7 @@ function App() {
               setYouRevision((value) => value + 1);
             }}
             onShowYou={() => {
-              if (you?.state === 'ready') setLevel('you');
+              if (you?.state === 'ready') goToLevel('you');
             }}
             onSendYou={(prompt) => sendToYou(prompt)}
             onStopYou={async () => {
@@ -1350,12 +1389,12 @@ function App() {
             spaces={workspaceSpaces}
             running={yourAiRunning}
             onUpdateDefinitions={updateDefinitions}
-            onBack={() => setLevel('overview')}
+            onBack={() => goToLevel('overview')}
             onError={report}
           />
         )}
         <PaneGroup
-          className="islands"
+          className={`islands ${scene?.leaving === 'overview' ? 'level-enter' : ''} ${scene?.leaving === 'brain' ? 'level-exit' : ''}`}
           inert={level !== 'brain'}
           orientation="horizontal"
           defaultLayout={islandLayout.defaultLayout}
@@ -1481,6 +1520,7 @@ function App() {
                       space={active}
                       items={[]}
                       here={active ? t('ホーム', 'Home') : t('ようこそ', 'Welcome')}
+                      hereIcon={active ? 'home' : undefined}
                     />
                   )}
                   <div className="stage-actions">
@@ -2615,7 +2655,7 @@ function App() {
         onAi={() => {
           if (othersActive) showOverview();
           else {
-            setLevel('brain');
+            goToLevel('brain');
             setPanel(true);
           }
         }}
