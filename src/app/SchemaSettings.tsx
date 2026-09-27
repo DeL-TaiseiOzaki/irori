@@ -523,8 +523,8 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
       <p className="muted">
         {target.key === instructionsFile || (!target.key && !folder)
           ? t(
-              'この Brain で動く AI が毎回最初に読む指示です（AGENTS.md）。',
-              "What this brain's AI reads first, every time (AGENTS.md).",
+              'この hibachi の hibachi agent が毎回最初に読む指示です（AGENTS.md）。',
+              "What this hibachi's hibachi agent reads first, every time (AGENTS.md).",
             )
           : t(
               'このフォルダで作業するときに AI が読む指示です。',
@@ -542,7 +542,7 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
           >
             {choices.map((choice) => (
               <option key={choice} value={choice}>
-                {choice || t('Brain 全体（AGENTS.md）', 'The whole brain (AGENTS.md)')}
+                {choice || t('hibachi 全体（AGENTS.md）', 'The whole hibachi (AGENTS.md)')}
               </option>
             ))}
           </select>
@@ -614,8 +614,8 @@ function RuleForm({ space, target, disabled, run, onSelect, onDelete }: FormProp
     >
       <p className="muted">
         {t(
-          'Claude Code がこの Brain で常に守るルールです（.claude/rules/）。',
-          'Rules Claude Code always follows in this brain (.claude/rules/).',
+          'Claude Code がこの hibachi で常に守るルールです（.claude/rules/）。',
+          'Rules Claude Code always follows in this hibachi (.claude/rules/).',
         )}
       </p>
       <label className="schema-field">
