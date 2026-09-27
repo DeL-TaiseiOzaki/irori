@@ -602,6 +602,13 @@ test('Model lists are read from each installed CLI once per version', fixtureOpt
   await counted.models('pi');
   await counted.models('pi');
   assert.equal(reads, 1, 'kept for the same CLI version');
+  // A stand-in answers `claude --version`, so the check does not depend on Claude Code being installed.
+  const bin = process.env.PATH!.split(path.delimiter)[0];
+  await writeFile(
+    path.join(bin, 'claude'),
+    `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('claude'));\n`,
+    { mode: 0o700 },
+  );
   const failing = new ModelCatalog(async () => {
     throw Error('unreachable');
   });
