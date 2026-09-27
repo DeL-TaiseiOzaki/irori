@@ -23,7 +23,7 @@
 [フィードバック](#フィードバック) ・
 [開発に参加する](#開発に参加する)
 
-<img src="docs/images/readme/ja-note-and-ai.png" alt="irori の画面。左に Brain のファイル（Schema・Knowledge・Contents）、中央にノート、右に AI パネル。" width="860">
+<img src="docs/images/readme/ja-note-and-ai.png" alt="irori の画面。左に hibachi のファイル（Schema・Knowledge・Contents）、中央にノート、右に AI パネル。" width="860">
 
 </div>
 
@@ -31,7 +31,7 @@
 
 irori は、Markdown のノートを中心に仕事を進めるための **知識の IDE / ADE** です。
 
-ノートを置いたフォルダを **Brain**（知識ベース）として開くと、ノートの編集、資料の閲覧、Git での記録、Google Drive の資料までをひとつの画面で扱えます。そのうえで、パソコンに入っている **Claude Code・Codex・OpenCode・Pi・Hermes Agent** を、その Brain の中でそのまま動かし、ノートの続きを頼めます。
+ノートを置いたフォルダを **hibachi**（知識ベース。旧 Brain）として開くと、ノートの編集、資料の閲覧、Git での記録、Google Drive の資料までをひとつの画面で扱えます。そのうえで、パソコンに入っている **Claude Code・Codex・OpenCode・Pi・Hermes Agent** を、その hibachi の中でそのまま動かし、ノートの続きを頼めます。
 
 ノートはいつでも手元のフォルダにある普通の Markdown ファイルです。AI は各 CLI の認証と設定をそのまま使うため、irori 独自のアカウントや API キーは要りません。
 
@@ -53,16 +53,16 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 ## はじめかた
 
 1. **準備する。** [Git](https://git-scm.com/downloads) を入れます。AI を使う場合は、使いたい CLI（`claude` / `codex` / `opencode` / `pi`）もインストールしてログインしておきます。ノートを書くだけなら CLI は要りません。
-2. **Brain を追加する。** 起動画面の **KBフォルダを開く** で手元のフォルダを選ぶか、**GitHub から取得** でリポジトリをクローンします。既存のファイルは移動しません。
-3. **ワークスペースを作る。** 使う Brain にチェックを入れて **ワークスペースを作成** を押します。個人・チーム・組織の Brain を自由に組み合わせられます。
+2. **hibachi を追加する。** 起動画面の **KBフォルダを開く** で手元のフォルダを選ぶか、**GitHub から取得** でリポジトリをクローンします。既存のファイルは移動しません。
+3. **ワークスペースを作る。** 使う hibachi にチェックを入れて **ワークスペースを作成** を押します。個人・チーム・組織の hibachi を自由に組み合わせられます。
 4. **書いて、頼む。** ノートを開いて書き、右上の **AIに相談** から AI に続きを依頼します。AI が許可を求めたときは、パネルに確認が表示されます。
 
 ## 主な機能
 
-**Brain とワークスペース**
-- Brain は **Schema**（AI への指示やスキル）・**Knowledge**（ノート）・**Contents**（資料）の 3 つの層で整理されます。
-- **全体** 画面で、ワークスペース内の Brain を地図または並列で見渡せます。検索もすべての Brain をまたいでできます。
-- Brain ごとに名前・分類・アイコン・色を設定できます。
+**hibachi とワークスペース**
+- hibachi は **Schema**（AI への指示やスキル）・**Knowledge**（ノート）・**Contents**（資料）の 3 つの層で整理されます。
+- **irori mode**（旧「全体」）で、ワークスペース内の hibachi を地図または並列で見渡せます。検索もすべての hibachi をまたいでできます。
+- hibachi ごとに名前・分類・アイコン・色を設定できます。
 
 **ノート**
 - 見たまま編集できる Markdown エディタです。自動で保存し、画像を貼り付けるとノートの隣の `_assets/` に入ります。
@@ -71,22 +71,22 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - CSV は表で表示できます。オントロジーは階層やグラフとして表示できます。
 
 **AI エージェント**
-- **Hibachi Agent**（Brain の AI）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その Brain の Schema を読み込んだ状態で起動します。複数の Brain の AI を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
-- **あなたの AI**：Brain をまたぐ仕事を頼めます。どの CLI でも動きます。Claude Code では依頼を Brain ごとに分けて各 Brain のサブエージェントに渡し、ほかの CLI では各 Brain の AGENTS.md を読んでから自分で作業し、結果をまとめて報告します。
-- 許可の扱いは各 CLI の設定に従います。Hibachi Agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
+- **hibachi agent**（各 hibachi の AI）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その hibachi の Schema を読み込んだ状態で起動します（hibachi mode）。複数の hibachi agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
+- **irori agent**（旧「あなたの AI」）：irori mode で、hibachi をまたぐ仕事を頼めます。どの CLI でも動きます。Claude Code・Codex・OpenCode では依頼を hibachi ごとに分け、irori が定義する各 hibachi のサブエージェント（`hibachi-<名前>`）に渡します。Pi と Hermes Agent では各 hibachi の AGENTS.md を読んでから自分で作業します。どちらも結果をまとめて報告します。
+- 許可の扱いは各 CLI の設定に従います。hibachi agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
 - AI への指示は送信待ちとして予約でき、会話は再起動しても残ります。
 
 **資料**
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。
-- Google Drive のフォルダを Brain の Contents として接続できます。irori からも、その Brain の AI からも編集でき、変更は Drive に送られます。Windows では [WinFsp](https://winfsp.dev/rel/) が必要です。
+- Google Drive のフォルダを hibachi の Contents として接続できます。irori からも、その hibachi agent からも編集でき、変更は Drive に送られます。Windows では [WinFsp](https://winfsp.dev/rel/) が必要です。
 
 **記録と道具**
 - **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。
-- Brain のフォルダで開く内蔵ターミナルがあります。
+- hibachi のフォルダで開く内蔵ターミナルがあります。
 - テーマ（システムに合わせる・いろり・ライト・ダーク）、Markdown のフォント、表示言語（日本語 / English）を切り替えられます。
 
 <div align="center">
-<img src="docs/images/readme/ja-overview.png" alt="全体画面。あなたの AI と、チーム・組織に分かれた 3 つの Brain を地図で表示している。" width="860">
+<img src="docs/images/readme/ja-overview.png" alt="irori mode の画面。irori agent と、チーム・組織に分かれた 3 つの hibachi を地図で表示している。" width="860">
 </div>
 
 ## 現在の状態
@@ -123,7 +123,7 @@ npm start
 
 ## 関連プロジェクト
 
-- [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete)：irori で使う Brain（知識ベース）のおすすめテンプレートです。
+- [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete)：irori で使う hibachi（知識ベース）のおすすめテンプレートです。
 
 ## ライセンス
 

@@ -26,6 +26,21 @@ or the old label now select or seed it explicitly. Details:
 beyond its source, real OpenCode/Pi model lists, and model-switching resume on a
 real CLI.
 
+Names and sub-agents, same branch, 2026-09-27 (owner's decisions): all copy and
+the text irori writes for agents now say **hibachi** for a brain, **hibachi
+agent** for its AI, **irori agent** for "your AI", and **irori mode** for the
+Overview level (**hibachi mode** for a hibachi opened); "irori" alone is still
+the app, and code identifiers are unchanged. Sub-agents are named
+`hibachi-<slug>`, and irori now writes each handed hibachi's definition itself,
+only when the file is absent, for the irori agent's CLI: `.claude/agents/*.md`,
+`.codex/agents/*.toml` (`name`, `description`, `developer_instructions`) or
+`.opencode/agents/*.md` (`mode: subagent`). Codex and OpenCode therefore get the
+delegating preamble; Pi and Hermes keep the direct one. The `brain-agents` skill
+is no longer in the starter and the "update the definitions" request button is
+gone; the irori agent's screen lists each hibachi's definition files. Unverified:
+real Codex/OpenCode runs, including whether Codex loads project `.codex/agents`
+for the untrusted irori agent folder ([YOUR-AI](YOUR-AI.md)).
+
 Stray errors, 2026-09-27: #112 (**0.1.47**) is merged at the owner's word and
 published as
 [v0.1.47-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.47-preview.1)
