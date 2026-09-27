@@ -186,7 +186,7 @@ try {
   const paneWidth = () =>
     page.locator('.brain-pane').evaluate((element) => element.getBoundingClientRect().width);
   const startWidth = await paneWidth();
-  const handle = page.getByRole('separator', { name: 'Brain パネルの幅', exact: true });
+  const handle = page.getByRole('separator', { name: 'hibachi パネルの幅', exact: true });
   const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
@@ -358,7 +358,7 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.literal-block').filter({ hasText: '<br' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {
     for (const agent of ['codex', 'claude']) {
@@ -461,7 +461,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
   await files.init();
   const space = files.list()[0];
   const store = new SessionStore(files.dataDir);
-  // Saved as a run of a brain's Hibachi Agent now saves it: in its default full access.
+  // Saved as a run of a brain's hibachi agent now saves it: in its default full access.
   for (const agent of ['codex', 'claude'] as const)
     await store.save(
       { scopeId: space.scopeId, root: space.root, agent },
@@ -497,7 +497,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
             .evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBeGreaterThan(chosenWidth - 12);
-      await window.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
+      await window.getByRole('button', { name: 'hibachi agent', exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).not.toBeVisible();
       await window.getByLabel('会話と接続の設定', { exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).toBeVisible();

@@ -41,8 +41,8 @@ export class WorkspaceCloudStorage implements CloudStorage {
     if (matches.length !== 1)
       throw Error(
         t(
-          'Drive 接続の持ち主（Brain またはワークスペース）が見つからないか、重複しています。',
-          'The owner of the Drive connection (a brain or workspace) is missing or ambiguous.',
+          'Drive 接続の持ち主（hibachi またはワークスペース）が見つからないか、重複しています。',
+          'The owner of the Drive connection (a hibachi or workspace) is missing or ambiguous.',
         ),
       );
     const root = matches[0];

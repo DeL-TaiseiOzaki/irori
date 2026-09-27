@@ -46,15 +46,15 @@ export function writeDecision(
       ? { allow: true }
       : {
           allow: false,
-          reason: `The ${brain.name} brain's AI works only inside that brain (${brain.root}). Report what else is needed instead.`,
+          reason: `The ${brain.name} hibachi's agent works only inside that hibachi (${brain.root}). Report what else is needed instead.`,
         };
   if (within(delegation.you, absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);
   return {
     allow: false,
     reason: target
-      ? `Hand work in the ${target.name} brain to its sub-agent "${target.agent}", which reads that brain's Schema first.`
-      : 'Your AI writes only in its own folder or, through their sub-agents, in the brains handed to it.',
+      ? `Hand work in the ${target.name} hibachi to its sub-agent "${target.agent}", which reads that hibachi's Schema first.`
+      : 'The irori agent writes only in its own folder or, through their sub-agents, in the hibachis handed to it.',
   };
 }
 

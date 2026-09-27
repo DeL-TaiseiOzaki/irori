@@ -54,7 +54,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
   );
 }
 
-/** Reads one brain's Hibachi Agent and hands it up, so every view of the Overview shares one reading. */
+/** Reads one brain's hibachi agent and hands it up, so every view of the Overview shares one reading. */
 function AiWatch({
   scopeId,
   agent,
@@ -82,7 +82,7 @@ interface Actions {
 }
 
 /**
- * A brain's Hibachi Agent in a few lines: the request it waits on, the step it is taking,
+ * A brain's hibachi agent in a few lines: the request it waits on, the step it is taking,
  * what waits to be sent, or the last thing it was asked.
  */
 function AiCard({
@@ -115,14 +115,14 @@ function AiCard({
     <section
       className={`ai-card ${aiState(ai)}`}
       role="group"
-      aria-label={t(`${space.name} の Hibachi Agent`, `${space.name}'s Hibachi Agent`)}
+      aria-label={t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)}
     >
       <header>
         {named && <BrainTile space={space} size={22} radius={7} />}
         <Icon name="sparkles" size={13} className="ai-card-spark" />
         <span className="ai-card-name">
           {named
-            ? t(`${space.name} の Hibachi Agent`, `${space.name}'s Hibachi Agent`)
+            ? t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)
             : agentNames[agent]}
         </span>
         <StateWords ai={ai} />
@@ -178,7 +178,7 @@ function AiCard({
           <div className="ai-card-actions">
             <button className="ember-button" onClick={() => onEnter(space, { ai: true })}>
               <Icon name="sparkles" size={13} />
-              {t('Hibachi Agent', 'Hibachi Agent')}
+              {t('hibachi agent', 'hibachi agent')}
             </button>
           </div>
         </>
@@ -247,7 +247,7 @@ function OverviewMap({
   const node = (id: string) => layout.nodes.find((item) => item.scopeId === id)!;
   const space = (id: string) => spaces.find((item) => item.scopeId === id)!;
   return (
-    <section className="map-board" aria-label={t('Brain の地図', 'Map of brains')}>
+    <section className="map-board" aria-label={t('hibachi の地図', 'Map of hibachis')}>
       <div className="map-canvas">
         {layout.groups.map((group) => (
           <div
@@ -307,13 +307,13 @@ function OverviewMap({
           <button
             className={`map-hearth ${yourAi.running ? 'working' : ''}`}
             style={at(layout.hearth)}
-            aria-label={t('あなたの AI の Schema を開く', "Open your AI's Schema")}
+            aria-label={t('irori agent の Schema を開く', "Open the irori agent's Schema")}
             onClick={onShowYou}
           >
             <span className="map-orb" aria-hidden="true">
               <Icon name="sparkles" size={30} strokeWidth={1.9} />
             </span>
-            <strong>{t('あなたの AI', 'Your AI')}</strong>
+            <strong>{t('irori agent', 'irori agent')}</strong>
             <small>
               <Icon name="schema" size={11} />
               {you.state === 'ready'
@@ -328,8 +328,8 @@ function OverviewMap({
             className="map-pill"
             style={at(curve(node(link.from), node(link.to)).label)}
             title={t(
-              `${space(link.to).name} の Hibachi Agent が ${space(link.from).name} の ${link.path} を参照（${link.notes} 件）`,
-              `${space(link.to).name}'s Hibachi Agent read ${link.path} in ${space(link.from).name} (${link.notes})`,
+              `${space(link.to).name} の hibachi agent が ${space(link.from).name} の ${link.path} を参照（${link.notes} 件）`,
+              `${space(link.to).name}'s hibachi agent read ${link.path} in ${space(link.from).name} (${link.notes})`,
             )}
           >
             <BrainTile space={space(link.from)} size={14} radius={4} />
@@ -368,12 +368,12 @@ function OverviewMap({
         {you && (
           <span>
             <i className="legend-hand-off" />
-            {t('あなたの AI からの依頼', 'Handed over by your AI')}
+            {t('irori agent からの依頼', 'Handed over by the irori agent')}
           </span>
         )}
         <span>
           <i className="legend-reference" />
-          {t('別の Brain のノートを参照', "Read another brain's notes")}
+          {t('別の hibachi のノートを参照', "Read another hibachi's notes")}
         </span>
         <span>
           <i className="legend-group" />
@@ -535,7 +535,7 @@ function OverviewColumns({
     <div
       className="overview-columns"
       role="region"
-      aria-label={t('Brain の並列表示', 'Brains side by side')}
+      aria-label={t('hibachi の並列表示', 'hibachis side by side')}
       style={{ '--columns': spaces.length } as CSSProperties}
     >
       <div className="columns-gutter" aria-hidden="true">
@@ -572,7 +572,7 @@ function OverviewColumns({
   );
 }
 
-/** Sends one instruction to the chosen brain's Hibachi Agent, or queues it behind the run in progress. */
+/** Sends one instruction to the chosen brain's hibachi agent, or queues it behind the run in progress. */
 function OverviewComposer({
   spaces,
   ais,
@@ -614,7 +614,7 @@ function OverviewComposer({
       }}
     >
       <fieldset className="overview-targets">
-        <legend className="sr-only">{t('送信先の Brain', 'Brain to send to')}</legend>
+        <legend className="sr-only">{t('送信先の hibachi', 'hibachi to send to')}</legend>
         {spaces.map((item) => (
           <label
             key={item.scopeId}
@@ -633,12 +633,12 @@ function OverviewComposer({
       </fieldset>
       <textarea
         aria-label={t(
-          `${space.name} の Hibachi Agent への指示`,
-          `Instruction for ${space.name}'s Hibachi Agent`,
+          `${space.name} の hibachi agent への指示`,
+          `Instruction for ${space.name}'s hibachi agent`,
         )}
         placeholder={t(
-          `${space.name} の Hibachi Agent に指示…`,
-          `Instruct ${space.name}'s Hibachi Agent…`,
+          `${space.name} の hibachi agent に指示…`,
+          `Instruct ${space.name}'s hibachi agent…`,
         )}
         rows={3}
         value={text}
@@ -792,14 +792,17 @@ export function Overview({
       )}
       <div className="overview-main">
         <header className="overview-header">
-          <h1>{t('全体', 'Overview')}</h1>
+          <h1>{t('irori mode', 'irori mode')}</h1>
           <span className="overview-sub">
             {workspace.name} ·{' '}
-            {t(`${spaces.length} Brain`, `${spaces.length} brain${spaces.length === 1 ? '' : 's'}`)}
+            {t(
+              `${spaces.length} hibachi`,
+              `${spaces.length} hibachi${spaces.length === 1 ? '' : 's'}`,
+            )}
           </span>
           <MagnetTabs
             className="overview-views"
-            label={t('全体の表示', 'Overview layout')}
+            label={t('irori mode の表示', 'irori mode layout')}
             value={view}
             onValueChange={onView}
             options={[
@@ -827,23 +830,26 @@ export function Overview({
             disabled={!spaces.length}
             onClick={onSearch}
             aria-label={t(
-              `すべての Brain を検索（${shortcut('K')}）`,
-              `Search all brains (${shortcut('K')})`,
+              `すべての hibachi を検索（${shortcut('K')}）`,
+              `Search all hibachis (${shortcut('K')})`,
             )}
           >
             <Icon name="search" size={15} />
-            <span>{t('すべての Brain を検索', 'Search all brains')}</span>
+            <span>{t('すべての hibachi を検索', 'Search all hibachis')}</span>
             <kbd>{shortcut('K')}</kbd>
           </button>
           <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>
             <Icon name="plus" size={14} />
-            {t('Brain を追加', 'Add a brain')}
+            {t('hibachi を追加', 'Add a hibachi')}
           </button>
         </header>
         {!spaces.length ? (
           <div className="overview-empty">
             <p>
-              {t('このワークスペースに Brain がありません。', 'This workspace has no brain yet.')}
+              {t(
+                'このワークスペースに hibachi がありません。',
+                'This workspace has no hibachi yet.',
+              )}
             </p>
           </div>
         ) : view === 'map' ? (
@@ -871,17 +877,19 @@ export function Overview({
         <aside
           className="overview-ai chrome"
           aria-label={
-            island === 'you' ? t('あなたの AI', 'Your AI') : t('Hibachi Agent', 'Hibachi Agents')
+            island === 'you'
+              ? t('irori agent', 'irori agent')
+              : t('hibachi agent', 'hibachi agents')
           }
         >
           <MagnetTabs
             className="overview-island-tabs"
-            label={t('全体の AI', 'AIs in the Overview')}
+            label={t('irori mode の AI', 'AIs in irori mode')}
             value={island}
             onValueChange={setIsland}
             options={[
-              { value: 'you', label: t('あなたの AI', 'Your AI') },
-              { value: 'brains', label: t('Hibachi Agent', 'Hibachi Agents') },
+              { value: 'you', label: t('irori agent', 'irori agent') },
+              { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
             ]}
           />
           {island === 'you' ? (
@@ -906,7 +914,7 @@ export function Overview({
                   <Icon name="sparkles" size={15} strokeWidth={2.1} />
                 </span>
                 <span>
-                  <strong>{t('Hibachi Agent', 'Hibachi Agents')}</strong>
+                  <strong>{t('hibachi agent', 'hibachi agents')}</strong>
                   <small>
                     {running || waiting
                       ? [

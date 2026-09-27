@@ -83,25 +83,20 @@ export function run() {
     const brains = [
       ...prompt.matchAll(/^- (.+?)(?: \([^)]*\))?: folder ("[^"]+"), sub-agent "([^"]+)"/gm),
     ].map((match) => ({ name: match[1], root: JSON.parse(match[2]), agent: match[3] }));
-    log({ prompt, brains });
+    // Like Claude Code, load the definitions in the folder's .claude/agents.
+    const loaded = fs.existsSync(path.join('.claude', 'agents'))
+      ? fs
+          .readdirSync(path.join('.claude', 'agents'))
+          .filter((name) => name.endsWith('.md'))
+          .map((name) => name.slice(0, -'.md'.length))
+      : [];
+    log({ prompt, brains, loaded });
     send({
       type: 'system',
       subtype: 'init',
       session_id: 'fixture-session',
-      agents: brains.map((brain) => brain.agent),
+      agents: loaded,
     });
-    // Asked with the brain-agents skill: your AI writes the definitions in its own folder.
-    if (prompt.includes('--- begin skill ---') && prompt.includes('brain-agents')) {
-      for (const each of brains) {
-        fs.mkdirSync(path.join('.claude', 'agents'), { recursive: true });
-        fs.writeFileSync(
-          path.join('.claude', 'agents', `${each.agent}.md`),
-          `---\nname: ${each.agent}\ndescription: The ${each.name} brain's AI.\n---\nRead ${each.root}/AGENTS.md first.\n`,
-        );
-      }
-      assistant([{ type: 'text', text: `Wrote ${brains.length} definitions.` }]);
-      return result();
-    }
     const brain = brains[0];
     if (!brain) {
       assistant([{ type: 'text', text: 'No brain was handed to me.' }]);
@@ -197,7 +192,7 @@ export function run() {
       stop_hook_active: false,
       agent_transcript_path: '',
     });
-    assistant([{ type: 'text', text: `Handed the note to ${brain.name}'s AI.` }]);
+    assistant([{ type: 'text', text: `Handed the note to ${brain.name}'s hibachi agent.` }]);
     result();
   }
 

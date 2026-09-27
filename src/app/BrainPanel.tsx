@@ -409,8 +409,8 @@ export function BrainPanel({
           <button
             className="brain-home-link"
             title={t(
-              `Brain のホーム · ${category} · ${space.root}`,
-              `The brain's home · ${category} · ${space.root}`,
+              `hibachi のホーム · ${category} · ${space.root}`,
+              `The hibachi's home · ${category} · ${space.root}`,
             )}
             onClick={onHome}
           >
@@ -428,8 +428,8 @@ export function BrainPanel({
           <Menu.Root modal={false}>
             <Menu.Trigger
               className="icon-button"
-              aria-label={t('Brain のメニュー', 'Brain menu')}
-              title={t('Brain のメニュー', 'Brain menu')}
+              aria-label={t('hibachi のメニュー', 'hibachi menu')}
+              title={t('hibachi のメニュー', 'hibachi menu')}
             >
               <Icon name="more" size={16} />
             </Menu.Trigger>
@@ -438,7 +438,7 @@ export function BrainPanel({
                 <Menu.Popup className="menu">
                   <Menu.Item disabled={locked} onClick={onSettings}>
                     <Icon name="penLine" size={14} />
-                    {t('Brain の設定', 'Brain settings')}
+                    {t('hibachi の設定', 'hibachi settings')}
                   </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
@@ -468,7 +468,7 @@ export function BrainPanel({
         </button>
         <MagnetTabs
           className="brain-modes"
-          label={t('Brain の表示', 'Brain view')}
+          label={t('hibachi の表示', 'hibachi view')}
           value={mode}
           onValueChange={onModeChange}
           options={[

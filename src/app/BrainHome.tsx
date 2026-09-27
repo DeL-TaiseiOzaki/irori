@@ -164,8 +164,8 @@ export function BrainHome({
             {space.name}
             <button
               className="stage-button home-edit"
-              aria-label={t('Brain の設定', 'Brain settings')}
-              title={t('Brain の設定', 'Brain settings')}
+              aria-label={t('hibachi の設定', 'hibachi settings')}
+              title={t('hibachi の設定', 'hibachi settings')}
               disabled={locked}
               onClick={onSettings}
             >

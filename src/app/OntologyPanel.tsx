@@ -470,7 +470,7 @@ export function OntologyPanel({
             onClick={onConfigure}
           >
             <Icon name="sparkles" size={14} />
-            {t('Hibachi Agent', 'Hibachi Agent')}
+            {t('hibachi agent', 'hibachi agent')}
           </button>
         </>
       }

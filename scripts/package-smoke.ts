@@ -590,7 +590,7 @@ try {
     restoredRecovery.note.text,
   );
   await restored.locator('.workspace-card').first().click();
-  await restored.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
+  await restored.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(restored.getByLabel('送信待ち', { exact: true })).toContainText(
     'Packaged pending instruction 日本語',
   );

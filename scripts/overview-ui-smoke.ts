@@ -60,10 +60,10 @@ try {
       .filter((event) => event.role === 'user')
       .map((e) => e.text);
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'Brain' });
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
 
   // Product's AI asks for permission and has a second instruction queued behind it.
-  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェントへの指示').fill('dialog');
   await page.getByRole('button', { name: '送信', exact: true }).click();
@@ -94,20 +94,20 @@ try {
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
 
   // The Overview: a map of both brains and their AIs.
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
-  const map = page.getByRole('region', { name: 'Brain の地図' });
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
+  const map = page.getByRole('region', { name: 'hibachi の地図' });
   await expect(map.getByRole('button', { name: 'Product を開く' })).toContainText('許可待ち');
   await expect(map.getByRole('button', { name: 'Research を開く' })).toContainText('実行中');
   await expect(map.locator('.map-group')).toHaveCount(2);
   // Beside the map, your AI comes first; each brain's own AI is the other tab.
-  await expect(page.getByRole('complementary', { name: 'あなたの AI' })).toBeVisible();
-  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
-  const ais = page.getByRole('complementary', { name: 'Hibachi Agent' });
-  const productAi = ais.getByRole('group', { name: 'Product の Hibachi Agent' });
+  await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  const ais = page.getByRole('complementary', { name: 'hibachi agent' });
+  const productAi = ais.getByRole('group', { name: 'Product の hibachi agent' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
   // Search from the Overview covers every brain.
-  await page.getByRole('button', { name: /^すべての Brain を検索/ }).click();
-  await expect(page.getByRole('radio', { name: 'すべての Brain', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: /^すべての hibachi を検索/ }).click();
+  await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
@@ -126,13 +126,13 @@ try {
 
   // Sending from the Overview queues behind Research's run.
   await ais.getByRole('radio', { name: 'Research', exact: true }).check();
-  await ais.getByLabel('Research の Hibachi Agent への指示').fill('queued from overview');
+  await ais.getByLabel('Research の hibachi agent への指示').fill('queued from overview');
   await ais.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
   await expect.poll(async () => (await conversation(research.scopeId)).queued.length).toBe(1);
 
   // Side by side: stop Research's run, then resume its queue.
   await page.getByRole('button', { name: '並列', exact: true }).click();
-  const columns = page.getByRole('region', { name: 'Brain の並列表示' });
+  const columns = page.getByRole('region', { name: 'hibachi の並列表示' });
   const researchColumn = columns.getByRole('region', { name: 'Research', exact: true });
   await expect(researchColumn).toContainText('実行中');
   await expect(researchColumn).toContainText('Research note');
@@ -154,7 +154,7 @@ try {
   // A brain with nothing running takes an instruction from the Overview at once.
   await page.getByRole('button', { name: '地図', exact: true }).click();
   await ais.getByRole('radio', { name: 'Product', exact: true }).check();
-  await ais.getByLabel('Product の Hibachi Agent への指示').fill('from overview');
+  await ais.getByLabel('Product の hibachi agent への指示').fill('from overview');
   await ais.getByRole('button', { name: '送信', exact: true }).click();
   await expect
     .poll(() => turns(product.scopeId))
@@ -176,7 +176,7 @@ try {
 
   // And back to the map, then into a brain from it.
   // The Overview comes back as it was left: side by side.
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(columns).toBeVisible();
   await page.getByRole('button', { name: '地図', exact: true }).click();
   await map.getByRole('button', { name: 'Product を開く' }).click();
@@ -187,7 +187,7 @@ try {
   await expect(page.locator('.islands.level-enter')).toHaveCount(0);
   // Asked for less motion, the levels change at once.
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(map).toBeVisible();
   expect(await page.locator('.islands.level-exit, .overview.level-return').count()).toBe(0);
   await map.getByRole('button', { name: 'Product を開く' }).click();
@@ -196,8 +196,8 @@ try {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // A result found from the Overview opens in its own brain.
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
-  await page.getByRole('button', { name: /^すべての Brain を検索/ }).click();
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
+  await page.getByRole('button', { name: /^すべての hibachi を検索/ }).click();
   const palette = page.getByRole('dialog', { name: 'KB内を検索' });
   await palette.getByLabel('本文を検索', { exact: true }).fill('lantern');
   await palette.getByRole('button', { name: '検索', exact: true }).click();

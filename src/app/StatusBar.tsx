@@ -37,7 +37,7 @@ export function StatusBar({
   workspaceDisabled: boolean;
   terminalOpen: boolean;
   terminalDisabled: boolean;
-  /** Where the AI summary leads: the Overview while other brains' AIs work, else the Hibachi Agent. */
+  /** Where the AI summary leads: the Overview while other brains' AIs work, else the hibachi agent. */
   aiTarget: 'overview' | 'panel';
   onWorkspace: () => void;
   onAi: () => void;
@@ -87,8 +87,8 @@ export function StatusBar({
         className="status-item ai-summary"
         title={
           aiTarget === 'overview'
-            ? t('全体で AI を見る', 'See the AIs in the Overview')
-            : t('Hibachi Agent を開く', 'Open Hibachi Agent')
+            ? t('irori mode で AI を見る', 'See the AIs in irori mode')
+            : t('hibachi agent を開く', 'Open hibachi agent')
         }
         onClick={onAi}
       >

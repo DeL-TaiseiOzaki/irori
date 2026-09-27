@@ -80,7 +80,7 @@ export function AgentRequest({
       {brain && (
         <span className="request-brain">
           <BrainTile space={brain} size={16} radius={5} />
-          {t(`${brain.name} の AI から`, `From ${brain.name}'s AI`)}
+          {t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)}
         </span>
       )}
       <strong className="request-title">
@@ -244,7 +244,7 @@ export function taskStateWords(state: TaskState) {
 
 function TaskList({ tasks, brains }: { tasks: ReturnType<typeof runTasks>; brains: Space[] }) {
   return (
-    <ul className="task-list" aria-label={t('Brain への依頼', 'Hand-offs to brains')}>
+    <ul className="task-list" aria-label={t('hibachi への依頼', 'Hand-offs to hibachis')}>
       {tasks.map((task) => {
         const brain = brains.find((space) => space.scopeId === task.scopeId);
         return (
@@ -253,8 +253,8 @@ function TaskList({ tasks, brains }: { tasks: ReturnType<typeof runTasks>; brain
             <span className="task-text">
               <small>
                 {brain
-                  ? t(`${brain.name} の AI`, `${brain.name}'s AI`)
-                  : t('Brain の AI', 'A brain')}
+                  ? t(`${brain.name} の hibachi agent`, `${brain.name}'s hibachi agent`)
+                  : t('hibachi agent', 'A hibachi agent')}
               </small>
               <span>{task.label}</span>
             </span>
@@ -360,7 +360,9 @@ export function AgentLog({
         <div className={`message report ${event.delegate.state}`} key={key}>
           <span className="report-from">
             {brain && <BrainTile space={brain} size={16} radius={5} />}
-            {brain ? t(`${brain.name} の AI から`, `From ${brain.name}'s AI`) : t('報告', 'Report')}
+            {brain
+              ? t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)
+              : t('報告', 'Report')}
           </span>
           <AgentMarkdown text={event.text} />
         </div>,

@@ -33,7 +33,7 @@ import { promptWithSkill } from '../domain/skills';
 import { parseSkill, requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
-import { brainAgentNames, brainsDirectPreamble, brainsPreamble } from '../domain/you';
+import { brainAgentNames, brainsDirectPreamble, brainsPreamble, hasSubAgents } from '../domain/you';
 import { categoryName } from '../domain/brains';
 import {
   brainOfAgent,
@@ -268,8 +268,8 @@ export class AgentService {
       if (input.notePath || input.personLines || input.sources?.length)
         throw Error(
           t(
-            'あなたの AI にはノートや資料を直接渡せません。Brain を渡してください。',
-            'Your AI takes brains, not notes or materials.',
+            'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
+            'The irori agent takes hibachis, not notes or materials.',
           ),
         );
       for (const scopeId of brains) {
@@ -277,12 +277,12 @@ export class AgentService {
         if (this.busy(scopeId))
           throw Error(
             t(
-              `${space.name} の Hibachi Agent が作業中です。終わってからあなたの AI に渡してください。`,
-              `${space.name}'s Hibachi Agent is working. Hand it to your AI after it finishes.`,
+              `${space.name} の hibachi agent が作業中です。終わってから irori agent に渡してください。`,
+              `${space.name}'s hibachi agent is working. Hand it to the irori agent after it finishes.`,
             ),
           );
       }
-    } else if (brains.length) throw Error('Only your AI takes brains');
+    } else if (brains.length) throw Error('Only the irori agent takes hibachis');
     let close!: () => void;
     let accept!: () => void;
     let reject!: (error: unknown) => void;
@@ -422,29 +422,41 @@ export class AgentService {
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
       const space = you
-        ? { root: this.root(input.scopeId), name: t('あなたの AI のフォルダ', "your AI's folder") }
+        ? {
+            root: this.root(input.scopeId),
+            name: t('irori agent のフォルダ', "the irori agent's folder"),
+          }
         : this.files.get(input.scopeId);
       const promptParts: string[] = [];
       if (you && input.brains?.length) {
         const names = brainAgentNames(this.files.list());
-        const handed = input.brains.map((scopeId) => this.files.get(scopeId));
-        const defined = await this.you!.defined(handed.map((brain) => names.get(brain.scopeId)!));
-        const brains = handed.map((brain) => ({
-          scopeId: brain.scopeId,
-          name: brain.name,
-          category: brain.category && categoryName(brain.category),
-          agent: names.get(brain.scopeId)!,
-          root: brain.root,
-          defined: defined.has(names.get(brain.scopeId)!),
-        }));
+        const brains = input.brains.map((scopeId) => {
+          const brain = this.files.get(scopeId);
+          return {
+            scopeId: brain.scopeId,
+            name: brain.name,
+            category: brain.category && categoryName(brain.category),
+            agent: names.get(brain.scopeId)!,
+            root: brain.root,
+          };
+        });
         run.delegation = { you: space.root, brains };
-        // Only Claude Code has irori's sub-agents and write hook; another CLI
-        // works in the brains itself.
-        promptParts.push(
-          input.agent === 'claude'
-            ? brainsPreamble(brains)
-            : brainsDirectPreamble(brains, agentNames[input.agent]),
-        );
+        const cli = input.agent;
+        if (hasSubAgents(cli)) {
+          // Each hibachi's sub-agent is defined by irori, only where no file is:
+          // the person may have edited one.
+          const written = await this.you!.writeDefinitions(cli, brains);
+          if (written.length)
+            this.event(
+              run,
+              'status',
+              t(
+                `hibachi agent の定義を書きました: ${written.join(', ')}`,
+                `Wrote the hibachi agent definitions: ${written.join(', ')}`,
+              ),
+            );
+          promptParts.push(brainsPreamble(brains, cli));
+        } else promptParts.push(brainsDirectPreamble(brains, agentNames[cli]));
       }
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);

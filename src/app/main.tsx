@@ -388,7 +388,7 @@ function App() {
     refresh: revision,
   });
   const notesDeclared = notesRead.data ?? null;
-  // The brain's top level, shared by its three sections and the Hibachi Agent's Schema line.
+  // The brain's top level, shared by its three sections and the hibachi agent's Schema line.
   const rootsRead = useResource(() => host.entries(active!.scopeId, ''), [active?.scopeId], {
     enabled: !!active,
     refresh: revision,
@@ -717,7 +717,7 @@ function App() {
           // An answered request says only that it ended; the run goes on.
           if (!incoming.resolved) markRunning(scopeId, incoming.type !== 'done');
           trackRequests(incoming);
-          // The AI that runs in a brain is that brain's Hibachi Agent from now on.
+          // The AI that runs in a brain is that brain's hibachi agent from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
             setAgentChoice((choice) =>
@@ -855,7 +855,7 @@ function App() {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
     if (!(await save())) return false;
-    // Another brain's Hibachi Agent keeps running and its queue keeps going; only a send
+    // Another brain's hibachi agent keeps running and its queue keeps going; only a send
     // in flight or a connection being prepared holds the brain on show.
     if (sending || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
@@ -879,8 +879,8 @@ function App() {
       if (sending && space.scopeId !== active?.scopeId) {
         setError(
           t(
-            '送信が終わってから Brain を切り替えてください。',
-            'Switch brains after the send finishes.',
+            '送信が終わってから hibachi を切り替えてください。',
+            'Switch hibachis after the send finishes.',
           ),
         );
         return false;
@@ -922,8 +922,8 @@ function App() {
     if (active && heldByYou(active.scopeId)) {
       report(
         t(
-          'あなたの AI が作業中です。終わってからこの Brain の Hibachi Agent に頼んでください。',
-          "Your AI is working. Ask this brain's Hibachi Agent after it finishes.",
+          'irori agent が作業中です。終わってからこの hibachi agent に頼んでください。',
+          'The irori agent is working. Ask this hibachi agent after it finishes.',
         ),
       );
       return;
@@ -1047,7 +1047,7 @@ function App() {
       draining.current.delete(scopeId);
     }
   }
-  /** Sends to a brain's Hibachi Agent from the Overview, or queues behind its run or its waiting queue. */
+  /** Sends to a brain's hibachi agent from the Overview, or queues behind its run or its waiting queue. */
   async function sendToBrain(scopeId: string, message: string) {
     const agentId = agentFor(scopeId);
     const key = `${scopeId}:${agentId}`;
@@ -1080,7 +1080,7 @@ function App() {
    * Sends to your AI with the workspace's brains that are free, or queues behind
    * its run, on the CLI and model chosen for it on this device.
    */
-  async function sendToYou(message: string, skill?: string) {
+  async function sendToYou(message: string) {
     if (!you) return;
     if (!(await save()))
       throw Error(
@@ -1097,7 +1097,6 @@ function App() {
       model: yourChoice.models[agentId] || undefined,
       prompt: message,
       brains,
-      skill,
     };
     const value = await host.agentConversation(you.id, agentId);
     if (value.activeRunId || value.queued.length || draining.current.has(you.id)) {
@@ -1112,17 +1111,6 @@ function App() {
       markRunning(you.id, false);
       throw error;
     }
-  }
-  /** Asks your AI to write each brain's sub-agent definition; irori never writes them. */
-  async function updateDefinitions() {
-    await sendToYou(
-      t(
-        'この Brain ごとのサブエージェント定義を、brain-agents スキルに従って作成・更新してください。',
-        "Create or update each brain's sub-agent definition following the brain-agents skill.",
-      ),
-      'brain-agents',
-    );
-    goToLevel('overview');
   }
   /** Resumes a brain's queue from the Overview. */
   async function resumeQueue(scopeId: string) {
@@ -1314,13 +1302,13 @@ function App() {
   );
   const referenced =
     !!doc && sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path);
-  // Another brain's Hibachi Agent is running or waiting: the AI summary leads to the Overview.
+  // Another brain's hibachi agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
     if (!workspaceSpaces.length) return;
     goToLevel('overview');
   }
-  /** Shows a brain, from the rail or the Overview: its note, or its Hibachi Agent. */
+  /** Shows a brain, from the rail or the Overview: its note, or its hibachi agent. */
   async function enterBrain(
     space: Space,
     options: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } } = {},
@@ -1446,9 +1434,7 @@ function App() {
             agent={yourChoice.agent}
             spaces={workspaceSpaces}
             running={yourAiRunning}
-            onUpdateDefinitions={updateDefinitions}
             onBack={() => goToLevel('overview')}
-            onError={report}
           />
         )}
         <PaneGroup
@@ -1534,20 +1520,20 @@ function App() {
               <section className="brain-panel brain-empty chrome">
                 <p>
                   {t(
-                    'このワークスペースに Brain がありません。',
-                    'This workspace has no brain yet.',
+                    'このワークスペースに hibachi がありません。',
+                    'This workspace has no hibachi yet.',
                   )}
                 </p>
                 <button className="solid-button" onClick={() => setAdd(true)}>
                   <Icon name="plus" size={14} />
-                  {t('Brain を追加', 'Add a brain')}
+                  {t('hibachi を追加', 'Add a hibachi')}
                 </button>
               </section>
             )}
           </Pane>
           <PaneSeparator
             className="island-handle"
-            aria-label={t('Brain パネルの幅', 'Brain panel width')}
+            aria-label={t('hibachi パネルの幅', 'hibachi panel width')}
           />
           <Pane id="stage" className="stage-pane" minSize={360}>
             <main id="editor-main" className="stage on-stage" tabIndex={-1}>
@@ -2157,7 +2143,7 @@ function App() {
             <>
               <PaneSeparator
                 className="island-handle"
-                aria-label={t('Hibachi Agent の幅', 'Hibachi Agent width')}
+                aria-label={t('hibachi agent の幅', 'hibachi agent width')}
               />
               <Pane
                 id="assistant"
@@ -2170,14 +2156,17 @@ function App() {
                   className="agent-panel chrome"
                   aria-label={
                     active
-                      ? t(`${active.name} の Hibachi Agent`, `${active.name}'s Hibachi Agent`)
+                      ? t(`${active.name} の hibachi agent`, `${active.name}'s hibachi agent`)
                       : 'AI'
                   }
                 >
                   <header className="agent-header">
                     <label
                       className="agent-picker"
-                      title={t('この Brain の Hibachi Agent', "This brain's Hibachi Agent")}
+                      title={t(
+                        'この hibachi の hibachi agent',
+                        'The hibachi agent of this hibachi',
+                      )}
                     >
                       {active && (
                         <span className="agent-mark">
@@ -2298,7 +2287,7 @@ function App() {
                     </Popover.Root>
                     <button
                       className="icon-button"
-                      aria-label={t('Hibachi Agent を閉じる', 'Close Hibachi Agent')}
+                      aria-label={t('hibachi agent を閉じる', 'Close hibachi agent')}
                       onClick={() => setPanel(false)}
                     >
                       <Icon name="close" size={16} />
@@ -2465,8 +2454,8 @@ function App() {
                       <p className="agent-held" role="status">
                         <Icon name="sparkles" size={13} />
                         {t(
-                          'あなたの AI がこの Brain にも仕事を渡しています。終わるまでこの Brain の Hibachi Agent は待機します。',
-                          "Your AI is handing work to this brain too. This brain's Hibachi Agent waits until it finishes.",
+                          'irori agent がこの hibachi にも仕事を渡しています。終わるまでこの hibachi agent は待機します。',
+                          'The irori agent is handing work to this hibachi too. This hibachi agent waits until it finishes.',
                         )}
                       </p>
                     )}
@@ -2804,7 +2793,7 @@ function App() {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
             setActive(next);
             setBrainSettings(false);
-            setStatus(t('Brain の設定を保存しました。', "Saved the brain's settings."));
+            setStatus(t('hibachi の設定を保存しました。', "Saved the hibachi's settings."));
           }}
         />
       )}

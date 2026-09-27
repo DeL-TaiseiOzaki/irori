@@ -54,7 +54,7 @@ export function Rail({
   settings: ReactNode;
 }) {
   return (
-    <nav className="rail chrome" aria-label={t('Brain', 'Brains')}>
+    <nav className="rail chrome" aria-label={t('hibachi', 'hibachis')}>
       <button
         className="rail-home"
         aria-label={t('ワークスペースを選択', 'Choose a workspace')}
@@ -68,7 +68,7 @@ export function Rail({
         {overview && <span className="rail-bar" aria-hidden="true" />}
         <button
           className="rail-button rail-overview"
-          aria-label={t('全体', 'Overview')}
+          aria-label={t('irori mode', 'irori mode')}
           aria-current={overview ? 'page' : undefined}
           disabled={!spaces.length}
           onClick={onOverview}
@@ -76,7 +76,7 @@ export function Rail({
           <Icon name="map" size={19} />
         </button>
         <span className="rail-label" aria-hidden="true">
-          {t('全体', 'Overview')}
+          {t('irori mode', 'irori mode')}
         </span>
       </div>
       <span className="rail-rule" aria-hidden="true" />
@@ -120,8 +120,8 @@ export function Rail({
       })}
       <button
         className="rail-add"
-        aria-label={t('Brain を追加', 'Add a brain')}
-        title={t('Brain を追加', 'Add a brain')}
+        aria-label={t('hibachi を追加', 'Add a hibachi')}
+        title={t('hibachi を追加', 'Add a hibachi')}
         disabled={addDisabled}
         onClick={onAdd}
       >

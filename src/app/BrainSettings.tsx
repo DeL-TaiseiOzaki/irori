@@ -186,7 +186,7 @@ export function BrainSettings({
   const others = spaces.filter((item) => item.scopeId !== space.scopeId).slice(0, 3);
   return (
     <Dialog
-      label={t('Brain の設定', 'Brain settings')}
+      label={t('hibachi の設定', 'hibachi settings')}
       className="modal-dialog brain-sheet-dialog"
       busy={saving}
       onClose={onClose}
@@ -200,7 +200,7 @@ export function BrainSettings({
       >
         <header className="brain-sheet-header">
           <BrainTile space={draft} image={image} size={26} radius={8} ring="stage" />
-          <h2>{t('Brain の設定', 'Brain settings')}</h2>
+          <h2>{t('hibachi の設定', 'hibachi settings')}</h2>
           <button
             type="button"
             className="stage-button"
@@ -388,8 +388,8 @@ export function BrainSettings({
           <Icon name="users" size={14} />
           <span>
             {t(
-              'この Brain を使う全員に同じ見た目で表示（.irori/scope.json に保存）',
-              'Everyone who uses this brain sees the same look (kept in .irori/scope.json)',
+              'この hibachi を使う全員に同じ見た目で表示（.irori/scope.json に保存）',
+              'Everyone who uses this hibachi sees the same look (kept in .irori/scope.json)',
             )}
           </span>
           <span className="brain-sheet-space" />

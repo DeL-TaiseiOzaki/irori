@@ -5,7 +5,7 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
   return agent === 'pi' ? ['default'] : ['default', 'full-access'];
 }
 
-/** A brain's Hibachi Agent starts in full access wherever the CLI offers it. */
+/** A brain's hibachi agent starts in full access wherever the CLI offers it. */
 export function defaultAgentAccess(agent: AgentId): AgentAccess {
   return agentAccessOptions(agent).includes('full-access') ? 'full-access' : 'default';
 }
