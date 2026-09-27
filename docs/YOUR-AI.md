@@ -10,7 +10,6 @@ to the text irori writes for agents; code identifiers (`brain`, `you`,
 | **hibachi agent** | Brain の AI, then Hibachi Agent | The AI of one hibachi, started inside it with its Schema. |
 | **irori agent** | your AI / あなたの AI | The person's own agent, run from its own folder, working across the hibachis. |
 | **irori mode** | Overview / 全体 | The workspace-wide level: the map, the columns and the irori agent. |
-| **hibachi mode** | the brain level | One hibachi open: its explorer, notes and hibachi agent. |
 
 "irori" alone is still the app. The irori agent and the hibachi agents differ
 only in hierarchy (the irori agent instructs; hibachi agents are its

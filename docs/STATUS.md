@@ -45,9 +45,8 @@ real CLI.
 Names and sub-agents, same branch, 2026-09-27 (owner's decisions): all copy and
 the text irori writes for agents now say **hibachi** for a brain, **hibachi
 agent** for its AI, **irori agent** for "your AI", and **irori mode** for the
-Overview level (**hibachi mode** for a hibachi opened); "irori" alone is still
-the app, and code identifiers are unchanged. Sub-agents are named
-`hibachi-<slug>`, and irori now writes each handed hibachi's definition itself,
+Overview level; "irori" alone is still the app, and code identifiers are
+unchanged. Sub-agents are named `hibachi-<slug>`, and irori now writes each handed hibachi's definition itself,
 only when the file is absent, for the irori agent's CLI: `.claude/agents/*.md`,
 `.codex/agents/*.toml` (`name`, `description`, `developer_instructions`) or
 `.opencode/agents/*.md` (`mode: subagent`). Codex and OpenCode therefore get the
