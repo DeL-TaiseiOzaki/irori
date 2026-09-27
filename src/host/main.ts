@@ -31,6 +31,7 @@ import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readSkillReach, readSkills } from './skills';
+import { SchemaSettingsService } from './schema-settings';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
 import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
@@ -64,6 +65,7 @@ app
     setLanguage(device.language);
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
+    const schemaSettings = new SchemaSettingsService(files, search);
     const drafts = new DraftService(files);
     const emit = (event: HostEvent) => {
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
@@ -215,6 +217,21 @@ app
       } finally {
         emit({ type: 'files', scopeId });
       }
+    }
+    /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
+    function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
+      return changeFiles(() =>
+        changed(scopeId, async () => {
+          if (agents.busy(scopeId) || cloud.busy)
+            throw Error(
+              t(
+                '実行と接続の準備が終わってから Schema を変更してください。',
+                'Wait for runs and connection setup to finish before changing the Schema.',
+              ),
+            );
+          return operation();
+        }),
+      );
     }
     function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (agents.busy(scopeId) || git.busy)
@@ -457,6 +474,11 @@ app
         ),
       skills: (id) => readSkills(files, id),
       skillReach: (id) => readSkillReach(files, id),
+      schemaSettings: (id) => schemaSettings.list(id),
+      readSchemaFile: (...args) => schemaSettings.read(...args),
+      writeSchemaFile: (id, rel, text, expected) =>
+        changeSchema(id, () => schemaSettings.write(id, rel, text, expected)),
+      moveSkill: (id, name, to) => changeSchema(id, () => schemaSettings.moveSkill(id, name, to)),
       workspaceCloud: (id) => cloud.workspaceRoot(id),
       cloudEntries: (...args) => cloud.entries(...args),
       cloudRead: (...args) => cloud.read(...args),

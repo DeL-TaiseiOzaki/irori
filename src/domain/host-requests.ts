@@ -10,7 +10,7 @@ import { noteRef } from './note-operations';
 import { externalUrl } from './links';
 import { languages } from './i18n';
 import { linkHref } from './note-links';
-import { skillAudience } from './skills';
+import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
 
 const id = z.uuid(),
@@ -156,6 +156,10 @@ export const hostArguments = {
   updateGraphIndex: z.tuple([id]),
   skills: z.tuple([id]),
   skillReach: z.tuple([id]),
+  schemaSettings: z.tuple([id]),
+  readSchemaFile: z.tuple([id, path]),
+  writeSchemaFile: z.tuple([id, path, text.nullable(), version.nullable()]),
+  moveSkill: z.tuple([id, skillName, skillName.nullable()]),
   noteAuthorship: z.tuple([id, path, text]),
   saveImage: z.tuple([
     id,

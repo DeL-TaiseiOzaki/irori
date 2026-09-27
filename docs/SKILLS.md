@@ -73,6 +73,47 @@ that declares them: switching spaces replaces the list and clears the choice,
 and a run naming a skill the space does not declare fails instead of running
 without it.
 
+## Schema settings
+
+Added 2026-09-27. The brain panel's Schema section no longer shows the raw file
+tree first. It lists four groups, each with an add (+) action, and selecting an
+item opens a form on the stage (`src/app/SchemaSettings.tsx`):
+
+| Group | Files behind it | Form |
+| --- | --- | --- |
+| 指示 / Instructions | `AGENTS.md` at the brain's root, and `AGENTS.md` in any knowledge folder (labelled by the folder) | Markdown body; a new one picks the root or a knowledge folder without one |
+| スキル / Skills | `.agents/skills/<name>/SKILL.md` and the package's other files | Name (the `skillName` rule; renaming renames the folder), description, instructions, and attached files: add by name and text or import a text file from disk, edit, delete |
+| ルール / Rules | `.claude/rules/*.md` | File name and Markdown body |
+| フック / Hooks | the `hooks` key of `.claude/settings.json` | Event (Claude Code's `PreToolUse` … `PreCompact`), optional matcher, command |
+
+Storage is unchanged: each setting stays an ordinary file in the KB, versioned
+by Git as before. The folder icon in the Schema heading (ファイルとして表示 / Show
+as files) switches back to the file tree, so nothing becomes unreachable.
+Retired skills are listed with a 退役 badge and open their `RETIRED.md`; a
+package that cannot be read is listed with a 要確認 badge. Every item has a
+delete action behind a confirmation.
+
+The form writes `SKILL.md` with `name`, `description` and the instructions and
+keeps every other front matter line (`metadata` roles and projects, a licence,
+comments) as written (`writeSkillText` in `src/domain/schema-settings.ts`). A
+description is written as a plain YAML scalar when that reads back unchanged and
+double-quoted otherwise. A hook edit replaces only `hooks` in
+`.claude/settings.json`, keeps every other key in its place, and writes 2-space
+JSON; a malformed `hooks` value is reported, not overwritten. Hooks of another
+`type` than `command` are listed but edited as a file. Hooks are Claude Code's
+only for now: Codex, OpenCode and Pi hook formats are not handled.
+
+All reads and writes go through four `HostAPI` methods: `schemaSettings`,
+`readSchemaFile`, `writeSchemaFile` and `moveSkill` (`src/host/schema-settings.ts`).
+They accept only the paths `settingKind` names — the ones above, and within a
+skill package plain names at most four levels deep, never hidden and never
+`RETIRED.md` — in the layer each belongs to, inside the brain. No folder on the
+way or the file itself may be an alias. A replacement or deletion carries the
+hash of the bytes the form read, so a file changed meanwhile is never
+overwritten. Changes wait, like note operations, while the brain's AI runs, a
+Git operation is in progress or a connection is being prepared; the forms are
+disabled then.
+
 ## Roles and projects
 
 A skill can say who it is for. The Agent Skills specification reserves
@@ -260,10 +301,24 @@ device record, the reach view naming `~/.claude/skills` and the retired name
 without the machine path, delivery to the fixture, the recorded status, and
 that a second space without skills shows no picker.
 
+`tests/schema-settings.test.ts` covers which paths are settings, the skill form
+keeping other front matter and agreeing with the host's YAML reader, hook
+reading and writing with other keys kept and malformed shapes refused, and the
+host service against a disposable KB: listing, hash-checked replacement,
+creation with folders, rename and removal of a package, pruning emptied
+folders, and refusal of other paths and of aliases leading out of the brain.
+`scripts/schema-settings-ui-smoke.ts` drives the forms and checks the files on
+disk: editing `AGENTS.md`, creating a skill with two attached files (one typed,
+one imported), renaming a skill with its roles kept, creating and deleting a
+rule, adding a hook beside existing settings keys, a folder's `AGENTS.md`, and
+the file toggle.
+
 ## What irori does not write
 
-irori reads `.agents/skills/` and never creates it. It does not create `.claude/`,
-`.codex/`, `.opencode/` or `.pi/` in a KB either, and does not pre-create a
+irori reads `.agents/skills/` and creates it only when the person adds a skill
+in the Schema settings. It likewise creates `.claude/rules/` or
+`.claude/settings.json` only for a rule or hook the person adds there, and never
+creates `.codex/`, `.opencode/` or `.pi/` in a KB. It does not pre-create a
 directory a user has not asked for. `tests/harnesses.test.ts` holds this as a
 property: the KB's schema-layer entries are identical before and after a turn.
 A retirement marker is likewise read and never written; the reader's role and
@@ -297,9 +352,8 @@ Codex has not been run against the new check.
 ## Remaining
 
 Skills are chosen per turn from a flat list; there is no search, no per-skill
-argument, and no editing inside irori — a skill is a file in the KB, edited like
-any other. A skill is not offered to the agent as something it may invoke on its
-own. Whether Codex should be given the name rather than the body, so its native
+argument; editing is through the Schema settings form or the file itself. A
+skill is not offered to the agent as something it may invoke on its own. Whether Codex should be given the name rather than the body, so its native
 repository-scope resolution is used instead, is open.
 
 The reach table is a statement about documented versions, not a probe of the

@@ -271,6 +271,7 @@ export function BrainPanel({
   onSearch,
   onCreateIn,
   onEntryAction,
+  schema,
   children,
 }: {
   space: Space;
@@ -307,10 +308,13 @@ export function BrainPanel({
   onSearch: () => void;
   onCreateIn: (space: Space, entry: Entry) => void;
   onEntryAction: (space: Space, entry: Entry, action: EntryAction) => void;
+  /** The Schema section as settings; the files behind it stay one toggle away. */
+  schema: ReactNode;
   /** The Changes view, owned by the caller. */
   children?: ReactNode;
 }) {
   const [folded, setFolded] = useState<Layer[]>([]);
+  const [schemaFiles, setSchemaFiles] = useState(false);
   const refs = {
     schema: usePanelRef(),
     Knowledge_Base: usePanelRef(),
@@ -328,11 +332,22 @@ export function BrainPanel({
   );
   const actions: Record<Layer, ReactNode> = {
     schema: (
-      <SectionAction
-        icon="refresh"
-        label={t('エクスプローラーを更新', 'Refresh explorer')}
-        onClick={onRefresh}
-      />
+      <>
+        <button
+          className="section-action"
+          aria-pressed={schemaFiles}
+          aria-label={t('ファイルとして表示', 'Show as files')}
+          title={t('ファイルとして表示', 'Show as files')}
+          onClick={() => setSchemaFiles((value) => !value)}
+        >
+          <Icon name={schemaFiles ? 'sliders' : 'folder'} size={14} />
+        </button>
+        <SectionAction
+          icon="refresh"
+          label={t('エクスプローラーを更新', 'Refresh explorer')}
+          onClick={onRefresh}
+        />
+      </>
     ),
     Knowledge_Base: (
       <>
@@ -368,6 +383,7 @@ export function BrainPanel({
     ),
   };
   function body(layer: Layer) {
+    if (layer === 'schema' && !schemaFiles) return schema;
     if (layer !== 'contents')
       return (
         <Tree

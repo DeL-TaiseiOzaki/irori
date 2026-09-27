@@ -434,6 +434,23 @@ export interface HostAPI {
   skills(scopeId: string): Promise<import('./skills').SkillListing>;
   /** Which user-scope skill directories hold a same-named skill, per declared name. */
   skillReach(scopeId: string): Promise<import('./skill-reach').SkillReach>;
+  /** The brain's instructions, Claude Code rules and skill package files, for the Schema settings. */
+  schemaSettings(scopeId: string): Promise<import('./schema-settings').SchemaSettings>;
+  /** The text of one file the Schema settings edit, whatever its extension. */
+  readSchemaFile(scopeId: string, path: string): Promise<Document>;
+  /**
+   * Creates (`expected` null), replaces (`expected` the hash being replaced) or,
+   * with `text` null, deletes one file the Schema settings edit; see
+   * `settingKind` in `schema-settings.ts` for the paths it accepts.
+   */
+  writeSchemaFile(
+    scopeId: string,
+    path: string,
+    text: string | null,
+    expected: string | null,
+  ): Promise<Document | null>;
+  /** Renames a skill package's folder, or with `to` null removes the package and its files. */
+  moveSkill(scopeId: string, name: string, to: string | null): Promise<void>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
   readImage(scopeId: string, note: string, url: string): Promise<string>;
   /** The bytes of a file a viewer shows (PDF, Office, image), in a KB or a Drive workspace. */
