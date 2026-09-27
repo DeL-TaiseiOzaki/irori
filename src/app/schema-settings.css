@@ -23,7 +23,8 @@
 .schema-group-heading > span {
   flex: 1;
 }
-.brain-panel .schema-group .tree-row {
+.brain-panel .schema-group .tree-row,
+.you-panel .schema-group .tree-row {
   padding-left: 10px;
 }
 

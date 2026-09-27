@@ -7,8 +7,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
+import { SearchService } from '../src/host/search';
+import { SchemaSettingsService } from '../src/host/schema-settings';
+import { readFolderSkills } from '../src/host/skills';
 import { AgentService } from '../src/agents/service';
-import { yourAiAccess } from '../src/domain/agent-access';
+import { defaultAgentAccess } from '../src/domain/agent-access';
 import { writeDecision, type Delegation } from '../src/agents/delegation';
 import {
   brainAgentNames,
@@ -176,6 +179,72 @@ test('the Your AI screen reads only inside the folder', async (t) => {
   assert.deepEqual(found.get('hibachi-research'), []);
 });
 
+test('the irori agent’s folder takes the same Schema settings as a hibachi, confined to it', async (t) => {
+  const { base, you } = await yourAi(t);
+  const { id, root } = await you.create();
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const service = new SchemaSettingsService(files, new SearchService(files), (scopeId) => {
+    assert.equal(scopeId, id);
+    return you.schemaFolder();
+  });
+  await mkdir(path.join(root, 'plans'));
+  await writeFile(path.join(root, 'plans', 'AGENTS.md'), '# not instructions\n');
+  const listing = await service.list(id);
+  // Only the root AGENTS.md: the folder has no knowledge folders.
+  assert.deepEqual(listing.instructions, ['AGENTS.md']);
+  assert.deepEqual(listing.folders, []);
+  await assert.rejects(service.read(id, 'plans/AGENTS.md'), /cannot be changed|変更できません/);
+  await assert.rejects(
+    service.write(id, 'plans/b/AGENTS.md', '# b\n', null),
+    /cannot be changed|変更できません/,
+  );
+  // The instructions, a rule, hooks and a skill, hash-checked as for a hibachi.
+  const agents = await service.read(id, 'AGENTS.md');
+  assert.equal(agents.text, yourAiStarter['AGENTS.md']);
+  await service.write(id, 'AGENTS.md', '# Mine\n', agents.hash);
+  await assert.rejects(service.write(id, 'AGENTS.md', '# Again\n', agents.hash), /CONFLICT/);
+  const mine = await service.read(id, 'AGENTS.md');
+  await assert.rejects(
+    service.write(id, 'AGENTS.md', null, mine.hash),
+    /cannot be changed|変更できません/,
+  );
+  await service.write(id, '.claude/rules/tone.md', 'Be brief.\n', null);
+  await service.write(id, '.claude/settings.json', '{"hooks":{}}\n', null);
+  await service.write(
+    id,
+    '.agents/skills/plan/SKILL.md',
+    '---\nname: plan\ndescription: Plans a week.\n---\n\nPlan.\n',
+    null,
+  );
+  const after = await service.list(id);
+  assert.deepEqual(after.rules, ['.claude/rules/tone.md']);
+  assert.equal(after.claudeSettings, true);
+  // Its skills are listed from its own .agents/skills, as a hibachi's are.
+  const skills = await readFolderSkills(await you.schemaFolder());
+  assert.deepEqual(
+    skills.skills.map((skill) => skill.name),
+    ['plan'],
+  );
+  await service.moveSkill(id, 'plan', 'weekly');
+  assert.deepEqual(await readdir(path.join(root, '.agents', 'skills')), ['weekly']);
+  // A definition irori wrote is not a setting, and no alias leads out of the folder.
+  await you.writeDefinitions('claude', [{ name: 'P', agent: 'hibachi-p', root: '/kb/p' }]);
+  await assert.rejects(
+    service.read(id, '.claude/agents/hibachi-p.md'),
+    /cannot be changed|変更できません/,
+  );
+  const outside = path.join(base, 'outside');
+  await mkdir(outside);
+  await rm(path.join(root, '.claude', 'rules'), { recursive: true });
+  await symlink(outside, path.join(root, '.claude', 'rules'));
+  await assert.rejects(
+    service.write(id, '.claude/rules/x.md', 'x\n', null),
+    /cannot be changed|変更できません/,
+  );
+  assert.deepEqual(await readdir(outside), []);
+});
+
 test('irori writes an absent definition, never over one, and only inside the folder', async (t) => {
   const { base, you } = await yourAi(t);
   const { root } = await you.create();
@@ -256,7 +325,7 @@ async function delegation(t: TestContext) {
     you,
   );
   t.after(() => service.cancel());
-  const run = async (prompt: string) => {
+  const run = async (prompt: string, access?: 'default' | 'full-access') => {
     events.length = 0;
     done = new Promise<void>((resolve) => {
       finished = resolve;
@@ -264,6 +333,7 @@ async function delegation(t: TestContext) {
     await service.startAccepted({
       scopeId: id,
       agent: 'claude',
+      access,
       prompt,
       brains: brains.map((b) => b.scopeId),
     });
@@ -349,6 +419,25 @@ test(
   },
 );
 
+test(
+  'the irori agent in full access on Claude Code still keeps out of the hibachis (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { brains, events, run, fixtureLog } = await delegation(t);
+    assert.equal(defaultAgentAccess('claude'), 'full-access');
+    await run('Try a direct write first.', defaultAgentAccess('claude'));
+    const log = await fixtureLog();
+    assert.equal(log[0].mode, 'bypassPermissions');
+    // The write hook runs in every mode: the irori agent's own write is refused.
+    assert.ok(log.some((entry) => entry.direct === 'denied'));
+    await assert.rejects(readFile(path.join(brains[0].root, 'direct.md')));
+    // The sub-agent inherits full access: it writes in its hibachi without asking.
+    assert.ok(log.some((entry) => entry.written === true));
+    assert.equal(events.filter((event) => event.type === 'permission').length, 0);
+    assert.equal(events.at(-1)?.outcome, 'completed');
+  },
+);
+
 test('only your AI takes brains, on any CLI, without notes or materials', async (t) => {
   const { base, you } = await yourAi(t);
   const files = new FileService(path.join(base, 'device'));
@@ -382,7 +471,7 @@ test('only your AI takes brains, on any CLI, without notes or materials', async 
 for (const cli of ['pi', 'opencode'] as const)
   test(
     cli === 'pi'
-      ? 'the irori agent on Pi works in the handed hibachis itself after reading their Schema (protocol fixture)'
+      ? 'the irori agent on Pi is told to hand each hibachi to its agent with the hibachi command (protocol fixture)'
       : 'the irori agent on OpenCode gets the hibachi definitions irori writes and hands work to them (protocol fixture)',
     fixtureOptions,
     async (t) => {
@@ -424,7 +513,7 @@ for (const cli of ['pi', 'opencode'] as const)
       await service.startAccepted({
         scopeId: id,
         agent: cli,
-        access: yourAiAccess(cli),
+        access: defaultAgentAccess(cli),
         prompt: 'Tidy the product notes.',
         brains: [brain.scopeId],
       });
@@ -446,9 +535,14 @@ for (const cli of ['pi', 'opencode'] as const)
       assert.ok(sent.endsWith('Tidy the product notes.'));
       const definition = path.join(root, '.opencode', 'agents', 'hibachi-product.md');
       if (cli === 'pi') {
-        assert.match(sent, /You run on Pi .* no irori sub-agents/);
-        assert.match(sent, /read the AGENTS\.md at the top of that hibachi's folder/);
-        assert.ok(!sent.includes('sub-agent "'), 'no sub-agent is named');
+        assert.match(sent, /You run on Pi .* loads no sub-agents from files/);
+        assert.match(sent, /hibachi agent "hibachi-product"/);
+        assert.match(
+          sent,
+          /with the `hibachi` command in your shell: hibachi <hibachi agent or hibachi name> "<task>"/,
+        );
+        // The hibachi agent reads its own Schema; the irori agent is not told to.
+        assert.doesNotMatch(sent, /AGENTS\.md/);
         // Pi loads no sub-agent files, so irori writes none.
         assert.equal(existsSync(path.join(root, '.claude', 'agents', 'hibachi-product.md')), false);
         assert.equal(existsSync(definition), false);

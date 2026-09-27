@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { agentIds, agentNames, type AgentId, type Space } from '../domain/types';
+import { agentIds, agentNames, type AgentAccess, type AgentId, type Space } from '../domain/types';
+import { agentAccessDetail, agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import { hasSubAgents, type YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
@@ -33,8 +34,10 @@ export function YourAiPanel({
   ai,
   agent,
   model,
+  access,
   onAgent,
   onModel,
+  onAccess,
   onCreate,
   onShow,
   onSend,
@@ -44,12 +47,15 @@ export function YourAiPanel({
   you?: YourAi;
   brains: Space[];
   ai: BrainAi;
-  /** The CLI your AI runs on; Claude Code hands work to sub-agents, another CLI works in the brains itself. */
+  /** The CLI your AI runs on; each hands a brain's work to its hibachi agent. */
   agent: AgentId;
   /** '' for the CLI's default. */
   model: string;
+  /** Full access by default where the CLI offers it, as for a hibachi agent. */
+  access: AgentAccess;
   onAgent: (agent: AgentId) => void;
   onModel: (model: string) => void;
+  onAccess: (access: AgentAccess) => void;
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
@@ -91,8 +97,8 @@ export function YourAiPanel({
                 `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent (a sub-agent) and gathers their reports.`,
               )
             : t(
-                `あなた専用のエージェントです。${agentNames[agent]} で動き、各 hibachi の AGENTS.md を読んでから直接作業します。`,
-                `Your own agent. It runs on ${agentNames[agent]} and works in each hibachi directly after reading its AGENTS.md.`,
+                `あなた専用のエージェントです。${agentNames[agent]} で動き、hibachi コマンドで各 hibachi の hibachi agent に仕事を渡して、報告をまとめます。`,
+                `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent with the hibachi command and gathers their reports.`,
               )}
         </p>
         <p className="mono your-ai-path" title={you.root}>
@@ -228,6 +234,21 @@ export function YourAiPanel({
                 {agentIds.map((id) => (
                   <option key={id} value={id}>
                     {agentNames[id]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="composer-pill" title={agentAccessDetail(agent, access)}>
+              <Icon name="shield" size={12} />
+              <select
+                aria-label={t('irori agent のアクセス', "The irori agent's access")}
+                value={access}
+                disabled={busy || agentAccessOptions(agent).length === 1}
+                onChange={(event) => onAccess(event.target.value as AgentAccess)}
+              >
+                {agentAccessOptions(agent).map((value) => (
+                  <option key={value} value={value}>
+                    {agentAccessLabel(agent, value)}
                   </option>
                 ))}
               </select>

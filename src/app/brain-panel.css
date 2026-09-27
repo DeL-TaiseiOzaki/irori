@@ -205,7 +205,8 @@ kbd {
 .brain-section.contents .layer-icon {
   color: var(--cont);
 }
-.brain-panel .section-action {
+.brain-panel .section-action,
+.you-panel .section-action {
   width: 26px;
   height: 26px;
   flex: none;
@@ -218,7 +219,8 @@ kbd {
   box-shadow: none;
   color: var(--tx-3);
 }
-.brain-panel .section-action:hover:not(:disabled) {
+.brain-panel .section-action:hover:not(:disabled),
+.you-panel .section-action:hover:not(:disabled) {
   background: var(--raised);
   color: var(--tx);
 }
@@ -245,7 +247,8 @@ kbd {
 .tree-item {
   position: relative;
 }
-.brain-panel .tree-row {
+.brain-panel .tree-row,
+.you-panel .tree-row {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -260,11 +263,13 @@ kbd {
   font-weight: 400;
   text-align: left;
 }
-.brain-panel .tree-row:hover {
+.brain-panel .tree-row:hover,
+.you-panel .tree-row:hover {
   background: var(--raised);
   color: var(--tx);
 }
-.brain-panel .tree-row.selected {
+.brain-panel .tree-row.selected,
+.you-panel .tree-row.selected {
   background: var(--raised-2);
   color: var(--tx);
   font-weight: 500;

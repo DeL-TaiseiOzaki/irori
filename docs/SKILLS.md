@@ -114,6 +114,23 @@ overwritten. Changes wait, like note operations, while the brain's AI runs, a
 Git operation is in progress or a connection is being prepared; the forms are
 disabled then.
 
+### On the irori agent
+
+Since 0.1.50 the irori agent's screen shows the same settings for its own
+folder ([YOUR-AI](YOUR-AI.md)): the same groups, forms, add and delete actions
+and the ファイルとして表示 toggle, which shows the folder read-only, including
+the hibachi sub-agent definitions irori writes. The four methods take the
+irori agent's id as the scope. The service resolves where a scope's files are
+through a `SchemaFolder` (`src/host/schema-folder.ts`): a hibachi's checkout
+through the file service, or the irori agent's folder through
+`YourAiService.schemaFolder`, which confines every path to the folder's real
+path and marks links. The same `settingKind` paths, alias checks and hashes
+apply. Two differences: only the root `AGENTS.md` counts as instructions (the
+folder has no knowledge folders), and that file cannot be deleted, since it
+marks the folder as set up. Its skills are listed from its own `.agents/skills`
+by the same reader as a hibachi's (`readFolderSkills`), and changes wait while
+the irori agent runs.
+
 ## Roles and projects
 
 A skill can say who it is for. The Agent Skills specification reserves

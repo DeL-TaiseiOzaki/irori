@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import readline from 'node:readline';
+import { exec } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 export function run(kind) {
   if (process.argv.includes('--version')) {
@@ -132,6 +133,17 @@ export function run(kind) {
         send({ type: 'agent_start' });
         send({ type: 'response', id: message.id, command: 'prompt', success: true });
         send({ type: 'tool_execution_start', toolName: 'read', args: { path: 'note.md' } });
+        // A line "run: <command>" runs it in a shell, as Pi's bash tool would,
+        // and answers with what it printed.
+        const command = /^run: (.+)$/m.exec(message.message)?.[1];
+        if (command) {
+          send({ type: 'tool_execution_start', toolName: 'bash', args: { command } });
+          exec(command, (error, stdout, stderr) => {
+            log({ type: 'command', command, code: error?.code ?? 0, stdout, stderr });
+            complete(false, error ? `exit ${error.code}: ${stderr}` : stdout);
+          });
+          return;
+        }
         if (message.message.includes('hold')) return;
         if (message.message.includes('rewrite')) return void hooks(message.message).then(complete);
         if (message.message.includes('dialog')) {

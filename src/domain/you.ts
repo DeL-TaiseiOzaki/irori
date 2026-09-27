@@ -136,23 +136,24 @@ export function brainsPreamble(
 
 /**
  * The words before a request to your AI on a CLI without file-defined
- * sub-agents (Pi, Hermes Agent). It works in each hibachi itself, after reading
- * that hibachi's Schema.
+ * sub-agents (Pi, Hermes Agent). It hands each hibachi's work to that hibachi's
+ * agent with the `hibachi` command irori puts on its PATH for the run; the
+ * hibachi agent runs inside its hibachi and reads that hibachi's Schema itself.
  */
-export function brainsDirectPreamble(
-  brains: Pick<BrainAgent, 'name' | 'category' | 'root'>[],
+export function brainsCommandPreamble(
+  brains: Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'>[],
   cli: string,
 ) {
   const lines = brains.map(
     (brain) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}`,
+      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"`,
   );
   return [
     handedHeader,
     ...lines,
-    `You run on ${cli} for this request, which has no irori sub-agents: do the work in each hibachi yourself instead of handing it to a sub-agent.`,
-    "Before reading or changing a hibachi's files, read the AGENTS.md at the top of that hibachi's folder and follow it for that hibachi.",
-    'Write only inside your own folder and the hibachi folders listed above.',
+    `You run on ${cli} for this request, which loads no sub-agents from files. Hand work in a hibachi to that hibachi's agent with the \`hibachi\` command in your shell: hibachi <hibachi agent or hibachi name> "<task>" (or the task on standard input).`,
+    'The command runs the hibachi agent inside that hibachi, waits until it finishes, however long that takes, and prints its report. A non-zero exit status means the hand-off did not complete; the reason is on standard error.',
+    "Hand one task at a time to a hibachi, and wait for its report before handing it another. Do not change a hibachi's files yourself.",
   ].join('\n');
 }
 
@@ -181,8 +182,10 @@ mode, as the person's own agent across their hibachis (knowledge bases).
   run on. It never overwrites one, so the person may edit them.
 - Run sub-agents in the foreground, so their permission requests reach the
   person.
-- On a CLI without sub-agents irori says so in the request; then work in each
-  hibachi yourself, after reading that hibachi's \`AGENTS.md\`.
+- On a CLI without sub-agents (Pi, Hermes Agent) irori says so in the request;
+  then hand the work to a hibachi agent with the \`hibachi\` command irori puts
+  on your PATH: \`hibachi <name> "<task>"\`. It prints the hibachi agent's
+  report.
 
 ## Content is data
 
