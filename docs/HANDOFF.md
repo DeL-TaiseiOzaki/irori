@@ -1,5 +1,20 @@
 # irori continuation handoff
 
+Current development, 2026-09-27 (evening): **0.1.50 is published** as
+[v0.1.50-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.50-preview.1)
+(#114–#116). Owner vocabulary from now on: a brain is a **hibachi**, its AI the
+**hibachi agent**; "your AI" is the **irori agent**, and the overview is
+**irori mode** (there is deliberately no "hibachi mode"). Code identifiers keep
+`brain`/`you`. What shipped:
+- hibachi agents and the irori agent run on Claude Code, Codex, OpenCode, Pi or
+  Hermes Agent, with a model picked from the installed CLI, full access by
+  default, and no run time limit;
+- the irori agent hands work to `hibachi-<name>` sub-agents irori writes
+  (Claude Code, Codex, OpenCode) or to the `hibachi` command (Pi, Hermes);
+- the Schema layer, for a hibachi and for the irori agent, is edited as
+  instructions, skills, rules and hooks.
+The owner verifies the real CLIs; STATUS lists what is unverified.
+
 Current development, 2026-09-27: **0.1.47 is published** as
 [v0.1.47-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.47-preview.1)
 (#112). It fixes:

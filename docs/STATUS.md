@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-09-27: #114 (**0.1.48**), #115 (**0.1.49**) and #116 (**0.1.50**)
+are merged at the owner's word ("全部マージしていいよ") and published together as
+[v0.1.50-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.50-preview.1)
+by release run `36322699549` from main's CI run `36322115768` (source `be6c046`).
+0.1.48 and 0.1.49 were never published on their own. The release carries Windows
+201,456,128 bytes, Mac 168,933,078 bytes and `irori-0.1.50-full.nupkg`
+200,816,614 bytes. The three entries below describe the branches; "not yet
+merged" in them is superseded. PR CI flakes seen on the way, both passing on
+rerun: `harness-ui-smoke.ts:271` (an OpenCode session read as `default` once) and a
+Linux `npm ci` headers download reset. The owner verifies real CLIs (Hermes, Pi
+and Hermes running `hibachi`, Codex/OpenCode picking `hibachi-*` sub-agents,
+Claude Code as the irori agent in full access).
+
 irori agent parity, 2026-09-27 (branch `feat/irori-agent-parity`, stacked on
 `feat/schema-settings` and `feat/hibachi-agent`, not yet merged; **0.1.50**): the
 owner asked that the irori agent and hibachi agents have the same shape. There
