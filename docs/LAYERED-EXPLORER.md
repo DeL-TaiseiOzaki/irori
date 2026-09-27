@@ -3,6 +3,10 @@
 > Superseded on 2026-09-25 by [ADR 014](decisions/014-ui-v5.md): each brain (KB)
 > shows its Schema, Knowledge and Contents together in one panel, and the
 > personal/team columns are gone. This page records the earlier layout.
+>
+> Since 2026-09-27 the Schema section lists settings — instructions, skills,
+> Claude Code rules and hooks — edited through forms on the stage, with the
+> file tree one toggle away; see [Schema settings](SKILLS.md#schema-settings).
 
 Implemented 2026-09-13, following the user's original irori-extention UI reference (`irori-extention/images/image2.png`). The reference repository and image are not modified.
 

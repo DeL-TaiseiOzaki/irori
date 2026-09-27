@@ -90,7 +90,7 @@ try {
   await expect(contents.getByRole('button', { name: /調査 資料/ })).toHaveCount(1);
   await expect(contents.getByText('未接続')).toBeVisible();
   // The Schema section lists settings; its files stay one toggle away.
-  await expect(schema.getByRole('group', { name: '指示' })).toContainText('AGENTS.md');
+  await expect(schema.getByRole('group', { name: 'Schema の指示' })).toContainText('AGENTS.md');
   await expect(schema.getByRole('button', { name: 'schema', exact: true })).toHaveCount(0);
   await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   // A nested contents root under schema/ stays out of the Schema section.

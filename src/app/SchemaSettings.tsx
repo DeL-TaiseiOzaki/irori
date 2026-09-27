@@ -165,7 +165,10 @@ export function SchemaList({
           key={group.kind}
           className="schema-group"
           role="group"
-          aria-label={kinds[group.kind].name()}
+          aria-label={t(
+            `Schema の${kinds[group.kind].name()}`,
+            `Schema ${kinds[group.kind].name().toLowerCase()}`,
+          )}
         >
           <div className="schema-group-heading">
             <span>{kinds[group.kind].name()}</span>

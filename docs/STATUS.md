@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Schema settings, 2026-09-27 (branch `feat/schema-settings`, not yet released):
+the brain panel's Schema section lists 指示 / Instructions (`AGENTS.md` at the
+root and in knowledge folders), スキル / Skills, ルール / Rules
+(`.claude/rules/*.md`) and フック / Hooks (`hooks` in `.claude/settings.json`)
+instead of the raw file tree, which stays behind a ファイルとして表示 toggle.
+Each item opens a form on the stage; a skill is defined by name, description,
+instructions and attached files rather than by writing `SKILL.md`. Storage is
+unchanged. Four narrow `HostAPI` methods (`schemaSettings`, `readSchemaFile`,
+`writeSchemaFile`, `moveSkill`) accept only those paths, inside the brain, with
+no alias and hash-checked writes, and wait while a run, Git or a connection is
+busy. Details and limits: [SKILLS](SKILLS.md#schema-settings). Verified with
+`npm run build`, `npm test` and `xvfb-run -a npm run test:ui`, which gains
+`scripts/schema-settings-ui-smoke.ts`. Not done: Codex/OpenCode/Pi hook formats,
+binary attachments (text only, 2 MiB), and a real-agent check that Claude Code
+picks up a rule or hook written this way.
+
 Hibachi Agent, 2026-09-27 (branch `feat/hibachi-agent`, not yet merged or
 published): the brain's AI panel and its entry points are called **Hibachi
 Agent**. It starts in full access wherever the CLI offers it (`defaultAgentAccess`),

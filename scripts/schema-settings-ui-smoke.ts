@@ -44,7 +44,8 @@ try {
   await page.getByRole('checkbox', { name: /Schema KB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   const schema = page.locator('.brain-panel').getByRole('region', { name: 'Schema', exact: true });
-  const group = (name: string) => schema.getByRole('group', { name, exact: true });
+  const group = (name: string) =>
+    schema.getByRole('group', { name: `Schema の${name}`, exact: true });
   const stage = page.getByRole('region', { name: 'Schema の設定' });
   await expect(group('指示')).toContainText('AGENTS.md');
   await expect(group('スキル')).toContainText('distill');
