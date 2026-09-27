@@ -31,7 +31,7 @@ A desktop app that brings together the notes where your knowledge lives and the 
 
 irori is a **knowledge IDE / ADE** for work that starts from Markdown notes.
 
-Open a folder of notes as a **brain** (a knowledge base) to edit notes, read materials, keep history in Git and reach Google Drive files in one window. Then run the **Claude Code, Codex, OpenCode or Pi** already installed on your computer inside that brain, and ask it to carry the note forward.
+Open a folder of notes as a **brain** (a knowledge base) to edit notes, read materials, keep history in Git and reach Google Drive files in one window. Then run the **Claude Code, Codex, OpenCode, Pi or Hermes Agent** already installed on your computer inside that brain, and ask it to carry the note forward.
 
 Your notes are always ordinary Markdown files in your own folder. The agents use each CLI's own sign-in and settings, so irori needs no account or API key of its own.
 
@@ -71,9 +71,9 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - CSV opens as a table, and an ontology as a hierarchy or a graph.
 
 **AI agents**
-- **Brain AIs**: Claude Code, Codex, OpenCode and Pi start inside a brain, with that brain's Schema loaded. Several brains' AIs can run at once.
-- **Your AI**: ask for work that spans brains. It splits the request by brain, hands each part to that brain's AI and reports back. It runs on Claude Code for now.
-- Permissions follow each CLI's settings. For Claude Code and Codex, choose standard (asks when needed) or full access.
+- **Hibachi Agent** (a brain's AI): Claude Code, Codex, OpenCode, Pi and Hermes Agent start inside a brain, with that brain's Schema loaded. Several brains' AIs can run at once. Pick a model from the list the installed CLI gives (type one in for Hermes Agent).
+- **Your AI**: ask for work that spans brains, on any of these CLIs. On Claude Code it splits the request by brain and hands each part to that brain's sub-agent; another CLI reads each brain's AGENTS.md and does the work itself. Either way it reports back.
+- Permissions follow each CLI's settings. Hibachi Agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Instructions can be queued while an agent works. Conversations survive a restart.
 
 **Materials**

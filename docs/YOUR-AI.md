@@ -27,13 +27,23 @@ investigation behind the design is in the
 
 ## A request
 
-- Your AI runs on Claude Code for now. Codex definitions (`.codex/agents/*.toml`)
-  come later. Your AI always runs with the standard access mode, because both
-  CLIs make sub-agents inherit the parent's permission mode.
+- Your AI runs on the CLI chosen in its panel (Claude Code unless the person
+  chose another), with the model chosen for that CLI. Both are kept on the device
+  (`yourAi` in the device settings).
+- On Claude Code it delegates as below and always runs with the standard access
+  mode, because sub-agents inherit the parent's permission mode.
+- Codex, OpenCode, Pi and Hermes Agent have no irori sub-agent or write hook.
+  They work in the handed brains themselves: the preamble
+  (`brainsDirectPreamble`) names each brain and its folder, says there are no
+  sub-agents, and tells them to read the `AGENTS.md` at the top of a brain's
+  folder before reading or changing its files and to write only in their own
+  folder and the handed brains. They run in full access where the CLI offers it
+  (`yourAiAccess`), so they can reach folders outside their own. Codex
+  definitions (`.codex/agents/*.toml`) come later.
 - The Overview sends each request with the workspace's brains that are not
-  busy. The host resolves their folders and passes them to Claude Code as
-  `additionalDirectories`. It also puts a preamble before the request naming
-  each brain, its folder, its sub-agent and whether that sub-agent is defined.
+  busy. On Claude Code the host resolves their folders and passes them as
+  `additionalDirectories`, and puts a preamble before the request naming each
+  brain, its folder, its sub-agent and whether that sub-agent is defined.
 - A brain's sub-agent name is stable: the brain's name in lowercase letters,
   digits and hyphens, or `brain-<first 8 of its id>` for a name without Latin
   letters, with the id added when two names collide (`brainAgentNames`).
@@ -43,8 +53,8 @@ investigation behind the design is in the
 
 ## Boundaries irori keeps
 
-- **Writes.** A `PreToolUse` hook decides each `Write`, `Edit`, `MultiEdit` and
-  `NotebookEdit` (`src/agents/delegation.ts`):
+- **Writes (Claude Code).** A `PreToolUse` hook decides each `Write`, `Edit`,
+  `MultiEdit` and `NotebookEdit` (`src/agents/delegation.ts`):
   - Your AI itself writes only in its own folder.
   - A brain's sub-agent writes only inside its brain.
   - Any other agent, built in or defined by a brain for itself, writes only in
@@ -74,9 +84,10 @@ investigation behind the design is in the
 - **Map:** your AI's orb at the hearth. A line runs to each brain with a hand-off
   under way, with a spark moving along it unless less motion is asked for. The
   brain glows.
-- **Your AI screen** (the orb, or "Claude Code · あなたの Schema"): the folder
-  read-only, each file's text, and each brain's sub-agent with whether it is
-  defined.
+- **Your AI's panel:** the CLI select and the model pill beside the composer.
+- **Your AI screen** (the orb, or "<CLI> · あなたの Schema"): the folder
+  read-only, each file's text, and each brain's Claude Code sub-agent with
+  whether it is defined.
 
 ## Verification
 
@@ -86,6 +97,9 @@ investigation behind the design is in the
   The fixture run checks that the brains are held, the attribution of steps,
   requests and the report, that your AI's own brain write is refused, and that
   hand-offs run in the foreground.
+- `tests/your-ai.test.ts` also runs your AI on Pi through its protocol fixture:
+  the brain is held, and the prompt carries the direct-work preamble with the
+  brain's folder and no sub-agent.
 - `scripts/your-ai-ui-smoke.ts`, the same fixture in the app: setup, a hand-off
   answered from the Overview, the report, the map's line, the held brain's
   panel, and definitions written on request and shown as defined.
@@ -103,6 +117,13 @@ investigation behind the design is in the
   - a resumed session still delegates.
 
 ## Limits
+
+- **No enforced write boundary outside Claude Code.** On Codex, OpenCode, Pi and
+  Hermes Agent the brains' boundaries and Schemas are instructions in the
+  preamble, not a hook: in full access the CLI can write anywhere its own rules
+  allow. Only the busy hold (no other run in a handed brain) still applies.
+- On those CLIs the person-lines notice reaches Pi and OpenCode only for a
+  brain's file named by its absolute path; Codex and Hermes Agent have no hook.
 
 - A brain's sub-agent is not the brain's own AI. It works in your AI's folder,
   loads your AI's settings rather than the brain's `.claude/settings.json`, and

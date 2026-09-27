@@ -6,6 +6,50 @@ Transport follow-up, 2026-09-13: OpenCode uses the matching official SDK 1.18.30
 
 Date: 2026-09-13. Codex, Claude Code, OpenCode and Pi are selectable in the ordinary AI panel. OpenCode/Pi are new integration previews; their real model-driven note edits and cloud-file access have not been accepted yet. No additional model API or embedded replacement agent was introduced.
 
+Hermes Agent and model selection, 2026-09-27: Hermes Agent (NousResearch
+`hermes-agent`, binary `hermes`) is the fifth selectable CLI. Each instruction
+runs `hermes chat --query-file - --format stream-json` in the checkout, with the
+prompt on stdin (no command-line length limit, never shell-interpreted),
+`--resume <session_id>` for a saved conversation, `-m <model>` for a chosen model
+and `--yolo` only in full access. stdout records are parsed per
+`hermes_cli/stream_json.py` on `main` (added 2026-08-20, fixed 2026-09-15;
+`--query-file` is a day older): `system`/`init` (`model`, `session_id`), `text`
+(`text`), `tool_use` (`name`, `input`), `tool_result` (`name`, `output`,
+`is_error`), and one `result` (`session_id`, `exit_code`, `text`, `error`). The
+parser also accepts `delta`/`content` for text and skips non-JSON lines. The
+session id is saved as soon as `init` names it and again if `result` names
+another (Hermes rotates it on compression). A `result` with `error` or a non-zero
+`exit_code`, or an exit without `result`, fails the run. A one-shot run cannot ask:
+in the default access Hermes decides dangerous commands through
+`approvals.single_query_mode` (deny by default), so the panel shows no requests.
+Hermes has no person-lines hook in irori. Hermes is not installed on the
+development machine: only the protocol fixture (`tests/fixtures/harnesses.mjs`)
+exercises it, and `available()` reports it untested.
+
+Every CLI's composer has a model pill: "CLI の既定" passes no model, or a model the
+installed CLI lists (`agentModels`, read once per CLI version and never
+generating text). Codex answers `model/list` on its app server (hidden models
+left out, pages followed); Claude Code answers the Agent SDK's
+`supportedModels()` on a session whose input never yields, so no turn starts.
+Both were read from the installed codex-cli 0.156.1 and Claude Code 2.1.280.
+OpenCode's `opencode models` (`provider/model` lines) and Pi's
+`pi --list-models` table are parsed from fixtures only; neither CLI is installed
+here. Hermes prints no machine-readable list, so its model is typed in; a CLI whose
+list is empty or unreadable also takes a typed name (Claude Code falls back to its
+aliases). A model name must match `^\w[\w./:@[\]-]{0,199}$`, so it can never be
+read as an option. Codex gets it as `model` on `thread/start`/`thread/resume` and
+`turn/start`, Claude Code as the SDK's `model`, OpenCode per prompt as
+`{providerID, modelID}`, Pi as `--provider`/`--model` and Hermes as `-m`. Every
+CLI resumes a saved conversation under another model, so a model change keeps
+the conversation. The choice is kept per brain and CLI for the window's life, and
+travels with queued instructions.
+
+Run lifetime, 2026-09-27: runs end on completion, a stop or the CLI's exit; the
+ten-minute (thirty for your AI) deadline is gone. Pi's `prompt` reply, which an
+extension command can hold while the person answers its dialogs, has no deadline
+of its own either. Other protocol replies keep their 45-second bound, and
+OpenCode's prompt request was already unbounded.
+
 ## Native configuration and lifecycle
 
 Access follow-up, 2026-09-23: the composer offers native/default behavior and
@@ -25,8 +69,9 @@ used the standard mode on the 0.1.26 baseline.
 The selected access mode travels with queued instructions and the native
 session record. A mode change starts a new native session while retaining the
 display history. Workspace, KB or CLI changes and app restart reset the
-composer's selection to default; an existing full-access session is not silently
-resumed with that label. Google OAuth and mounts remain read-only independently
+composer's selection to the Hibachi Agent's starting mode (full access where the
+CLI offers it, since 2026-09-27; standard before); a session saved under the other
+mode is not silently resumed with that label. Google OAuth and mounts remain read-only independently
 of native agent access.
 
 Install and configure the desired native CLI on the desktop's PATH. irori also searches the existing standard local binary locations. Authentication, model defaults, rules, skills and extensions remain with that CLI. The app displays detection/version status and uses the selected scope's canonical checkout as its working directory. It does not concatenate other spaces' rules. `.opencode/`, `.pi/`, `.agents/` and root `opencode.json`/`opencode.jsonc` are classified as schema; contents ownership still overrides classification.
@@ -37,6 +82,7 @@ Install and configure the desired native CLI on the desktop's PATH. irori also s
 | Claude Code | Existing Agent SDK controlling the installed `claude` | Existing native settings, permission callbacks and session ID |
 | OpenCode | `opencode serve` on a private authenticated loopback port | SSE text/tools, native permission replies and single/multiple-choice questions; native session ID |
 | Pi | `pi --mode rpc` with LF-delimited JSON | Text/tools, native extension dialogs, native session file; requires Pi 0.85+ for settled-run handling |
+| Hermes Agent | `hermes chat --query-file - --format stream-json`, one process per instruction | Text/tools from JSONL; no requests (one-shot); `--resume` session id |
 
 The OpenCode child gets a random server password and fixed loopback binding. The renderer receives neither credentials nor a generic HTTP/command API. The host subscribes before prompting, validates the session's checkout, filters conversation events by session, and accepts permission/question requests only for that session or verified descendants. Ordinary approval replies apply once; choosing full access explicitly changes that native session's permission rules as described above. Response completion is reconciled with streamed text; an interrupted event stream fails the run. See the official [server protocol](https://opencode.ai/docs/server/) and [permission semantics](https://opencode.ai/docs/permissions/).
 
@@ -44,7 +90,7 @@ Pi retains its own tool and project-trust behavior. Standard Pi tool execution d
 
 Before a file tool would change lines the person wrote, Pi and OpenCode hear which through their own hook: irori starts a loopback listener per run and hands each CLI a script from irori's data directory (`pi -e`, OpenCode's `plugin` list in `OPENCODE_CONFIG_CONTENT`) that holds the `edit`/`write` call once with the notice. Codex offers no such channel. See [AUTHORSHIP](AUTHORSHIP.md).
 
-All four adapters share the existing single-run lock, ten-minute run deadline, process-tree cancellation, device-local scope/provider/checkout bindings and explicit reset. A failed resumed session retains its binding instead of silently creating a fresh conversation. Pi validates the exact saved file and header checkout before launch. Pi creates new session files lazily; command-only runs that produce no file are not marked saved. Existing native session files remain outside the KB, and ordinary reset detaches the irori handle without deleting native history. Conversation text redisplay after app restart remains open.
+All adapters share the existing single-run lock, process-tree cancellation, device-local scope/provider/checkout bindings and explicit reset. A failed resumed session retains its binding instead of silently creating a fresh conversation. Pi validates the exact saved file and header checkout before launch. Pi creates new session files lazily; command-only runs that produce no file are not marked saved. Existing native session files remain outside the KB, and ordinary reset detaches the irori handle without deleting native history. Conversation text redisplay after app restart remains open.
 
 ## Verified boundary
 

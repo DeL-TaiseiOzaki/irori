@@ -31,7 +31,7 @@
 
 irori は、Markdown のノートを中心に仕事を進めるための **知識の IDE / ADE** です。
 
-ノートを置いたフォルダを **Brain**（知識ベース）として開くと、ノートの編集、資料の閲覧、Git での記録、Google Drive の資料までをひとつの画面で扱えます。そのうえで、パソコンに入っている **Claude Code・Codex・OpenCode・Pi** を、その Brain の中でそのまま動かし、ノートの続きを頼めます。
+ノートを置いたフォルダを **Brain**（知識ベース）として開くと、ノートの編集、資料の閲覧、Git での記録、Google Drive の資料までをひとつの画面で扱えます。そのうえで、パソコンに入っている **Claude Code・Codex・OpenCode・Pi・Hermes Agent** を、その Brain の中でそのまま動かし、ノートの続きを頼めます。
 
 ノートはいつでも手元のフォルダにある普通の Markdown ファイルです。AI は各 CLI の認証と設定をそのまま使うため、irori 独自のアカウントや API キーは要りません。
 
@@ -71,9 +71,9 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - CSV は表で表示できます。オントロジーは階層やグラフとして表示できます。
 
 **AI エージェント**
-- **Brain の AI**：Claude Code・Codex・OpenCode・Pi を、その Brain の Schema を読み込んだ状態で起動します。複数の Brain の AI を同時に動かせます。
-- **あなたの AI**：Brain をまたぐ仕事を頼めます。依頼を Brain ごとに分けて各 Brain の AI に渡し、結果をまとめて報告します（現在は Claude Code に対応）。
-- 許可の扱いは各 CLI の設定に従います。Claude Code と Codex では、標準（必要なときに承認）かフルアクセスかを選べます。
+- **Hibachi Agent**（Brain の AI）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その Brain の Schema を読み込んだ状態で起動します。複数の Brain の AI を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
+- **あなたの AI**：Brain をまたぐ仕事を頼めます。どの CLI でも動きます。Claude Code では依頼を Brain ごとに分けて各 Brain のサブエージェントに渡し、ほかの CLI では各 Brain の AGENTS.md を読んでから自分で作業し、結果をまとめて報告します。
+- 許可の扱いは各 CLI の設定に従います。Hibachi Agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
 - AI への指示は送信待ちとして予約でき、会話は再起動しても残ります。
 
 **資料**

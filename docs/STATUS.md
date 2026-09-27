@@ -1,5 +1,31 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Hibachi Agent, 2026-09-27 (branch `feat/hibachi-agent`, not yet merged or
+published): the brain's AI panel and its entry points are called **Hibachi
+Agent**. It starts in full access wherever the CLI offers it (`defaultAgentAccess`),
+also for instructions sent from the Overview, and the open note's context chip
+can be removed and put back. Runs no longer stop after 10 (your AI: 30) minutes;
+Pi's `prompt` reply lost its 600-second deadline too, since an extension command
+can hold it while the person answers. **Hermes Agent** is the fifth CLI
+(`src/agents/hermes.ts`): `hermes chat --query-file - --format stream-json` with
+the prompt on stdin, `--resume`, `-m` and `--yolo` (full access only), parsed per
+Hermes's `stream_json.py`. It is exercised only by a protocol fixture; Hermes is
+not installed here. Every composer has a **model pill** fed by the new HostAPI
+`agentModels(agent)` (`src/agents/models.ts`, cached per CLI version): Codex
+`model/list` and Claude Code `supportedModels()` were read live from codex-cli
+0.156.1 and Claude Code 2.1.280 without generating text; OpenCode and Pi lists are
+fixture-parsed; Hermes takes a typed name. The model travels as `StartRun.model`
+(validated, never an option) to each CLI's own model setting. **Your AI** runs on
+any CLI, chosen with its model in its panel and kept in the device settings.
+Claude Code keeps sub-agent delegation, its write hook and standard access; other
+CLIs get a preamble naming each brain's folder and telling them to read its
+`AGENTS.md` first, and run in full access, with no enforced write boundary
+([YOUR-AI](YOUR-AI.md)). UI smokes whose fixtures assumed the old standard access
+or the old label now select or seed it explicitly. Details:
+[HARNESSES](HARNESSES.md). Unverified: a real Hermes run, Hermes's field names
+beyond its source, real OpenCode/Pi model lists, and model-switching resume on a
+real CLI.
+
 Stray errors, 2026-09-27: #112 (**0.1.47**) is merged at the owner's word and
 published as
 [v0.1.47-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.47-preview.1)
