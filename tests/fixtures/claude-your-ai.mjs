@@ -5,6 +5,8 @@
 // - "direct" also tries to write in the brain from your AI itself;
 // - "background" asks for the hand-off in the background;
 // - otherwise the first brain irori lists gets a note from its sub-agent.
+// As Claude Code does, hooks run in every permission mode, and in
+// bypassPermissions (irori's full access) no permission request is made.
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -13,6 +15,9 @@ export function run() {
   const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
   const log = (value) => fs.appendFileSync('your-ai-fixture.jsonl', JSON.stringify(value) + '\n');
   const pending = new Map();
+  const mode = process.argv.includes('--permission-mode')
+    ? process.argv[process.argv.indexOf('--permission-mode') + 1]
+    : 'default';
   let hooks = {};
   let next = 0;
   const request = (body) =>
@@ -90,7 +95,7 @@ export function run() {
           .filter((name) => name.endsWith('.md'))
           .map((name) => name.slice(0, -'.md'.length))
       : [];
-    log({ prompt, brains, loaded });
+    log({ prompt, brains, loaded, mode });
     send({
       type: 'system',
       subtype: 'init',
@@ -162,13 +167,17 @@ export function run() {
     );
     let written = false;
     if (!denied(writeHook)) {
-      const permission = await request({
-        subtype: 'can_use_tool',
-        tool_name: 'Write',
-        input: write,
-        tool_use_id: 'toolu-write',
-        agent_id: 'agent-1',
-      });
+      // The sub-agent inherits the parent's mode.
+      const permission =
+        mode === 'bypassPermissions'
+          ? { behavior: 'allow' }
+          : await request({
+              subtype: 'can_use_tool',
+              tool_name: 'Write',
+              input: write,
+              tool_use_id: 'toolu-write',
+              agent_id: 'agent-1',
+            });
       if (permission?.behavior === 'allow') {
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, write.content);

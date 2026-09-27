@@ -103,6 +103,11 @@ try {
   await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
+  // The irori agent starts in full access like a hibachi agent. This part is
+  // about requests, so it runs in the standard mode, chosen in the composer.
+  const access = island.getByLabel('irori agent のアクセス', { exact: true });
+  await expect(access).toHaveValue('full-access');
+  await access.selectOption('default');
   // A request goes to your AI with the workspace's brains; it hands a note to
   // Product's sub-agent, whose write asks the person here.
   await composer.fill('Write a decision note.');

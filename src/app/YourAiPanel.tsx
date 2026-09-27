@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { agentIds, agentNames, type AgentId, type Space } from '../domain/types';
+import { agentIds, agentNames, type AgentAccess, type AgentId, type Space } from '../domain/types';
+import { agentAccessDetail, agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import { hasSubAgents, type YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
@@ -33,8 +34,10 @@ export function YourAiPanel({
   ai,
   agent,
   model,
+  access,
   onAgent,
   onModel,
+  onAccess,
   onCreate,
   onShow,
   onSend,
@@ -48,8 +51,11 @@ export function YourAiPanel({
   agent: AgentId;
   /** '' for the CLI's default. */
   model: string;
+  /** Full access by default where the CLI offers it, as for a hibachi agent. */
+  access: AgentAccess;
   onAgent: (agent: AgentId) => void;
   onModel: (model: string) => void;
+  onAccess: (access: AgentAccess) => void;
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
@@ -228,6 +234,21 @@ export function YourAiPanel({
                 {agentIds.map((id) => (
                   <option key={id} value={id}>
                     {agentNames[id]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="composer-pill" title={agentAccessDetail(agent, access)}>
+              <Icon name="shield" size={12} />
+              <select
+                aria-label={t('irori agent のアクセス', "The irori agent's access")}
+                value={access}
+                disabled={busy || agentAccessOptions(agent).length === 1}
+                onChange={(event) => onAccess(event.target.value as AgentAccess)}
+              >
+                {agentAccessOptions(agent).map((value) => (
+                  <option key={value} value={value}>
+                    {agentAccessLabel(agent, value)}
                   </option>
                 ))}
               </select>

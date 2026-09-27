@@ -16,7 +16,6 @@ import {
   agentAccessLabel,
   agentAccessDetail,
   defaultAgentAccess,
-  yourAiAccess,
 } from '../domain/agent-access';
 import { ModelPicker } from './ModelPicker';
 import { Dialog } from './Dialog';
@@ -366,6 +365,15 @@ function App() {
     setYourChoice(next);
     void chooseYourAi(next).catch(report);
   }
+  // Your AI's access, kept like a brain composer's choice: for its CLI, until that changes.
+  const [yourAccessSelection, setYourAccessSelection] = useState<{
+    agent: AgentId;
+    value: AgentAccess;
+  }>();
+  const yourAccess =
+    yourAccessSelection?.agent === yourChoice.agent
+      ? yourAccessSelection.value
+      : defaultAgentAccess(yourChoice.agent);
   const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
   const access =
     accessSelection?.owner === accessOwner ? accessSelection.value : defaultAgentAccess(agent);
@@ -1099,7 +1107,7 @@ function App() {
     const input = {
       scopeId: you.id,
       agent: agentId,
-      access: yourAiAccess(agentId),
+      access: yourAccess,
       model: yourChoice.models[agentId] || undefined,
       prompt: message,
       brains,
@@ -1420,6 +1428,8 @@ function App() {
             onSendYou={(prompt) => sendToYou(prompt)}
             yourAgent={yourChoice.agent}
             yourModel={yourChoice.models[yourChoice.agent] ?? ''}
+            yourAccess={yourAccess}
+            onYourAccess={(value) => setYourAccessSelection({ agent: yourChoice.agent, value })}
             onYourAgent={(next) => chooseYour({ ...yourChoice, agent: next })}
             onYourModel={(next) => {
               const models = { ...yourChoice.models };

@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
 import { AgentService } from '../src/agents/service';
-import { yourAiAccess } from '../src/domain/agent-access';
+import { defaultAgentAccess } from '../src/domain/agent-access';
 import { writeDecision, type Delegation } from '../src/agents/delegation';
 import {
   brainAgentNames,
@@ -256,7 +256,7 @@ async function delegation(t: TestContext) {
     you,
   );
   t.after(() => service.cancel());
-  const run = async (prompt: string) => {
+  const run = async (prompt: string, access?: 'default' | 'full-access') => {
     events.length = 0;
     done = new Promise<void>((resolve) => {
       finished = resolve;
@@ -264,6 +264,7 @@ async function delegation(t: TestContext) {
     await service.startAccepted({
       scopeId: id,
       agent: 'claude',
+      access,
       prompt,
       brains: brains.map((b) => b.scopeId),
     });
@@ -349,6 +350,25 @@ test(
   },
 );
 
+test(
+  'the irori agent in full access on Claude Code still keeps out of the hibachis (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { brains, events, run, fixtureLog } = await delegation(t);
+    assert.equal(defaultAgentAccess('claude'), 'full-access');
+    await run('Try a direct write first.', defaultAgentAccess('claude'));
+    const log = await fixtureLog();
+    assert.equal(log[0].mode, 'bypassPermissions');
+    // The write hook runs in every mode: the irori agent's own write is refused.
+    assert.ok(log.some((entry) => entry.direct === 'denied'));
+    await assert.rejects(readFile(path.join(brains[0].root, 'direct.md')));
+    // The sub-agent inherits full access: it writes in its hibachi without asking.
+    assert.ok(log.some((entry) => entry.written === true));
+    assert.equal(events.filter((event) => event.type === 'permission').length, 0);
+    assert.equal(events.at(-1)?.outcome, 'completed');
+  },
+);
+
 test('only your AI takes brains, on any CLI, without notes or materials', async (t) => {
   const { base, you } = await yourAi(t);
   const files = new FileService(path.join(base, 'device'));
@@ -424,7 +444,7 @@ for (const cli of ['pi', 'opencode'] as const)
       await service.startAccepted({
         scopeId: id,
         agent: cli,
-        access: yourAiAccess(cli),
+        access: defaultAgentAccess(cli),
         prompt: 'Tidy the product notes.',
         brains: [brain.scopeId],
       });

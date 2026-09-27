@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import type { AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
+import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
 import { categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
@@ -705,8 +705,10 @@ export function Overview({
   onStopYou,
   yourAgent,
   yourModel,
+  yourAccess,
   onYourAgent,
   onYourModel,
+  onYourAccess,
   ...actions
 }: {
   workspace: WorkspaceProfile;
@@ -731,8 +733,11 @@ export function Overview({
   /** The CLI your AI runs on, and the model chosen for it ('' for the CLI's default). */
   yourAgent: AgentId;
   yourModel: string;
+  /** Your AI's access, full access by default where the CLI offers it. */
+  yourAccess: AgentAccess;
   onYourAgent: (agent: AgentId) => void;
   onYourModel: (model: string) => void;
+  onYourAccess: (access: AgentAccess) => void;
 } & Actions) {
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
@@ -899,8 +904,10 @@ export function Overview({
               ai={yourAi}
               agent={yourAgent}
               model={yourModel}
+              access={yourAccess}
               onAgent={onYourAgent}
               onModel={onYourModel}
+              onAccess={onYourAccess}
               onCreate={onCreateYou}
               onShow={onShowYou}
               onSend={reread(onSendYou)}

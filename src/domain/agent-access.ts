@@ -5,18 +5,13 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
   return agent === 'pi' ? ['default'] : ['default', 'full-access'];
 }
 
-/** A brain's hibachi agent starts in full access wherever the CLI offers it. */
+/**
+ * A hibachi agent and the irori agent start in full access wherever the CLI
+ * offers it. On Claude Code the irori agent's sub-agents inherit that mode, and
+ * its write hook still decides every file write: hooks run before the mode.
+ */
 export function defaultAgentAccess(agent: AgentId): AgentAccess {
   return agentAccessOptions(agent).includes('full-access') ? 'full-access' : 'default';
-}
-
-/**
- * Your AI on Claude Code stays in the standard mode: its sub-agents inherit the
- * parent's permission mode. Other CLIs work in the brains directly and need
- * their full access to reach those folders.
- */
-export function yourAiAccess(agent: AgentId): AgentAccess {
-  return agent === 'claude' ? 'default' : defaultAgentAccess(agent);
 }
 
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {
