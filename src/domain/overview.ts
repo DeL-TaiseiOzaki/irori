@@ -61,7 +61,7 @@ export function mapLayout(
   return { nodes, groups, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };
 }
 
-/** One brain's AI read notes of another brain: drawn from the source to the reader. */
+/** One brain's Hibachi Agent read notes of another brain: drawn from the source to the reader. */
 export interface ReferenceLink {
   from: string;
   to: string;

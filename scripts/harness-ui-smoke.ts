@@ -57,7 +57,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   const settings = () => page.getByLabel('会話と接続の設定', { exact: true });
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
@@ -155,7 +155,7 @@ try {
         page = await app.firstWindow();
         page.on('pageerror', (error) => errors.push(String(error)));
         await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-        await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+        await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
         await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
         await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
           'after cancellation',
@@ -191,7 +191,7 @@ try {
       await expect(page.locator('.request')).toBeVisible();
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-      await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+      await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
       await expect(page.locator('.message.done')).toHaveCount(5);
       await expect(page.locator('.request')).toHaveCount(0);
@@ -228,7 +228,7 @@ try {
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
@@ -254,7 +254,8 @@ try {
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
-  await access.selectOption('full-access');
+  // A brain's Hibachi Agent starts in full access.
+  await expect(access).toHaveValue('full-access');
   await expect(page.locator('#agent-access-detail')).toContainText(
     '編集可で接続した Google Drive フォルダは、エージェントも変更できます',
   );
@@ -267,7 +268,8 @@ try {
   ).toBe('full-access');
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
-  await expect(access).toHaveValue('default');
+  await expect(access).toHaveValue('full-access');
+  await access.selectOption('default');
   await settings().click();
   await expect(
     page.getByText(

@@ -145,7 +145,7 @@ try {
   // Preparing an upload now offers the KB's Drive folders.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Preserved note');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await page.getByRole('button', { name: '参照に追加', exact: true }).click();
   await expect(page.locator('.context-chip.reference')).toContainText('note.md');
   await page.getByRole('button', { name: /^その他（/ }).click();

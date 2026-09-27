@@ -11,7 +11,12 @@ import {
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, withRequests, type QueuedMessage } from '../domain/conversation';
-import { agentAccessOptions, agentAccessLabel, agentAccessDetail } from '../domain/agent-access';
+import {
+  agentAccessOptions,
+  agentAccessLabel,
+  agentAccessDetail,
+  defaultAgentAccess,
+} from '../domain/agent-access';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
 import { retirementNotice } from '../domain/skills';
@@ -308,6 +313,8 @@ function App() {
   const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
   const [sources, setSources] = useState<SourceRef[]>([]);
+  // The open note the person took out of the AI's context, as `scopeId:path`.
+  const [noteOmitted, setNoteOmitted] = useState('');
   const [skill, setSkill] = useState('');
   const [personLines, setPersonLines] = useState(false);
   const [accessSelection, setAccessSelection] = useState<{ owner: string; value: AgentAccess }>();
@@ -343,7 +350,8 @@ function App() {
     }));
   }
   const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
-  const access = accessSelection?.owner === accessOwner ? accessSelection.value : 'default';
+  const access =
+    accessSelection?.owner === accessOwner ? accessSelection.value : defaultAgentAccess(agent);
   useEffect(() => setAccessSelection(undefined), [workspace?.id, active?.scopeId, agent]);
   const [events, setEvents] = useState<AgentEvent[]>([]),
     [runningScopes, setRunningScopes] = useState<string[]>([]),
@@ -365,7 +373,7 @@ function App() {
     refresh: revision,
   });
   const notesDeclared = notesRead.data ?? null;
-  // The brain's top level, shared by its three sections and the AI panel's Schema line.
+  // The brain's top level, shared by its three sections and the Hibachi Agent's Schema line.
   const rootsRead = useResource(() => host.entries(active!.scopeId, ''), [active?.scopeId], {
     enabled: !!active,
     refresh: revision,
@@ -545,8 +553,11 @@ function App() {
     };
   }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
   const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
+  const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
+  // The open note of the active space goes with each instruction unless the person removed it.
+  const noteInContext = !!doc && doc.scopeId === active?.scopeId && noteOmitted !== noteKey;
   // Offered only for a note of the active space that has such lines to name.
-  const personLinesOffered = personLineCount > 0 && !!active && doc?.scopeId === active.scopeId;
+  const personLinesOffered = personLineCount > 0 && noteInContext;
   const editor = useRef<EditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
@@ -691,7 +702,7 @@ function App() {
           // An answered request says only that it ended; the run goes on.
           if (!incoming.resolved) markRunning(scopeId, incoming.type !== 'done');
           trackRequests(incoming);
-          // The AI that runs in a brain is that brain's AI from now on.
+          // The AI that runs in a brain is that brain's Hibachi Agent from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
             setAgentChoice((choice) =>
@@ -829,7 +840,7 @@ function App() {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
     if (!(await save())) return false;
-    // Another brain's AI keeps running and its queue keeps going; only a send
+    // Another brain's Hibachi Agent keeps running and its queue keeps going; only a send
     // in flight or a connection being prepared holds the brain on show.
     if (sending || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
@@ -895,8 +906,8 @@ function App() {
     if (active && heldByYou(active.scopeId)) {
       report(
         t(
-          'あなたの AI が作業中です。終わってからこの Brain の AI に頼んでください。',
-          "Your AI is working. Ask this brain's AI after it finishes.",
+          'あなたの AI が作業中です。終わってからこの Brain の Hibachi Agent に頼んでください。',
+          "Your AI is working. Ask this brain's Hibachi Agent after it finishes.",
         ),
       );
       return;
@@ -918,7 +929,7 @@ function App() {
       if (!(await composer.flush())) return;
       const draftRevision = composer.snapshot().record?.revision;
       if (!(await save())) return;
-      const notePath = doc?.scopeId === active.scopeId ? doc.path : undefined;
+      const notePath = noteInContext ? doc!.path : undefined;
       if (running || queued.length) {
         setQueued(
           await host.queueAgentMessage({
@@ -1019,7 +1030,7 @@ function App() {
       draining.current.delete(scopeId);
     }
   }
-  /** Sends to a brain's AI from the Overview, or queues behind its run or its waiting queue. */
+  /** Sends to a brain's Hibachi Agent from the Overview, or queues behind its run or its waiting queue. */
   async function sendToBrain(scopeId: string, message: string) {
     const agentId = agentFor(scopeId);
     const key = `${scopeId}:${agentId}`;
@@ -1278,13 +1289,13 @@ function App() {
   );
   const referenced =
     !!doc && sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path);
-  // Another brain's AI is running or waiting: the AI summary leads to the Overview.
+  // Another brain's Hibachi Agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
     if (!workspaceSpaces.length) return;
     goToLevel('overview');
   }
-  /** Shows a brain, from the rail or the Overview: its note, or its AI panel. */
+  /** Shows a brain, from the rail or the Overview: its note, or its Hibachi Agent. */
   async function enterBrain(
     space: Space,
     options: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } } = {},
@@ -2111,7 +2122,7 @@ function App() {
             <>
               <PaneSeparator
                 className="island-handle"
-                aria-label={t('AIパネルの幅', 'AI panel width')}
+                aria-label={t('Hibachi Agent の幅', 'Hibachi Agent width')}
               />
               <Pane
                 id="assistant"
@@ -2122,12 +2133,16 @@ function App() {
               >
                 <aside
                   className="agent-panel chrome"
-                  aria-label={active ? t(`${active.name} の AI`, `${active.name}'s AI`) : 'AI'}
+                  aria-label={
+                    active
+                      ? t(`${active.name} の Hibachi Agent`, `${active.name}'s Hibachi Agent`)
+                      : 'AI'
+                  }
                 >
                   <header className="agent-header">
                     <label
                       className="agent-picker"
-                      title={t('この Brain の AI', "This brain's AI")}
+                      title={t('この Brain の Hibachi Agent', "This brain's Hibachi Agent")}
                     >
                       {active && (
                         <span className="agent-mark">
@@ -2248,7 +2263,7 @@ function App() {
                     </Popover.Root>
                     <button
                       className="icon-button"
-                      aria-label={t('AIパネルを閉じる', 'Close AI panel')}
+                      aria-label={t('Hibachi Agent を閉じる', 'Close Hibachi Agent')}
                       onClick={() => setPanel(false)}
                     >
                       <Icon name="close" size={16} />
@@ -2415,8 +2430,8 @@ function App() {
                       <p className="agent-held" role="status">
                         <Icon name="sparkles" size={13} />
                         {t(
-                          'あなたの AI がこの Brain にも仕事を渡しています。終わるまでこの Brain の AI は待機します。',
-                          "Your AI is handing work to this brain too. This brain's AI waits until it finishes.",
+                          'あなたの AI がこの Brain にも仕事を渡しています。終わるまでこの Brain の Hibachi Agent は待機します。',
+                          "Your AI is handing work to this brain too. This brain's Hibachi Agent waits until it finishes.",
                         )}
                       </p>
                     )}
@@ -2430,8 +2445,8 @@ function App() {
                           )}
                           {active?.name ?? t('スペース未選択', 'No space selected')}
                         </span>
-                        {doc?.scopeId === active?.scopeId && doc && (
-                          <span className="context-chip" title={doc.path}>
+                        {noteInContext && (
+                          <span className="context-chip" title={doc!.path}>
                             <Icon
                               name={
                                 docLayer === 'contents'
@@ -2443,8 +2458,35 @@ function App() {
                               size={13}
                               className={`layer-icon ${docLayer ?? ''}`}
                             />
-                            {doc.path.split('/').at(-1)}
+                            <span className="context-chip-label">
+                              {doc!.path.split('/').at(-1)}
+                            </span>
+                            <button
+                              aria-label={t(
+                                `${doc!.path} を相談の対象から外す`,
+                                `Remove ${doc!.path} from the context`,
+                              )}
+                              disabled={sending}
+                              onClick={() => setNoteOmitted(noteKey)}
+                            >
+                              <Icon name="close" size={12} />
+                            </button>
                           </span>
+                        )}
+                        {!!doc && doc.scopeId === active?.scopeId && !noteInContext && (
+                          <button
+                            className="context-add"
+                            title={doc.path}
+                            aria-label={t(
+                              `${doc.path} を相談の対象に戻す`,
+                              `Put ${doc.path} back in the context`,
+                            )}
+                            disabled={sending}
+                            onClick={() => setNoteOmitted('')}
+                          >
+                            <Icon name="plus" size={13} />
+                            {doc.path.split('/').at(-1)}
+                          </button>
                         )}
                         {sources.map((source) => {
                           const owner = spaces.find((space) => space.scopeId === source.scopeId);

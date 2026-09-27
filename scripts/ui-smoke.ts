@@ -358,7 +358,7 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.literal-block').filter({ hasText: '<br' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {
     for (const agent of ['codex', 'claude']) {
@@ -495,7 +495,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
             .evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBeGreaterThan(chosenWidth - 12);
-      await window.getByRole('button', { name: 'AIに相談', exact: true }).click();
+      await window.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).not.toBeVisible();
       await window.getByLabel('会話と接続の設定', { exact: true }).click();
       await expect(window.getByText(savedText, { exact: true })).toBeVisible();

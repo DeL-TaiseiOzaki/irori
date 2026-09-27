@@ -54,7 +54,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
   );
 }
 
-/** Reads one brain's AI and hands it up, so every view of the Overview shares one reading. */
+/** Reads one brain's Hibachi Agent and hands it up, so every view of the Overview shares one reading. */
 function AiWatch({
   scopeId,
   agent,
@@ -82,7 +82,7 @@ interface Actions {
 }
 
 /**
- * A brain's AI in a few lines: the request it waits on, the step it is taking,
+ * A brain's Hibachi Agent in a few lines: the request it waits on, the step it is taking,
  * what waits to be sent, or the last thing it was asked.
  */
 function AiCard({
@@ -115,13 +115,15 @@ function AiCard({
     <section
       className={`ai-card ${aiState(ai)}`}
       role="group"
-      aria-label={t(`${space.name} の AI`, `${space.name}'s AI`)}
+      aria-label={t(`${space.name} の Hibachi Agent`, `${space.name}'s Hibachi Agent`)}
     >
       <header>
         {named && <BrainTile space={space} size={22} radius={7} />}
         <Icon name="sparkles" size={13} className="ai-card-spark" />
         <span className="ai-card-name">
-          {named ? t(`${space.name} の AI`, `${space.name}'s AI`) : agentNames[agent]}
+          {named
+            ? t(`${space.name} の Hibachi Agent`, `${space.name}'s Hibachi Agent`)
+            : agentNames[agent]}
         </span>
         <StateWords ai={ai} />
       </header>
@@ -176,7 +178,7 @@ function AiCard({
           <div className="ai-card-actions">
             <button className="ember-button" onClick={() => onEnter(space, { ai: true })}>
               <Icon name="sparkles" size={13} />
-              {t('AI に相談', 'Ask AI')}
+              {t('Hibachi Agent', 'Hibachi Agent')}
             </button>
           </div>
         </>
@@ -326,8 +328,8 @@ function OverviewMap({
             className="map-pill"
             style={at(curve(node(link.from), node(link.to)).label)}
             title={t(
-              `${space(link.to).name} の AI が ${space(link.from).name} の ${link.path} を参照（${link.notes} 件）`,
-              `${space(link.to).name}'s AI read ${link.path} in ${space(link.from).name} (${link.notes})`,
+              `${space(link.to).name} の Hibachi Agent が ${space(link.from).name} の ${link.path} を参照（${link.notes} 件）`,
+              `${space(link.to).name}'s Hibachi Agent read ${link.path} in ${space(link.from).name} (${link.notes})`,
             )}
           >
             <BrainTile space={space(link.from)} size={14} radius={4} />
@@ -570,7 +572,7 @@ function OverviewColumns({
   );
 }
 
-/** Sends one instruction to the chosen brain's AI, or queues it behind the run in progress. */
+/** Sends one instruction to the chosen brain's Hibachi Agent, or queues it behind the run in progress. */
 function OverviewComposer({
   spaces,
   ais,
@@ -630,8 +632,14 @@ function OverviewComposer({
         ))}
       </fieldset>
       <textarea
-        aria-label={t(`${space.name} の AI への指示`, `Instruction for ${space.name}'s AI`)}
-        placeholder={t(`${space.name} の AI に指示…`, `Instruct ${space.name}'s AI…`)}
+        aria-label={t(
+          `${space.name} の Hibachi Agent への指示`,
+          `Instruction for ${space.name}'s Hibachi Agent`,
+        )}
+        placeholder={t(
+          `${space.name} の Hibachi Agent に指示…`,
+          `Instruct ${space.name}'s Hibachi Agent…`,
+        )}
         rows={3}
         value={text}
         maxLength={32000}
@@ -854,7 +862,7 @@ export function Overview({
         <aside
           className="overview-ai chrome"
           aria-label={
-            island === 'you' ? t('あなたの AI', 'Your AI') : t('Brain の AI', 'Brain AIs')
+            island === 'you' ? t('あなたの AI', 'Your AI') : t('Hibachi Agent', 'Hibachi Agents')
           }
         >
           <MagnetTabs
@@ -864,7 +872,7 @@ export function Overview({
             onValueChange={setIsland}
             options={[
               { value: 'you', label: t('あなたの AI', 'Your AI') },
-              { value: 'brains', label: t('Brain の AI', 'Brain AIs') },
+              { value: 'brains', label: t('Hibachi Agent', 'Hibachi Agents') },
             ]}
           />
           {island === 'you' ? (
@@ -885,7 +893,7 @@ export function Overview({
                   <Icon name="sparkles" size={15} strokeWidth={2.1} />
                 </span>
                 <span>
-                  <strong>{t('Brain の AI', 'Brain AIs')}</strong>
+                  <strong>{t('Hibachi Agent', 'Hibachi Agents')}</strong>
                   <small>
                     {running || waiting
                       ? [

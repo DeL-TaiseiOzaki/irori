@@ -265,8 +265,8 @@ export class AgentService {
         if (this.busy(scopeId))
           throw Error(
             t(
-              `${space.name} の AI が作業中です。終わってからあなたの AI に渡してください。`,
-              `${space.name}'s AI is working. Hand it to your AI after it finishes.`,
+              `${space.name} の Hibachi Agent が作業中です。終わってからあなたの AI に渡してください。`,
+              `${space.name}'s Hibachi Agent is working. Hand it to your AI after it finishes.`,
             ),
           );
       }
@@ -397,19 +397,6 @@ export class AgentService {
     await run.closed;
   }
   private async execute(run: Run, input: StartRun) {
-    // Your AI hands work on, so its runs may take longer than a brain's own.
-    const minutes = this.isYou(input.scopeId) ? 30 : 10;
-    const timer = setTimeout(() => {
-      this.event(
-        run,
-        'error',
-        t(
-          `実行時間の上限（${minutes}分）に達しました。`,
-          `The run reached its time limit (${minutes} minutes).`,
-        ),
-      );
-      void this.cancel(run.binding.scopeId);
-    }, minutes * 60000);
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
     let record: RunRecord | undefined;
@@ -579,7 +566,6 @@ export class AgentService {
           );
       }
     } finally {
-      clearTimeout(timer);
       this.denyRequests(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();

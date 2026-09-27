@@ -122,23 +122,23 @@ export function NoteMenu({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opens and closes the brain's AI; closed, it is the AI's own ember button. */
+/** Opens and closes the brain's Hibachi Agent; closed, it is the AI's own ember button. */
 export function AiToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return open ? (
     <button
       className="ai-toggle open"
       aria-pressed="true"
-      aria-label={t('AIパネルを閉じる', 'Close AI panel')}
-      title={t('AI パネル', 'AI panel')}
+      aria-label={t('Hibachi Agent を閉じる', 'Close Hibachi Agent')}
+      title={t('Hibachi Agent', 'Hibachi Agent')}
       onClick={onToggle}
     >
       <Icon name="sparkles" size={14} />
       AI
     </button>
   ) : (
-    <button className="ai-toggle" title={t('AI に相談', 'Ask AI')} onClick={onToggle}>
+    <button className="ai-toggle" title={t('Hibachi Agent', 'Hibachi Agent')} onClick={onToggle}>
       <Icon name="sparkles" size={14} />
-      {t('AIに相談', 'Ask AI')}
+      {t('Hibachi Agent', 'Hibachi Agent')}
     </button>
   );
 }

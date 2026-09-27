@@ -57,12 +57,12 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  await expect(page.getByRole('button', { name: 'AIに相談', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hibachi Agent', exact: true })).toBeVisible();
 
   // The switch is immediate: no restart, and the open workspace stays open.
   await chooseLanguage(page, 'English', /^設定（/);
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('en');
-  await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hibachi Agent', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'welcome', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Plain notes.');
   await japaneseLeft(page, 'the workspace with a note open');
@@ -93,11 +93,11 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   visited.push('note creation dialog');
 
-  await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await expect(page.locator('.agent-panel')).toBeVisible();
-  await japaneseLeft(page, 'the AI panel');
-  await page.getByRole('button', { name: 'Close AI panel' }).first().click();
-  visited.push('AI panel');
+  await japaneseLeft(page, 'the Hibachi Agent');
+  await page.getByRole('button', { name: 'Close Hibachi Agent' }).first().click();
+  visited.push('Hibachi Agent');
 
   const modes = page.getByRole('group', { name: 'Brain view' });
   await modes.getByRole('button', { name: /^Changes/ }).click();
@@ -119,8 +119,8 @@ try {
   await expect(page.getByRole('region', { name: 'Map of brains' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Your AI' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Set up your AI' })).toBeVisible();
-  await page.getByRole('button', { name: 'Brain AIs', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: 'Brain AIs' })).toBeVisible();
+  await page.getByRole('button', { name: 'Hibachi Agents', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: 'Hibachi Agents' })).toBeVisible();
   await japaneseLeft(page, 'the Overview map');
   await page.getByRole('button', { name: 'Columns', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Brains side by side' })).toBeVisible();
@@ -162,7 +162,7 @@ try {
   visited.push('startup screen after restart');
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await chooseLanguage(page, '日本語', /^Settings \(/);
-  await expect(page.getByRole('button', { name: 'AIに相談', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hibachi Agent', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
 } finally {
   await app.close();

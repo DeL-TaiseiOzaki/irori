@@ -149,7 +149,7 @@ try {
     page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }),
   ).toBeFocused();
   await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
-  await page.getByRole('button', { name: 'AI に相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toHaveValue(/\.irori\/ontology.json/);
   // The bundle KB: no declaration, so the panel offers to generate the graph index.
   await page

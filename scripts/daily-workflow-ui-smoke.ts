@@ -106,7 +106,7 @@ async function launch() {
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('Daily fixture note');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示', { exact: true })).toBeEnabled();
   return page;
 }
@@ -252,7 +252,7 @@ try {
   await expect(composer).toHaveValue('');
   await page
     .locator('.agent-panel')
-    .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
+    .getByRole('button', { name: 'Hibachi Agent を閉じる', exact: true })
     .click();
 
   await page.getByRole('button', { name: / にノートを作成$/ }).click();
@@ -339,7 +339,7 @@ try {
   expect(
     await page.evaluate((scopeId) => window.irori.trashedNotes(scopeId), spaces[0].scopeId),
   ).toEqual([]);
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-daily-workflow.png' });
 

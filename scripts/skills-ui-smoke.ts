@@ -90,7 +90,7 @@ try {
   for (const name of ['スキル検証', '素のKB'])
     await page.getByRole('checkbox', { name: new RegExp(name) }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
 
   const picker = page.getByLabel('スキル', { exact: true });

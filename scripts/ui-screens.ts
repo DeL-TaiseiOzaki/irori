@@ -152,7 +152,9 @@ for (const run of runs) {
     await step('note', async () => {
       await page.getByRole('button', { name: 'notes', exact: true }).click();
       await page.getByRole('button', { name: 'decision-001', exact: true }).click();
-      await page.getByRole('button', { name: L('AIに相談', 'Ask AI'), exact: true }).click();
+      await page
+        .getByRole('button', { name: L('Hibachi Agent', 'Hibachi Agent'), exact: true })
+        .click();
       await shot(page, 'Main', run);
     });
     await step('search', async () => {

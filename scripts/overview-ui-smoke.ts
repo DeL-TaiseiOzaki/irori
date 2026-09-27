@@ -63,7 +63,7 @@ try {
   const rail = page.getByRole('navigation', { name: 'Brain' });
 
   // Product's AI asks for permission and has a second instruction queued behind it.
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェントへの指示').fill('dialog');
   await page.getByRole('button', { name: '送信', exact: true }).click();
@@ -101,8 +101,8 @@ try {
   await expect(map.locator('.map-group')).toHaveCount(2);
   // Beside the map, your AI comes first; each brain's own AI is the other tab.
   await expect(page.getByRole('complementary', { name: 'あなたの AI' })).toBeVisible();
-  await page.getByRole('button', { name: 'Brain の AI', exact: true }).click();
-  const ais = page.getByRole('complementary', { name: 'Brain の AI' });
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
+  const ais = page.getByRole('complementary', { name: 'Hibachi Agent' });
   const productAi = ais.getByRole('group', { name: 'Product の AI' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
   // Search from the Overview covers every brain.

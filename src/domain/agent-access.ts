@@ -5,6 +5,11 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
   return agent === 'pi' ? ['default'] : ['default', 'full-access'];
 }
 
+/** A brain's Hibachi Agent starts in full access wherever the CLI offers it. */
+export function defaultAgentAccess(agent: AgentId): AgentAccess {
+  return agentAccessOptions(agent).includes('full-access') ? 'full-access' : 'default';
+}
+
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {
   if (!agentAccessOptions(agent).includes(access))
     throw Error(

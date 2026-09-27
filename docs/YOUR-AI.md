@@ -39,7 +39,7 @@ investigation behind the design is in the
   letters, with the id added when two names collide (`brainAgentNames`).
 - While your AI's run lasts, every brain handed to it is busy, as if its own AI
   were running. Its own AI, Git operations and brain settings wait. The brain's
-  AI panel says why. The run's time limit is 30 minutes.
+  AI panel says why.
 
 ## Boundaries irori keeps
 

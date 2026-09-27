@@ -159,8 +159,8 @@ try {
   );
   expect(await readFile(path.join(spaces[2].root, 'README.md'), 'utf8')).toBe('# Research notes\n');
   await expect(page.locator('.document-editor')).toContainText('Research notes');
-  // The AI panel belongs to the brain on show and names its Schema.
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  // The Hibachi Agent belongs to the brain on show and names its Schema.
+  await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   await expect(page.getByLabel('相談の対象')).toContainText('Research');
   await expect(page.locator('.schema-line')).toContainText('Research の Schema');
   await expect(page.locator('.schema-line')).toContainText('AGENTS.md');
@@ -182,7 +182,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-brain-panel-narrow.png' });
   await page
     .locator('.agent-header')
-    .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
+    .getByRole('button', { name: 'Hibachi Agent を閉じる', exact: true })
     .click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   // The Contents action opens the connections of the brain it belongs to.
