@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { z } from 'zod';
 import { parse as parseYaml } from 'yaml';
 import type { FileService } from './files';
-import { classify } from '../domain/scopes';
+import { spaceFolder, type SchemaFolder } from './schema-folder';
 import {
   audienceName,
   maxSkillBytes,
@@ -87,20 +87,18 @@ export function parseRetired(directory: string, text: string): RetiredSkill {
 }
 
 async function readPackage(
-  files: FileService,
-  scopeId: string,
+  folder: SchemaFolder,
   name: string,
 ): Promise<{ skill?: AgentSkill; retired?: RetiredSkill } | undefined> {
-  const space = files.get(scopeId);
   const read = async (file: string) => {
     const relative = `${skillsRoot}/${name}/${file}`;
-    if (classify(space, relative) !== 'schema')
+    if (folder.layer(relative) !== 'schema')
       throw Error('A skill package must stay in the schema layer');
     try {
-      const actual = await files.resolve(scopeId, relative);
-      if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
+      const actual = await folder.resolve(relative);
+      if (path.relative(folder.root, actual).split(path.sep).join('/') !== relative)
         throw Error('A skill package must not be an alias');
-      return (await files.read(scopeId, relative)).text;
+      return await folder.read(relative);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw error;
@@ -122,9 +120,14 @@ async function readPackage(
  * visible reason, and a retired one carries the reason the KB wrote down.
  */
 export async function readSkills(files: FileService, scopeId: string): Promise<SkillListing> {
+  return readFolderSkills(spaceFolder(files, scopeId));
+}
+
+/** The same listing for any Schema folder, the irori agent's among them. */
+export async function readFolderSkills(folder: SchemaFolder): Promise<SkillListing> {
   let directories: string[];
   try {
-    directories = (await files.entries(scopeId, skillsRoot))
+    directories = (await folder.entries(skillsRoot))
       .filter((entry) => entry.directory || entry.blocked)
       .map((entry) => entry.name)
       .sort((left, right) => left.localeCompare(right));
@@ -139,7 +142,7 @@ export async function readSkills(files: FileService, scopeId: string): Promise<S
   let packages = 0;
   for (const name of directories) {
     try {
-      const found = await readPackage(files, scopeId, name);
+      const found = await readPackage(folder, name);
       if (!found) continue;
       if (++packages > maxSkills) break;
       if (found.skill) skills.push(found.skill);
@@ -167,7 +170,7 @@ export async function requireSkill(
   scopeId: string,
   name: string,
 ): Promise<AgentSkill> {
-  const found = await readPackage(files, scopeId, name);
+  const found = await readPackage(spaceFolder(files, scopeId), name);
   if (found?.retired) throw Error(retirementNotice(found.retired));
   if (!found?.skill)
     throw Error(

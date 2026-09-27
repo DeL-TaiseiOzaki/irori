@@ -5,7 +5,7 @@ import { SerialQueue } from './serial-queue';
 import { hash, textFileByteLimit, type FileService } from './files';
 import type { SearchService } from './search';
 import { replaceFile } from './local-json';
-import { classify } from '../domain/scopes';
+import { spaceFolder, type SchemaFolder } from './schema-folder';
 import { skillName, skillsRoot } from '../domain/skills';
 import {
   attachmentPath,
@@ -36,44 +36,51 @@ const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'E
  * knowledge folder's), `.claude/rules/*.md`, `.claude/settings.json` and the files
  * of a skill package. Nothing else is reachable through it: the path must be one
  * `settingKind` names, in the layer that kind belongs to, inside the brain, and no
- * folder on the way or the file itself may be an alias.
+ * folder on the way or the file itself may be an alias. The same holds for the
+ * irori agent's folder, which `folderOf` resolves by its id; there only the root
+ * `AGENTS.md` counts as instructions.
  */
 export class SchemaSettingsService {
   private queue = new SerialQueue();
   constructor(
-    private readonly files: FileService,
+    files: FileService,
     private readonly search: SearchService,
+    private readonly folderOf: (scopeId: string) => Promise<SchemaFolder> = async (scopeId) =>
+      spaceFolder(files, scopeId),
   ) {}
 
   /** The instructions, rules and skill files a brain has; skills themselves come from `skills`. */
   async list(scopeId: string): Promise<SchemaSettings> {
-    const top = await this.files.entries(scopeId, '');
+    const folder = await this.folderOf(scopeId);
+    const top = await folder.entries('');
     const instructions = top.some((entry) => entry.path === instructionsFile && !entry.directory)
       ? [instructionsFile]
       : [];
     const folders: string[] = [];
     const nested: string[] = [];
-    const walk = await this.search.walk(
-      scopeId,
-      (relative) => relative.split('/').at(-1) === instructionsFile,
-      (directory) => {
-        if (folders.length < folderLimit) folders.push(directory);
-        return true;
-      },
-      async ({ path: relative }) => {
-        nested.push(relative);
-      },
-    );
-    const rules = (await this.optional(() => this.files.entries(scopeId, rulesRoot)))
+    const walk = folder.knowledge
+      ? await this.search.walk(
+          scopeId,
+          (relative) => relative.split('/').at(-1) === instructionsFile,
+          (directory) => {
+            if (folders.length < folderLimit) folders.push(directory);
+            return true;
+          },
+          async ({ path: relative }) => {
+            nested.push(relative);
+          },
+        )
+      : { incomplete: false };
+    const rules = (await this.optional(() => folder.entries(rulesRoot)))
       .filter((entry) => !entry.directory && !entry.blocked && ruleFileName(entry.name))
       .map((entry) => entry.path);
-    const claudeSettings = (await this.optional(() => this.files.entries(scopeId, '.claude'))).some(
+    const claudeSettings = (await this.optional(() => folder.entries('.claude'))).some(
       (entry) => entry.path === claudeSettingsFile && !entry.directory && !entry.blocked,
     );
     const attachments: SchemaSettings['attachments'] = {};
-    for (const entry of await this.optional(() => this.files.entries(scopeId, skillsRoot))) {
+    for (const entry of await this.optional(() => folder.entries(skillsRoot))) {
       if (!entry.directory || entry.blocked || !skillName.safeParse(entry.name).success) continue;
-      attachments[entry.name] = await this.attachments(scopeId, entry.path);
+      attachments[entry.name] = await this.attachments(folder, entry.path);
     }
     const taken = new Set(nested.map((file) => path.posix.dirname(file)));
     return {
@@ -88,7 +95,7 @@ export class SchemaSettingsService {
 
   /** A setting's text, whatever its extension, under the editor's limits. */
   async read(scopeId: string, relative: string): Promise<Document> {
-    const filename = await this.target(scopeId, relative, false);
+    const filename = await this.target(await this.folderOf(scopeId), relative, false);
     const stat = await fs.lstat(filename);
     if (!stat.isFile())
       throw Error(t('通常のファイルではありません。', 'This is not an ordinary file.'));
@@ -120,7 +127,10 @@ export class SchemaSettingsService {
           throw Error('The text editor supports files up to 2 MiB');
         if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
       }
-      const filename = await this.target(scopeId, relative, text !== null && expected === null);
+      const folder = await this.folderOf(scopeId);
+      // The irori agent's AGENTS.md marks its folder as set up; it is edited, never removed.
+      if (!folder.knowledge && relative === instructionsFile && text === null) throw refused();
+      const filename = await this.target(folder, relative, text !== null && expected === null);
       const existing = await fs.lstat(filename).catch((error) => {
         if (!missing(error)) throw error;
       });
@@ -151,7 +161,7 @@ export class SchemaSettingsService {
       if (!existing || (await current()) !== expected) throw changed();
       if (text === null) {
         await fs.unlink(filename);
-        await this.prune(scopeId, relative);
+        await this.prune(folder, relative);
         return null;
       }
       const temp = path.join(path.dirname(filename), `.irori-save-${randomUUID()}.tmp`);
@@ -177,7 +187,7 @@ export class SchemaSettingsService {
     return this.queue.run(async () => {
       skillName.parse(name);
       if (to !== null) skillName.parse(to);
-      const from = await this.folder(scopeId, `${skillsRoot}/${name}`, false);
+      const from = await this.folder(await this.folderOf(scopeId), `${skillsRoot}/${name}`, false);
       if (to === null) {
         // The folder itself was checked; rm removes links inside it without following them.
         await fs.rm(from, { recursive: true });
@@ -207,10 +217,10 @@ export class SchemaSettingsService {
     });
   }
 
-  private async attachments(scopeId: string, directory: string) {
+  private async attachments(schema: SchemaFolder, directory: string) {
     const out: string[] = [];
     const visit = async (folder: string, depth: number) => {
-      for (const entry of await this.files.entries(scopeId, folder)) {
+      for (const entry of await schema.entries(folder)) {
         if (out.length >= attachmentLimit || entry.blocked || entry.name.startsWith('.')) continue;
         const inside = entry.path.slice(directory.length + 1);
         if (entry.directory) {
@@ -225,10 +235,9 @@ export class SchemaSettingsService {
   }
 
   /** The file a setting path names, after checking every folder on the way. */
-  private async target(scopeId: string, relative: string, create: boolean) {
+  private async target(schema: SchemaFolder, relative: string, create: boolean) {
     const kind = settingKind(relative);
-    const space = this.files.get(scopeId);
-    const layer = classify(space, relative);
+    const layer = schema.layer(relative);
     if (
       !kind ||
       (kind === 'instructions' && relative !== instructionsFile
@@ -237,17 +246,16 @@ export class SchemaSettingsService {
     )
       throw refused();
     const parent = path.posix.dirname(relative);
-    const folder = await this.folder(scopeId, parent === '.' ? '' : parent, create);
+    const folder = await this.folder(schema, parent === '.' ? '' : parent, create);
     return path.join(folder, path.posix.basename(relative));
   }
 
   /** A folder inside the brain with no alias on the way, created when asked. */
-  private async folder(scopeId: string, relative: string, create: boolean) {
-    const space = this.files.get(scopeId);
+  private async folder(schema: SchemaFolder, relative: string, create: boolean) {
     let prefix = '';
     for (const part of relative.split('/').filter(Boolean)) {
       prefix = prefix ? `${prefix}/${part}` : part;
-      const filename = path.join(space.root, prefix);
+      const filename = path.join(schema.root, prefix);
       let stat = await fs.lstat(filename).catch((error) => {
         if (!missing(error) || !create) throw error;
       });
@@ -256,17 +264,17 @@ export class SchemaSettingsService {
         stat = await fs.lstat(filename);
       }
       if (stat.isSymbolicLink() || !stat.isDirectory()) throw refused();
-      // The file service's own check: the same brain, not a nested one or another layer's alias.
-      if ((await this.files.resolve(scopeId, prefix)) !== filename) throw refused();
+      // The folder's own check: the same brain, not a nested one or another layer's alias.
+      if ((await schema.resolve(prefix)) !== filename) throw refused();
     }
-    return path.join(space.root, relative);
+    return path.join(schema.root, relative);
   }
 
   /** Removes the folders a deletion emptied inside a skill package, never the package itself. */
-  private async prune(scopeId: string, relative: string) {
+  private async prune(schema: SchemaFolder, relative: string) {
     const parts = relative.split('/');
     if (!relative.startsWith(`${skillsRoot}/`)) return;
-    const root = this.files.get(scopeId).root;
+    const root = schema.root;
     for (let end = parts.length - 1; end > 3; end--) {
       const folder = path.join(root, ...parts.slice(0, end));
       if ((await fs.readdir(folder)).length) return;

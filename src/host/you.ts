@@ -15,6 +15,7 @@ import {
 } from '../domain/you';
 import { readTextDocument } from './files';
 import { readLocalJson, writeLocalJson } from './local-json';
+import type { SchemaFolder } from './schema-folder';
 
 const record = z
   .object({ schemaVersion: z.literal(1), id: z.uuid(), root: z.string().min(1) })
@@ -110,11 +111,11 @@ export class YourAiService {
       throw Error('Path alias leaves the irori agent’s folder');
     return actual;
   }
-  /** One folder's entries, folders first, for the read-only Your AI screen. */
-  async entries(rel: string): Promise<YourAiEntry[]> {
+  /** One folder's entries, folders first, links marked. */
+  private async listing(rel: string) {
     const dir = await this.resolve(rel);
     const found = (await fs.readdir(dir, { withFileTypes: true })).filter(
-      (entry) => !['.git', 'node_modules'].includes(entry.name) && !entry.isSymbolicLink(),
+      (entry) => !['.git', 'node_modules'].includes(entry.name),
     );
     if (found.length > 4000) throw Error('This folder exceeds the 4,000-entry limit');
     return found
@@ -122,8 +123,34 @@ export class YourAiService {
         path: rel ? `${rel}/${entry.name}` : entry.name,
         name: entry.name,
         directory: entry.isDirectory(),
+        link: entry.isSymbolicLink(),
       }))
       .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
+  }
+  /** One folder's entries without links, for the Your AI screen's file view. */
+  async entries(rel: string): Promise<YourAiEntry[]> {
+    return (await this.listing(rel))
+      .filter((entry) => !entry.link)
+      .map(({ link: _, ...entry }) => entry);
+  }
+  /**
+   * The folder as the Schema settings see it: its real path, instructions only
+   * at the root, and every path confined to it with no alias leaving it.
+   */
+  async schemaFolder(): Promise<SchemaFolder> {
+    const root = await fs.realpath((await this.load()).root);
+    return {
+      root,
+      knowledge: false,
+      layer: () => 'schema',
+      entries: async (rel) =>
+        (await this.listing(rel)).map(({ link, ...entry }) => ({
+          ...entry,
+          blocked: link ? t('リンクは開けません', 'Links cannot be opened') : undefined,
+        })),
+      resolve: (rel) => this.resolve(rel),
+      read: async (rel) => (await this.read(rel)).text,
+    };
   }
   async read(rel: string) {
     const { id } = await this.load();

@@ -72,6 +72,7 @@ const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${f
 
 /** The Schema section as settings: what the agent reads, grouped by what it is. */
 export function SchemaList({
+  scopeId,
   space,
   revision,
   selected,
@@ -79,14 +80,16 @@ export function SchemaList({
   onSelect,
   onOpenFile,
 }: {
-  space: Space;
+  scopeId: string;
+  /** The hibachi, or none for the irori agent's folder. */
+  space?: Space;
   revision: number;
   selected?: SchemaTarget;
   locked: boolean;
   onSelect: (target: SchemaTarget) => void;
   onOpenFile: (entry: Entry) => void;
 }) {
-  const data = useResource(() => loadSchema(space.scopeId), [space.scopeId], {
+  const data = useResource(() => loadSchema(scopeId), [scopeId], {
     refresh: revision,
   });
   if (!data.data)
@@ -310,6 +313,7 @@ function TextField({
  * behind it through the host, checked against the version this form read.
  */
 export function SchemaEditor({
+  scopeId,
   space,
   target,
   locked,
@@ -317,7 +321,9 @@ export function SchemaEditor({
   onSelect,
   onClose,
 }: {
-  space: Space;
+  scopeId: string;
+  /** The hibachi, or none for the irori agent's folder. */
+  space?: Space;
   target: SchemaTarget;
   locked: boolean;
   revision: number;
@@ -325,7 +331,7 @@ export function SchemaEditor({
   onSelect: (target?: SchemaTarget) => void;
   onClose: () => void;
 }) {
-  const data = useResource(() => loadSchema(space.scopeId), [space.scopeId], {
+  const data = useResource(() => loadSchema(scopeId), [scopeId], {
     refresh: revision,
   });
   const [busy, setBusy] = useState(false);
@@ -363,6 +369,7 @@ export function SchemaEditor({
         : target.key.split('/').at(-1)!
     : t(`${kinds[target.kind].one()}を追加`, `Add ${kinds[target.kind].one()}`);
   const shared = {
+    scopeId,
     space,
     target,
     data: data.data,
@@ -381,6 +388,9 @@ export function SchemaEditor({
         <Crumbs
           space={space}
           items={[
+            ...(space
+              ? []
+              : [{ icon: 'sparkles' as const, label: t('irori agent', 'irori agent') }]),
             { icon: 'schema', label: 'Schema', className: 'layer schema' },
             { label: kinds[target.kind].name(), className: 'folder' },
           ]}
@@ -392,10 +402,15 @@ export function SchemaEditor({
       <div className="schema-form">
         {locked && (
           <p className="hint" role="status">
-            {t(
-              '実行・Git 操作・接続の間は Schema を変更できません。',
-              'The Schema cannot change during a run, a Git operation or a connection.',
-            )}
+            {space
+              ? t(
+                  '実行・Git 操作・接続の間は Schema を変更できません。',
+                  'The Schema cannot change during a run, a Git operation or a connection.',
+                )
+              : t(
+                  'irori agent の実行中は Schema を変更できません。',
+                  'The Schema cannot change while the irori agent runs.',
+                )}
           </p>
         )}
         {!data.data ? (
@@ -440,7 +455,8 @@ export function SchemaEditor({
 }
 
 type FormProps = {
-  space: Space;
+  scopeId: string;
+  space?: Space;
   target: SchemaTarget;
   data: SchemaData;
   disabled: boolean;
@@ -495,8 +511,17 @@ function DeleteButton({ disabled, onClick }: { disabled: boolean; onClick: () =>
   );
 }
 
-function InstructionsForm({ space, target, data, disabled, run, onSelect, onDelete }: FormProps) {
-  const { doc, setDoc, error } = useSettingFile(space.scopeId, target.key);
+function InstructionsForm({
+  scopeId,
+  space,
+  target,
+  data,
+  disabled,
+  run,
+  onSelect,
+  onDelete,
+}: FormProps) {
+  const { doc, setDoc, error } = useSettingFile(scopeId, target.key);
   const [text, setText] = useState<string>();
   const choices = [
     ...(data.settings.instructions.includes(instructionsFile) ? [] : ['']),
@@ -512,7 +537,7 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
       onSubmit={(event) => {
         event.preventDefault();
         void run(async () => {
-          const next = await host.writeSchemaFile(space.scopeId, where, value, doc?.hash ?? null);
+          const next = await host.writeSchemaFile(scopeId, where, value, doc?.hash ?? null);
           if (!target.key) return onSelect({ kind: 'instructions', key: where });
           setDoc(next);
           setText(undefined);
@@ -521,15 +546,20 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
       }}
     >
       <p className="muted">
-        {target.key === instructionsFile || (!target.key && !folder)
+        {!space
           ? t(
-              'この hibachi の hibachi agent が毎回最初に読む指示です（AGENTS.md）。',
-              "What this hibachi's hibachi agent reads first, every time (AGENTS.md).",
+              'irori agent が毎回最初に読む指示です（AGENTS.md）。',
+              'What the irori agent reads first, every time (AGENTS.md).',
             )
-          : t(
-              'このフォルダで作業するときに AI が読む指示です。',
-              'What the AI reads when it works in this folder.',
-            )}
+          : target.key === instructionsFile || (!target.key && !folder)
+            ? t(
+                'この hibachi の hibachi agent が毎回最初に読む指示です（AGENTS.md）。',
+                "What this hibachi's hibachi agent reads first, every time (AGENTS.md).",
+              )
+            : t(
+                'このフォルダで作業するときに AI が読む指示です。',
+                'What the AI reads when it works in this folder.',
+              )}
       </p>
       {!target.key && (
         <label className="schema-field">
@@ -542,7 +572,10 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
           >
             {choices.map((choice) => (
               <option key={choice} value={choice}>
-                {choice || t('hibachi 全体（AGENTS.md）', 'The whole hibachi (AGENTS.md)')}
+                {choice ||
+                  (space
+                    ? t('hibachi 全体（AGENTS.md）', 'The whole hibachi (AGENTS.md)')
+                    : t('irori agent（AGENTS.md）', 'The irori agent (AGENTS.md)'))}
               </option>
             ))}
           </select>
@@ -560,12 +593,13 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
         onChange={setText}
       />
       <Actions>
-        {target.key && (
+        {/* The irori agent's AGENTS.md marks its folder as set up, so it stays. */}
+        {target.key && space && (
           <DeleteButton
             disabled={disabled}
             onClick={() =>
               onDelete(t('指示', 'the instructions'), target.key!, async () => {
-                await host.writeSchemaFile(space.scopeId, target.key!, null, doc!.hash);
+                await host.writeSchemaFile(scopeId, target.key!, null, doc!.hash);
                 onSelect(undefined);
               })
             }
@@ -585,8 +619,8 @@ function InstructionsForm({ space, target, data, disabled, run, onSelect, onDele
   );
 }
 
-function RuleForm({ space, target, disabled, run, onSelect, onDelete }: FormProps) {
-  const { doc, setDoc, error } = useSettingFile(space.scopeId, target.key);
+function RuleForm({ scopeId, target, disabled, run, onSelect, onDelete }: FormProps) {
+  const { doc, setDoc, error } = useSettingFile(scopeId, target.key);
   const [text, setText] = useState<string>();
   const [name, setName] = useState(target.key?.split('/').at(-1) ?? '');
   if (doc === undefined) return <Loading error={error} />;
@@ -602,11 +636,11 @@ function RuleForm({ space, target, disabled, run, onSelect, onDelete }: FormProp
         void run(async () => {
           const where = `${rulesRoot}/${filename}`;
           if (!target.key || renamed) {
-            await host.writeSchemaFile(space.scopeId, where, value, null);
-            if (target.key) await host.writeSchemaFile(space.scopeId, target.key, null, doc!.hash);
+            await host.writeSchemaFile(scopeId, where, value, null);
+            if (target.key) await host.writeSchemaFile(scopeId, target.key, null, doc!.hash);
             return onSelect({ kind: 'rule', key: where });
           }
-          setDoc(await host.writeSchemaFile(space.scopeId, where, value, doc!.hash));
+          setDoc(await host.writeSchemaFile(scopeId, where, value, doc!.hash));
           setText(undefined);
           return saved();
         });
@@ -641,7 +675,7 @@ function RuleForm({ space, target, disabled, run, onSelect, onDelete }: FormProp
             disabled={disabled}
             onClick={() =>
               onDelete(t('ルール', 'the rule'), target.key!, async () => {
-                await host.writeSchemaFile(space.scopeId, target.key!, null, doc!.hash);
+                await host.writeSchemaFile(scopeId, target.key!, null, doc!.hash);
                 onSelect(undefined);
               })
             }
@@ -659,7 +693,7 @@ function RuleForm({ space, target, disabled, run, onSelect, onDelete }: FormProp
   );
 }
 
-function HookForm({ space, target, data, disabled, run, onSelect, onDelete }: FormProps) {
+function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: FormProps) {
   const index = target.key === undefined ? undefined : Number(target.key);
   const current = index === undefined ? undefined : data.hooks[index];
   const [event, setEvent] = useState(current?.event ?? hookEvents[0]);
@@ -669,7 +703,7 @@ function HookForm({ space, target, data, disabled, run, onSelect, onDelete }: Fo
   const editable = !current || current.type === 'command';
   const write = async (next: HookEntry[]) => {
     const file = data.settings.claudeSettings
-      ? await host.readSchemaFile(space.scopeId, claudeSettingsFile)
+      ? await host.readSchemaFile(scopeId, claudeSettingsFile)
       : undefined;
     // The form edits what the list showed; a file changed since then is re-read, not overwritten.
     if (JSON.stringify(readHooks(file?.text)) !== JSON.stringify(data.hooks))
@@ -680,7 +714,7 @@ function HookForm({ space, target, data, disabled, run, onSelect, onDelete }: Fo
         ),
       );
     await host.writeSchemaFile(
-      space.scopeId,
+      scopeId,
       claudeSettingsFile,
       writeHooks(file?.text, next),
       file?.hash ?? null,
@@ -791,9 +825,9 @@ function HookForm({ space, target, data, disabled, run, onSelect, onDelete }: Fo
   );
 }
 
-function SkillForm({ space, target, data, disabled, run, onSelect, onDelete }: FormProps) {
+function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: FormProps) {
   const { doc, setDoc, error } = useSettingFile(
-    space.scopeId,
+    scopeId,
     target.key ? skillPath(target.key) : undefined,
   );
   const [form, setForm] = useState<{ name: string; description: string; body: string }>();
@@ -822,17 +856,15 @@ function SkillForm({ space, target, data, disabled, run, onSelect, onDelete }: F
           void run(async () => {
             const text = writeSkillText(doc?.text, { ...form, description });
             if (!target.key) {
-              await host.writeSchemaFile(space.scopeId, skillPath(form.name), text, null);
+              await host.writeSchemaFile(scopeId, skillPath(form.name), text, null);
               return onSelect({ kind: 'skill', key: form.name });
             }
             if (form.name !== target.key) {
-              await host.moveSkill(space.scopeId, target.key, form.name);
-              await host.writeSchemaFile(space.scopeId, skillPath(form.name), text, doc!.hash);
+              await host.moveSkill(scopeId, target.key, form.name);
+              await host.writeSchemaFile(scopeId, skillPath(form.name), text, doc!.hash);
               return onSelect({ kind: 'skill', key: form.name });
             }
-            setDoc(
-              await host.writeSchemaFile(space.scopeId, skillPath(form.name), text, doc!.hash),
-            );
+            setDoc(await host.writeSchemaFile(scopeId, skillPath(form.name), text, doc!.hash));
             return saved();
           });
         }}
@@ -894,7 +926,7 @@ function SkillForm({ space, target, data, disabled, run, onSelect, onDelete }: F
                     `${skillsRoot}/${target.key}/ and every file in it`,
                   ),
                   async () => {
-                    await host.moveSkill(space.scopeId, target.key!, null);
+                    await host.moveSkill(scopeId, target.key!, null);
                     onSelect(undefined);
                   },
                 )
@@ -909,7 +941,7 @@ function SkillForm({ space, target, data, disabled, run, onSelect, onDelete }: F
       </form>
       {target.key ? (
         <Attachments
-          space={space}
+          scopeId={scopeId}
           skill={target.key}
           files={data.settings.attachments[target.key] ?? []}
           disabled={disabled}
@@ -930,14 +962,14 @@ function SkillForm({ space, target, data, disabled, run, onSelect, onDelete }: F
 
 /** The other files of a skill package: scripts, templates, references. */
 function Attachments({
-  space,
+  scopeId,
   skill,
   files,
   disabled,
   run,
   onDelete,
 }: {
-  space: Space;
+  scopeId: string;
   skill: string;
   files: string[];
   disabled: boolean;
@@ -955,7 +987,7 @@ function Attachments({
     setDoc(undefined);
     if (!open) return;
     let live = true;
-    host.readSchemaFile(space.scopeId, skillPath(skill, open)).then(
+    host.readSchemaFile(scopeId, skillPath(skill, open)).then(
       (value) => {
         if (!live) return;
         setDoc(value);
@@ -1036,7 +1068,7 @@ function Attachments({
             event.preventDefault();
             const file = name.trim();
             void run(async () => {
-              await host.writeSchemaFile(space.scopeId, skillPath(skill, file), text, null);
+              await host.writeSchemaFile(scopeId, skillPath(skill, file), text, null);
               setOpen(file);
               return t(`${file} を追加しました。`, `Added ${file}.`);
             });
@@ -1102,8 +1134,7 @@ function Attachments({
             event.preventDefault();
             void run(async () => {
               setDoc(
-                (await host.writeSchemaFile(space.scopeId, doc!.path, text, doc!.hash)) ??
-                  undefined,
+                (await host.writeSchemaFile(scopeId, doc!.path, text, doc!.hash)) ?? undefined,
               );
               return saved();
             });
@@ -1125,7 +1156,7 @@ function Attachments({
                   disabled={disabled}
                   onClick={() =>
                     onDelete(t('添付ファイル', 'the attached file'), doc.path, async () => {
-                      await host.writeSchemaFile(space.scopeId, doc.path, null, doc.hash);
+                      await host.writeSchemaFile(scopeId, doc.path, null, doc.hash);
                       setOpen(undefined);
                     })
                   }

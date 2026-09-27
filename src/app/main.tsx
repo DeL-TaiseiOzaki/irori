@@ -1450,6 +1450,7 @@ function App() {
             agent={yourChoice.agent}
             spaces={workspaceSpaces}
             running={yourAiRunning}
+            revision={revision}
             onBack={() => goToLevel('overview')}
           />
         )}
@@ -1509,6 +1510,7 @@ function App() {
                 onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
                 schema={
                   <SchemaList
+                    scopeId={active.scopeId}
                     space={active}
                     revision={revision}
                     selected={
@@ -1960,6 +1962,7 @@ function App() {
                     !gitReview && (
                       <SchemaEditor
                         key={active.scopeId}
+                        scopeId={active.scopeId}
                         space={active}
                         target={schemaTarget}
                         locked={brainLocked || gitBusy}

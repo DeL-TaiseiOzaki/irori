@@ -4,6 +4,7 @@ import { agentNames } from '../domain/types';
 import { hasSubAgents, subAgentFiles, type BrainAgent, type YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
+import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import './you.css';
@@ -164,8 +165,8 @@ function FileView({ path, reads }: { path: string; reads: number }) {
         <span
           className="you-stage-note"
           title={t(
-            'irori がここに書くのは、まだないサブエージェント定義だけです。ほかの変更は irori agent に頼んでください。',
-            'irori writes only missing sub-agent definitions here. Ask the irori agent for other changes.',
+            'ファイルとしては読むだけです。指示・スキル・ルール・フックは Schema の設定で編集できます。',
+            'Files are read-only here. Edit the instructions, skills, rules and hooks in the Schema settings.',
           )}
         >
           <Icon name="lock" size={12} />
@@ -221,27 +222,39 @@ function Definition({ file, reads }: { file: BrainAgent['definitions'][number]; 
 }
 
 /**
- * The irori agent (your AI): its folder, read-only, and the hibachi agent it
- * hands each brain's work to. irori writes a missing definition when it hands
- * that brain to the irori agent, and never replaces one.
+ * The irori agent (your AI): its Schema settings, the same as a hibachi's, its
+ * folder as files, read-only, and the hibachi agent it hands each brain's work
+ * to. irori writes a missing definition when it hands that brain to the irori
+ * agent, and never replaces one.
  */
 export function YourAiScreen({
   you,
   agent,
   spaces,
   running,
+  revision,
   onBack,
 }: {
   you: YourAi;
   /** The CLI your AI runs on. */
   agent: AgentId;
   spaces: Space[];
+  /** While the irori agent runs, its Schema does not change, as a hibachi's does not. */
   running: boolean;
+  /** Counts the host's file changes, the Schema settings' own writes among them. */
+  revision: number;
   onBack: () => void;
 }) {
   // Every read of the folder and the brains follows this count.
-  const [reads, setReads] = useState(0);
+  const [local, setReads] = useState(0);
+  const reads = local + revision;
   const reread = () => setReads((value) => value + 1);
+  // The Schema settings first, as in a hibachi; the folder's files are one click away.
+  const [schemaFiles, setSchemaFiles] = useState(false);
+  const [target, setTarget] = useState<SchemaTarget | undefined>({
+    kind: 'instructions',
+    key: 'AGENTS.md',
+  });
   const wasRunning = useRef(running);
   useEffect(() => {
     // irori or your AI may have just written definitions.
@@ -268,6 +281,7 @@ export function YourAiScreen({
       value.includes(path) ? value.filter((item) => item !== path) : [...value, path],
     );
   const show = (path: string) => {
+    setTarget(undefined);
     setFile(path);
     // A brain's definition also picks that brain on the right.
     const owner = owners.get(path);
@@ -318,6 +332,15 @@ export function YourAiScreen({
             </h2>
             <button
               className="you-action"
+              aria-pressed={schemaFiles}
+              aria-label={t('ファイルとして表示', 'Show as files')}
+              title={t('ファイルとして表示', 'Show as files')}
+              onClick={() => setSchemaFiles((value) => !value)}
+            >
+              <Icon name={schemaFiles ? 'sliders' : 'folder'} size={14} />
+            </button>
+            <button
+              className="you-action"
               aria-label={t('フォルダを読み直す', 'Reload the folder')}
               title={t('フォルダを読み直す', 'Reload the folder')}
               onClick={reread}
@@ -326,20 +349,44 @@ export function YourAiScreen({
             </button>
           </div>
           <div className="you-tree-body">
-            <Folder
-              directory=""
-              depth={0}
-              reads={reads}
-              open={open}
-              file={file}
-              owners={owners}
-              onToggle={toggle}
-              onShow={show}
-            />
+            {schemaFiles ? (
+              <Folder
+                directory=""
+                depth={0}
+                reads={reads}
+                open={open}
+                file={target ? '' : file}
+                owners={owners}
+                onToggle={toggle}
+                onShow={show}
+              />
+            ) : (
+              <SchemaList
+                scopeId={you.id}
+                revision={reads}
+                selected={target}
+                locked={running}
+                onSelect={setTarget}
+                onOpenFile={(entry) => show(entry.path)}
+              />
+            )}
           </div>
         </div>
       </section>
-      <FileView path={file} reads={reads} />
+      {target ? (
+        <div className="you-stage on-stage">
+          <SchemaEditor
+            scopeId={you.id}
+            target={target}
+            locked={running}
+            revision={reads}
+            onSelect={(next) => (next ? setTarget(next) : show(file))}
+            onClose={() => show(file)}
+          />
+        </div>
+      ) : (
+        <FileView path={file} reads={reads} />
+      )}
       <section
         className="you-panel you-brains chrome"
         aria-label={t('hibachi agent', 'hibachi agents')}

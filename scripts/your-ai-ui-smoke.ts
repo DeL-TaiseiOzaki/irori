@@ -101,6 +101,44 @@ try {
     definitions.getByRole('button', { name: /^Research の hibachi agent/ }),
   ).toContainText('定義済み');
   await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
+  // Its Schema is edited as settings, the same as a hibachi's: the instructions
+  // open first, and a rule and a skill are added in its own folder.
+  const youPanel = page.getByRole('region', { name: 'irori agent のフォルダ' });
+  const youGroup = (name: string) =>
+    youPanel.getByRole('group', { name: `Schema の${name}`, exact: true });
+  const settings = page.getByRole('region', { name: 'Schema の設定' });
+  await expect(
+    settings.getByRole('textbox', { name: '指示（Markdown）', exact: true }),
+  ).toHaveValue(/^# irori agent\n/);
+  await expect(settings).toContainText('irori agent が毎回最初に読む指示です');
+  await youGroup('ルール').getByRole('button', { name: 'ルールを追加', exact: true }).click();
+  await settings.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('tone');
+  await settings
+    .getByRole('textbox', { name: 'ルール（Markdown）', exact: true })
+    .fill('Report in Japanese.\n');
+  await settings.getByRole('button', { name: '作成', exact: true }).click();
+  await expect(youGroup('ルール').getByRole('button', { name: 'tone.md' })).toBeVisible();
+  expect(await readFile(path.join(you, '.claude', 'rules', 'tone.md'), 'utf8')).toBe(
+    'Report in Japanese.\n',
+  );
+  await youGroup('スキル').getByRole('button', { name: 'スキルを追加', exact: true }).click();
+  await settings.getByRole('textbox', { name: '名前', exact: true }).fill('weekly');
+  await settings.getByRole('textbox', { name: '説明', exact: true }).fill('Plans the week.');
+  await settings
+    .getByRole('textbox', { name: '手順（Markdown）', exact: true })
+    .fill('Ask each hibachi.');
+  await settings.getByRole('button', { name: '作成', exact: true }).click();
+  await expect(youGroup('スキル').getByRole('button', { name: 'weekly' })).toBeVisible();
+  expect(await readFile(path.join(you, '.agents', 'skills', 'weekly', 'SKILL.md'), 'utf8')).toBe(
+    '---\nname: weekly\ndescription: Plans the week.\n---\n\nAsk each hibachi.\n',
+  );
+  // The folder as files, read-only, still shows the definitions.
+  await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
+  await youPanel.getByRole('button', { name: 'hibachi-research.md' }).click();
+  await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText(
+    'Edited by the person.',
+  );
+  await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
   // The irori agent starts in full access like a hibachi agent. This part is
@@ -121,6 +159,13 @@ try {
   // The map draws the hand-off, and the brains are held while your AI works.
   await expect(map.locator('.map-pill.hand-off')).toContainText('Write a note in Product');
   await expect(map.getByRole('button', { name: 'Product を開く' })).toHaveClass(/handed/);
+  // Its Schema waits while it runs, as a hibachi's does during its run.
+  await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
+  await expect(page.getByRole('region', { name: 'Schema の設定' })).toContainText(
+    'irori agent の実行中は Schema を変更できません。',
+  );
+  await expect(youPanel.getByRole('button', { name: 'ルールを追加', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   await page.screenshot({ path: 'test-results/irori-your-ai.png' });
   await rail.getByRole('button', { name: /^Research・AI/ }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
@@ -176,7 +221,11 @@ try {
     await readFile(path.join(you, '.claude', 'agents', 'hibachi-research.md'), 'utf8'),
   ).toContain('Edited by the person.');
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
-  await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText('# irori agent');
+  await expect(
+    page
+      .getByRole('region', { name: 'Schema の設定' })
+      .getByRole('textbox', { name: '指示（Markdown）', exact: true }),
+  ).toHaveValue(/^# irori agent\n/);
   await expect(
     definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
   ).toContainText('定義済み');

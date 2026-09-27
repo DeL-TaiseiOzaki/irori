@@ -30,8 +30,9 @@ import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
-import { readSkillReach, readSkills } from './skills';
+import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
+import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
 import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
@@ -65,7 +66,6 @@ app
     setLanguage(device.language);
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
-    const schemaSettings = new SchemaSettingsService(files, search);
     const drafts = new DraftService(files);
     const emit = (event: HostEvent) => {
       if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
@@ -114,6 +114,10 @@ app
     // Your AI's folder is the device's, not a KB's: its record is read before any run.
     const you = new YourAiService(files.dataDir);
     await you.load();
+    // The Schema settings take a hibachi's id or the irori agent's, whose folder is its Schema.
+    const schemaFolder = async (scopeId: string) =>
+      you.rootOf(scopeId) ? you.schemaFolder() : spaceFolder(files, scopeId);
+    const schemaSettings = new SchemaSettingsService(files, search, schemaFolder);
     const agents = new AgentService(
       files,
       (event) => emit({ type: 'agent', event }),
@@ -472,7 +476,8 @@ app
             return graphIndex.update(id);
           }),
         ),
-      skills: (id) => readSkills(files, id),
+      skills: async (id) =>
+        you.rootOf(id) ? readFolderSkills(await you.schemaFolder()) : readSkills(files, id),
       skillReach: (id) => readSkillReach(files, id),
       schemaSettings: (id) => schemaSettings.list(id),
       readSchemaFile: (...args) => schemaSettings.read(...args),

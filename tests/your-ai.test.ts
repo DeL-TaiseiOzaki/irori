@@ -7,6 +7,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
+import { SearchService } from '../src/host/search';
+import { SchemaSettingsService } from '../src/host/schema-settings';
+import { readFolderSkills } from '../src/host/skills';
 import { AgentService } from '../src/agents/service';
 import { defaultAgentAccess } from '../src/domain/agent-access';
 import { writeDecision, type Delegation } from '../src/agents/delegation';
@@ -174,6 +177,72 @@ test('the Your AI screen reads only inside the folder', async (t) => {
     { cli: 'claude', path: '.claude/agents/hibachi-product.md' },
   ]);
   assert.deepEqual(found.get('hibachi-research'), []);
+});
+
+test('the irori agent’s folder takes the same Schema settings as a hibachi, confined to it', async (t) => {
+  const { base, you } = await yourAi(t);
+  const { id, root } = await you.create();
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const service = new SchemaSettingsService(files, new SearchService(files), (scopeId) => {
+    assert.equal(scopeId, id);
+    return you.schemaFolder();
+  });
+  await mkdir(path.join(root, 'plans'));
+  await writeFile(path.join(root, 'plans', 'AGENTS.md'), '# not instructions\n');
+  const listing = await service.list(id);
+  // Only the root AGENTS.md: the folder has no knowledge folders.
+  assert.deepEqual(listing.instructions, ['AGENTS.md']);
+  assert.deepEqual(listing.folders, []);
+  await assert.rejects(service.read(id, 'plans/AGENTS.md'), /cannot be changed|変更できません/);
+  await assert.rejects(
+    service.write(id, 'plans/b/AGENTS.md', '# b\n', null),
+    /cannot be changed|変更できません/,
+  );
+  // The instructions, a rule, hooks and a skill, hash-checked as for a hibachi.
+  const agents = await service.read(id, 'AGENTS.md');
+  assert.equal(agents.text, yourAiStarter['AGENTS.md']);
+  await service.write(id, 'AGENTS.md', '# Mine\n', agents.hash);
+  await assert.rejects(service.write(id, 'AGENTS.md', '# Again\n', agents.hash), /CONFLICT/);
+  const mine = await service.read(id, 'AGENTS.md');
+  await assert.rejects(
+    service.write(id, 'AGENTS.md', null, mine.hash),
+    /cannot be changed|変更できません/,
+  );
+  await service.write(id, '.claude/rules/tone.md', 'Be brief.\n', null);
+  await service.write(id, '.claude/settings.json', '{"hooks":{}}\n', null);
+  await service.write(
+    id,
+    '.agents/skills/plan/SKILL.md',
+    '---\nname: plan\ndescription: Plans a week.\n---\n\nPlan.\n',
+    null,
+  );
+  const after = await service.list(id);
+  assert.deepEqual(after.rules, ['.claude/rules/tone.md']);
+  assert.equal(after.claudeSettings, true);
+  // Its skills are listed from its own .agents/skills, as a hibachi's are.
+  const skills = await readFolderSkills(await you.schemaFolder());
+  assert.deepEqual(
+    skills.skills.map((skill) => skill.name),
+    ['plan'],
+  );
+  await service.moveSkill(id, 'plan', 'weekly');
+  assert.deepEqual(await readdir(path.join(root, '.agents', 'skills')), ['weekly']);
+  // A definition irori wrote is not a setting, and no alias leads out of the folder.
+  await you.writeDefinitions('claude', [{ name: 'P', agent: 'hibachi-p', root: '/kb/p' }]);
+  await assert.rejects(
+    service.read(id, '.claude/agents/hibachi-p.md'),
+    /cannot be changed|変更できません/,
+  );
+  const outside = path.join(base, 'outside');
+  await mkdir(outside);
+  await rm(path.join(root, '.claude', 'rules'), { recursive: true });
+  await symlink(outside, path.join(root, '.claude', 'rules'));
+  await assert.rejects(
+    service.write(id, '.claude/rules/x.md', 'x\n', null),
+    /cannot be changed|変更できません/,
+  );
+  assert.deepEqual(await readdir(outside), []);
 });
 
 test('irori writes an absent definition, never over one, and only inside the folder', async (t) => {
