@@ -1039,7 +1039,7 @@ function App() {
         t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
       );
     const value = await host.agentConversation(scopeId, agentId);
-    const input = { scopeId, agent: agentId, access: 'default' as const, prompt: message };
+    const input = { scopeId, agent: agentId, access: defaultAgentAccess(agentId), prompt: message };
     if (value.activeRunId || value.queued.length || draining.current.has(scopeId)) {
       const list = await host.queueAgentMessage(input);
       if (conversationKey.current === key) setQueued(list);
