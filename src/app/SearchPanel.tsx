@@ -218,7 +218,7 @@ export function SearchPanel({
             maxLength={200}
             value={query}
             disabled={opening}
-            placeholder={t('Brain の本文を検索…', "Search the brain's notes…")}
+            placeholder={t('hibachi の本文を検索…', "Search the hibachi's notes…")}
             onChange={(event) => {
               invalidate();
               setQuery(event.target.value);
@@ -244,7 +244,7 @@ export function SearchPanel({
         </form>
         <div className="palette-scopes">
           <fieldset aria-describedby="search-scope-help">
-            <legend className="sr-only">{t('検索する Brain', 'Brain to search')}</legend>
+            <legend className="sr-only">{t('検索する hibachi', 'hibachi to search')}</legend>
             <label className="palette-scope" data-checked={allBrains}>
               <input
                 type="radio"
@@ -258,7 +258,7 @@ export function SearchPanel({
                 }}
               />
               <Icon name="grid" size={16} />
-              {t('すべての Brain', 'All brains')}
+              {t('すべての hibachi', 'All hibachis')}
             </label>
             {spaces.map((item) => (
               <label

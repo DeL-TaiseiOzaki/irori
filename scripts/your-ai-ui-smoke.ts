@@ -37,6 +37,12 @@ await writeFile(
   `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/claude-your-ai.mjs')).href)}).then(m=>m.run());\n`,
   { mode: 0o700 },
 );
+// Your AI on another CLI: Pi's protocol fixture.
+await writeFile(
+  path.join(bin, 'pi'),
+  `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
+  { mode: 0o700 },
+);
 const env = {
   ...process.env,
   HOME: home,
@@ -65,52 +71,71 @@ try {
       .filter(Boolean)
       .map((line) => JSON.parse(line));
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'Brain' });
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
   // Your AI is set up from the Overview; its starter never overwrites anything.
-  const island = page.getByRole('complementary', { name: 'あなたの AI' });
+  const island = page.getByRole('complementary', { name: 'irori agent' });
   await expect(island).toContainText(you);
-  await island.getByRole('button', { name: 'あなたの AI を用意する' }).click();
-  const composer = island.getByLabel('あなたの AI への指示');
+  await island.getByRole('button', { name: 'irori agent を用意する' }).click();
+  const composer = island.getByLabel('irori agent への指示');
   await expect(composer).toBeVisible();
-  expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).toContain('# Your AI');
-  expect(
-    (await stat(path.join(you, '.agents', 'skills', 'brain-agents', 'SKILL.md'))).isFile(),
-  ).toBe(true);
-  const map = page.getByRole('region', { name: 'Brain の地図' });
-  await expect(map.getByRole('button', { name: 'あなたの AI の Schema を開く' })).toBeVisible();
+  expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).toContain('# irori agent');
+  await expect(stat(path.join(you, '.agents'))).rejects.toThrow();
+  const map = page.getByRole('region', { name: 'hibachi の地図' });
+  await expect(map.getByRole('button', { name: 'irori agent の Schema を開く' })).toBeVisible();
+
+  // Before any hand-off the Your AI screen says irori writes the definitions;
+  // one the person already wrote is kept as it is.
+  await writeFile(
+    path.join(you, '.claude', 'agents', 'hibachi-research.md'),
+    '---\nname: hibachi-research\ndescription: Edited by the person.\n---\nMine.\n',
+  );
+  await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
+  const definitions = page.getByRole('region', { name: 'hibachi agent' });
+  await expect(
+    definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
+  ).toContainText('未作成');
+  await expect(definitions).toContainText('irori が .claude/agents/hibachi-product.md を書きます');
+  await expect(
+    definitions.getByRole('button', { name: /^Research の hibachi agent/ }),
+  ).toContainText('定義済み');
+  await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
   // A request goes to your AI with the workspace's brains; it hands a note to
   // Product's sub-agent, whose write asks the person here.
   await composer.fill('Write a decision note.');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   const request = island.getByRole('group', { name: '許可の要求' });
-  await expect(request).toContainText('Product の AI から');
-  await expect(island.getByRole('list', { name: 'Brain への依頼' })).toContainText(
+  await expect(request).toContainText('Product の hibachi agent から');
+  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText(
     'Write a note in Product',
   );
-  await expect(island.getByRole('list', { name: 'Brain への依頼' })).toContainText('許可待ち');
+  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText('許可待ち');
   // The map draws the hand-off, and the brains are held while your AI works.
   await expect(map.locator('.map-pill.hand-off')).toContainText('Write a note in Product');
   await expect(map.getByRole('button', { name: 'Product を開く' })).toHaveClass(/handed/);
   await page.screenshot({ path: 'test-results/irori-your-ai.png' });
   await rail.getByRole('button', { name: /^Research・AI/ }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page
+    .getByTestId('stage')
+    .getByRole('button', { name: 'hibachi agent', exact: true })
+    .click();
   await expect(page.locator('.agent-held')).toContainText(
-    'あなたの AI がこの Brain にも仕事を渡しています',
+    'irori agent がこの hibachi にも仕事を渡しています',
   );
   await expect(page.getByRole('button', { name: '送信', exact: true })).toBeDisabled();
-  await rail.getByRole('button', { name: '全体', exact: true }).click();
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
   // Allowed here, the sub-agent writes in its brain and reports.
   await request.getByRole('button', { name: '今回のみ許可' }).click();
   await expect(island.locator('.message.report')).toContainText(
     'Wrote Knowledge_Base/from-your-ai.md.',
   );
-  await expect(island).toContainText("Handed the note to Product's AI.");
-  await expect(island.getByRole('list', { name: 'Brain への依頼' })).toContainText('完了');
+  await expect(island).toContainText("Handed the note to Product's hibachi agent.");
+  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText('完了');
   expect(await readFile(path.join(roots[0], 'Knowledge_Base', 'from-your-ai.md'), 'utf8')).toBe(
     '# From your AI\n',
   );
@@ -135,30 +160,67 @@ try {
   ]);
   await expect(readFile(path.join(roots[0], 'direct.md'))).rejects.toThrow();
 
-  // The Your AI screen: its folder read-only, and each brain's sub-agent. irori
-  // asks your AI to write the definitions and shows them once written.
-  await map.getByRole('button', { name: 'あなたの AI の Schema を開く' }).click();
-  await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText('# Your AI');
-  const definitions = page.getByRole('region', { name: 'Brain の AI' });
-  await expect(definitions.getByRole('button', { name: /^Product の AI/ })).toContainText('未定義');
+  // The Your AI screen: its folder read-only, and each hibachi's sub-agent.
+  // irori wrote the missing definition when it handed Product over, and left
+  // the person's own one alone.
+  expect(log[0].loaded.sort()).toEqual(['hibachi-product', 'hibachi-research']);
+  expect(
+    await readFile(path.join(you, '.claude', 'agents', 'hibachi-product.md'), 'utf8'),
+  ).toContain('name: hibachi-product');
+  expect(
+    await readFile(path.join(you, '.claude', 'agents', 'hibachi-research.md'), 'utf8'),
+  ).toContain('Edited by the person.');
+  await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
+  await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText('# irori agent');
+  await expect(
+    definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
+  ).toContainText('定義済み');
+  await definitions.getByRole('button', { name: /^Product の hibachi agent/ }).click();
+  await expect(definitions.locator('.you-definition')).toContainText('name: hibachi-product');
   await page.screenshot({ path: 'test-results/irori-your-ai-screen.png' });
-  await definitions.getByRole('button', { name: 'あなたの AI に定義を更新させる' }).click();
-  await expect(island).toContainText('Wrote 2 definitions.');
-  expect(await readFile(path.join(you, '.claude', 'agents', 'product.md'), 'utf8')).toContain(
-    'name: product',
-  );
-  await map.getByRole('button', { name: 'あなたの AI の Schema を開く' }).click();
-  await expect(definitions.getByRole('button', { name: /^Product の AI/ })).toContainText(
-    '定義済み',
-  );
-  await expect(definitions.getByRole('button', { name: /^Research の AI/ })).toContainText(
-    '定義済み',
-  );
-  await page.getByRole('button', { name: '全体に戻る' }).click();
+  await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   await expect(map).toBeVisible();
+
+  // Your AI on another CLI, with a model from that CLI's list: it works in the
+  // brains itself, told to read each brain's AGENTS.md. The choice is kept.
+  const cli = island.getByLabel('irori agent の CLI', { exact: true });
+  await expect(cli).toHaveValue('claude');
+  await cli.selectOption('pi');
+  await expect(island.getByRole('button', { name: 'Pi · あなたの Schema' })).toBeVisible();
+  await island.getByLabel('モデル', { exact: true }).selectOption('anthropic/claude-fixture');
+  await composer.fill('Tidy both brains.');
+  await island.getByRole('button', { name: '送信', exact: true }).click();
+  const piLog = async () =>
+    (await readFile(path.join(you, 'fixture-requests.jsonl'), 'utf8').catch(() => ''))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  await expect
+    .poll(async () => (await piLog()).filter((entry) => entry.type === 'prompt').length)
+    .toBe(1);
+  await expect(island).toContainText('の応答');
+  const sent = (await piLog()).find((entry) => entry.type === 'prompt').message as string;
+  expect(sent).toContain(`folder ${JSON.stringify(roots[0])}`);
+  expect(sent).toContain('You run on Pi');
+  expect(sent).toContain("read the AGENTS.md at the top of that hibachi's folder");
+  expect(sent.endsWith('Tidy both brains.')).toBe(true);
+  expect((await piLog()).find((entry) => entry.type === 'launch').args.slice(2, 6)).toEqual([
+    '--provider',
+    'anthropic',
+    '--model',
+    'claude-fixture',
+  ]);
+  expect((await page.evaluate(() => window.irori.deviceSettings())).yourAi).toEqual({
+    agent: 'pi',
+    models: { pi: 'anthropic/claude-fixture' },
+  });
+  await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
+  await expect(page.locator('.you-chip')).toHaveText('Pi');
+  await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions written on request and shown on the Your AI screen. Protocol fixture only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, and your AI on Pi with a listed model working in the brains after their AGENTS.md. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

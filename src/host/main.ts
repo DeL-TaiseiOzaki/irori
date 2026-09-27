@@ -521,8 +521,8 @@ app
         if (agents.busy(scopeId) || cloud.busy || git.busy)
           throw Error(
             t(
-              '実行・Git 操作・接続が終わってから Brain の設定を変えてください。',
-              "Change the brain's settings after the run, Git operation and connection finish.",
+              '実行・Git 操作・接続が終わってから hibachi の設定を変えてください。',
+              "Change the hibachi's settings after the run, Git operation and connection finish.",
             ),
           );
         return changeFiles(() => files.update(scopeId, change));
@@ -572,6 +572,7 @@ app
       },
       noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
       agents: () => agents.available(),
+      agentModels: (agent) => agents.models(agent),
       agentSession: (...args) => agents.session(...args),
       agentConversation: (...args) => agents.conversation(...args),
       queueAgentMessage: (input) => agents.queueMessage(input),
@@ -588,14 +589,14 @@ app
       yourAiBrains: async (scopeIds) => {
         const names = brainAgentNames(files.list());
         const brains = scopeIds.map((scopeId) => files.get(scopeId));
-        const defined = await you.defined(brains.map((brain) => names.get(brain.scopeId)!));
+        const definitions = await you.definitions(brains.map((brain) => names.get(brain.scopeId)!));
         return brains.map((brain) => ({
           scopeId: brain.scopeId,
           name: brain.name,
           category: brain.category,
           agent: names.get(brain.scopeId)!,
           root: brain.root,
-          defined: defined.has(names.get(brain.scopeId)!),
+          definitions: definitions.get(names.get(brain.scopeId)!) ?? [],
         }));
       },
       start: (input) => {

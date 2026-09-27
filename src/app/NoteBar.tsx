@@ -56,7 +56,7 @@ export function Crumbs({
         (onBrain ? (
           <button
             className="crumb brain"
-            title={t('Brain のホーム', "The brain's home")}
+            title={t('hibachi のホーム', "The hibachi's home")}
             onClick={onBrain}
           >
             <BrainTile space={space} size={20} radius={6} ring="stage" />
@@ -122,23 +122,23 @@ export function NoteMenu({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opens and closes the brain's AI; closed, it is the AI's own ember button. */
+/** Opens and closes the brain's hibachi agent; closed, it is the AI's own ember button. */
 export function AiToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return open ? (
     <button
       className="ai-toggle open"
       aria-pressed="true"
-      aria-label={t('AIパネルを閉じる', 'Close AI panel')}
-      title={t('AI パネル', 'AI panel')}
+      aria-label={t('hibachi agent を閉じる', 'Close hibachi agent')}
+      title={t('hibachi agent', 'hibachi agent')}
       onClick={onToggle}
     >
       <Icon name="sparkles" size={14} />
       AI
     </button>
   ) : (
-    <button className="ai-toggle" title={t('AI に相談', 'Ask AI')} onClick={onToggle}>
+    <button className="ai-toggle" title={t('hibachi agent', 'hibachi agent')} onClick={onToggle}>
       <Icon name="sparkles" size={14} />
-      {t('AIに相談', 'Ask AI')}
+      {t('hibachi agent', 'hibachi agent')}
     </button>
   );
 }

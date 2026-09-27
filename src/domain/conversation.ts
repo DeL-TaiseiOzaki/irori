@@ -3,6 +3,13 @@ import { sourceRef } from './knowledge';
 import { skillName } from './skills';
 import { agentIds, agentAccessModes, type AgentEvent } from './types';
 
+/** A model name as a CLI takes it: never an option, never shell syntax. */
+export const agentModel = z.string().regex(/^\w[\w./:@[\]-]{0,199}$/);
+/** The CLI your AI runs on and the model chosen for each CLI, kept on the device. */
+export const yourAiChoice = z.object({
+  agent: z.enum(agentIds),
+  models: z.partialRecord(z.enum(agentIds), agentModel),
+});
 export const messageInput = z.object({
   prompt: z
     .string()
@@ -12,6 +19,7 @@ export const messageInput = z.object({
   notePath: z.string().max(4096).optional(),
   newSession: z.boolean().optional(),
   access: z.enum(agentAccessModes).optional(),
+  model: agentModel.optional(),
   sources: z.array(sourceRef).max(20).optional(),
   skill: skillName.optional(),
   /** Tell the agent which lines of the note the person wrote or revised. */

@@ -6,6 +6,8 @@ export interface NativeContext {
   prompt: string;
   session?: string;
   access?: AgentAccess;
+  /** The model chosen for this instruction; the CLI's own default when absent. */
+  model?: string;
   /** The environment and extra arguments the CLI starts with; its own defaults when absent. */
   env?: NodeJS.ProcessEnv;
   args?: string[];

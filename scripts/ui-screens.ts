@@ -152,7 +152,9 @@ for (const run of runs) {
     await step('note', async () => {
       await page.getByRole('button', { name: 'notes', exact: true }).click();
       await page.getByRole('button', { name: 'decision-001', exact: true }).click();
-      await page.getByRole('button', { name: L('AIに相談', 'Ask AI'), exact: true }).click();
+      await page
+        .getByRole('button', { name: L('hibachi agent', 'hibachi agent'), exact: true })
+        .click();
       await shot(page, 'Main', run);
     });
     await step('search', async () => {
@@ -165,10 +167,10 @@ for (const run of runs) {
     });
     await step('settings', async () => {
       await page
-        .getByRole('button', { name: L('Brain のメニュー', 'Brain menu'), exact: true })
+        .getByRole('button', { name: L('hibachi のメニュー', 'hibachi menu'), exact: true })
         .click();
       await page
-        .getByRole('menuitem', { name: L('Brain の設定', 'Brain settings'), exact: true })
+        .getByRole('menuitem', { name: L('hibachi の設定', 'hibachi settings'), exact: true })
         .click();
       await shot(page, 'Settings', run);
       await page.keyboard.press('Escape');
@@ -176,7 +178,7 @@ for (const run of runs) {
     });
     await step('changes', async () => {
       await page
-        .getByRole('group', { name: L('Brain の表示', 'Brain view') })
+        .getByRole('group', { name: L('hibachi の表示', 'hibachi view') })
         .getByRole('button', { name: new RegExp(`^${L('変更', 'Changes')}`) })
         .click();
       await page
@@ -185,7 +187,7 @@ for (const run of runs) {
         .click();
       await shot(page, 'Changes', run);
       await page
-        .getByRole('group', { name: L('Brain の表示', 'Brain view') })
+        .getByRole('group', { name: L('hibachi の表示', 'hibachi view') })
         .getByRole('button', { name: L('ファイル', 'Files'), exact: true })
         .click();
     });
@@ -215,9 +217,9 @@ for (const run of runs) {
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'detached' });
     });
-    const rail = page.getByRole('navigation', { name: L('Brain', 'Brains') });
+    const rail = page.getByRole('navigation', { name: L('hibachi', 'hibachis') });
     await step('overview', async () => {
-      await rail.getByRole('button', { name: L('全体', 'Overview'), exact: true }).click();
+      await rail.getByRole('button', { name: L('irori mode', 'irori mode'), exact: true }).click();
       await shot(page, 'Atlas', run);
     });
     await step('columns', async () => {
@@ -227,7 +229,9 @@ for (const run of runs) {
     });
     await step('you', async () => {
       await page
-        .getByRole('button', { name: L('あなたの AI の Schema を開く', "Open your AI's Schema") })
+        .getByRole('button', {
+          name: L('irori agent の Schema を開く', "Open the irori agent's Schema"),
+        })
         .click();
       await shot(page, 'You', run);
     });

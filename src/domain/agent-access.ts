@@ -5,6 +5,20 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
   return agent === 'pi' ? ['default'] : ['default', 'full-access'];
 }
 
+/** A brain's hibachi agent starts in full access wherever the CLI offers it. */
+export function defaultAgentAccess(agent: AgentId): AgentAccess {
+  return agentAccessOptions(agent).includes('full-access') ? 'full-access' : 'default';
+}
+
+/**
+ * Your AI on Claude Code stays in the standard mode: its sub-agents inherit the
+ * parent's permission mode. Other CLIs work in the brains directly and need
+ * their full access to reach those folders.
+ */
+export function yourAiAccess(agent: AgentId): AgentAccess {
+  return agent === 'claude' ? 'default' : defaultAgentAccess(agent);
+}
+
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {
   if (!agentAccessOptions(agent).includes(access))
     throw Error(
@@ -35,10 +49,15 @@ export function agentAccessDetail(agent: AgentId, access: AgentAccess = 'default
             'Claude Codeの通常のツール承認を省略します。明示的な権限ルール・管理者の制限は有効です。',
             "Skips Claude Code's usual tool approvals. Explicit permission rules and administrator restrictions still apply.",
           )
-        : t(
-            'この会話のOpenCodeツール権限を許可に設定します。OS・管理者の制限は有効です。',
-            "Sets OpenCode's tool permissions to allow for this conversation. OS and administrator restrictions still apply.",
-          );
+        : agent === 'hermes'
+          ? t(
+              'Hermes Agent を --yolo で実行し、危険なコマンドの承認を省略します。OS・管理者の制限は有効です。',
+              'Runs Hermes Agent with --yolo, skipping its dangerous-command approvals. OS and administrator restrictions still apply.',
+            )
+          : t(
+              'この会話のOpenCodeツール権限を許可に設定します。OS・管理者の制限は有効です。',
+              "Sets OpenCode's tool permissions to allow for this conversation. OS and administrator restrictions still apply.",
+            );
   if (agent === 'codex')
     return t(
       '作業フォルダへの書き込みは可能です。追加のアクセスが必要な場合に承認を求めます。',
@@ -53,6 +72,11 @@ export function agentAccessDetail(agent: AgentId, access: AgentAccess = 'default
     return t(
       'OpenCodeの権限設定を使い、ask要求をここに表示します。標準では多くのツールが承認なしで動きます。',
       "Uses OpenCode's permission settings and shows its ask requests here. By default many tools run without approval.",
+    );
+  if (agent === 'hermes')
+    return t(
+      'Hermes Agent の設定を使います。1回ごとの実行なので承認を尋ねられず、危険なコマンドは approvals.single_query_mode（既定は拒否）に従います。',
+      "Uses Hermes Agent's settings. Each run is one-shot, so it cannot ask: dangerous commands follow approvals.single_query_mode (deny by default).",
     );
   return t(
     'Piのネイティブ設定を使います。標準のツール実行には承認ダイアログがありません。',

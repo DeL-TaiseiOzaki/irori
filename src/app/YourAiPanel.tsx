@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Space } from '../domain/types';
-import type { YourAi } from '../domain/you';
+import { agentIds, agentNames, type AgentId, type Space } from '../domain/types';
+import { hasSubAgents, type YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
 import { Icon } from './Icon';
 import type { BrainAi } from './useBrainAi';
+import { ModelPicker } from './ModelPicker';
 
 /** The latest run of a conversation, and whether it is still going. */
 export function latestRun(ai: BrainAi) {
@@ -30,6 +31,10 @@ export function YourAiPanel({
   you,
   brains,
   ai,
+  agent,
+  model,
+  onAgent,
+  onModel,
   onCreate,
   onShow,
   onSend,
@@ -39,6 +44,12 @@ export function YourAiPanel({
   you?: YourAi;
   brains: Space[];
   ai: BrainAi;
+  /** The CLI your AI runs on; Claude Code hands work to sub-agents, another CLI works in the brains itself. */
+  agent: AgentId;
+  /** '' for the CLI's default. */
+  model: string;
+  onAgent: (agent: AgentId) => void;
+  onModel: (model: string) => void;
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
@@ -72,24 +83,29 @@ export function YourAiPanel({
         <span className="overview-orb large" aria-hidden="true">
           <Icon name="sparkles" size={24} strokeWidth={2} />
         </span>
-        <h2>{t('あなたの AI', 'Your AI')}</h2>
+        <h2>{t('irori agent', 'irori agent')}</h2>
         <p>
-          {t(
-            'あなた専用のエージェントです。Brain ごとのサブエージェントに仕事を渡し、報告をまとめます。Claude Code で動きます。',
-            'Your own agent. It hands work to a sub-agent for each brain and gathers their reports. It runs on Claude Code.',
-          )}
+          {hasSubAgents(agent)
+            ? t(
+                `あなた専用のエージェントです。${agentNames[agent]} で動き、hibachi ごとの hibachi agent（サブエージェント）に仕事を渡して、報告をまとめます。`,
+                `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent (a sub-agent) and gathers their reports.`,
+              )
+            : t(
+                `あなた専用のエージェントです。${agentNames[agent]} で動き、各 hibachi の AGENTS.md を読んでから直接作業します。`,
+                `Your own agent. It runs on ${agentNames[agent]} and works in each hibachi directly after reading its AGENTS.md.`,
+              )}
         </p>
         <p className="mono your-ai-path" title={you.root}>
           {you.root}
         </p>
         <button className="ember-button" disabled={busy} onClick={() => void act(onCreate)}>
           <Icon name="sparkles" size={14} />
-          {t('あなたの AI を用意する', 'Set up your AI')}
+          {t('irori agent を用意する', 'Set up the irori agent')}
         </button>
         <small className="hint">
           {t(
-            'このフォルダに AGENTS.md と brain-agents スキルを書きます。既存のファイルは上書きしません。',
-            'Writes AGENTS.md and the brain-agents skill into this folder. Existing files are never overwritten.',
+            'このフォルダに AGENTS.md を書きます。既存のファイルは上書きしません。',
+            'Writes AGENTS.md into this folder. Existing files are never overwritten.',
           )}
         </small>
       </div>
@@ -107,9 +123,9 @@ export function YourAiPanel({
           <Icon name="sparkles" size={15} strokeWidth={2.1} />
         </span>
         <span className="your-ai-title">
-          <strong>{t('あなたの AI', 'Your AI')}</strong>
+          <strong>{t('irori agent', 'irori agent')}</strong>
           <button className="your-ai-schema" onClick={onShow}>
-            {t('Claude Code · あなたの Schema', 'Claude Code · your Schema')}
+            {t(`${agentNames[agent]} · あなたの Schema`, `${agentNames[agent]} · your Schema`)}
           </button>
         </span>
         <span className="overview-space" />
@@ -118,7 +134,7 @@ export function YourAiPanel({
             className="panel-button"
             disabled={busy}
             onClick={() => void act(onStop)}
-            aria-label={t('あなたの AI を停止', 'Stop your AI')}
+            aria-label={t('irori agent を停止', 'Stop the irori agent')}
           >
             <Icon name="close" size={13} />
             {t('停止', 'Stop')}
@@ -133,7 +149,7 @@ export function YourAiPanel({
       <div
         className="conversation your-ai-log"
         role="log"
-        aria-label={t('あなたの AI との会話', 'Conversation with your AI')}
+        aria-label={t('irori agent との会話', 'Conversation with the irori agent')}
         aria-live="polite"
         ref={log}
       >
@@ -146,8 +162,8 @@ export function YourAiPanel({
           <div className="agent-empty">
             <p>
               {t(
-                'Brain をまたぐ仕事を頼めます。あなたの AI が Brain ごとに分けて渡します。',
-                'Ask for work across your brains. Your AI splits it and hands each part to a brain.',
+                'hibachi をまたぐ仕事を頼めます。irori agent が hibachi ごとに分けて渡します。',
+                'Ask for work across your hibachis. The irori agent splits it and hands each part to a hibachi.',
               )}
             </p>
           </div>
@@ -168,7 +184,7 @@ export function YourAiPanel({
       >
         <span className="context-chip your-ai-scope">
           <Icon name="map" size={12} />
-          {t(`全体（${brains.length} Brain）`, `Overview (${brains.length} brains)`)}
+          {t(`すべての hibachi（${brains.length}）`, `All hibachis (${brains.length})`)}
         </span>
         {ai.queued.length > 0 && (
           <small className="your-ai-queued">
@@ -177,8 +193,8 @@ export function YourAiPanel({
           </small>
         )}
         <textarea
-          aria-label={t('あなたの AI への指示', 'Instruction for your AI')}
-          placeholder={t('あなたの AI に指示…', 'Instruct your AI…')}
+          aria-label={t('irori agent への指示', 'Instruction for the irori agent')}
+          placeholder={t('irori agent に指示…', 'Instruct the irori agent…')}
           rows={3}
           value={text}
           maxLength={32000}
@@ -197,10 +213,27 @@ export function YourAiPanel({
           }}
         />
         <footer>
-          <small>
-            <Icon name="sparkles" size={12} />
-            Claude Code
-          </small>
+          <span className="composer-selects your-ai-selects">
+            <label
+              className="composer-pill"
+              title={t('irori agent の CLI', "The irori agent's CLI")}
+            >
+              <Icon name="sparkles" size={12} />
+              <select
+                aria-label={t('irori agent の CLI', "The irori agent's CLI")}
+                value={agent}
+                disabled={busy || ai.running || ai.queued.length > 0}
+                onChange={(event) => onAgent(event.target.value as AgentId)}
+              >
+                {agentIds.map((id) => (
+                  <option key={id} value={id}>
+                    {agentNames[id]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ModelPicker agent={agent} value={model} disabled={busy} onChange={onModel} />
+          </span>
           <button
             type="submit"
             className="ember-button"

@@ -106,7 +106,7 @@ async function launch() {
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('Daily fixture note');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示', { exact: true })).toBeEnabled();
   return page;
 }
@@ -124,7 +124,7 @@ async function close() {
 function brainButton(page: Page, space: Space) {
   const name = space.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return page
-    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('navigation', { name: 'hibachi' })
     .getByRole('button', { name: new RegExp(`^${name}・AI`) });
 }
 /** Opens the note's menu and takes one of its actions. */
@@ -252,7 +252,7 @@ try {
   await expect(composer).toHaveValue('');
   await page
     .locator('.agent-panel')
-    .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
+    .getByRole('button', { name: 'hibachi agent を閉じる', exact: true })
     .click();
 
   await page.getByRole('button', { name: / にノートを作成$/ }).click();
@@ -326,7 +326,7 @@ try {
   expect(await exists(movedPath)).toBe(false);
   expect(await exists(path.join(root, destination, imageRelative))).toBe(true);
   await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Brain のメニュー', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
   await page.getByRole('menuitem', { name: '削除したノートを復元', exact: true }).click();
   const restore = page.getByRole('dialog', { name: '削除済みノート', exact: true });
   await restore
@@ -339,7 +339,7 @@ try {
   expect(
     await page.evaluate((scopeId) => window.irori.trashedNotes(scopeId), spaces[0].scopeId),
   ).toEqual([]);
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-daily-workflow.png' });
 

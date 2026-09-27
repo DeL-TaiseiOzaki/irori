@@ -714,6 +714,20 @@
 .composer-pill.toggle {
   padding: 0 9px 0 8px;
 }
+/* A model name typed in where the CLI lists none. */
+.model-pill input {
+  width: 150px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--tx);
+  font: inherit;
+}
+.model-pill input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
 .composer-pill.toggle {
   position: relative;
 }

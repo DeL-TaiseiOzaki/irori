@@ -43,11 +43,11 @@ try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'Brain' });
-  const sheet = page.getByRole('dialog', { name: 'Brain の設定' });
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const sheet = page.getByRole('dialog', { name: 'hibachi の設定' });
   const open = async () => {
-    await page.getByRole('button', { name: 'Brain のメニュー', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Brain の設定', exact: true }).click();
+    await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'hibachi の設定', exact: true }).click();
     await expect(sheet).toBeVisible();
   };
 
@@ -123,11 +123,14 @@ try {
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await expect(
     page
-      .getByRole('navigation', { name: 'Brain' })
+      .getByRole('navigation', { name: 'hibachi' })
       .getByRole('button', { name: /^Product Lab・AI/ }),
   ).toBeVisible();
   await expect(
-    page.getByRole('navigation', { name: 'Brain' }).locator('.rail-brain .brain-tile img').first(),
+    page
+      .getByRole('navigation', { name: 'hibachi' })
+      .locator('.rail-brain .brain-tile img')
+      .first(),
   ).toBeVisible();
   expect(
     (await readdir(path.join(roots[0], '.irori'))).filter((name) => name.startsWith('icon-')),

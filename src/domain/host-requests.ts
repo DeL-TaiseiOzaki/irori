@@ -3,7 +3,7 @@ import { agentIds, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
-import { startInput } from './conversation';
+import { startInput, yourAiChoice } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
@@ -44,6 +44,7 @@ export const hostArguments = {
       // The pane library keys a layout by its prefix, the group id and every panel id.
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
+      yourAi: yourAiChoice.optional(),
     }),
   ]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
@@ -170,6 +171,7 @@ export const hostArguments = {
   dailyNote: z.tuple([id]),
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),
+  agentModels: z.tuple([z.enum(agentIds)]),
   agentSession: z.tuple([id, z.enum(agentIds)]),
   agentConversation: z.tuple([id, z.enum(agentIds)]),
   queueAgentMessage: z.tuple([startInput]),

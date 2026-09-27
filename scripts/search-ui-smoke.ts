@@ -144,7 +144,7 @@ try {
 
   // Cross-brain search: one query against every brain, grouped by brain with a
   // BrainTile, name and hit count per group.
-  await scope('すべての Brain').check();
+  await scope('すべての hibachi').check();
   await query.fill('orbital');
   await submit.click();
   await expect(results.locator('li')).toHaveCount(2);
@@ -164,7 +164,7 @@ try {
   await launcher.click();
   // Opening a hit switches the active brain; the panel still preselects it, not "all".
   await expect(scope('参照KB')).toBeChecked();
-  await scope('すべての Brain').check();
+  await scope('すべての hibachi').check();
   await query.fill('ＯＲＢＩＴＡＬ');
   await submit.click();
   await expect(results).toContainText('一致する本文はありません。');
@@ -305,7 +305,7 @@ try {
   // An unresolved external edit still blocks search's preflight save. The panel
   // shows one brain at a time, so the search target's brain is chosen first.
   await page
-    .getByRole('navigation', { name: 'Brain' })
+    .getByRole('navigation', { name: 'hibachi' })
     .getByRole('button', { name: /^検索対象KB・AI/ })
     .click();
   await page.getByRole('button', { name: 'editing', exact: true }).click();

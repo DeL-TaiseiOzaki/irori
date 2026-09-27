@@ -880,3 +880,12 @@ button.column-row:hover {
   font-weight: 400;
   line-height: 1.7;
 }
+
+/* Your AI's CLI and model sit where the composer names them. */
+.your-ai-selects {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}

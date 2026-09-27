@@ -20,7 +20,7 @@ export interface BrainAi {
 }
 
 /**
- * One brain's AI as the Overview sees it: its conversation with the live
+ * One brain's hibachi agent as the Overview sees it: its conversation with the live
  * requests, its queue, and whether a run is in progress. Events stream in; a
  * run's start or end reads the queue again, since it changes then.
  */

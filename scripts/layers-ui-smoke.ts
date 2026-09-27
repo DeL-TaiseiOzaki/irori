@@ -70,7 +70,7 @@ try {
   for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   // The rail holds the workspace's brains in order; the panel shows one brain.
-  const rail = page.getByRole('navigation', { name: 'Brain' });
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
   const brain = (name: string) => rail.getByRole('button', { name: new RegExp(`^${name}・AI`) });
   for (const name of ['個人KB', 'Engineering', 'Research', '組織KB'])
     await expect(brain(name)).toBeVisible();
@@ -159,9 +159,9 @@ try {
   );
   expect(await readFile(path.join(spaces[2].root, 'README.md'), 'utf8')).toBe('# Research notes\n');
   await expect(page.locator('.document-editor')).toContainText('Research notes');
-  // The AI panel belongs to the brain on show and names its Schema.
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
-  await expect(page.getByLabel('相談の対象')).toContainText('Research');
+  // The hibachi agent belongs to the brain on show and names its Schema.
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await expect(page.getByLabel('相談の対象', { exact: true })).toContainText('Research');
   await expect(page.locator('.schema-line')).toContainText('Research の Schema');
   await expect(page.locator('.schema-line')).toContainText('AGENTS.md');
   await page.getByRole('button', { name: 'このノートの要点をまとめて', exact: true }).click();
@@ -182,7 +182,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-brain-panel-narrow.png' });
   await page
     .locator('.agent-header')
-    .getByRole('button', { name: 'AIパネルを閉じる', exact: true })
+    .getByRole('button', { name: 'hibachi agent を閉じる', exact: true })
     .click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   // The Contents action opens the connections of the brain it belongs to.

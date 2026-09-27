@@ -522,24 +522,13 @@
   margin-top: 2px;
 }
 
-/* The one action: ask your AI to write the definitions. */
+/* The footer: the irori agent's run, and who writes the definitions. */
 .you-update {
   flex: none;
   display: flex;
   flex-direction: column;
   padding: 12px;
   box-shadow: inset 0 1px 0 var(--hair);
-}
-.you-update .ember-button {
-  width: 100%;
-  height: auto;
-  min-height: 38px;
-  padding: 8px 12px;
-  white-space: normal;
-  line-height: 1.35;
-}
-.you-update .ember-button:disabled {
-  filter: none;
 }
 .you-update-state {
   display: flex;

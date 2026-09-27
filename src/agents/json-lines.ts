@@ -10,7 +10,7 @@ export class JsonLineConnection {
     {
       resolve(value: any): void;
       reject(error: Error): void;
-      timer: NodeJS.Timeout;
+      timer?: NodeJS.Timeout;
     }
   >();
   private cleanup: () => void = () => {};
@@ -64,14 +64,22 @@ export class JsonLineConnection {
   send(message: unknown) {
     if (!this.dead) this.child.stdin!.write(JSON.stringify(message) + '\n');
   }
-  request(message: Record<string, unknown>, timeout = 45000, numericId = false): Promise<any> {
+  /** `timeout: null` waits for the reply until the process ends or the run is cancelled. */
+  request(
+    message: Record<string, unknown>,
+    timeout: number | null = 45000,
+    numericId = false,
+  ): Promise<any> {
     if (this.dead) return Promise.reject(Error('Agent process has stopped'));
     const id = String(++this.next);
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(Error(`Agent request timed out: ${message.method ?? message.type}`));
-      }, timeout);
+      const timer =
+        timeout === null
+          ? undefined
+          : setTimeout(() => {
+              this.pending.delete(id);
+              reject(Error(`Agent request timed out: ${message.method ?? message.type}`));
+            }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       this.send({ ...message, id: numericId ? Number(id) : id });
     });

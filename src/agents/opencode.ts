@@ -136,7 +136,22 @@ export class OpenCodeServer {
   }
 }
 
+/** OpenCode names a model `provider/model`, as `opencode models` lists it. */
+export function openCodeModel(model?: string) {
+  if (!model) return undefined;
+  const slash = model.indexOf('/');
+  if (slash <= 0 || slash === model.length - 1)
+    throw Error(
+      t(
+        `OpenCode のモデルは「プロバイダ/モデル」の形で指定してください: ${model}`,
+        `Name an OpenCode model as provider/model: ${model}`,
+      ),
+    );
+  return { providerID: model.slice(0, slash), modelID: model.slice(slash + 1) };
+}
+
 export async function runOpenCode(ctx: NativeContext) {
+  const model = openCodeModel(ctx.model);
   const server = new OpenCodeServer(ctx.cwd, ctx.signal, 'opencode', ctx.env);
   ctx.child(server.child);
   let stream: Promise<void> | undefined;
@@ -302,6 +317,7 @@ export async function runOpenCode(ctx: NativeContext) {
         {
           sessionID: sessionId,
           parts: [{ type: 'text', text: ctx.prompt }],
+          ...(model && { model }),
         },
         { fetch: async (request) => boundedResponse(await server.fetch(request, true)) },
       ),

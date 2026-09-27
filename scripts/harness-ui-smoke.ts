@@ -29,7 +29,7 @@ await writeFile(path.join(root, 'note.md'), '# Harness fixture\n');
 await writeFile(path.join(root, 'second.md'), '# Other note\n');
 const bin = path.join(base, 'bin');
 await mkdir(bin);
-for (const id of ['pi', 'opencode'])
+for (const id of ['pi', 'opencode', 'hermes'])
   await writeFile(
     path.join(bin, id),
     `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
@@ -57,7 +57,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   const settings = () => page.getByLabel('会話と接続の設定', { exact: true });
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
@@ -70,6 +70,9 @@ try {
   );
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
+    // This pass is about native approvals, so OpenCode leaves its default full access.
+    if (agent === 'opencode')
+      await page.getByLabel('エージェントのアクセス', { exact: true }).selectOption('default');
     await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toHaveValue('default');
     if (agent === 'pi') {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
@@ -155,7 +158,7 @@ try {
         page = await app.firstWindow();
         page.on('pageerror', (error) => errors.push(String(error)));
         await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-        await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+        await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
         await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
         await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
           'after cancellation',
@@ -191,7 +194,7 @@ try {
       await expect(page.locator('.request')).toBeVisible();
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-      await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+      await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
       await expect(page.locator('.message.done')).toHaveCount(5);
       await expect(page.locator('.request')).toHaveCount(0);
@@ -228,7 +231,7 @@ try {
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
@@ -254,7 +257,8 @@ try {
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
-  await access.selectOption('full-access');
+  // A brain's hibachi agent starts in full access.
+  await expect(access).toHaveValue('full-access');
   await expect(page.locator('#agent-access-detail')).toContainText(
     '編集可で接続した Google Drive フォルダは、エージェントも変更できます',
   );
@@ -267,7 +271,8 @@ try {
   ).toBe('full-access');
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
-  await expect(access).toHaveValue('default');
+  await expect(access).toHaveValue('full-access');
+  await access.selectOption('default');
   await settings().click();
   await expect(
     page.getByText(
@@ -282,6 +287,57 @@ try {
   expect(
     (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
   ).toBe('default');
+  // The model pill lists what the installed CLI prints, and the choice reaches it.
+  const fixtureLog = async () =>
+    (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+  const modelPill = page.getByLabel('モデル', { exact: true });
+  await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+  await expect(modelPill).toHaveValue('');
+  await expect(modelPill.locator('option', { hasText: 'openai/gpt-fixture' })).toHaveCount(1);
+  await modelPill.selectOption('anthropic/claude-fixture');
+  await page.getByLabel('エージェントへの指示').fill('model fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.user').last()).toHaveText('model fixture');
+  const settled = (agent: string) =>
+    expect
+      .poll(async () => {
+        const value = await page.evaluate(
+          ([id, cli]) => window.irori.agentConversation(id, cli as 'pi'),
+          [space.scopeId, agent],
+        );
+        return !value.activeRunId && value.events.at(-1)?.type === 'done';
+      })
+      .toBe(true);
+  await settled('pi');
+  expect(
+    (await fixtureLog())
+      .filter((call) => call.type === 'launch')
+      .at(-1)
+      .args.slice(2, 6),
+  ).toEqual(['--provider', 'anthropic', '--model', 'claude-fixture']);
+  // Hermes Agent lists no models: a name is typed in. It starts in full access.
+  await page.getByLabel('エージェント', { exact: true }).selectOption('hermes');
+  await expect(access).toHaveValue('full-access');
+  await expect(modelPill).toHaveValue('');
+  await modelPill.selectOption({ label: 'その他…' });
+  await page.getByLabel('モデル名', { exact: true }).fill('vendor/model-x');
+  await page.getByLabel('モデル名', { exact: true }).press('Enter');
+  await expect(modelPill).toHaveValue('vendor/model-x');
+  await page.getByLabel('エージェントへの指示').fill('hermes fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.user').last()).toHaveText('hermes fixture');
+  await settled('hermes');
+  await expect(page.locator('.message.done').last()).toContainText('完了');
+  await expect(page.locator('.conversation')).toContainText('の応答');
+  const hermesCall = (await fixtureLog()).filter((call) => call.kind === 'hermes').at(-1);
+  expect(hermesCall.prompt).toContain('hermes fixture');
+  expect(hermesCall.args.slice(5)).toEqual(['-m', 'vendor/model-x', '--yolo']);
+  expect(
+    (await page.evaluate((id) => window.irori.agentSession(id, 'hermes'), space.scopeId)).state,
+  ).toBe('saved');
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();
@@ -300,6 +356,7 @@ try {
         evidence: 'Explicit protocol fixtures; no native model inference',
         checks: [
           'Pi/OpenCode panel selection',
+          'model pill from the CLI list, and a typed Hermes model with its full access',
           'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',
           'new conversation intent and cancellation preserve the composer',

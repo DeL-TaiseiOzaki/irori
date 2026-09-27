@@ -242,7 +242,7 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  const modes = page.getByRole('group', { name: 'Brain の表示' });
+  const modes = page.getByRole('group', { name: 'hibachi の表示' });
   const notesView = modes.getByRole('button', { name: 'ファイル', exact: true });
   const gitView = modes.getByRole('button', { name: /^変更/ });
   await notesView.focus();
@@ -330,7 +330,7 @@ try {
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('UI saved 日本語');
   await page.screenshot({ path: 'test-results/irori-git-history.png' });
   // Changes belong to the brain on show; choosing another brain shows its repository.
-  const rail = page.getByRole('navigation', { name: 'Brain' });
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
   await rail.getByRole('button', { name: /^チームKB・AI/ }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText('リモート未設定');
   await panel.getByRole('button', { name: '履歴', exact: true }).click();
@@ -406,7 +406,7 @@ try {
     .getByRole('button', { name: 'README', exact: true })
     .click();
   await page
-    .getByRole('group', { name: 'Brain の表示' })
+    .getByRole('group', { name: 'hibachi の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
   sidebar = page.getByRole('region', { name: 'ソース管理' });
@@ -433,7 +433,9 @@ try {
   await expect(page.getByRole('button', { name: 'ファイル', exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
   await expect(
-    page.getByRole('navigation', { name: 'Brain' }).getByRole('button', { name: /^チームKB・AI/ }),
+    page
+      .getByRole('navigation', { name: 'hibachi' })
+      .getByRole('button', { name: /^チームKB・AI/ }),
   ).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(sidebar).toBeVisible();
@@ -537,7 +539,7 @@ try {
   await expect(page.locator('.document-editor')).toContainText('Combined');
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
-  await page.getByRole('button', { name: 'Brain を追加', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
   await page.getByRole('button', { name: 'GitHub から取得', exact: true }).click();
   const registration = page.getByRole('form', { name: 'スペース登録' });
   // Nothing to preview yet, so no empty panel sits under the form.

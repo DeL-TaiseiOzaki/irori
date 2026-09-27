@@ -90,7 +90,7 @@ try {
   for (const name of ['スキル検証', '素のKB'])
     await page.getByRole('checkbox', { name: new RegExp(name) }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
 
   const picker = page.getByLabel('スキル', { exact: true });
@@ -172,7 +172,7 @@ try {
   expect(sent.indexOf('Only ever append.')).toBeLessThan(sent.indexOf('sort out yesterday'));
 
   // Skills belong to the space that declares them; switching must not carry them over.
-  const rail = page.getByRole('navigation', { name: 'Brain' });
+  const rail = page.getByRole('navigation', { name: 'hibachi' });
   await rail.getByRole('button', { name: /^素のKB・AI/ }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveCount(0);
   await expect(page.getByText('読み込めないスキル')).toHaveCount(0);

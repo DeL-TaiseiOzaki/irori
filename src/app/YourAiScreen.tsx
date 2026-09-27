@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Space } from '../domain/types';
+import type { AgentId, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
-import type { BrainAgent, YourAi } from '../domain/you';
+import { hasSubAgents, subAgentFiles, type BrainAgent, type YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
@@ -9,11 +9,12 @@ import { useResource } from './useResource';
 import './you.css';
 
 const host = window.irori;
-/** Where your AI keeps one Claude Code sub-agent definition per brain. */
-const agentsFolder = '.claude/agents';
-const definitionOf = (agent: string) => `${agentsFolder}/${agent}.md`;
-/** Folders open when the screen first shows, so the definitions are in view. */
-const initiallyOpen = ['.claude', agentsFolder];
+/** The folder a CLI loads sub-agent definitions from, and its parent: `.claude`, `.claude/agents`. */
+function definitionFolders(agent: AgentId) {
+  if (!hasSubAgents(agent)) return [];
+  const folder = subAgentFiles[agent]('x').replace(/\/[^/]*$/, '');
+  return [folder.split('/')[0], folder];
+}
 
 /** A host error without the `Error: ` prefixes it gathers on its way to the renderer. */
 const message = (error: string) => error.replace(/^(?:Error: )+/, '');
@@ -55,7 +56,7 @@ function Folder({
   reads: number;
   open: string[];
   file: string;
-  /** The brain each sub-agent name belongs to. */
+  /** The brain each sub-agent definition file belongs to, by its path. */
   owners: Map<string, Space>;
   onToggle: (path: string) => void;
   onShow: (path: string) => void;
@@ -88,10 +89,7 @@ function Folder({
       {listing.data?.map((entry) => {
         const expanded = entry.directory && open.includes(entry.path);
         const current = !entry.directory && entry.path === file;
-        const owner =
-          !entry.directory && directory === agentsFolder && entry.name.endsWith('.md')
-            ? owners.get(entry.name.slice(0, -'.md'.length))
-            : undefined;
+        const owner = entry.directory ? undefined : owners.get(entry.path);
         return (
           <div key={entry.path} className="you-tree-item">
             <button
@@ -101,7 +99,10 @@ function Folder({
               aria-current={current ? 'page' : undefined}
               title={
                 owner
-                  ? t(`${entry.path} · ${owner.name} の AI`, `${entry.path} · ${owner.name}'s AI`)
+                  ? t(
+                      `${entry.path} · ${owner.name} の hibachi agent`,
+                      `${entry.path} · ${owner.name}'s hibachi agent`,
+                    )
                   : entry.path
               }
               onClick={() => (entry.directory ? onToggle(entry.path) : onShow(entry.path))}
@@ -155,7 +156,7 @@ function FileView({ path, reads }: { path: string; reads: number }) {
           <span className="you-orb small" aria-hidden="true">
             <Icon name="sparkles" size={11} strokeWidth={2.2} />
           </span>
-          {t('あなたの AI', 'Your AI')}
+          {t('irori agent', 'irori agent')}
         </span>
         <Icon name="chevron" size={12} className="you-stage-separator" />
         <PathText path={path} className="you-stage-path" />
@@ -163,8 +164,8 @@ function FileView({ path, reads }: { path: string; reads: number }) {
         <span
           className="you-stage-note"
           title={t(
-            'irori はこのフォルダに書き込みません。変更はあなたの AI に頼んでください。',
-            'irori does not write to this folder. Ask your AI to change it.',
+            'irori がここに書くのは、まだないサブエージェント定義だけです。ほかの変更は irori agent に頼んでください。',
+            'irori writes only missing sub-agent definitions here. Ask the irori agent for other changes.',
           )}
         >
           <Icon name="lock" size={12} />
@@ -190,29 +191,20 @@ function FileView({ path, reads }: { path: string; reads: number }) {
   );
 }
 
-/** One brain's sub-agent definition in a small card, or a word that it is not written yet. */
-function Definition({ brain, reads }: { brain: BrainAgent; reads: number }) {
-  const path = definitionOf(brain.agent);
-  const read = useResource(() => host.yourAiRead(path), [path], {
-    enabled: brain.defined,
-    refresh: reads,
-  });
-  const [head, body] = splitFrontMatter(read.data?.text ?? '');
+/** One file defining a brain's sub-agent, in a small card. */
+function Definition({ file, reads }: { file: BrainAgent['definitions'][number]; reads: number }) {
+  const read = useResource(() => host.yourAiRead(file.path), [file.path], { refresh: reads });
+  const [head, body] = file.path.endsWith('.md')
+    ? splitFrontMatter(read.data?.text ?? '')
+    : ['', read.data?.text ?? ''];
   return (
     <div className="you-definition">
       <header>
         <Icon name="file" size={13} />
-        <PathText path={path} className="you-definition-path" />
-        <small>{agentNames.claude}</small>
+        <PathText path={file.path} className="you-definition-path" />
+        <small>{agentNames[file.cli]}</small>
       </header>
-      {!brain.defined ? (
-        <p className="you-definition-note">
-          {t(
-            `${brain.name} の AI はまだ定義されていません。下のボタンで、あなたの AI に書いてもらえます。`,
-            `${brain.name}'s AI is not defined yet. Use the button below to have your AI write it.`,
-          )}
-        </p>
-      ) : read.error ? (
+      {read.error ? (
         <p className="you-definition-note error" role="alert">
           {message(read.error)}
         </p>
@@ -229,37 +221,37 @@ function Definition({ brain, reads }: { brain: BrainAgent; reads: number }) {
 }
 
 /**
- * Your AI: its folder, read-only, and the sub-agent it hands each brain's work
- * to. irori never writes the definitions; it asks your AI to update them.
+ * The irori agent (your AI): its folder, read-only, and the hibachi agent it
+ * hands each brain's work to. irori writes a missing definition when it hands
+ * that brain to the irori agent, and never replaces one.
  */
 export function YourAiScreen({
   you,
+  agent,
   spaces,
   running,
-  onUpdateDefinitions,
   onBack,
-  onError,
 }: {
   you: YourAi;
+  /** The CLI your AI runs on. */
+  agent: AgentId;
   spaces: Space[];
   running: boolean;
-  onUpdateDefinitions: () => Promise<void>;
   onBack: () => void;
-  onError: (error: unknown) => void;
 }) {
   // Every read of the folder and the brains follows this count.
   const [reads, setReads] = useState(0);
   const reread = () => setReads((value) => value + 1);
   const wasRunning = useRef(running);
   useEffect(() => {
-    // Your AI may have just written definitions.
+    // irori or your AI may have just written definitions.
     if (wasRunning.current && !running) reread();
     wasRunning.current = running;
   }, [running]);
   const [file, setFile] = useState('AGENTS.md');
-  const [open, setOpen] = useState(initiallyOpen);
+  // The chosen CLI's definitions folder is open, so the definitions are in view.
+  const [open, setOpen] = useState(() => definitionFolders(agent));
   const [picked, setPicked] = useState<string>();
-  const [sending, setSending] = useState(false);
   const ids = spaces.map((space) => space.scopeId);
   const brains = useResource(() => host.yourAiBrains(ids), [ids.join()], {
     enabled: ids.length > 0,
@@ -267,10 +259,8 @@ export function YourAiScreen({
   });
   const agents = new Map((brains.data ?? []).map((brain) => [brain.scopeId, brain]));
   const owners = new Map<string, Space>();
-  for (const space of spaces) {
-    const brain = agents.get(space.scopeId);
-    if (brain) owners.set(brain.agent, space);
-  }
+  for (const space of spaces)
+    for (const file of agents.get(space.scopeId)?.definitions ?? []) owners.set(file.path, space);
   const chosen = spaces.find((space) => space.scopeId === picked) ?? spaces[0];
   const chosenAgent = chosen && agents.get(chosen.scopeId);
   const toggle = (path: string) =>
@@ -280,33 +270,21 @@ export function YourAiScreen({
   const show = (path: string) => {
     setFile(path);
     // A brain's definition also picks that brain on the right.
-    const owner = path.startsWith(`${agentsFolder}/`)
-      ? owners.get(path.slice(agentsFolder.length + 1).replace(/\.md$/, ''))
-      : undefined;
+    const owner = owners.get(path);
     if (owner) setPicked(owner.scopeId);
   };
-  async function update() {
-    setSending(true);
-    try {
-      await onUpdateDefinitions();
-    } catch (error) {
-      onError(error);
-    } finally {
-      setSending(false);
-    }
-  }
   return (
     <div className="your-ai-screen">
       <section
         className="you-panel you-folder chrome"
-        aria-label={t('あなたの AI のフォルダ', 'Your AI folder')}
+        aria-label={t('irori agent のフォルダ', "The irori agent's folder")}
       >
         <header className="you-head">
           <div className="you-identity">
             <button
               className="icon-button"
-              aria-label={t('全体に戻る', 'Back to the Overview')}
-              title={t('全体に戻る', 'Back to the Overview')}
+              aria-label={t('irori mode に戻る', 'Back to irori mode')}
+              title={t('irori mode に戻る', 'Back to irori mode')}
               onClick={onBack}
             >
               <Icon name="back" size={16} />
@@ -315,17 +293,20 @@ export function YourAiScreen({
               <Icon name="sparkles" size={16} strokeWidth={2.1} />
             </span>
             <span className="you-names">
-              <h1>{t('あなたの AI', 'Your AI')}</h1>
+              <h1>{t('irori agent', 'irori agent')}</h1>
               <PathText path={you.root} className="you-root" />
             </span>
           </div>
           <div className="you-chips">
             <span
               className="you-chip"
-              title={t('あなたの AI は Claude Code で動きます', 'Your AI runs in Claude Code')}
+              title={t(
+                `irori agent は ${agentNames[agent]} で動きます`,
+                `The irori agent runs in ${agentNames[agent]}`,
+              )}
             >
               <Icon name="sparkles" size={13} />
-              {agentNames.claude}
+              {agentNames[agent]}
             </span>
           </div>
         </header>
@@ -359,16 +340,22 @@ export function YourAiScreen({
         </div>
       </section>
       <FileView path={file} reads={reads} />
-      <section className="you-panel you-brains chrome" aria-label={t('Brain の AI', 'Brain AIs')}>
+      <section
+        className="you-panel you-brains chrome"
+        aria-label={t('hibachi agent', 'hibachi agents')}
+      >
         <header className="you-brains-head">
           <Icon name="users" size={16} />
-          <h2>{t('Brain の AI', 'Brain AIs')}</h2>
+          <h2>{t('hibachi agent', 'hibachi agents')}</h2>
           <span className="you-count">{spaces.length}</span>
         </header>
         <div className="you-brains-body">
           {!spaces.length ? (
             <p className="you-brains-note">
-              {t('このワークスペースに Brain がありません。', 'This workspace has no brain yet.')}
+              {t(
+                'このワークスペースに hibachi がありません。',
+                'This workspace has no hibachi yet.',
+              )}
             </p>
           ) : (
             <div className="you-brain-list">
@@ -383,11 +370,14 @@ export function YourAiScreen({
                   >
                     <BrainTile space={space} size={26} radius={8} />
                     <span className="you-brain-names">
-                      <strong>{t(`${space.name} の AI`, `${space.name}'s AI`)}</strong>
+                      <strong>
+                        {t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)}
+                      </strong>
                       <small>{brain?.agent ?? '…'}</small>
                     </span>
                     {brain &&
-                      (brain.defined ? (
+                      hasSubAgents(agent) &&
+                      (brain.definitions.some((file) => file.cli === agent) ? (
                         <span className="you-state defined">
                           <Icon name="checkCircle" size={12} />
                           {t('定義済み', 'Defined')}
@@ -395,7 +385,7 @@ export function YourAiScreen({
                       ) : (
                         <span className="you-state">
                           <i />
-                          {t('未定義', 'Not defined')}
+                          {t('未作成', 'Not written yet')}
                         </span>
                       ))}
                   </button>
@@ -408,45 +398,45 @@ export function YourAiScreen({
               {message(brains.error)}
             </p>
           )}
-          {chosenAgent && <Definition brain={chosenAgent} reads={reads} />}
-          <p className="you-later">
-            <Icon name="info" size={13} />
-            {t(
-              'Codex の定義（.codex/agents）は今後対応します。',
-              'Codex definitions (.codex/agents) come later.',
+          {chosenAgent?.definitions.map((file) => (
+            <Definition key={file.path} file={file} reads={reads} />
+          ))}
+          {chosenAgent &&
+            hasSubAgents(agent) &&
+            !chosenAgent.definitions.some((file) => file.cli === agent) && (
+              <p className="you-definition-note">
+                {t(
+                  `irori agent が ${chosenAgent.name} に初めて仕事を渡すとき、irori が ${subAgentFiles[agent](chosenAgent.agent)} を書きます。`,
+                  `irori writes ${subAgentFiles[agent](chosenAgent.agent)} when the irori agent first hands work to ${chosenAgent.name}.`,
+                )}
+              </p>
             )}
-          </p>
+          {!hasSubAgents(agent) && (
+            <p className="you-later">
+              <Icon name="info" size={13} />
+              {t(
+                `${agentNames[agent]} にはサブエージェントがありません。irori agent は各 hibachi の AGENTS.md を読んでから直接作業します。`,
+                `${agentNames[agent]} has no sub-agents. The irori agent works in each hibachi itself after reading its AGENTS.md.`,
+              )}
+            </p>
+          )}
         </div>
         <footer className="you-update">
-          <button
-            className="ember-button"
-            disabled={running || sending || !spaces.length}
-            onClick={() => void update()}
-          >
-            <Icon
-              name={sending ? 'loader' : 'sparkles'}
-              size={15}
-              className={sending ? 'you-spin' : ''}
-            />
-            {t('あなたの AI に定義を更新させる', 'Ask your AI to update the definitions')}
-          </button>
           <p className="you-update-state" role="status">
             {running && (
               <>
                 <Icon name="loader" size={12} className="you-spin" />
                 {t(
-                  'あなたの AI が作業中です。終わると、フォルダと定義を読み直します。',
-                  'Your AI is working. The folder and the definitions are read again when it finishes.',
+                  'irori agent が作業中です。終わると、フォルダと定義を読み直します。',
+                  'The irori agent is working. The folder and the definitions are read again when it finishes.',
                 )}
               </>
             )}
           </p>
           <p className="you-update-hint">
-            {t('あなたの AI が brain-agents スキルで、Brain ごとに ', 'Your AI writes ')}
-            <code>{definitionOf('<agent>')}</code>
             {t(
-              ' を書きます。irori が定義を書くことはありません。',
-              ' for each brain with its brain-agents skill. irori never writes a definition itself.',
+              'hibachi ごとの定義（.claude/agents・.codex/agents・.opencode/agents）は、irori agent の CLI に合わせて、ファイルがないときだけ irori が書きます。既存の定義は上書きしないので、編集できます。',
+              "irori writes each hibachi's definition for the irori agent's CLI (.claude/agents, .codex/agents, .opencode/agents) only where the file is missing. It never overwrites one, so you can edit them.",
             )}
           </p>
         </footer>

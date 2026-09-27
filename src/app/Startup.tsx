@@ -483,8 +483,8 @@ export function Startup({
         ) : (
           <p className="start-note">
             {t(
-              'まだワークスペースはありません。Brain を組み合わせて作成します。',
-              'No workspaces yet. Combine brains to create one.',
+              'まだワークスペースはありません。hibachi を組み合わせて作成します。',
+              'No workspaces yet. Combine hibachis to create one.',
             )}
           </p>
         )}
@@ -493,13 +493,13 @@ export function Startup({
           <h3 id="start-combine">
             {editing
               ? t('ワークスペースを編集', 'Edit workspace')
-              : t('Brain を選んで組み合わせる', 'Combine brains')}
+              : t('hibachi を選んで組み合わせる', 'Combine hibachis')}
           </h3>
           {editing && (
             <p className="start-note">
               {t(
-                '下で名前と Brain の組み合わせを変更して保存できます。利用できない Brain も登録を保持できます。',
-                'Change the name and combination of brains below and save. Unavailable brains can keep their registration too.',
+                '下で名前と hibachi の組み合わせを変更して保存できます。利用できない hibachi も登録を保持できます。',
+                'Change the name and combination of hibachis below and save. Unavailable hibachis can keep their registration too.',
               )}
             </p>
           )}
@@ -512,7 +512,10 @@ export function Startup({
                   onChange={(on) => toggle(id, on)}
                 />
                 <span>
-                  {t('利用できない Brain（登録を保持）', 'Unavailable brain (registration kept)')}
+                  {t(
+                    '利用できない hibachi（登録を保持）',
+                    'Unavailable hibachi (registration kept)',
+                  )}
                   <small>{id}</small>
                 </span>
               </label>
@@ -530,7 +533,7 @@ export function Startup({
             ))}
             {!spaces.length && (
               <p className="start-note">
-                {t('Brain はまだありません。下で追加します。', 'No brains yet. Add one below.')}
+                {t('hibachi はまだありません。下で追加します。', 'No hibachis yet. Add one below.')}
               </p>
             )}
           </div>
@@ -579,7 +582,7 @@ export function Startup({
         </section>
         <hr />
         <section aria-labelledby="start-add">
-          <h3 id="start-add">{t('Brain を追加', 'Add brain')}</h3>
+          <h3 id="start-add">{t('hibachi を追加', 'Add hibachi')}</h3>
           <div className="start-add">
             <button disabled={busy} onClick={() => setAdding('folder')}>
               <span className="start-add-icon">
@@ -602,8 +605,8 @@ export function Startup({
           </div>
           <p className="start-note">
             {t(
-              'クラウドのフォルダは、開いた後に Brain の Contents から接続します。',
-              "Connect cloud folders from a brain's Contents after opening.",
+              'クラウドのフォルダは、開いた後に hibachi の Contents から接続します。',
+              "Connect cloud folders from a hibachi's Contents after opening.",
             )}
           </p>
         </section>

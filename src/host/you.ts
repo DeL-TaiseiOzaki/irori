@@ -4,7 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import { t } from '../domain/i18n';
-import { yourAiStarter, type YourAi, type YourAiEntry } from '../domain/you';
+import {
+  subAgentDefinition,
+  subAgentFiles,
+  yourAiStarter,
+  type BrainAgent,
+  type SubAgentCli,
+  type YourAi,
+  type YourAiEntry,
+} from '../domain/you';
 import { readTextDocument } from './files';
 import { readLocalJson, writeLocalJson } from './local-json';
 
@@ -96,9 +104,10 @@ export class YourAiService {
     const { root } = await this.load();
     relative.parse(rel);
     const requested = path.resolve(root, rel);
-    if (!within(root, requested)) throw Error('Path is outside your AI’s folder');
+    if (!within(root, requested)) throw Error('Path is outside the irori agent’s folder');
     const actual = await fs.realpath(requested);
-    if (!within(await fs.realpath(root), actual)) throw Error('Path alias leaves your AI’s folder');
+    if (!within(await fs.realpath(root), actual))
+      throw Error('Path alias leaves the irori agent’s folder');
     return actual;
   }
   /** One folder's entries, folders first, for the read-only Your AI screen. */
@@ -121,12 +130,58 @@ export class YourAiService {
     const doc = await readTextDocument(await this.resolve(rel), id, rel);
     return { path: doc.path, text: doc.text };
   }
-  /** Which of the named sub-agents have a definition in `.claude/agents`. */
-  async defined(agents: string[]) {
+  /** The definition files each named sub-agent has in the folder, for every CLI that loads them. */
+  async definitions(agents: string[]) {
     const { root } = await this.load();
-    const present = new Set(
-      await fs.readdir(path.join(root, '.claude', 'agents')).catch(() => [] as string[]),
-    );
-    return new Set(agents.filter((agent) => present.has(`${agent}.md`)));
+    const found = new Map<string, BrainAgent['definitions']>();
+    for (const agent of agents) {
+      const files: BrainAgent['definitions'] = [];
+      for (const [cli, file] of Object.entries(subAgentFiles) as [
+        SubAgentCli,
+        (agent: string) => string,
+      ][]) {
+        const rel = file(agent);
+        const present = await fs
+          .lstat(path.join(root, rel))
+          .then((stat) => stat.isFile())
+          .catch(() => false);
+        if (present) files.push({ cli, path: rel });
+      }
+      found.set(agent, files);
+    }
+    return found;
+  }
+  /**
+   * Writes the definition of each brain's sub-agent for `cli` where the file is
+   * absent, and returns the paths written. An existing file is never replaced:
+   * the person may have edited it. Folders on the way are made inside the
+   * folder only; a link or file in their place stops the write.
+   */
+  async writeDefinitions(cli: SubAgentCli, brains: Pick<BrainAgent, 'name' | 'agent' | 'root'>[]) {
+    const { root } = await this.load();
+    const written: string[] = [];
+    for (const brain of brains) {
+      const rel = subAgentFiles[cli](brain.agent);
+      relative.parse(rel);
+      const parts = rel.split('/');
+      let dir = root;
+      for (const part of parts.slice(0, -1)) {
+        dir = path.join(dir, part);
+        const stat = await fs.lstat(dir).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return undefined;
+          throw error;
+        });
+        if (!stat) await fs.mkdir(dir);
+        else if (!stat.isDirectory())
+          throw Error(`${dir} is not a folder inside the irori agent’s folder`);
+      }
+      try {
+        await fs.writeFile(path.join(root, rel), subAgentDefinition(cli, brain), { flag: 'wx' });
+        written.push(rel);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    }
+    return written;
   }
 }

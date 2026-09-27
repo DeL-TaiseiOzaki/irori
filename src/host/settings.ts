@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
 import { markdownFonts, themes, type DeviceSettings } from '../domain/types';
+import { yourAiChoice } from '../domain/conversation';
 import { skillAudience } from '../domain/skills';
 import { languages } from '../domain/i18n';
 
@@ -15,6 +16,7 @@ const settings = z.object({
   // Keys are the library's: its prefix, the group id and every panel id.
   layouts: z.record(z.string().max(160), z.string().max(4096)).default({}),
   skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
+  yourAi: yourAiChoice.default({ agent: 'claude', models: {} }),
 });
 
 /**
@@ -44,6 +46,7 @@ export class SettingsService {
         editorAssistance: patch.editorAssistance ?? current.editorAssistance,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
+        yourAi: patch.yourAi ?? current.yourAi,
       });
       await writeLocalJson(this.file, next);
       return next;

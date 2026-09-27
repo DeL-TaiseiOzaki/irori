@@ -1,5 +1,6 @@
 import { KnowledgeStore } from '../knowledge/store';
-import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
+import { AuthorshipStore, editedPath, personLinesNotice } from '../knowledge/authorship';
+import path from 'node:path';
 import { personLinesSummary, type RunRecord } from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -18,6 +19,8 @@ import { agentIds, agentNames } from '../domain/types';
 import { agentAccessDetail, agentAccessLabel, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
+import { runHermes } from './hermes';
+import { ModelCatalog } from './models';
 import { personLinesBridge } from './person-lines';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
@@ -30,7 +33,7 @@ import { promptWithSkill } from '../domain/skills';
 import { parseSkill, requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
-import { brainAgentNames, brainsPreamble } from '../domain/you';
+import { brainAgentNames, brainsDirectPreamble, brainsPreamble, hasSubAgents } from '../domain/you';
 import { categoryName } from '../domain/brains';
 import {
   brainOfAgent,
@@ -70,6 +73,7 @@ export class AgentService {
   private sessions: SessionStore;
   private conversations: ConversationStore;
   private resetting = new Set<string>();
+  private catalog = new ModelCatalog();
   // Brains handed to your AI's run in progress, by the run that holds them. A brain
   // is busy while its sub-agent may be working in its checkout.
   private delegated = new Map<string, string>();
@@ -205,6 +209,10 @@ export class AgentService {
       this.resetting.delete(scopeId);
     }
   }
+  /** The models the installed CLI offers, read once per CLI version. */
+  models(agent: AgentId) {
+    return this.catalog.models(agent);
+  }
   async available(): Promise<AgentInfo[]> {
     return Promise.all(
       agentIds.map(async (id) => {
@@ -231,7 +239,15 @@ export class AgentService {
                       'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。',
                       "Uses OpenCode's native sign-in, model and permission settings. Its ask requests appear in the panel.",
                     )
-                  : t('既存のCLI認証・設定を使用', "Uses the CLI's existing sign-in and settings"),
+                  : id === 'hermes'
+                    ? t(
+                        'Hermes Agent のネイティブ設定・プロバイダ・承認設定を使用。1回ごとの実行のため、パネルでの承認や質問はありません。',
+                        "Uses Hermes Agent's native settings, provider and approval rules. Each run is one-shot, so nothing is asked in the panel.",
+                      )
+                    : t(
+                        '既存のCLI認証・設定を使用',
+                        "Uses the CLI's existing sign-in and settings",
+                      ),
           };
         } catch (e) {
           return { id, version: '', available: false, tested: false, detail: String(e) };
@@ -249,15 +265,11 @@ export class AgentService {
     this.root(input.scopeId);
     const brains = [...new Set(input.brains ?? [])];
     if (this.isYou(input.scopeId)) {
-      if (input.agent !== 'claude')
-        throw Error(
-          t('あなたの AI は今は Claude Code で動きます。', 'Your AI runs on Claude Code for now.'),
-        );
       if (input.notePath || input.personLines || input.sources?.length)
         throw Error(
           t(
-            'あなたの AI にはノートや資料を直接渡せません。Brain を渡してください。',
-            'Your AI takes brains, not notes or materials.',
+            'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
+            'The irori agent takes hibachis, not notes or materials.',
           ),
         );
       for (const scopeId of brains) {
@@ -265,12 +277,12 @@ export class AgentService {
         if (this.busy(scopeId))
           throw Error(
             t(
-              `${space.name} の AI が作業中です。終わってからあなたの AI に渡してください。`,
-              `${space.name}'s AI is working. Hand it to your AI after it finishes.`,
+              `${space.name} の hibachi agent が作業中です。終わってから irori agent に渡してください。`,
+              `${space.name}'s hibachi agent is working. Hand it to the irori agent after it finishes.`,
             ),
           );
       }
-    } else if (brains.length) throw Error('Only your AI takes brains');
+    } else if (brains.length) throw Error('Only the irori agent takes hibachis');
     let close!: () => void;
     let accept!: () => void;
     let reject!: (error: unknown) => void;
@@ -397,19 +409,6 @@ export class AgentService {
     await run.closed;
   }
   private async execute(run: Run, input: StartRun) {
-    // Your AI hands work on, so its runs may take longer than a brain's own.
-    const minutes = this.isYou(input.scopeId) ? 30 : 10;
-    const timer = setTimeout(() => {
-      this.event(
-        run,
-        'error',
-        t(
-          `実行時間の上限（${minutes}分）に達しました。`,
-          `The run reached its time limit (${minutes} minutes).`,
-        ),
-      );
-      void this.cancel(run.binding.scopeId);
-    }, minutes * 60000);
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
     let record: RunRecord | undefined;
@@ -423,23 +422,41 @@ export class AgentService {
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
       const space = you
-        ? { root: this.root(input.scopeId), name: t('あなたの AI のフォルダ', "your AI's folder") }
+        ? {
+            root: this.root(input.scopeId),
+            name: t('irori agent のフォルダ', "the irori agent's folder"),
+          }
         : this.files.get(input.scopeId);
       const promptParts: string[] = [];
       if (you && input.brains?.length) {
         const names = brainAgentNames(this.files.list());
-        const handed = input.brains.map((scopeId) => this.files.get(scopeId));
-        const defined = await this.you!.defined(handed.map((brain) => names.get(brain.scopeId)!));
-        const brains = handed.map((brain) => ({
-          scopeId: brain.scopeId,
-          name: brain.name,
-          category: brain.category && categoryName(brain.category),
-          agent: names.get(brain.scopeId)!,
-          root: brain.root,
-          defined: defined.has(names.get(brain.scopeId)!),
-        }));
+        const brains = input.brains.map((scopeId) => {
+          const brain = this.files.get(scopeId);
+          return {
+            scopeId: brain.scopeId,
+            name: brain.name,
+            category: brain.category && categoryName(brain.category),
+            agent: names.get(brain.scopeId)!,
+            root: brain.root,
+          };
+        });
         run.delegation = { you: space.root, brains };
-        promptParts.push(brainsPreamble(brains));
+        const cli = input.agent;
+        if (hasSubAgents(cli)) {
+          // Each hibachi's sub-agent is defined by irori, only where no file is:
+          // the person may have edited one.
+          const written = await this.you!.writeDefinitions(cli, brains);
+          if (written.length)
+            this.event(
+              run,
+              'status',
+              t(
+                `hibachi agent の定義を書きました: ${written.join(', ')}`,
+                `Wrote the hibachi agent definitions: ${written.join(', ')}`,
+              ),
+            );
+          promptParts.push(brainsPreamble(brains, cli));
+        } else promptParts.push(brainsDirectPreamble(brains, agentNames[cli]));
       }
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
@@ -531,27 +548,51 @@ export class AgentService {
         'status',
         `${agentAccessLabel(input.agent, run.access)}: ${agentAccessDetail(input.agent, run.access)}`,
       );
+      if (input.model)
+        this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
       if (input.agent === 'codex')
-        await this.codex(run, space.root, prompt, binding, saved?.handle);
+        await this.codex(run, space.root, prompt, binding, saved?.handle, input.model);
       else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, binding, saved?.handle);
+        await this.claude(run, space.root, prompt, binding, saved?.handle, input.model);
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
-        const bridge = await personLinesBridge(
-          this.files.dataDir,
-          input.agent,
-          (tool, edit) => personLinesNotice(this.files, this.authorship, input.scopeId, tool, edit),
-          agentEnv(),
-        );
-        run.bridge = bridge.close;
+        // Hermes Agent offers no such hook.
+        const delegation = run.delegation;
+        const bridge =
+          input.agent === 'hermes'
+            ? undefined
+            : await personLinesBridge(
+                this.files.dataDir,
+                input.agent,
+                async (tool, edit) => {
+                  if (!delegation)
+                    return personLinesNotice(
+                      this.files,
+                      this.authorship,
+                      input.scopeId,
+                      tool,
+                      edit,
+                    );
+                  // Your AI names a brain's file by its absolute path.
+                  const file = editedPath(edit);
+                  const brain =
+                    file && path.isAbsolute(file) ? brainOfPath(delegation, file) : undefined;
+                  return brain
+                    ? personLinesNotice(this.files, this.authorship, brain.scopeId, tool, edit)
+                    : undefined;
+                },
+                agentEnv(),
+              );
+        run.bridge = bridge?.close;
         const context: NativeContext = {
           cwd: space.root,
           prompt,
           session: saved?.handle,
           access: run.access,
-          env: bridge.env,
-          args: bridge.args,
+          model: input.model,
+          env: bridge?.env,
+          args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
             run.child = child;
@@ -561,7 +602,8 @@ export class AgentService {
           saveSession: (handle) => this.sessions.save(binding, handle, run.access),
         };
         if (input.agent === 'pi') await runPi(context);
-        else await runOpenCode(context);
+        else if (input.agent === 'opencode') await runOpenCode(context);
+        else await runHermes(context);
       }
     } catch (e) {
       run.reject(e);
@@ -579,7 +621,6 @@ export class AgentService {
           );
       }
     } finally {
-      clearTimeout(timer);
       this.denyRequests(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();
@@ -631,6 +672,7 @@ export class AgentService {
     prompt: string,
     binding: SessionBinding,
     session?: string,
+    model?: string,
   ) {
     const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd);
     run.child = child;
@@ -697,6 +739,7 @@ export class AgentService {
       approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
       approvalsReviewer: 'user',
       sandbox: run.access === 'full-access' ? 'danger-full-access' : 'workspace-write',
+      ...(model && { model }),
     };
     const thread = await rpc.request(
       session ? 'thread/resume' : 'thread/start',
@@ -708,6 +751,7 @@ export class AgentService {
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
       input: [{ type: 'text', text: prompt, text_elements: [] }],
+      ...(model && { model }),
     });
     run.turnId = turn.turn.id;
     await completion;
@@ -777,6 +821,7 @@ export class AgentService {
     prompt: string,
     binding: SessionBinding,
     session?: string,
+    model?: string,
   ) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
     let stderr = '';
@@ -822,6 +867,7 @@ export class AgentService {
         allowDangerouslySkipPermissions: run.access === 'full-access',
         includePartialMessages: true,
         resume: session,
+        ...(model && { model }),
         ...(delegation && { additionalDirectories: delegation.brains.map((brain) => brain.root) }),
         // Told when it matters rather than on every turn: before an edit would
         // change lines the person wrote or revised, Claude Code hears which.
