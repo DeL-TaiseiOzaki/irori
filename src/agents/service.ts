@@ -16,12 +16,18 @@ import type {
 } from '../domain/types';
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk';
 import { agentIds, agentNames } from '../domain/types';
-import { agentAccessDetail, agentAccessLabel, requireAgentAccess } from '../domain/agent-access';
+import {
+  agentAccessDetail,
+  agentAccessLabel,
+  defaultAgentAccess,
+  requireAgentAccess,
+} from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
 import { ModelCatalog } from './models';
 import { personLinesBridge } from './person-lines';
+import { hibachiBridge } from './hibachi-bridge';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
@@ -33,11 +39,17 @@ import { promptWithSkill } from '../domain/skills';
 import { parseSkill, requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
-import { brainAgentNames, brainsDirectPreamble, brainsPreamble, hasSubAgents } from '../domain/you';
+import {
+  brainAgentNames,
+  brainsCommandPreamble,
+  brainsPreamble,
+  hasSubAgents,
+} from '../domain/you';
 import { categoryName } from '../domain/brains';
 import {
   brainOfAgent,
   brainOfPath,
+  hibachiOf,
   toolFile,
   writeDecision,
   writeTools,
@@ -49,6 +61,8 @@ type Run = {
   binding: SessionBinding;
   /** For your AI: its folder and the brains handed to it in this run. */
   delegation?: Delegation;
+  /** For a hibachi agent's run started by your AI's `hibachi` command: that run's id. */
+  holder?: string;
   access: AgentAccess;
   queuedId?: string;
   recorded?: boolean;
@@ -81,6 +95,8 @@ export class AgentService {
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
   >();
+  // Who else follows a run's events, by run id: a hand-off collecting its report.
+  private watchers = new Map<string, (event: AgentEvent) => void>();
   constructor(
     private files: FileService,
     private emit: (event: AgentEvent) => void,
@@ -255,10 +271,16 @@ export class AgentService {
       }),
     );
   }
-  start(input: StartRun, queuedId?: string): string {
+  start(input: StartRun, queuedId?: string, holder?: string): string {
     input = startInput.parse(input);
     const access = requireAgentAccess(input.agent, input.access);
-    if (this.busy(input.scopeId))
+    // A brain held by your AI's run takes exactly one run more: the hand-off that run asks for.
+    const handed =
+      holder !== undefined &&
+      this.delegated.get(input.scopeId) === holder &&
+      !this.runs.has(input.scopeId) &&
+      !this.resetting.has(input.scopeId);
+    if (this.busy(input.scopeId) && !handed)
       throw Error('This space is already running an agent. Stop it before starting another.');
     if (!input.prompt.trim() || input.prompt.length > 32000)
       throw Error('Enter an instruction (up to 32,000 characters)');
@@ -299,6 +321,7 @@ export class AgentService {
       id: randomUUID(),
       binding: this.binding(input.scopeId, input.agent),
       access,
+      holder,
       queuedId,
       accepted,
       accept,
@@ -348,6 +371,7 @@ export class AgentService {
       ...extra,
     };
     this.emit(event);
+    this.watchers.get(run.id)?.(event);
     return event;
   }
   private ask(
@@ -398,6 +422,7 @@ export class AgentService {
     run.cancelled = true;
     run.abort.abort();
     this.denyRequests(run);
+    await this.cancelHeld(run);
     if (run.rpc && run.threadId && run.turnId)
       run.rpc.send({
         id: 0,
@@ -456,7 +481,7 @@ export class AgentService {
               ),
             );
           promptParts.push(brainsPreamble(brains, cli));
-        } else promptParts.push(brainsDirectPreamble(brains, agentNames[cli]));
+        } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli]));
       }
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
@@ -585,13 +610,28 @@ export class AgentService {
                 agentEnv(),
               );
         run.bridge = bridge?.close;
+        // Pi and Hermes Agent load no sub-agents from files: your AI hands a
+        // brain's work to its hibachi agent with the `hibachi` command instead.
+        const command =
+          delegation && !hasSubAgents(input.agent)
+            ? await hibachiBridge(
+                this.files.dataDir,
+                (name, task, signal) => this.handOff(run, input, name, task, signal),
+                bridge?.env ?? agentEnv(),
+              )
+            : undefined;
+        if (command)
+          run.bridge = () => {
+            bridge?.close();
+            command.close();
+          };
         const context: NativeContext = {
           cwd: space.root,
           prompt,
           session: saved?.handle,
           access: run.access,
           model: input.model,
-          env: bridge?.env,
+          env: command?.env ?? bridge?.env,
           args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
@@ -622,6 +662,7 @@ export class AgentService {
       }
     } finally {
       this.denyRequests(run);
+      await this.cancelHeld(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();
       run.rpc?.fail(Error('Run finished'));
@@ -664,6 +705,89 @@ export class AgentService {
         if (holder === run.id) this.delegated.delete(scopeId);
       this.publish(run, 'done', done.text, { outcome: done.outcome });
       run.close();
+    }
+  }
+  /** Stops the hibachi agents' runs your AI's run handed work to. */
+  private async cancelHeld(run: Run) {
+    await Promise.all(
+      [...this.runs.values()]
+        .filter((held) => held.holder === run.id)
+        .map((held) => this.cancel(held.binding.scopeId)),
+    );
+  }
+  /**
+   * One hand-off through the `hibachi` command: a run of the named brain's
+   * hibachi agent in that brain, on your AI's CLI and model in the hibachi
+   * agent's default access, shown in that brain's own log. Your AI's log follows
+   * it as a task, and the command gets the run's words as its report.
+   */
+  private async handOff(
+    holder: Run,
+    input: StartRun,
+    name: string,
+    task: string,
+    signal: AbortSignal,
+  ) {
+    const brain = hibachiOf(holder.delegation!, name);
+    if (holder.cancelled || signal.aborted) throw Error('The irori agent’s run has stopped.');
+    if (this.delegated.get(brain.scopeId) !== holder.id)
+      throw Error(`The ${brain.name} hibachi is not handed to this request.`);
+    if (this.runs.has(brain.scopeId))
+      throw Error(
+        `The ${brain.name} hibachi's agent is already working on a hand-off. Wait for its report before handing it another.`,
+      );
+    const id = randomUUID();
+    const delegate = (state: Delegate['state']) => ({
+      delegate: { scopeId: brain.scopeId, task: id, state },
+    });
+    let words = '';
+    const errors: string[] = [];
+    let finished!: (outcome: AgentEvent['outcome']) => void;
+    const done = new Promise<AgentEvent['outcome']>((resolve) => {
+      finished = resolve;
+    });
+    const runId = this.start(
+      {
+        scopeId: brain.scopeId,
+        agent: input.agent,
+        model: input.model,
+        access: defaultAgentAccess(input.agent),
+        prompt: `irori: the irori agent handed you this task. Finish with a short report: what you did, and every file you created or changed, as paths inside this hibachi.\n\n${task}`,
+      },
+      undefined,
+      holder.id,
+    );
+    // Registered before the run's first event, which waits for the next tick.
+    this.watchers.set(runId, (event) => {
+      if (event.type === 'text') words = (words + event.text).slice(-100000);
+      else if (event.type === 'error') errors.push(event.text);
+      else if (event.type === 'tool')
+        this.event(holder, 'tool', event.text, { details: event.details, ...delegate('working') });
+      else if (event.type === 'done') finished(event.outcome);
+    });
+    const label = task.trim().split('\n')[0].slice(0, 120);
+    this.event(holder, 'status', label, delegate('started'));
+    const stop = () => void this.cancel(brain.scopeId);
+    signal.addEventListener('abort', stop);
+    try {
+      const outcome = await done;
+      const report = words.trim();
+      if (outcome === 'completed') {
+        this.event(
+          holder,
+          'status',
+          report || t('報告がありません。', 'No report.'),
+          delegate('reported'),
+        );
+        return report || 'The hibachi agent finished without a report.';
+      }
+      const reason =
+        errors.at(-1) ?? (outcome === 'cancelled' ? 'The run was stopped.' : 'The run failed.');
+      this.event(holder, 'status', reason, delegate('failed'));
+      throw Error(`The ${brain.name} hibachi's agent did not finish: ${reason}`);
+    } finally {
+      this.watchers.delete(runId);
+      signal.removeEventListener('abort', stop);
     }
   }
   private async codex(

@@ -471,7 +471,7 @@ test('only your AI takes brains, on any CLI, without notes or materials', async 
 for (const cli of ['pi', 'opencode'] as const)
   test(
     cli === 'pi'
-      ? 'the irori agent on Pi works in the handed hibachis itself after reading their Schema (protocol fixture)'
+      ? 'the irori agent on Pi is told to hand each hibachi to its agent with the hibachi command (protocol fixture)'
       : 'the irori agent on OpenCode gets the hibachi definitions irori writes and hands work to them (protocol fixture)',
     fixtureOptions,
     async (t) => {
@@ -535,9 +535,14 @@ for (const cli of ['pi', 'opencode'] as const)
       assert.ok(sent.endsWith('Tidy the product notes.'));
       const definition = path.join(root, '.opencode', 'agents', 'hibachi-product.md');
       if (cli === 'pi') {
-        assert.match(sent, /You run on Pi .* no irori sub-agents/);
-        assert.match(sent, /read the AGENTS\.md at the top of that hibachi's folder/);
-        assert.ok(!sent.includes('sub-agent "'), 'no sub-agent is named');
+        assert.match(sent, /You run on Pi .* loads no sub-agents from files/);
+        assert.match(sent, /hibachi agent "hibachi-product"/);
+        assert.match(
+          sent,
+          /with the `hibachi` command in your shell: hibachi <hibachi agent or hibachi name> "<task>"/,
+        );
+        // The hibachi agent reads its own Schema; the irori agent is not told to.
+        assert.doesNotMatch(sent, /AGENTS\.md/);
         // Pi loads no sub-agent files, so irori writes none.
         assert.equal(existsSync(path.join(root, '.claude', 'agents', 'hibachi-product.md')), false);
         assert.equal(existsSync(definition), false);

@@ -47,7 +47,7 @@ export function YourAiPanel({
   you?: YourAi;
   brains: Space[];
   ai: BrainAi;
-  /** The CLI your AI runs on; Claude Code hands work to sub-agents, another CLI works in the brains itself. */
+  /** The CLI your AI runs on; each hands a brain's work to its hibachi agent. */
   agent: AgentId;
   /** '' for the CLI's default. */
   model: string;
@@ -97,8 +97,8 @@ export function YourAiPanel({
                 `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent (a sub-agent) and gathers their reports.`,
               )
             : t(
-                `あなた専用のエージェントです。${agentNames[agent]} で動き、各 hibachi の AGENTS.md を読んでから直接作業します。`,
-                `Your own agent. It runs on ${agentNames[agent]} and works in each hibachi directly after reading its AGENTS.md.`,
+                `あなた専用のエージェントです。${agentNames[agent]} で動き、hibachi コマンドで各 hibachi の hibachi agent に仕事を渡して、報告をまとめます。`,
+                `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent with the hibachi command and gathers their reports.`,
               )}
         </p>
         <p className="mono your-ai-path" title={you.root}>

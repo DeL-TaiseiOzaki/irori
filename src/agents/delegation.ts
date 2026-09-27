@@ -66,3 +66,22 @@ export function toolFile(input: unknown) {
 }
 
 export const writeTools = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
+
+/**
+ * The handed hibachi a `hibachi` command names: by its sub-agent name, or by its
+ * name when only one handed hibachi has it. Any other is refused, with the names
+ * this run may use.
+ */
+export function hibachiOf(delegation: Delegation, name: string) {
+  const fold = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+  const byAgent = delegation.brains.find((brain) => brain.agent === name);
+  if (byAgent) return byAgent;
+  const byName = delegation.brains.filter((brain) => fold(brain.name) === fold(name));
+  if (byName.length === 1) return byName[0];
+  const names = delegation.brains.map((brain) => `${brain.agent} (${brain.name})`).join(', ');
+  throw Error(
+    byName.length
+      ? `More than one hibachi is named ${JSON.stringify(name)}. Use its sub-agent name: ${names}.`
+      : `No hibachi named ${JSON.stringify(name)} was handed to this request. Use one of: ${names || 'none'}.`,
+  );
+}

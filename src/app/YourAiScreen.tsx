@@ -462,8 +462,8 @@ export function YourAiScreen({
             <p className="you-later">
               <Icon name="info" size={13} />
               {t(
-                `${agentNames[agent]} にはサブエージェントがありません。irori agent は各 hibachi の AGENTS.md を読んでから直接作業します。`,
-                `${agentNames[agent]} has no sub-agents. The irori agent works in each hibachi itself after reading its AGENTS.md.`,
+                `${agentNames[agent]} はサブエージェントをファイルから読みません。irori agent は hibachi コマンド（hibachi <名前> "<作業>"）で各 hibachi の hibachi agent に仕事を渡します。`,
+                `${agentNames[agent]} loads no sub-agents from files. The irori agent hands work to each hibachi's hibachi agent with the hibachi command (hibachi <name> "<task>").`,
               )}
             </p>
           )}
