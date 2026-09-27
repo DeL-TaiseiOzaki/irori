@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+irori agent parity, 2026-09-27 (branch `feat/irori-agent-parity`, stacked on
+`feat/schema-settings` and `feat/hibachi-agent`, not yet merged; **0.1.50**): the
+owner asked that the irori agent and hibachi agents have the same shape. There
+is no "hibachi mode" label any more. The irori agent's screen edits its folder
+with the same Schema settings as a hibachi (root `AGENTS.md` only as
+instructions, never deleted; skills from its `.agents/skills`; rules; hooks),
+through the same four `HostAPI` methods with its id as the scope;
+`SchemaSettingsService` now resolves a `SchemaFolder` (a hibachi's checkout or
+`YourAiService.schemaFolder`) and keeps the path, alias and hash rules; writes
+wait while the irori agent runs. The irori agent starts in full access on every
+CLI, Claude Code included (`yourAiAccess` removed), with the composer's access
+pill; on Claude Code the `PreToolUse` write hook still decides in
+`bypassPermissions` and sub-agents inherit the mode. Pi and Hermes Agent, which
+load no sub-agents from files, get a `hibachi` command on the run's `PATH`
+(`src/agents/hibachi-bridge.ts`): a loopback server with a per-run token, a
+launcher in irori's data directory running irori's own executable as Node, and
+a hand-off that starts that hibachi's own run (same CLI and model,
+`defaultAgentAccess`) as the one run the irori agent's hold admits, reports its
+words back and appears in both logs; `brainsCommandPreamble` replaces the
+direct-work preamble. Verified with `npm run build`, `npm test` (new
+`tests/hibachi-command.test.ts`) and `xvfb-run -a npm run test:ui` (the irori
+agent smoke now covers the settings, the access pill and a Pi hand-off through
+the real Electron-as-Node launcher). Unverified: real Claude Code in
+`bypassPermissions` as the irori agent, real Pi/Hermes shells running `hibachi`
+(environment and tool timeouts), `hibachi.cmd` on Windows, installed apps
+([YOUR-AI](YOUR-AI.md#limits)).
+
 Schema settings, 2026-09-27 (branch `feat/schema-settings`, not yet released):
 the brain panel's Schema section lists 指示 / Instructions (`AGENTS.md` at the
 root and in knowledge folders), スキル / Skills, ルール / Rules

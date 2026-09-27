@@ -72,7 +72,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 
 **AI agents**
 - **hibachi agent** (a hibachi's AI): Claude Code, Codex, OpenCode, Pi and Hermes Agent start inside a hibachi, with that hibachi's Schema loaded. Several hibachi agents can run at once. Pick a model from the list the installed CLI gives (type one in for Hermes Agent).
-- **irori agent** (formerly "your AI"): in irori mode, ask for work that spans hibachis, on any of these CLIs. On Claude Code, Codex and OpenCode it splits the request by hibachi and hands each part to that hibachi's sub-agent (`hibachi-<name>`), which irori defines; on Pi and Hermes Agent it reads each hibachi's AGENTS.md and does the work itself. Either way it reports back.
+- **irori agent** (formerly "your AI"): in irori mode, ask for work that spans hibachis, on any of these CLIs. It splits the request by hibachi and hands each part to that hibachi's hibachi agent: on Claude Code, Codex and OpenCode a sub-agent (`hibachi-<name>`) that irori defines, on Pi and Hermes Agent a `hibachi` command irori provides for the request. It reports back. Like a hibachi agent it starts in full access, and its own Schema is edited with the same settings.
 - Permissions follow each CLI's settings. A hibachi agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Instructions can be queued while an agent works. Conversations survive a restart.
 
