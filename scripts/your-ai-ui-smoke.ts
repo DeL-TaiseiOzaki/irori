@@ -37,6 +37,12 @@ await writeFile(
   `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/claude-your-ai.mjs')).href)}).then(m=>m.run());\n`,
   { mode: 0o700 },
 );
+// Your AI on another CLI: Pi's protocol fixture.
+await writeFile(
+  path.join(bin, 'pi'),
+  `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
+  { mode: 0o700 },
+);
 const env = {
   ...process.env,
   HOME: home,
@@ -159,9 +165,47 @@ try {
   );
   await page.getByRole('button', { name: '全体に戻る' }).click();
   await expect(map).toBeVisible();
+
+  // Your AI on another CLI, with a model from that CLI's list: it works in the
+  // brains itself, told to read each brain's AGENTS.md. The choice is kept.
+  const cli = island.getByLabel('あなたの AI の CLI', { exact: true });
+  await expect(cli).toHaveValue('claude');
+  await cli.selectOption('pi');
+  await expect(island.getByRole('button', { name: 'Pi · あなたの Schema' })).toBeVisible();
+  await island.getByLabel('モデル', { exact: true }).selectOption('anthropic/claude-fixture');
+  await composer.fill('Tidy both brains.');
+  await island.getByRole('button', { name: '送信', exact: true }).click();
+  const piLog = async () =>
+    (await readFile(path.join(you, 'fixture-requests.jsonl'), 'utf8').catch(() => ''))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  await expect
+    .poll(async () => (await piLog()).filter((entry) => entry.type === 'prompt').length)
+    .toBe(1);
+  await expect(island).toContainText('の応答');
+  const sent = (await piLog()).find((entry) => entry.type === 'prompt').message as string;
+  expect(sent).toContain(`folder ${JSON.stringify(roots[0])}`);
+  expect(sent).toContain('You run on Pi');
+  expect(sent).toContain("read the AGENTS.md at the top of that brain's folder");
+  expect(sent.endsWith('Tidy both brains.')).toBe(true);
+  expect((await piLog()).find((entry) => entry.type === 'launch').args.slice(2, 6)).toEqual([
+    '--provider',
+    'anthropic',
+    '--model',
+    'claude-fixture',
+  ]);
+  expect((await page.evaluate(() => window.irori.deviceSettings())).yourAi).toEqual({
+    agent: 'pi',
+    models: { pi: 'anthropic/claude-fixture' },
+  });
+  await map.getByRole('button', { name: 'あなたの AI の Schema を開く' }).click();
+  await expect(page.locator('.you-chip')).toHaveText('Pi');
+  await page.getByRole('button', { name: '全体に戻る' }).click();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions written on request and shown on the Your AI screen. Protocol fixture only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions written on request and shown on the Your AI screen, and your AI on Pi with a listed model working in the brains after their AGENTS.md. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

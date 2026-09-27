@@ -703,6 +703,10 @@ export function Overview({
   onShowYou,
   onSendYou,
   onStopYou,
+  yourAgent,
+  yourModel,
+  onYourAgent,
+  onYourModel,
   ...actions
 }: {
   workspace: WorkspaceProfile;
@@ -724,6 +728,11 @@ export function Overview({
   onShowYou: () => void;
   onSendYou: (prompt: string) => Promise<void>;
   onStopYou: () => Promise<void>;
+  /** The CLI your AI runs on, and the model chosen for it ('' for the CLI's default). */
+  yourAgent: AgentId;
+  yourModel: string;
+  onYourAgent: (agent: AgentId) => void;
+  onYourModel: (model: string) => void;
 } & Actions) {
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
@@ -774,9 +783,9 @@ export function Overview({
       ))}
       {you?.state === 'ready' && (
         <AiWatch
-          key={`you:${you.id}`}
+          key={`you:${you.id}:${yourAgent}`}
           scopeId={you.id}
-          agent="claude"
+          agent={yourAgent}
           refresh={acted}
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
@@ -880,6 +889,10 @@ export function Overview({
               you={you}
               brains={spaces}
               ai={yourAi}
+              agent={yourAgent}
+              model={yourModel}
+              onAgent={onYourAgent}
+              onModel={onYourModel}
               onCreate={onCreateYou}
               onShow={onShowYou}
               onSend={reread(onSendYou)}

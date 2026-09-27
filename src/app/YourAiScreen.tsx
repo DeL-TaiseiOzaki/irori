@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Space } from '../domain/types';
+import type { AgentId, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
 import type { BrainAgent, YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
@@ -234,6 +234,7 @@ function Definition({ brain, reads }: { brain: BrainAgent; reads: number }) {
  */
 export function YourAiScreen({
   you,
+  agent,
   spaces,
   running,
   onUpdateDefinitions,
@@ -241,6 +242,8 @@ export function YourAiScreen({
   onError,
 }: {
   you: YourAi;
+  /** The CLI your AI runs on. */
+  agent: AgentId;
   spaces: Space[];
   running: boolean;
   onUpdateDefinitions: () => Promise<void>;
@@ -322,10 +325,13 @@ export function YourAiScreen({
           <div className="you-chips">
             <span
               className="you-chip"
-              title={t('あなたの AI は Claude Code で動きます', 'Your AI runs in Claude Code')}
+              title={t(
+                `あなたの AI は ${agentNames[agent]} で動きます`,
+                `Your AI runs in ${agentNames[agent]}`,
+              )}
             >
               <Icon name="sparkles" size={13} />
-              {agentNames.claude}
+              {agentNames[agent]}
             </span>
           </div>
         </header>

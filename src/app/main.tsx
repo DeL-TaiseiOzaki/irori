@@ -16,7 +16,9 @@ import {
   agentAccessLabel,
   agentAccessDetail,
   defaultAgentAccess,
+  yourAiAccess,
 } from '../domain/agent-access';
+import { ModelPicker } from './ModelPicker';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
 import { retirementNotice } from '../domain/skills';
@@ -27,7 +29,9 @@ import {
   applyMarkdownFont,
   applyTheme,
   chooseEditorAssistance,
+  chooseYourAi,
   currentEditorAssistance,
+  currentYourAi,
   layoutStorage,
   loadDeviceSettings,
   watchSystemTheme,
@@ -348,6 +352,17 @@ function App() {
       last: next,
       brains: active ? { ...choice.brains, [active.scopeId]: next } : choice.brains,
     }));
+  }
+  // Each brain keeps the model chosen for each CLI; '' is the CLI's own default.
+  const [modelChoice, setModelChoice] = useState<Record<string, string>>({});
+  const modelFor = (scopeId: string, agentId: AgentId) =>
+    modelChoice[`${scopeId}:${agentId}`] || undefined;
+  const model = active ? modelFor(active.scopeId, agent) : undefined;
+  // Your AI's CLI and models are kept on the device.
+  const [yourChoice, setYourChoice] = useState(currentYourAi);
+  function chooseYour(next: typeof yourChoice) {
+    setYourChoice(next);
+    void chooseYourAi(next).catch(report);
   }
   const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
   const access =
@@ -894,6 +909,7 @@ function App() {
       scopeId: active!.scopeId,
       agent,
       access,
+      model,
       prompt: message,
       notePath,
       newSession,
@@ -936,6 +952,7 @@ function App() {
             scopeId: active.scopeId,
             agent,
             access,
+            model,
             prompt: message,
             notePath,
             sources,
@@ -1039,7 +1056,13 @@ function App() {
         t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
       );
     const value = await host.agentConversation(scopeId, agentId);
-    const input = { scopeId, agent: agentId, access: defaultAgentAccess(agentId), prompt: message };
+    const input = {
+      scopeId,
+      agent: agentId,
+      access: defaultAgentAccess(agentId),
+      model: modelFor(scopeId, agentId),
+      prompt: message,
+    };
     if (value.activeRunId || value.queued.length || draining.current.has(scopeId)) {
       const list = await host.queueAgentMessage(input);
       if (conversationKey.current === key) setQueued(list);
@@ -1055,7 +1078,7 @@ function App() {
   }
   /**
    * Sends to your AI with the workspace's brains that are free, or queues behind
-   * its run. It works on Claude Code for now.
+   * its run, on the CLI and model chosen for it on this device.
    */
   async function sendToYou(message: string, skill?: string) {
     if (!you) return;
@@ -1066,15 +1089,17 @@ function App() {
     const brains = workspaceSpaces
       .map((space) => space.scopeId)
       .filter((scopeId) => !runningScopes.includes(scopeId));
+    const agentId = yourChoice.agent;
     const input = {
       scopeId: you.id,
-      agent: 'claude' as const,
-      access: 'default' as const,
+      agent: agentId,
+      access: yourAiAccess(agentId),
+      model: yourChoice.models[agentId] || undefined,
       prompt: message,
       brains,
       skill,
     };
-    const value = await host.agentConversation(you.id, 'claude');
+    const value = await host.agentConversation(you.id, agentId);
     if (value.activeRunId || value.queued.length || draining.current.has(you.id)) {
       await host.queueAgentMessage(input);
       return;
@@ -1399,6 +1424,15 @@ function App() {
               if (you?.state === 'ready') goToLevel('you');
             }}
             onSendYou={(prompt) => sendToYou(prompt)}
+            yourAgent={yourChoice.agent}
+            yourModel={yourChoice.models[yourChoice.agent] ?? ''}
+            onYourAgent={(next) => chooseYour({ ...yourChoice, agent: next })}
+            onYourModel={(next) => {
+              const models = { ...yourChoice.models };
+              if (next) models[yourChoice.agent] = next;
+              else delete models[yourChoice.agent];
+              chooseYour({ ...yourChoice, models });
+            }}
             onStopYou={async () => {
               if (you) await host.cancel(you.id);
             }}
@@ -1409,6 +1443,7 @@ function App() {
         {level === 'you' && workspace && you?.state === 'ready' && (
           <YourAiScreen
             you={you}
+            agent={yourChoice.agent}
             spaces={workspaceSpaces}
             running={yourAiRunning}
             onUpdateDefinitions={updateDefinitions}
@@ -2600,6 +2635,18 @@ function App() {
                               ))}
                             </select>
                           </label>
+                          <ModelPicker
+                            agent={agent}
+                            value={model ?? ''}
+                            disabled={sending || gitBusy}
+                            onChange={(next) =>
+                              active &&
+                              setModelChoice((all) => ({
+                                ...all,
+                                [`${active.scopeId}:${agent}`]: next,
+                              }))
+                            }
+                          />
                           {personLinesOffered && (
                             <label
                               className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}

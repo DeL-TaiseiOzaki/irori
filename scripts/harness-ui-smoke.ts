@@ -29,7 +29,7 @@ await writeFile(path.join(root, 'note.md'), '# Harness fixture\n');
 await writeFile(path.join(root, 'second.md'), '# Other note\n');
 const bin = path.join(base, 'bin');
 await mkdir(bin);
-for (const id of ['pi', 'opencode'])
+for (const id of ['pi', 'opencode', 'hermes'])
   await writeFile(
     path.join(bin, id),
     `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
@@ -287,6 +287,57 @@ try {
   expect(
     (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
   ).toBe('default');
+  // The model pill lists what the installed CLI prints, and the choice reaches it.
+  const fixtureLog = async () =>
+    (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+  const modelPill = page.getByLabel('モデル', { exact: true });
+  await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
+  await expect(modelPill).toHaveValue('');
+  await expect(modelPill.locator('option', { hasText: 'openai/gpt-fixture' })).toHaveCount(1);
+  await modelPill.selectOption('anthropic/claude-fixture');
+  await page.getByLabel('エージェントへの指示').fill('model fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.user').last()).toHaveText('model fixture');
+  const settled = (agent: string) =>
+    expect
+      .poll(async () => {
+        const value = await page.evaluate(
+          ([id, cli]) => window.irori.agentConversation(id, cli as 'pi'),
+          [space.scopeId, agent],
+        );
+        return !value.activeRunId && value.events.at(-1)?.type === 'done';
+      })
+      .toBe(true);
+  await settled('pi');
+  expect(
+    (await fixtureLog())
+      .filter((call) => call.type === 'launch')
+      .at(-1)
+      .args.slice(2, 6),
+  ).toEqual(['--provider', 'anthropic', '--model', 'claude-fixture']);
+  // Hermes Agent lists no models: a name is typed in. It starts in full access.
+  await page.getByLabel('エージェント', { exact: true }).selectOption('hermes');
+  await expect(access).toHaveValue('full-access');
+  await expect(modelPill).toHaveValue('');
+  await modelPill.selectOption({ label: 'その他…' });
+  await page.getByLabel('モデル名', { exact: true }).fill('vendor/model-x');
+  await page.getByLabel('モデル名', { exact: true }).press('Enter');
+  await expect(modelPill).toHaveValue('vendor/model-x');
+  await page.getByLabel('エージェントへの指示').fill('hermes fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.user').last()).toHaveText('hermes fixture');
+  await settled('hermes');
+  await expect(page.locator('.message.done').last()).toContainText('完了');
+  await expect(page.locator('.conversation')).toContainText('の応答');
+  const hermesCall = (await fixtureLog()).filter((call) => call.kind === 'hermes').at(-1);
+  expect(hermesCall.prompt).toContain('hermes fixture');
+  expect(hermesCall.args.slice(5)).toEqual(['-m', 'vendor/model-x', '--yolo']);
+  expect(
+    (await page.evaluate((id) => window.irori.agentSession(id, 'hermes'), space.scopeId)).state,
+  ).toBe('saved');
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();
@@ -305,6 +356,7 @@ try {
         evidence: 'Explicit protocol fixtures; no native model inference',
         checks: [
           'Pi/OpenCode panel selection',
+          'model pill from the CLI list, and a typed Hermes model with its full access',
           'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',
           'new conversation intent and cancellation preserve the composer',

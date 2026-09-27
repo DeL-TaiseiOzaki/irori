@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Space } from '../domain/types';
+import { agentIds, agentNames, type AgentId, type Space } from '../domain/types';
 import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
 import { Icon } from './Icon';
 import type { BrainAi } from './useBrainAi';
+import { ModelPicker } from './ModelPicker';
 
 /** The latest run of a conversation, and whether it is still going. */
 export function latestRun(ai: BrainAi) {
@@ -30,6 +31,10 @@ export function YourAiPanel({
   you,
   brains,
   ai,
+  agent,
+  model,
+  onAgent,
+  onModel,
   onCreate,
   onShow,
   onSend,
@@ -39,6 +44,12 @@ export function YourAiPanel({
   you?: YourAi;
   brains: Space[];
   ai: BrainAi;
+  /** The CLI your AI runs on; Claude Code hands work to sub-agents, another CLI works in the brains itself. */
+  agent: AgentId;
+  /** '' for the CLI's default. */
+  model: string;
+  onAgent: (agent: AgentId) => void;
+  onModel: (model: string) => void;
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
@@ -74,10 +85,15 @@ export function YourAiPanel({
         </span>
         <h2>{t('あなたの AI', 'Your AI')}</h2>
         <p>
-          {t(
-            'あなた専用のエージェントです。Brain ごとのサブエージェントに仕事を渡し、報告をまとめます。Claude Code で動きます。',
-            'Your own agent. It hands work to a sub-agent for each brain and gathers their reports. It runs on Claude Code.',
-          )}
+          {agent === 'claude'
+            ? t(
+                'あなた専用のエージェントです。Brain ごとのサブエージェントに仕事を渡し、報告をまとめます。Claude Code で動きます。',
+                'Your own agent. It hands work to a sub-agent for each brain and gathers their reports. It runs on Claude Code.',
+              )
+            : t(
+                `あなた専用のエージェントです。${agentNames[agent]} で動き、各 Brain の AGENTS.md を読んでから直接作業します。`,
+                `Your own agent. It runs on ${agentNames[agent]} and works in each brain directly after reading its AGENTS.md.`,
+              )}
         </p>
         <p className="mono your-ai-path" title={you.root}>
           {you.root}
@@ -109,7 +125,7 @@ export function YourAiPanel({
         <span className="your-ai-title">
           <strong>{t('あなたの AI', 'Your AI')}</strong>
           <button className="your-ai-schema" onClick={onShow}>
-            {t('Claude Code · あなたの Schema', 'Claude Code · your Schema')}
+            {t(`${agentNames[agent]} · あなたの Schema`, `${agentNames[agent]} · your Schema`)}
           </button>
         </span>
         <span className="overview-space" />
@@ -197,10 +213,24 @@ export function YourAiPanel({
           }}
         />
         <footer>
-          <small>
-            <Icon name="sparkles" size={12} />
-            Claude Code
-          </small>
+          <span className="composer-selects your-ai-selects">
+            <label className="composer-pill" title={t('あなたの AI の CLI', "Your AI's CLI")}>
+              <Icon name="sparkles" size={12} />
+              <select
+                aria-label={t('あなたの AI の CLI', "Your AI's CLI")}
+                value={agent}
+                disabled={busy || ai.running || ai.queued.length > 0}
+                onChange={(event) => onAgent(event.target.value as AgentId)}
+              >
+                {agentIds.map((id) => (
+                  <option key={id} value={id}>
+                    {agentNames[id]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ModelPicker agent={agent} value={model} disabled={busy} onChange={onModel} />
+          </span>
           <button
             type="submit"
             className="ember-button"
