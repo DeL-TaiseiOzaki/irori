@@ -130,6 +130,7 @@ import { useResource } from './useResource';
 import { agentIds, agentNames } from '../domain/types';
 import { AgentLog } from './AgentLog';
 import { BrainPanel, type BrainMode } from './BrainPanel';
+import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
 import { BrainSettings } from './BrainSettings';
@@ -276,8 +277,9 @@ function App() {
   const [gitReview, setGitReview] = useState(false);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitDetailTarget, setGitDetailTarget] = useState<HTMLDivElement | null>(null);
-  // What the stage shows: the note, the brain's home, its graph, or its materials.
-  const [view, setView] = useState<'note' | 'home' | 'graph' | 'records'>('note');
+  // What the stage shows: the note, the brain's home, its graph, its materials or a Schema setting.
+  const [view, setView] = useState<'note' | 'home' | 'graph' | 'records' | 'schema'>('note');
+  const [schemaTarget, setSchemaTarget] = useState<SchemaTarget & { scopeId: string }>();
   const [searchOpen, setSearchOpen] = useState(false);
   // The palette opened from the Overview searches every brain.
   const [searchAll, setSearchAll] = useState(false);
@@ -543,6 +545,10 @@ function App() {
   }, [active?.scopeId, agent, historyReload]);
   // A skill choice belongs to one space, even when another space declares the same name.
   useEffect(() => setSkill(''), [active?.scopeId]);
+  // A Schema setting belongs to its brain; another brain shows its note instead.
+  useEffect(() => {
+    if (view === 'schema' && schemaTarget?.scopeId !== active?.scopeId) setView('note');
+  }, [active?.scopeId]);
   // A skill that disappeared, or a space that does not declare it, must not be sent.
   useEffect(() => {
     if (!skillRead.loading && skill && !skills.some((s) => s.name === skill)) setSkill('');
@@ -1491,6 +1497,27 @@ function App() {
                   setNewNote(true);
                 }}
                 onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
+                schema={
+                  <SchemaList
+                    space={active}
+                    revision={revision}
+                    selected={
+                      view === 'schema' && schemaTarget?.scopeId === active.scopeId
+                        ? schemaTarget
+                        : undefined
+                    }
+                    locked={brainLocked || gitBusy}
+                    onSelect={(target) => {
+                      // The note being edited is saved first, as before the graph or materials.
+                      void save().then((saved) => {
+                        if (!saved) return;
+                        setSchemaTarget({ ...target, scopeId: active.scopeId });
+                        setView('schema');
+                      });
+                    }}
+                    onOpenFile={(entry) => void open(active, entry)}
+                  />
+                }
               >
                 <GitPanel
                   space={active}
@@ -1539,7 +1566,7 @@ function App() {
             <main id="editor-main" className="stage on-stage" tabIndex={-1}>
               <div
                 className="stage-top"
-                hidden={gitReview || view === 'graph' || view === 'records'}
+                hidden={gitReview || view === 'graph' || view === 'records' || view === 'schema'}
               >
                 <header className="stage-bar">
                   {onNote && doc?.workspaceId ? (
@@ -1917,6 +1944,23 @@ function App() {
                       onClose={() => setView('note')}
                     />
                   )}
+                  {view === 'schema' &&
+                    active &&
+                    schemaTarget?.scopeId === active.scopeId &&
+                    !gitReview && (
+                      <SchemaEditor
+                        key={active.scopeId}
+                        space={active}
+                        target={schemaTarget}
+                        locked={brainLocked || gitBusy}
+                        revision={revision}
+                        onSelect={(target) => {
+                          if (target) setSchemaTarget({ ...target, scopeId: active.scopeId });
+                          else setView('note');
+                        }}
+                        onClose={() => setView('note')}
+                      />
+                    )}
                   {view === 'graph' && active && !gitReview && (
                     <Suspense
                       fallback={
@@ -1953,7 +1997,9 @@ function App() {
                   )}
                   <div
                     className="note-surface"
-                    hidden={gitReview || view === 'graph' || view === 'records'}
+                    hidden={
+                      gitReview || view === 'graph' || view === 'records' || view === 'schema'
+                    }
                   >
                     {doc && (
                       <div className="document-scroll" hidden={view !== 'note'}>
