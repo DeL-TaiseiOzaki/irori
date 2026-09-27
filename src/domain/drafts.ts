@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AgentId } from './types';
+import { agentIds, type AgentId } from './types';
 import { t } from './i18n';
 
 export const draftKey = z.discriminatedUnion('kind', [
@@ -7,7 +7,7 @@ export const draftKey = z.discriminatedUnion('kind', [
     .object({
       scopeId: z.uuid(),
       kind: z.literal('composer'),
-      agent: z.enum(['codex', 'claude', 'opencode', 'pi']),
+      agent: z.enum(agentIds),
     })
     .strict(),
   z.object({ scopeId: z.uuid(), kind: z.literal('git-commit') }).strict(),

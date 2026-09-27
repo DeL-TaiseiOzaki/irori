@@ -16,6 +16,7 @@ let current: DeviceSettings = {
   editorAssistance: true,
   layouts: {},
   skillAudiences: {},
+  yourAi: { agent: 'claude', models: {} },
 };
 
 export async function loadDeviceSettings() {
@@ -129,6 +130,16 @@ export function currentSkillAudience(scopeId: string): SkillAudience {
 
 export async function chooseSkillAudience(scopeId: string, audience: SkillAudience) {
   current = await host.saveDeviceSettings({ skillAudiences: { [scopeId]: audience } });
+  return current;
+}
+
+/** The CLI your AI runs on and the model chosen for each CLI. */
+export function currentYourAi() {
+  return current.yourAi;
+}
+
+export async function chooseYourAi(yourAi: DeviceSettings['yourAi']) {
+  current = await host.saveDeviceSettings({ yourAi });
   return current;
 }
 

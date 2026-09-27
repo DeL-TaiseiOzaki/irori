@@ -172,6 +172,7 @@ source states it.
 | Claude Code 2.1.278 | No: project skills are `.claude/skills` only | `~/.claude/skills` (personal) | Personal over project; the KB copy is not read either way |
 | OpenCode 1.18.30 | Yes: `.agents/skills` from the working directory up to the git worktree | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Warns "duplicate skill name" and keeps one; which one is not documented |
 | Pi 0.86.1 documentation (0.85.1 is what irori exercised) | Yes, once the project is trusted: `.agents/skills` in the working directory and its ancestors up to the git root | `~/.agents/skills`, `~/.pi/agent/skills` | First found wins, and global is loaded before project, so the personal copy wins |
+| Hermes Agent v2026.9.24 documentation (not exercised by irori) | Yes, inside a git checkout once the project is trusted (`hermes skills trust`): `.hermes/skills` and `.agents/skills` at the project root | `~/.hermes/skills`; `~/.agents/skills` only when listed in `skills.external_dirs` | Project over local over external, so the KB copy wins |
 
 Sources, read on 2026-09-21:
 
@@ -199,6 +200,9 @@ Sources, read on 2026-09-21:
   and keep the first skill found"), CHANGELOG 0.54.0 (added `.agents/skills`
   discovery) and 0.63.1 (root `.md` files in `.agents/skills` ignored), and
   `src/core/skills.ts`, where `loadSkills` keeps the first skill under a name.
+- Hermes Agent: `website/docs/user-guide/features/skills.md` on `main`, read
+  on 2026-09-27 ("External Skill Directories", "Project-Local Skills" and
+  "Precedence": `project → local (~/.hermes/skills/) → external_dirs`).
 - teamai-cli v0.24.0: `docs/usage-guide.md`, `teamai doctor` ("`Skills
   delivered to <tool>` compares the skills your role namespaces … resolve to
   against what is on disk for each installed tool: it reports a skill that was

@@ -286,6 +286,7 @@ test('A retired skill is listed with its reason, refused for a run, and checked 
     '~/.claude/skills',
     '~/.config/opencode/skills',
     '~/.pi/agent/skills',
+    '~/.hermes/skills',
   ]);
   assert.ok(
     Object.values(skillReachRules).every((rule) => rule.user.every((dir) => dir.startsWith('~/'))),

@@ -14,6 +14,7 @@ const nativeText = {
 };
 const clashText = {
   'user-wins': () => t('そちらが優先される', 'that one takes priority'),
+  'kb-wins': () => t('KB のものが優先される', "the KB's one takes priority"),
   both: () => t('両方が並ぶ', 'both are listed'),
   unspecified: () => t('どちらが残るかは未定義', 'which remains is undefined'),
 };

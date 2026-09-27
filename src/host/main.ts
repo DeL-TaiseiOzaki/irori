@@ -572,6 +572,7 @@ app
       },
       noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
       agents: () => agents.available(),
+      agentModels: (agent) => agents.models(agent),
       agentSession: (...args) => agents.session(...args),
       agentConversation: (...args) => agents.conversation(...args),
       queueAgentMessage: (input) => agents.queueMessage(input),

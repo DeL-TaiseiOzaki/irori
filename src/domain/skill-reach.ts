@@ -11,7 +11,7 @@ export type ReachRule = {
   /** Home-relative directories the CLI also reads. */
   user: string[];
   /** The KB skill's fate when a user-scope skill has the same name. */
-  clash: 'user-wins' | 'both' | 'unspecified';
+  clash: 'user-wins' | 'kb-wins' | 'both' | 'unspecified';
 };
 export const skillReachRules: Record<AgentId, ReachRule> = {
   codex: { native: 'reads', user: ['~/.agents/skills', '~/.codex/skills'], clash: 'both' },
@@ -22,6 +22,7 @@ export const skillReachRules: Record<AgentId, ReachRule> = {
     clash: 'unspecified',
   },
   pi: { native: 'trusted', user: ['~/.agents/skills', '~/.pi/agent/skills'], clash: 'user-wins' },
+  hermes: { native: 'trusted', user: ['~/.hermes/skills'], clash: 'kb-wins' },
 };
 /** Every user-scope directory some harness reads, checked once per skill name. */
 export const userSkillRoots = [...new Set(Object.values(skillReachRules).flatMap((r) => r.user))];

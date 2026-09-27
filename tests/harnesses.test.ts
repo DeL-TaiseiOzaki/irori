@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
@@ -11,6 +12,10 @@ import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { withRequests } from '../src/domain/conversation';
+import { ModelCatalog, parseOpenCodeModels, parsePiModels } from '../src/agents/models';
+import { piModelArgs } from '../src/agents/pi';
+import { hostArguments } from '../src/domain/host-requests';
+import { openCodeModel } from '../src/agents/opencode';
 
 const fixtureOptions = {
   skip: process.platform === 'win32' && 'POSIX executable fixture',
@@ -26,7 +31,7 @@ async function setup(t: any) {
     process.env.PATH = old;
     await rm(base, { recursive: true, force: true });
   });
-  for (const id of ['pi', 'opencode'])
+  for (const id of ['pi', 'opencode', 'hermes'])
     await writeFile(
       path.join(bin, id),
       `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
@@ -371,7 +376,7 @@ test(
       '.gitignore .irori',
       'registration writes its own scope metadata and ignores contents',
     );
-    for (const agent of ['pi', 'opencode'] as const) {
+    for (const agent of ['pi', 'opencode', 'hermes'] as const) {
       const run = await execute(agent, 'ordinary request');
       assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
       assert.equal(await schema(), before, `${agent} left the schema layer unchanged`);
@@ -446,3 +451,165 @@ test(
     await firstDone;
   },
 );
+
+test(
+  'Hermes Agent streams stream-json, saves and resumes its session, and passes model and access (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { root, space, files, calls, execute } = await setup(t);
+    const hermes = async () => (await calls()).filter((call: any) => call.kind === 'hermes');
+    const first = await execute('hermes', 'ordinary request');
+    assert.equal(first.events.at(-1)?.outcome, 'completed', JSON.stringify(first.events));
+    assert.deepEqual(
+      first.events.filter((e) => e.type === 'text').map((e) => e.text),
+      ['日本語\u2028', 'の応答'],
+      'deltas stream, and the final text is not repeated',
+    );
+    assert.deepEqual(
+      first.events.filter((e) => e.type === 'tool').map((e) => e.text),
+      ['read_file', 'read_file'],
+    );
+    assert.match(await readFile(path.join(root, 'note.md'), 'utf8'), /Fixture Hermes edit/);
+    // The prompt travels on stdin, never on the command line.
+    const [call] = await hermes();
+    assert.equal(call.prompt, 'ordinary request');
+    assert.deepEqual(call.args, ['chat', '--query-file', '-', '--format', 'stream-json']);
+    const store = new SessionStore(files.dataDir);
+    const binding = { scopeId: space.scopeId, root, agent: 'hermes' as const };
+    assert.equal((await store.read(binding))!.handle, '20260927_120000_fixture');
+
+    const full = await execute('hermes', 'rotate', false, {
+      access: 'full-access',
+      model: 'anthropic/claude-x',
+    });
+    assert.equal(full.events.at(-1)?.outcome, 'completed', JSON.stringify(full.events));
+    assert.ok(
+      full.events.some((e) => e.type === 'status' && e.text.includes('anthropic/claude-x')),
+    );
+    // A new access mode starts a new conversation; the model and --yolo are passed.
+    assert.deepEqual((await hermes()).at(-1).args.slice(5), ['-m', 'anthropic/claude-x', '--yolo']);
+    assert.equal((await store.read(binding))!.handle, '20260927_120500_rotated');
+    const resumed = await execute('hermes', 'final only', false, { access: 'full-access' });
+    assert.equal(resumed.events.at(-1)?.outcome, 'completed', JSON.stringify(resumed.events));
+    assert.deepEqual((await hermes()).at(-1).args.slice(5), [
+      '--resume',
+      '20260927_120500_rotated',
+      '--yolo',
+    ]);
+    assert.deepEqual(
+      resumed.events.filter((e) => e.type === 'text').map((e) => e.text),
+      ['日本語\u2028の応答'],
+      'the final text stands in when no delta carried it',
+    );
+
+    assert.equal(
+      (await execute('hermes', 'fail', false, { access: 'full-access' })).events.at(-1)?.outcome,
+      'failed',
+    );
+    const crashed = await execute('hermes', 'crash', false, { access: 'full-access' });
+    assert.equal(crashed.events.at(-1)?.outcome, 'failed');
+    assert.ok(
+      crashed.events.some(
+        (e) => e.type === 'error' && /without a result|結果を返さず/.test(e.text),
+      ),
+    );
+    const held = await execute('hermes', 'hold', true, { access: 'full-access' });
+    assert.equal(held.events.at(-1)?.outcome, 'cancelled');
+    await writeFile(path.join(root, 'fail-resume'), 'fixture');
+    const lost = await execute('hermes', 'again', false, { access: 'full-access' });
+    assert.equal(lost.events.at(-1)?.outcome, 'failed');
+    assert.ok(lost.events.some((e) => e.type === 'error' && e.text.includes('Session not found')));
+    assert.equal(
+      (await store.read(binding))!.handle,
+      '20260927_120500_rotated',
+      'a failed resume keeps its handle',
+    );
+  },
+);
+
+test('Each CLI gets the chosen model in its own form', fixtureOptions, async (t) => {
+  assert.deepEqual(piModelArgs(), []);
+  assert.deepEqual(piModelArgs('anthropic/claude-x'), [
+    '--provider',
+    'anthropic',
+    '--model',
+    'claude-x',
+  ]);
+  assert.deepEqual(piModelArgs('claude-x'), ['--model', 'claude-x']);
+  assert.deepEqual(openCodeModel('openrouter/vendor/model'), {
+    providerID: 'openrouter',
+    modelID: 'vendor/model',
+  });
+  assert.throws(() => openCodeModel('no-provider'), /provider\/model|プロバイダ/);
+  const { calls, execute } = await setup(t);
+  for (const agent of ['pi', 'opencode'] as const) {
+    const run = await execute(agent, 'ordinary request', false, {
+      model: 'anthropic/claude-fixture',
+    });
+    assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+  }
+  const log = await calls();
+  assert.deepEqual(log.find((call: any) => call.route?.endsWith('/message')).body.model, {
+    providerID: 'anthropic',
+    modelID: 'claude-fixture',
+  });
+  assert.deepEqual(
+    log
+      .filter((call: any) => call.type === 'launch')
+      .at(-1)
+      .args.slice(2, 6),
+    ['--provider', 'anthropic', '--model', 'claude-fixture'],
+  );
+  // A model is an argument to the CLI: never an option.
+  const service = new AgentService((await setup(t)).files, () => {});
+  assert.throws(() =>
+    service.start({ scopeId: randomUUID(), agent: 'pi', prompt: 'x', model: '--yolo' }),
+  );
+});
+
+test('Model lists are read from each installed CLI once per version', fixtureOptions, async (t) => {
+  assert.deepEqual(
+    parseOpenCodeModels('anthropic/a\nnoise line\n\x1b[1mopenai/b\x1b[0m\nanthropic/a\n'),
+    [
+      { id: 'anthropic/a', label: 'anthropic/a' },
+      { id: 'openai/b', label: 'openai/b' },
+    ],
+  );
+  assert.deepEqual(parsePiModels('No models available. Log in first.'), []);
+  await setup(t);
+  const catalog = new ModelCatalog();
+  assert.deepEqual(await catalog.models('opencode'), {
+    models: [
+      { id: 'anthropic/claude-fixture', label: 'anthropic/claude-fixture' },
+      { id: 'openrouter/vendor/model-x', label: 'openrouter/vendor/model-x' },
+    ],
+    custom: false,
+  });
+  assert.deepEqual(
+    (await catalog.models('pi')).models.map((model) => model.id),
+    ['anthropic/claude-fixture', 'openai/gpt-fixture'],
+  );
+  // The renderer may ask only for a known CLI.
+  assert.equal(hostArguments.agentModels.safeParse(['hermes']).success, true);
+  assert.equal(hostArguments.agentModels.safeParse(['gpt']).success, false);
+  // Hermes prints no list: a model is typed in.
+  assert.deepEqual(await catalog.models('hermes'), { models: [], custom: true });
+  let reads = 0;
+  const counted = new ModelCatalog(async () => {
+    reads++;
+    return [{ id: 'm', label: 'M' }];
+  });
+  await counted.models('pi');
+  await counted.models('pi');
+  assert.equal(reads, 1, 'kept for the same CLI version');
+  const failing = new ModelCatalog(async () => {
+    throw Error('unreachable');
+  });
+  const failed = await failing.models('claude');
+  assert.equal(failed.custom, true);
+  assert.match(failed.error!, /unreachable/);
+  assert.ok(
+    failed.models.some((model) => model.id === 'sonnet'),
+    'Claude Code aliases stand in',
+  );
+});

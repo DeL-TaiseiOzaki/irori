@@ -14,6 +14,7 @@ const defaults = {
   editorAssistance: true,
   layouts: {},
   skillAudiences: {},
+  yourAi: { agent: 'claude', models: {} },
 };
 
 async function service() {
@@ -96,6 +97,26 @@ test("the reader's role and project are kept per KB on the device, not in the KB
     'kb-1': { project: 'thesis' },
     'kb-2': { role: '研究者' },
   });
+});
+
+test('the CLI and models your AI runs on are kept on the device', async () => {
+  const { dir, settings } = await service();
+  await settings.save({ yourAi: { agent: 'hermes', models: { hermes: 'anthropic/claude-x' } } });
+  await settings.save({ theme: 'dark' });
+  assert.deepEqual((await new SettingsService(dir).read()).yourAi, {
+    agent: 'hermes',
+    models: { hermes: 'anthropic/claude-x' },
+  });
+  const save = hostArguments.saveDeviceSettings;
+  assert.equal(save.safeParse([{ yourAi: { agent: 'pi', models: {} } }]).success, true);
+  assert.equal(save.safeParse([{ yourAi: { agent: 'gpt', models: {} } }]).success, false);
+  // A model is passed to a CLI as an argument: never an option or shell syntax.
+  for (const model of ['--yolo', 'a b', 'a;rm', '$(x)', ''])
+    assert.equal(
+      save.safeParse([{ yourAi: { agent: 'pi', models: { pi: model } } }]).success,
+      false,
+      model,
+    );
 });
 
 test('a damaged or hostile record becomes the defaults rather than an error', async () => {

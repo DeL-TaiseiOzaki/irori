@@ -1,4 +1,4 @@
-export const agentIds = ['codex', 'claude', 'opencode', 'pi'] as const;
+export const agentIds = ['codex', 'claude', 'opencode', 'pi', 'hermes'] as const;
 export type AgentId = (typeof agentIds)[number];
 export const agentAccessModes = ['default', 'full-access'] as const;
 export type AgentAccess = (typeof agentAccessModes)[number];
@@ -7,6 +7,7 @@ export const agentNames: Record<AgentId, string> = {
   claude: 'Claude Code',
   opencode: 'OpenCode',
   pi: 'Pi',
+  hermes: 'Hermes Agent',
 };
 export type Category = 'personal' | 'team' | 'organization';
 export type Layer = 'schema' | 'Knowledge_Base' | 'contents';
@@ -101,6 +102,21 @@ export interface AgentInfo {
   available: boolean;
   tested: boolean;
   detail: string;
+}
+/** A model the installed CLI offers, as it names it. */
+export interface AgentModel {
+  /** What is passed to the CLI. */
+  id: string;
+  label: string;
+  /** The CLI's own default. */
+  default?: boolean;
+}
+export interface AgentModels {
+  models: AgentModel[];
+  /** A model name may be typed in: the CLI gives no list, or reading it failed. */
+  custom: boolean;
+  /** Why the list could not be read. */
+  error?: string;
 }
 export interface AgentSession {
   state: 'empty' | 'saved' | 'unavailable';
@@ -208,6 +224,8 @@ export interface StartRun {
   agent: AgentId;
   /** Native permission policy for this instruction; omitted inputs keep the standard policy. */
   access?: AgentAccess;
+  /** The CLI's model for this instruction; the CLI's own default when absent. */
+  model?: string;
   prompt: string;
   notePath?: string;
   newSession?: boolean;
@@ -235,6 +253,8 @@ export interface DeviceSettings {
   markdownFont: MarkdownFont;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
+  /** The CLI your AI runs on and the model chosen for each CLI ('' or absent: the CLI's default). */
+  yourAi: { agent: AgentId; models: Partial<Record<AgentId, string>> };
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
   /** The reader's role and project per KB, which narrows that KB's skill picker. */
@@ -431,6 +451,8 @@ export interface HostAPI {
   deviceSettings(): Promise<DeviceSettings>;
   saveDeviceSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
   agents(): Promise<AgentInfo[]>;
+  /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */
+  agentModels(agent: AgentId): Promise<AgentModels>;
   agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;
   agentConversation(
     scopeId: string,

@@ -6,11 +6,29 @@ import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
 export function run(kind) {
   if (process.argv.includes('--version')) {
-    console.log(kind === 'pi' ? '0.85.1 fixture' : '1.18.30 fixture');
+    console.log(
+      kind === 'pi'
+        ? '0.85.1 fixture'
+        : kind === 'hermes'
+          ? 'Hermes Agent v2026.9.24 fixture'
+          : '1.18.30 fixture',
+    );
+    return;
+  }
+  // The model lists as each CLI prints them.
+  if (kind === 'opencode' && process.argv[2] === 'models') {
+    console.log('anthropic/claude-fixture\nopenrouter/vendor/model-x\nnot a model line');
+    return;
+  }
+  if (kind === 'pi' && process.argv.includes('--list-models')) {
+    console.log('provider   model          context  max-out  thinking  images');
+    console.log('anthropic  claude-fixture 200K     64K      yes       yes');
+    console.log('openai     gpt-fixture    1M       128K     no        no');
     return;
   }
   const log = (value) =>
     fs.appendFileSync('fixture-requests.jsonl', JSON.stringify({ kind, ...value }) + '\n');
+  if (kind === 'hermes') return hermes(log);
   // What the real CLI does with the script irori hands it: load it and run its
   // hook for an edit of note.md, here the same edit twice, with no model.
   async function hooks(message) {
@@ -54,6 +72,7 @@ export function run(kind) {
     for (const result of results) log({ type: 'hook', ...result });
   }
   if (kind === 'pi') {
+    log({ type: 'launch', args: process.argv.slice(2) });
     const session = process.argv.includes('--session')
       ? process.argv[process.argv.indexOf('--session') + 1]
       : path.join(process.cwd(), 'fixture-pi.jsonl');
@@ -269,4 +288,70 @@ export function run(kind) {
   server.listen(0, '127.0.0.1', () =>
     console.log('opencode server listening on http://127.0.0.1:' + server.address().port),
   );
+}
+
+// `hermes chat --query-file - --format stream-json`, as its stream_json.py writes it.
+async function hermes(log) {
+  const args = process.argv.slice(2);
+  const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  let prompt = '';
+  for await (const chunk of process.stdin) prompt += chunk;
+  log({ args, prompt });
+  const send = (value) =>
+    process.stdout.write(JSON.stringify({ ...value, timestamp: Date.now() }) + '\n');
+  if (prompt.includes('crash')) process.exit(2);
+  const resumed = option('--resume');
+  let session = resumed ?? '20260927_120000_fixture';
+  send({
+    type: 'system',
+    subtype: 'init',
+    model: option('-m') ?? 'fixture-model',
+    session_id: session,
+  });
+  if (resumed && fs.existsSync('fail-resume')) {
+    process.stderr.write('Session not found\n');
+    send({
+      type: 'result',
+      session_id: session,
+      exit_code: 1,
+      text: '',
+      error: 'Session not found',
+    });
+    process.exit(1);
+  }
+  send({ type: 'tool_use', name: 'read_file', tool_call_id: 'call-1', input: { path: 'note.md' } });
+  if (prompt.includes('hold')) return setInterval(() => {}, 1000);
+  send({
+    type: 'tool_result',
+    name: 'read_file',
+    tool_call_id: 'call-1',
+    output: '# Fixture',
+    duration_ms: 3,
+    is_error: false,
+  });
+  if (prompt.includes('fail')) {
+    send({
+      type: 'result',
+      session_id: session,
+      exit_code: 1,
+      text: '',
+      error: 'Fixture provider error',
+    });
+    process.exit(1);
+  }
+  const text = '日本語\u2028の応答';
+  if (prompt.includes('final only')) process.stdout.write('not a protocol record\n');
+  else for (const part of ['日本語\u2028', 'の応答']) send({ type: 'text', text: part });
+  fs.appendFileSync('note.md', '\nFixture Hermes edit\n');
+  // A compressed conversation continues under a new id.
+  if (prompt.includes('rotate')) session = '20260927_120500_rotated';
+  send({
+    type: 'result',
+    session_id: session,
+    exit_code: 0,
+    text,
+    tokens: { input: 1, output: 1, total: 2, cache_read: 0, cache_write: 0 },
+    duration_ms: 5,
+  });
+  process.stderr.write(`\nsession_id: ${session}\n`);
 }

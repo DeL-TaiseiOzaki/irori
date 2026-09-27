@@ -34,12 +34,24 @@ export class PiRpc {
   send(value: unknown) {
     this.connection.send(value);
   }
+  // A prompt's reply can wait on an extension command and the person answering its
+  // dialogs, so it has no deadline of its own: it ends with the reply, the process
+  // or a stop. Other commands answer at once.
   request(type: string, values: Record<string, unknown> = {}): Promise<any> {
-    return this.connection.request({ ...values, type }, type === 'prompt' ? 600000 : 45000);
+    return this.connection.request({ ...values, type }, type === 'prompt' ? null : 45000);
   }
   fail(error: Error) {
     this.connection.fail(error);
   }
+}
+
+/** Pi names a model `provider/model`, as `pi --list-models` lists it. */
+export function piModelArgs(model?: string) {
+  if (!model) return [];
+  const slash = model.indexOf('/');
+  return slash > 0
+    ? ['--provider', model.slice(0, slash), '--model', model.slice(slash + 1)]
+    : ['--model', model];
 }
 
 export async function runPi(ctx: NativeContext) {
@@ -72,7 +84,13 @@ export async function runPi(ctx: NativeContext) {
   ctx.signal.throwIfAborted();
   const child = launch(
     'pi',
-    ['--mode', 'rpc', ...(ctx.args ?? []), ...(ctx.session ? ['--session', ctx.session] : [])],
+    [
+      '--mode',
+      'rpc',
+      ...piModelArgs(ctx.model),
+      ...(ctx.args ?? []),
+      ...(ctx.session ? ['--session', ctx.session] : []),
+    ],
     ctx.cwd,
     ctx.env,
   );

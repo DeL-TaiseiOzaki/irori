@@ -248,7 +248,7 @@ test(
   },
 );
 
-test('only your AI takes brains, on Claude Code, without notes or materials', async (t) => {
+test('only your AI takes brains, on any CLI, without notes or materials', async (t) => {
   const { base, you } = await yourAi(t);
   const files = new FileService(path.join(base, 'device'));
   await files.init();
@@ -259,8 +259,8 @@ test('only your AI takes brains, on Claude Code, without notes or materials', as
   const service = new AgentService(files, () => {}, undefined, undefined, you);
   t.after(() => service.cancel());
   assert.throws(
-    () => service.start({ scopeId: id, agent: 'pi', prompt: 'x', brains: [space.scopeId] }),
-    /Claude Code/,
+    () => service.start({ scopeId: id, agent: 'pi', prompt: 'x', notePath: 'a.md' }),
+    /brains, not notes|ノートや資料/,
   );
   assert.throws(
     () => service.start({ scopeId: id, agent: 'claude', prompt: 'x', notePath: 'a.md' }),
@@ -277,3 +277,66 @@ test('only your AI takes brains, on Claude Code, without notes or materials', as
     /Only your AI takes brains/,
   );
 });
+
+test(
+  'your AI on another CLI works in the handed brains itself after reading their Schema (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { base, you } = await yourAi(t);
+    const bin = path.join(base, 'bin');
+    await mkdir(bin);
+    await writeFile(
+      path.join(bin, 'pi'),
+      `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
+      { mode: 0o700 },
+    );
+    const previous = process.env.PATH;
+    process.env.PATH = bin + path.delimiter + previous;
+    t.after(() => {
+      process.env.PATH = previous;
+    });
+    const files = new FileService(path.join(base, 'device'));
+    await files.init();
+    const brainRoot = path.join(base, 'Product');
+    await mkdir(brainRoot);
+    const brain = await files.register(brainRoot, 'Product', 'team');
+    const { id, root } = await you.create();
+    let finished!: () => void;
+    const done = new Promise<void>((resolve) => {
+      finished = resolve;
+    });
+    const events: AgentEvent[] = [];
+    const service = new AgentService(
+      files,
+      (event) => {
+        events.push(event);
+        if (event.type === 'done') finished();
+      },
+      undefined,
+      undefined,
+      you,
+    );
+    t.after(() => service.cancel());
+    await service.startAccepted({
+      scopeId: id,
+      agent: 'pi',
+      prompt: 'Tidy the product notes.',
+      brains: [brain.scopeId],
+    });
+    // The brain is held as it is for Claude Code.
+    assert.equal(service.busy(brain.scopeId), true);
+    await done;
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+    assert.equal(service.busy(brain.scopeId), false);
+    const sent = (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .find((call) => call.type === 'prompt').message as string;
+    assert.ok(sent.includes(`Product (チーム): folder ${JSON.stringify(brainRoot)}`), sent);
+    assert.match(sent, /You run on Pi .* no irori sub-agents/);
+    assert.match(sent, /read the AGENTS\.md at the top of that brain's folder/);
+    assert.ok(!sent.includes('sub-agent "product"'), 'no sub-agent is named');
+    assert.ok(sent.endsWith('Tidy the product notes.'));
+  },
+);
