@@ -103,7 +103,7 @@ try {
   await expect(page.getByRole('complementary', { name: 'あなたの AI' })).toBeVisible();
   await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
   const ais = page.getByRole('complementary', { name: 'Hibachi Agent' });
-  const productAi = ais.getByRole('group', { name: 'Product の AI' });
+  const productAi = ais.getByRole('group', { name: 'Product の Hibachi Agent' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
   // Search from the Overview covers every brain.
   await page.getByRole('button', { name: /^すべての Brain を検索/ }).click();
@@ -126,7 +126,7 @@ try {
 
   // Sending from the Overview queues behind Research's run.
   await ais.getByRole('radio', { name: 'Research', exact: true }).check();
-  await ais.getByLabel('Research の AI への指示').fill('queued from overview');
+  await ais.getByLabel('Research の Hibachi Agent への指示').fill('queued from overview');
   await ais.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
   await expect.poll(async () => (await conversation(research.scopeId)).queued.length).toBe(1);
 
@@ -154,7 +154,7 @@ try {
   // A brain with nothing running takes an instruction from the Overview at once.
   await page.getByRole('button', { name: '地図', exact: true }).click();
   await ais.getByRole('radio', { name: 'Product', exact: true }).check();
-  await ais.getByLabel('Product の AI への指示').fill('from overview');
+  await ais.getByLabel('Product の Hibachi Agent への指示').fill('from overview');
   await ais.getByRole('button', { name: '送信', exact: true }).click();
   await expect
     .poll(() => turns(product.scopeId))

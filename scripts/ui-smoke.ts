@@ -461,10 +461,12 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
   await files.init();
   const space = files.list()[0];
   const store = new SessionStore(files.dataDir);
+  // Saved as a run of a brain's Hibachi Agent now saves it: in its default full access.
   for (const agent of ['codex', 'claude'] as const)
     await store.save(
       { scopeId: space.scopeId, root: space.root, agent },
       `fixture-${agent}-handle`,
+      'full-access',
     );
   const savedText = '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。';
   for (const cycle of [1, 2]) {

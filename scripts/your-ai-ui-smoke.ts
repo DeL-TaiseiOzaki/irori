@@ -97,7 +97,10 @@ try {
   await page.screenshot({ path: 'test-results/irori-your-ai.png' });
   await rail.getByRole('button', { name: /^Research・AI/ }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
-  await page.getByRole('button', { name: 'AIに相談', exact: true }).click();
+  await page
+    .getByTestId('stage')
+    .getByRole('button', { name: 'Hibachi Agent', exact: true })
+    .click();
   await expect(page.locator('.agent-held')).toContainText(
     'あなたの AI がこの Brain にも仕事を渡しています',
   );

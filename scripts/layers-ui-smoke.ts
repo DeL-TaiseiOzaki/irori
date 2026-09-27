@@ -161,7 +161,7 @@ try {
   await expect(page.locator('.document-editor')).toContainText('Research notes');
   // The Hibachi Agent belongs to the brain on show and names its Schema.
   await page.getByRole('button', { name: 'Hibachi Agent', exact: true }).click();
-  await expect(page.getByLabel('相談の対象')).toContainText('Research');
+  await expect(page.getByLabel('相談の対象', { exact: true })).toContainText('Research');
   await expect(page.locator('.schema-line')).toContainText('Research の Schema');
   await expect(page.locator('.schema-line')).toContainText('AGENTS.md');
   await page.getByRole('button', { name: 'このノートの要点をまとめて', exact: true }).click();

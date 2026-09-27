@@ -70,6 +70,9 @@ try {
   );
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
+    // This pass is about native approvals, so OpenCode leaves its default full access.
+    if (agent === 'opencode')
+      await page.getByLabel('エージェントのアクセス', { exact: true }).selectOption('default');
     await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toHaveValue('default');
     if (agent === 'pi') {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
