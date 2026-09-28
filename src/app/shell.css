@@ -145,9 +145,22 @@
 .rail-overview {
   border-radius: 12px;
 }
-.rail-overview[aria-current] {
-  background: var(--solid);
-  color: var(--on-solid);
+.rail-overview img {
+  width: 40px;
+  height: 40px;
+  display: block;
+  opacity: 0.72;
+  transition: opacity 0.15s;
+}
+.rail .rail-overview:hover:not(:disabled) {
+  background: none;
+}
+.rail-overview:hover:not(:disabled) img,
+.rail-overview[aria-current] img {
+  opacity: 1;
+}
+.rail-overview:disabled img {
+  opacity: 0.35;
 }
 .rail-slot {
   position: relative;
