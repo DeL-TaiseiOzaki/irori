@@ -120,13 +120,25 @@ test(
       assert.equal(request.params.fs.description, `irori-mount-${connection.mountId}`);
       return request.params.vfsOpt;
     };
+    // Both kinds keep what they read on this device, so opening a file again does
+    // not download it again.
+    const readCache = {
+      CacheMode: 3,
+      CacheMaxSize: 2 * 1024 ** 3,
+      CacheMaxAge: 7 * 24 * 3600 * 1e9,
+    };
     assert.deepEqual(await mountOptions('read-write', accountId), {
       ReadOnly: false,
-      CacheMode: 2,
       DirPerms: 0o700,
       FilePerms: 0o600,
+      ...readCache,
     });
-    assert.equal((await mountOptions('read-write', secondAccountId)).ReadOnly, true);
+    assert.deepEqual(await mountOptions('read-write', secondAccountId), {
+      ReadOnly: true,
+      DirPerms: 0o500,
+      FilePerms: 0o400,
+      ...readCache,
+    });
     assert.equal((await mountOptions('read-only', accountId)).ReadOnly, true);
     const declared = JSON.parse(
       await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8'),
