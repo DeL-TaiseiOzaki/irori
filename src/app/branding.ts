@@ -4,5 +4,4 @@ export { version as appVersion } from '../../package.json';
 // 1.6 MB of pixels nobody displays into the first paint.
 export const appIcon = new URL('../../assets/irori-icon-256.png', import.meta.url).href;
 // irori mode's own mark, drawn at 40 CSS pixels on the rail.
-export const iroriModeIcon = new URL('../../assets/irori-mode-icon-256.png', import.meta.url)
-  .href;
+export const iroriModeIcon = new URL('../../assets/irori-mode-icon-256.png', import.meta.url).href;
