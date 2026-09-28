@@ -1,7 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Make a hibachi here and publish it, 2026-09-28 (branch `feat/hibachi-publish-github`,
-not yet merged; **0.1.53**): the owner asked for the reverse of cloning — a hibachi
+Published 2026-09-28: #122 (**0.1.53**) is merged at the owner's word ("マージして公開して")
+and published as
+[v0.1.53-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.53-preview.1)
+by release run `36428007641` from main's CI run `36426700197` (source `d54aae9`).
+The release carries Windows 202,679,296 bytes, Mac 170,128,671 bytes and
+`irori-0.1.53-full.nupkg` 202,039,339 bytes; anonymous downloads matched
+`SHA256SUMS.txt`.
+
+Make a hibachi here and publish it, 2026-09-28 (**0.1.53**): the owner asked for the reverse of cloning — a hibachi
 made in the app that becomes a GitHub repository. **hibachi を追加 → 新しく作成**
 creates a folder, starts Git on `main`, registers it and commits only
 `.irori/scope.json` and `.gitignore`; **GitHub にもリポジトリを作成する** publishes it in
