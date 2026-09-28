@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
-import { appIcon } from './branding';
+import { appIcon, iroriModeIcon } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
 import { shortcut } from './shortcuts';
@@ -73,7 +73,7 @@ export function Rail({
           disabled={!spaces.length}
           onClick={onOverview}
         >
-          <Icon name="map" size={19} />
+          <img src={iroriModeIcon} alt="" width="40" height="40" />
         </button>
         <span className="rail-label" aria-hidden="true">
           {t('irori mode', 'irori mode')}
