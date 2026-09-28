@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+Current development, 2026-09-28: **0.1.51 is published** as
+[v0.1.51-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.51-preview.1)
+(#118). The rail's irori mode button shows irori mode's own mark
+(`assets/irori-mode-icon*.png`, made from the owner's artwork; `assets/README.md`
+records how) instead of the map glyph. The same PR fixed the CI-only
+`harness-ui-smoke.ts` race that had failed main at `d3f46b9`.
+
 Current development, 2026-09-27 (evening): **0.1.50 is published** as
 [v0.1.50-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.50-preview.1)
 (#114–#116). Owner vocabulary from now on: a brain is a **hibachi**, its AI the
