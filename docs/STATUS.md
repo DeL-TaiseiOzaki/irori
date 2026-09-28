@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-09-28: #118 (**0.1.51**) is merged at the owner's word ("マージまでしていいよ",
+then "公開して") and published as
+[v0.1.51-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.51-preview.1)
+by release run `36374442510` from main's CI run `36372933316` (source `79dcffa`).
+It carries Windows 202,672,128 bytes, Mac 170,114,933 bytes and
+`irori-0.1.51-full.nupkg` 202,030,746 bytes; anonymous downloads of all three
+matched `SHA256SUMS.txt`.
+- The irori mode rail button shows `assets/irori-mode-icon-256.png` at 40 px,
+  dimmed unless hovered or current. The 2048 px master was upscaled from the
+  owner's `irori-agent-mode.png` with Real-ESRGAN and given `irori-icon.png`'s
+  tile silhouette. Checked in the dark theme's screenshots only; not yet seen
+  in the light theme or an installed app.
+- `harness-ui-smoke.ts:271` failed on every CI run of main at `d3f46b9` and of
+  this PR: the done-message count could be taken before the OpenCode
+  conversation's history loaded, so the check read the previous run's
+  `default` session. Both OpenCode access checks now poll the session.
+
 Published 2026-09-27: #114 (**0.1.48**), #115 (**0.1.49**) and #116 (**0.1.50**)
 are merged at the owner's word ("全部マージしていいよ") and published together as
 [v0.1.50-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.50-preview.1)
