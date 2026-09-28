@@ -29,7 +29,7 @@ this ([HANDOFF](../HANDOFF.md)).
   permissions. macOS's NFS mount cannot write without it. Each mount carries
   its own `description`, so two connections to one folder never share a write
   cache or its statistics.
-- **Reading** (0.1.51). Every connection, editable or read-only, uses rclone's
+- **Reading** (0.1.52). Every connection, editable or read-only, uses rclone's
   full cache (`CacheMode` 3): what was read stays on this device, so a file
   opened again, or read again every 25 s while open, comes from the cache
   unless Drive's copy changed. Before, editable folders cached only writes and
