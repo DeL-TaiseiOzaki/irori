@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-09-28: #120 (**0.1.52**) is merged at the owner's word ("マージ公開までやって")
+and published as
+[v0.1.52-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.52-preview.1)
+by release run `36376072906` from main's CI run `36375356486` (source `b002eb2`).
+The release carries Windows 202,672,128 bytes, Mac 170,114,421 bytes and
+`irori-0.1.52-full.nupkg` 202,031,825 bytes; anonymous downloads matched
+`SHA256SUMS.txt`. Drive mounts, editable and read-only, use rclone's full cache
+(`CacheMode` 3, 2 GiB and 7 days per mount), so a file read once is not
+downloaded again on reopening or on the 25 s re-read. Checked: build, unit tests
+with rclone 1.75.1 and the option types in rclone's own `options/set`.
+Unverified: a real mount on macOS or Windows 11.
+
 Published 2026-09-28: #118 (**0.1.51**) is merged at the owner's word ("マージまでしていいよ",
 then "公開して") and published as
 [v0.1.51-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.51-preview.1)

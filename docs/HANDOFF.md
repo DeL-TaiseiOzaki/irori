@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+Current development, 2026-09-28: **0.1.52 is published** as
+[v0.1.52-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.52-preview.1)
+(#120; release run `36376072906` from main CI `36375356486` at `b002eb2`). Every
+Drive connection now mounts with rclone's full cache, 2 GiB / 7 days per mount
+([ADR 012](decisions/012-drive-editing.md)), because the owner found opening a
+file in `contents` slow. Not yet tried on a real mount. The owner also reported
+an error dialog that blocks quitting; its text is still awaited. Only two
+dialogs in `stop()` (`src/host/main.ts`) do that: the conversation-history save
+and closing the cloud connections, where a failed unmount is retried forever.
+
 Current development, 2026-09-28: **0.1.51 is published** as
 [v0.1.51-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.51-preview.1)
 (#118). The rail's irori mode button shows irori mode's own mark
