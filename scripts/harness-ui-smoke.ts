@@ -266,9 +266,14 @@ try {
   await page.getByLabel('エージェントへの指示').fill('access fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done')).toHaveCount(++doneCount);
-  expect(
-    (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
-  ).toBe('full-access');
+  // The conversation's history can load after the count above; wait for the run's own session.
+  await expect
+    .poll(
+      async () =>
+        (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId))
+          .access,
+    )
+    .toBe('full-access');
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   await expect(access).toHaveValue('full-access');
@@ -284,9 +289,14 @@ try {
   await page.getByLabel('エージェントへの指示').fill('standard again');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done')).toHaveCount(++doneCount);
-  expect(
-    (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId)).access,
-  ).toBe('default');
+  // The conversation's history can load after the count above; wait for the run's own session.
+  await expect
+    .poll(
+      async () =>
+        (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId))
+          .access,
+    )
+    .toBe('default');
   // The model pill lists what the installed CLI prints, and the choice reaches it.
   const fixtureLog = async () =>
     (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
