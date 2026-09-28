@@ -527,3 +527,7 @@
 .git-resolution p {
   font-size: 12px;
 }
+.git-repository-bar .git-publish {
+  align-self: flex-start;
+  margin-top: 4px;
+}

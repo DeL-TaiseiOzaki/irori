@@ -355,6 +355,16 @@ export interface HostAPI {
     version: string,
   ): Promise<GitStatus>;
   gitClone(input: CloneRepository): Promise<import('./git').CloneResult>;
+  /** Makes a hibachi that is an ordinary folder a Git repository on `main`. */
+  gitInit(scopeId: string): Promise<GitStatus>;
+  /** The account the GitHub CLI is signed in to and its organizations. */
+  githubAccount(): Promise<import('./git').GitHubAccount>;
+  /** Creates a GitHub repository for a hibachi without a remote and pushes to it. */
+  gitPublish(
+    scopeId: string,
+    input: import('./git').PublishRepository,
+    version: string,
+  ): Promise<GitStatus>;
   gitOpenRepository(scopeId: string): Promise<void>;
   repositories(root: string): Promise<RepositoryInfo>;
   workspaces(): Promise<WorkspaceProfile[]>;
@@ -413,6 +423,8 @@ export interface HostAPI {
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;
+  /** Makes a new folder a Git repository and registers it as a hibachi. */
+  createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
   /** Changes a brain's name, category or look in its `.irori/scope.json`. */
   updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
   /** Keeps an image in the brain's `.irori/` as its icon and returns its path. */

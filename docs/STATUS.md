@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Make a hibachi here and publish it, 2026-09-28 (branch `feat/hibachi-publish-github`,
+not yet merged; **0.1.53**): the owner asked for the reverse of cloning — a hibachi
+made in the app that becomes a GitHub repository. **hibachi を追加 → 新しく作成**
+creates a folder, starts Git on `main`, registers it and commits only
+`.irori/scope.json` and `.gitignore`; **GitHub にもリポジトリを作成する** publishes it in
+the same step. In the 変更 view an ordinary-folder hibachi gets **Git を始める**, and a
+hibachi without a remote gets **GitHub に公開…**, which runs `gh repo create`
+(private by default), adds `origin` and pushes through the existing push path
+with the authorship notes ([GIT](GIT.md#making-a-hibachi-here-and-publishing-it)).
+New `HostAPI` methods: `createSpace`, `gitInit`, `githubAccount`, `gitPublish`;
+`src/git/github.ts` runs gh. Verified with `npm run build`, `npm test`
+(`tests/git-publish.test.ts`) and `scripts/git-ui-smoke.ts` with a stand-in gh.
+Unverified: a real `gh` against github.com (repo creation, `git_protocol`,
+organizations without `read:org`), macOS and Windows. The new hibachi does not
+copy the irori-templete structure.
+
 Published 2026-09-28: #120 (**0.1.52**) is merged at the owner's word ("マージ公開までやって")
 and published as
 [v0.1.52-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.52-preview.1)

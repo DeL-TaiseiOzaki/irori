@@ -532,3 +532,15 @@
   background: var(--on-ink-solid);
   color: var(--ink-solid);
 }
+.modal .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.modal .github-publish {
+  border: 0;
+  padding: 0 0 0 16px;
+  margin: 0;
+  box-shadow: inset 2px 0 0 var(--hair-2);
+}
