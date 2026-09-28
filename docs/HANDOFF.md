@@ -1,5 +1,13 @@
 # irori continuation handoff
 
+Current development, 2026-09-28: **0.1.53 is published** as
+[v0.1.53-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.53-preview.1)
+(#122; release run `36428007641` from main CI `36426700197` at `d54aae9`). A hibachi
+can now start in irori and become a GitHub repository: **hibachi を追加 → 新しく作成**,
+**Git を始める** and **GitHub に公開…** ([GIT](GIT.md#making-a-hibachi-here-and-publishing-it)).
+Publishing runs the person's GitHub CLI (`gh repo create`, private by default).
+Not yet tried with a real `gh` on github.com, nor on macOS or Windows 11.
+
 Current development, 2026-09-28: **0.1.52 is published** as
 [v0.1.52-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.52-preview.1)
 (#120; release run `36376072906` from main CI `36375356486` at `b002eb2`). Every
