@@ -11,6 +11,7 @@ import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
 import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
+import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
@@ -20,29 +21,76 @@ export function RegisterSpace({
 }: {
   onRegistered: (space: Space) => void;
   onCancel: () => void;
-  mode?: 'folder' | 'clone';
+  mode?: 'folder' | 'clone' | 'create';
 }) {
   const [folder, setFolder] = useState(''),
     [name, setName] = useState(''),
     [category, setCategory] = useState<Category>('personal');
-  const [cloneMode, setCloneMode] = useState(mode === 'clone'),
+  const [way, setWay] = useState(mode),
     [url, setUrl] = useState(''),
     [parent, setParent] = useState(''),
     [cloneName, setCloneName] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [cloneNotice, setCloneNotice] = useState('');
+  const [publishing, setPublishing] = useState(false),
+    [publish, setPublish] = useState(() => initialPublish('')),
+    [created, setCreated] = useState<Space>();
+  const cloneMode = way === 'clone',
+    creating = way === 'create';
   const repository = useResource(() => host.repositories(folder), [folder], {
-    enabled: !!folder,
+    enabled: !!folder && !creating,
     delay: 250,
   });
   const info = repository.data;
-  const issue = error || repository.error;
+  const issue = error || (creating ? '' : repository.error);
+  /** A new hibachi: made, registered, committed, then published when asked. */
+  async function create() {
+    const result = await host.createSpace({
+      parent,
+      folder: cloneName,
+      name: name.trim() || cloneName,
+      category,
+    });
+    if (!publishing && !result.notice) return onRegistered(result.space);
+    // From here the hibachi exists; what follows can only add a notice to it.
+    setCreated(result.space);
+    if (result.notice)
+      return setError(
+        publishing
+          ? result.notice.replace(
+              '\n',
+              `\n${t(
+                'GitHub への公開は、commit の後にソース管理から行えます。',
+                'After committing, publish to GitHub from Source control.',
+              )}\n`,
+            )
+          : result.notice,
+      );
+    try {
+      const status = await host.gitStatus(result.space.scopeId);
+      await host.gitPublish(result.space.scopeId, publish, status.version);
+      onRegistered(result.space);
+    } catch (e) {
+      const [advice, ...detail] = errorText(e).split('\n\n');
+      setError(
+        [
+          `${t(
+            'hibachi は作成しましたが、GitHub への公開は完了していません。開いた後にソース管理から再試行できます。',
+            'The hibachi was created, but publishing to GitHub did not finish. You can retry from Source control after opening it.',
+          )}\n${advice}`,
+          ...detail,
+        ].join('\n\n'),
+      );
+    }
+  }
   async function submit() {
+    if (created) return onRegistered(created);
     setBusy(true);
     setError('');
     try {
-      if (cloneMode && !folder) {
+      if (creating) await create();
+      else if (cloneMode && !folder) {
         const result = await host.gitClone({ url, parent, name: cloneName });
         setFolder(result.path);
         setCloneNotice(result.notice ?? '');
@@ -65,19 +113,71 @@ export function RegisterSpace({
         }}
       >
         <h2>{t('リポジトリ・KBフォルダを登録', 'Register a repository or KB folder')}</h2>
-        {!folder && (
+        {!folder && !created && (
           <MagnetTabs
             className="git-registration-mode"
             label={t('リポジトリの取得方法', 'How to get the repository')}
-            value={cloneMode ? 'clone' : 'folder'}
-            onValueChange={(next) => setCloneMode(next === 'clone')}
+            value={way}
+            onValueChange={(next) => {
+              setWay(next);
+              setError('');
+            }}
             options={[
               { value: 'folder', label: t('既存のフォルダ', 'Existing folder'), disabled: busy },
               { value: 'clone', label: t('GitHub から取得', 'Clone from GitHub'), disabled: busy },
+              { value: 'create', label: t('新しく作成', 'Create new'), disabled: busy },
             ]}
           />
         )}
-        {cloneMode && !folder ? (
+        {creating ? (
+          <>
+            <label>
+              {t('保存先の親フォルダ', 'Parent folder to save into')}
+              <div className="actions">
+                <input
+                  aria-label={t('保存先の親フォルダ', 'Parent folder to save into')}
+                  ref={(input) => {
+                    if (input) input.autofocus = true;
+                  }}
+                  value={parent}
+                  onChange={(e) => setParent(e.target.value)}
+                  disabled={busy || !!created}
+                  required
+                />
+                <button
+                  type="button"
+                  disabled={busy || !!created}
+                  onClick={() =>
+                    void host
+                      .chooseFolder()
+                      .then((value) => {
+                        if (value) setParent(value);
+                      })
+                      .catch((e) => setError(errorText(e)))
+                  }
+                >
+                  {t('選択', 'Choose')}
+                </button>
+              </div>
+            </label>
+            <label>
+              {t('新しいフォルダ名', 'New folder name')}
+              <input
+                aria-label={t('新しいフォルダ名', 'New folder name')}
+                value={cloneName}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  // The repository name follows the folder until someone edits it.
+                  if (publish.name === initialPublish(cloneName).name)
+                    setPublish({ ...publish, name: initialPublish(next).name });
+                  setCloneName(next);
+                }}
+                disabled={busy || !!created}
+                required
+              />
+            </label>
+          </>
+        ) : cloneMode && !folder ? (
           <>
             <label>
               {t('GitHub リポジトリ URL', 'GitHub repository URL')}
@@ -172,34 +272,36 @@ export function RegisterSpace({
             </div>
           </label>
         )}
-        <div className="repository-preview" aria-live="polite">
-          {cloneNotice && <p role="alert">{cloneNotice}</p>}
-          {folder && !info
-            ? t('フォルダを確認しています…', 'Checking the folder…')
-            : info && (
-                <>
-                  <strong>
-                    {info.kind === 'github'
-                      ? `GitHub · ${info.repository}`
-                      : info.kind === 'git'
-                        ? t('Gitリポジトリ', 'Git repository')
-                        : info.kind === 'folder'
-                          ? t('ローカルのKBフォルダ', 'Local KB folder')
-                          : t('登録先を確認してください', 'Check the registration destination')}
-                  </strong>
-                  {info.branch && (
-                    <p>
-                      {info.branch} ·{' '}
-                      {info.changed
-                        ? t('未コミットの変更あり（保持します）', 'Uncommitted changes (kept)')
-                        : t('変更なし', 'No changes')}
-                    </p>
-                  )}
-                  {info.detail && <p>{info.detail}</p>}
-                  {info.root !== folder && <p>{info.root}</p>}
-                </>
-              )}
-        </div>
+        {!creating && (
+          <div className="repository-preview" aria-live="polite">
+            {cloneNotice && <p role="alert">{cloneNotice}</p>}
+            {folder && !info
+              ? t('フォルダを確認しています…', 'Checking the folder…')
+              : info && (
+                  <>
+                    <strong>
+                      {info.kind === 'github'
+                        ? `GitHub · ${info.repository}`
+                        : info.kind === 'git'
+                          ? t('Gitリポジトリ', 'Git repository')
+                          : info.kind === 'folder'
+                            ? t('ローカルのKBフォルダ', 'Local KB folder')
+                            : t('登録先を確認してください', 'Check the registration destination')}
+                    </strong>
+                    {info.branch && (
+                      <p>
+                        {info.branch} ·{' '}
+                        {info.changed
+                          ? t('未コミットの変更あり（保持します）', 'Uncommitted changes (kept)')
+                          : t('変更なし', 'No changes')}
+                      </p>
+                    )}
+                    {info.detail && <p>{info.detail}</p>}
+                    {info.root !== folder && <p>{info.root}</p>}
+                  </>
+                )}
+          </div>
+        )}
         {(!cloneMode || folder) && (
           <>
             <label>
@@ -207,8 +309,9 @@ export function RegisterSpace({
               <input
                 aria-label={t('スペース名', 'Space name')}
                 value={name}
-                required
-                disabled={busy}
+                placeholder={creating ? cloneName : undefined}
+                required={!creating}
+                disabled={busy || !!created}
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
@@ -219,7 +322,7 @@ export function RegisterSpace({
                 <select
                   aria-label={t('スペースの種類', 'Space type')}
                   value={category}
-                  disabled={busy}
+                  disabled={busy || !!created}
                   onChange={(e) => setCategory(e.target.value as Category)}
                 >
                   <option value="personal">{t('個人', 'Personal')}</option>
@@ -228,33 +331,80 @@ export function RegisterSpace({
                 </select>
               </label>
             </details>
-            <p className="muted">
-              {t(
-                '登録に必要な識別情報を .irori に作成し、contents をGitの対象外にします。既存ノートとGitの変更は保持します。',
-                'Creates the identifying information needed for registration in .irori and excludes contents from Git. Existing notes and Git changes are kept.',
-              )}
-            </p>
+            {creating ? (
+              <>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={publishing}
+                    disabled={busy || !!created}
+                    onChange={(e) => {
+                      setPublishing(e.target.checked);
+                      if (e.target.checked && !publish.name)
+                        setPublish({ ...publish, name: initialPublish(cloneName).name });
+                    }}
+                  />
+                  {t('GitHub にもリポジトリを作成する', 'Also create a repository on GitHub')}
+                </label>
+                {publishing && !created && (
+                  <PublishFields value={publish} onChange={setPublish} disabled={busy} />
+                )}
+                <p className="muted">
+                  {t(
+                    '選んだ保存先に新しいフォルダを作り、Git リポジトリ（main ブランチ）として始めます。.irori の識別情報と .gitignore（contents を対象外）を最初の commit にします。',
+                    'Creates a new folder at the chosen destination and starts it as a Git repository on main. The first commit holds the .irori identity and a .gitignore that leaves contents out.',
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="muted">
+                {t(
+                  '登録に必要な識別情報を .irori に作成し、contents をGitの対象外にします。既存ノートとGitの変更は保持します。',
+                  'Creates the identifying information needed for registration in .irori and excludes contents from Git. Existing notes and Git changes are kept.',
+                )}
+              </p>
+            )}
           </>
         )}
         {issue && <ErrorMessage text={issue} />}
         {busy && (
           <p role="status">
-            {cloneMode && !folder
-              ? t('リポジトリを取得しています…', 'Cloning the repository…')
-              : t('登録しています…', 'Registering…')}
+            {creating
+              ? publishing
+                ? t('作成して GitHub に公開しています…', 'Creating and publishing to GitHub…')
+                : t('作成しています…', 'Creating…')
+              : cloneMode && !folder
+                ? t('リポジトリを取得しています…', 'Cloning the repository…')
+                : t('登録しています…', 'Registering…')}
           </p>
         )}
         <div className="actions">
-          <button type="button" disabled={busy} onClick={onCancel}>
-            {t('キャンセル', 'Cancel')}
+          {/* Once the hibachi exists, closing the form opens it rather than leaving it unseen. */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => (created ? onRegistered(created) : onCancel())}
+          >
+            {created ? t('閉じる', 'Close') : t('キャンセル', 'Cancel')}
           </button>
           <ArrowFillButton
             type="submit"
-            disabled={busy || (!(cloneMode && !folder) && (!info || info.kind === 'unavailable'))}
+            disabled={
+              busy ||
+              (creating
+                ? !created && publishing && !publishReady(publish)
+                : !(cloneMode && !folder) && (!info || info.kind === 'unavailable'))
+            }
           >
-            {cloneMode && !folder
-              ? t('リポジトリを取得', 'Clone repository')
-              : t('登録して開く', 'Register and open')}
+            {created
+              ? t('開く', 'Open')
+              : creating
+                ? publishing
+                  ? t('作成して公開', 'Create and publish')
+                  : t('作成して開く', 'Create and open')
+                : cloneMode && !folder
+                  ? t('リポジトリを取得', 'Clone repository')
+                  : t('登録して開く', 'Register and open')}
           </ArrowFillButton>
         </div>
       </form>
@@ -348,7 +498,7 @@ export function Startup({
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
     [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState(t('マイワークスペース', 'My workspace')),
-    [adding, setAdding] = useState<'folder' | 'clone'>(),
+    [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string>();
@@ -600,6 +750,17 @@ export function Startup({
               <span>
                 <strong>{t('GitHub から取得', 'Clone from GitHub')}</strong>
                 <small>{t('リポジトリをクローン', 'Clone a repository')}</small>
+              </span>
+            </button>
+            <button disabled={busy} onClick={() => setAdding('create')}>
+              <span className="start-add-icon">
+                <Icon name="plus" size={20} />
+              </span>
+              <span>
+                <strong>{t('新しく作成', 'Create new')}</strong>
+                <small>
+                  {t('空の hibachi から始めて GitHub へ', 'Start empty, publish to GitHub')}
+                </small>
               </span>
             </button>
           </div>

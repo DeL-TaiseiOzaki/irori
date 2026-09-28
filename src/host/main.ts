@@ -444,6 +444,9 @@ app
       gitSync: (...args) => changed(args[0], () => git.sync(...args)),
       gitResolve: (...args) => changed(args[0], () => git.resolve(...args)),
       gitClone: (input) => git.clone(input),
+      gitInit: (id) => changed(id, () => git.init(id)),
+      githubAccount: () => git.githubAccount(),
+      gitPublish: (...args) => changed(args[0], () => git.publish(...args)),
       gitOpenRepository: async (id) => {
         await shell.openExternal(await git.repositoryURL(id));
       },
@@ -543,6 +546,25 @@ app
         const space = await changeFiles(() => files.register(root, name, category));
         watch(space);
         return space;
+      },
+      createSpace: async (input) => {
+        if (agents.anyBusy || cloud.busy || git.busy)
+          throw Error(
+            t(
+              '実行中の処理の完了後に作成してください。',
+              'Create it after the operation in progress finishes.',
+            ),
+          );
+        const root = await git.create(input);
+        let space: Space;
+        try {
+          space = await changeFiles(() => files.register(root, input.name, input.category));
+        } catch (error) {
+          await git.abandon(root);
+          throw error;
+        }
+        watch(space);
+        return { space, notice: await git.firstCommit(space.scopeId) };
       },
       updateSpace: async (scopeId, change) => {
         if (agents.busy(scopeId) || cloud.busy || git.busy)

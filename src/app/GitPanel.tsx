@@ -10,6 +10,7 @@ import { Icon } from './Icon';
 import { useDraft } from './useDraft';
 import { displayLocale, t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
+import { PublishDialog } from './GitHubPublish';
 import './git-panel.css';
 const host = window.irori;
 // A function so each entry is read in the language of the current render.
@@ -213,6 +214,7 @@ function RepositoryPanel({
     [conflict, setConflict] = useState<GitConflict>(),
     [resolution, setResolution] = useState('');
   const [confirmation, setConfirmation] = useState<'commit' | GitSyncAction>();
+  const [publishing, setPublishing] = useState(false);
   const [history, setHistory] = useState<GitCommit[]>([]),
     [more, setMore] = useState(false),
     [commit, setCommit] = useState<GitCommit>(),
@@ -448,7 +450,33 @@ function RepositoryPanel({
       </p>
     );
   if (!status.available)
-    return (
+    return status.initializable ? (
+      <div className="git-empty">
+        <h2>{t('この hibachi は Git で管理されていません', 'This hibachi is not in Git')}</h2>
+        <p>
+          {t(
+            'Git を始めると、変更の履歴を残し、GitHub のリポジトリとして公開・共有できます。フォルダの中身はそのまま保持します。',
+            'Starting Git keeps a history of changes and lets you publish and share the hibachi as a GitHub repository. The files in the folder stay as they are.',
+          )}
+        </p>
+        {error && <ErrorMessage className="git-notice error" text={error} />}
+        <button
+          className="solid-button"
+          disabled={busy}
+          onClick={() =>
+            void perform(
+              () => host.gitInit(space.scopeId),
+              t(
+                'Git を始めました。変更を commit すると GitHub に公開できます。',
+                'Git is started. Commit the changes, then you can publish to GitHub.',
+              ),
+            )
+          }
+        >
+          {t('Git を始める', 'Start Git')}
+        </button>
+      </div>
+    ) : (
       <div className="git-empty">
         <h2>{t('Git リポジトリを開いてください', 'Open a Git repository')}</h2>
         <p>{status.detail}</p>
@@ -538,6 +566,24 @@ function RepositoryPanel({
             {t('受信元', 'Fetches from')}: {status.remote.fetchLabel}
           </small>
         )}
+        {!status.remote &&
+          (status.head && status.branch ? (
+            <button
+              className="panel-button git-publish"
+              disabled={busy || conflictDirty || draftBlocked || status.operation !== 'none'}
+              onClick={() => setPublishing(true)}
+            >
+              <Icon name="up" size={14} />
+              {t('GitHub に公開…', 'Publish to GitHub…')}
+            </button>
+          ) : (
+            <small>
+              {t(
+                '最初の commit を作成すると GitHub に公開できます。',
+                'Make the first commit to publish to GitHub.',
+              )}
+            </small>
+          ))}
         <small className="git-sr-only">
           {status.ahead === undefined
             ? t('受信先の履歴は未取得です', 'The incoming history has not been fetched yet')
@@ -1196,6 +1242,47 @@ function RepositoryPanel({
           </section>,
           detailTarget,
         )}
+      {publishing && (
+        <PublishDialog
+          suggestion={space.root.split(/[/\\]/).at(-1) ?? space.name}
+          onCancel={() => setPublishing(false)}
+          publish={async (value) => {
+            if (active.current || !(await beforeAction()))
+              throw Error(
+                t(
+                  '実行中の処理が終わってから公開してください。',
+                  'Publish after the operation in progress finishes.',
+                ),
+              );
+            active.current = true;
+            onBusy(true);
+            try {
+              const next = await host.gitPublish(space.scopeId, value, status.version);
+              accept(next);
+              setPublishing(false);
+              setError('');
+              setNotice(
+                [
+                  t(
+                    `GitHub に ${value.owner}/${value.name} を作成し、送信しました。`,
+                    `Created ${value.owner}/${value.name} on GitHub and sent this branch.`,
+                  ),
+                  next.notice,
+                ]
+                  .filter(Boolean)
+                  .join(' '),
+              );
+            } catch (e) {
+              // A repository may exist on GitHub now even though sending failed.
+              await host.gitStatus(space.scopeId).then(accept, () => {});
+              throw e;
+            } finally {
+              active.current = false;
+              onBusy(false);
+            }
+          }}
+        />
+      )}
       {confirmation && (
         <div
           className="git-confirmation"

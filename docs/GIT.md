@@ -82,6 +82,41 @@ repository; the result names it and the branch operation is unaffected.
 
 **スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
 
+### Making a hibachi here and publishing it
+
+Since 0.1.53 the direction also runs the other way: a hibachi can start in irori
+and become a GitHub repository.
+
+**hibachi を追加 → 新しく作成** takes a parent folder, a new folder name and the
+hibachi's name. The host (`GitService.create`) applies the clone's destination
+rules — never an existing folder, never inside a registered space or cloud
+materials — makes the folder, runs `git init` and points `HEAD` at `main`
+whatever `init.defaultBranch` says. Registration then writes `.irori/scope.json`
+and the `.gitignore` excluding `/contents/`, and `firstCommit` commits exactly
+those two paths with the person's own Git identity, hooks and signing. A commit
+that fails leaves the hibachi registered and returns the reason as a notice. A
+folder whose registration fails is removed only while it holds nothing beyond
+`.git`, `.irori` and `.gitignore`.
+
+A registered hibachi that is an ordinary folder reports `initializable` in its
+status, and the 変更 view offers **Git を始める** (`gitInit`); a folder inside
+another repository or with a `.git` entry Git cannot read is not offered it.
+
+A hibachi with a commit and no remote shows **GitHub に公開…** (`gitPublish`),
+also offered by the creation form's **GitHub にもリポジトリを作成する**. irori runs
+the GitHub CLI with `GH_HOST=github.com` and prompts disabled:
+`gh api user` and `gh api user/orgs` list where the repository may go (without
+the `read:org` scope only the account itself), and `gh repo create
+<owner>/<name> --private|--public` creates it empty. The remote URL follows
+`gh config get git_protocol` (SSH or HTTPS). irori then adds it as `origin`,
+sets the branch's upstream, and sends the reviewed commit and `refs/notes/ai`
+through the same single-refspec push as **Push**, so the credential fallback to
+gh applies. The remote-tracking ref is set to the pushed commit. When the
+repository is created but sending fails, the error says so and the remote stays
+set for a later **Push**; the repository on GitHub is never deleted by irori.
+gh keeps the token; irori reads only account names and exit status, and its
+diagnostics are redacted like Git's.
+
 ## Boundaries and recovery
 
 - Native Git runs through typed, Zod-validated HostAPI calls. No raw renderer command/IPC interface is added. Arguments and literal pathspecs preserve spaces, Japanese, newlines and glob-like filenames without shell interpolation. Native credential helpers, SSH, hooks and signing remain effective; provider model calls are unnecessary.

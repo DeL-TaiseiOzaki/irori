@@ -11,6 +11,8 @@ import type { Space } from '../domain/types';
 import type {
   CloneRepository,
   CloneResult,
+  CreateSpace,
+  PublishRepository,
   GitChange,
   GitConflict,
   GitDiff,
@@ -20,6 +22,7 @@ import type {
   GitSyncAction,
 } from '../domain/git';
 import { GitError, GitProcess } from './process';
+import { GitHubCli } from './github';
 import { t } from '../domain/i18n';
 import {
   formatNote,
@@ -54,6 +57,7 @@ export class GitService {
     private canMutate: () => boolean = () => true,
     private authorship?: Pick<AuthorshipStore, 'view'>,
     private process = new GitProcess(),
+    private github = new GitHubCli(),
   ) {}
   get busy() {
     return this.pending > 0;
@@ -80,7 +84,11 @@ export class GitService {
       );
     return s;
   }
-  private mutate<T>(id: string, fn: (s: Space) => Promise<T>): Promise<T> {
+  private mutate<T>(
+    id: string,
+    fn: (s: Space) => Promise<T>,
+    resolve: (id: string) => Promise<Space> = (id) => this.root(id),
+  ): Promise<T> {
     if (!this.canMutate())
       return Promise.reject(
         Error(
@@ -102,7 +110,7 @@ export class GitService {
               'Another operation is running. Try again once it finishes.',
             ),
           );
-        return fn(await this.root(id));
+        return fn(await resolve(id));
       });
     this.queues.set(key, next);
     return next.finally(() => {
@@ -446,6 +454,7 @@ export class GitService {
     } catch (error) {
       return {
         available: false,
+        initializable: await this.initializable(id, error),
         detail:
           error instanceof GitError
             ? t(
@@ -460,6 +469,17 @@ export class GitService {
     }
     // Do not run the generic onboarding inspection here: its unscoped status would scan contents.
     return this.snapshot(s);
+  }
+  /** An ordinary folder: Git finds no repository at or above it, and no `.git` entry is there. */
+  private async initializable(id: string, error: unknown) {
+    if (!(error instanceof GitError) || !/not a git repository/i.test(error.diagnostic))
+      return false;
+    try {
+      await fs.lstat(path.join(this.files.get(id).root, '.git'));
+      return false;
+    } catch (missing) {
+      return (missing as NodeJS.ErrnoException).code === 'ENOENT';
+    }
   }
   private async snapshot(s: Space): Promise<GitStatus> {
     const directory = await this.gitDirectory(s);
@@ -781,6 +801,65 @@ export class GitService {
         );
     }
   }
+  /** Pushes the checked-out commit to its branch on `remote`, and the notes after it. */
+  private async push(s: Space, state: GitStatus, remote: GitRemote): Promise<string | undefined> {
+    const urls = (await this.git(s, ['remote', 'get-url', '--push', '--all', remote.name]))
+      .trimEnd()
+      .split('\n');
+    if (urls.length !== 1)
+      throw Error(
+        t(
+          '送信先が複数あります。Git のリモート設定を確認してください。',
+          'There are multiple push destinations. Check the Git remote configuration.',
+        ),
+      );
+    if ((await this.config(s, `remote.${remote.name}.mirror`)) === 'true')
+      throw Error(
+        t(
+          'ミラー設定のリモートにはこの画面から送信できません。',
+          'A mirrored remote cannot be pushed to from this screen.',
+        ),
+      );
+    // Explicit source OID and one branch: configured push refspecs/tags cannot broaden publication.
+    await this.git(
+      s,
+      [
+        '-c',
+        'push.followTags=false',
+        'push',
+        '--porcelain',
+        '--no-force',
+        '--no-recurse-submodules',
+        remote.name,
+        `${state.head}:refs/heads/${remote.branch}`,
+      ],
+      { network: true },
+    );
+    // The notes follow the branch, never forced: a rejection means another
+    // device's notes are not merged here yet, which Fetch does.
+    if (await this.ref(s, notesRef))
+      try {
+        await this.git(
+          s,
+          [
+            '-c',
+            'push.followTags=false',
+            'push',
+            '--porcelain',
+            '--no-force',
+            '--no-recurse-submodules',
+            remote.name,
+            `${notesRef}:${notesRef}`,
+          ],
+          { network: true },
+        );
+      } catch {
+        return t(
+          '作者情報ノート（refs/notes/ai）は送信されませんでした。Fetch で受信・統合してから再度 Push してください。',
+          'The authorship note (refs/notes/ai) was not pushed. Fetch to receive and merge it, then push again.',
+        );
+      }
+  }
   async sync(id: string, action: GitSyncAction, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version),
@@ -793,64 +872,8 @@ export class GitService {
           ),
         );
       let notice: string | undefined;
-      if (action === 'push') {
-        const urls = (await this.git(s, ['remote', 'get-url', '--push', '--all', remote.name]))
-          .trimEnd()
-          .split('\n');
-        if (urls.length !== 1)
-          throw Error(
-            t(
-              '送信先が複数あります。Git のリモート設定を確認してください。',
-              'There are multiple push destinations. Check the Git remote configuration.',
-            ),
-          );
-        if ((await this.config(s, `remote.${remote.name}.mirror`)) === 'true')
-          throw Error(
-            t(
-              'ミラー設定のリモートにはこの画面から送信できません。',
-              'A mirrored remote cannot be pushed to from this screen.',
-            ),
-          );
-        // Explicit source OID and one branch: configured push refspecs/tags cannot broaden publication.
-        await this.git(
-          s,
-          [
-            '-c',
-            'push.followTags=false',
-            'push',
-            '--porcelain',
-            '--no-force',
-            '--no-recurse-submodules',
-            remote.name,
-            `${state.head}:refs/heads/${remote.branch}`,
-          ],
-          { network: true },
-        );
-        // The notes follow the branch, never forced: a rejection means another
-        // device's notes are not merged here yet, which Fetch does.
-        if (await this.ref(s, notesRef))
-          try {
-            await this.git(
-              s,
-              [
-                '-c',
-                'push.followTags=false',
-                'push',
-                '--porcelain',
-                '--no-force',
-                '--no-recurse-submodules',
-                remote.name,
-                `${notesRef}:${notesRef}`,
-              ],
-              { network: true },
-            );
-          } catch {
-            notice = t(
-              '作者情報ノート（refs/notes/ai）は送信されませんでした。Fetch で受信・統合してから再度 Push してください。',
-              'The authorship note (refs/notes/ai) was not pushed. Fetch to receive and merge it, then push again.',
-            );
-          }
-      } else {
+      if (action === 'push') notice = await this.push(s, state, remote);
+      else {
         if (action !== 'fetch' && state.changes.length)
           throw Error(
             t(
@@ -1055,6 +1078,67 @@ export class GitService {
       );
     return `https://github.com/${repository}`;
   }
+  /**
+   * A new, empty folder for a clone or a new hibachi: outside every registered
+   * space and cloud material, never an existing folder.
+   */
+  private async newFolder(parentInput: string, name: string, purpose: 'clone' | 'create') {
+    if (
+      !name.trim() ||
+      name.length > 120 ||
+      /[\\/:*?"<>|\x00-\x1f]/.test(name) ||
+      name.startsWith('.') ||
+      /[. ]$/.test(name)
+    )
+      throw Error(t('新しいフォルダ名を入力してください。', 'Enter a name for the new folder.'));
+    const parent = await fs.realpath(parentInput);
+    if (!(await fs.stat(parent)).isDirectory())
+      throw Error(
+        t('保存先の親フォルダを選択してください。', 'Select the parent folder to save into.'),
+      );
+    for (const s of this.files.list()) {
+      if (within(s.root, parent))
+        throw Error(
+          t(
+            '登録済みスペースの外に保存先を選択してください。',
+            'Select a destination outside registered spaces.',
+          ),
+        );
+      for (const contents of s.contents) {
+        const root = path.join(s.root, contents);
+        const children = await fs.readdir(root).catch(() => [] as string[]);
+        for (const candidate of [root, ...children.map((c) => path.join(root, c))]) {
+          const actual = await fs.realpath(candidate).catch(() => undefined);
+          if (actual && within(actual, parent))
+            throw Error(
+              purpose === 'clone'
+                ? t(
+                    'クラウド資料の中にはリポジトリを取得できません。',
+                    'A repository cannot be cloned inside cloud materials.',
+                  )
+                : t(
+                    'クラウド資料の中には hibachi を作成できません。',
+                    'A hibachi cannot be created inside cloud materials.',
+                  ),
+            );
+        }
+      }
+    }
+    const destination = path.join(parent, name);
+    try {
+      await fs.mkdir(destination);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+        throw Error(
+          t(
+            '同じ名前のフォルダがあります。新しい名前を選択してください。',
+            'A folder with this name already exists. Choose a different name.',
+          ),
+        );
+      throw error;
+    }
+    return { parent, destination };
+  }
   async clone(input: CloneRepository): Promise<CloneResult> {
     if (!this.canMutate() || this.busy)
       throw Error(
@@ -1075,57 +1159,9 @@ export class GitService {
           'Enter a GitHub HTTPS or SSH repository URL. Do not include credentials in the URL.',
         ),
       );
-    if (
-      !input.name.trim() ||
-      input.name.length > 120 ||
-      /[\\/:*?"<>|\x00-\x1f]/.test(input.name) ||
-      input.name.startsWith('.') ||
-      /[. ]$/.test(input.name)
-    )
-      throw Error(t('新しいフォルダ名を入力してください。', 'Enter a name for the new folder.'));
     this.pending++;
     try {
-      const parent = await fs.realpath(input.parent);
-      if (!(await fs.stat(parent)).isDirectory())
-        throw Error(
-          t('保存先の親フォルダを選択してください。', 'Select the parent folder to save into.'),
-        );
-      for (const s of this.files.list()) {
-        if (within(s.root, parent))
-          throw Error(
-            t(
-              '登録済みスペースの外に保存先を選択してください。',
-              'Select a destination outside registered spaces.',
-            ),
-          );
-        for (const contents of s.contents) {
-          const root = path.join(s.root, contents);
-          const children = await fs.readdir(root).catch(() => [] as string[]);
-          for (const candidate of [root, ...children.map((c) => path.join(root, c))]) {
-            const actual = await fs.realpath(candidate).catch(() => undefined);
-            if (actual && within(actual, parent))
-              throw Error(
-                t(
-                  'クラウド資料の中にはリポジトリを取得できません。',
-                  'A repository cannot be cloned inside cloud materials.',
-                ),
-              );
-          }
-        }
-      }
-      const destination = path.join(parent, input.name);
-      try {
-        await fs.mkdir(destination);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'EEXIST')
-          throw Error(
-            t(
-              '同じ名前のフォルダがあります。新しい名前を選択してください。',
-              'A folder with this name already exists. Choose a different name.',
-            ),
-          );
-        throw error;
-      }
+      const { parent, destination } = await this.newFolder(input.parent, input.name, 'clone');
       try {
         await this.process.run(
           parent,
@@ -1166,8 +1202,166 @@ export class GitService {
       this.pending--;
     }
   }
+  /**
+   * The folder of a new hibachi: created empty and made a Git repository on
+   * `main`, ready for registration. Nothing is committed yet.
+   */
+  async create(input: Pick<CreateSpace, 'parent' | 'folder'>): Promise<string> {
+    if (!this.canMutate() || this.busy)
+      throw Error(
+        t(
+          '実行中の処理の完了後に作成してください。',
+          'Create it after the operation in progress finishes.',
+        ),
+      );
+    this.pending++;
+    try {
+      const { destination } = await this.newFolder(input.parent, input.folder, 'create');
+      try {
+        await this.initialize({ root: destination });
+      } catch (error) {
+        await this.abandon(destination);
+        throw error;
+      }
+      return destination;
+    } finally {
+      this.pending--;
+    }
+  }
+  /**
+   * Removes a new hibachi's folder that could not be registered, but only while
+   * it holds nothing beyond what irori itself wrote there.
+   */
+  async abandon(root: string) {
+    const written = new Set(['.git', '.irori', '.gitignore']);
+    const entries = await fs.readdir(root).catch(() => undefined);
+    if (!entries?.every((entry) => written.has(entry))) return;
+    for (const entry of entries)
+      await fs.rm(path.join(root, entry), { recursive: true, force: true });
+    await fs.rmdir(root).catch(() => {});
+  }
+  private async initialize(s: Pick<Space, 'root'>) {
+    await this.git(s, ['init', '--quiet']);
+    // Every Git version, whatever its `init.defaultBranch`, starts on `main`.
+    await this.git(s, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+  }
+  /**
+   * The first commit of a hibachi made here: only the files registration wrote.
+   * Returns why it was not made (no author identity, a hook, signing) instead of failing.
+   */
+  async firstCommit(id: string): Promise<string | undefined> {
+    try {
+      await this.mutate(id, async (s) => {
+        const paths = ['.irori/scope.json', '.gitignore'];
+        for (const p of paths) this.boundary(s, p);
+        await this.git(s, ['add', '--', ...paths.map(literal)]);
+        await this.git(s, [
+          'commit',
+          '--quiet',
+          '-m',
+          t(`hibachi「${s.name}」を作成`, `Create the hibachi ${s.name}`),
+          '--',
+          ...paths.map(literal),
+        ]);
+      });
+    } catch (error) {
+      const [advice, ...detail] = (error as Error).message.split('\n\n');
+      return [
+        `${t(
+          'hibachi は作成しましたが、最初の commit はできませんでした。ソース管理から commit できます。',
+          'The hibachi was created, but its first commit could not be made. You can commit it from Source control.',
+        )}\n${advice}`,
+        ...detail,
+      ].join('\n\n');
+    }
+  }
+  /** Makes a registered hibachi that is an ordinary folder a Git repository on `main`. */
+  async init(id: string): Promise<GitStatus> {
+    await this.mutate(
+      id,
+      async (s) => s,
+      async (id) => {
+        const s = this.files.get(id);
+        const status = await this.status(id);
+        if (!status.initializable)
+          throw Error(
+            t(
+              'この hibachi はすでに Git リポジトリか、Git で扱えない場所にあります。',
+              'This hibachi is already a Git repository, or is somewhere Git cannot use.',
+            ),
+          );
+        await this.initialize(s);
+        return s;
+      },
+    );
+    return this.status(id);
+  }
+  /** The GitHub account the GitHub CLI is signed in to, for choosing where to publish. */
+  githubAccount() {
+    return this.github.account();
+  }
+  /**
+   * Creates a repository on GitHub for a hibachi that has none, sets it as
+   * `origin` and pushes the checked-out branch to it, with the authorship notes.
+   */
+  async publish(id: string, input: PublishRepository, version: string): Promise<GitStatus> {
+    return this.mutate(id, async (s) => {
+      const state = await this.checked(s, version);
+      if (!state.head || !state.branch)
+        throw Error(
+          t(
+            '最初の commit を作成してから GitHub に公開してください。',
+            'Make the first commit before publishing to GitHub.',
+          ),
+        );
+      if (state.operation !== 'none')
+        throw Error(
+          t(
+            '進行中の Git 操作を完了してから公開してください。',
+            'Finish the Git operation in progress before publishing.',
+          ),
+        );
+      if (await this.optional(s, ['remote']))
+        throw Error(
+          t(
+            'この hibachi にはすでにリモートが設定されています。Push で送信してください。',
+            'This hibachi already has a remote. Send it with Push.',
+          ),
+        );
+      await this.git(s, ['check-ref-format', `refs/heads/${state.branch}`]);
+      const repository = await this.github.create(input);
+      const url =
+        (await this.github.protocol()) === 'ssh'
+          ? `git@github.com:${repository}.git`
+          : `https://github.com/${repository}.git`;
+      let notice: string | undefined;
+      try {
+        await this.git(s, ['remote', 'add', 'origin', url]);
+        await this.git(s, ['config', `branch.${state.branch}.remote`, 'origin']);
+        await this.git(s, ['config', `branch.${state.branch}.merge`, `refs/heads/${state.branch}`]);
+        const next = await this.snapshot(s);
+        notice = await this.push(s, next, this.requireRemote(next));
+      } catch (error) {
+        const [advice, ...detail] = (error as Error).message.split('\n\n');
+        throw Error(
+          [
+            `${t(
+              `GitHub に ${repository} を作成しましたが、送信は完了していません。リモートが設定されていれば Push で再試行できます。`,
+              `${repository} was created on GitHub, but sending did not finish. If the remote is set, retry with Push.`,
+            )}\n${advice}`,
+            ...detail,
+          ].join('\n\n'),
+        );
+      }
+      // The push above set the branch on GitHub to this commit, as a named push would record.
+      await this.git(s, ['update-ref', `refs/remotes/origin/${state.branch}`, state.head]);
+      const status = await this.snapshot(s);
+      return notice ? { ...status, notice } : status;
+    });
+  }
   async close() {
     await Promise.allSettled(this.queues.values());
     await this.process.close();
+    await this.github.close();
   }
 }

@@ -12,6 +12,7 @@ import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
+import { githubOwnerPattern, validRepositoryName } from './git';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -88,6 +89,18 @@ export const hostArguments = {
   gitResolve: z.tuple([id, path, text.nullable(), version]),
   gitClone: z.tuple([z.object({ url: z.string().max(2048), parent: path, name })]),
   gitOpenRepository: z.tuple([id]),
+  gitInit: z.tuple([id]),
+  githubAccount: z.tuple([]),
+  gitPublish: z.tuple([
+    id,
+    z.object({
+      owner: z.string().regex(githubOwnerPattern),
+      name: z.string().max(100).refine(validRepositoryName),
+      visibility: z.enum(['private', 'public']),
+      description: z.string().max(350).optional(),
+    }),
+    version,
+  ]),
   repositories: z.tuple([path]),
   workspaces: z.tuple([]),
   saveWorkspace: z.tuple([name.trim().min(1), z.array(id).max(100), id.optional()]),
@@ -135,6 +148,14 @@ export const hostArguments = {
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),
+  createSpace: z.tuple([
+    z.object({
+      parent: path,
+      folder: name,
+      name,
+      category: z.enum(['personal', 'team', 'organization']),
+    }),
+  ]),
   updateSpace: z.tuple([
     id,
     z

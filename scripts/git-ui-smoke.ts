@@ -4,7 +4,7 @@ import {
   type ElectronApplication,
   type Page,
 } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, chmod } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -208,10 +208,44 @@ git(
   `url.${path.join(base, 'missing.git')}.insteadOf`,
   'https://github.com/irori-fixture/missing.git',
 );
+// Hibachis made in the app commit with the person's own identity.
+git(base, 'config', '--file', globalConfig, 'user.name', 'UI fixture');
+git(base, 'config', '--file', globalConfig, 'user.email', 'fixture@example.invalid');
+git(base, 'config', '--file', globalConfig, 'commit.gpgsign', 'false');
+// A stand-in for the GitHub CLI, signed in as `octo` with the organization `team-a`.
+// `repo create` makes a bare repository and points the new github.com URL at it,
+// except for `octo/taken`, which GitHub refuses as an existing name.
+const ghBin = path.join(base, 'bin'),
+  ghLog = path.join(base, 'gh.log'),
+  github = path.join(base, 'github');
+await mkdir(ghBin);
+await writeFile(
+  path.join(ghBin, 'gh'),
+  `#!/bin/sh
+printf '%s|%s\\n' "$GH_HOST" "$*" >> '${ghLog}'
+case "$*" in
+  "api user --jq .login") echo octo ;;
+  "api user/orgs --paginate --jq .[].login") echo team-a ;;
+  "config get git_protocol --host github.com") echo https ;;
+  "repo create octo/taken "*)
+    echo 'GraphQL: Name already exists on this account (createRepository)' >&2; exit 1 ;;
+  "repo create "*)
+    bare='${github}'/"$3.git"
+    git init --quiet --bare "$bare" &&
+      git config --file "$GIT_CONFIG_GLOBAL" "url.$bare.insteadOf" "https://github.com/$3.git" || exit 1
+    echo "https://github.com/$3" ;;
+  *) echo "unknown command $*" >&2; exit 1 ;;
+esac
+`,
+);
+await chmod(path.join(ghBin, 'gh'), 0o755);
+const ghCalls = async () =>
+  (await readFile(ghLog, 'utf8').catch(() => '')).split('\n').filter(Boolean);
 const env = {
   ...process.env,
   IRORI_DATA_DIR: files.dataDir,
   GIT_CONFIG_GLOBAL: globalConfig,
+  PATH: [ghBin, process.env.PATH].filter(Boolean).join(path.delimiter),
 } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const launch = () =>
@@ -579,6 +613,122 @@ try {
   expect(JSON.parse(await readFile(path.join(files.dataDir, 'spaces.json'), 'utf8'))).toHaveLength(
     3,
   );
+
+  // A hibachi made in the app, published in the same step. GitHub refuses the
+  // first name; the hibachi stays created and is published from Source control.
+  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
+  const creation = page.getByRole('form', { name: 'スペース登録' });
+  await creation.getByRole('button', { name: '新しく作成', exact: true }).click();
+  await creation.getByRole('textbox', { name: '保存先の親フォルダ' }).fill(base);
+  await creation.getByRole('textbox', { name: '新しいフォルダ名' }).fill('new-hibachi');
+  await creation.getByRole('textbox', { name: 'スペース名' }).fill('新しい hibachi');
+  await expect(creation.getByRole('button', { name: '作成して開く', exact: true })).toBeEnabled();
+  await creation.getByRole('checkbox', { name: 'GitHub にもリポジトリを作成する' }).check();
+  await expect(creation.getByRole('combobox', { name: 'GitHub アカウント' })).toHaveValue('octo');
+  await expect(creation.getByRole('combobox', { name: '公開範囲' })).toHaveValue('private');
+  const repositoryName = creation.getByRole('textbox', { name: 'リポジトリ名' });
+  await expect(repositoryName).toHaveValue('new-hibachi');
+  await repositoryName.fill('bad name');
+  await expect(creation.getByRole('button', { name: '作成して公開', exact: true })).toBeDisabled();
+  await repositoryName.fill('taken');
+  await creation.getByRole('button', { name: '作成して公開', exact: true }).click();
+  const partial = creation.getByRole('alert');
+  await expect(partial).toContainText('hibachi は作成しましたが');
+  await expect(partial).toContainText('同じ名前のリポジトリが GitHub にすでにあります');
+  const created = path.join(base, 'new-hibachi');
+  expect(git(created, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').sort()).toEqual([
+    '.gitignore',
+    '.irori/scope.json',
+  ]);
+  expect(git(created, 'log', '-1', '--format=%s')).toBe('hibachi「新しい hibachi」を作成');
+  expect(git(created, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
+  expect(git(created, 'remote')).toBe('');
+  await creation.getByRole('button', { name: '開く', exact: true }).click();
+  await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
+  await page
+    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('button', { name: /^変更/ })
+    .click();
+  panel = page.locator('.git-sidebar, .git-workspace-detail');
+  await expect(panel.locator('.git-remote')).toContainText('リモート未設定');
+  await panel.getByRole('button', { name: 'GitHub に公開…', exact: true }).click();
+  let publication = page.getByRole('form', { name: 'GitHub に公開' });
+  await expect(publication.getByRole('combobox', { name: 'GitHub アカウント' })).toHaveValue(
+    'octo',
+  );
+  await expect(publication.getByRole('textbox', { name: 'リポジトリ名' })).toHaveValue(
+    'new-hibachi',
+  );
+  await publication.getByRole('button', { name: '作成して送信', exact: true }).click();
+  await expect(page.getByRole('form', { name: 'GitHub に公開' })).toHaveCount(0);
+  // The publish dialog's own progress line is a status too; read the panel's notice.
+  await expect(panel.locator('.git-notice[role="status"]')).toContainText(
+    'GitHub に octo/new-hibachi を作成し、送信しました。',
+  );
+  expect(git(created, 'config', '--get', 'remote.origin.url')).toBe(
+    'https://github.com/octo/new-hibachi.git',
+  );
+  expect(git(created, 'config', '--get', 'branch.main.merge')).toBe('refs/heads/main');
+  expect(git(path.join(github, 'octo/new-hibachi.git'), 'rev-parse', 'main')).toBe(
+    git(created, 'rev-parse', 'HEAD'),
+  );
+  await expect(panel.locator('.git-ahead')).toHaveText('↑0 ↓0');
+  await expect(panel.getByRole('button', { name: 'GitHub に公開…' })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Push', exact: true })).toBeEnabled();
+
+  // A hibachi registered as an ordinary folder starts Git, commits, and goes to an organization.
+  const plain = path.join(base, 'plain KB');
+  await mkdir(plain);
+  await writeFile(path.join(plain, 'note.md'), '# Plain\n\nWritten before Git\n');
+  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
+  await page.getByRole('textbox', { name: 'KBフォルダ', exact: true }).fill(plain);
+  await expect(page.getByRole('form', { name: 'スペース登録' })).toContainText(
+    'ローカルのKBフォルダ',
+  );
+  await page.getByRole('textbox', { name: 'スペース名' }).fill('Plain');
+  await page.getByRole('button', { name: '登録して開く', exact: true }).click();
+  await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
+  await page
+    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('button', { name: /^変更/ })
+    .click();
+  await expect(
+    panel.getByRole('heading', { name: 'この hibachi は Git で管理されていません' }),
+  ).toBeVisible();
+  await panel.getByRole('button', { name: 'Git を始める', exact: true }).click();
+  await expect(panel.getByText('最初の commit を作成すると GitHub に公開できます。')).toBeVisible();
+  expect(git(plain, 'symbolic-ref', 'HEAD')).toBe('refs/heads/main');
+  await expect(panel.locator('.git-file').filter({ hasText: 'note.md' })).toHaveCount(1);
+  await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
+  await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Start the plain hibachi');
+  await panel.getByRole('button', { name: 'コミット', exact: true }).click();
+  await expect(panel.locator('.git-notice[role="status"]')).toContainText(
+    'この端末の履歴に commit',
+  );
+  await panel.getByRole('button', { name: 'GitHub に公開…', exact: true }).click();
+  publication = page.getByRole('form', { name: 'GitHub に公開' });
+  const account = publication.getByRole('combobox', { name: 'GitHub アカウント' });
+  await expect(account).toHaveValue('octo');
+  await account.selectOption('team-a');
+  await expect(publication.getByRole('textbox', { name: 'リポジトリ名' })).toHaveValue('plain-KB');
+  await publication.getByRole('combobox', { name: '公開範囲' }).selectOption('public');
+  await expect(publication).toContainText('公開リポジトリは誰でも閲覧できます');
+  await publication.getByRole('button', { name: '作成して送信', exact: true }).click();
+  // The publish dialog's own progress line is a status too; read the panel's notice.
+  await expect(panel.locator('.git-notice[role="status"]')).toContainText(
+    'GitHub に team-a/plain-KB を作成し、送信しました。',
+  );
+  expect(git(path.join(github, 'team-a/plain-KB.git'), 'show', 'main:note.md')).toContain(
+    'Written before Git',
+  );
+  expect(await ghCalls()).toEqual(
+    expect.arrayContaining([
+      'github.com|repo create octo/taken --private',
+      'github.com|repo create octo/new-hibachi --private',
+      'github.com|repo create team-a/plain-KB --public',
+    ]),
+  );
+  expect((await ghCalls()).filter((call) => call.includes('repo create'))).toHaveLength(3);
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/git-ui-smoke.json',
@@ -604,6 +754,9 @@ try {
           '1024px sidebar bounds',
           'a failed clone folds redacted Git output under one advice line and removes its empty folder',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
+          'a hibachi created in the app is a repository on main whose first commit holds only .irori/scope.json and .gitignore',
+          'a GitHub refusal while creating keeps the hibachi and its form open, and Source control publishes it afterwards through a fake gh',
+          'an ordinary-folder hibachi starts Git, commits, and publishes to an organization as a public repository',
           "a collaborator's h_ line in refs/notes/ai counts for the open note, a commit names the lines typed here as the committer's, and Push carries the ref",
         ],
         errors,
@@ -613,7 +766,7 @@ try {
     ),
   );
   console.log(
-    'Git UI checks passed with real disposable Git repositories; no live GitHub or model calls.',
+    'Git UI checks passed with real disposable Git repositories and a fake gh; no live GitHub or model calls.',
   );
 } finally {
   await app.close();
