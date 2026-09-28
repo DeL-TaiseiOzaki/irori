@@ -25,10 +25,18 @@ this ([HANDOFF](../HANDOFF.md)).
   again. The rclone remote keeps its name, so bindings and connections survive,
   and cancelling that sign-in keeps the account. An editable connection whose
   account may only read mounts read-only and says why.
-- **Mounting.** Editable folders use rclone's write cache (`CacheMode` 2,
-  "writes") with owner-only permissions. macOS's NFS mount cannot write without
-  it. Each mount carries its own `description`, so two connections to one
-  folder never share a write cache or its statistics.
+- **Mounting.** Editable folders use rclone's write cache with owner-only
+  permissions. macOS's NFS mount cannot write without it. Each mount carries
+  its own `description`, so two connections to one folder never share a write
+  cache or its statistics.
+- **Reading** (0.1.51). Every connection, editable or read-only, uses rclone's
+  full cache (`CacheMode` 3): what was read stays on this device, so a file
+  opened again, or read again every 25 s while open, comes from the cache
+  unless Drive's copy changed. Before, editable folders cached only writes and
+  read-only ones nothing, so every open downloaded the whole file. Each mount
+  keeps up to 2 GiB of unchanged reads for 7 days; rclone evicts beyond that,
+  never a change still waiting to upload. The owner reported that opening a
+  file in `contents` was slow.
 - **Saving.** A Drive file is written in place after the editor's hash check,
   with the previous bytes kept as a device backup. It is never replaced through
   a temporary file: on Drive that deletes the file and uploads a new one,

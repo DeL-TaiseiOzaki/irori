@@ -55,6 +55,13 @@ const queueSchema = z.object({
     .nullish()
     .transform((items) => items ?? []),
 });
+// Each mount's read cache, as rclone's VFS options take them: bytes and nanoseconds.
+// The size is a target rclone evicts toward, never below what still waits to upload.
+const readCache = {
+  CacheMode: 3,
+  CacheMaxSize: 2 * 1024 ** 3,
+  CacheMaxAge: 7 * 24 * 3600 * 1e9,
+};
 function assertCloudPath(rel: string) {
   if (
     !rel ||
@@ -750,12 +757,18 @@ export class CloudService {
         mountPoint: target,
         ...(process.platform === 'darwin' ? { mountType: 'nfsmount' } : {}),
         mountOpt: { AllowOther: false },
-        // Writing needs rclone's write cache (CacheMode 2, "writes"): files are staged on
-        // this device and uploaded shortly after they are closed. macOS's NFS mount is
-        // read-only without it. Changes left when irori quits are uploaded on the next mount.
-        vfsOpt: writable
-          ? { ReadOnly: false, CacheMode: 2, DirPerms: 0o700, FilePerms: 0o600 }
-          : { ReadOnly: true, CacheMode: 0, DirPerms: 0o500, FilePerms: 0o400 },
+        // rclone's full cache (CacheMode 3) keeps what was read on this device, so a file
+        // opened again, or read again while it stays open, comes from the cache unless
+        // Drive's copy changed; without it every open downloaded the whole file. Writes
+        // are staged there and uploaded shortly after the file is closed; macOS's NFS
+        // mount is read-only without a write cache. Changes left when irori quits are
+        // uploaded on the next mount. Unchanged reads past the size or age are evicted.
+        vfsOpt: {
+          ...(writable
+            ? { ReadOnly: false, DirPerms: 0o700, FilePerms: 0o600 }
+            : { ReadOnly: true, DirPerms: 0o500, FilePerms: 0o400 }),
+          ...readCache,
+        },
       });
       const stat = await fs.stat(target);
       if (stat.dev === (await fs.stat(parent)).dev)
