@@ -98,9 +98,7 @@ try {
   await late.click();
   await expect(backlinks).toBeHidden();
   await expect(editor).toContainText('遅れて書いたページ');
-  await expect(notice).toHaveText(
-    'リンクを安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。3 行目を確認してください。',
-  );
+  await expect(notice).toHaveText('リンクを特定できませんでした。3 行目を確認してください。');
 
   // A plain label is selected in the note that carries it.
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
@@ -131,7 +129,7 @@ try {
   await page.getByRole('button', { name: /^その他（/ }).click();
   await page.getByRole('menuitem', { name: '名前・場所', exact: true }).click();
   const move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
-  await expect(move).toContainText('参照元 3 件のノートにある 4 件のリンク');
+  await expect(move).toContainText('参照元 3 件のノートの 4 件のリンク');
   await move.getByLabel('ノート名', { exact: true }).fill('到着');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);

@@ -77,7 +77,7 @@ try {
     if (agent === 'pi') {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
       await expect(page.locator('#agent-access-detail')).toContainText(
-        '承認ダイアログがありません',
+        '承認ダイアログはありません',
       );
     }
     await settings().click();
@@ -202,7 +202,7 @@ try {
     }
     await settings().click();
     await expect(
-      page.getByText('次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。', {
+      page.getByText('会話を継続します。', {
         exact: true,
       }),
     ).toBeVisible();
@@ -259,9 +259,7 @@ try {
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
   // A brain's hibachi agent starts in full access.
   await expect(access).toHaveValue('full-access');
-  await expect(page.locator('#agent-access-detail')).toContainText(
-    '編集可で接続した Google Drive フォルダは、エージェントも変更できます',
-  );
+  await expect(page.locator('#agent-access-detail')).not.toBeEmpty();
   let doneCount = await page.locator('.message.done').count();
   await page.getByLabel('エージェントへの指示').fill('access fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
@@ -279,12 +277,7 @@ try {
   await expect(access).toHaveValue('full-access');
   await access.selectOption('default');
   await settings().click();
-  await expect(
-    page.getByText(
-      'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。',
-      { exact: true },
-    ),
-  ).toBeVisible();
+  await expect(page.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
   await settings().click();
   await page.getByLabel('エージェントへの指示').fill('standard again');
   await page.getByRole('button', { name: '送信', exact: true }).click();
@@ -355,7 +348,7 @@ try {
       page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
-    await expect(page.getByText('次の実行で新しい会話を始めます。', { exact: true })).toBeVisible();
+    await expect(page.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
     await settings().click();
   }
   expect(errors).toEqual([]);

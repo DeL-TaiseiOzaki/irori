@@ -48,12 +48,6 @@ export function SkillReach({ scopeId, onClose }: { scopeId: string; onClose: () 
     <Dialog label={t('スキルの到達', 'Skill reach')} onClose={onClose}>
       <div className="modal skill-reach">
         <h2>{t('スキルの到達', 'Skill reach')}</h2>
-        <p className="hint">
-          {t(
-            '選んだスキルは irori がどのエージェントにも指示に含めて渡します。この表は、この KB で起動した各 CLI が自力で見つけるか、同名の個人スキルに隠されないかを示します。',
-            'irori includes the selected skills in the instructions for every agent. This table shows whether each CLI started in this KB would find them on its own, and whether a same-named personal skill hides them.',
-          )}
-        </p>
         {read.error && <div role="alert">{read.error}</div>}
         {read.data &&
           (read.data.entries.length ? (

@@ -277,7 +277,7 @@ try {
   await page.keyboard.insertText('\n保持する下書き\n');
   await writeFile(path.join(kb, '日本語 note.md'), input + '\nエージェントの別の変更。\n');
   await expect(
-    page.getByText('外部でノートが変更されました。未保存の編集を保持しています。'),
+    page.getByText('外部でノートが変更されました。編集は保持されています。'),
   ).toBeVisible();
   await expect(page.locator('.versions')).toContainText('保持する下書き');
   await expect(page.locator('.versions')).toContainText('エージェントの別の変更。');
@@ -468,7 +468,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       `fixture-${agent}-handle`,
       'full-access',
     );
-  const savedText = '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。';
+  const savedText = '会話を継続します。';
   for (const cycle of [1, 2]) {
     const restarted = await electron.launch({
       args: [
@@ -506,9 +506,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
         await expect(window.getByText(savedText, { exact: true })).toBeVisible();
         await window.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
       }
-      await expect(
-        window.getByText('次の実行で新しい会話を始めます。', { exact: true }),
-      ).toBeVisible();
+      await expect(window.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
       await expect(
         window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
       ).toHaveCount(0);

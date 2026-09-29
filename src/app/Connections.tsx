@@ -240,8 +240,8 @@ export function Connections({
             {setup && !setup.oauthConfigured && (
               <p className="connect-notice">
                 {t(
-                  'この検証版では Google 接続の配布準備が未完了です。接続対応版への更新が必要です。Google アカウント側の設定変更は不要です。',
-                  'Distribution setup for Google connections is not yet complete in this preview. An update to a connection-enabled build is required. No change to Google account settings is needed.',
+                  'この検証版では Google 接続はまだ利用できません。',
+                  'Google connection is not yet available in this preview.',
                 )}
               </p>
             )}
@@ -563,17 +563,6 @@ export function Connections({
                       {contentsRoot}/{name}/
                     </span>
                   </p>
-                  <p className="connect-hint">
-                    {editable
-                      ? t(
-                          '保存した変更はこの端末に一時保存され、Google Drive へ自動で送信されます。選んだ名前は接続情報に保存し、再接続時にも使用します。',
-                          'Saved changes are kept on this device briefly and uploaded to Google Drive automatically. The chosen name is saved with the connection and reused on reconnection.',
-                        )
-                      : t(
-                          '読み取り専用で登録します。選んだ名前を接続情報に保存し、再接続時にも使用します。',
-                          'Registers as read-only. The chosen name is saved with the connection and reused on reconnection.',
-                        )}
-                  </p>
                   <div className="connect-submit">
                     <button className="solid-button" disabled={disabled || !!invalidName}>
                       <Icon name="cloud" size={15} />
@@ -583,14 +572,7 @@ export function Connections({
                     </button>
                   </div>
                 </form>
-              ) : (
-                <p className="connect-hint">
-                  {t(
-                    '接続するフォルダを一覧で選ぶか、開いたフォルダの「接続先にする」を押すと、ここに接続ボタンが表示されます。',
-                    'Choose a folder from the list, or open a folder and press "Use as the connection" — the connect button then appears here.',
-                  )}
-                </p>
-              )}
+              ) : null}
             </Step>
           </div>
           <aside
@@ -610,12 +592,6 @@ export function Connections({
                     'Drive folders connected to the workspace',
                   )}
                 </h3>
-                <p className="connect-hint">
-                  {t(
-                    'Drive フォルダは KB の資料に接続するようになりました。以前ワークスペースに接続したフォルダは、この KB に移すと資料として表示されます。フォルダの ID・名前・編集の設定はそのままです。',
-                    "Drive folders are now connected to a KB's materials. Move a folder connected to the workspace earlier into this KB to see it among the materials; its ID, name and editing setting stay.",
-                  )}
-                </p>
                 {earlier.map((connection) => (
                   <div className="connection-card" key={connection.mountId}>
                     <div className="connection-head">
@@ -704,8 +680,8 @@ export function Connections({
                   !connection.accountWritable && (
                     <p className="connect-hint">
                       {t(
-                        'このアカウントは読み取りのみ許可されているため、読み取り専用で接続します。アカウントの「書き込みを許可」で再ログインすると編集できます。',
-                        'This account may only read, so the folder connects read-only. Sign in again with “Allow writing” on the account to edit it.',
+                        'アカウントが読み取りのみ許可されているため、読み取り専用です。',
+                        'Read-only: this account may only read.',
                       )}
                     </p>
                   )}
@@ -824,8 +800,8 @@ export function Connections({
                   <div className="connection-confirm" role="alert">
                     <p>
                       {t(
-                        `Google Drive への送信待ちが ${connection.pending ?? 0} 件あります。待たずに${leaving.action === 'disconnect' ? '接続を解除' : '読み取り専用に'}すると、変更はこの端末に残り、次にこのフォルダを編集可で接続したときに送信されます。`,
-                        `${connection.pending ?? 0} changes are still waiting to upload to Google Drive. If you ${leaving.action === 'disconnect' ? 'disconnect' : 'make the folder read-only'} without waiting, they stay on this device and are uploaded the next time this folder is connected as editable.`,
+                        `送信待ちが ${connection.pending ?? 0} 件あります。待たずに進めると、変更はこの端末に残ります。`,
+                        `${connection.pending ?? 0} changes are still waiting to upload. If you proceed now, they stay on this device.`,
                       )}
                     </p>
                     <div className="connection-actions">
@@ -902,14 +878,6 @@ export function Connections({
                 )}
               </div>
             ))}
-            {connections.length > 0 && (
-              <p className="connect-hint">
-                {t(
-                  '名前変更・登録解除は接続を解除してから行います。登録解除後もGoogle Driveの元フォルダと既存のローカルデータは残ります。',
-                  'Rename and removal require disconnecting first. The original Google Drive folder and existing local data remain after removal.',
-                )}
-              </p>
-            )}
           </aside>
         </div>
       </div>

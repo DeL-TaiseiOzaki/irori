@@ -110,7 +110,7 @@ try {
   await query.fill('ambiguous');
   await submit.click();
   await results.getByRole('button').click();
-  await expect(page.getByText(/一致箇所を安全に特定できませんでした/)).toBeVisible();
+  await expect(page.getByText(/一致箇所を特定できませんでした/)).toBeVisible();
   await launcher.click();
   await query.fill('CRLFMatch');
   await submit.click();
@@ -176,11 +176,11 @@ try {
   // Real files exercise incomplete search and refresh notices; the index records the
   // oversized file as unreadable and the walk reports it on every request.
   await writeFile(path.join(root, 'oversized.txt'), 'x'.repeat(3 * 1024 * 1024));
-  await expect(results).toContainText('KB のファイルが更新されました');
+  await expect(results).toContainText('ファイルが更新されました');
   await query.fill('not-present');
   await submit.click();
   await expect(results).toContainText('検索できた範囲に一致する本文はありません。');
-  await expect(results).toContainText('1 ファイルをスキップしました。');
+  await expect(results).toContainText('1 件スキップ');
   await query.fill('orbital');
   await submit.click();
   await expect(results).toContainText('notes/body.md');

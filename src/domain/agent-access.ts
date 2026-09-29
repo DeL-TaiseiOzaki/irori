@@ -36,45 +36,45 @@ export function agentAccessDetail(agent: AgentId, access: AgentAccess = 'default
   if (access === 'full-access')
     return agent === 'codex'
       ? t(
-          'ファイル・ネットワークの制限と実行承認を外します。OS・管理者の制限は有効です。',
-          'Removes file and network restrictions and command approvals. OS and administrator restrictions still apply.',
+          'ファイル・ネットワークの制限と実行承認を外します。',
+          'Removes file and network restrictions and command approvals.',
         )
       : agent === 'claude'
         ? t(
-            'Claude Codeの通常のツール承認を省略します。明示的な権限ルール・管理者の制限は有効です。',
-            "Skips Claude Code's usual tool approvals. Explicit permission rules and administrator restrictions still apply.",
+            'Claude Codeの通常のツール承認を省略します。',
+            "Skips Claude Code's usual tool approvals.",
           )
         : agent === 'hermes'
           ? t(
-              'Hermes Agent を --yolo で実行し、危険なコマンドの承認を省略します。OS・管理者の制限は有効です。',
-              'Runs Hermes Agent with --yolo, skipping its dangerous-command approvals. OS and administrator restrictions still apply.',
+              'Hermes Agent を --yolo で実行し、危険なコマンドの承認を省略します。',
+              'Runs Hermes Agent with --yolo, skipping dangerous-command approvals.',
             )
           : t(
-              'この会話のOpenCodeツール権限を許可に設定します。OS・管理者の制限は有効です。',
-              "Sets OpenCode's tool permissions to allow for this conversation. OS and administrator restrictions still apply.",
+              'この会話のOpenCodeツール権限を許可に設定します。',
+              "Sets OpenCode's tool permissions to allow for this conversation.",
             );
   if (agent === 'codex')
     return t(
-      '作業フォルダへの書き込みは可能です。追加のアクセスが必要な場合に承認を求めます。',
-      'Can write to the working folder. Asks for approval when more access is needed.',
+      '作業フォルダへの書き込みのみ可能で、追加アクセスには承認が必要です。',
+      'Can write to the working folder; asks for approval when more access is needed.',
     );
   if (agent === 'claude')
     return t(
-      'Claude Codeの標準の権限モードです。CLIの許可ルールを使い、必要な承認をここに表示します。',
-      "Claude Code's standard permission mode. Uses the CLI's permission rules and shows required approvals here.",
+      'Claude Codeの許可ルールを使い、必要な承認をここに表示します。',
+      "Uses Claude Code's permission rules and shows required approvals here.",
     );
   if (agent === 'opencode')
     return t(
-      'OpenCodeの権限設定を使い、ask要求をここに表示します。標準では多くのツールが承認なしで動きます。',
-      "Uses OpenCode's permission settings and shows its ask requests here. By default many tools run without approval.",
+      'OpenCodeの権限設定に従います。標準では多くのツールが承認なしで動きます。',
+      "Follows OpenCode's permission settings. By default many tools run without approval.",
     );
   if (agent === 'hermes')
     return t(
-      'Hermes Agent の設定を使います。1回ごとの実行なので承認を尋ねられず、危険なコマンドは approvals.single_query_mode（既定は拒否）に従います。',
-      "Uses Hermes Agent's settings. Each run is one-shot, so it cannot ask: dangerous commands follow approvals.single_query_mode (deny by default).",
+      'Hermes Agent の設定に従い、危険なコマンドは既定で拒否されます。',
+      "Uses Hermes Agent's settings; dangerous commands are denied by default.",
     );
   return t(
-    'Piのネイティブ設定を使います。標準のツール実行には承認ダイアログがありません。',
-    "Uses Pi's native settings. Standard tool runs have no approval dialog.",
+    'Piのネイティブ設定を使います。承認ダイアログはありません。',
+    "Uses Pi's native settings; no approval dialog.",
   );
 }

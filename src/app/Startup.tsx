@@ -76,8 +76,8 @@ export function RegisterSpace({
       setError(
         [
           `${t(
-            'hibachi は作成しましたが、GitHub への公開は完了していません。開いた後にソース管理から再試行できます。',
-            'The hibachi was created, but publishing to GitHub did not finish. You can retry from Source control after opening it.',
+            'hibachi は作成しましたが、GitHub への公開は完了していません。',
+            'The hibachi was created, but publishing to GitHub did not finish.',
           )}\n${advice}`,
           ...detail,
         ].join('\n\n'),
@@ -230,12 +230,6 @@ export function RegisterSpace({
                 required
               />
             </label>
-            <p className="muted">
-              {t(
-                '選んだ保存先に新しいフォルダを作成します。Git の既存の認証設定を使用し、GitHub CLI（gh）にログイン済みならその認証でも再試行します。',
-                'Creates a new folder at the chosen destination. Uses your existing Git authentication settings, and retries with the GitHub CLI (gh) if you are signed in to it.',
-              )}
-            </p>
           </>
         ) : (
           <label>
@@ -349,18 +343,12 @@ export function RegisterSpace({
                 {publishing && !created && (
                   <PublishFields value={publish} onChange={setPublish} disabled={busy} />
                 )}
-                <p className="muted">
-                  {t(
-                    '選んだ保存先に新しいフォルダを作り、Git リポジトリ（main ブランチ）として始めます。.irori の識別情報と .gitignore（contents を対象外）を最初の commit にします。',
-                    'Creates a new folder at the chosen destination and starts it as a Git repository on main. The first commit holds the .irori identity and a .gitignore that leaves contents out.',
-                  )}
-                </p>
               </>
             ) : (
               <p className="muted">
                 {t(
-                  '登録に必要な識別情報を .irori に作成し、contents をGitの対象外にします。既存ノートとGitの変更は保持します。',
-                  'Creates the identifying information needed for registration in .irori and excludes contents from Git. Existing notes and Git changes are kept.',
+                  '既存ノートと Git の変更は保持します。',
+                  'Existing notes and Git changes are kept.',
                 )}
               </p>
             )}
@@ -624,18 +612,12 @@ export function Startup({
               );
             })}
             <p className="start-note">
-              {t(
-                'KBフォルダ・ノートは残ります。Drive 接続がある場合は、接続の登録解除後にワークスペースを削除できます。',
-                'The KB folder and notes remain. If there is a Drive connection, you can delete the workspace after unregistering the connection.',
-              )}
+              {t('KBフォルダ・ノートは残ります。', 'The KB folder and notes remain.')}
             </p>
           </div>
         ) : (
           <p className="start-note">
-            {t(
-              'まだワークスペースはありません。hibachi を組み合わせて作成します。',
-              'No workspaces yet. Combine hibachis to create one.',
-            )}
+            {t('まだワークスペースはありません。', 'No workspaces yet.')}
           </p>
         )}
         <hr />
@@ -645,14 +627,6 @@ export function Startup({
               ? t('ワークスペースを編集', 'Edit workspace')
               : t('hibachi を選んで組み合わせる', 'Combine hibachis')}
           </h3>
-          {editing && (
-            <p className="start-note">
-              {t(
-                '下で名前と hibachi の組み合わせを変更して保存できます。利用できない hibachi も登録を保持できます。',
-                'Change the name and combination of hibachis below and save. Unavailable hibachis can keep their registration too.',
-              )}
-            </p>
-          )}
           <div className="start-library">
             {unavailable?.map((id) => (
               <label key={id} className="start-chip unavailable" title={id}>
@@ -682,9 +656,7 @@ export function Startup({
               </label>
             ))}
             {!spaces.length && (
-              <p className="start-note">
-                {t('hibachi はまだありません。下で追加します。', 'No hibachis yet. Add one below.')}
-              </p>
+              <p className="start-note">{t('hibachi はまだありません。', 'No hibachis yet.')}</p>
             )}
           </div>
           <form
@@ -764,12 +736,6 @@ export function Startup({
               </span>
             </button>
           </div>
-          <p className="start-note">
-            {t(
-              'クラウドのフォルダは、開いた後に hibachi の Contents から接続します。',
-              "Connect cloud folders from a hibachi's Contents after opening.",
-            )}
-          </p>
         </section>
         {error && <p role="alert">{error}</p>}
       </main>

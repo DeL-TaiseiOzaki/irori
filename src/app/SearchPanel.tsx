@@ -103,10 +103,7 @@ export function SearchPanel({
       if (request.current !== id) return;
       if (!saved)
         throw Error(
-          t(
-            '編集中のノートを保存できませんでした。閉じて、保存や競合の状態を確認してください。',
-            'Could not save the note you were editing. Close this and check its save or conflict state.',
-          ),
+          t('編集中のノートを保存できませんでした。', 'Could not save the note you were editing.'),
         );
       if (allBrains) {
         // Every brain at once: each KB has its own index, and one brain's
@@ -214,7 +211,6 @@ export function SearchPanel({
             ref={queryInput}
             type="search"
             aria-label={t('本文を検索', 'Search body text')}
-            aria-describedby="search-query-help"
             maxLength={200}
             value={query}
             disabled={opening}
@@ -307,28 +303,16 @@ export function SearchPanel({
           >
             {(incomplete || skippedFiles > 0) && (
               <p className="search-notice">
-                {incomplete &&
-                  t(
-                    '検索できた範囲の結果です。上限または読めないファイルにより、すべての本文を確認できていません。',
-                    'These are the results within what could be searched. A limit or unreadable files meant not every note could be checked.',
-                  )}
+                {incomplete && t('一部確認できていません。', 'Some notes could not be checked.')}
                 {skippedFiles > 0 &&
-                  ' ' +
-                    t(
-                      `${skippedFiles} ファイルをスキップしました。`,
-                      `Skipped ${skippedFiles} files.`,
-                    )}{' '}
-                {t(
-                  '必要に応じて検索語を絞って再検索してください。',
-                  'Narrow the search term and search again if needed.',
-                )}
+                  ' ' + t(`${skippedFiles} 件スキップ`, `${skippedFiles} skipped`)}
               </p>
             )}
             {changed && (
               <p className="search-notice">
                 {t(
-                  'KB のファイルが更新されました。最新の内容を確認するには再検索してください。',
-                  'Files in the KB have changed. Search again to see the latest content.',
+                  'ファイルが更新されました。再検索してください。',
+                  'Files changed. Search again.',
                 )}
               </p>
             )}
@@ -411,12 +395,6 @@ export function SearchPanel({
             {t('閉じる', 'Close')}
           </span>
           <span className="palette-footer-space" />
-          <small className="muted" id="search-query-help">
-            {t(
-              '文字列として検索（英字の大小は区別しない・最大 200 文字）',
-              'Literal text, ASCII case-insensitive, up to 200 characters',
-            )}
-          </small>
         </footer>
       </div>
     </Dialog>

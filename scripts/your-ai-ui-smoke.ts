@@ -96,7 +96,6 @@ try {
   await expect(
     definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
   ).toContainText('未作成');
-  await expect(definitions).toContainText('irori が .claude/agents/hibachi-product.md を書きます');
   await expect(
     definitions.getByRole('button', { name: /^Research の hibachi agent/ }),
   ).toContainText('定義済み');
@@ -110,7 +109,6 @@ try {
   await expect(
     settings.getByRole('textbox', { name: '指示（Markdown）', exact: true }),
   ).toHaveValue(/^# irori agent\n/);
-  await expect(settings).toContainText('irori agent が毎回最初に読む指示です');
   await youGroup('ルール').getByRole('button', { name: 'ルールを追加', exact: true }).click();
   await settings.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('tone');
   await settings
@@ -173,9 +171,7 @@ try {
     .getByTestId('stage')
     .getByRole('button', { name: 'hibachi agent', exact: true })
     .click();
-  await expect(page.locator('.agent-held')).toContainText(
-    'irori agent がこの hibachi にも仕事を渡しています',
-  );
+  await expect(page.locator('.agent-held')).toContainText('irori agent がこの hibachi でも作業中');
   await expect(page.getByRole('button', { name: '送信', exact: true })).toBeDisabled();
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 

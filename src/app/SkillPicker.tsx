@@ -87,15 +87,7 @@ export function SkillPicker({
           ))}
         </select>
       )}
-      <button
-        type="button"
-        disabled={disabled}
-        title={t(
-          '各エージェントがこの KB のスキルを自力で見つけるかを確認します',
-          'Check whether each agent can find this KB’s skills on its own',
-        )}
-        onClick={() => setReach(true)}
-      >
+      <button type="button" disabled={disabled} onClick={() => setReach(true)}>
         {t('到達確認', 'Check reach')}
       </button>
       {reach && <SkillReach scopeId={scopeId} onClose={() => setReach(false)} />}

@@ -120,10 +120,7 @@ export function Tree({
       {data && !data.error && !entries.length && (
         <small className="tree-empty" style={indent}>
           {layer === 'contents' && !depth
-            ? t(
-                'Google Drive のフォルダを接続すると、ここに表示されます。',
-                'Connect a Google Drive folder to see it here.',
-              )
+            ? t('Drive フォルダ未接続', 'No Drive folder connected')
             : t('項目がありません', 'No items')}
         </small>
       )}

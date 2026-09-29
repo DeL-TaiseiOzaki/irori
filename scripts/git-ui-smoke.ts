@@ -319,11 +319,11 @@ try {
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('まとめて追加');
+  await expect(panel.getByRole('status')).toContainText('すべて追加しました');
   await panel.getByRole('button', { name: 'すべて解除', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('すべて外しました');
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('まとめて追加');
+  await expect(panel.getByRole('status')).toContainText('すべて追加しました');
   await writeFile(path.join(root, 'extra.md'), '# Extra after staging');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await expect(panel.locator('.git-file').filter({ hasText: 'extra.md' })).toHaveCount(2);
@@ -340,7 +340,7 @@ try {
   await panel.getByRole('button', { name: 'ノートに戻る' }).click();
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('UI note update');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('この端末の履歴に commit');
+  await expect(panel.getByRole('status')).toContainText('コミットしました');
   expect(git(root, 'show', 'HEAD:README.md')).toContain('UI saved 日本語');
   expect(git(root, 'show', 'HEAD:extra.md')).toBe('# Extra staged note');
   // The line typed here is named as the committer's in the commit's own note.
@@ -376,7 +376,7 @@ try {
     'origin / main',
   );
   await panel.getByRole('button', { name: 'Push を実行', exact: true }).click();
-  await expect(panel.getByRole('status')).toContainText('リモートへの送信が完了');
+  await expect(panel.getByRole('status')).toContainText('送信しました');
   expect(git(remote, 'show', 'main:README.md')).toContain('UI saved 日本語');
   expect(git(remote, 'rev-parse', 'refs/notes/ai')).toBe(git(root, 'rev-parse', 'refs/notes/ai'));
 
@@ -450,7 +450,7 @@ try {
   );
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
   await expect(panel.getByRole('region', { name: '統合の下書きの復元' })).toContainText(
-    'Git の状態が変わっています',
+    'Git の状態が変わりました',
   );
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
     'Native content changed while irori was closed\n',
@@ -544,9 +544,7 @@ try {
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Merge reviewed versions');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   try {
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'この端末の履歴に commit しました。' }),
-    ).toBeVisible();
+    await expect(panel.getByRole('status').filter({ hasText: 'コミットしました。' })).toBeVisible();
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -663,7 +661,7 @@ try {
   await expect(page.getByRole('form', { name: 'GitHub に公開' })).toHaveCount(0);
   // The publish dialog's own progress line is a status too; read the panel's notice.
   await expect(panel.locator('.git-notice[role="status"]')).toContainText(
-    'GitHub に octo/new-hibachi を作成し、送信しました。',
+    'octo/new-hibachi を公開しました。',
   );
   expect(git(created, 'config', '--get', 'remote.origin.url')).toBe(
     'https://github.com/octo/new-hibachi.git',
@@ -696,15 +694,13 @@ try {
     panel.getByRole('heading', { name: 'この hibachi は Git で管理されていません' }),
   ).toBeVisible();
   await panel.getByRole('button', { name: 'Git を始める', exact: true }).click();
-  await expect(panel.getByText('最初の commit を作成すると GitHub に公開できます。')).toBeVisible();
+  await expect(panel.getByText('Git を始めました。')).toBeVisible();
   expect(git(plain, 'symbolic-ref', 'HEAD')).toBe('refs/heads/main');
   await expect(panel.locator('.git-file').filter({ hasText: 'note.md' })).toHaveCount(1);
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Start the plain hibachi');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
-  await expect(panel.locator('.git-notice[role="status"]')).toContainText(
-    'この端末の履歴に commit',
-  );
+  await expect(panel.locator('.git-notice[role="status"]')).toContainText('コミットしました');
   await panel.getByRole('button', { name: 'GitHub に公開…', exact: true }).click();
   publication = page.getByRole('form', { name: 'GitHub に公開' });
   const account = publication.getByRole('combobox', { name: 'GitHub アカウント' });
@@ -716,7 +712,7 @@ try {
   await publication.getByRole('button', { name: '作成して送信', exact: true }).click();
   // The publish dialog's own progress line is a status too; read the panel's notice.
   await expect(panel.locator('.git-notice[role="status"]')).toContainText(
-    'GitHub に team-a/plain-KB を作成し、送信しました。',
+    'team-a/plain-KB を公開しました。',
   );
   expect(git(path.join(github, 'team-a/plain-KB.git'), 'show', 'main:note.md')).toContain(
     'Written before Git',

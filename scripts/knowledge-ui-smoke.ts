@@ -139,7 +139,7 @@ try {
   await expect(preview.getByRole('button', { name: '現在のファイルを開く' })).toBeDisabled();
   await preview.getByLabel('資料の移動先のパス').fill('移動先.md');
   await preview.getByRole('button', { name: 'この移動先に再接続' }).click();
-  await expect(panel.getByRole('status')).toContainText('資料 ID を移動先に再接続');
+  await expect(panel.getByRole('status')).toContainText('再接続しました');
   await expect(preview).toContainText('現在の登録先: 移動先.md');
   await expect(preview).toContainText('別の版');
   await expect(preview).toContainText('この版');

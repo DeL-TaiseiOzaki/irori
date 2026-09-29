@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { agentIds, agentNames, type AgentAccess, type AgentId, type Space } from '../domain/types';
 import { agentAccessDetail, agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
-import { hasSubAgents, type YourAi } from '../domain/you';
+import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
 import { Icon } from './Icon';
@@ -90,17 +90,6 @@ export function YourAiPanel({
           <Icon name="sparkles" size={24} strokeWidth={2} />
         </span>
         <h2>{t('irori agent', 'irori agent')}</h2>
-        <p>
-          {hasSubAgents(agent)
-            ? t(
-                `あなた専用のエージェントです。${agentNames[agent]} で動き、hibachi ごとの hibachi agent（サブエージェント）に仕事を渡して、報告をまとめます。`,
-                `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent (a sub-agent) and gathers their reports.`,
-              )
-            : t(
-                `あなた専用のエージェントです。${agentNames[agent]} で動き、hibachi コマンドで各 hibachi の hibachi agent に仕事を渡して、報告をまとめます。`,
-                `Your own agent. It runs on ${agentNames[agent]}, hands work to each hibachi's hibachi agent with the hibachi command and gathers their reports.`,
-              )}
-        </p>
         <p className="mono your-ai-path" title={you.root}>
           {you.root}
         </p>
@@ -108,12 +97,6 @@ export function YourAiPanel({
           <Icon name="sparkles" size={14} />
           {t('irori agent を用意する', 'Set up the irori agent')}
         </button>
-        <small className="hint">
-          {t(
-            'このフォルダに AGENTS.md を書きます。既存のファイルは上書きしません。',
-            'Writes AGENTS.md into this folder. Existing files are never overwritten.',
-          )}
-        </small>
       </div>
     );
   const run = latestRun(ai);
@@ -166,12 +149,7 @@ export function YourAiPanel({
         )}
         {!ai.events.length && (
           <div className="agent-empty">
-            <p>
-              {t(
-                'hibachi をまたぐ仕事を頼めます。irori agent が hibachi ごとに分けて渡します。',
-                'Ask for work across your hibachis. The irori agent splits it and hands each part to a hibachi.',
-              )}
-            </p>
+            <p>{t('hibachi をまたぐ仕事を頼めます。', 'Ask for work across your hibachis.')}</p>
           </div>
         )}
         <AgentLog

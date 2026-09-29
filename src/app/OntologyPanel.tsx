@@ -173,14 +173,7 @@ function OntologyContent({
         >
           {t('絞り込みを解除', 'Clear filters')}
         </button>
-        <span
-          className="graph-counts"
-          role="status"
-          title={t(
-            'グループ外・階層外の関係は非表示です。',
-            'Relations outside the group or hierarchy are hidden.',
-          )}
-        >
+        <span className="graph-counts" role="status">
           {t(
             `${subgraph.entities.length} / ${view.entities.length} エンティティ · ${subgraph.edges.length} / ${view.edges.length} 関係`,
             `${subgraph.entities.length} / ${view.entities.length} entities · ${subgraph.edges.length} / ${view.edges.length} relations`,
@@ -191,8 +184,8 @@ function OntologyContent({
         {tooLarge ? (
           <p className="hint">
             {t(
-              'グラフは 250 エンティティ・1,000 関係まで表示できます。サブグラフや階層で絞り込んでください。下の一覧からもノートを開けます。',
-              'The graph can show up to 250 entities and 1,000 relations. Narrow it with a subgraph or hierarchy. Notes can also be opened from the list below.',
+              '多すぎるため絞り込んでください。',
+              'Too large to display. Narrow it with a subgraph or hierarchy.',
             )}
           </p>
         ) : subgraph.entities.length ? (
@@ -247,12 +240,7 @@ function OntologyContent({
               )}
             </>
           ) : (
-            <span className="muted">
-              {t(
-                'グラフのエンティティを選ぶと、ここに詳しく表示します。',
-                'Select an entity in the graph to see it here.',
-              )}
-            </span>
+            <span className="muted">{t('未選択', 'Nothing selected')}</span>
           )}
         </div>
         <div className="graph-legend" aria-hidden="true">
@@ -394,12 +382,7 @@ export function OntologyPanel({
     setFailure('');
     try {
       await window.irori.updateGraphIndex(space.scopeId);
-      setNotice(
-        t(
-          'Knowledge_Base/ontology/ をコミットすると、ほかの端末でも同じグラフが表示されます。',
-          'Committing Knowledge_Base/ontology/ shows the same graph on other devices.',
-        ),
-      );
+      setNotice(t('コミットすると共有されます。', 'Commit it to share.'));
       setRefresh((value) => value + 1);
     } catch (error) {
       setFailure(errorText(error));
@@ -461,14 +444,7 @@ export function OntologyPanel({
           >
             <Icon name="refresh" size={16} />
           </button>
-          <button
-            className="stage-text-button ask-ai"
-            title={t(
-              '構築・表示設定をエージェントに相談',
-              'Ask an agent about building or display settings',
-            )}
-            onClick={onConfigure}
-          >
+          <button className="stage-text-button ask-ai" onClick={onConfigure}>
             <Icon name="sparkles" size={14} />
             {t('hibachi agent', 'hibachi agent')}
           </button>
@@ -514,12 +490,7 @@ export function OntologyPanel({
         !error && (
           <div className="graph-empty">
             <Icon name="graph" size={32} />
-            <p>
-              {t(
-                'この KB にはオントロジーの表示設定がありません。ページの frontmatter（type・title・relations）からグラフ索引を作成できます。',
-                'This KB has no ontology display settings. A graph index can be created from page frontmatter (type, title, relations).',
-              )}
-            </p>
+            <p>{t('グラフ索引はまだありません。', 'No graph index yet.')}</p>
             <button className="solid-button" disabled={busy} onClick={generate}>
               {t('グラフ索引を作成', 'Create graph index')}
             </button>

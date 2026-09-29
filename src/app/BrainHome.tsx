@@ -257,9 +257,7 @@ export function BrainHome({
                 </span>
               ))
             ) : (
-              <small className="home-more">
-                {t('.agents/skills にスキルはありません。', 'No skills in .agents/skills.')}
-              </small>
+              <small className="home-more">{t('スキルはありません。', 'No skills.')}</small>
             )}
           </div>
         </Card>
@@ -336,10 +334,7 @@ export function BrainHome({
           ))}
           {!connections.length && (
             <small className="home-more">
-              {t(
-                'Google Drive のフォルダを接続すると、エージェントも資料として使えます。',
-                'Connect a Google Drive folder and agents can use it as material too.',
-              )}
+              {t('接続はまだありません。', 'No connections yet.')}
             </small>
           )}
         </Card>
@@ -420,12 +415,7 @@ export function BrainHome({
             </button>
           ))}
           {!runs.length && (
-            <small className="home-more">
-              {t(
-                'AI に送信すると、実行と参照した資料の版がここに残ります。',
-                'Sending to AI keeps its runs and the versions of the materials here.',
-              )}
-            </small>
+            <small className="home-more">{t('実行はまだありません。', 'No runs yet.')}</small>
           )}
         </Card>
       </div>

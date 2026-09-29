@@ -31,10 +31,7 @@ const locationNames: Record<SourceLocation['state'], () => string> = {
   missing: () =>
     t('現在の場所にファイルが見つかりません。', 'No file was found at the current location.'),
   unavailable: () =>
-    t(
-      '現在のファイルにアクセスできません。スペースや接続を確認してください。',
-      'The current file cannot be accessed. Check the space or connection.',
-    ),
+    t('現在のファイルにアクセスできません。', 'The current file cannot be accessed.'),
   unbound: () =>
     t(
       'この資料 ID の現在の場所は登録されていません。',
@@ -177,12 +174,6 @@ export function KnowledgePanel({
     >
       <div className="records-layout">
         <div className="records-main">
-          <p className="muted">
-            {t(
-              `${space.name} の実行と、参照した資料の版をこの端末に保持します。`,
-              `Runs of ${space.name} and the versions of referenced materials are kept on this device.`,
-            )}
-          </p>
           {(error || notice) && (
             <p
               ref={feedbackElement}
@@ -193,22 +184,8 @@ export function KnowledgePanel({
               {error || notice}
             </p>
           )}
-          <p className="muted">
-            {t(
-              'このスペースの直近 100 件ずつの実行・成果物登録を検索します。',
-              'Searches the most recent 100 runs and 100 artifact registrations in this space.',
-            )}
-          </p>
           <section>
             <h3>{t('実行の記録', 'Run records')}</h3>
-            {!history.runs.length && (
-              <p>
-                {t(
-                  'AI に送信すると、選んだ資料の版と実行の記録が残ります。',
-                  'Sending to AI keeps a record of the run and the versions of the materials you chose.',
-                )}
-              </p>
-            )}
             {!!needle && !visibleRuns.length && (
               <p>{t('一致する実行はありません。', 'No matching runs.')}</p>
             )}
@@ -279,12 +256,7 @@ export function KnowledgePanel({
                       {t('関連する実行へ', 'Go to related run')}
                     </button>
                   ) : (
-                    <p className="muted">
-                      {t(
-                        '関連する実行は直近の表示範囲外です。',
-                        'The related run is outside the recent range shown.',
-                      )}
-                    </p>
+                    <p className="muted">{t('表示範囲外', 'Outside the recent range')}</p>
                   )}
                 </li>
               ))}
@@ -329,10 +301,7 @@ export function KnowledgePanel({
                     setPreview({ ...preview, location });
                     if (location.state !== 'matching' && location.state !== 'changed')
                       throw Error(
-                        t(
-                          '現在のファイルを開けません。場所や接続を確認してください。',
-                          'The current file cannot be opened. Check the location or connection.',
-                        ),
+                        t('現在のファイルを開けません。', 'The current file cannot be opened.'),
                       );
                     await onOpen(location.current);
                   })
@@ -352,10 +321,7 @@ export function KnowledgePanel({
                         });
                         await inspectSource(preview.source, preview.text !== undefined);
                       },
-                      t(
-                        '資料 ID を移動先に再接続しました。過去の記録と保持版はそのまま残ります。',
-                        'Reconnected the material ID to the new location. Past records and the kept version remain unchanged.',
-                      ),
+                      t('再接続しました。', 'Reconnected.'),
                     );
                   }}
                 >
@@ -369,12 +335,6 @@ export function KnowledgePanel({
                       onChange={(event) => setDestination(event.target.value)}
                     />
                   </label>
-                  <p className="muted">
-                    {t(
-                      '保持版と内容が一致する未登録のファイルに再接続します。ファイル自体は移動しません。',
-                      'Reconnects to an unregistered file whose content matches the kept version. The file itself is not moved.',
-                    )}
-                  </p>
                   <button disabled={busy || !destination.trim()} type="submit">
                     {t('この移動先に再接続', 'Reconnect to this location')}
                   </button>
@@ -467,31 +427,16 @@ export function KnowledgePanel({
               onClick={() =>
                 void perform(
                   () => host.registerArtifact({ scopeId: space.scopeId, path: filename }, runId),
-                  t(
-                    '成果物の版と関連する実行を保持しました。',
-                    'Kept the artifact version and its related run.',
-                  ),
+                  t('登録しました。', 'Registered.'),
                 )
               }
             >
               {t('この版を成果物として登録', 'Register this version as an artifact')}
             </button>
-            <p className="muted">
-              {t(
-                '登録は人による関連付けです。自動生成の証明にはなりません。既存の記録は残ります。',
-                'Registration is a person’s association, not proof of automatic generation. Existing records remain.',
-              )}
-            </p>
           </section>
           {cloudOwner && (
             <section>
               <h3>{t('Drive への送信準備', 'Pending upload to Drive')}</h3>
-              <p>
-                {t(
-                  '編集可で接続した Drive フォルダには、ファイルを開いて直接保存できます。ここでは、送信前のファイルをこの端末に保持できます。',
-                  'A Drive folder connected as editable takes saves directly when you open a file there. Here, a file can be kept on this device before it is sent.',
-                )}
-              </p>
               <label>
                 {t('送信先', 'Destination')}
                 <select
@@ -516,10 +461,7 @@ export function KnowledgePanel({
                         scopeId: space.scopeId,
                         path: filename,
                       }),
-                    t(
-                      '送信前の版を端末に保持しました。Drive にはまだ送信していません。',
-                      'Kept the pre-upload version on this device. It has not been sent to Drive yet.',
-                    ),
+                    t('保持しました。まだ送信していません。', 'Kept. Not sent yet.'),
                   )
                 }
               >
