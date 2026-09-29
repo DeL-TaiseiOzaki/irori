@@ -75,7 +75,7 @@ function StepRequest({
   conversation: Conversation;
   onError: (error: unknown) => void;
 }) {
-  const ai = useBrainAi(conversation.scopeId, conversation.agent);
+  const ai = useBrainAi(conversation.scopeId, conversation.agent, 0, conversation.conversationId);
   const request = openRequest(ai);
   if (!request || request.runId !== conversation.runId) return null;
   return <AgentRequest key={request.requestId} event={request} ended={false} onError={onError} />;

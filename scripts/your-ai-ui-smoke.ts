@@ -262,11 +262,17 @@ try {
   expect(sent.endsWith('run: hibachi Product "Tidy the Product notes."')).toBe(true);
   const command = (await piLog()).find((entry) => entry.type === 'command');
   expect(command).toMatchObject({ code: 0, stdout: '日本語\u2028の応答\n' });
-  // The hand-off is Product's own run, kept in Product's conversation.
-  const productRun = await page.evaluate(
-    (scopeId) => window.irori.agentConversation(scopeId, 'pi'),
-    product.scopeId,
-  );
+  // The hand-off is Product's own run, kept in a Product conversation of its own
+  // for this irori agent conversation, titled with the task (ADR 017).
+  const productRun = await page.evaluate(async (scopeId) => {
+    const rows = await window.irori.agentConversations(scopeId);
+    const handed = rows.find((row) => 'origin' in row && row.origin === 'hand-off');
+    return handed && 'title' in handed
+      ? { title: handed.title, ...(await window.irori.agentConversation(scopeId, 'pi', handed.id)) }
+      : undefined;
+  }, product.scopeId);
+  expect(productRun?.title).toBe('Tidy the Product notes.');
+  if (!productRun) throw Error('The hand-off has no conversation');
   expect(
     productRun.events.some(
       (event) => event.role === 'user' && event.text.endsWith('Tidy the Product notes.'),

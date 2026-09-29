@@ -213,10 +213,12 @@ try {
       [product.scopeId],
     )
   )[0];
+  // The step is a conversation of its own (ADR 017), named in the run's record.
   const conversation = await page.evaluate(
-    ([scopeId]) => window.irori.agentConversation(scopeId, 'pi'),
-    [product.scopeId],
+    ({ scopeId, id }) => window.irori.agentConversation(scopeId, 'pi', id),
+    { scopeId: product.scopeId, id: run.steps[0].conversation?.conversationId },
   );
+  expect(conversation.summary?.title).toBe('ルーティン: Ask（ステップ 1）');
   const shown = conversation.events.filter(
     (event) => event.runId === run.steps[0].conversation?.runId,
   );
