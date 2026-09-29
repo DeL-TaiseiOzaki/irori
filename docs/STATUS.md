@@ -1,7 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Routines, 2026-09-30 (**0.1.57**, branch `feat/routines`, not yet merged; it carries #133's
-design commits, so merging it makes #133 redundant): [ADR 016](decisions/016-routines.md)
+Published 2026-09-30: #137 (**0.1.57**, routines) is merged at the owner's word
+("mergeして公開まで行きましょう．") and published as
+[v0.1.57-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.57-preview.1)
+by release run `36623266425` from main's CI run `36621924195` (source `1c45665`).
+The release carries Windows 202,709,504 bytes, Mac 170,162,875 bytes and
+`irori-0.1.57-full.nupkg` 202,070,226 bytes; anonymous downloads matched
+`SHA256SUMS.txt`. #133 (the design record alone) was closed as carried by #137.
+
+Routines, 2026-09-30 (**0.1.57**, #137, which carried #133's design commits):
+[ADR 016](decisions/016-routines.md)
 stage 1, described in [ROUTINES](ROUTINES.md). The owner chose routines as irori's one
 general way to gather what a person keeps in other tools and to run any defined job: a
 folder with `routine.yaml` in the irori agent's `routines/` or a hibachi's
