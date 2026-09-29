@@ -1,4 +1,4 @@
-import { classify } from '../domain/scopes';
+import { classify, isPropertyPage } from '../domain/scopes';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
@@ -61,8 +61,8 @@ import type {
   CloudRoot,
 } from '../domain/types';
 import { opensInIrori } from '../domain/viewers';
-const Editor = lazy(() =>
-  import('../editor/Editor').then((module) => ({ default: module.Editor })),
+const PageEditor = lazy(() =>
+  import('./PageEditor').then((module) => ({ default: module.PageEditor })),
 );
 const CsvPreview = lazy(() =>
   import('./CsvPreview').then((module) => ({ default: module.CsvPreview })),
@@ -115,7 +115,7 @@ function KnowledgePanel(props: ComponentProps<typeof KnowledgePanelView>) {
     </Suspense>
   );
 }
-import type { EditorHandle } from '../editor/Editor';
+import type { PageEditorHandle } from './PageEditor';
 import './tokens.css';
 import './style.css';
 import './shell.css';
@@ -398,6 +398,12 @@ function App() {
     refresh: revision,
   });
   const notesDeclared = notesRead.data ?? null;
+  // The open page's declared properties and the person's actor id (ADR 015), read
+  // again whenever a note is loaded so an edited declaration takes effect.
+  const propertiesRead = useResource(() => host.pageProperties(doc!.scopeId), [doc?.scopeId], {
+    enabled: !!doc && !doc.workspaceId && !doc.cloud,
+    refresh: editorKey,
+  });
   // The brain's top level, shared by its three sections and the hibachi agent's Schema line.
   const rootsRead = useResource(() => host.entries(active!.scopeId, ''), [active?.scopeId], {
     enabled: !!active,
@@ -587,7 +593,7 @@ function App() {
   const noteInContext = !!doc && doc.scopeId === active?.scopeId && noteOmitted !== noteKey;
   // Offered only for a note of the active space that has such lines to name.
   const personLinesOffered = personLineCount > 0 && noteInContext;
-  const editor = useRef<EditorHandle>(null);
+  const editor = useRef<PageEditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
   const saving = useRef<Promise<boolean> | undefined>(undefined);
@@ -789,8 +795,10 @@ function App() {
     const now = current.current;
     if (!now.doc || now.doc.readOnly) return true;
     if (now.external) return false;
-    const text = editor.current?.getText() ?? now.buffer;
+    let text = editor.current?.getText() ?? now.buffer;
     if (text === now.doc.text) return true;
+    // A knowledge page names the person as its last change (ADR 015).
+    text = editor.current?.stamp?.() ?? text;
     const operation = (async () => {
       try {
         const saved = await host.save({ ...now.doc!, text });
@@ -2045,9 +2053,11 @@ function App() {
                           ) : mode === 'table' ? (
                             <CsvPreview key={editorKey} text={buffer} />
                           ) : (
-                            <Editor
+                            <PageEditor
                               ref={editor}
                               key={editorKey}
+                              page={!doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)}
+                              properties={propertiesRead.data}
                               text={buffer}
                               mode={mode}
                               filename={doc.path}

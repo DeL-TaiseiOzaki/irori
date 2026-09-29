@@ -22,3 +22,11 @@ export function classify(space: Space, relative: string): Layer {
   if (['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode.jsonc'].includes(p)) return 'schema';
   return 'Knowledge_Base';
 }
+
+/** A knowledge page, which shows its properties above its body (ADR 015); a folder index does not. */
+export function isPropertyPage(space: Space, relative: string): boolean {
+  const p = relative.replaceAll('\\', '/');
+  return (
+    classify(space, p) === 'Knowledge_Base' && /\.md$/i.test(p) && !/(^|\/)index\.md$/i.test(p)
+  );
+}

@@ -1,0 +1,216 @@
+/* Page properties sit where the literal frontmatter block was, aligned with the
+   body text of the editor below them (ADR 015). */
+.page-properties {
+  max-width: 696px;
+  margin: 0 auto;
+  padding: 40px 48px 8px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.page-properties + .document-editor {
+  padding-top: 0;
+}
+.page-properties input,
+.page-properties select,
+.page-properties textarea {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 6px;
+  min-width: 0;
+}
+.page-properties input:hover:not([readonly]),
+.page-properties select:hover:not(:disabled) {
+  background: var(--stage-2);
+}
+.page-properties input:focus,
+.page-properties select:focus,
+.page-properties textarea:focus {
+  outline: none;
+  border-color: var(--rule-2);
+  background: var(--card);
+}
+.page-properties .properties-title {
+  display: block;
+  width: 100%;
+  margin-left: -7px;
+  font-family: var(--markdown-font, var(--font-ui));
+  font-size: 32px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.page-properties .properties-description {
+  display: block;
+  width: 100%;
+  margin: 2px 0 14px -7px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.page-properties .properties-title::placeholder,
+.page-properties .properties-description::placeholder {
+  color: var(--ink-3);
+  font-weight: inherit;
+}
+.page-properties .properties-title[data-missing],
+.page-properties .properties-description[data-missing] {
+  border-bottom-color: var(--warn-ink);
+  border-radius: 0;
+}
+.properties-rows {
+  margin: 0;
+  padding: 6px 0 10px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.properties-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13.5px;
+}
+.properties-row dt {
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.properties-row dd {
+  margin: 0;
+  min-width: 0;
+}
+.properties-row dd > input,
+.properties-row dd > select {
+  width: 100%;
+  margin-left: -7px;
+}
+.properties-row[data-missing] dd > input,
+.properties-row[data-missing] dd > select {
+  background: var(--warn-wash);
+}
+.properties-required {
+  font-size: 11px;
+  color: var(--warn-ink);
+  background: var(--warn-wash);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.properties-static {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.properties-static.empty {
+  color: var(--ink-3);
+}
+.properties-list {
+  margin: 4px 0;
+  padding-left: 16px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.properties-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.properties-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px 1px 8px;
+  border-radius: 999px;
+  background: var(--stage-3);
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.properties-chip button,
+.properties-remove {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 1.4;
+}
+.properties-chip button:hover,
+.properties-remove:hover {
+  color: var(--ink);
+  background: var(--stage-2);
+}
+.properties-remove {
+  opacity: 0;
+}
+.properties-row:hover .properties-remove,
+.properties-remove:focus-visible {
+  opacity: 1;
+}
+.properties-chips input {
+  flex: 1;
+  min-width: 90px;
+}
+.properties-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0 0;
+  font-size: 12.5px;
+}
+.page-properties .properties-actions select,
+.page-properties .properties-toggle,
+.page-properties .properties-add-first {
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.properties-toggle {
+  margin-left: auto;
+}
+.page-properties .properties-actions select:hover,
+.page-properties .properties-toggle:hover,
+.page-properties .properties-add-first:hover {
+  color: var(--ink);
+  background: var(--stage-2);
+}
+.page-properties.empty {
+  padding-bottom: 0;
+}
+.page-properties .properties-raw {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: 13px/1.7 var(--font-mono);
+  background: var(--stage-2);
+  border: 1px solid var(--rule);
+  padding: 10px 12px;
+  resize: vertical;
+}
+.properties-hint {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--warn-ink);
+  background: var(--warn-wash);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .page-properties {
+    padding: 24px 20px 8px;
+  }
+  .properties-row {
+    grid-template-columns: 96px minmax(0, 1fr) 24px;
+  }
+}
