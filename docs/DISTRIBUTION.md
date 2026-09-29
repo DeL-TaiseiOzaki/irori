@@ -8,7 +8,7 @@ Forge packaging and an unsigned CI pipeline are now implemented; see [commands, 
 
 ## Implemented website
 
-`website/` is an independent static entry inside the irori repository. It reuses Vite, TypeScript and Zod, with no new dependencies. Its build emits only public website assets into `dist-website/`. It neither embeds Electron nor exposes the desktop HostAPI. Relative asset URLs support a GitHub Pages project subpath or a custom domain. The screenshot is the actual development UI using disposable test content.
+`website/` is an independent static entry inside the irori repository. It reuses Vite, TypeScript and Zod, with no new dependencies. Its build emits only public website assets into `dist-website/`. It neither embeds Electron nor exposes the desktop HostAPI. Relative asset URLs support a GitHub Pages project subpath or a custom domain. The page is in English and dark only; it reuses the app's v5 colour tokens and bundled Geist fonts. Its screenshots in `website/public/screens/` are the actual English UI, taken at 2x with `scripts/ui-screens.ts`'s disposable fixture and converted to WebP. When the UI changes noticeably, retake them the same way.
 
 ```sh
 npm run dev:website
@@ -18,7 +18,7 @@ npm run preview:website
 xvfb-run -a npm run test:website
 ```
 
-The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. There is no Intel Mac slot: that architecture is out of scope by [ADR 002](decisions/002-release-and-workspace.md), so the manifest, the page and its browser tests describe two platforms rather than carrying a permanently empty third. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, links Git setup/support/release evidence and explains the Google connection trial, the Windows WinFsp prerequisite and the Mac mount route. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
+The Windows x64 and macOS arm64 slots point to the exact CI-tested installers in the current preview tag. The manifest also carries that release's notes URL, so the page's release-evidence link is published from the same source as the installers instead of a separately edited tag. There is no Intel Mac slot: that architecture is out of scope by [ADR 002](decisions/002-release-and-workspace.md), so the manifest, the page and its browser tests describe two platforms rather than carrying a permanently empty third. The page labels the downloads as carrying no distribution signature, describes the one-time System Settings approval a Mac reader needs, notes that Windows 11 and macOS device acceptance is still awaited, explains the Windows SmartScreen prompt, and links Git setup, support and release evidence. It points a Windows or Mac visitor at their own installer, as a hint only: both downloads always stay on the page, and a Mac's architecture is not visible to it. Browser tests exercise the actual manifest plus isolated unavailable/mixed/available fixtures; they do not download fixture URLs.
 
 ## Previews kept in step with main
 
@@ -62,6 +62,7 @@ tests, the website and test scripts, and treats everything else as shipping.
   The notes are prose written before the package exists. `release.yml` appends
   an **Exact package** section when it publishes, listing the source commit, the
   CI run, and each file's size and SHA-256. Do not type digests into the notes.
+
 - **After merge.** Publish from `main`'s successful **Verify and package
   desktop** run: dispatch `release.yml` with that run id,
   `tag=v<version>-preview.1` and `platforms=both`. Then update
