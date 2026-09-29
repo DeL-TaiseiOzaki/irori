@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+Current development, 2026-09-29: **0.1.55 is published** as
+[v0.1.55-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.55-preview.1)
+(#129; release run `36544049853` from main CI `36542859364` at `15f7c3d`). Explanatory
+text across the app was cut to a minimum at the owner's request: keep new UI copy to a
+heading or a few words, and fix the UI rather than add an explanation. The download
+website is now English and short (#127, #128).
+
 Current development, 2026-09-29: **0.1.54 is published** as
 [v0.1.54-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.54-preview.1)
 (#125; release run `36530029192` from main CI `36529091919` at `f46a187`). A knowledge
