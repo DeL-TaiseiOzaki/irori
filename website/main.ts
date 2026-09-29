@@ -4,14 +4,12 @@ const platforms = [
   {
     id: 'windows-x64',
     title: 'Windows',
-    detail: 'Windows 11 · x64 (Intel / AMD)',
-    file: 'Installer (.exe)',
+    detail: 'Windows 11 · x64',
   },
   {
     id: 'macos-arm64',
     title: 'macOS',
-    detail: 'Apple silicon (M series)',
-    file: 'Disk image (.dmg)',
+    detail: 'Apple silicon',
   },
 ] as const;
 type PlatformId = (typeof platforms)[number]['id'];
@@ -57,10 +55,7 @@ for (const platform of platforms) {
     const info = document.createElement('p');
     info.className = 'artifact-info';
     info.textContent = `v${release.version} · ${item.size}`;
-    const file = document.createElement('p');
-    file.className = 'artifact-file';
-    file.textContent = platform.file;
-    card.append(info, file);
+    card.append(info);
   } else {
     const button = document.createElement('button');
     button.type = 'button';
@@ -76,9 +71,8 @@ for (const platform of platforms) {
 
 if (release.version && Object.values(release.downloads).some(Boolean)) {
   document.querySelector('#release-status')!.textContent =
-    `Version ${release.version} · testing preview for Windows and Mac. Free, and open source.`;
-  document.querySelector('#hero-version-text')!.textContent =
-    `v${release.version} preview is out — see what's new`;
+    `v${release.version} · testing preview for Windows and Mac.`;
+  document.querySelector('#hero-version-text')!.textContent = `v${release.version} is out`;
   if (release.notes)
     document.querySelector<HTMLAnchorElement>('#hero-version')!.href = release.notes;
 }
@@ -89,7 +83,7 @@ if (detected && heroItem) {
   hero.href = heroItem.url;
   hero.textContent = `Download for ${platform.title} ↓`;
   document.querySelector('#hero-meta')!.textContent =
-    `v${release.version} · ${heroItem.size} · ${platform.detail} · Other platforms below`;
+    `v${release.version} · ${heroItem.size} · ${platform.detail}`;
 }
 if (release.notes) {
   // Assigned as a URL property; the manifest keeps this link on the published release.
