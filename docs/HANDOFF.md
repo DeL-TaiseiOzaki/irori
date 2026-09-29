@@ -1,5 +1,11 @@
 # irori continuation handoff
 
+Current development, 2026-09-29: **0.1.56 is published** as
+[v0.1.56-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.56-preview.1)
+(#131; release run `36560142606` from main CI `36559142972` at `71b8da6`). UI copy rule
+from the owner: labels and values only, one-sentence errors, the shortest name that still
+identifies an action, nothing shown twice. Write new UI text to that rule.
+
 Current development, 2026-09-29: **0.1.55 is published** as
 [v0.1.55-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.55-preview.1)
 (#129; release run `36544049853` from main CI `36542859364` at `15f7c3d`). Explanatory
