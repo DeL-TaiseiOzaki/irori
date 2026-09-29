@@ -14,10 +14,12 @@ import { useResource } from './useResource';
 import { currentStep, lastRun, openRequest, useBrainAi, type BrainAi } from './useBrainAi';
 import type { YourAi } from '../domain/you';
 import { openTasks, YourAiPanel } from './YourAiPanel';
+import { RoutinesView } from './RoutinesView';
+import type { RunRoutine } from '../domain/routines';
 import './overview.css';
 
 const host = window.irori;
-export type OverviewView = 'map' | 'columns';
+export type OverviewView = 'map' | 'columns' | 'routines';
 type AiState = 'running' | 'waiting' | 'queued' | 'idle';
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 const idle: BrainAi = { events: [], queued: [], running: false, ready: false, error: '' };
@@ -702,6 +704,7 @@ export function Overview({
   onYourAgent,
   onYourModel,
   onYourAccess,
+  routineChoices,
   ...actions
 }: {
   workspace: WorkspaceProfile;
@@ -731,6 +734,8 @@ export function Overview({
   onYourAgent: (agent: AgentId) => void;
   onYourModel: (model: string) => void;
   onYourAccess: (access: AgentAccess) => void;
+  /** The CLI and model chosen in each agent's panel, for routine steps that name none. */
+  routineChoices: () => RunRoutine['agents'];
 } & Actions) {
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
@@ -820,6 +825,14 @@ export function Overview({
                   </>
                 ),
               },
+              {
+                value: 'routines',
+                label: (
+                  <>
+                    <Icon name="routine" size={14} /> {t('ルーティン', 'Routines')}
+                  </>
+                ),
+              },
             ]}
           />
           <span className="overview-space" />
@@ -860,7 +873,7 @@ export function Overview({
             onShowYou={onShowYou}
             onEnter={actions.onEnter}
           />
-        ) : (
+        ) : view === 'columns' ? (
           <OverviewColumns
             spaces={spaces}
             ais={ais}
@@ -869,9 +882,23 @@ export function Overview({
             onConnect={onConnect}
             {...shared}
           />
+        ) : (
+          <RoutinesView
+            workspaceId={workspace.id}
+            spaces={spaces}
+            you={you}
+            revision={revision}
+            choices={routineChoices}
+            onOpenConversation={(conversation) => {
+              const space = spaces.find((item) => item.scopeId === conversation.scopeId);
+              if (space) actions.onEnter(space, { ai: true });
+              else setIsland('you');
+            }}
+            onError={actions.onError}
+          />
         )}
       </div>
-      {view === 'map' && !!spaces.length && (
+      {view !== 'columns' && !!spaces.length && (
         <aside
           className="overview-ai chrome"
           aria-label={

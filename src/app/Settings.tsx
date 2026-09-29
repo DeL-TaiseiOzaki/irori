@@ -5,9 +5,11 @@ import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
 import {
   chooseLanguage,
   chooseMarkdownFont,
+  chooseRoutineRuntimes,
   chooseTheme,
   currentLanguageChoice,
   currentMarkdownFont,
+  currentRoutineRuntimes,
   currentTheme,
 } from './device-settings';
 import { markdownFonts, themes, type MarkdownFont, type Theme } from '../domain/types';
@@ -92,6 +94,31 @@ function Choices<T extends string>({
   );
 }
 
+/** The runtimes routines may use here; read each time the settings open, since a routine can add one. */
+function RoutineRuntimes({ onError }: { onError: (e: unknown) => void }) {
+  const [javascript, choose] = useChoice(
+    () => currentRoutineRuntimes().includes('javascript'),
+    (on: boolean) => chooseRoutineRuntimes(on ? ['javascript'] : []),
+    onError,
+  );
+  return (
+    <fieldset className="settings-choices routine-runtimes">
+      <legend>{t('ルーティン', 'Routines')}</legend>
+      <div>
+        <label className="settings-choice" data-checked={javascript}>
+          <input
+            type="checkbox"
+            checked={javascript}
+            onChange={(event) => choose(event.target.checked)}
+          />
+          <Icon name="code" size={15} />
+          <span>JavaScript</span>
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
 /**
  * The rail's settings: display choices shared by every workspace on this device,
  * updates, and the pending uploads kept on this device.
@@ -157,6 +184,7 @@ export function Settings({
               label={(option) => languageLabels[option]}
               onChange={chooseLanguageValue}
             />
+            <RoutineRuntimes onError={onError} />
             <section className="settings-updates" aria-label={t('更新', 'Updates')}>
               <h3>{t('更新', 'Updates')}</h3>
               <UpdateNotice host={host} />
