@@ -74,7 +74,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - **hibachi agent** (a hibachi's AI): Claude Code, Codex, OpenCode, Pi and Hermes Agent start inside a hibachi, with that hibachi's Schema loaded. Several hibachi agents can run at once. Pick a model from the list the installed CLI gives (type one in for Hermes Agent).
 - **irori agent** (formerly "your AI"): in irori mode, ask for work that spans hibachis, on any of these CLIs. It splits the request by hibachi and hands each part to that hibachi's hibachi agent: on Claude Code, Codex and OpenCode a sub-agent (`hibachi-<name>`) that irori defines, on Pi and Hermes Agent a `hibachi` command irori provides for the request. It reports back. Like a hibachi agent it starts in full access, and its own Schema is edited with the same settings.
 - Permissions follow each CLI's settings. A hibachi agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
-- Instructions can be queued while an agent works. Conversations survive a restart.
+- Each hibachi and the irori agent keep any number of whole conversations on this PC, with **新しい会話** and a **履歴** list (rename, pin, archive, delete). Instructions can be queued while an agent works, and survive a restart ([CONVERSATIONS](docs/CONVERSATIONS.md)).
 - **Routines**: in irori mode's **Routines** view, run a job you defined with one button. A routine is a folder with `routine.yaml` (in the irori agent's `routines/` or a hibachi's `.irori/routines/`) that lists programs to run and instructions for agents, in order. irori shows its files before the first run and after any change ([ROUTINES](docs/ROUTINES.md)).
 
 **Materials**

@@ -1,10 +1,10 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { processTree } from './process-metrics';
 import { FileService } from '../src/host/files';
-import { SessionStore } from '../src/agents/sessions';
+import { sessionKey } from '../src/agents/sessions';
 const base = await mkdtemp(path.join(tmpdir(), 'irori UI 日本語 '));
 const kb = path.join(base, 'KB folder');
 await mkdir(kb);
@@ -453,19 +453,26 @@ try {
 }
 
 if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
-  // Seeded handles exercise actual host persistence/IPC/UI across process restarts.
-  // They do not represent a successful native provider resume.
+  // Seeded records from before ADR 017 exercise the migration, the history list and
+  // deletion across process restarts. They do not represent a native provider resume.
   const files = new FileService(env.IRORI_DATA_DIR);
   await files.init();
   const space = files.list()[0];
-  const store = new SessionStore(files.dataDir);
-  // Saved as a run of a brain's hibachi agent now saves it: in its default full access.
-  for (const agent of ['codex', 'claude'] as const)
-    await store.save(
-      { scopeId: space.scopeId, root: space.root, agent },
-      `fixture-${agent}-handle`,
-      'full-access',
+  await rm(path.join(files.dataDir, 'conversations-migrated.json'), { force: true });
+  for (const agent of ['codex', 'claude'] as const) {
+    const binding = { scopeId: space.scopeId, root: space.root, agent };
+    await mkdir(path.join(files.dataDir, 'agent-sessions'), { recursive: true });
+    await writeFile(
+      path.join(files.dataDir, 'agent-sessions', `${sessionKey(binding)}.json`),
+      JSON.stringify({
+        schemaVersion: 1,
+        ...binding,
+        handle: `fixture-${agent}-handle`,
+        access: 'full-access',
+        updatedAt: new Date().toISOString(),
+      }),
     );
+  }
   for (const cycle of [1, 2]) {
     const restarted = await electron.launch({
       args: [
@@ -495,27 +502,18 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
         )
         .toBeGreaterThan(chosenWidth - 12);
       await window.getByRole('button', { name: 'hibachi agent', exact: true }).click();
-      await expect(
-        window.getByRole('button', { name: '会話をリセット', exact: true }),
-      ).not.toBeVisible();
-      await window.getByRole('button', { name: '会話と接続', exact: true }).click();
-      await expect(
-        window.getByRole('button', { name: '会話をリセット', exact: true }),
-      ).toBeVisible();
-      await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
+      await window.getByRole('button', { name: '履歴', exact: true }).click();
+      const history = window.getByRole('region', { name: '履歴' });
+      const earlier = history.locator('.history-row').filter({ hasText: '以前の会話' });
       if (cycle === 1) {
-        await expect(
-          window.getByRole('button', { name: '会話をリセット', exact: true }),
-        ).toBeVisible();
-        await window.getByRole('button', { name: '会話をリセット', exact: true }).click();
+        await expect(earlier).toHaveCount(2);
+        await expect(earlier.filter({ hasText: 'Claude Code' })).toHaveCount(1);
+        await history.getByRole('button', { name: '以前の会話 の操作' }).last().click();
+        await window.getByRole('menuitem', { name: '削除' }).click();
+        await history.getByRole('button', { name: '削除する', exact: true }).click();
       }
-      await expect(window.getByRole('button', { name: '会話をリセット', exact: true })).toHaveCount(
-        0,
-      );
-      await window.getByLabel('エージェント', { exact: true }).selectOption('codex');
-      await expect(
-        window.getByRole('button', { name: '会話をリセット', exact: true }),
-      ).toBeVisible();
+      // Deleted in the first run, it stays deleted; the migration does not run twice.
+      await expect(earlier).toHaveCount(1);
       if (cycle === 2) await window.screenshot({ path: 'test-results/irori-session-recovery.png' });
       expect(errors).toEqual([]);
     } finally {
@@ -525,10 +523,10 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
   const report = {
     nativeProviderResume: 'not exercised',
     checks: [
-      'saved handle status after host process restart',
-      'provider-specific reset through ordinary panel',
-      'reset persists through second restart',
-      'other provider session retained',
+      'saved handles migrated into conversations on restart',
+      'conversation deleted through the history list',
+      'deletion persists through a second restart without migrating again',
+      'the other conversation retained',
     ],
     errors,
   };

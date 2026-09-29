@@ -75,7 +75,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - **hibachi agent**（各 hibachi の AI）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その hibachi の Schema を読み込んだ状態で起動します。複数の hibachi agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
 - **irori agent**（旧「あなたの AI」）：irori mode で、hibachi をまたぐ仕事を頼めます。どの CLI でも動きます。依頼を hibachi ごとに分け、各 hibachi の hibachi agent に渡します。Claude Code・Codex・OpenCode では irori が定義するサブエージェント（`hibachi-<名前>`）、Pi と Hermes Agent では irori が依頼ごとに用意する `hibachi` コマンドを使います。結果はまとめて報告します。hibachi agent と同じくフルアクセスで始まり、自分の Schema も同じ設定画面で編集できます。
 - 許可の扱いは各 CLI の設定に従います。hibachi agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
-- AI への指示は送信待ちとして予約でき、会話は再起動しても残ります。
+- 会話は hibachi ごと・irori agent ごとにいくつでも持て、この PC に丸ごと残ります。**新しい会話** と **履歴**（名前の変更・ピン留め・アーカイブ・削除）があります。AI への指示は送信待ちとして予約でき、再起動しても残ります（[CONVERSATIONS](docs/CONVERSATIONS.md)）。
 - **ルーティン**：irori mode の **ルーティン** で、決めた手順を「実行」ボタンで動かせます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か hibachi の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
 
 **資料**

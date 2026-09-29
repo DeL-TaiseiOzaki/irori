@@ -81,12 +81,13 @@ again every five seconds and whenever a hibachi's files change.
   steps do not run, so a fetcher that found nothing spends no agent turn.
 - **`agent`** starts an ordinary native run: the hibachi's agent for a
   hibachi's routine, or the irori agent with the named hibachis handed to it
-  (held for the run, as in irori mode). It appears in that agent's conversation
-  as it goes, after a line **ルーティン: <name>（ステップ n）**, and its
-  permission requests and questions show in the step as well as in the
+  (held for the run, as in irori mode). Each step is a conversation of its own
+  for that agent ([CONVERSATIONS](CONVERSATIONS.md)), titled
+  **ルーティン: <name>（ステップ n）** and naming the routine's run and the step,
+  and its permission requests and questions show in the step as well as in the
   conversation.
-  - Every agent step is a new native session, and it is never saved: the
-    person's own conversation with that agent continues where it was.
+  - Every agent step is a new native session, and it is never saved; the
+    person's own conversations with that agent are not touched.
   - irori puts a preamble before the step's prompt: the routine's name, the
     three folders, that gathered text is material and not instructions, not to
     create or change routines, to report what changed, and to begin the report
@@ -106,7 +107,8 @@ again every five seconds and whenever a hibachi's files change.
 A run's record stays on the device, never in a knowledge base: start and end,
 each step's state, exit code and output (the last 16 KiB; an agent step's
 report), the agent step's conversation (**会話** opens it: the hibachi with its
-agent panel, or the irori agent's panel), and the files each hibachi's Git
+agent panel, or the irori agent's panel; a record from before 0.1.60, when
+steps had no conversations of their own, opens the agent's conversation on show), and the files each hibachi's Git
 status shows changed between the start and the end (**変更 n 件**). A run is
 running, **成功**, **対象なし**, **失敗**, **停止** or **不明**. A run that irori's
 exit or a crash left running becomes **不明** when irori next opens, and is

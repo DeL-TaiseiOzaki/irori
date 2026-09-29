@@ -1,5 +1,40 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Conversations, 2026-09-30 (**0.1.60**, branch `feat/conversation-history`, not yet merged):
+[ADR 017](decisions/017-conversation-history.md) stage 1 (D1, D2, D4, D5 without search, D6's
+**新しい会話**, D8), described in [CONVERSATIONS](CONVERSATIONS.md). The owner approved the plan
+on 2026-09-30 and chose, where the ADR was silent or the code differed from it: record tool
+results (Claude Code's `tool_result`, Codex's finished items) with the 1 MiB mark, views still
+getting 16,000 characters; the irori agent's hand-off through the `hibachi` command goes to one
+hibachi conversation per irori agent conversation (`handedBy`); a resume that fails before the
+agent does anything sets this device's handle aside, so the next turn starts a new session.
+- `src/agents/conversations.ts` (`ConversationStore`) keeps `<data>/conversations/<id>/`
+  (`meta.json` atomic, `events.jsonl` appended with fsync, U+2028/U+2029 escaped) and
+  `<data>/conversation-state/<id>.json` (queue and run in progress), one `SerialQueue` per
+  conversation, the 250 ms buffer, recovery of a claimed run from its claim, damage counted
+  per line and per `meta.json`. `src/host/device.ts` makes `device.json`.
+  `src/agents/conversation-migration.ts` moves `agent-conversations`/`agent-sessions` once
+  (deterministic ids, `conversations-migrated.json`), leaving the old files.
+- `AgentService` keeps the run map by space (one run per checkout), places each run in a
+  conversation (named, the owner's latest for the CLI, a routine step's own, or a hand-off's),
+  resumes `native[deviceId]` only with the same checkout digest and access, and gives every
+  event an id and its conversation. `SessionStore`, `resetSession` and `newSession` are gone.
+- `HostAPI`: `agentConversations`, `agentConversation(scopeId, agent, id?)`,
+  `createConversation`, `renameConversation`, `pinConversation`, `archiveConversation`,
+  `deleteConversation`, `removeQueuedMessage(conversationId, id)`, `startNextQueued`;
+  `agentSession`, `resetAgentSession` and `startQueuedMessage` removed. Renderer:
+  `src/app/ConversationHistory.tsx` (履歴) in the hibachi panel and `YourAiPanel`, whose header
+  gains 新しい会話; the panel follows one conversation per owner and drains the owner's queue
+  oldest first; `AgentLog` shows a tool's result under its call (by `call`), and a CLI's
+  later updates of one call join its step. Routine records name their step's conversation.
+- Verified with `npm run build`, `npm test` (393 tests with #136 and #139 below it: 386 passed, 0 failed, 7 skipped; new
+  `tests/conversation-migration.test.ts`, rewritten `tests/conversations.test.ts` and
+  `tests/sessions.test.ts`), `xvfb-run -a npm run test:ui` (exit 0; new
+  `scripts/conversations-ui-smoke.ts`) and `npm run format:check`. Real CLIs were not run.
+- Not done: stage 2 (a chosen folder, search) and stage 3 (rewind, clone, rebuilt context);
+  a conversation continued on another device or folder starts a new native session without
+  the earlier turns until then. Removing the old `agent-conversations`/`agent-sessions`
+  files is for the release after this one.
 Prompts in one place, 2026-09-30 (**0.1.59**): the owner asked to gather the words irori gives CLI agents
 by situation and to have every mechanism take them from there. They now live in `prompts/` at the
 repository root, one file per situation (the irori agent's handed hibachis and starter Schema, the

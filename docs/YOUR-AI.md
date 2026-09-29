@@ -130,8 +130,12 @@ agent's shape. The investigation behind the design is in the
   asking for a short report. The hibachi is held by the irori agent's run; that
   run, and only it, may start this one run there. One hand-off at a time per
   hibachi; a second is refused until the first reports. The run is an ordinary
-  run of that hibachi: its panel and conversation show it, and it resumes that
-  hibachi's saved session for the CLI.
+  run of that hibachi, in a conversation of the hibachi's own for this irori
+  agent conversation (`handedBy`, [CONVERSATIONS](CONVERSATIONS.md)): the first
+  hand-off makes it, titled with the task, and later hand-offs from the same
+  irori agent conversation continue it and its native session. The person's own
+  conversations with that hibachi are not touched. A hibachi with queued
+  instructions refuses the hand-off.
 - The hand-off's text events are its report. The irori agent's log gets
   `delegate` events like Claude Code's: started (the task's first line), working
   (the hibachi agent's tool steps), and reported or failed.
