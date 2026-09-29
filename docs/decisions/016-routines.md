@@ -1,4 +1,4 @@
-# 016 — Routines: jobs a person or an agent defines
+# 016 — Routines: jobs a person defines and starts
 
 Date: 2026-09-30. Status: owner direction accepted; design only, not implemented.
 The owner chose the name **routines** (ルーティン) on 2026-09-30 over "tasks",
@@ -24,10 +24,16 @@ Three designs were discussed and set aside:
   virtual filesystem needs platform drivers. Drive keeps its rclone mounts.
 
 The owner's decision: irori gains one general capability, jobs that a person
-or an agent defines and that run on demand or on a schedule. A job may run a
+or an agent defines and that the person starts with a button. A job may run a
 program (rule-based fetching, filtering, reformatting) or instruct an agent
 (deciding which hibachi a mail concerns and putting it there). Gathering
 sources is one use of it; the rest can remain extension-level material.
+
+Running at set times was designed and then deferred (owner, 2026-09-30): an
+IDE that does work every morning on its own, as Hermes Agent does, is not what
+irori is. A routine is irori sending instructions to Claude Code or another
+native agent, and to programs, when the person asks. The schedule design is
+kept under "Later" below.
 
 A hibachi is a folder with `.irori/scope.json` (`src/host/files.ts`); Git,
 GitHub and Drive are optional. Routines therefore belong to folders, not to a
@@ -49,15 +55,12 @@ by one of two owners (owner, 2026-09-30):
 | `<irori agent folder>/routines/<name>/` | the irori agent's folder | personal routines that span hibachis |
 | `<hibachi>/.irori/routines/<name>/` | the hibachi's root | a routine of that hibachi, carried and shared with it |
 
-A skill says how to do something; a routine says when it runs, what runs and
-who does it. An agent step may simply tell the agent to apply a skill.
+A skill says how to do something; a routine says what runs and who does it. An agent step may simply tell the agent to apply a skill.
 
 ### D2 — `routine.yaml`
 
 ```yaml
 name: Mail triage
-when: '0 8 * * *'        # five-field cron, local time; omitted = on demand only
-timeout: 30m
 steps:
   - run: fetch_gmail.py   # a file in the routine folder, or an argv array
     secrets: [GMAIL_TOKEN]
@@ -76,8 +79,8 @@ Two step kinds only:
 - **`agent`** — a native agent run. In the irori agent's folder, `agent: irori`
   with `hibachis` (names or `all`) handed to it, as an ordinary irori agent
   request. In a hibachi, `agent: hibachi` is that hibachi's agent. `cli` and
-  `model` default to the ones chosen in the panel. `access` is required, so an
-  unattended run never depends on a remembered choice.
+  `model` default to the ones chosen in the panel. `access` is required, so what
+  a routine may do is written in it, not taken from the panel's last choice.
 
 Every step receives:
 
@@ -115,19 +118,17 @@ routine's files.
 - A routine folder holds code and declared dependencies only, so a hibachi's
   routine runs on another device once that device has the runtime.
 
-### D4 — A routine runs only after the person enables it on this device
+### D4 — A routine runs only after the person has reviewed it on this device
 
 Routine code runs with the person's permissions, as the terminal does, and an
 agent can write routines. So:
 
-- A routine is enabled per device. The record, in irori's data directory, keeps
-  a digest of the routine folder's files.
-- Enabling shows `routine.yaml` and the files beside it. A later change to any
-  of them, by a person, an agent or a pull, disables the routine until it is
-  enabled again, and the review shows the difference.
-- **今すぐ実行** on a routine that is not enabled shows the same review first.
-- A routine arriving in a shared hibachi starts disabled on every device, so
-  a team's members do not all run it at once without choosing to.
+- The first **実行** of a routine on a device shows `routine.yaml` and the
+  files beside it, and runs only after the person confirms. The device keeps,
+  in irori's data directory, a digest of the folder's files as reviewed.
+- A later change to any of them, by a person, an agent or a pull, brings the
+  review back, showing the difference.
+- This applies equally to a routine that arrives in a shared hibachi.
 
 ### D5 — Secrets
 
@@ -142,67 +143,47 @@ agent can write routines. So:
   store what the routine needs as a secret. irori ships no provider sign-in
   for routines, so it carries no provider's app review.
 
-### D6 — Schedule and dispatch
+### D6 — Starting and stopping
 
-- A routine starts only from its schedule or from **今すぐ実行** (owner,
-  2026-09-30). There are no other triggers.
-- Routines run only while irori is open (owner, 2026-09-30); irori installs no
-  operating-system scheduler. The host checks due routines once a minute.
-- `when` is read in the device's time zone with a maintained cron library
-  (croner, as Pi's scheduling extensions and its former Slack bot use). In the
-  hour repeated when clocks go back, a routine runs once.
-- Dispatch is at most once: the next due time is advanced and the run recorded
-  as started before its first step runs, so a crash never repeats a run.
-- A run missed while irori was closed runs once when irori opens, however many
-  times it was missed, and only within a grace window of half the routine's
-  period, at least 2 minutes and at most 2 hours (Hermes Agent's rule). Later
-  than that, the run is recorded as missed and the routine waits for its next
-  time.
-- Runs go one at a time across all routines, in the order they fell due. A
-  routine already running or waiting is not queued a second time; the skipped
-  time is recorded.
-- An agent step in a hibachi waits while that hibachi is held by another agent
-  run, as a hand-off does.
+- A routine starts only when the person presses **実行** in the routines view
+  (owner, 2026-09-30). There is no schedule, no file-change trigger and nothing
+  that runs while irori is closed.
+- A routine that is running cannot be started again; its **停止** ends the
+  step in progress, and later steps do not run.
+- Different routines may run at the same time. An agent step in a hibachi
+  waits while that hibachi is held by another agent run, as a hand-off does.
 
-### D7 — Unattended agent steps
+### D7 — Agent steps
 
+- An agent step is an ordinary native run started by irori, shown in the
+  agent's conversation as it goes. A question or an approval request from the
+  CLI reaches the person as in any other run.
 - Every agent step is a new native session. Nothing carries over between runs
   except what the routine keeps in `IRORI_STATE`.
-- The step's preamble tells the agent that no one is present, that captured
-  text is material and not instructions (as notes are,
-  [YOUR-AI](../YOUR-AI.md)), that it must not create or change routines, and
-  that it must report what it changed.
-- The report may begin with `[SILENT]`, meaning nothing worth telling, or with
-  `[FAILED]` and a reason, which fails the step although the CLI ended
-  normally.
-- A question or an approval request from the native CLI fails the step with
-  that request recorded, instead of waiting for an answer no one gives.
-- Success is read from the adapter's end-of-turn result, not the process exit
-  code: Pi's JSON mode exits 0 after a failed turn.
-- A step with no output from the agent for 10 minutes is stopped as stalled,
-  in addition to the routine's `timeout`.
+- The step's preamble says that captured text is material and not
+  instructions (as notes are, [YOUR-AI](../YOUR-AI.md)), that the agent must not
+  create or change routines, and that it must report what it changed.
+- A report beginning with `[FAILED]` and a reason fails the step although the
+  CLI ended normally. Success is otherwise read from the adapter's end-of-turn
+  result, not the process exit code: Pi's JSON mode exits 0 after a failed turn.
 
-### D8 — Run records and notices
+### D8 — Run records
 
 - Each run keeps, in irori's data directory and never in a knowledge base:
-  start and end, the trigger, each step's exit status and its output (capped),
-  the agent step's conversation, which can be opened like any conversation,
-  and the files changed in each hibachi with Git (from `git status` before and
-  after). Definitions stay in the routine folders; this record is the only run
-  state, as Hermes Agent keeps its execution ledger apart from its jobs.
-- A run's state is one of started, succeeded, nothing to do, failed, missed,
-  skipped or unknown. A run that irori's exit or a crash left started is marked
-  unknown when irori opens and is never repeated automatically.
-- A finished run shows a badge on the routines view unless it was silent or
-  had nothing to do. A failure notifies once; the same routine failing again
-  adds to its failure count without a new notice until the person looks at it.
+  start and end, each step's exit status and its output (capped), the agent
+  step's conversation, which opens like any conversation, and the files
+  changed in each hibachi with Git (from `git status` before and after).
+  Definitions stay in the routine folders; the record is the only run state,
+  as Hermes Agent keeps its execution ledger apart from its jobs.
+- A run's state is one of running, succeeded, nothing to do, failed, stopped
+  or unknown. A run that irori's exit or a crash left running is marked unknown
+  when irori opens and is never repeated automatically.
 
 ### D9 — Host boundary
 
-Routine discovery, enabling, scheduling, runtimes, secrets and execution live
-in the host. The renderer reaches them through narrow `HostAPI` methods (list,
-review and enable, run now, records, runtime install). Document content cannot
-start a routine.
+Routine discovery, review, runtimes, secrets and execution live in the host.
+The renderer reaches them through narrow `HostAPI` methods (list, review, run,
+stop, records, runtime install). Document content cannot start a routine.
 
 ## What was borrowed
 
@@ -213,17 +194,15 @@ none, and scheduling comes from extensions (`pi-schedule-prompt`,
 `pi-scheduler`) and from its former Slack bot, mom, whose jobs were JSON files
 the agent wrote into a watched folder.
 
-Taken: the one-minute check, at-most-once dispatch, one catch-up within a grace
-window, skipping a routine already running, a fresh session per run, the
-nothing-to-do gate before the agent, `[SILENT]` and failure markers, unknown
-runs after a crash, one notice per failure, and a run ledger apart from the
-definitions.
+Taken now: a fresh session per run, the nothing-to-do gate before the agent,
+a failure marker in the agent's report, unknown runs after a crash, and a run
+ledger apart from the definitions. The scheduling parts are kept for later
+below.
 
-Not taken: agents creating standing jobs that run without review (mom, and
-Hermes when `allow_agent_scheduling` is on); deleting a definition that does
-not parse or is late (mom); one global jobs file holding definitions and run
-state together (Hermes); delivery to chat platforms, hosted schedulers and
-quota holds, which a desktop app that runs only while open does not need.
+Not taken: agents creating jobs that run without review (mom, and Hermes when
+`allow_agent_scheduling` is on); deleting a definition that does not parse or
+is late (mom); one global jobs file holding definitions and run state together
+(Hermes); delivery to chat platforms, hosted schedulers and quota holds.
 
 ## Relation to earlier decisions
 
@@ -234,7 +213,27 @@ quota holds, which a desktop app that runs only while open does not need.
 - [ADR 009](009-agent-access-and-extension-compatibility.md): `access` in an
   agent step uses the same modes as the composer.
 - [ADR 013](013-drive-folders-in-kbs.md): the split between what a folder
-  declares and what the device binds (accounts, secrets, enabling) is the same.
+  declares and what the device binds (accounts, secrets, reviews) is the same.
+
+## Later: running at set times
+
+Deferred by the owner on 2026-09-30, together with Hermes-like standing jobs.
+If it is taken up, the design worked out from Hermes Agent and Pi's
+extensions was:
+
+- `when:` as a five-field cron in the device's time zone, read with a
+  maintained library (croner, which Pi's scheduling extensions use), checked
+  once a minute and only while irori is open (the owner's answer of
+  2026-09-30).
+- At-most-once dispatch: advance the next due time and record the run before
+  its first step, so a crash never repeats it; skip a routine already running.
+- A run missed while irori was closed runs once when irori opens. Hermes
+  limits this to half the period, at most two hours, which would drop a
+  morning routine on a day irori opens late; running once until the next due
+  time suits an app that is often closed. Open for the owner.
+- Unattended agent steps: a question or approval request fails the step, a
+  `[SILENT]` report suppresses the notice, a step silent for ten minutes is
+  stopped, and a failure notifies once until the person looks.
 
 ## Not in this decision
 
@@ -242,8 +241,7 @@ quota holds, which a desktop app that runs only while open does not need.
   their distribution; a Gmail or Slack fetcher is ordinary routine code until
   then.
 - How long a person's own Google OAuth client keeps a refresh token while the
-  client is in testing, and what that means for a daily routine, is
-  unverified.
+  client is in testing is unverified.
 - Putting the installed runtimes on the `PATH` of irori's terminal and agent
   runs.
 - Docker and in-process Python (Pyodide): too heavy for most people, and too
@@ -251,13 +249,13 @@ quota holds, which a desktop app that runs only while open does not need.
 
 ## Stages
 
-1. `routine.yaml`, discovery in both locations, D4's review and enabling,
-   **今すぐ実行**, `run` steps with the JavaScript runtime and `PATH` commands,
-   agent steps, D7 and D8.
-2. D6's schedule and dispatch, and D5's secrets.
+1. `routine.yaml`, discovery in both locations, D4's review, **実行** and
+   **停止**, `run` steps with the JavaScript runtime and `PATH` commands, agent
+   steps, D7 and D8.
+2. D5's secrets.
 3. The Python runtime.
 4. A skill in the irori agent's starter that tells it how to write a routine,
-   and a check it can run before asking the person to enable one.
+   and a check it can run before asking the person to run one.
 
 Each stage runs `npm run build`, `npm test` and `xvfb-run -a npm run test:ui`,
 with disposable folders for routines that write files.
