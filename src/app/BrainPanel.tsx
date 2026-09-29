@@ -40,13 +40,7 @@ function DriveBadge({ connection }: { connection?: CloudConnection }) {
   if (!connection) return null;
   if (connection.pending)
     return (
-      <span
-        className="drive-badge pending"
-        title={t(
-          `Google Drive へ送信待ち ${connection.pending} 件`,
-          `${connection.pending} waiting to upload to Google Drive`,
-        )}
-      >
+      <span className="drive-badge pending">
         <span className="drive-badge-arrow">
           <Icon name="up" size={11} strokeWidth={2.4} />
         </span>
@@ -55,7 +49,7 @@ function DriveBadge({ connection }: { connection?: CloudConnection }) {
     );
   if (connection.state === 'mounted' && !connection.writable)
     return (
-      <span className="drive-badge" title={t('読み取り専用', 'Read-only')}>
+      <span className="drive-badge">
         <Icon name="lock" size={12} strokeWidth={2} />
       </span>
     );
@@ -137,7 +131,6 @@ export function Tree({
               style={indent}
               aria-current={isSelected ? 'page' : undefined}
               aria-expanded={entry.directory && !entry.blocked ? isOpen : undefined}
-              title={entry.blocked ? `${entry.path} · ${entry.blocked}` : entry.path}
               onClick={() =>
                 entry.directory && !entry.blocked
                   ? setExpanded((value) =>
@@ -419,14 +412,7 @@ export function BrainPanel({
     <section className="brain-panel chrome" aria-label={space.name}>
       <header className="brain-header">
         <div className="brain-identity">
-          <button
-            className="brain-home-link"
-            title={t(
-              `hibachi のホーム · ${category} · ${space.root}`,
-              `The hibachi's home · ${category} · ${space.root}`,
-            )}
-            onClick={onHome}
-          >
+          <button className="brain-home-link" onClick={onHome}>
             <BrainTile space={space} size={34} radius={10} />
             <span className="brain-names">
               <strong>{space.name}</strong>

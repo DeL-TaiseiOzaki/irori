@@ -119,9 +119,9 @@ try {
   await editable.uncheck();
   await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
   await expect(page.locator('.connection-card')).toHaveCount(2);
-  // An editable connection says why it will mount read-only while its account may only read.
+  // An editable connection shows that its account may only read.
   await expect(page.locator('.connection-card').filter({ hasText: '調査 資料' })).toContainText(
-    '読み取りのみ許可されているため',
+    'アカウントが読み取りのみ',
   );
   const deliveries = page.locator('.connection-card').filter({ hasText: '納品物' });
   await deliveries.getByRole('button', { name: '編集できるようにする' }).click();

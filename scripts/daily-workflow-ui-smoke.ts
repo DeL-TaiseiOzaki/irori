@@ -166,7 +166,7 @@ try {
   const teamClaude = 'チーム Claude の未送信下書き';
   await expect(composer).toHaveValue('');
   await composer.fill(personalCodex);
-  await expect(page.locator('.composer')).toContainText('未送信の下書きをこの端末に保存済み');
+  await expect(page.locator('.composer')).toContainText('下書き保存済み');
   const send = page.getByRole('button', { name: '送信', exact: true });
   await expect(send).toBeEnabled();
   const draftDirectory = path.join(files.dataDir, 'drafts');
@@ -300,7 +300,7 @@ try {
   const renamedPath = path.join(root, customDirectory, '名前変更.md');
   expect(await exists(originalPath)).toBe(false);
   expect(await readFile(renamedPath, 'utf8')).toBe(savedMarkdown);
-  await expect(page.locator('.crumbs')).toHaveAttribute('title', /名前変更\.md$/);
+  await expect(page.locator('.crumbs')).toContainText('名前変更');
   await imageIsVisible(page);
   await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
 
@@ -362,7 +362,7 @@ try {
   expect(await exists(dailyPath)).toBe(false);
   await page.getByRole('button', { name: '今日のノート', exact: true }).click();
   await expect.poll(() => exists(dailyPath)).toBe(true);
-  await expect(page.locator('.crumbs')).toHaveAttribute('title', new RegExp(`${today.date}\\.md$`));
+  await expect(page.locator('.crumbs')).toContainText(today.date);
   await expect(page.locator('.ProseMirror')).toContainText(`Daily ${today.date}`);
   expect(await readFile(dailyPath, 'utf8')).toBe(`# Daily ${today.date}\n\n## Log\n`);
   await page.locator('.ProseMirror').click();
@@ -371,7 +371,7 @@ try {
   await page.keyboard.press('ControlOrMeta+s');
   await expect.poll(() => readFile(dailyPath, 'utf8')).toContain('今日の記録');
   await page.getByRole('button', { name: '今日のノート', exact: true }).click();
-  await expect(page.locator('.crumbs')).toHaveAttribute('title', new RegExp(`${today.date}\\.md$`));
+  await expect(page.locator('.crumbs')).toContainText(today.date);
   await expect(page.locator('.ProseMirror')).toContainText('今日の記録');
   expect(await readFile(dailyPath, 'utf8')).toContain('# Daily ');
   await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);

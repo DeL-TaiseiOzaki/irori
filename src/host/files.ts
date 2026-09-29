@@ -389,8 +389,8 @@ export class FileService {
       if (hash(before) !== doc.hash)
         throw Error(
           t(
-            'CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。',
-            'CONFLICT: Check the changes on disk. Your draft is kept.',
+            'CONFLICT: ディスク上でファイルが変更されました。下書きは保持されています。',
+            'CONFLICT: The file changed on disk. Your draft is kept.',
           ),
         );
       if (hash(doc.text) !== doc.hash) {
@@ -487,12 +487,7 @@ export class FileService {
         ),
       );
     if (doc.draft && doc.draft.text !== doc.text)
-      throw Error(
-        t(
-          '未保存の下書きを保存または解決してからノートを整理してください。',
-          'Save or resolve the unsaved draft before organizing notes.',
-        ),
-      );
+      throw Error(t('未保存の下書きがあります。', 'There is an unsaved draft.'));
     return { filename, doc, stat };
   }
   async createNote(id: string, name: string, directory = defaultNoteDirectory) {
@@ -653,8 +648,8 @@ export class FileService {
         if (!rewriting && references.links)
           throw Error(
             t(
-              '相対参照を含むノートを移動するには「リンクも更新する」を有効にしてください。',
-              'To move a note with relative references, turn on "Also update links".',
+              '相対参照を含むノートはリンクを更新せずに移動できません。',
+              'A note with relative references cannot be moved without updating links.',
             ),
           );
       }
@@ -670,10 +665,7 @@ export class FileService {
         )
       )
         throw Error(
-          t(
-            '移動先には既にファイルがあります。別の名前を指定してください。',
-            'A file already exists at the destination. Choose another name.',
-          ),
+          t('移動先には既にファイルがあります。', 'A file already exists at the destination.'),
         );
       for (const asset of assets) {
         const oldRel = path.posix.join(from, asset);
@@ -721,8 +713,8 @@ export class FileService {
       if (latest.stat.ino !== source.stat.ino || hash(await fs.readFile(destination)) !== ref.hash)
         throw Error(
           t(
-            'CONFLICT: 移動中にノートが変更されました。両方のファイルを確認してください。',
-            'CONFLICT: The note changed during the move. Check both files.',
+            'CONFLICT: 移動中にノートが変更されました。',
+            'CONFLICT: The note changed during the move.',
           ),
         );
       await fs.unlink(source.filename);
@@ -825,8 +817,8 @@ export class FileService {
         return {
           ...doc,
           notice: t(
-            'ノートは復元しましたが、削除済み一覧の更新に失敗しました。このノートを再度復元する必要はありません。',
-            'The note was restored, but the list of deleted notes could not be updated. You do not need to restore this note again.',
+            'ノートは復元しましたが、削除済み一覧を更新できませんでした。再度の復元は不要です。',
+            'The note was restored, but the list of deleted notes could not be updated. No need to restore it again.',
           ),
         };
       }

@@ -17,7 +17,7 @@ function states(): Record<CloudConnection['state'], string> {
     disconnected: t('未接続', 'Not connected'),
     connecting: t('接続中', 'Connecting'),
     mounted: t('接続済み・読み取り専用', 'Connected · read-only'),
-    error: t('接続を確認してください', 'Check the connection'),
+    error: t('接続エラー', 'Connection error'),
   };
 }
 function stateLabel(connection: CloudConnection) {
@@ -27,11 +27,7 @@ function stateLabel(connection: CloudConnection) {
 }
 function accountState(account: CloudAccount): [tone: string, icon: IconName, label: string] {
   if (account.state === 'authorizing')
-    return [
-      'wait',
-      'loader',
-      t('ブラウザでログインしてください', 'Please sign in via the browser'),
-    ];
+    return ['wait', 'loader', t('ブラウザでログイン中', 'Signing in via browser')];
   if (account.state !== 'ready')
     return ['bad', 'info', t('認証未完了', 'Authentication incomplete')];
   return account.writable
@@ -240,8 +236,8 @@ export function Connections({
             {setup && !setup.oauthConfigured && (
               <p className="connect-notice">
                 {t(
-                  'この検証版では Google 接続はまだ利用できません。',
-                  'Google connection is not yet available in this preview.',
+                  'この検証版では Google 接続を利用できません。',
+                  'Google connection is not available in this preview.',
                 )}
               </p>
             )}
@@ -271,14 +267,6 @@ export function Connections({
                         </span>
                       </span>
                       {account.detail && <small>{account.detail}</small>}
-                      {account.state === 'ready' && !account.writable && (
-                        <small>
-                          {t(
-                            'フォルダを編集するには、書き込みを許可してもう一度ログインしてください。',
-                            'To edit folders, allow writing and sign in again.',
-                          )}
-                        </small>
-                      )}
                     </div>
                     {(account.state === 'incomplete' ||
                       (account.state === 'ready' && !account.writable)) && (
@@ -679,10 +667,7 @@ export function Connections({
                   connection.accountName &&
                   !connection.accountWritable && (
                     <p className="connect-hint">
-                      {t(
-                        'アカウントが読み取りのみ許可されているため、読み取り専用です。',
-                        'Read-only: this account may only read.',
-                      )}
+                      {t('アカウントが読み取りのみ', 'Account is read-only')}
                     </p>
                   )}
                 {!!connection.pending && (
@@ -800,8 +785,8 @@ export function Connections({
                   <div className="connection-confirm" role="alert">
                     <p>
                       {t(
-                        `送信待ちが ${connection.pending ?? 0} 件あります。待たずに進めると、変更はこの端末に残ります。`,
-                        `${connection.pending ?? 0} changes are still waiting to upload. If you proceed now, they stay on this device.`,
+                        `送信待ち ${connection.pending ?? 0} 件はこの端末に残ります。`,
+                        `${connection.pending ?? 0} pending uploads will stay on this device.`,
                       )}
                     </p>
                     <div className="connection-actions">

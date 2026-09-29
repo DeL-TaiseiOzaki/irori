@@ -105,11 +105,7 @@ export function FileViewer({
           >
             <Icon name="minus" size={14} />
           </button>
-          <button
-            className="zoom-level"
-            title={t('幅に合わせる', 'Fit to width')}
-            onClick={() => setZoom(1)}
-          >
+          <button className="zoom-level" onClick={() => setZoom(1)}>
             {Math.round(zoom * 100)}%
           </button>
           <button

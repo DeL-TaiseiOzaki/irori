@@ -73,8 +73,8 @@ function assertCloudPath(rel: string) {
 const connectionFolderError = () =>
   Error(
     t(
-      '接続フォルダ自体はここでは変更できません。名前の変更や登録解除は「クラウド接続」から行ってください。',
-      'The connection folder itself is not changed here. Rename or unregister it from "Cloud connection".',
+      '接続フォルダ自体はここでは変更できません。',
+      'The connection folder itself cannot be changed here.',
     ),
   );
 type Mounted = {
@@ -174,8 +174,8 @@ export class CloudService {
         )
           throw Error(
             t(
-              `この KB には同じ名前の接続先（${moved.name}）があります。名前を変更してから移してください。`,
-              `This KB already has a connection named ${moved.name}. Rename it before moving.`,
+              `この KB には同じ名前の接続先（${moved.name}）があります。`,
+              `This KB already has a connection named ${moved.name}.`,
             ),
           );
         await this.checkVacant(moved);
@@ -230,10 +230,7 @@ export class CloudService {
         const binding = bindingSchema.parse(await readLocalJson(path.join(directory, name), null));
         if (binding.accountId === id)
           throw Error(
-            t(
-              'このアカウントを使う接続先があります。各スペースで登録解除するか、別のアカウントに紐づけてください。',
-              'Some connections use this account. Unregister them in each space or link them to another account.',
-            ),
+            t('このアカウントを使う接続先があります。', 'Some connections use this account.'),
           );
       }
       await this.accounts.remove(id);
@@ -254,15 +251,12 @@ export class CloudService {
       const version = await this.rpc.call('core/version');
       const types = await this.rpc.call('mount/types');
       let mountAvailable = Array.isArray(types.mountTypes) && types.mountTypes.length > 0;
-      let detail = t(
-        'クラウドフォルダは読み取り専用で接続します。',
-        'Cloud folders connect read-only.',
-      );
+      let detail = t('読み取り専用で接続', 'Read-only connection');
       let prerequisite: CloudSetup['prerequisite'];
       if (!mountAvailable)
         detail = t(
-          'このrcloneには利用できるマウント機能がありません。接続先の登録は可能です。',
-          'This rclone has no usable mount support. Connections can still be registered.',
+          'このrcloneには利用できるマウント機能がありません。',
+          'This rclone has no usable mount support.',
         );
       if (process.platform === 'linux') {
         try {
@@ -270,10 +264,7 @@ export class CloudService {
         } catch {
           mountAvailable = false;
           prerequisite = 'fuse';
-          detail = t(
-            'この環境にはFUSEがありません。フォルダ選択・登録は可能ですが、マウントにはFUSEが必要です。',
-            'FUSE is not available here. You can still choose and register folders, but mounting needs FUSE.',
-          );
+          detail = t('この環境にはFUSEがありません。', 'FUSE is not available here.');
         }
       } else if (process.platform === 'win32') {
         try {
@@ -294,8 +285,8 @@ export class CloudService {
         }
       } else if (process.platform === 'darwin') {
         detail = t(
-          'macOSのNFSマウントを使用します。このビルドの実機動作は未検証です。',
-          'Uses the macOS NFS mount. This build has not been tested on real hardware.',
+          'macOS では実機動作が未検証です。',
+          'Real-hardware behavior on macOS is unverified.',
         );
         mountAvailable = types.mountTypes.includes('nfsmount');
       } else {
@@ -346,8 +337,8 @@ export class CloudService {
       if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
       throw Error(
         t(
-          `「${space.name}」の Drive 接続の記録（.irori/cloud-mounts.json）を読み取れません。Git の履歴から戻すか、ファイルを修正してください。`,
-          `Cannot read the Drive connection record (.irori/cloud-mounts.json) of "${space.name}". Restore it from the Git history or fix the file.`,
+          `「${space.name}」の Drive 接続の記録（.irori/cloud-mounts.json）を読み取れません。`,
+          `Cannot read the Drive connection record (.irori/cloud-mounts.json) of "${space.name}".`,
         ),
       );
     }
@@ -507,8 +498,8 @@ export class CloudService {
     }
     throw Error(
       t(
-        '同じ名前のフォルダ・ファイルまたは接続先があります。別の名前を指定してください。',
-        'A folder, file or connection with the same name exists. Choose another name.',
+        '同じ名前のフォルダ・ファイルまたは接続先があります。',
+        'A folder, file or connection with the same name exists.',
       ),
     );
   }
@@ -556,8 +547,8 @@ export class CloudService {
       if (JSON.stringify(await this.declarations(input.scopeId)) !== JSON.stringify(records))
         throw Error(
           t(
-            '接続情報が外部で変更されました。再読み込みしてから登録してください。',
-            'The connection information changed outside irori. Reload before registering.',
+            '接続情報が外部で変更されました。',
+            'The connection information changed outside irori.',
           ),
         );
       await writeLocalJson(await this.declarationFile(input.scopeId), [...records, record]);
@@ -612,12 +603,7 @@ export class CloudService {
     });
     if (!info || info.isSymbolicLink()) return;
     if (info.dev !== (await fs.stat(parent)).dev)
-      throw Error(
-        t(
-          'マウントが残っています。接続を解除してから変更してください。',
-          'A mount is still active. Disconnect before changing it.',
-        ),
-      );
+      throw Error(t('マウントが残っています。', 'A mount is still active.'));
     if (
       !info.isDirectory() ||
       info.dev !== binding?.placeholder?.dev ||
@@ -836,8 +822,8 @@ export class CloudService {
     if (pending)
       throw Error(
         t(
-          `Google Drive への送信待ちが ${pending} 件あります。送信が終わってから操作してください。`,
-          `${pending} saved changes are still waiting to be uploaded to Google Drive. Try again once they are sent.`,
+          `Google Drive への送信待ちが ${pending} 件あります。`,
+          `${pending} saved changes are still waiting to be uploaded to Google Drive.`,
         ),
       );
   }
@@ -954,12 +940,7 @@ export class CloudService {
   async folder(scopeId: string, mountId: string) {
     const mounted = this.mounted.get(this.key(scopeId, mountId));
     if (!mounted)
-      throw Error(
-        t(
-          'クラウドフォルダは未接続です。接続画面から再接続してください。',
-          'The cloud folder is not connected. Reconnect it from the Connect screen.',
-        ),
-      );
+      throw Error(t('クラウドフォルダは未接続です。', 'The cloud folder is not connected.'));
     await this.assertMounted(mounted);
     return mounted.target;
   }
@@ -1002,8 +983,8 @@ export class CloudService {
       const conflict = () =>
         Error(
           t(
-            'CONFLICT: ディスク上の変更を確認してください。下書きは保持されています。',
-            'CONFLICT: Check the changes on disk. Your draft is kept.',
+            'CONFLICT: ディスク上の変更を確認してください。',
+            'CONFLICT: Check the changes on disk.',
           ),
         );
       const before = await fs.readFile(filename);
@@ -1157,8 +1138,8 @@ export class CloudService {
       )
         throw Error(
           t(
-            '同じ名前のファイルまたはフォルダがあります。別の名前を指定してください。',
-            'A file or folder with the same name exists. Choose another name.',
+            '同じ名前のファイルまたはフォルダがあります。',
+            'A file or folder with the same name exists.',
           ),
         );
       if (destination !== actual) {
@@ -1287,12 +1268,7 @@ export class CloudService {
       (item) => item.attachment.scopeId === scopeId && within(item.target, target),
     );
     if (!entry)
-      throw Error(
-        t(
-          'クラウドフォルダは未接続です。接続画面から再接続してください。',
-          'The cloud folder is not connected. Reconnect it from the Connect screen.',
-        ),
-      );
+      throw Error(t('クラウドフォルダは未接続です。', 'The cloud folder is not connected.'));
     await this.assertMounted(entry);
     // The mount point's identity is verified above; below it no component may be
     // a link, checked one component at a time as parent() does above it. realpath
@@ -1333,10 +1309,7 @@ export class CloudService {
             directory: item.isDirectory(),
             layer: 'contents',
             note: false,
-            blocked: t(
-              '登録されていないローカルデータです。既存の内容を保持しています。',
-              'Unregistered local data. Its existing contents are kept.',
-            ),
+            blocked: t('登録されていないローカルデータです。', 'Unregistered local data.'),
           });
       }
     return entries;

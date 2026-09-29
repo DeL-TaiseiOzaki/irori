@@ -159,7 +159,7 @@ try {
   await expect(records.getByRole('status')).toContainText('登録しました');
   await records.getByLabel('送信準備の Drive フォルダ').selectOption(earlier[0].mountId);
   await records.getByRole('button', { name: '送信準備として保持', exact: true }).click();
-  await expect(records.getByRole('status')).toContainText('まだ送信していません');
+  await expect(records.getByRole('status')).toContainText('送信待ちとして保持しました');
   await expect(records).toContainText('送信待ち・端末に保持');
   const restoredFile = path.join(base, 'restored.md');
   await app.evaluate(({ dialog: native }, filename) => {

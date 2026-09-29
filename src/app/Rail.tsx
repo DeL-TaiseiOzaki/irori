@@ -58,7 +58,7 @@ export function Rail({
       <button
         className="rail-home"
         aria-label={t('ワークスペースを選択', 'Choose a workspace')}
-        title={t('ワークスペース', 'Workspaces')}
+        title={t('ワークスペースを選択', 'Choose a workspace')}
         disabled={homeDisabled}
         onClick={onHome}
       >

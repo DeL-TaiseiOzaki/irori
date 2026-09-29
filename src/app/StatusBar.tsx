@@ -20,7 +20,6 @@ export function StatusBar({
   workspaceDisabled,
   terminalOpen,
   terminalDisabled,
-  aiTarget,
   onWorkspace,
   onAi,
   onTerminal,
@@ -37,20 +36,13 @@ export function StatusBar({
   workspaceDisabled: boolean;
   terminalOpen: boolean;
   terminalDisabled: boolean;
-  /** Where the AI summary leads: the Overview while other brains' AIs work, else the hibachi agent. */
-  aiTarget: 'overview' | 'panel';
   onWorkspace: () => void;
   onAi: () => void;
   onTerminal: () => void;
 }) {
   return (
     <footer className="status-bar chrome">
-      <button
-        className="status-item"
-        title={t('ワークスペースを切り替え', 'Switch workspace')}
-        disabled={workspaceDisabled}
-        onClick={onWorkspace}
-      >
+      <button className="status-item" disabled={workspaceDisabled} onClick={onWorkspace}>
         <Icon name="grid" size={13} />
         {workspace}
       </button>
@@ -61,13 +53,7 @@ export function StatusBar({
         </span>
       )}
       {git?.available && git.branch && (
-        <span
-          className="status-item plain"
-          title={t(
-            '取得済みのリモート履歴との比較',
-            'Compared with the last fetched remote history',
-          )}
-        >
+        <span className="status-item plain">
           <Icon name="branch" size={12} />
           {git.branch}
           {!!git.ahead && <span className="mono">↑{git.ahead}</span>}
@@ -83,15 +69,7 @@ export function StatusBar({
       <span className="status-message" role="status">
         {status}
       </span>
-      <button
-        className="status-item ai-summary"
-        title={
-          aiTarget === 'overview'
-            ? t('irori mode で AI を見る', 'See the AIs in irori mode')
-            : t('hibachi agent を開く', 'Open hibachi agent')
-        }
-        onClick={onAi}
-      >
+      <button className="status-item ai-summary" onClick={onAi}>
         <Icon name="sparkles" size={13} />
         {running > 0 && (
           <span className="ai-count">
@@ -111,7 +89,6 @@ export function StatusBar({
         className="status-item"
         aria-pressed={terminalOpen}
         disabled={terminalDisabled}
-        title={t('ターミナル', 'Terminal') + ' (Ctrl+`)'}
         onClick={onTerminal}
       >
         <Icon name="terminal" size={12} />

@@ -89,10 +89,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
         return {
           root,
           kind: 'unavailable',
-          detail: t(
-            'Gitが見つかりません。Gitをインストールしてください。',
-            'Git was not found. Install Git.',
-          ),
+          detail: t('Gitが見つかりません。', 'Git was not found.'),
         };
       }
       try {
@@ -100,10 +97,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
         return {
           root,
           kind: 'unavailable',
-          detail: t(
-            'このGitリポジトリを確認できません。所有者・権限を確認してください。',
-            'Could not check this Git repository. Check its owner and permissions.',
-          ),
+          detail: t('このGitリポジトリを確認できません。', 'Could not check this Git repository.'),
         };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -111,10 +105,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       return {
         root,
         kind: 'folder',
-        detail: t(
-          '通常のフォルダです。既存ノートをそのまま登録できます。',
-          'An ordinary folder. Its existing notes can be added as they are.',
-        ),
+        detail: t('通常のフォルダです。', 'An ordinary folder.'),
       };
     }
     gitRoot = await fs.realpath(gitRoot);
@@ -122,10 +113,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       return {
         root: gitRoot,
         kind: 'unavailable',
-        detail: t(
-          'リポジトリ内のサブフォルダです。表示されたリポジトリのルートを選択してください。',
-          'This is a subfolder of a repository. Choose the repository root shown.',
-        ),
+        detail: t('リポジトリ内のサブフォルダです。', 'This is a subfolder of a repository.'),
       };
     const [remote, branch, changes] = await Promise.all([
       git(root, ['config', '--get', 'remote.origin.url']).catch(() => ''),
@@ -145,8 +133,8 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
       root,
       kind: 'unavailable',
       detail: t(
-        'フォルダまたはGit情報を確認できません。接続先とアクセス権を確認してください。',
-        'Could not read the folder or its Git information. Check the location and access rights.',
+        'フォルダまたはGit情報を確認できません。',
+        'Could not read the folder or its Git information.',
       ),
     };
   } finally {

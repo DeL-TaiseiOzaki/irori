@@ -218,12 +218,6 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                         {t('変更点を見る', 'View changes')}
                       </button>
                     </div>
-                    <p className="update-notice-version">
-                      {t(
-                        'ブラウザで開くので、終了してインストールしてください。',
-                        'Opens in your browser; quit the app to install it.',
-                      )}
-                    </p>
                   </>
                 )}
               </>

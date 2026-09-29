@@ -15,8 +15,7 @@ const host = window.irori;
 // Names are functions so that they are read in the language of each render.
 const stateNames: Record<PendingWrite['state'], () => string> = {
   pending: () => t('送信待ち・端末に保持', 'Pending upload · kept on this device'),
-  uploading: () =>
-    t('送信完了を再確認する必要があります', 'Upload completion needs to be reconfirmed'),
+  uploading: () => t('送信済み・再確認が必要', 'Uploaded · needs reconfirmation'),
   confirmed: () => t('送信先の版を確認済み', 'Destination version confirmed'),
   failed: () => t('再確認が必要・端末に保持', 'Needs reconfirmation · kept on this device'),
 };
@@ -461,7 +460,7 @@ export function KnowledgePanel({
                         scopeId: space.scopeId,
                         path: filename,
                       }),
-                    t('保持しました。まだ送信していません。', 'Kept. Not sent yet.'),
+                    t('送信待ちとして保持しました。', 'Kept as pending.'),
                   )
                 }
               >

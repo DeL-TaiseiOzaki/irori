@@ -27,8 +27,7 @@ export function CsvPreview({ text }: { text: string }) {
           {t(
             `${rows.length} 行 · ${columns.length} 列`,
             `${rows.length} rows · ${columns.length} columns`,
-          )}{' '}
-          <span className="muted">{t('編集は「ソース」から', 'Edit from "Source"')}</span>
+          )}
         </p>
         <button disabled={!current} onClick={() => setPage(current - 1)}>
           {t('前の 100 行', 'Previous 100 rows')}

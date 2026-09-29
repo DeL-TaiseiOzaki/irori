@@ -114,10 +114,7 @@ export function SchemaList({
         title: file,
       })),
       note: settings.incomplete
-        ? t(
-            '上限に達したため、一部のフォルダは調べていません。',
-            'A limit was reached, so some folders were not checked.',
-          )
+        ? t('上限に達し、一部未確認です。', 'Limit reached; some folders not checked.')
         : undefined,
     },
     {
@@ -768,8 +765,8 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
       ) : (
         <p className="hint">
           {t(
-            `type: ${current!.type} のフックはファイルとして編集してください。`,
-            `Edit a hook of type ${current!.type} as a file.`,
+            `type: ${current!.type} のフックはここでは編集できません。`,
+            `A hook of type ${current!.type} cannot be edited here.`,
           )}
         </p>
       )}
@@ -953,9 +950,7 @@ function Attachments({
   const valid = attachmentPath(name.trim());
   async function importFile(file: File) {
     if (file.size > 2 * 1024 * 1024)
-      throw Error(
-        t('2 MiB までのテキストファイルを選んでください。', 'Choose a text file up to 2 MiB.'),
-      );
+      throw Error(t('ファイルが 2 MiB を超えています。', 'The file is larger than 2 MiB.'));
     const bytes = new Uint8Array(await file.arrayBuffer());
     let value: string;
     try {

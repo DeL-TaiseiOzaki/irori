@@ -477,12 +477,6 @@ export function Editor({
       {imageErrors.length > 0 && (
         <div className="hint image-errors" role="alert">
           <strong>{t('表示できない画像があります。', 'Some images cannot be shown.')}</strong>
-          <p>
-            {t(
-              '画像ファイルの場所・接続と、対応形式（PNG・JPEG・GIF・WebP、20 MiB 以下）を確認して、ノートを開き直してください。本文の画像リンクは保持しています。',
-              "Check the image file's location, connection, and supported format (PNG, JPEG, GIF, WebP, 20 MiB or smaller), then reopen the note. Image links in the body are kept.",
-            )}
-          </p>
           <ul>
             {imageErrors.map((url) => (
               <li key={url}>{url}</li>

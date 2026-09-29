@@ -23,7 +23,7 @@ const message = (error: string) => error.replace(/^(?:Error: )+/, '');
 /** A path whose end stays in view: a long start gives way to an ellipsis. */
 function PathText({ path, className }: { path: string; className: string }) {
   return (
-    <span className={`${className} you-tail`} title={path}>
+    <span className={`${className} you-tail`}>
       <bdi dir="ltr">{path}</bdi>
     </span>
   );
@@ -98,14 +98,6 @@ function Folder({
               style={indent}
               aria-expanded={entry.directory ? expanded : undefined}
               aria-current={current ? 'page' : undefined}
-              title={
-                owner
-                  ? t(
-                      `${entry.path} · ${owner.name} の hibachi agent`,
-                      `${entry.path} · ${owner.name}'s hibachi agent`,
-                    )
-                  : entry.path
-              }
               onClick={() => (entry.directory ? onToggle(entry.path) : onShow(entry.path))}
             >
               {entry.directory ? (
@@ -162,10 +154,7 @@ function FileView({ path, reads }: { path: string; reads: number }) {
         <Icon name="chevron" size={12} className="you-stage-separator" />
         <PathText path={path} className="you-stage-path" />
         <span className="you-stage-space" />
-        <span
-          className="you-stage-note"
-          title={t('Schema の設定で編集できます。', 'Edit in the Schema settings.')}
-        >
+        <span className="you-stage-note">
           <Icon name="lock" size={12} />
           {t('読み取り専用', 'Read-only')}
         </span>

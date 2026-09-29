@@ -244,26 +244,7 @@ export class AgentService {
                 : id === 'claude'
                   ? v.includes('2.1.232')
                   : false,
-            detail:
-              id === 'pi'
-                ? t(
-                    'Piのネイティブ設定を使用。標準のツール実行には許可ダイアログがありません。プロジェクト拡張はPi側の信頼設定に従います。',
-                    "Uses Pi's native settings. Standard tool runs have no permission dialog. Project extensions follow Pi's trust settings.",
-                  )
-                : id === 'opencode'
-                  ? t(
-                      'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。',
-                      "Uses OpenCode's native sign-in, model and permission settings. Its ask requests appear in the panel.",
-                    )
-                  : id === 'hermes'
-                    ? t(
-                        'Hermes Agent のネイティブ設定・プロバイダ・承認設定を使用。1回ごとの実行のため、パネルでの承認や質問はありません。',
-                        "Uses Hermes Agent's native settings, provider and approval rules. Each run is one-shot, so nothing is asked in the panel.",
-                      )
-                    : t(
-                        '既存のCLI認証・設定を使用',
-                        "Uses the CLI's existing sign-in and settings",
-                      ),
+            detail: '',
           };
         } catch (e) {
           return { id, version: '', available: false, tested: false, detail: String(e) };

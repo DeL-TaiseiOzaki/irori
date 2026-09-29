@@ -98,7 +98,7 @@ try {
   await late.click();
   await expect(backlinks).toBeHidden();
   await expect(editor).toContainText('遅れて書いたページ');
-  await expect(notice).toHaveText('リンクを特定できませんでした。3 行目を確認してください。');
+  await expect(notice).toHaveText('リンクを特定できませんでした。');
 
   // A plain label is selected in the note that carries it.
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
@@ -156,7 +156,7 @@ try {
   await expect(editor).toContainText('深いページ');
   await editor.getByRole('link', { name: '上の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
   await expect(editor).toContainText('到着点');
-  await expect(page.locator('.crumbs')).toHaveAttribute('title', /到着\.md$/);
+  await expect(page.locator('.crumbs')).toContainText('到着');
 
   // Moving a page into a folder rewrites its own links so they still lead where they did.
   await page.getByRole('button', { name: 'topic', exact: true }).click();

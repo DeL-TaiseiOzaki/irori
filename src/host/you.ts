@@ -88,10 +88,7 @@ export class YourAiService {
     });
     if (existing.length)
       throw Error(
-        t(
-          `${current.root} にはすでにファイルがあります。空のフォルダにするか、AGENTS.md を置いてください。`,
-          `${current.root} already holds files. Empty it, or put an AGENTS.md there.`,
-        ),
+        t(`${current.root} にはすでにファイルがあります。`, `${current.root} already holds files.`),
       );
     for (const [rel, text] of Object.entries(yourAiStarter)) {
       const file = path.join(current.root, rel);

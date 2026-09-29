@@ -99,33 +99,33 @@ export function uploadErrorMessage(category: UploadErrorCategory, count: number)
   switch (category) {
     case 'permission':
       return t(
-        `このフォルダに書き込む権限がありません（閲覧のみで共有されている可能性があります）。${count} 件の変更を Google Drive に送信できません。`,
-        `You do not have permission to write to this folder (it may be shared view-only). ${count} changes cannot be uploaded to Google Drive.`,
+        `このフォルダに書き込む権限がありません。${count} 件を送信できません。`,
+        `No permission to write to this folder. ${count} changes cannot be uploaded.`,
       );
     case 'quota':
       return t(
-        `Google Drive の保存容量がいっぱいです。${count} 件の変更を送信できません。空き容量を確保してください。`,
-        `Google Drive storage is full. ${count} changes cannot be uploaded. Free up space to continue.`,
+        `Google Drive の空き容量が不足しています。${count} 件を送信できません。`,
+        `Google Drive storage is full. ${count} changes cannot be uploaded.`,
       );
     case 'auth':
       return t(
-        `Google へのログインが期限切れか取り消されています。${count} 件の変更を送信できません。アカウントの「書き込みを許可」または「再ログイン」でログインし直してください。`,
-        `The Google sign-in has expired or been revoked. ${count} changes cannot be uploaded. Sign in again with “Allow writing” or “Sign in again” on the account.`,
+        `Google のログインが期限切れか取り消されています。${count} 件を送信できません。`,
+        `The Google sign-in has expired or been revoked. ${count} changes cannot be uploaded.`,
       );
     case 'network':
       return t(
-        `Google Drive に接続できません（オフラインか通信エラー）。${count} 件の変更は接続が戻ると自動で送信されます。`,
-        `Google Drive cannot be reached (offline or a connection error). ${count} changes will be uploaded automatically once the connection is back.`,
+        `Google Drive に接続できません。${count} 件が送信待ちです。`,
+        `Cannot reach Google Drive. ${count} changes are pending.`,
       );
     case 'rateLimit':
       return t(
-        `Google がリクエストを制限しています。${count} 件の変更は自動で再試行されます。`,
-        `Google is limiting requests. ${count} changes will be retried automatically.`,
+        `Google がリクエストを制限しています。${count} 件が送信待ちです。`,
+        `Google is limiting requests. ${count} changes are pending.`,
       );
     default:
       return t(
-        `${count} 件の変更を Google Drive に送信できませんでした。自動で再試行しますが、続く場合は irori を再起動してフォルダを接続し直してください。`,
-        `${count} changes could not be uploaded to Google Drive. They are retried automatically; if this continues, restart irori and connect the folder again.`,
+        `${count} 件の変更を Google Drive に送信できませんでした。`,
+        `${count} changes could not be uploaded to Google Drive.`,
       );
   }
 }

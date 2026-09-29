@@ -276,12 +276,10 @@ try {
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\n保持する下書き\n');
   await writeFile(path.join(kb, '日本語 note.md'), input + '\nエージェントの別の変更。\n');
-  await expect(
-    page.getByText('外部でノートが変更されました。編集は保持されています。'),
-  ).toBeVisible();
+  await expect(page.getByText('外部でノートが変更されました。')).toBeVisible();
   await expect(page.locator('.versions')).toContainText('保持する下書き');
   await expect(page.locator('.versions')).toContainText('エージェントの別の変更。');
-  await page.getByRole('button', { name: 'ディスク版を表示（下書きは保持）' }).click();
+  await page.getByRole('button', { name: 'ディスク版を表示' }).click();
   await page.getByRole('button', { name: '互換', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toBeVisible();
   await page.locator('.ProseMirror').click();
@@ -401,7 +399,7 @@ try {
       if (agent === 'claude') {
         await expect(page.locator('.versions')).toContainText(marker, { timeout: 10000 });
         await expect(page.locator('.versions')).toContainText('実行中の下書き');
-        await page.getByRole('button', { name: 'ディスク版を表示（下書きは保持）' }).click();
+        await page.getByRole('button', { name: 'ディスク版を表示' }).click();
       }
       await expect(page.locator('.document-editor')).toContainText(marker, { timeout: 10000 });
       const bytes = await readFile(path.join(kb, '日本語 note.md'), 'utf8');
@@ -468,7 +466,6 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
       `fixture-${agent}-handle`,
       'full-access',
     );
-  const savedText = '会話を継続します。';
   for (const cycle of [1, 2]) {
     const restarted = await electron.launch({
       args: [
@@ -498,20 +495,27 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
         )
         .toBeGreaterThan(chosenWidth - 12);
       await window.getByRole('button', { name: 'hibachi agent', exact: true }).click();
-      await expect(window.getByText(savedText, { exact: true })).not.toBeVisible();
+      await expect(
+        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+      ).not.toBeVisible();
       await window.getByLabel('会話と接続の設定', { exact: true }).click();
-      await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+      await expect(
+        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+      ).toBeVisible();
       await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
       if (cycle === 1) {
-        await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+        await expect(
+          window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+        ).toBeVisible();
         await window.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
       }
-      await expect(window.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
       await expect(
         window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
       ).toHaveCount(0);
       await window.getByLabel('エージェント', { exact: true }).selectOption('codex');
-      await expect(window.getByText(savedText, { exact: true })).toBeVisible();
+      await expect(
+        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+      ).toBeVisible();
       if (cycle === 2) await window.screenshot({ path: 'test-results/irori-session-recovery.png' });
       expect(errors).toEqual([]);
     } finally {

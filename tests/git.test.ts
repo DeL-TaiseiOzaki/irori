@@ -285,7 +285,7 @@ test('clone validates URLs, reserved destinations and credentials without networ
   );
   await assert.rejects(
     service.clone({ url: 'https://github.com/org/repo.git', parent: root, name: 'nested' }),
-    /スペースの外/,
+    /スペースの内側/,
   );
   assert.equal(git(root, 'log', '-1', '--format=%s'), 'Initial notes');
 });

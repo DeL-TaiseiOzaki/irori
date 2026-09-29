@@ -318,12 +318,7 @@ function RepositoryPanel({
     setConfirmation(undefined);
     try {
       if (!(await messageDraft.flush()) || !(await storedResolution.flush())) {
-        throw Error(
-          t(
-            '下書きを保存してから Git 操作を再試行してください。',
-            'Save the draft, then try the Git operation again.',
-          ),
-        );
+        throw Error(t('下書きを保存できませんでした。', 'Could not save the draft.'));
       }
       if (!(await beforeAction())) return;
       const value = await fn();
@@ -545,10 +540,10 @@ function RepositoryPanel({
           ) : null)}
         <small className="git-sr-only">
           {status.ahead === undefined
-            ? t('受信先の履歴は未取得です', 'The incoming history has not been fetched yet')
+            ? t('未取得', 'Not fetched')
             : t(
-                `送信待ち ${status.ahead} commit ・ 受信待ち ${status.behind} commit（取得済みの履歴）`,
-                `${status.ahead} commit to send, ${status.behind} commit to receive (last fetched history)`,
+                `送信待ち ${status.ahead} commit ・ 受信待ち ${status.behind} commit`,
+                `${status.ahead} commit to send, ${status.behind} commit to receive`,
               )}
         </small>
       </div>
@@ -690,7 +685,7 @@ function RepositoryPanel({
       )}
       {(messageDraft.pending || storedResolution.pending) && (
         <p className="git-notice" aria-live="polite">
-          {t('下書きをこの端末に保存中…', 'Saving the draft on this device…')}
+          {t('下書きを保存中…', 'Saving the draft…')}
         </p>
       )}
       {/* One pressed view at a time, with the group's own roving focus. */}
@@ -1007,14 +1002,8 @@ function RepositoryPanel({
                       >
                         <p>
                           {storedResolution.record.baseVersion === conflict.version
-                            ? t(
-                                'この端末に未完了の統合の下書きがあります。',
-                                'This device has an unfinished merge draft.',
-                              )
-                            : t(
-                                '保存後に Git の状態が変わりました。比較してから戻してください。',
-                                'The Git state changed since this was saved. Compare before restoring.',
-                              )}
+                            ? t('未完了の下書きがあります。', 'There is an unfinished draft.')
+                            : t('Git の状態が変わりました。', 'The Git state has changed.')}
                         </p>
                         <details>
                           <summary>{t('保存済みの下書きを確認', 'View the saved draft')}</summary>
@@ -1084,12 +1073,6 @@ function RepositoryPanel({
                           spellCheck={false}
                         />
                       </label>
-                      <p className="muted">
-                        {t(
-                          '解決前の内容はこの端末に保持します。',
-                          'The pre-resolution content is kept on this device.',
-                        )}
-                      </p>
                       <div className="actions">
                         {conflictDirty && (
                           <button
@@ -1150,12 +1133,7 @@ function RepositoryPanel({
           onCancel={() => setPublishing(false)}
           publish={async (value) => {
             if (active.current || !(await beforeAction()))
-              throw Error(
-                t(
-                  '実行中の処理が終わってから公開してください。',
-                  'Publish after the operation in progress finishes.',
-                ),
-              );
+              throw Error(t('別の操作を実行中です。', 'Another operation is running.'));
             active.current = true;
             onBusy(true);
             try {
@@ -1205,17 +1183,14 @@ function RepositoryPanel({
                 ? message
                 : confirmation === 'push'
                   ? t(
-                      `commit ${status.head?.slice(0, 8)} までを送信します。未コミットの変更は含みません。`,
-                      `Sends this branch up to commit ${status.head?.slice(0, 8)}. Uncommitted changes are not included.`,
+                      `commit ${status.head?.slice(0, 8)} までを送信します。`,
+                      `Sends up to commit ${status.head?.slice(0, 8)}.`,
                     )
                   : confirmation === 'merge'
-                    ? t(
-                        'リモートの最新状態を取得し、統合します。',
-                        'Fetches the latest remote state and merges it.',
-                      )
+                    ? t('リモートを取得して統合します。', 'Fetches remote and merges.')
                     : t(
-                        'リモートの最新状態を取得し、分岐していなければ更新します。',
-                        'Fetches the latest remote state and updates files if history has not diverged.',
+                        'リモートを取得し、分岐していなければ更新します。',
+                        'Fetches remote and updates if history has not diverged.',
                       )}
             </p>
             {confirmation === 'commit' && (

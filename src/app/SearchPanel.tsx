@@ -231,7 +231,6 @@ export function SearchPanel({
             type="button"
             className="palette-close"
             aria-label={t('閉じる', 'Close')}
-            title={t('閉じる（esc）', 'Close (esc)')}
             disabled={opening}
             onClick={onClose}
           >
@@ -309,12 +308,7 @@ export function SearchPanel({
               </p>
             )}
             {changed && (
-              <p className="search-notice">
-                {t(
-                  'ファイルが更新されました。再検索してください。',
-                  'Files changed. Search again.',
-                )}
-              </p>
+              <p className="search-notice">{t('ファイルが更新されました。', 'Files changed.')}</p>
             )}
             {totalHits === 0 && (
               <p className="palette-empty">

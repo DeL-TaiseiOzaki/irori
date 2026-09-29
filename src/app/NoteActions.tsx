@@ -84,17 +84,9 @@ export function NoteActionDialog({
     setError('');
     try {
       const saved = await beforeChange();
-      if (!saved)
-        throw Error(
-          t('ノートを保存してからもう一度操作してください。', 'Save the note before trying again.'),
-        );
+      if (!saved) throw Error(t('ノートを保存できませんでした。', 'Could not save the note.'));
       if (saved.scopeId !== doc.scopeId || saved.path !== doc.path)
-        throw Error(
-          t(
-            '選択中のノートが変わりました。開き直してください。',
-            'The selected note has changed. Open it again.',
-          ),
-        );
+        throw Error(t('選択中のノートが変わりました。', 'The selected note has changed.'));
       if (action === 'trash') {
         await host.trashNote(saved);
         onChanged(null);

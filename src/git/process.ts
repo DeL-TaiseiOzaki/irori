@@ -47,35 +47,29 @@ export class GitError extends Error {
     github?: GitHubFallback,
   ) {
     const hint = /non-fast-forward|fetch first|rejected/i.test(diagnostic)
-      ? t(
-          'リモートに受け付けられませんでした。取得して履歴を確認してください。保護ブランチでは pull request が必要な場合があります。',
-          'The remote rejected this change. Fetch and review the history. A protected branch may require a pull request.',
-        )
+      ? t('リモートに受け付けられませんでした。', 'The remote rejected this change.')
       : github === 'tried'
         ? t(
-            'GitHub CLI（gh）の認証でもアクセスできませんでした。`gh auth status` でログイン中のアカウントと、そのアカウントにこのリポジトリへのアクセス権があるかを確認してください。',
-            'GitHub CLI (gh) authentication could not access it either. Run `gh auth status` to check the signed-in account, and that the account can access this repository.',
+            'GitHub CLI（gh）の認証でもアクセスできませんでした（`gh auth status`）。',
+            'GitHub CLI (gh) authentication could not access it either (`gh auth status`).',
           )
         : github === 'unavailable'
           ? t(
-              'GitHub の認証を確認してください。GitHub CLI（gh）をインストールして `gh auth login` を実行するか、Git の認証ヘルパー・SSH 設定を用意してから再試行してください。',
-              'Check your GitHub authentication. Install the GitHub CLI (gh) and run `gh auth login`, or set up a Git credential helper or SSH, then try again.',
+              'GitHub の認証を確認できませんでした（`gh auth login`）。',
+              'Could not verify GitHub authentication (`gh auth login`).',
             )
           : authentication.test(diagnostic)
             ? t(
-                'Git の認証・アクセス権を確認してから再試行してください。既存の認証ヘルパー・SSH 設定を使用します。',
-                'Check your Git authentication and access, then try again. This uses your existing credential helper and SSH settings.',
+                'Git の認証・アクセス権に問題があります。',
+                'There is a problem with Git authentication or access.',
               )
             : /unable to auto-detect email|author identity unknown/i.test(diagnostic)
               ? t(
-                  'Git に commit の作成者名とメールアドレスを設定してください。',
-                  'Set your commit author name and email in Git.',
+                  'commit の作成者名とメールアドレスが未設定です。',
+                  'The commit author name and email are not set.',
                 )
               : /index.lock|another git process/i.test(diagnostic)
-                ? t(
-                    '別の Git 操作が実行中です。完了後に再試行してください。',
-                    'Another Git operation is running. Try again once it finishes.',
-                  )
+                ? t('別の Git 操作が実行中です。', 'Another Git operation is running.')
                 : /could not resolve|unable to access|connection|repository not found|could not read from remote/i.test(
                       diagnostic,
                     )
@@ -83,10 +77,7 @@ export class GitError extends Error {
                       '接続先・ネットワーク・アクセス権を確認してから再試行してください。',
                       'Check the remote, network, and access, then try again.',
                     )
-                  : t(
-                      'Git 操作が完了しませんでした。変更一覧を更新し、Git の設定・フック・署名設定を確認してください。',
-                      'The Git operation did not complete. Refresh the change list and check your Git configuration, hooks, and signing settings.',
-                    );
+                  : t('Git 操作が完了しませんでした。', 'The Git operation did not complete.');
     // Git diagnostics may contain credential-bearing URLs, helper output and machine
     // paths; only the redacted tail travels with the advice, after a blank line.
     const detail = gitDetail(diagnostic);
@@ -201,28 +192,13 @@ export class GitProcess {
         void stopping.catch(() => {});
       };
       const timer = setTimeout(
-        () =>
-          stop(
-            Error(
-              t(
-                'Git 操作が時間切れになりました。状態を更新して結果を確認してください。',
-                'The Git operation timed out. Refresh the status to see the result.',
-              ),
-            ),
-          ),
+        () => stop(Error(t('Git 操作が時間切れになりました。', 'The Git operation timed out.'))),
         options.inspection ? 8000 : options.network ? 90000 : 30000,
       );
       child.stdout?.on('data', (bytes: Buffer) => {
         size += bytes.length;
         if (size > limit)
-          stop(
-            Error(
-              t(
-                'Git の表示上限を超えました。対象を絞ってください。',
-                "This exceeds Git's display limit. Narrow the selection.",
-              ),
-            ),
-          );
+          stop(Error(t('Git の表示上限を超えました。', "This exceeds Git's display limit.")));
         else chunks.push(bytes);
       });
       child.stderr?.on('data', (bytes: Buffer) => {
@@ -230,12 +206,7 @@ export class GitProcess {
       });
       child.stdin?.on('error', () => {});
       child.on('error', () => {
-        failure ??= Error(
-          t(
-            'Git を起動できません。インストールと実行権限を確認してください。',
-            'Could not start Git. Check that it is installed and executable.',
-          ),
-        );
+        failure ??= Error(t('Git を起動できません。', 'Could not start Git.'));
       });
       child.on('close', (code) => {
         clearTimeout(timer);

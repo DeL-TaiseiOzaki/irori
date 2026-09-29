@@ -79,8 +79,8 @@ export default function PdfView({ bytes, zoom, width, onInfo }: ViewProps) {
         setError(
           reason.name === 'PasswordException'
             ? t(
-                'パスワードで保護された PDF は外部アプリで開いてください。',
-                'Open password-protected PDFs in an external app.',
+                'パスワードで保護された PDF は表示できません。',
+                "Can't show password-protected PDFs.",
               )
             : t(
                 `PDF を読めませんでした: ${reason.message}`,

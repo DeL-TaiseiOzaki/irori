@@ -117,7 +117,7 @@ try {
     .getByRole('button', { name: '現在の場所・関連記録', exact: true })
     .click();
   await preview.getByRole('button', { name: '現在のファイルを開く', exact: true }).click();
-  await expect(panel.getByRole('alert')).toContainText('ワークスペースに追加');
+  await expect(panel.getByRole('alert')).toContainText('ワークスペースにありません');
   await search().fill('not-present');
   await expect(panel).toContainText('一致する実行はありません');
   await search().fill(first.id);

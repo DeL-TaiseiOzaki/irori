@@ -162,7 +162,7 @@ try {
   await panel.getByRole('button', { name: 'グラフ索引を作成', exact: true }).click();
   const freshness = panel.getByRole('status').filter({ hasText: 'グラフ索引' });
   await expect(freshness).toContainText('一致しています');
-  await expect(freshness).toContainText('関係 1 件は除外');
+  await expect(freshness).toContainText('除外した関係 1 件');
   await expect(panel).toContainText('コミットすると共有されます');
   await expect(panel.locator('.react-flow__node')).toHaveCount(3);
   await expect(panel.locator('.react-flow__edge')).toHaveCount(3);

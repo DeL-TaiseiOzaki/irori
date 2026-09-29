@@ -38,7 +38,6 @@ export function Crumbs({
   items,
   here,
   hereIcon,
-  title,
   onBrain,
 }: {
   space?: Space;
@@ -46,19 +45,14 @@ export function Crumbs({
   here?: string;
   /** An icon before the last crumb, such as the house of a brain's home. */
   hereIcon?: IconName;
-  title?: string;
   /** Shows the brain's home from its crumb. */
   onBrain?: () => void;
 }) {
   return (
-    <nav className="crumbs" aria-label={t('場所', 'Location')} title={title}>
+    <nav className="crumbs" aria-label={t('場所', 'Location')}>
       {space &&
         (onBrain ? (
-          <button
-            className="crumb brain"
-            title={t('hibachi のホーム', "The hibachi's home")}
-            onClick={onBrain}
-          >
+          <button className="crumb brain" onClick={onBrain}>
             <BrainTile space={space} size={20} radius={6} ring="stage" />
             {space.name}
           </button>
@@ -129,14 +123,13 @@ export function AiToggle({ open, onToggle }: { open: boolean; onToggle: () => vo
       className="ai-toggle open"
       aria-pressed="true"
       aria-label={t('hibachi agent を閉じる', 'Close hibachi agent')}
-      title={t('hibachi agent', 'hibachi agent')}
       onClick={onToggle}
     >
       <Icon name="sparkles" size={14} />
       AI
     </button>
   ) : (
-    <button className="ai-toggle" title={t('hibachi agent', 'hibachi agent')} onClick={onToggle}>
+    <button className="ai-toggle" onClick={onToggle}>
       <Icon name="sparkles" size={14} />
       {t('hibachi agent', 'hibachi agent')}
     </button>

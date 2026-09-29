@@ -166,12 +166,7 @@ export class ConversationStore {
           throw Error(t('送信待ちの順序が変わりました。', 'The queue order has changed.'));
         value.queued.shift();
       } else if (value.queued.length)
-        throw Error(
-          t(
-            '送信待ちを再開または取り消してください。',
-            'Resume or cancel the queued instructions.',
-          ),
-        );
+        throw Error(t('送信待ちがあります。', 'There are queued instructions.'));
       messageInput.parse(input);
       value.activeRunId = runId;
       if (input.newSession)
