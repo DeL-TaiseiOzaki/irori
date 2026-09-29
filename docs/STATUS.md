@@ -8,6 +8,14 @@ The release carries Windows 202,679,296 bytes, Mac 170,128,671 bytes and
 `irori-0.1.53-full.nupkg` 202,039,339 bytes; anonymous downloads matched
 `SHA256SUMS.txt`.
 
+Page properties, 2026-09-29 (design only; [ADR 015](decisions/015-page-properties.md)):
+the owner asked for Notion-like properties above a knowledge page instead of
+hand-written YAML frontmatter. irori will read the knowledge base's optional
+`.property/property.json` (irori-templete ADR 005), show typed rows with pickers
+for pages and contents files, keep YAML as the storage with a node-level round
+trip, and set `generated` to the person on save. irori assumes no folder names
+inside the three layers. Nothing is implemented yet; the stages are in the ADR.
+
 Make a hibachi here and publish it, 2026-09-28 (**0.1.53**): the owner asked for the reverse of cloning — a hibachi
 made in the app that becomes a GitHub repository. **hibachi を追加 → 新しく作成**
 creates a folder, starts Git on `main`, registers it and commits only
