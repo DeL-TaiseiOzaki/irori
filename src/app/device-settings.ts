@@ -17,6 +17,7 @@ let current: DeviceSettings = {
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
+  routineRuntimes: [],
 };
 
 export async function loadDeviceSettings() {
@@ -65,6 +66,16 @@ export function currentEditorAssistance() {
 
 export async function chooseEditorAssistance(editorAssistance: boolean) {
   current = await host.saveDeviceSettings({ editorAssistance });
+  return current;
+}
+
+/** The runtimes routines may use on this device (ADR 016 D3). */
+export function currentRoutineRuntimes() {
+  return current.routineRuntimes;
+}
+
+export async function chooseRoutineRuntimes(routineRuntimes: DeviceSettings['routineRuntimes']) {
+  current = await host.saveDeviceSettings({ routineRuntimes });
   return current;
 }
 

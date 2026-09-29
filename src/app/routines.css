@@ -1,0 +1,351 @@
+/* irori mode's routines: each owner's routines, their steps, runs and review. */
+
+.routines-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 18px 24px;
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.routines-note {
+  margin: 0;
+  color: var(--tx-3);
+  font-size: 12.5px;
+}
+.routines-empty {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--tx-2);
+  font-size: 13px;
+}
+.routines-empty p {
+  margin: 0;
+}
+.routines-empty dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+.routines-empty dt {
+  color: var(--tx-3);
+}
+.routines-empty dd {
+  margin: 0;
+  color: var(--tx-2);
+  overflow-wrap: anywhere;
+}
+.routine-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.routine-group > h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  color: var(--tx-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.routine-orb {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ember);
+  color: var(--on-ember);
+}
+.routine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+}
+.routine.running {
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+.routine-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.routine-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 3px 4px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+}
+.routine-toggle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+.routine-space {
+  flex: 1;
+}
+.routine-head .solid-button,
+.routine-head .panel-button {
+  height: 30px;
+  gap: 6px;
+}
+.routine-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.routine-state time {
+  color: var(--tx-3);
+  font-weight: 400;
+}
+.routine-state.running,
+.routine-state.waiting,
+.routine-state.review {
+  color: var(--tx);
+  font-weight: 600;
+}
+.routine-state.succeeded {
+  color: var(--add-ink);
+}
+.routine-state.failed,
+.routine-state.invalid,
+.routine-state.unknown {
+  color: var(--del-ink);
+  font-weight: 600;
+}
+.routine-state .spin {
+  animation: irori-spin 1.1s linear infinite;
+}
+.routine-problem,
+.routine-needs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--tx-2);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.routine-problem {
+  color: var(--del-ink);
+}
+.routine-needs .panel-button {
+  height: 28px;
+  gap: 6px;
+}
+.routine-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 4px 2px 22px;
+}
+.routine-path {
+  margin: 0;
+  color: var(--tx-3);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.routine-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routine-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--field);
+}
+.routine-step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.routine-step-number {
+  width: 16px;
+  flex: none;
+  color: var(--tx-3);
+  font: 11px var(--font-mono);
+  text-align: right;
+}
+.routine-step-agent {
+  color: var(--ember);
+}
+.routine-step-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  color: var(--tx);
+  overflow-wrap: anywhere;
+}
+.routine-step-label small {
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.routine-step-detail {
+  margin: 0 0 0 24px;
+  color: var(--tx-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.routine-step.failed .routine-step-detail {
+  color: var(--del-ink);
+}
+.routine-link {
+  height: 24px;
+  padding: 0 8px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-2);
+  font-size: 11.5px;
+}
+.routine-step .request {
+  margin-left: 24px;
+  padding: 11px;
+  gap: 9px;
+}
+.routine-output,
+.routine-changes {
+  margin-left: 24px;
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.routine-output summary,
+.routine-changes summary {
+  cursor: pointer;
+  color: var(--tx-3);
+}
+.routine-output pre {
+  max-height: 240px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--tx);
+  font: 11.5px/1.55 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.routine-changes {
+  margin-left: 0;
+}
+.routine-changes > div {
+  margin-top: 6px;
+}
+.routine-changes strong {
+  font-size: 12px;
+  color: var(--tx);
+}
+.routine-changes ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+}
+.routine-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.routine-history button {
+  height: 26px;
+  gap: 6px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  color: var(--tx-2);
+}
+.routine-history button[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--hair-3, var(--hair-2));
+  color: var(--tx);
+}
+
+/* The review before a run: every file the first time, the difference later. */
+.modal.routine-review {
+  width: min(880px, calc(100vw - 48px));
+}
+.modal.routine-review h2 {
+  margin-bottom: 6px;
+}
+.review-files {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0;
+}
+.review-file header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.review-file header small {
+  color: var(--ink-3);
+}
+.review-file.removed header .mono {
+  text-decoration: line-through;
+}
+.review-file pre {
+  max-height: 46vh;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  font: 12px/1.55 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-diff .add {
+  background: var(--add-wash);
+  color: var(--add-ink);
+}
+.review-diff .del {
+  background: var(--del-wash);
+  color: var(--del-ink);
+}
+.review-diff .gap {
+  color: var(--ink-3);
+}
+.review-opaque,
+.review-same {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+}

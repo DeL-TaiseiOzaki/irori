@@ -75,6 +75,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - **irori agent** (formerly "your AI"): in irori mode, ask for work that spans hibachis, on any of these CLIs. It splits the request by hibachi and hands each part to that hibachi's hibachi agent: on Claude Code, Codex and OpenCode a sub-agent (`hibachi-<name>`) that irori defines, on Pi and Hermes Agent a `hibachi` command irori provides for the request. It reports back. Like a hibachi agent it starts in full access, and its own Schema is edited with the same settings.
 - Permissions follow each CLI's settings. A hibachi agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Instructions can be queued while an agent works. Conversations survive a restart.
+- **Routines**: in irori mode's **Routines** view, run a job you defined with one button. A routine is a folder with `routine.yaml` (in the irori agent's `routines/` or a hibachi's `.irori/routines/`) that lists programs to run and instructions for agents, in order. irori shows its files before the first run and after any change ([ROUTINES](docs/ROUTINES.md)).
 
 **Materials**
 - PDF, Word (.docx), PowerPoint (.pptx), spreadsheets such as Excel (.xlsx/.xlsm/.xls/.ods) and images open in the window, without switching apps. They are view only; edit them in their own app.

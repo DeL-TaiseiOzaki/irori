@@ -1,5 +1,46 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Routines, 2026-09-30 (**0.1.57**, branch `feat/routines`, not yet merged; it carries #133's
+design commits, so merging it makes #133 redundant): [ADR 016](decisions/016-routines.md)
+stage 1, described in [ROUTINES](ROUTINES.md). The owner chose routines as irori's one
+general way to gather what a person keeps in other tools and to run any defined job: a
+folder with `routine.yaml` in the irori agent's `routines/` or a hibachi's
+`.irori/routines/`, `run` and `agent` steps, started only by **実行**. The owner put the
+list in irori mode, as a third view (**ルーティン**) beside the map and the columns.
+- `src/host/routines.ts` (`RoutineService`) reads `routine.yaml` strictly (Zod, one-sentence
+  reasons), finds routines for the open workspace, keeps the review (a digest of the folder
+  and the confirmed text, so a change shows line by line; a changed routine runs only with the
+  digest the review showed), runs `run` steps (`.js` with irori as Node once **JavaScript** is
+  added, other files by their `#!` line, argv commands from `PATH`) with `IRORI_WORK`,
+  `IRORI_STATE` and `IRORI_ROUTINE`, honours `{"continue": false}`, stops on **停止**, and
+  records each run (last 20; output capped at 16 KiB; files changed per hibachi from Git
+  status and content hashes). A run left running is marked unknown when irori opens.
+- Agent steps go through `AgentService.startStep`: an ordinary run shown in its
+  conversation, in a new native session that is never saved (the person's own session
+  stays), with the preamble (gathered text is material, no routine edits, report changes,
+  `[FAILED]`) and the variables in the CLI's environment. A step waits while its agent or a
+  handed hibachi runs. Running routines hold Git operations as agent runs do; quitting asks.
+- `HostAPI`: `routines`, `reviewRoutine`, `runRoutine`, `stopRoutine`, `routineRuns` and
+  `routine` events; the device setting `routineRuntimes`. The renderer's
+  `src/app/RoutinesView.tsx` lists routines by owner with **実行**/**停止**, the review
+  dialog, steps with output or report, changed files, history, and an agent step's request
+  answered in the step; the settings have the **JavaScript** switch.
+- Verified with `npm run build`, `npm test` (377 tests: 370 passed, 0 failed, 7 skipped as
+  before; new `tests/routines.test.ts`), `xvfb-run -a npm run test:ui` (exit 0; new
+  `scripts/routines-ui-smoke.ts`) and `npm run format:check`.
+- Real CLIs, at the owner's word (2026-09-30), with `npm run test:routines` on a disposable
+  Git hibachi: Claude Code 2.1.280 in the standard mode (this container runs as root, where
+  Claude Code refuses `bypassPermissions`; the script allowed its one write request as the
+  person would in the step) and Codex 0.156.1 in full access (its sandbox cannot start
+  here). On each, a `run` step wrote `$IRORI_WORK/items.txt` and an agent step turned it
+  into `Knowledge_Base/inbox-<cli>.md` in about 15 s; the run's change record named exactly
+  that file, the conversation showed the routine's line and the step's prompt without the
+  preamble, and no native session was saved. A second routine whose agent could not do its
+  task reported `[FAILED]` with a reason, and the step failed with that reason.
+- Not done: secrets, Python and the irori agent's routine skill (stages 2–4); an installed
+  macOS or Windows 11 app; real Pi, OpenCode and Hermes Agent steps; changes under a
+  hibachi's contents folders are not in a run's record.
+
 Published 2026-09-29: #131 (**0.1.56**, labels and values) is merged at the owner's word
 ("マージ公開までやって") and published as
 [v0.1.56-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.56-preview.1)

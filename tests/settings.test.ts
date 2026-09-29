@@ -15,6 +15,7 @@ const defaults = {
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
+  routineRuntimes: [],
 };
 
 async function service() {
@@ -117,6 +118,20 @@ test('the CLI and models your AI runs on are kept on the device', async () => {
       false,
       model,
     );
+});
+
+test('the runtimes routines may use are added by the person and kept on the device', async () => {
+  const { dir, settings } = await service();
+  await settings.save({ routineRuntimes: ['javascript'] });
+  await settings.save({ theme: 'dark' });
+  assert.deepEqual((await new SettingsService(dir).read()).routineRuntimes, ['javascript']);
+  await settings.save({ routineRuntimes: [] });
+  assert.deepEqual((await settings.read()).routineRuntimes, []);
+  const save = hostArguments.saveDeviceSettings;
+  assert.equal(save.safeParse([{ routineRuntimes: ['javascript'] }]).success, true);
+  // Python needs a download that irori does not make yet (ADR 016 stage 3).
+  for (const runtimes of [['python'], ['node'], ['javascript', 'javascript']])
+    assert.equal(save.safeParse([{ routineRuntimes: runtimes }]).success, false, String(runtimes));
 });
 
 test('a damaged or hostile record becomes the defaults rather than an error', async () => {

@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Current development, 2026-09-30: **routines (0.1.57) are on `feat/routines`**, in a pull
+request that also carries #133's design commits (merging it makes #133 redundant). Leave it
+open until the owner says to merge, then publish as usual. Routines are
+[ADR 016](decisions/016-routines.md) stage 1, described in [ROUTINES](ROUTINES.md); the
+view is irori mode → **ルーティン**. Agent steps ran on real Claude Code and Codex
+(`npm run test:routines`, at the owner's word); STATUS has the results. Next, when the owner
+asks: stage 2 secrets (`safeStorage`, given only to the `run` steps that name them, removed
+from recorded output), stage 3 Python through uv (a pinned SHA-256, and
+`PYTHONDONTWRITEBYTECODE` so `__pycache__` does not bring the review back), stage 4 the irori
+agent's skill for writing a routine. Still unverified: an installed app, real Pi, OpenCode
+and Hermes Agent steps, and a routine gathering real mail with the person's own OAuth
+client. A separate session is building page comments as 0.1.58 from `origin/main`; whichever
+merges second rebases.
+
 Current development, 2026-09-29: **0.1.56 is published** as
 [v0.1.56-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.56-preview.1)
 (#131; release run `36560142606` from main CI `36559142972` at `71b8da6`). UI copy rule

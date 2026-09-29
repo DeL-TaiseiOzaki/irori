@@ -6,6 +6,7 @@ import { markdownFonts, themes, type DeviceSettings } from '../domain/types';
 import { yourAiChoice } from '../domain/conversation';
 import { skillAudience } from '../domain/skills';
 import { languages } from '../domain/i18n';
+import { routineRuntimes } from '../domain/routines';
 
 const settings = z.object({
   theme: z.enum(themes).default('system'),
@@ -17,6 +18,7 @@ const settings = z.object({
   layouts: z.record(z.string().max(160), z.string().max(4096)).default({}),
   skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
   yourAi: yourAiChoice.default({ agent: 'claude', models: {} }),
+  routineRuntimes: z.array(z.enum(routineRuntimes)).default([]),
 });
 
 /**
@@ -47,6 +49,7 @@ export class SettingsService {
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
         yourAi: patch.yourAi ?? current.yourAi,
+        routineRuntimes: patch.routineRuntimes ?? current.routineRuntimes,
       });
       await writeLocalJson(this.file, next);
       return next;

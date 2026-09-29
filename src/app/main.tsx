@@ -1376,6 +1376,23 @@ function App() {
             onStopYou={async () => {
               if (you) await host.cancel(you.id);
             }}
+            routineChoices={() => ({
+              ...Object.fromEntries(
+                workspaceSpaces.map((space) => {
+                  const agentId = agentFor(space.scopeId);
+                  return [
+                    space.scopeId,
+                    { agent: agentId, model: modelFor(space.scopeId, agentId) },
+                  ];
+                }),
+              ),
+              ...(you && {
+                [you.id]: {
+                  agent: yourChoice.agent,
+                  model: yourChoice.models[yourChoice.agent] || undefined,
+                },
+              }),
+            })}
             onEnter={(space, options) => void enterBrain(space, options)}
             onError={report}
           />
