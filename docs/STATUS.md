@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-09-29: #129 (**0.1.55**, less explanatory text) is merged at the owner's
+word ("マージ＋公開までやって") and published as
+[v0.1.55-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.55-preview.1)
+by release run `36544049853` from main's CI run `36542859364` (source `15f7c3d`).
+The release carries Windows 202,705,408 bytes, Mac 170,161,478 bytes and
+`irori-0.1.55-full.nupkg` 202,065,578 bytes; anonymous downloads matched
+`SHA256SUMS.txt`. The owner's rule behind it: a well-designed screen needs no
+explanation, so helper paragraphs, repeated tooltips and "where this is kept" notes
+were removed, and only what prevents a wrong or irreversible action stays, in one
+sentence. The download website was redesigned in English (#127) and cut down the same
+way (#128).
+
 Published 2026-09-29: #125 (**0.1.54**, page properties) is merged at the owner's word
 ("同じ字で公開してください") and published as
 [v0.1.54-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.54-preview.1)
