@@ -7,7 +7,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
-import { SessionStore, sessionKey } from '../src/agents/sessions';
+import { latestConversation } from './fixtures/conversations';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
@@ -100,9 +100,9 @@ for (const agent of ['pi', 'opencode'] as const) {
       assert.ok(!JSON.stringify(first.events).includes('DO NOT DISPLAY'));
       assert.ok(first.events.some((e) => e.type === 'permission'));
       assert.ok(first.events.some((e) => e.type === 'question'));
-      const store = new SessionStore(files.dataDir);
-      const binding = { scopeId: space.scopeId, root, agent };
-      const handle = (await store.read(binding))!.handle;
+      const saved = async () =>
+        (await latestConversation(files.dataDir, space.scopeId, agent)).native?.handle;
+      const handle = (await saved())!;
       assert.ok(handle);
       assert.equal((await execute(agent, 'again')).events.at(-1)?.outcome, 'completed');
       if (agent === 'opencode') {
@@ -128,10 +128,24 @@ for (const agent of ['pi', 'opencode'] as const) {
         assert.ok(first.events.find((e) => e.type === 'text')?.text.includes('\u2028'));
         await rm(handle);
       }
-      assert.equal((await execute(agent, 'again')).events.at(-1)?.outcome, 'failed');
-      assert.equal((await store.read(binding))!.handle, handle);
-      await first.service.resetSession(space.scopeId, agent);
-      assert.equal((await store.status(binding)).state, 'empty');
+      // A resume that fails before the agent does anything is reported, and the
+      // next instruction starts a new native session in the same conversation.
+      const failed = await execute(agent, 'again');
+      assert.equal(failed.events.at(-1)?.outcome, 'failed');
+      assert.ok(
+        failed.events.some((e) => e.type === 'error' && e.text.includes('新しいセッション')),
+      );
+      assert.equal(await saved(), undefined);
+      if (agent === 'opencode') await rm(path.join(root, 'fail-resume'));
+      const fresh = await execute(agent, 'again');
+      assert.equal(fresh.events.at(-1)?.outcome, 'completed', JSON.stringify(fresh.events));
+      assert.ok(await saved());
+      assert.equal(
+        new Set([...first.events, ...failed.events, ...fresh.events].map((e) => e.conversationId))
+          .size,
+        1,
+        'the conversation stays one while its native session is replaced',
+      );
     },
   );
   test(
@@ -187,7 +201,7 @@ test(
 );
 
 test(
-  'Durable queue claims launch once, retain history and reject session resets with pending messages',
+  'Durable queue claims launch once, go before new instructions and survive a restart',
   fixtureOptions,
   async (t) => {
     const { space, files, calls } = await setup(t);
@@ -196,7 +210,7 @@ test(
       completed = resolve;
     });
     const service = new AgentService(files, (event) => {
-      if (event.type === 'done') completed();
+      if (event.type === 'done' && event.outcome === 'completed') completed();
     });
     t.after(() => service.cancel());
     const input = {
@@ -207,38 +221,40 @@ test(
     };
     await service.queueMessage(input);
     const queue = await service.queueMessage({ ...input, prompt: 'keep pending' });
-    await assert.rejects(service.resetSession(space.scopeId, 'pi'), /送信待ち/);
+    // The queue goes first: an instruction sent past it is refused.
+    await assert.rejects(service.startAccepted({ ...input, prompt: 'jump the queue' }), /送信待ち/);
     const starts = await Promise.allSettled([
-      service.startQueued(space.scopeId, 'pi', queue[0].id),
-      service.startQueued(space.scopeId, 'pi', queue[0].id),
+      service.startNextQueued(space.scopeId),
+      service.startNextQueued(space.scopeId),
     ]);
-    assert.equal(starts.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(
+      starts.filter((result) => result.status === 'fulfilled' && result.value).length,
+      1,
+    );
     await done;
     assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
-    await assert.rejects(service.startQueued(space.scopeId, 'pi', queue[0].id), /順序/);
     const restarted = new AgentService(files, () => {});
     const recovered = await restarted.conversation(space.scopeId, 'pi');
     assert.equal(recovered.queued[0].prompt, 'keep pending');
+    assert.equal(recovered.pending, 1);
     assert.equal(recovered.events.filter((event) => event.role === 'user').length, 1);
     assert.equal(recovered.events.at(-1)?.outcome, 'completed');
-    await restarted.removeQueued(space.scopeId, 'pi', queue[1].id);
-    await restarted.resetSession(space.scopeId, 'pi');
-    assert.deepEqual((await restarted.conversation(space.scopeId, 'pi')).events, recovered.events);
-    const filename = path.join(
-      files.dataDir,
-      'agent-conversations',
-      sessionKey({
-        scopeId: space.scopeId,
-        agent: 'pi',
-        root: space.root,
-      }) + '.json',
+    await assert.rejects(
+      restarted.removeQueued(recovered.id!, queue[0].id),
+      /送信待ちにありません/,
     );
-    await writeFile(filename, '{broken');
+    await restarted.removeQueued(recovered.id!, queue[1].id);
+    const state = path.join(files.dataDir, 'conversation-state', `${recovered.id}.json`);
+    await restarted.queueMessage({ ...input, prompt: 'kept while damaged' });
+    await writeFile(state, '{broken');
     const damaged = new AgentService(files, () => {});
-    await assert.rejects(damaged.startAccepted(input));
+    await assert.rejects(
+      damaged.startAccepted({ ...input, conversationId: recovered.id }),
+      /送信待ちの記録/,
+    );
     await damaged.cancel();
     assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
-    assert.equal(await readFile(filename, 'utf8'), '{broken');
+    assert.equal(await readFile(state, 'utf8'), '{broken');
   },
 );
 
@@ -512,9 +528,10 @@ test(
     const [call] = await hermes();
     assert.equal(call.prompt, 'ordinary request');
     assert.deepEqual(call.args, ['chat', '--query-file', '-', '--format', 'stream-json']);
-    const store = new SessionStore(files.dataDir);
-    const binding = { scopeId: space.scopeId, root, agent: 'hermes' as const };
-    assert.equal((await store.read(binding))!.handle, '20260927_120000_fixture');
+    assert.equal(
+      (await latestConversation(files.dataDir, space.scopeId, 'hermes')).native?.handle,
+      '20260927_120000_fixture',
+    );
 
     const full = await execute('hermes', 'rotate', false, {
       access: 'full-access',
@@ -526,7 +543,9 @@ test(
     );
     // A new access mode starts a new conversation; the model and --yolo are passed.
     assert.deepEqual((await hermes()).at(-1).args.slice(5), ['-m', 'anthropic/claude-x', '--yolo']);
-    assert.equal((await store.read(binding))!.handle, '20260927_120500_rotated');
+    const saved = async () =>
+      (await latestConversation(files.dataDir, space.scopeId, 'hermes')).native?.handle;
+    assert.equal(await saved(), '20260927_120500_rotated');
     const resumed = await execute('hermes', 'final only', false, { access: 'full-access' });
     assert.equal(resumed.events.at(-1)?.outcome, 'completed', JSON.stringify(resumed.events));
     assert.deepEqual((await hermes()).at(-1).args.slice(5), [
@@ -544,6 +563,7 @@ test(
       (await execute('hermes', 'fail', false, { access: 'full-access' })).events.at(-1)?.outcome,
       'failed',
     );
+    assert.equal(await saved(), '20260927_120500_rotated', 'a turn failing after work keeps it');
     const crashed = await execute('hermes', 'crash', false, { access: 'full-access' });
     assert.equal(crashed.events.at(-1)?.outcome, 'failed');
     assert.ok(
@@ -551,17 +571,16 @@ test(
         (e) => e.type === 'error' && /without a result|結果を返さず/.test(e.text),
       ),
     );
+    assert.equal(await saved(), undefined, 'a resume failing before any work sets it aside');
     const held = await execute('hermes', 'hold', true, { access: 'full-access' });
     assert.equal(held.events.at(-1)?.outcome, 'cancelled');
+    assert.ok(!(await hermes()).at(-1).args.includes('--resume'));
     await writeFile(path.join(root, 'fail-resume'), 'fixture');
     const lost = await execute('hermes', 'again', false, { access: 'full-access' });
     assert.equal(lost.events.at(-1)?.outcome, 'failed');
     assert.ok(lost.events.some((e) => e.type === 'error' && e.text.includes('Session not found')));
-    assert.equal(
-      (await store.read(binding))!.handle,
-      '20260927_120500_rotated',
-      'a failed resume keeps its handle',
-    );
+    assert.ok(lost.events.some((e) => e.type === 'error' && e.text.includes('新しいセッション')));
+    assert.equal(await saved(), undefined);
   },
 );
 

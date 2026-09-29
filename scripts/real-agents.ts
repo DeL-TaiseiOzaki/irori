@@ -7,7 +7,7 @@ import { FileService } from '../src/host/files';
 import { AgentService } from '../src/agents/service';
 import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
-import { SessionStore } from '../src/agents/sessions';
+import { latestConversation } from '../tests/fixtures/conversations';
 import type { AgentEvent, AgentId } from '../src/domain/types';
 const base = await mkdtemp(path.join(tmpdir(), 'irori real 日本語 '));
 const files = new FileService(path.join(base, 'device'));
@@ -100,7 +100,8 @@ for (const agent of selectedAgent
     agent,
     notePath: note.path,
     prompt: `Read the selected note. Append exactly one new paragraph: ${marker}. Use your native tools to read and edit the file; shell file reads and apply_patch are allowed and preserve the Japanese title. Do not change other files. ${continuity ? `Also use your native Edit tool to replace the exact sentence ${JSON.stringify(originalLine)} with ${JSON.stringify(revisedLine)}. After editing, mention any extra tool-provided context about that edit. Remember this continuation token in the conversation only, never write it to a file: ${continuationToken}.` : ''} Then briefly report completion.`,
-    newSession: true,
+    // A conversation of its own, so no earlier native session is continued.
+    conversationId: service.createConversation(space.scopeId, agent),
   });
   const finish = await done;
   clearTimeout(timer);
@@ -138,8 +139,7 @@ for (const agent of selectedAgent
     // native process. No token or first-turn text enters the second request.
     const reloadedFiles = new FileService(files.dataDir);
     await reloadedFiles.init();
-    const binding = { scopeId: space.scopeId, agent, root: reloadedFiles.get(space.scopeId).root };
-    const before = await new SessionStore(files.dataDir).read(binding);
+    const before = (await latestConversation(files.dataDir, space.scopeId, agent)).native;
     const resumedEvents: AgentEvent[] = [];
     let complete!: (event: AgentEvent) => void;
     const resumedDone = new Promise<AgentEvent>((resolve) => {
@@ -162,7 +162,7 @@ for (const agent of selectedAgent
     const resumed = await resumedDone;
     clearTimeout(resumeTimer);
     await reloaded.flush();
-    const after = await new SessionStore(files.dataDir).read(binding);
+    const after = (await latestConversation(files.dataDir, space.scopeId, agent)).native;
     const text = resumedEvents
       .filter((event) => event.type === 'text')
       .map((event) => event.text)

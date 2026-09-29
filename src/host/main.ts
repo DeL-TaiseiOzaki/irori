@@ -20,6 +20,8 @@ import { KnowledgeStore } from '../knowledge/store';
 import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
+import { DeviceIdentity } from './device';
+import { migrateConversations } from '../agents/conversation-migration';
 import { brainAgentNames } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
@@ -117,6 +119,14 @@ app
     // Your AI's folder is the device's, not a KB's: its record is read before any run.
     const you = new YourAiService(files.dataDir);
     await you.load();
+    // Conversations kept per space, CLI and checkout become conversations (ADR 017 D8),
+    // once and before any run; a failure leaves the old records to try again next start.
+    const identity = new DeviceIdentity(files.dataDir);
+    await migrateConversations(files.dataDir, {
+      deviceId: () => identity.id(),
+      youId: (await you.load()).id,
+      spaceName: (scopeId) => files.list().find((space) => space.scopeId === scopeId)?.name,
+    }).catch((error) => console.warn('Saved conversations could not be migrated', String(error)));
     // The Schema settings take a hibachi's id or the irori agent's, whose folder is its Schema.
     const schemaFolder = async (scopeId: string) =>
       you.rootOf(scopeId) ? you.schemaFolder() : spaceFolder(files, scopeId);
@@ -656,15 +666,16 @@ app
         changeFiles(() => removeNoteComment(files, id, p, commentId)),
       agents: () => agents.available(),
       agentModels: (agent) => agents.models(agent),
-      agentSession: (...args) => agents.session(...args),
+      agentConversations: (scopeId) => agents.conversationList(scopeId),
       agentConversation: (...args) => agents.conversation(...args),
+      createConversation: (...args) => agents.createConversation(...args),
+      renameConversation: (...args) => agents.renameConversation(...args),
+      pinConversation: (...args) => agents.pinConversation(...args),
+      archiveConversation: (...args) => agents.archiveConversation(...args),
+      deleteConversation: (id) => agents.deleteConversation(id),
       queueAgentMessage: (input) => agents.queueMessage(input),
       removeQueuedMessage: (...args) => agents.removeQueued(...args),
-      startQueuedMessage: async (...args) => {
-        canStartAgent();
-        return agents.startQueued(...args, canStartAgent);
-      },
-      resetAgentSession: (...args) => agents.resetSession(...args),
+      startNextQueued: (scopeId) => agents.startNextQueued(scopeId, canStartAgent),
       yourAi: () => you.status(),
       createYourAi: () => you.create(),
       yourAiEntries: (rel) => you.entries(rel),

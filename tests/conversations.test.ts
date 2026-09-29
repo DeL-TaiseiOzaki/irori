@@ -1,165 +1,429 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { ConversationStore } from '../src/agents/conversations';
-import { sessionKey } from '../src/agents/sessions';
+import { ConversationStore, viewDetails } from '../src/agents/conversations';
+import { DeviceIdentity } from '../src/host/device';
+import type { StartRun } from '../src/domain/types';
+
+const posix = process.platform !== 'win32';
 
 async function fixture(t: TestContext) {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'irori conversation '));
-  const binding = { scopeId: randomUUID(), agent: 'pi' as const, root: path.join(dataDir, 'KB') };
-  const store = new ConversationStore(dataDir);
+  const open = () => new ConversationStore(dataDir, new DeviceIdentity(dataDir));
+  const store = open();
+  const owner = { kind: 'hibachi' as const, id: randomUUID(), name: 'KB' };
+  const placement = { owner, agent: 'pi' as const, create: true };
+  const input = (prompt: string, extra: Partial<StartRun> = {}): StartRun => ({
+    scopeId: owner.id,
+    agent: 'pi',
+    prompt,
+    ...extra,
+  });
+  const folder = (id: string) => path.join(dataDir, 'conversations', id);
   t.after(async () => {
     await store.flush();
     await rm(dataDir, { recursive: true, force: true });
   });
-  const filename = path.join(dataDir, 'agent-conversations', sessionKey(binding) + '.json');
-  return { dataDir, binding, store, filename };
+  return { dataDir, open, store, owner, placement, input, folder };
+}
+async function lines(file: string) {
+  return (await readFile(file, 'utf8')).split('\n').filter(Boolean);
 }
 
-test('Accepted instructions retain their note and multiple sources across restart and checkout isolation', async (t) => {
-  const { dataDir, binding, store, filename } = await fixture(t);
-  const input = {
-    ...binding,
-    prompt: '  日本語の指示\n次の行  ',
-    notePath: 'Wiki/選択.md',
-    sources: [{ scopeId: randomUUID(), path: '資料/出典.md' }],
-  };
-  const queue = await store.enqueue(binding, input);
-  input.sources[0].path = 'changed.md';
+test('A conversation is a folder of metadata and events, made on its first instruction and titled by its first line', async (t) => {
+  const { dataDir, open, store, owner, placement, input, folder } = await fixture(t);
+  const id = store.reserve(owner.id, 'pi');
+  // A reserved id writes nothing until an instruction arrives.
+  await assert.rejects(stat(path.join(dataDir, 'conversations')));
+  const title = 'あ'.repeat(48) + '👨‍👩‍👧' + 'い'.repeat(10);
+  const sources = [{ scopeId: randomUUID(), path: '資料/出典.md' }];
+  const queue = await store.enqueue(
+    id,
+    { owner, agent: 'pi' },
+    input(`\n  ${title}\n次の行  `, { notePath: 'Wiki/選択.md', sources }),
+  );
   queue[0].prompt = 'changed';
-  const restarted = new ConversationStore(dataDir);
-  const saved = await restarted.read(binding);
-  assert.equal(saved.queued[0].prompt, '  日本語の指示\n次の行  ');
+  sources[0].path = 'changed.md';
+  const meta = JSON.parse(await readFile(path.join(folder(id), 'meta.json'), 'utf8'));
+  assert.equal(meta.id, id);
+  assert.deepEqual(meta.owner, owner);
+  assert.equal(meta.agent, 'pi');
+  assert.equal(meta.title, 'あ'.repeat(48) + '👨‍👩‍👧' + 'い', 'cut at 50 characters, never inside one');
+  assert.equal(meta.titleSource, 'first-message');
+  assert.equal(meta.linkedNote, 'Wiki/選択.md');
+  assert.deepEqual(meta.native, {});
+  assert.deepEqual((await readdir(folder(id))).sort(), ['events.jsonl', 'meta.json']);
+  // The queue is this device's: it stays in the data directory, never in the conversation.
+  assert.doesNotMatch(await readFile(path.join(folder(id), 'meta.json'), 'utf8'), /次の行/);
+  const restarted = open();
+  const saved = await restarted.read(id);
+  assert.equal(saved.queued[0].prompt, `\n  ${title}\n次の行  `);
   assert.equal(saved.queued[0].notePath, 'Wiki/選択.md');
   assert.equal(saved.queued[0].sources?.[0].path, '資料/出典.md');
-  for (const other of [
-    { ...binding, agent: 'codex' as const },
-    { ...binding, scopeId: randomUUID() },
-    { ...binding, root: path.join(dataDir, 'copied-KB') },
-  ])
-    assert.deepEqual((await restarted.read(other)).queued, []);
-  if (process.platform !== 'win32') assert.equal((await stat(filename)).mode & 0o777, 0o600);
-  await restarted.remove(binding, saved.queued[0].id);
-  assert.deepEqual((await new ConversationStore(dataDir).read(binding)).queued, []);
-  const codex = { ...binding, agent: 'codex' as const };
-  await store.enqueue(codex, { ...input, agent: 'codex', access: 'full-access' });
-  const resumed = await new ConversationStore(dataDir).read(codex);
-  assert.equal(
-    resumed.queued[0].access,
-    'full-access',
-    'an accepted queued policy survives restart',
+  if (posix) {
+    assert.equal((await stat(path.join(folder(id), 'meta.json'))).mode & 0o777, 0o600);
+    assert.equal((await stat(path.join(folder(id), 'events.jsonl'))).mode & 0o777, 0o600);
+    assert.equal(
+      (await stat(path.join(dataDir, 'conversation-state', `${id}.json`))).mode & 0o777,
+      0o600,
+    );
+  }
+  // An id nobody reserved, another owner's, or another CLI's is refused.
+  await assert.rejects(
+    store.enqueue(randomUUID(), { owner, agent: 'pi' }, input('x')),
+    /ありません/,
   );
-  await store.enqueue(codex, { ...input, agent: 'codex' });
-  const pending = await new ConversationStore(dataDir).read(codex);
-  assert.equal(
-    pending.queued[1].access,
-    undefined,
-    'legacy/default messages never inherit a previous elevation',
+  await assert.rejects(
+    store.enqueue(id, { owner: { ...owner, id: randomUUID() }, agent: 'pi' }, input('x')),
+    /持ち主/,
   );
+  await assert.rejects(store.enqueue(id, { ...placement, agent: 'codex' }, input('x')), /Pi/);
+  const [row] = await restarted.list(owner.id);
+  assert.ok(row && !('damaged' in row));
+  assert.equal(row.queued, 1);
+  assert.equal(row.running, false);
+  assert.deepEqual(await restarted.list(randomUUID()), []);
 });
 
-test('A persisted start is never replayed after interruption and restored requests cannot be answered', async (t) => {
-  const { dataDir, binding, store } = await fixture(t);
-  const first = { ...binding, prompt: 'first' };
-  await store.enqueue(binding, first);
-  const queue = await store.enqueue(binding, { ...binding, prompt: 'second' });
+test('Events are appended, a streamed reply keeps one id across writes, and details over 1 MiB keep a marker', async (t) => {
+  const { open, store, owner, placement, input, folder } = await fixture(t);
+  const id = randomUUID();
   const runId = randomUUID();
-  await store.begin(binding, runId, first, queue[0].id);
-  await store.event(binding, { runId, type: 'text', text: '途中までの' });
-  await store.event(binding, { runId, type: 'text', text: '日本語' });
-  await store.event(binding, {
+  const eventId = randomUUID();
+  await store.begin(id, placement, { runId, eventId }, input('最初の指示'));
+  const file = path.join(folder(id), 'events.jsonl');
+  const first = await readFile(file, 'utf8');
+  const reply = randomUUID();
+  store.event(id, { id: reply, runId, type: 'text', text: '途中までの' });
+  await store.flush();
+  store.event(id, { id: reply, runId, type: 'text', text: '日本語' });
+  const details = '日本語'.repeat(200000); // 1.8 MB of UTF-8
+  store.event(id, { runId, type: 'tool', text: 'read', details, call: 'call-1' });
+  store.event(id, {
+    runId,
+    type: 'tool',
+    text: 'read の結果',
+    details: 'ok',
+    call: 'call-1',
+    result: true,
+  });
+  const long = randomUUID();
+  store.event(id, { id: long, runId, type: 'text', text: 'x'.repeat(2.5 * 1024 * 1024) });
+  store.event(id, {
     runId,
     type: 'question',
     text: '質問',
     requestId: randomUUID(),
     questions: [{ id: 'q', title: '選択' }],
   });
+  await store.finish(id, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  // Append only: what was written stays byte for byte.
+  assert.ok((await readFile(file, 'utf8')).startsWith(first));
+  const stored = (await lines(file)).map((line) => JSON.parse(line));
+  assert.equal(stored.filter((line) => line.id === reply).length, 2, 'two writes, one id');
+  assert.ok(stored.filter((line) => line.id === long).length >= 3, 'a long reply spans lines');
+  const tool = stored.find((line) => line.call === 'call-1' && !line.result);
+  assert.equal(tool.cut, Buffer.byteLength(details));
+  assert.ok(Buffer.byteLength(tool.details) <= 1024 * 1024);
+  assert.ok(tool.details.startsWith('日本語'));
+  const { events, earlier, damaged, activeRunId, meta } = await open().read(id);
+  assert.equal(earlier, 0);
+  assert.equal(damaged, 0);
+  assert.equal(activeRunId, undefined);
+  assert.equal(meta.updatedAt > meta.createdAt, true);
+  assert.deepEqual(
+    events.map((event) => [event.role ?? '', event.type]),
+    [
+      ['user', 'status'],
+      ['', 'text'],
+      ['', 'tool'],
+      ['', 'tool'],
+      ['', 'text'],
+      ['', 'status'],
+      ['', 'done'],
+    ],
+  );
+  assert.equal(events[0].id, eventId);
+  assert.equal(events[1].text, '途中までの日本語');
+  assert.equal(events[1].id, reply);
+  assert.equal(events[2].details?.length, viewDetails, 'a view gets the first 16,000');
+  assert.equal(events[2].cut, Buffer.byteLength(details));
+  assert.equal(events[3].result, true);
+  assert.equal(events[4].text.length, 2.5 * 1024 * 1024, 'text is kept whole');
+  assert.ok(events.every((event) => !event.requestId && !event.questions));
+  assert.ok(events.every((event) => event.conversationId === id && event.agent === 'pi'));
+});
+
+test('A damaged meta.json is listed and never replaced; a damaged line is skipped and later turns still append', async (t) => {
+  const { open, store, owner, placement, input, folder } = await fixture(t);
+  const a = randomUUID();
+  const b = randomUUID();
+  for (const id of [a, b]) {
+    const runId = randomUUID();
+    await store.begin(id, placement, { runId, eventId: randomUUID() }, input(`about ${id}`));
+    store.event(id, { runId, type: 'text', text: 'reply' });
+    store.event(id, { runId, type: 'tool', text: 'tool' });
+    await store.finish(id, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  }
+  const file = path.join(folder(a), 'events.jsonl');
+  const written = await lines(file);
+  written[1] = '{broken';
+  await writeFile(file, written.join('\n') + '\n');
+  // A crash in the middle of a write leaves a line without its end.
+  await appendFile(file, '{"id":"half a line');
+  let restarted = open();
+  const read = await restarted.read(a);
+  assert.equal(read.damaged, 2);
+  assert.deepEqual(
+    read.events.map((event) => event.type),
+    ['status', 'tool', 'done'],
+  );
+  const runId = randomUUID();
+  await restarted.begin(a, placement, { runId, eventId: randomUUID() }, input('again'));
+  await restarted.finish(a, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  const after = await open().read(a);
+  assert.equal(after.damaged, 2, 'the cut line stays apart from the next write');
+  assert.equal(after.events.at(-2)?.text, 'again');
+  assert.equal(after.events.at(-1)?.outcome, 'completed');
+
+  const metaFile = path.join(folder(b), 'meta.json');
+  for (const content of [
+    '{broken',
+    JSON.stringify({ schemaVersion: 1, id: b, owner: { id: owner.id }, title: 3 }),
+  ]) {
+    await writeFile(metaFile, content);
+    restarted = open();
+    const rows = await restarted.list(owner.id);
+    const row = rows.find((item) => item.id === b);
+    assert.ok(row && 'damaged' in row, JSON.stringify(rows));
+    assert.match(row.damaged, /meta\.json/);
+    await assert.rejects(restarted.read(b), /meta\.json/);
+    await assert.rejects(restarted.enqueue(b, placement, input('new')), /meta\.json/);
+    assert.equal(await readFile(metaFile, 'utf8'), content);
+  }
+  // Its owner still readable, a damaged row stays out of another owner's list.
+  assert.equal((await restarted.list(randomUUID())).length, 0);
+  await restarted.remove(b);
+  await assert.rejects(stat(folder(b)));
+  assert.deepEqual(
+    (await restarted.list(owner.id)).map((row) => row.id),
+    [a],
+  );
+});
+
+test('Pending instructions stay on this device, come back paused and run oldest first across conversations', async (t) => {
+  const { dataDir, open, store, owner, placement, input } = await fixture(t);
+  const x = randomUUID();
+  const y = randomUUID();
+  const [x1] = await store.enqueue(x, placement, input('x1\nbody of x1'));
+  const [y1] = await store.enqueue(y, placement, input('y1\nbody of y1'));
+  await store.enqueue(x, placement, input('x2\nbody of x2'));
+  assert.equal(await store.pending(owner.id), 3);
+  assert.equal((await store.nextQueued(owner.id))?.item.prompt, 'x1\nbody of x1');
+  assert.equal(await store.current(owner.id, 'pi'), x, 'the conversation queued longest is shown');
+  // An instruction cannot pass the queue it waits behind, or take another's place.
+  await assert.rejects(
+    store.begin(x, placement, { runId: randomUUID(), eventId: randomUUID() }, input('now')),
+    /送信待ちがあります/,
+  );
+  await assert.rejects(
+    store.begin(x, placement, { runId: randomUUID(), eventId: randomUUID() }, input('y1'), y1.id),
+    /順序/,
+  );
+  const runId = randomUUID();
+  await store.begin(x, placement, { runId, eventId: randomUUID() }, input(x1.prompt), x1.id);
+  assert.equal(await store.current(owner.id, 'pi'), x, 'the running conversation is shown');
+  const running = (await store.list(owner.id)).find((row) => row.id === x);
+  assert.ok(running && !('damaged' in running) && running.running);
+  await store.finish(x, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  // The oldest waiting instruction is now in the other conversation.
+  const restarted = open();
+  assert.equal(await restarted.pending(owner.id), 2);
+  const next = await restarted.nextQueued(owner.id);
+  assert.equal(next?.conversationId, y);
+  assert.equal(next?.item.prompt, 'y1\nbody of y1');
+  assert.equal((await restarted.read(x)).queued[0].prompt, 'x2\nbody of x2');
+  // Nothing about the queue is in the conversations folder.
+  for (const id of [x, y])
+    for (const name of ['meta.json', 'events.jsonl'])
+      assert.doesNotMatch(
+        await readFile(path.join(dataDir, 'conversations', id, name), 'utf8'),
+        /body of (x2|y1)/,
+      );
+  await restarted.removeQueued(y, y1.id);
+  await assert.rejects(restarted.removeQueued(y, y1.id), /送信待ちにありません/);
+  await assert.rejects(stat(path.join(dataDir, 'conversation-state', `${y}.json`)));
+});
+
+test('A claimed run is never sent again after an interruption, and its message comes back from the claim', async (t) => {
+  const { dataDir, open, store, placement, input } = await fixture(t);
+  const id = randomUUID();
+  const [first] = await store.enqueue(id, placement, input('first'));
+  await store.enqueue(id, placement, input('second'));
+  const runId = randomUUID();
+  await store.begin(id, placement, { runId, eventId: randomUUID() }, input('first'), first.id);
+  store.event(id, { runId, type: 'text', text: '途中まで' });
   await store.flush();
-  const restarted = new ConversationStore(dataDir);
-  const recovered = await restarted.read(binding);
+  let recovered = await open().read(id);
+  assert.equal(recovered.activeRunId, undefined);
   assert.deepEqual(
     recovered.queued.map((item) => item.prompt),
     ['second'],
   );
-  assert.equal(recovered.activeRunId, undefined);
-  assert.ok(recovered.events.some((event) => event.text === '途中までの日本語'));
+  assert.equal(recovered.events[1].text, '途中まで');
   assert.match(recovered.events.at(-1)!.text, /未確認.*再送していません/);
-  assert.ok(recovered.events.every((event) => !event.requestId && !event.questions));
-  await assert.rejects(restarted.begin(binding, randomUUID(), first, queue[0].id), /順序/);
-  const nextId = randomUUID();
-  await restarted.begin(binding, nextId, { ...binding, prompt: 'second' }, queue[1].id);
-  await restarted.finish(binding, {
-    runId: nextId,
-    type: 'done',
-    text: '完了',
-    outcome: 'completed',
-  });
-  const finished = await new ConversationStore(dataDir).read(binding);
-  assert.equal(finished.queued.length, 0);
-  assert.equal(finished.events.filter((event) => event.role === 'user').length, 2);
-  assert.equal(finished.events.at(-1)?.outcome, 'completed');
-});
 
-test('Corrupt and mismatched history fails closed without replacing accepted instructions', async (t) => {
-  const { dataDir, binding, store, filename } = await fixture(t);
-  await store.enqueue(binding, { ...binding, prompt: 'Keep this instruction' });
-  const original = await readFile(filename, 'utf8');
-  for (const content of [
-    '{broken',
-    JSON.stringify({ ...JSON.parse(original), root: 'elsewhere' }),
-  ]) {
-    await writeFile(filename, content);
-    const restarted = new ConversationStore(dataDir);
-    await assert.rejects(restarted.read(binding));
-    await assert.rejects(restarted.enqueue(binding, { ...binding, prompt: 'new' }));
-    assert.equal(await readFile(filename, 'utf8'), content);
-  }
-  await writeFile(filename, original);
-  assert.equal(
-    (await new ConversationStore(dataDir).read(binding)).queued[0].prompt,
-    'Keep this instruction',
+  // The host stopped between the claim and the message: the claim holds the message.
+  const other = randomUUID();
+  await store.enqueue(other, placement, input('placeholder'));
+  const state = path.join(dataDir, 'conversation-state', `${other}.json`);
+  const record = JSON.parse(await readFile(state, 'utf8'));
+  const eventId = randomUUID();
+  const claimed = randomUUID();
+  record.queued = [];
+  record.active = {
+    runId: claimed,
+    eventId,
+    at: new Date().toISOString(),
+    input: { prompt: '取り出した指示' },
+  };
+  await writeFile(state, JSON.stringify(record));
+  recovered = await open().read(other);
+  assert.deepEqual(
+    recovered.events.map((event) => [event.id === eventId, event.role, event.text.slice(0, 8)]),
+    [
+      [true, 'user', '取り出した指示'],
+      [false, undefined, '前回の実行結果は'],
+    ],
   );
+  await assert.rejects(stat(state), 'nothing is left to recover or send');
 });
 
-test('A failed claim leaves its queued instruction intact and history stays within a readable bound', async (t) => {
-  const { dataDir, binding, store, filename } = await fixture(t);
-  const input = { ...binding, prompt: 'Keep me' };
-  const queued = await store.enqueue(binding, input);
-  const original = await readFile(filename, 'utf8');
-  await rm(filename);
-  await mkdir(filename);
-  await assert.rejects(store.begin(binding, randomUUID(), input, queued[0].id), /regular file/);
-  assert.equal((await store.read(binding)).queued[0].id, queued[0].id);
-  await rm(filename, { recursive: true });
-  await writeFile(filename, original);
+test('Queue count and byte limits refuse additions without dropping accepted instructions', async (t) => {
+  const { open, store, placement, input } = await fixture(t);
+  const id = randomUUID();
+  for (let i = 0; i < 20; i++) await store.enqueue(id, placement, input(String(i)));
+  await assert.rejects(store.enqueue(id, placement, input('overflow')), /20/);
+  assert.equal((await open().read(id)).queued.length, 20);
+  const another = randomUUID();
+  for (let i = 0; i < 5; i++) await store.enqueue(another, placement, input('\0'.repeat(32000)));
+  await assert.rejects(store.enqueue(another, placement, input('\0'.repeat(32000))), /保存容量/);
+  assert.equal((await open().read(another)).queued.length, 5);
+});
+
+test('Rename, pin, archive and delete change only irori’s copy', async (t) => {
+  const { dataDir, open, store, owner, placement, input, folder } = await fixture(t);
+  const ids: string[] = [];
+  for (const prompt of ['one', 'two', 'three']) {
+    const id = randomUUID();
+    const runId = randomUUID();
+    await store.begin(id, placement, { runId, eventId: randomUUID() }, input(prompt));
+    await store.finish(id, { runId, type: 'done', text: '完了', outcome: 'completed' });
+    ids.push(id);
+  }
+  const [one, two, three] = ids;
+  assert.deepEqual(
+    (await store.list(owner.id)).map((row) => row.id),
+    [three, two, one],
+    'newest first',
+  );
+  const renamed = await store.rename(one, '  名前を\n変えた  ');
+  assert.equal(renamed.title, '名前を 変えた');
+  await assert.rejects(store.rename(one, '   '));
+  await store.pin(one, true);
+  await store.archive(three, true);
+  const rows = await open().list(owner.id);
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    [one, three, two],
+    'pinned first; an archived row is still listed, marked',
+  );
+  assert.equal(
+    JSON.parse(await readFile(path.join(folder(one), 'meta.json'), 'utf8')).titleSource,
+    'person',
+  );
+  assert.equal(
+    await store.latest(owner.id, 'pi'),
+    two,
+    'the latest not archived; pins do not count',
+  );
+  // Sending in an archived conversation brings it back.
+  await store.enqueue(three, placement, input('back'));
+  assert.equal(
+    JSON.parse(await readFile(path.join(folder(three), 'meta.json'), 'utf8')).archived,
+    false,
+  );
+  await assert.rejects(store.remove(three), /取り消して/);
+  const [item] = (await store.read(three)).queued;
+  await store.removeQueued(three, item.id);
+  await store.remove(three);
+  await assert.rejects(stat(folder(three)));
   const runId = randomUUID();
-  await store.begin(binding, runId, input, queued[0].id);
-  for (let i = 0; i < 430; i++)
-    await store.event(binding, {
-      runId,
-      type: 'tool',
-      text: `event ${i}`,
-      details: '日本語'.repeat(500),
-    });
-  await store.event(binding, { runId, type: 'text', text: '\0'.repeat(150000) });
-  await store.finish(binding, { runId, type: 'done', text: '完了', outcome: 'completed' });
-  assert.ok((await stat(filename)).size < 2 * 1024 * 1024);
-  const restored = await new ConversationStore(dataDir).read(binding);
-  assert.equal(restored.truncated, true);
-  assert.equal(restored.events.at(-1)?.text, '完了');
+  await store.begin(two, placement, { runId, eventId: randomUUID() }, input('busy'));
+  await assert.rejects(store.remove(two), /停止/);
+  await store.finish(two, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  if (posix) {
+    // A conversation folder that is a link is removed as a link.
+    const outside = path.join(dataDir, 'outside');
+    await mkdir(outside);
+    await writeFile(path.join(outside, 'keep.txt'), 'keep');
+    const linked = randomUUID();
+    await symlink(outside, folder(linked));
+    const fresh = open();
+    assert.ok((await fresh.list(owner.id)).some((row) => row.id === linked && 'damaged' in row));
+    await fresh.remove(linked);
+    assert.equal(await readFile(path.join(outside, 'keep.txt'), 'utf8'), 'keep');
+  }
 });
 
-test('Queue count and byte limits reject additions without dropping previously accepted messages', async (t) => {
-  const { binding, store, dataDir } = await fixture(t);
-  for (let i = 0; i < 20; i++) await store.enqueue(binding, { ...binding, prompt: String(i) });
-  await assert.rejects(store.enqueue(binding, { ...binding, prompt: 'overflow' }), /20/);
-  assert.equal((await new ConversationStore(dataDir).read(binding)).queued.length, 20);
-  const another = { ...binding, agent: 'codex' as const };
-  const input = { ...another, prompt: '\0'.repeat(32000) };
-  for (let i = 0; i < 5; i++) await store.enqueue(another, input);
-  await assert.rejects(store.enqueue(another, input), /保存容量/);
-  assert.equal((await new ConversationStore(dataDir).read(another)).queued.length, 5);
+test('A failed claim leaves its queued instruction where it was', async (t) => {
+  const { open, store, placement, input, folder } = await fixture(t);
+  const id = randomUUID();
+  const [queued] = await store.enqueue(id, placement, input('Keep me'));
+  const file = path.join(folder(id), 'events.jsonl');
+  await rm(file);
+  await mkdir(file);
+  await assert.rejects(
+    store.begin(
+      id,
+      placement,
+      { runId: randomUUID(), eventId: randomUUID() },
+      input('Keep me'),
+      queued.id,
+    ),
+    /regular file|EISDIR/,
+  );
+  const restarted = open();
+  assert.equal(await restarted.pending(placement.owner.id), 1);
+  assert.equal((await restarted.nextQueued(placement.owner.id))?.item.id, queued.id);
+});
+
+test('Line and paragraph separators and lone carriage returns stay inside their event', async (t) => {
+  const { open, store, placement, input, folder } = await fixture(t);
+  const id = randomUUID();
+  const runId = randomUUID();
+  await store.begin(id, placement, { runId, eventId: randomUUID() }, input('区切り を含む指示'));
+  store.event(id, { runId, type: 'text', text: '日本語 の 応答\rです' });
+  store.event(id, { runId, type: 'tool', text: 'read', details: '{"a":" "}' });
+  await store.finish(id, { runId, type: 'done', text: '完了', outcome: 'completed' });
+  const raw = await readFile(path.join(folder(id), 'events.jsonl'), 'utf8');
+  assert.ok(!raw.includes(' ') && !raw.includes(' '));
+  const { events, damaged } = await open().read(id);
+  assert.equal(damaged, 0);
+  assert.equal(events[0].text, '区切り を含む指示');
+  assert.equal(events[1].text, '日本語 の 応答\rです');
+  assert.equal(events[2].details, '{"a":" "}');
 });

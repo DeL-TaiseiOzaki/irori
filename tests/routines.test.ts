@@ -12,7 +12,7 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { GitService } from '../src/git/service';
 import { AgentService } from '../src/agents/service';
-import { SessionStore } from '../src/agents/sessions';
+import { conversationMetas } from './fixtures/conversations';
 import { failedReport, nothingToDo, parseRoutine, RoutineService } from '../src/host/routines';
 import { lineDiff, type RoutineRef, type RoutineRun } from '../src/domain/routines';
 import type { AgentEvent } from '../src/domain/types';
@@ -517,10 +517,6 @@ test(
   fixtureOptions,
   async (t) => {
     const { routine, start, ended, root, space, agents, files } = await setup(t);
-    // The person's own saved session with that CLI stays as it was.
-    const sessions = new SessionStore(files.dataDir);
-    const binding = { scopeId: space.scopeId, agent: 'pi' as const, root: space.root };
-    await sessions.save(binding, path.join(root, 'person-session.jsonl'), 'default');
     const ref = await routine('ask', {
       'routine.yaml':
         'name: Ask\nsteps:\n  - agent: hibachi\n    access: default\n    prompt: Summarize the inbox.\n',
@@ -533,11 +529,22 @@ test(
     assert.equal(step.output, '日本語 の応答');
     assert.equal(step.conversation?.scopeId, space.scopeId);
     assert.equal(step.conversation?.agent, 'pi');
-    assert.equal((await sessions.read(binding))?.handle, path.join(root, 'person-session.jsonl'));
-    // The conversation shows the step's prompt and the routine, not the preamble.
-    const shown = (await agents.conversation(space.scopeId, 'pi')).events.filter(
-      (event) => event.runId === step.conversation?.runId,
+    // The step is a conversation of its own (ADR 017), naming the routine's run, and
+    // its native session is never kept: the person's conversations are not touched.
+    const [meta] = await conversationMetas(files.dataDir);
+    assert.equal(meta.id, step.conversation?.conversationId);
+    assert.deepEqual(meta.routine, { runId: run.id, step: 0 });
+    assert.equal(meta.title, 'ルーティン: Ask（ステップ 1）');
+    assert.deepEqual(meta.native, {});
+    assert.equal(
+      (await agents.conversationList(space.scopeId)).length,
+      1,
+      'no conversation of the person was made or changed',
     );
+    // The conversation shows the step's prompt and the routine, not the preamble.
+    const shown = (
+      await agents.conversation(space.scopeId, 'pi', step.conversation?.conversationId)
+    ).events.filter((event) => event.runId === step.conversation?.runId);
     assert.ok(
       shown.some((event) => event.role === 'user' && event.text === 'Summarize the inbox.'),
     );

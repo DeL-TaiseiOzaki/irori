@@ -32,9 +32,15 @@ import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import type { FileService } from '../host/files';
-import { SessionStore, type SessionBinding } from './sessions';
-import { ConversationStore } from './conversations';
-import { startInput, type Conversation } from '../domain/conversation';
+import type { SessionBinding } from './sessions';
+import { ConversationStore, rootDigest, viewDetails, type Placement } from './conversations';
+import {
+  conversationTitle,
+  startInput,
+  type Conversation,
+  type ConversationOwner,
+} from '../domain/conversation';
+import { DeviceIdentity } from '../host/device';
 import {
   brainsCommandPreamble,
   brainsPreamble,
@@ -74,6 +80,8 @@ export interface StepRun {
   notice: string;
   /** `IRORI_WORK`, `IRORI_STATE` and `IRORI_ROUTINE`, in the CLI's environment too. */
   env: Record<string, string>;
+  /** The routine's run and this step's index, kept in the step's conversation. */
+  routine?: { runId: string; step: number };
 }
 /** How a routine's agent step ended, and its report: the words after its last other event. */
 export interface StepEnd {
@@ -84,6 +92,8 @@ export interface StepEnd {
 type Run = {
   id: string;
   binding: SessionBinding;
+  /** The conversation the run is recorded in, once it is known (ADR 017). */
+  conversationId?: string;
   /** For your AI: its folder and the brains handed to it in this run. */
   delegation?: Delegation;
   /** For a hibachi agent's run started by your AI's `hibachi` command: that run's id. */
@@ -93,6 +103,16 @@ type Run = {
   access: AgentAccess;
   queuedId?: string;
   recorded?: boolean;
+  /** The id streamed text keeps until another kind of event comes. */
+  textId?: string;
+  /** The agent said or did something in this run: a failure is not the resume's. */
+  progressed?: boolean;
+  /** The hibachis this run's hand-offs reached. */
+  reached: Set<string>;
+  /** The digest of the checkout the run works in, kept with its native session. */
+  root?: string;
+  /** The title a new conversation for this run takes instead of its first line. */
+  title?: string;
   accepted: Promise<void>;
   accept: () => void;
   reject: (error: unknown) => void;
@@ -108,12 +128,12 @@ type Run = {
   close: () => void;
 };
 export class AgentService {
-  // One run per space. Two spaces are separate checkouts, so their runs never
-  // touch the same bytes; two runs in one space would.
+  // One run per checkout, whatever its conversation (ADR 017 D4). A space is one
+  // registered checkout on this device, so its runs never touch another's bytes;
+  // two runs in one space would.
   private runs = new Map<string, Run>();
-  private sessions: SessionStore;
+  private device: DeviceIdentity;
   private conversations: ConversationStore;
-  private resetting = new Set<string>();
   private catalog = new ModelCatalog();
   // Brains handed to your AI's run in progress, by the run that holds them. A brain
   // is busy while its sub-agent may be working in its checkout.
@@ -133,9 +153,9 @@ export class AgentService {
     private authorship = new AuthorshipStore(files.dataDir),
     private you?: YourAiService,
   ) {
-    this.sessions = new SessionStore(files.dataDir);
+    this.device = new DeviceIdentity(files.dataDir);
     // An unwritable history is a whole-device fault, so every run stops.
-    this.conversations = new ConversationStore(files.dataDir, () => {
+    this.conversations = new ConversationStore(files.dataDir, this.device, () => {
       for (const run of [...this.runs.values()]) {
         this.publish(
           run,
@@ -150,7 +170,7 @@ export class AgentService {
     });
   }
   busy(scopeId: string) {
-    return this.runs.has(scopeId) || this.resetting.has(scopeId) || this.delegated.has(scopeId);
+    return this.runs.has(scopeId) || this.delegated.has(scopeId);
   }
   /** Whether `scopeId` is your AI's own id rather than a brain's. */
   private isYou(scopeId: string) {
@@ -160,8 +180,14 @@ export class AgentService {
   private root(scopeId: string) {
     return this.you?.rootOf(scopeId) ?? this.files.get(scopeId).root;
   }
+  /** Whose conversation it is: a hibachi's, or the irori agent's. */
+  private owner(scopeId: string): ConversationOwner {
+    return this.isYou(scopeId)
+      ? { kind: 'irori-agent', id: scopeId, name: 'irori agent' }
+      : { kind: 'hibachi', id: scopeId, name: this.files.get(scopeId).name.slice(0, 200) };
+  }
   get anyBusy() {
-    return this.runs.size > 0 || this.resetting.size > 0;
+    return this.runs.size > 0;
   }
   runningScopes() {
     return [...this.runs.keys()];
@@ -169,56 +195,116 @@ export class AgentService {
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.root(scopeId) };
   }
-  session(scopeId: string, agent: AgentId) {
-    return this.sessions.status(this.binding(scopeId, agent));
+  /** The owner's conversations for its history list. */
+  async conversationList(scopeId: string) {
+    this.root(scopeId);
+    return this.conversations.list(scopeId);
+  }
+  /** An id for the owner's next conversation; it is written with its first instruction. */
+  createConversation(scopeId: string, agent: AgentId) {
+    this.root(scopeId);
+    return this.conversations.reserve(scopeId, agent);
+  }
+  renameConversation(id: string, title: string) {
+    return this.conversations.rename(id, title);
+  }
+  pinConversation(id: string, pinned: boolean) {
+    return this.conversations.pin(id, pinned);
+  }
+  archiveConversation(id: string, archived: boolean) {
+    return this.conversations.archive(id, archived);
+  }
+  deleteConversation(id: string) {
+    if ([...this.runs.values()].some((run) => run.conversationId === id))
+      throw Error(t('実行を停止してから削除してください。', 'Stop the run before deleting.'));
+    return this.conversations.remove(id);
   }
   /**
-   * The saved conversation and the requests its run is waiting on now. A request
-   * is kept only as status text in the history, so a view opened while it waits
-   * takes the live one from here.
+   * A conversation and the requests its run is waiting on now. A request is kept
+   * only as status text in the history, so a view opened while it waits takes the
+   * live one from here. Without an id, the owner's conversation on show: the one
+   * running, the one queued longest, or its latest with this CLI.
    */
-  async conversation(scopeId: string, agent: AgentId): Promise<Conversation> {
-    const value = await this.conversations.read(this.binding(scopeId, agent));
+  async conversation(scopeId: string, agent: AgentId, id?: string): Promise<Conversation> {
+    this.root(scopeId);
+    id ??= await this.conversations.current(scopeId, agent);
+    const pending = await this.conversations.pending(scopeId);
+    const reserved = id && this.conversations.reservation(id);
+    if (!id || reserved) {
+      if (reserved && reserved.owner !== scopeId)
+        throw Error(
+          t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.'),
+        );
+      return {
+        id,
+        events: [],
+        queued: [],
+        pending,
+        earlier: 0,
+        damaged: 0,
+        session: { state: 'empty' },
+      };
+    }
+    const value = await this.conversations.read(id);
+    if (value.meta.owner.id !== scopeId)
+      throw Error(
+        t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.'),
+      );
+    const native = await this.conversations.native(id).catch(() => undefined);
     const requests = [...this.requests.values()]
-      .filter(
-        ({ run }) =>
-          run.binding.scopeId === scopeId &&
-          run.binding.agent === agent &&
-          run.id === value.activeRunId,
-      )
+      .filter(({ run }) => run.conversationId === id && run.id === value.activeRunId)
       .map(({ event }) => event);
-    return { ...value, requests };
+    return {
+      id,
+      summary: this.conversations.summary(value.meta),
+      events: value.events,
+      queued: value.queued,
+      pending,
+      earlier: value.earlier,
+      damaged: value.damaged,
+      activeRunId: value.activeRunId,
+      requests,
+      session: native?.entry ? { state: 'saved', access: native.entry.access } : { state: 'empty' },
+    };
   }
-  queueMessage(input: StartRun) {
+  /** Where an instruction that names no conversation goes: the owner's latest with this CLI, or a new one. */
+  private async placement(input: StartRun) {
+    const placement: Placement = { owner: this.owner(input.scopeId), agent: input.agent };
+    if (input.conversationId) return { id: input.conversationId, placement };
+    const latest = await this.conversations.latest(input.scopeId, input.agent);
+    return { id: latest ?? randomUUID(), placement: { ...placement, create: !latest } };
+  }
+  async queueMessage(input: StartRun) {
     input = startInput.parse(input);
     requireAgentAccess(input.agent, input.access);
-    if (input.newSession)
+    this.root(input.scopeId);
+    if (this.isYou(input.scopeId) && (input.notePath || input.personLines || input.sources?.length))
       throw Error(
         t(
-          '新しい会話は送信待ちを完了してから開始してください。',
-          'Finish the queued instructions before starting a new conversation.',
+          'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
+          'The irori agent takes hibachis, not notes or materials.',
         ),
       );
-    const run = this.runs.get(input.scopeId);
-    if (this.resetting.has(input.scopeId) || (run && run.binding.agent !== input.agent))
-      throw Error(
-        t(
-          'このスペースで実行中のCLIに指示を追加してください。',
-          'Add instructions to the CLI running in this space.',
-        ),
-      );
-    return this.conversations.enqueue(this.binding(input.scopeId, input.agent), input);
+    const { id, placement } = await this.placement(input);
+    return this.conversations.enqueue(id, placement, input);
   }
-  removeQueued(scopeId: string, agent: AgentId, id: string) {
-    return this.conversations.remove(this.binding(scopeId, agent), id);
+  removeQueued(conversationId: string, id: string) {
+    return this.conversations.removeQueued(conversationId, id);
   }
-  async startQueued(scopeId: string, agent: AgentId, id: string, canStart = () => {}) {
-    const { queued } = await this.conversation(scopeId, agent);
-    const next = queued[0];
-    if (!next || next.id !== id)
-      throw Error(t('送信待ちの順序が変わりました。', 'The queue order has changed.'));
+  /** Instructions waiting across the owner's conversations. */
+  pending(scopeId: string) {
+    return this.conversations.pending(scopeId);
+  }
+  /** Starts the owner's oldest queued instruction, whichever conversation holds it. */
+  async startNextQueued(scopeId: string, canStart = () => {}) {
+    if (this.busy(scopeId)) return null;
+    const next = await this.conversations.nextQueued(scopeId);
+    if (!next) return null;
     canStart();
-    const runId = this.start({ ...next, scopeId, agent }, id);
+    const runId = this.start(
+      { ...next.item, scopeId, agent: next.agent, conversationId: next.conversationId },
+      next.item.id,
+    );
     await this.runs.get(scopeId)!.accepted;
     return runId;
   }
@@ -229,28 +315,6 @@ export class AgentService {
   }
   flush() {
     return this.conversations.flush();
-  }
-  async resetSession(scopeId: string, agent: AgentId) {
-    if (this.busy(scopeId))
-      throw Error(
-        t(
-          '実行を停止してから会話をリセットしてください。',
-          'Stop the run before resetting the conversation.',
-        ),
-      );
-    this.resetting.add(scopeId);
-    try {
-      if ((await this.conversation(scopeId, agent)).queued.length)
-        throw Error(
-          t(
-            '送信待ちを完了または取り消してから会話をリセットしてください。',
-            'Finish or cancel the queued instructions before resetting the conversation.',
-          ),
-        );
-      await this.sessions.reset(this.binding(scopeId, agent));
-    } finally {
-      this.resetting.delete(scopeId);
-    }
   }
   /** The models the installed CLI offers, read once per CLI version. */
   models(agent: AgentId) {
@@ -279,15 +343,20 @@ export class AgentService {
       }),
     );
   }
-  start(input: StartRun, queuedId?: string, holder?: string, step?: StepRun): string {
+  start(
+    input: StartRun,
+    queuedId?: string,
+    holder?: string,
+    step?: StepRun,
+    title?: string,
+  ): string {
     input = startInput.parse(input);
     const access = requireAgentAccess(input.agent, input.access);
     // A brain held by your AI's run takes exactly one run more: the hand-off that run asks for.
     const handed =
       holder !== undefined &&
       this.delegated.get(input.scopeId) === holder &&
-      !this.runs.has(input.scopeId) &&
-      !this.resetting.has(input.scopeId);
+      !this.runs.has(input.scopeId);
     if (this.busy(input.scopeId) && !handed)
       throw Error('This space is already running an agent. Stop it before starting another.');
     if (!input.prompt.trim() || input.prompt.length > 32000)
@@ -328,10 +397,14 @@ export class AgentService {
     const run: Run = {
       id: randomUUID(),
       binding: this.binding(input.scopeId, input.agent),
+      // A routine's step is a conversation of its own, named at once so its record can open it.
+      conversationId: step ? randomUUID() : input.conversationId,
       access,
       holder,
       step,
       queuedId,
+      reached: new Set(),
+      title,
       accepted,
       accept,
       reject,
@@ -347,31 +420,44 @@ export class AgentService {
     return run.id;
   }
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
+    if (type === 'text' || type === 'tool') run.progressed = true;
     const event = this.publish(run, type, text, extra);
     this.record(run, event);
     return event;
   }
   private record(run: Run, event: AgentEvent) {
-    if (run.recorded)
-      void this.conversations.event(run.binding, event).catch(() => {
-        this.publish(
-          run,
-          'error',
-          t(
-            '会話履歴を保存できません。実行を停止します。',
-            'Could not save the conversation history. Stopping the run.',
-          ),
-        );
-        void this.cancel(run.binding.scopeId);
-      });
+    if (!run.recorded || !run.conversationId) return;
+    if (event.delegate?.state === 'started') run.reached.add(event.delegate.scopeId);
+    try {
+      this.conversations.event(run.conversationId, event);
+    } catch {
+      this.publish(
+        run,
+        'error',
+        t(
+          '会話履歴を保存できません。実行を停止します。',
+          'Could not save the conversation history. Stopping the run.',
+        ),
+      );
+      void this.cancel(run.binding.scopeId);
+    }
   }
+  /**
+   * Sends an event to the views. Each gets an id the saved conversation keeps; a
+   * streamed reply keeps one id until another kind of event comes. Views get at
+   * most `viewDetails` of a tool's details; the conversation keeps up to 1 MiB.
+   */
   private publish(
     run: Run,
     type: AgentEvent['type'],
     text: string,
     extra: Partial<AgentEvent> = {},
   ) {
-    const event = {
+    const id = extra.id ?? (type === 'text' ? (run.textId ??= randomUUID()) : randomUUID());
+    if (type !== 'text') run.textId = undefined;
+    const event: AgentEvent = {
+      id,
+      conversationId: run.conversationId,
       runId: run.id,
       scopeId: run.binding.scopeId,
       agent: run.binding.agent,
@@ -379,8 +465,12 @@ export class AgentService {
       text,
       ...extra,
     };
-    this.emit(event);
-    this.watchers.get(run.id)?.(event);
+    const shown =
+      event.details && event.details.length > viewDetails
+        ? { ...event, details: event.details.slice(0, viewDetails) }
+        : event;
+    this.emit(shown);
+    this.watchers.get(run.id)?.(shown);
     return event;
   }
   private ask(
@@ -391,6 +481,7 @@ export class AgentService {
     extra: Partial<AgentEvent> = {},
   ): Promise<Reply> {
     if (run.cancelled) return Promise.resolve({ allow: false });
+    run.progressed = true;
     const requestId = randomUUID();
     return new Promise((resolve) => {
       // Registered before it is published, since an answer can arrive at once.
@@ -451,8 +542,12 @@ export class AgentService {
    * Starts a routine's agent step (ADR 016 D7): an ordinary run, shown in its
    * conversation as it goes. `done` resolves when it ends, with its report.
    */
-  startStep(input: StartRun, step: StepRun): { runId: string; done: Promise<StepEnd> } {
+  startStep(
+    input: StartRun,
+    step: StepRun,
+  ): { runId: string; conversationId: string; done: Promise<StepEnd> } {
     const runId = this.start(input, undefined, undefined, step);
+    const conversationId = this.runs.get(input.scopeId)!.conversationId!;
     let report = '';
     let after = true;
     const errors: string[] = [];
@@ -472,19 +567,70 @@ export class AgentService {
         resolve({ outcome: event.outcome ?? 'failed', report, error: errors.at(-1) });
       });
     });
-    return { runId, done };
+    return { runId, conversationId, done };
+  }
+  /** The conversation a run goes to, and how a new one is made (ADR 017 D2, D4). */
+  private async place(run: Run, input: StartRun): Promise<{ id: string; placement: Placement }> {
+    const placement: Placement = {
+      owner: this.owner(input.scopeId),
+      agent: input.agent,
+      title: run.title,
+    };
+    if (run.step)
+      return {
+        id: run.conversationId!,
+        placement: {
+          ...placement,
+          create: true,
+          title: run.step.notice,
+          titleSource: 'routine',
+          ...(run.step.routine && { routine: run.step.routine }),
+        },
+      };
+    const holder = run.holder && [...this.runs.values()].find((item) => item.id === run.holder);
+    if (holder && holder.conversationId) {
+      // Work handed from one of the irori agent's conversations continues in one
+      // conversation of the hibachi, apart from the person's own.
+      const from = holder.conversationId;
+      const found = await this.conversations.handed(input.scopeId, input.agent, from);
+      return {
+        id: found ?? randomUUID(),
+        placement: { ...placement, create: !found, handedBy: { conversationId: from } },
+      };
+    }
+    const placed = await this.placement(input);
+    return { id: placed.id, placement: { ...placed.placement, title: run.title } };
+  }
+  /** Keeps the CLI's session handle for this device, unless the run is a routine's step. */
+  private async saveSession(run: Run, handle: string) {
+    if (run.step || !run.conversationId || !run.root) return;
+    await this.conversations.saveNative(run.conversationId, {
+      handle,
+      access: run.access,
+      root: run.root,
+    });
   }
   private async execute(run: Run, input: StartRun) {
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
     let record: RunRecord | undefined;
     try {
-      await this.conversations.begin(run.binding, run.id, input, run.queuedId);
+      const placed = await this.place(run, input);
+      run.conversationId = placed.id;
+      // The owner's queue goes first, whichever of its conversations it waits in.
+      if (!run.queuedId && (await this.conversations.pending(input.scopeId)))
+        throw Error(t('送信待ちがあります。', 'There are queued instructions.'));
+      const eventId = randomUUID();
+      await this.conversations.begin(
+        placed.id,
+        placed.placement,
+        { runId: run.id, eventId },
+        input,
+        run.queuedId,
+      );
       run.recorded = true;
       run.accept();
-      if (input.newSession)
-        this.publish(run, 'status', t('新しい会話を開始します。', 'Starting a new conversation.'));
-      this.publish(run, 'status', input.prompt, { role: 'user' });
+      this.publish(run, 'status', input.prompt, { role: 'user', id: eventId });
       if (run.step) this.event(run, 'status', run.step.notice);
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
@@ -597,28 +743,42 @@ export class AgentService {
       let prompt = promptParts.join('\n\n');
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       const binding = this.binding(input.scopeId, input.agent);
-      if (input.newSession) await this.sessions.reset(binding);
-      // A routine's step starts afresh and leaves the person's own session as it was.
-      const previous = run.step ? undefined : await this.sessions.read(binding);
-      // Native sessions can retain approvals. A policy change starts a fresh
-      // native conversation, while irori's display history remains available.
-      const saved = previous?.access === run.access ? previous : undefined;
-      if (previous && !saved)
-        this.event(
-          run,
-          'status',
-          t(
-            'アクセス設定が変わったため、新しい会話で実行します。表示履歴は残ります。',
-            'The access setting changed, so this runs in a new conversation. The displayed history stays.',
-          ),
-        );
+      // A native session continues only on the device, checkout and access mode it
+      // was made with (ADR 017 D7). Native sessions can retain approvals, so a
+      // policy change starts a fresh one in the same conversation (ADR 009). A
+      // routine's step always starts afresh and is never kept.
+      run.root = rootDigest(space.root);
+      let saved: string | undefined;
+      if (!run.step) {
+        const { entry, elsewhere } = await this.conversations.native(run.conversationId!);
+        if (entry && entry.root === run.root && entry.access === run.access) saved = entry.handle;
+        else if (entry || elsewhere)
+          this.event(
+            run,
+            'status',
+            !entry
+              ? t(
+                  'この端末では新しいセッションで続けます。',
+                  'This device continues in a new session.',
+                )
+              : entry.root !== run.root
+                ? t(
+                    '別のフォルダのため、新しいセッションで続けます。',
+                    'This is another folder, so this continues in a new session.',
+                  )
+                : t(
+                    'アクセス設定が変わったため、新しいセッションで続けます。',
+                    'The access setting changed, so this continues in a new session.',
+                  ),
+          );
+      }
       resuming = !!saved;
       if (run.cancelled) return;
       if (saved)
         this.event(
           run,
           'status',
-          t('保存済みの会話を引き継ぎます。', 'Continuing the saved conversation.'),
+          t('保存済みのセッションを引き継ぎます。', 'Continuing the saved session.'),
         );
       this.event(
         run,
@@ -636,9 +796,9 @@ export class AgentService {
       if (input.model)
         this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
       if (input.agent === 'codex')
-        await this.codex(run, space.root, prompt, binding, saved?.handle, input.model);
+        await this.codex(run, space.root, prompt, binding, saved, input.model);
       else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, binding, saved?.handle, input.model);
+        await this.claude(run, space.root, prompt, binding, saved, input.model);
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
@@ -688,7 +848,7 @@ export class AgentService {
         const context: NativeContext = {
           cwd: space.root,
           prompt,
-          session: saved?.handle,
+          session: saved,
           access: run.access,
           model: input.model,
           env: run.step
@@ -701,9 +861,7 @@ export class AgentService {
           },
           event: (type, text, extra) => this.event(run, type, text, extra),
           ask: (text, details, questions) => this.ask(run, text, details, questions),
-          saveSession: async (handle) => {
-            if (!run.step) await this.sessions.save(binding, handle, run.access);
-          },
+          saveSession: (handle) => this.saveSession(run, handle),
         };
         if (input.agent === 'pi') await runPi(context);
         else if (input.agent === 'opencode') await runOpenCode(context);
@@ -714,15 +872,19 @@ export class AgentService {
       if (!run.cancelled) {
         outcome = 'failed';
         this.event(run, 'error', String(e));
-        if (resuming)
+        // A resume that failed before the agent did anything is reported, and this
+        // device's handle is set aside: the next instruction starts a new session.
+        if (resuming && !run.progressed) {
           this.event(
             run,
             'error',
             t(
-              '前回の会話を引き継げませんでした（会話をリセット）。',
-              'Could not continue the previous conversation (reset the conversation).',
+              '前回のセッションを引き継げませんでした。次の送信は新しいセッションで始まります。',
+              'Could not continue the previous session. The next instruction starts a new one.',
             ),
           );
+          await this.conversations.saveNative(run.conversationId!, undefined).catch(() => {});
+        }
       }
     } finally {
       this.denyRequests(run);
@@ -743,6 +905,7 @@ export class AgentService {
           );
         });
       const done: AgentEvent = {
+        id: randomUUID(),
         runId: run.id,
         type: 'done',
         outcome,
@@ -755,7 +918,7 @@ export class AgentService {
       };
       if (run.recorded) {
         try {
-          await this.conversations.finish(run.binding, done);
+          await this.conversations.finish(run.conversationId!, done, [...run.reached]);
         } catch {
           done.outcome = 'failed';
           done.text = t(
@@ -767,7 +930,7 @@ export class AgentService {
       if (this.runs.get(run.binding.scopeId) === run) this.runs.delete(run.binding.scopeId);
       for (const [scopeId, holder] of this.delegated)
         if (holder === run.id) this.delegated.delete(scopeId);
-      this.publish(run, 'done', done.text, { outcome: done.outcome });
+      this.publish(run, 'done', done.text, { outcome: done.outcome, id: done.id });
       run.close();
     }
   }
@@ -820,13 +983,20 @@ export class AgentService {
       },
       undefined,
       holder.id,
+      undefined,
+      conversationTitle(task),
     );
     // Registered before the run's first event, which waits for the next tick.
     this.watchers.set(runId, (event) => {
       if (event.type === 'text') words = (words + event.text).slice(-100000);
       else if (event.type === 'error') errors.push(event.text);
       else if (event.type === 'tool')
-        this.event(holder, 'tool', event.text, { details: event.details, ...delegate('working') });
+        this.event(holder, 'tool', event.text, {
+          details: event.details,
+          call: event.call,
+          result: event.result,
+          ...delegate('working'),
+        });
       else if (event.type === 'done') finished(event.outcome);
     });
     const label = task.trim().split('\n')[0].slice(0, 120);
@@ -901,12 +1071,23 @@ export class AgentService {
           p.item?.type !== 'userMessage'
         )
           this.event(run, 'tool', p.item?.type ?? 'tool', {
-            details: JSON.stringify(p.item).slice(0, 16000),
+            details: JSON.stringify(p.item),
+            call: p.item?.id,
           });
-        if (m.method === 'item/completed' && p.item?.type === 'fileChange')
-          this.event(run, 'tool', t('ファイルを変更しました', 'Changed files'), {
-            details: JSON.stringify(p.item).slice(0, 16000),
-          });
+        // A finished item carries its output: a command's, a tool's, the files changed.
+        if (
+          m.method === 'item/completed' &&
+          p.item &&
+          !['agentMessage', 'userMessage', 'reasoning'].includes(p.item.type)
+        )
+          this.event(
+            run,
+            'tool',
+            p.item.type === 'fileChange'
+              ? t('ファイルを変更しました', 'Changed files')
+              : t(`${p.item.type} の結果`, `${p.item.type} result`),
+            { details: JSON.stringify(p.item), call: p.item.id, result: true },
+          );
         if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
         if (m.method === 'turn/completed') {
           if (p.turn?.status === 'failed')
@@ -937,7 +1118,7 @@ export class AgentService {
       session ? { ...params, threadId: session } : params,
     );
     run.threadId = thread.thread.id;
-    if (!run.step) await this.sessions.save(binding, thread.thread.id, run.access);
+    await this.saveSession(run, thread.thread.id);
     if (run.cancelled) return;
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
@@ -1021,6 +1202,8 @@ export class AgentService {
     // hand-off it runs: every step and request of a sub-agent names its brain.
     const tasks = new Map<string, string>();
     const agentTasks = new Map<string, string>();
+    // Each tool call's name by its id, for its result.
+    const tools = new Map<string, string>();
     const agentTypes = new Map<string, string>();
     const delegate = (task: string | undefined, state: Delegate['state']) => {
       const scopeId = task ? tasks.get(task) : undefined;
@@ -1202,8 +1385,8 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
-        if (msg.type === 'system' && msg.subtype === 'init' && !run.step)
-          await this.sessions.save(binding, msg.session_id, run.access);
+        if (msg.type === 'system' && msg.subtype === 'init')
+          await this.saveSession(run, msg.session_id);
         // A sub-agent's words stay with its hand-off; the reply shown is the
         // main conversation's.
         const main = !('parent_tool_use_id' in msg) || !msg.parent_tool_use_id;
@@ -1235,6 +1418,7 @@ export class AgentService {
           for (const block of msg.message.content) {
             if (block.type === 'text' && !streamed && main) this.event(run, 'text', block.text);
             if (block.type !== 'tool_use') continue;
+            tools.set(block.id, block.name);
             const input = block.input as { subagent_type?: string; description?: string };
             const brain =
               main && /^(Agent|Task)$/.test(block.name) && delegation
@@ -1250,9 +1434,23 @@ export class AgentService {
               );
             } else
               this.event(run, 'tool', block.name, {
-                details: JSON.stringify(block.input).slice(0, 16000),
+                details: JSON.stringify(block.input),
+                call: block.id,
                 ...(main ? {} : delegate(msg.parent_tool_use_id ?? undefined, 'working')),
               });
+          }
+        // Each tool's result comes back in the next user message; a hand-off's is its report.
+        if (msg.type === 'user' && !('isReplay' in msg) && Array.isArray(msg.message.content))
+          for (const block of msg.message.content) {
+            if (block.type !== 'tool_result' || tasks.has(block.tool_use_id)) continue;
+            const name = tools.get(block.tool_use_id) ?? 'Tool';
+            this.event(run, 'tool', t(`${name} の結果`, `${name} result`), {
+              details:
+                typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+              call: block.tool_use_id,
+              result: true,
+              ...(main ? {} : delegate(msg.parent_tool_use_id ?? undefined, 'working')),
+            });
           }
         if (msg.type === 'result') {
           sawResult = true;
