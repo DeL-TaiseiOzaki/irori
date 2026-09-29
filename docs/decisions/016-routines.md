@@ -1,6 +1,7 @@
 # 016 — Routines: jobs a person defines and starts
 
-Date: 2026-09-30. Status: owner direction accepted; design only, not implemented.
+Date: 2026-09-30. Status: owner direction accepted; stage 1 implemented in
+0.1.57 ([ROUTINES](../ROUTINES.md), and "Stage 1 as built" below).
 The owner chose the name **routines** (ルーティン) on 2026-09-30 over "tasks",
 which a second brain's reader takes for to-do items.
 
@@ -247,11 +248,52 @@ extensions was:
 - Docker and in-process Python (Pyodide): too heavy for most people, and too
   limited for network fetching, respectively.
 
+## Stage 1 as built
+
+Implemented on 2026-09-30 (0.1.57). What the implementation settled that the
+decisions above left open:
+
+- **Where it shows** (owner, 2026-09-30): irori mode's third view,
+  **ルーティン**, beside the map and the columns. It lists the irori agent's
+  routines and those of the open workspace's hibachis, grouped by owner, with
+  the agent panel beside it.
+- **Names and defaults.** `hibachis: all` and hibachi names resolve within the
+  open workspace. A step without `cli` or `model` takes the ones chosen in that
+  agent's panel when **実行** is pressed.
+- **Other files.** A `run` file that is not JavaScript or Python runs as a
+  program itself: its `#!` line names the interpreter, found on `PATH`, and it
+  must be executable. A command in an argv array is looked up on `PATH` before
+  the run and named when missing. `.py` steps and `secrets:` are read but keep
+  the routine from running until stages 3 and 2.
+- **The review** keeps, beside the digest, the text of the files as confirmed
+  (up to 1 MiB in all), so a change is shown line by line; a binary or large
+  file is shown as changed without its text. A routine folder holds at most
+  100 files and 5 MiB, with no links; `.DS_Store` is ignored.
+- **Agent steps.** Their native session is never saved, so the person's own
+  conversation with that agent continues where it was. The three variables are
+  in the step's preamble and in the CLI's environment; on Claude Code the three
+  folders are also additional directories. The report checked for `[FAILED]`
+  is the agent's text after its last other event (a tool call, a request or a
+  hand-off). A step waits while its agent or a handed hibachi runs, while Git,
+  a save or a connection keeps agents from starting, and while that agent has
+  queued instructions.
+- **While a routine runs,** Git operations wait, as they do for an agent run,
+  and closing irori asks before stopping it.
+- **JavaScript** is added by a device setting (`routineRuntimes`), from the
+  routine's row or the settings; Python's download will be stage 3's `HostAPI`
+  method.
+- **The change record** compares each hibachi's Git status before and after,
+  and the content of paths changed at both ends. Git status leaves out a
+  hibachi's contents folders and hibachis that are not Git repositories, so
+  changes there are not listed.
+- **Run records**: the last 20 runs of each routine, each step's output kept to
+  its last 16 KiB.
+
 ## Stages
 
 1. `routine.yaml`, discovery in both locations, D4's review, **実行** and
    **停止**, `run` steps with the JavaScript runtime and `PATH` commands, agent
-   steps, D7 and D8.
+   steps, D7 and D8. Done in 0.1.57.
 2. D5's secrets.
 3. The Python runtime.
 4. A skill in the irori agent's starter that tells it how to write a routine,
