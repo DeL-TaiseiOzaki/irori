@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-09-29: #131 (**0.1.56**, labels and values) is merged at the owner's word
+("マージ公開までやって") and published as
+[v0.1.56-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.56-preview.1)
+by release run `36560142606` from main's CI run `36559142972` (source `71b8da6`).
+The release carries Windows 202,697,216 bytes, Mac 170,115,058 bytes and
+`irori-0.1.56-full.nupkg` 202,056,864 bytes; anonymous downloads matched
+`SHA256SUMS.txt`. A second copy pass after 0.1.55: visible text is labels and values,
+errors are one sentence, names are as short as they can be, and nothing is shown twice
+on one screen. 送信待ち is the single term for changes waiting for Google Drive.
+
 Published 2026-09-29: #129 (**0.1.55**, less explanatory text) is merged at the owner's
 word ("マージ＋公開までやって") and published as
 [v0.1.55-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.55-preview.1)
