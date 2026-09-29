@@ -1,6 +1,7 @@
 # 015 — Page properties above the note
 
-Date: 2026-09-29. Status: owner request accepted in design; not implemented.
+Date: 2026-09-29. Status: owner request accepted; stage 1 implemented for 0.1.54,
+stages 2 and 3 open.
 Addresses the "properties" item that [ACCEPTANCE](../ACCEPTANCE.md) leaves open
 under R03 and R08.
 

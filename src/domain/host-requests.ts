@@ -193,6 +193,7 @@ export const hostArguments = {
   draft: z.tuple([document]),
   createNote: z.tuple([id, z.string().max(120), path.optional()]),
   notesDeclaration: z.tuple([id]),
+  pageProperties: z.tuple([id]),
   dailyNote: z.tuple([id]),
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),

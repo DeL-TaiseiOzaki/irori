@@ -472,6 +472,8 @@ export interface HostAPI {
   createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
   /** Where this KB asks new notes and today's note to go (`.irori/notes.json`), or null. */
   notesDeclaration(scopeId: string): Promise<import('./notes').NotesDeclaration | null>;
+  /** The KB's declared page properties (`.property/property.json`) and the person's actor id. */
+  pageProperties(scopeId: string): Promise<import('./properties').PageProperties>;
   /** Opens today's note at the declared path, creating it from the template on first use. */
   dailyNote(scopeId: string): Promise<Document>;
   openExternal(scopeId: string, path: string): Promise<void>;

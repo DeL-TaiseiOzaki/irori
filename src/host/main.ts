@@ -30,6 +30,7 @@ import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
+import { readPageProperties } from './properties';
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { spaceFolder } from './schema-folder';
@@ -614,6 +615,7 @@ app
           files.createNote(id, name, directory ?? (await noteDirectory(files, id))),
         ),
       notesDeclaration: (id) => readNotesDeclaration(files, id),
+      pageProperties: (id) => readPageProperties(files, git, id),
       dailyNote: (id) => changeFiles(() => openDailyNote(files, id)),
       openExternal: async (...args) => {
         const filename = await files.resolve(...args);

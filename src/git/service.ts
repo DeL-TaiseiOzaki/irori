@@ -184,6 +184,10 @@ export class GitService {
       throw error;
     }
   }
+  /** The person's Git author email for this space's checkout, or '' when unset. */
+  async userEmail(id: string): Promise<string> {
+    return this.config(this.files.get(id), 'user.email');
+  }
   private async config(s: Space, key: string) {
     return this.optional(s, ['config', '--get', key]);
   }
