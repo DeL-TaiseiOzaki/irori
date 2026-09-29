@@ -13,7 +13,15 @@ import { toolbar as toolbarFeature } from '@milkdown/crepe/feature/toolbar';
 import { languages } from '@codemirror/language-data';
 import { serializerCtx, editorViewCtx, remarkCtx } from '@milkdown/kit/core';
 import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
-import { richMatch, sourceMatch, type SearchTarget } from './search-navigation';
+import {
+  nearest,
+  positionsOf,
+  quoteHead,
+  richMatch,
+  sourceLineOf,
+  sourceMatch,
+  type SearchTarget,
+} from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
 import type { NoteAuthorship } from '../domain/knowledge';
@@ -155,8 +163,30 @@ class PersonLine extends GutterMarker {
 }
 const personLine = new PersonLine();
 
+/** Selected text, and the line of the source it starts on when that is known. */
+export interface EditorSelection {
+  quote: string;
+  line?: number;
+}
 export interface EditorHandle {
   getText(): string;
+  /** What is selected, or undefined when nothing is. */
+  selection(): EditorSelection | undefined;
+  /** Selects a quoted passage, nearest the line when it occurs more than once; false when absent. */
+  reveal(quote: string, line?: number): boolean;
+}
+
+/** Where the text of each textblock of a rendered document starts, by the text it shows. */
+function renderedPositions(doc: import('@milkdown/kit/prose/model').Node, text: string) {
+  const found: number[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    // Inline leaves count one position each, as the replacement character does here.
+    const shown = node.textBetween(0, node.content.size, '', '\ufffc');
+    for (const offset of positionsOf(shown, text)) found.push(pos + 1 + offset);
+    return false;
+  });
+  return found;
 }
 export function Editor({
   text,
@@ -207,7 +237,17 @@ export function Editor({
   follow.current = onFollowLink;
   const initial = useRef(text);
   const snapshot = useRef(() => initial.current);
-  useImperativeHandle(ref, () => ({ getText: () => snapshot.current() }), []);
+  const selecting = useRef<() => EditorSelection | undefined>(() => undefined);
+  const revealing = useRef<(quote: string, line?: number) => boolean>(() => false);
+  useImperativeHandle(
+    ref,
+    () => ({
+      getText: () => snapshot.current(),
+      selection: () => selecting.current(),
+      reveal: (quote, line) => revealing.current(quote, line),
+    }),
+    [],
+  );
   // The gutter reads the record through a ref, so a new one only needs a repaint.
   useEffect(() => {
     source.current?.dispatch({});
@@ -248,6 +288,26 @@ export function Editor({
       });
       source.current = view;
       snapshot.current = () => view.state.sliceDoc();
+      selecting.current = () => {
+        const { from, to } = view.state.selection.main;
+        if (from === to) return undefined;
+        const quote = view.state.doc.sliceString(from, to);
+        return quote.trim() ? { quote, line: view.state.doc.lineAt(from).number } : undefined;
+      };
+      revealing.current = (quote, line) => {
+        const text = view.state.doc.toString();
+        const whole = quote.replace(/\r\n/g, '\n');
+        const head = quoteHead(whole);
+        const exact = nearest(text, positionsOf(text, whole), line);
+        const from = exact ?? nearest(text, positionsOf(text, head), line);
+        if (from === undefined) return false;
+        view.dispatch({
+          selection: { anchor: from, head: from + (exact === undefined ? head : whole).length },
+          scrollIntoView: true,
+        });
+        view.focus();
+        return true;
+      };
       if (navigation.current.searchTarget) {
         // CodeMirror positions count a line separator as one character, even
         // when sliceDoc preserves the original CRLF encoding on disk.
@@ -263,6 +323,8 @@ export function Editor({
       }
       return () => {
         source.current = null;
+        selecting.current = () => undefined;
+        revealing.current = () => false;
         view.destroy();
       };
     }
@@ -405,6 +467,45 @@ export function Editor({
         else {
           ready = true;
           crepe.setReadonly(readOnly);
+          const markdown = () => snapshot.current().replace(/\r\n/g, '\n');
+          selecting.current = () =>
+            crepe.editor.action((ctx) => {
+              const { state } = ctx.get(editorViewCtx);
+              const { from, to, empty } = state.selection;
+              if (empty) return undefined;
+              const quote = state.doc
+                .textBetween(from, to, '\n', '\ufffc')
+                .replaceAll('\ufffc', '');
+              if (!quote.trim()) return undefined;
+              // The source line is found by where the first line shows: the same
+              // text shown earlier in the document counts the same in the source.
+              const before = renderedPositions(state.doc, quoteHead(quote)).filter(
+                (at) => at < from,
+              ).length;
+              return { quote, line: sourceLineOf(markdown(), quote, before) };
+            });
+          revealing.current = (quote, line) =>
+            crepe.editor.action((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const head = quoteHead(quote);
+              const shown = renderedPositions(view.state.doc, head);
+              if (!shown.length) return false;
+              const source = markdown();
+              const written = positionsOf(source, head);
+              // Rendered and source occurrences pair up only when both count the same.
+              const index =
+                written.length === shown.length
+                  ? written.indexOf(nearest(source, written, line)!)
+                  : 0;
+              const from = shown[index];
+              view.dispatch(
+                view.state.tr
+                  .setSelection(TextSelection.create(view.state.doc, from, from + head.length))
+                  .scrollIntoView(),
+              );
+              view.focus();
+              return true;
+            });
           const target = navigation.current.searchTarget;
           if (target) {
             const found = crepe.editor.action((ctx) => {
@@ -433,6 +534,8 @@ export function Editor({
       });
     return () => {
       dead = true;
+      selecting.current = () => undefined;
+      revealing.current = () => false;
       codeBlocks.current.clear();
       const wasReady = ready;
       ready = false;

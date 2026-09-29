@@ -31,6 +31,7 @@ import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readPageProperties } from './properties';
+import { addNoteComment, moveNoteComments, readNoteComments, removeNoteComment } from './comments';
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
@@ -321,6 +322,19 @@ app
                     'The note moved, but its material IDs could not be reconnected.',
                   ),
               );
+            try {
+              await moveNoteComments(files, ref.scopeId, ref.path, next.path);
+            } catch {
+              notice = [
+                notice,
+                t(
+                  'ノートは移動しましたが、コメントを移せませんでした。',
+                  'The note moved, but its comments could not be moved with it.',
+                ),
+              ]
+                .filter(Boolean)
+                .join(' ');
+            }
             try {
               await authorship.carry(ref, next, next.text);
             } catch {
@@ -635,6 +649,11 @@ app
         await openFile(filename);
       },
       noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
+      noteComments: (id, p) => readNoteComments(files, id, p),
+      addNoteComment: (id, p, comment) =>
+        changeFiles(() => addNoteComment(files, git, id, p, comment)),
+      removeNoteComment: (id, p, commentId) =>
+        changeFiles(() => removeNoteComment(files, id, p, commentId)),
       agents: () => agents.available(),
       agentModels: (agent) => agents.models(agent),
       agentSession: (...args) => agents.session(...args),

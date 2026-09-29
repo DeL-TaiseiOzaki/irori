@@ -1,4 +1,5 @@
 import type { AgentId } from './types';
+import { commentsDirectory } from './comments';
 
 /**
  * The irori agent (formerly "your AI"): the person's own agent, run from its own
@@ -126,13 +127,24 @@ const handOff: Record<SubAgentCli, string> = {
 export function brainsPreamble(
   brains: Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'>[],
   cli: SubAgentCli,
+  comments: number[] = [],
 ) {
   const lines = brains.map(
-    (brain) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, sub-agent "${brain.agent}"`,
+    (brain, index) =>
+      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, sub-agent "${brain.agent}"${commentCount(comments[index])}`,
   );
-  return [handedHeader, ...lines, handOff[cli]].join('\n');
+  return [handedHeader, ...lines, handOff[cli], ...commentsNote(comments)].join('\n');
 }
+
+const commentCount = (count = 0) =>
+  count ? `, ${count} comment${count === 1 ? '' : 's'} from people` : '';
+/** Where a handed hibachi keeps people's comments, said only when one has any. */
+const commentsNote = (comments: number[]) =>
+  comments.some(Boolean)
+    ? [
+        `People's comments on a hibachi's Markdown files are in that hibachi's ${commentsDirectory}/<file path>.json; read them when the request concerns comments.`,
+      ]
+    : [];
 
 /**
  * The words before a request to your AI on a CLI without file-defined
@@ -143,10 +155,11 @@ export function brainsPreamble(
 export function brainsCommandPreamble(
   brains: Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'>[],
   cli: string,
+  comments: number[] = [],
 ) {
   const lines = brains.map(
-    (brain) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"`,
+    (brain, index) =>
+      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"${commentCount(comments[index])}`,
   );
   return [
     handedHeader,
@@ -154,6 +167,7 @@ export function brainsCommandPreamble(
     `You run on ${cli} for this request, which loads no sub-agents from files. Hand work in a hibachi to that hibachi's agent with the \`hibachi\` command in your shell: hibachi <hibachi agent or hibachi name> "<task>" (or the task on standard input).`,
     'The command runs the hibachi agent inside that hibachi, waits until it finishes, however long that takes, and prints its report. A non-zero exit status means the hand-off did not complete; the reason is on standard error.',
     "Hand one task at a time to a hibachi, and wait for its report before handing it another. Do not change a hibachi's files yourself.",
+    ...commentsNote(comments),
   ].join('\n');
 }
 

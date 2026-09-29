@@ -73,6 +73,14 @@ export function PageEditor({
     ref,
     () => ({
       getText: whole,
+      // Lines count from the top of the file; in the rich view the editor holds only the body.
+      selection: () => {
+        const selected = inner.current?.selection();
+        return selected?.line ? { ...selected, line: selected.line + headLines } : selected;
+      },
+      reveal: (quote, line) =>
+        inner.current?.reveal(quote, line && line > headLines ? line - headLines : undefined) ??
+        false,
       stamp: () => {
         const current = declared.current;
         // Markdown notes open in the rich view; only there is the frontmatter held here.
@@ -87,7 +95,7 @@ export function PageEditor({
         return after;
       },
     }),
-    [readOnly, split],
+    [readOnly, split, headLines],
   );
   // A search hit inside the frontmatter is on show in the properties above.
   useEffect(() => {

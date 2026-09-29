@@ -36,6 +36,8 @@ import { SessionStore, type SessionBinding } from './sessions';
 import { ConversationStore } from './conversations';
 import { startInput, type Conversation } from '../domain/conversation';
 import { promptWithSkill } from '../domain/skills';
+import { commentsPointer, commentsSummary } from '../domain/comments';
+import { commentsCount, readNoteComments } from '../host/comments';
 import { parseSkill, requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
@@ -499,6 +501,14 @@ export class AgentService {
             root: brain.root,
           };
         });
+        const comments = await Promise.all(
+          brains.map((brain) =>
+            commentsCount(this.files, brain.scopeId).then(
+              (count) => count.comments,
+              () => 0,
+            ),
+          ),
+        );
         run.delegation = { you: space.root, brains };
         const cli = input.agent;
         if (hasSubAgents(cli)) {
@@ -514,8 +524,8 @@ export class AgentService {
                 `Wrote the hibachi agent definitions: ${written.join(', ')}`,
               ),
             );
-          promptParts.push(brainsPreamble(brains, cli));
-        } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli]));
+          promptParts.push(brainsPreamble(brains, cli, comments));
+        } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
@@ -533,6 +543,20 @@ export class AgentService {
               .catch(() => undefined)
           : undefined;
         if (summary) promptParts.push(summary);
+      }
+      if (!you) {
+        // The comments on the note in hand go with the instruction; without one,
+        // a line says where this hibachi keeps the comments it has.
+        const onNote = input.notePath
+          ? await readNoteComments(this.files, input.scopeId, input.notePath).catch(() => [])
+          : [];
+        const words = onNote.length
+          ? commentsSummary(input.notePath!, onNote)
+          : await commentsCount(this.files, input.scopeId).then(
+              ({ comments, files }) => (comments ? commentsPointer(comments, files) : undefined),
+              () => undefined,
+            );
+        if (words) promptParts.push(words);
       }
       const selectedSkill = !input.skill
         ? undefined

@@ -73,3 +73,50 @@ export function richMatch(doc: Node, source: string, target: SearchTarget, ast: 
   if (visibleSource.length !== matches.length) return null;
   return matches[index] ?? null;
 }
+
+/** The first line of a quote that has text, trimmed: what a rendered view and its source share. */
+export function quoteHead(quote: string) {
+  return (
+    quote
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean) ?? ''
+  );
+}
+
+/** Where each occurrence of `text` starts in `source`, exactly as written. */
+export function positionsOf(source: string, text: string) {
+  const found: number[] = [];
+  if (!text) return found;
+  for (let at = source.indexOf(text); at !== -1; at = source.indexOf(text, at + 1)) found.push(at);
+  return found;
+}
+
+/** The 1-based line of an offset in `source`. */
+export function lineAt(source: string, offset: number) {
+  let line = 1;
+  for (let at = source.indexOf('\n'); at !== -1 && at < offset; at = source.indexOf('\n', at + 1))
+    line++;
+  return line;
+}
+
+/**
+ * The line of the source a rendered selection stands on: the `index`-th place
+ * its first line occurs in the source, or the first when the source shows it
+ * fewer times (formatting inside it, say). Undefined when the source does not
+ * carry it at all.
+ */
+export function sourceLineOf(source: string, quote: string, index: number) {
+  const at = positionsOf(source, quoteHead(quote));
+  const offset = at[index] ?? at[0];
+  return offset === undefined ? undefined : lineAt(source, offset);
+}
+
+/** Which of `positions` is on the line nearest to `line`, or the first without one. */
+export function nearest(source: string, positions: number[], line?: number) {
+  if (!positions.length) return undefined;
+  if (!line) return positions[0];
+  return positions.reduce((best, at) =>
+    Math.abs(lineAt(source, at) - line) < Math.abs(lineAt(source, best) - line) ? at : best,
+  );
+}
