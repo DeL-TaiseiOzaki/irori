@@ -33,6 +33,7 @@ import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readPageProperties } from './properties';
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
+import { RoutineService } from './routines';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
 import { Rclone } from '../cloud/rclone';
@@ -129,9 +130,25 @@ app
     let fileMutations = 0;
     const git = new GitService(
       files,
-      () => !agents.anyBusy && !cloud.busy && fileMutations === 0,
+      () => !agents.anyBusy && !cloud.busy && fileMutations === 0 && !routines.busy,
       authorship,
     );
+    // Routines run only when the person presses 実行; their records stay on this device.
+    const routines = new RoutineService({
+      dataDir: files.dataDir,
+      files,
+      you,
+      agents,
+      workspaces: () => workspaces.list(),
+      settings: () => settings.read(),
+      gitStatus: (id) => git.status(id),
+      canStart: canStartAgent,
+      emit: (run) => emit({ type: 'routine', run }),
+      runtime: process.execPath,
+    });
+    await routines
+      .init()
+      .catch((error) => console.warn('Routine records could not be checked', String(error)));
     function canStartAgent() {
       if (git.busy || fileMutations)
         throw Error(
@@ -208,6 +225,7 @@ app
     // A reloaded/crashed renderer cannot keep controlling its old sessions.
     const stopRendererSessions = () => {
       void terminals.closeAll();
+      void routines.stopAll();
       void agents.cancel();
     };
     window.webContents.on('render-process-gone', stopRendererSessions);
@@ -649,6 +667,11 @@ app
         canStartAgent();
         return agents.startAccepted(input);
       },
+      routines: (workspaceId) => routines.list(workspaceId),
+      reviewRoutine: (ref) => routines.review(ref),
+      runRoutine: (ref, input) => routines.run(ref, input),
+      stopRoutine: (ref) => routines.stop(ref),
+      routineRuns: (ref) => routines.runs(ref),
       cancel: (scopeId) => agents.cancel(scopeId),
       respond: (...args) => agents.respond(...args),
     } satisfies HostHandlers;
@@ -705,16 +728,16 @@ app
           return false;
         }
       }
-      if (agents.anyBusy || terminals.busy) {
+      if (agents.anyBusy || terminals.busy || routines.busy) {
         const answer = await dialog.showMessageBox(window!, {
           message: restart
             ? t(
-                '実行中のエージェント・ターミナルを停止して再起動しますか？',
-                'Stop the running agents and terminals and restart?',
+                '実行中のエージェント・ルーティン・ターミナルを停止して再起動しますか？',
+                'Stop the running agents, routines and terminals and restart?',
               )
             : t(
-                '実行中のエージェント・ターミナルを停止して閉じますか？',
-                'Stop the running agents and terminals and close?',
+                '実行中のエージェント・ルーティン・ターミナルを停止して閉じますか？',
+                'Stop the running agents, routines and terminals and close?',
               ),
           buttons: [
             t('戻る', 'Back'),
@@ -751,6 +774,7 @@ app
         while ((pending = await cloud.pendingUploads()) > 0 && Date.now() < deadline)
           await new Promise((resolve) => setTimeout(resolve, 1000));
       }
+      await routines.stopAll();
       await agents.cancel();
       try {
         await drafts.idle();

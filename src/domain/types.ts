@@ -218,7 +218,8 @@ export type HostEvent =
   | { type: 'files'; scopeId: string }
   | { type: 'agent'; event: AgentEvent }
   | { type: 'terminal'; event: TerminalEvent }
-  | { type: 'update'; state: import('./updates').UpdateState };
+  | { type: 'update'; state: import('./updates').UpdateState }
+  | { type: 'routine'; run: import('./routines').RoutineRun };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -259,6 +260,8 @@ export interface DeviceSettings {
   layouts: Record<string, string>;
   /** The reader's role and project per KB, which narrows that KB's skill picker. */
   skillAudiences: Record<string, import('./skills').SkillAudience>;
+  /** The runtimes routines may use on this device, added by the person. */
+  routineRuntimes: import('./routines').RoutineRuntime[];
 }
 
 export interface HostAPI {
@@ -506,6 +509,19 @@ export interface HostAPI {
   yourAiRead(path: string): Promise<{ path: string; text: string }>;
   /** The sub-agent each brain gets from your AI, and whether its definition exists. */
   yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
+  /** The irori agent's routines and those of the workspace's hibachis, as this device sees them. */
+  routines(workspaceId: string): Promise<import('./routines').Routine[]>;
+  /** A routine's files as they are now, and what changed since the person confirmed them. */
+  reviewRoutine(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineReview>;
+  /** Starts a routine and returns its run's id; nothing else ever starts one. */
+  runRoutine(
+    ref: import('./routines').RoutineRef,
+    input: import('./routines').RunRoutine,
+  ): Promise<string>;
+  /** Ends the routine's step in progress; later steps do not run. */
+  stopRoutine(ref: import('./routines').RoutineRef): Promise<void>;
+  /** The routine's runs kept on this device, newest first. */
+  routineRuns(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineRun[]>;
   /** Stops the run in one space, or every run when no space is named. */
   cancel(scopeId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;

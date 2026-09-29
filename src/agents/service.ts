@@ -56,6 +56,23 @@ import {
   type Delegation,
 } from './delegation';
 type Reply = { allow: boolean; answers?: AgentAnswers };
+/** What a routine's agent step adds to an ordinary run (ADR 016 D7). */
+export interface StepRun {
+  /** Put before the step's prompt; the conversation shows the prompt alone. */
+  preamble: string;
+  /** Folders the run reads besides its own: the routine's and this run's. */
+  directories: string[];
+  /** The status line naming the routine, first in the conversation. */
+  notice: string;
+  /** `IRORI_WORK`, `IRORI_STATE` and `IRORI_ROUTINE`, in the CLI's environment too. */
+  env: Record<string, string>;
+}
+/** How a routine's agent step ended, and its report: the words after its last other event. */
+export interface StepEnd {
+  outcome: NonNullable<AgentEvent['outcome']>;
+  report: string;
+  error?: string;
+}
 type Run = {
   id: string;
   binding: SessionBinding;
@@ -63,6 +80,8 @@ type Run = {
   delegation?: Delegation;
   /** For a hibachi agent's run started by your AI's `hibachi` command: that run's id. */
   holder?: string;
+  /** A routine's agent step: a new native session that is never kept. */
+  step?: StepRun;
   access: AgentAccess;
   queuedId?: string;
   recorded?: boolean;
@@ -252,7 +271,7 @@ export class AgentService {
       }),
     );
   }
-  start(input: StartRun, queuedId?: string, holder?: string): string {
+  start(input: StartRun, queuedId?: string, holder?: string, step?: StepRun): string {
     input = startInput.parse(input);
     const access = requireAgentAccess(input.agent, input.access);
     // A brain held by your AI's run takes exactly one run more: the hand-off that run asks for.
@@ -303,6 +322,7 @@ export class AgentService {
       binding: this.binding(input.scopeId, input.agent),
       access,
       holder,
+      step,
       queuedId,
       accepted,
       accept,
@@ -414,6 +434,38 @@ export class AgentService {
     run.finish?.();
     await run.closed;
   }
+  /** Stops one run by its id while it is still the run in its space. */
+  async cancelRun(runId: string) {
+    const run = [...this.runs.values()].find((item) => item.id === runId);
+    if (run) await this.cancel(run.binding.scopeId);
+  }
+  /**
+   * Starts a routine's agent step (ADR 016 D7): an ordinary run, shown in its
+   * conversation as it goes. `done` resolves when it ends, with its report.
+   */
+  startStep(input: StartRun, step: StepRun): { runId: string; done: Promise<StepEnd> } {
+    const runId = this.start(input, undefined, undefined, step);
+    let report = '';
+    let after = true;
+    const errors: string[] = [];
+    const done = new Promise<StepEnd>((resolve) => {
+      // Registered before the run's first event, which waits for the next tick.
+      this.watchers.set(runId, (event) => {
+        if (event.type === 'text') {
+          if (after) report = '';
+          after = false;
+          report = (report + event.text).slice(-100000);
+          return;
+        }
+        after = true;
+        if (event.type === 'error') errors.push(event.text);
+        if (event.type !== 'done') return;
+        this.watchers.delete(runId);
+        resolve({ outcome: event.outcome ?? 'failed', report, error: errors.at(-1) });
+      });
+    });
+    return { runId, done };
+  }
   private async execute(run: Run, input: StartRun) {
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
@@ -425,6 +477,7 @@ export class AgentService {
       if (input.newSession)
         this.publish(run, 'status', t('新しい会話を開始します。', 'Starting a new conversation.'));
       this.publish(run, 'status', input.prompt, { role: 'user' });
+      if (run.step) this.event(run, 'status', run.step.notice);
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
       const space = you
@@ -515,12 +568,14 @@ export class AgentService {
               .join('\n') +
             '\nRetained snapshots are read-only references: never modify them. Read these observed bytes when grounding an artifact; report if access is unavailable.',
         );
+      if (run.step) promptParts.push(run.step.preamble);
       promptParts.push(input.prompt);
       let prompt = promptParts.join('\n\n');
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       const binding = this.binding(input.scopeId, input.agent);
       if (input.newSession) await this.sessions.reset(binding);
-      const previous = await this.sessions.read(binding);
+      // A routine's step starts afresh and leaves the person's own session as it was.
+      const previous = run.step ? undefined : await this.sessions.read(binding);
       // Native sessions can retain approvals. A policy change starts a fresh
       // native conversation, while irori's display history remains available.
       const saved = previous?.access === run.access ? previous : undefined;
@@ -612,7 +667,9 @@ export class AgentService {
           session: saved?.handle,
           access: run.access,
           model: input.model,
-          env: command?.env ?? bridge?.env,
+          env: run.step
+            ? { ...(command?.env ?? bridge?.env ?? agentEnv()), ...run.step.env }
+            : (command?.env ?? bridge?.env),
           args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
@@ -620,7 +677,9 @@ export class AgentService {
           },
           event: (type, text, extra) => this.event(run, type, text, extra),
           ask: (text, details, questions) => this.ask(run, text, details, questions),
-          saveSession: (handle) => this.sessions.save(binding, handle, run.access),
+          saveSession: async (handle) => {
+            if (!run.step) await this.sessions.save(binding, handle, run.access);
+          },
         };
         if (input.agent === 'pi') await runPi(context);
         else if (input.agent === 'opencode') await runOpenCode(context);
@@ -779,7 +838,10 @@ export class AgentService {
     session?: string,
     model?: string,
   ) {
-    const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd);
+    const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd, {
+      ...agentEnv(),
+      ...run.step?.env,
+    });
     run.child = child;
     let finished = false;
     let failure: Error | undefined;
@@ -851,7 +913,7 @@ export class AgentService {
       session ? { ...params, threadId: session } : params,
     );
     run.threadId = thread.thread.id;
-    await this.sessions.save(binding, thread.thread.id, run.access);
+    if (!run.step) await this.sessions.save(binding, thread.thread.id, run.access);
     if (run.cancelled) return;
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
@@ -965,7 +1027,7 @@ export class AgentService {
       options: {
         cwd,
         pathToClaudeCodeExecutable: 'claude',
-        env: agentEnv(),
+        env: { ...agentEnv(), ...run.step?.env },
         settingSources: ['user', 'project', 'local'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
@@ -973,7 +1035,12 @@ export class AgentService {
         includePartialMessages: true,
         resume: session,
         ...(model && { model }),
-        ...(delegation && { additionalDirectories: delegation.brains.map((brain) => brain.root) }),
+        ...((delegation || run.step) && {
+          additionalDirectories: [
+            ...(delegation?.brains.map((brain) => brain.root) ?? []),
+            ...(run.step?.directories ?? []),
+          ],
+        }),
         // Told when it matters rather than on every turn: before an edit would
         // change lines the person wrote or revised, Claude Code hears which.
         hooks: {
@@ -1113,7 +1180,7 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
-        if (msg.type === 'system' && msg.subtype === 'init')
+        if (msg.type === 'system' && msg.subtype === 'init' && !run.step)
           await this.sessions.save(binding, msg.session_id, run.access);
         // A sub-agent's words stay with its hand-off; the reply shown is the
         // main conversation's.

@@ -3,7 +3,7 @@ import { agentIds, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { providerId } from './connections';
-import { startInput, yourAiChoice } from './conversation';
+import { agentModel, startInput, yourAiChoice } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
@@ -13,6 +13,7 @@ import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
 import { githubOwnerPattern, validRepositoryName } from './git';
+import { routineRef, routineRuntimes } from './routines';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -46,6 +47,7 @@ export const hostArguments = {
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
       yourAi: yourAiChoice.optional(),
+      routineRuntimes: z.array(z.enum(routineRuntimes)).max(routineRuntimes.length).optional(),
     }),
   ]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
@@ -210,6 +212,20 @@ export const hostArguments = {
   yourAiEntries: z.tuple([path]),
   yourAiRead: z.tuple([path]),
   yourAiBrains: z.tuple([z.array(id).max(50)]),
+  routines: z.tuple([id]),
+  reviewRoutine: z.tuple([routineRef]),
+  runRoutine: z.tuple([
+    routineRef,
+    z
+      .object({
+        workspaceId: id,
+        digest: version.optional(),
+        agents: z.record(id, z.object({ agent: z.enum(agentIds), model: agentModel.optional() })),
+      })
+      .strict(),
+  ]),
+  stopRoutine: z.tuple([routineRef]),
+  routineRuns: z.tuple([routineRef]),
   cancel: z.union([z.tuple([]), z.tuple([id])]),
   respond: z.tuple([
     id,

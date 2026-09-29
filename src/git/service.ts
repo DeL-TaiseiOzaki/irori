@@ -85,8 +85,8 @@ export class GitService {
       return Promise.reject(
         Error(
           t(
-            '保存・エージェント・接続処理の完了後に Git 操作ができます。',
-            'Git operations are available after saving, agent, and connection work finishes.',
+            '保存・エージェント・ルーティン・接続処理の完了後に Git 操作ができます。',
+            'Git operations are available after saving, agent, routine and connection work finishes.',
           ),
         ),
       );
