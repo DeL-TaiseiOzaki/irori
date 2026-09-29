@@ -107,7 +107,7 @@ test('The collector joins split lines, keeps the last hundred failures and no pr
   assert(!JSON.stringify(kept).includes('googleapi'));
 });
 
-test('Each category has a message in both languages that names the count', (t) => {
+test('Each category has a message in both languages; an unknown cause names the count', (t) => {
   t.after(() => setLanguage('ja'));
   const all: UploadErrorCategory[] = [
     'permission',
@@ -117,12 +117,18 @@ test('Each category has a message in both languages that names the count', (t) =
     'rateLimit',
     'other',
   ];
+  // The connection shows the pending count beside the message, so a known cause is enough.
   for (const category of all) {
     setLanguage('ja');
-    assert.match(uploadErrorMessage(category, 3), /3 件/);
+    const ja = uploadErrorMessage(category, 3);
     setLanguage('en');
-    assert.match(uploadErrorMessage(category, 3), /3 changes/);
+    const en = uploadErrorMessage(category, 3);
+    assert.ok(ja && en && ja !== en);
   }
+  setLanguage('ja');
+  assert.match(uploadErrorMessage('other', 3), /3 件/);
+  setLanguage('en');
+  assert.match(uploadErrorMessage('other', 3), /3 failed/);
 });
 
 test('A connection says why its saved changes are not reaching Google Drive', async (t) => {
@@ -154,7 +160,7 @@ test('A connection says why its saved changes are not reaching Google Drive', as
   queue[0] = { ...queue[0], tries: 2, delay: 20, uploading: false };
   rpc.failures = [{ path: 'folder/file.md', category: 'permission' }];
   [connection] = await cloud.connections(space.scopeId);
-  assert.match(connection.uploadError!, /書き込む権限がありません.*1 件/);
+  assert.match(connection.uploadError!, /書き込み権限がありません/);
   assert.equal(connection.pending, 3);
   assert.equal(connection.state, 'mounted');
   // The category the most failing changes share is named, from each file's latest
@@ -167,7 +173,7 @@ test('A connection says why its saved changes are not reaching Google Drive', as
     { path: 'folder/file.md', category: 'network' },
   ];
   [connection] = await cloud.connections(space.scopeId);
-  assert.match(connection.uploadError!, /接続できません.*3 件/);
+  assert.match(connection.uploadError!, /接続できません/);
   // A queue that cannot be read leaves the connection with its waiting count alone.
   unavailable = true;
   [connection] = await cloud.connections(space.scopeId);

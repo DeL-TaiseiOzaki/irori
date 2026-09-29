@@ -53,9 +53,6 @@ export function ModelPicker({
   }, [agent]);
   const models = list?.models ?? [];
   const listed = models.some((model) => model.id === value);
-  const title =
-    list?.error ??
-    t('このCLIのモデル（既定はCLIの設定）', "This CLI's model (the default is the CLI's setting)");
   if (typing !== undefined) {
     const valid = !typing.trim() || agentModel.safeParse(typing.trim()).success;
     const commit = () => {
@@ -64,7 +61,7 @@ export function ModelPicker({
       setTyping(undefined);
     };
     return (
-      <label className="composer-pill model-pill" title={title}>
+      <label className="composer-pill model-pill">
         <Icon name="cpu" size={13} />
         <input
           aria-label={t('モデル名', 'Model name')}
@@ -91,7 +88,7 @@ export function ModelPicker({
     );
   }
   return (
-    <label className="composer-pill model-pill" title={title}>
+    <label className="composer-pill model-pill">
       <Icon name="cpu" size={13} />
       <select
         aria-label={t('モデル', 'Model')}

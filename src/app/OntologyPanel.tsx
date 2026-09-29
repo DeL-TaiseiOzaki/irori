@@ -182,12 +182,7 @@ function OntologyContent({
       </div>
       <div className="graph-canvas">
         {tooLarge ? (
-          <p className="hint">
-            {t(
-              '多すぎるため絞り込んでください。',
-              'Too large to display. Narrow it with a subgraph or hierarchy.',
-            )}
-          </p>
+          <p className="hint">{t('多すぎて表示できません。', 'Too many to display.')}</p>
         ) : subgraph.entities.length ? (
           <Graph key={`${group}:${root}:${hierarchy}`} view={subgraph} onSelect={setSelectedId} />
         ) : (
@@ -321,16 +316,12 @@ function OntologyContent({
 /** The freshness line for the graph index the KB carries, as the host reports it. */
 function describeGraphIndex(status: GraphIndexStatus) {
   const detailJa = [
-    status.excluded
-      ? `リンク先のページがない・URL などの関係 ${status.excluded} 件は除外しています。`
-      : '',
-    status.unreadable ? `frontmatter を読めないページが ${status.unreadable} 件あります。` : '',
+    status.excluded ? `除外した関係 ${status.excluded} 件。` : '',
+    status.unreadable ? `読めないページ ${status.unreadable} 件。` : '',
   ].join('');
   const detailEn = [
-    status.excluded
-      ? `Excludes ${status.excluded} relations with no linked page or a URL target.`
-      : '',
-    status.unreadable ? `${status.unreadable} pages have unreadable frontmatter.` : '',
+    status.excluded ? `Excludes ${status.excluded} relations.` : '',
+    status.unreadable ? `${status.unreadable} pages unreadable.` : '',
   ].join(' ');
   if (status.current)
     return t(
@@ -421,7 +412,7 @@ export function OntologyPanel({
             <button className="stage-text-button framed" disabled={busy} onClick={generate}>
               <Icon name="refresh" size={14} />
               {repairModule
-                ? t('ページからグラフ索引を再生成', 'Regenerate graph index from pages')
+                ? t('ページから再生成', 'Regenerate from pages')
                 : t('グラフ索引を更新', 'Update graph index')}
             </button>
           )}

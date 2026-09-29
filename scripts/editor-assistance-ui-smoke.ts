@@ -92,7 +92,7 @@ async function close() {
 // Code assistance is a checkbox in the note's menu, which stays open after it.
 const toggle = (page: Page) => page.getByRole('menuitemcheckbox', { name: 'コード支援' });
 async function inMenu(page: Page, act: () => Promise<void>) {
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await act();
   await page.keyboard.press('Escape');
   await expect(toggle(page)).toHaveCount(0);

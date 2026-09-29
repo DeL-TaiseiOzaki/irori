@@ -332,7 +332,7 @@ test("A note another tool attached to the commit keeps every entry it had, with 
   );
   await edits(f);
   status = await commit(service, id, [ref.path], 'Unreadable note');
-  assert.match(status.notice!, /読めない/);
+  assert.match(status.notice!, /読めませんでした/);
   assert.equal(git(root, 'notes', '--ref=ai', 'show', 'HEAD'), 'not a note at all');
   assert.equal(git(root, 'log', '-1', '--format=%s'), 'Unreadable note');
 });
@@ -404,7 +404,7 @@ test("Fetch brings the remote's notes in, Push carries this device's, and diverg
   git(peer, 'push', 'origin', 'refs/notes/ai:refs/notes/ai');
   const published = git(remote, 'rev-parse', 'refs/notes/ai');
   status = await service.sync(id, 'push', (await service.status(id)).version);
-  assert.match(status.notice!, /Fetch/);
+  assert.match(status.notice!, /送信されませんでした/);
   assert.equal(git(remote, 'rev-parse', 'main'), local);
   assert.equal(git(remote, 'rev-parse', 'refs/notes/ai'), published);
 

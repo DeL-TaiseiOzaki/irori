@@ -23,8 +23,8 @@ export class GitHubCli {
     if (!gh)
       throw Error(
         t(
-          'GitHub CLI（gh）が見つかりません。gh をインストールし、`gh auth login` でログインしてから再試行してください。',
-          'The GitHub CLI (gh) was not found. Install gh, sign in with `gh auth login`, then try again.',
+          'GitHub CLI（gh）が見つかりません（インストール後 `gh auth login`）。',
+          'The GitHub CLI (gh) was not found (install it, then `gh auth login`).',
         ),
       );
     const env = agentEnv();
@@ -44,10 +44,7 @@ export class GitHubCli {
       let stopping: Promise<void> | undefined;
       const timer = setTimeout(() => {
         failure ??= Error(
-          t(
-            'GitHub の応答が時間切れになりました。GitHub 上の状態を確認してから再試行してください。',
-            'GitHub did not answer in time. Check what exists on GitHub, then try again.',
-          ),
+          t('GitHub の応答が時間切れになりました。', 'GitHub did not answer in time.'),
         );
         stopping ??= killTree(child);
       }, timeout);
@@ -107,8 +104,8 @@ export class GitHubCli {
     if (!githubOwnerPattern.test(input.owner) || !validRepositoryName(input.name))
       throw Error(
         t(
-          'GitHub のアカウント名とリポジトリ名を確認してください。リポジトリ名には英数字・「-」「_」「.」を使えます。',
-          'Check the GitHub account and repository name. A repository name may use letters, digits, "-", "_" and ".".',
+          'GitHub のアカウント名またはリポジトリ名が無効です。',
+          'The GitHub account name or repository name is invalid.',
         ),
       );
     const repository = `${input.owner}/${input.name}`;
@@ -132,25 +129,22 @@ export class GitHubCli {
 function ghError(diagnostic: string) {
   const hint = signedOut.test(diagnostic)
     ? t(
-        'GitHub CLI（gh）にログインしていません。ターミナルで `gh auth login` を実行してから再試行してください。',
-        'The GitHub CLI (gh) is not signed in. Run `gh auth login` in a terminal, then try again.',
+        'GitHub CLI（gh）にログインしていません（`gh auth login`）。',
+        'The GitHub CLI (gh) is not signed in (`gh auth login`).',
       )
     : /name already exists/i.test(diagnostic)
       ? t(
-          '同じ名前のリポジトリが GitHub にすでにあります。別の名前を選んでください。',
-          'A repository with this name already exists on GitHub. Choose a different name.',
+          '同じ名前のリポジトリが GitHub にすでにあります。',
+          'A repository with this name already exists on GitHub.',
         )
       : /HTTP 403|HTTP 404|not have permission|must be an? (?:owner|admin)|resource not accessible/i.test(
             diagnostic,
           )
         ? t(
-            'この GitHub アカウントには、選んだ場所にリポジトリを作成する権限がありません。`gh auth status` でアカウントと権限を確認してください。',
-            'This GitHub account cannot create a repository there. Run `gh auth status` to check the account and its permissions.',
+            'この GitHub アカウントには、選んだ場所にリポジトリを作成する権限がありません。',
+            'This GitHub account cannot create a repository there.',
           )
-        : t(
-            'GitHub での操作が完了しませんでした。ネットワークと GitHub の状態を確認してから再試行してください。',
-            'The GitHub operation did not complete. Check the network and GitHub, then try again.',
-          );
+        : t('GitHub での操作が完了しませんでした。', 'The GitHub operation did not complete.');
   const detail = gitDetail(diagnostic);
   return Error(detail ? `${hint}\n\n${detail}` : hint);
 }

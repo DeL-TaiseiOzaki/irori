@@ -9,7 +9,7 @@ export function CloudRecovery() {
   return (
     <>
       <button className="cloud-recovery-trigger" onClick={() => setOpen(true)}>
-        {t('端末の送信準備を復元', 'Restore pending uploads on this device')}
+        {t('送信待ちを復元', 'Restore pending uploads')}
       </button>
       {open && <CloudRecoveryDialog onClose={() => setOpen(false)} />}
     </>
@@ -31,7 +31,7 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
     try {
       setResult(await window.irori.recoverableCloudWrites());
     } catch {
-      setError(t('送信準備を読み込めませんでした。', 'Could not load pending uploads.'));
+      setError(t('送信待ちを読み込めませんでした。', 'Could not load pending uploads.'));
     } finally {
       setBusy(false);
     }
@@ -53,14 +53,10 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
     }
   }
   return (
-    <Dialog
-      label={t('端末の送信準備', 'Pending uploads on this device')}
-      busy={busy}
-      onClose={onClose}
-    >
+    <Dialog label={t('送信待ち', 'Pending uploads')} busy={busy} onClose={onClose}>
       <div className="modal">
         <header className="actions">
-          <h2>{t('端末の送信準備', 'Pending uploads on this device')}</h2>
+          <h2>{t('送信待ち', 'Pending uploads')}</h2>
           <button disabled={busy} onClick={onClose}>
             {t('閉じる', 'Close')}
           </button>
@@ -76,7 +72,7 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
           </p>
         )}
         {result && !result.entries.length && (
-          <p>{t('復元できる送信準備はありません。', 'There are no pending uploads to restore.')}</p>
+          <p>{t('送信待ちはありません。', 'No pending uploads.')}</p>
         )}
         <ul>
           {result?.entries.map((item) => (

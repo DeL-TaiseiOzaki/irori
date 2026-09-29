@@ -115,7 +115,7 @@ test('Rebinding rejects copies, occupied identities, wrong scopes and untrusted 
     store.rebind({ ...version, id: randomUUID() }, { ...next, path: 'unused.md' }),
     /登録状態/,
   );
-  await assert.rejects(store.rebind(version, { ...next, scopeId: randomUUID() }), /同じスペース/);
+  await assert.rejects(store.rebind(version, { ...next, scopeId: randomUUID() }), /別のスペース/);
   for (const relative of [
     '../outside.md',
     '/absolute.md',

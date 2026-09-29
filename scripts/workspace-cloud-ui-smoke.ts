@@ -118,9 +118,7 @@ try {
       .filter({ hasText: `${name}/` })
       .getByRole('button', { name: 'この KB に移す', exact: true })
       .click();
-    await expect(dialog.locator('.moved-notice')).toContainText(
-      `「${name}」をこの KB の資料に移しました`,
-    );
+    await expect(dialog.locator('.moved-notice')).toContainText(`「${name}」を移しました`);
   }
   await expect(dialog.locator('.earlier-connections')).toHaveCount(0);
   await expect(dialog.locator('.connection-card')).toHaveCount(2);
@@ -148,18 +146,18 @@ try {
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await page.getByRole('button', { name: '参照に追加', exact: true }).click();
   await expect(page.locator('.context-chip.reference')).toContainText('note.md');
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   const records = page.getByRole('region', { name: '資料と成果物' });
   await records.locator('summary').first().click();
   await records.getByRole('button', { name: '保持版を見る', exact: true }).click();
   await expect(records.getByLabel('保持した資料の版')).toContainText('Earlier retained source');
-  await records.getByLabel('成果物に関連する実行').selectOption(retainedRun.id);
-  await records.getByRole('button', { name: 'この版を成果物として登録', exact: true }).click();
+  await records.getByLabel('関連する実行').selectOption(retainedRun.id);
+  await records.getByRole('button', { name: 'この版を登録', exact: true }).click();
   await expect(records.getByRole('status')).toContainText('登録しました');
-  await records.getByLabel('送信準備の Drive フォルダ').selectOption(earlier[0].mountId);
-  await records.getByRole('button', { name: '送信準備として保持', exact: true }).click();
-  await expect(records.getByRole('status')).toContainText('まだ送信していません');
+  await records.getByLabel('送信先').selectOption(earlier[0].mountId);
+  await records.getByRole('button', { name: '送信待ちとして保持', exact: true }).click();
+  await expect(records.getByRole('status')).toContainText('送信待ちとして保持しました');
   await expect(records).toContainText('送信待ち・端末に保持');
   const restoredFile = path.join(base, 'restored.md');
   await app.evaluate(({ dialog: native }, filename) => {
@@ -178,7 +176,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Drive workspace' }).click();
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   await expect(page.getByRole('region', { name: '資料と成果物' })).toContainText(
     '送信待ち・端末に保持',

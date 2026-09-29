@@ -16,22 +16,16 @@ function states(): Record<CloudConnection['state'], string> {
     unconfigured: t('アカウント未設定', 'Account not set'),
     disconnected: t('未接続', 'Not connected'),
     connecting: t('接続中', 'Connecting'),
-    mounted: t('接続済み・読み取り専用', 'Connected · read-only'),
-    error: t('接続を確認してください', 'Check the connection'),
+    mounted: t('接続済み', 'Connected'),
+    error: t('接続エラー', 'Connection error'),
   };
 }
 function stateLabel(connection: CloudConnection) {
-  if (connection.state === 'mounted' && connection.writable)
-    return t('接続済み・編集できます', 'Connected · editable');
   return states()[connection.state];
 }
 function accountState(account: CloudAccount): [tone: string, icon: IconName, label: string] {
   if (account.state === 'authorizing')
-    return [
-      'wait',
-      'loader',
-      t('ブラウザでログインしてください', 'Please sign in via the browser'),
-    ];
+    return ['wait', 'loader', t('ブラウザでログイン中', 'Signing in via browser')];
   if (account.state !== 'ready')
     return ['bad', 'info', t('認証未完了', 'Authentication incomplete')];
   return account.writable
@@ -220,18 +214,15 @@ export function Connections({
                       disabled={disabled}
                     >
                       {setup.prerequisite === 'winfsp'
-                        ? t('WinFsp のダウンロードページを開く', 'Open the WinFsp download page')
-                        : t(
-                            'マウント機能の導入手順を開く',
-                            'Open the mount feature setup instructions',
-                          )}
+                        ? t('WinFsp をダウンロード', 'Download WinFsp')
+                        : t('導入手順を見る', 'View setup instructions')}
                     </button>
                     <button
                       className="stage-text-button framed small"
                       onClick={() => setRevision((value) => value + 1)}
                       disabled={disabled}
                     >
-                      {t('導入後に再確認', 'Recheck after installing')}
+                      {t('再確認', 'Recheck')}
                     </button>
                   </div>
                 )}
@@ -240,8 +231,8 @@ export function Connections({
             {setup && !setup.oauthConfigured && (
               <p className="connect-notice">
                 {t(
-                  'この検証版では Google 接続はまだ利用できません。',
-                  'Google connection is not yet available in this preview.',
+                  'この検証版では Google 接続を利用できません。',
+                  'Google connection is not available in this preview.',
                 )}
               </p>
             )}
@@ -271,14 +262,6 @@ export function Connections({
                         </span>
                       </span>
                       {account.detail && <small>{account.detail}</small>}
-                      {account.state === 'ready' && !account.writable && (
-                        <small>
-                          {t(
-                            'フォルダを編集するには、書き込みを許可してもう一度ログインしてください。',
-                            'To edit folders, allow writing and sign in again.',
-                          )}
-                        </small>
-                      )}
                     </div>
                     {(account.state === 'incomplete' ||
                       (account.state === 'ready' && !account.writable)) && (
@@ -313,7 +296,7 @@ export function Connections({
                           }
                         >
                           <Icon name="trash" size={15} />
-                          {t('アカウントの登録解除', 'Remove account')}
+                          {t('登録解除', 'Remove account')}
                         </Menu.Item>
                       </MoreMenu>
                     )}
@@ -332,10 +315,7 @@ export function Connections({
               >
                 <input
                   aria-label={t('アカウントの表示名', 'Account display name')}
-                  placeholder={t(
-                    '表示名（個人用、仕事用など）',
-                    'Display name (e.g. Personal, Work)',
-                  )}
+                  placeholder={t('個人用、仕事用など', 'e.g. Personal, Work')}
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
                   required
@@ -345,7 +325,7 @@ export function Connections({
                   disabled={disabled || !setup?.available || !setup.oauthConfigured || authorizing}
                 >
                   <Icon name="plus" size={14} />
-                  {t('Google アカウントを追加', 'Add Google account')}
+                  {t('アカウントを追加', 'Add account')}
                 </button>
               </form>
             </Step>
@@ -430,10 +410,7 @@ export function Connections({
                         disabled={disabled}
                         onClick={() => choose(current)}
                       >
-                        {t(
-                          `「${current.name}」を接続先にする`,
-                          `Use "${current.name}" as the connection`,
-                        )}
+                        {t('ここを接続先にする', 'Use this folder')}
                       </button>
                     )}
                   </div>
@@ -472,10 +449,7 @@ export function Connections({
                       ))}
                       {folders.length === 0 && (
                         <p className="folder-note">
-                          {t(
-                            'この場所にはフォルダがありません。',
-                            'There are no folders in this location.',
-                          )}
+                          {t('フォルダがありません。', 'No folders here.')}
                         </p>
                       )}
                     </div>
@@ -527,7 +501,7 @@ export function Connections({
                       </label>
                     )}
                     <label className="connect-field">
-                      {t('contents 内のフォルダ名', 'Folder name within Materials')}
+                      {t('フォルダ名', 'Folder name')}
                       <input
                         value={name}
                         disabled={disabled}
@@ -550,10 +524,7 @@ export function Connections({
                       onChange={(e) => setEditable(e.target.checked)}
                     />
                     <span className="switch-track" aria-hidden="true" />
-                    {t(
-                      'irori とエージェントから編集できるようにする',
-                      'Allow editing from irori and agents',
-                    )}
+                    {t('編集を許可', 'Allow editing')}
                   </label>
                   <p className="mount-preview" aria-live="polite">
                     <Icon name="cloud" size={15} />
@@ -586,12 +557,7 @@ export function Connections({
             )}
             {earlier.length > 0 && workspaceId && (
               <section className="earlier-connections">
-                <h3>
-                  {t(
-                    'ワークスペースに接続されている Drive フォルダ',
-                    'Drive folders connected to the workspace',
-                  )}
-                </h3>
+                <h3>{t('ワークスペースの接続', 'Workspace connections')}</h3>
                 {earlier.map((connection) => (
                   <div className="connection-card" key={connection.mountId}>
                     <div className="connection-head">
@@ -622,12 +588,12 @@ export function Connections({
                             setMoved(
                               duplicate
                                 ? t(
-                                    `この KB にはすでに同じフォルダが接続されているため、ワークスペース側の「${connection.name}」の登録だけを解除しました。`,
-                                    `This KB already connects the same folder, so only the workspace's “${connection.name}” was unregistered.`,
+                                    `重複のため「${connection.name}」の登録を解除しました。`,
+                                    `Removed duplicate “${connection.name}”.`,
                                   )
                                 : t(
-                                    `「${connection.name}」をこの KB の資料に移しました。`,
-                                    `Moved “${connection.name}” into this KB's materials.`,
+                                    `「${connection.name}」を移しました。`,
+                                    `Moved “${connection.name}”.`,
                                   ),
                             );
                           })
@@ -679,19 +645,13 @@ export function Connections({
                   connection.accountName &&
                   !connection.accountWritable && (
                     <p className="connect-hint">
-                      {t(
-                        'アカウントが読み取りのみ許可されているため、読み取り専用です。',
-                        'Read-only: this account may only read.',
-                      )}
+                      {t('アカウントが読み取りのみ', 'Account is read-only')}
                     </p>
                   )}
                 {!!connection.pending && (
                   <p className="connection-pending" role="status">
                     <Icon name="cloudUp" size={13} className="blink" />
-                    {t(
-                      `Google Drive への送信待ち ${connection.pending} 件`,
-                      `${connection.pending} changes waiting to upload to Google Drive`,
-                    )}
+                    {t(`送信待ち ${connection.pending} 件`, `${connection.pending} pending`)}
                   </p>
                 )}
                 {connection.uploadError && (
@@ -740,7 +700,7 @@ export function Connections({
                   >
                     {connection.access === 'read-write'
                       ? t('読み取り専用にする', 'Make read-only')
-                      : t('編集できるようにする', 'Allow editing')}
+                      : t('編集を許可', 'Allow editing')}
                   </button>
                   <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
                     {(connection.state === 'mounted' || connection.state === 'error') && (
@@ -766,7 +726,7 @@ export function Connections({
                           )
                         }
                       >
-                        {t('選択中のアカウントに紐づける', 'Bind to the selected account')}
+                        {t('アカウントに紐づける', 'Bind to account')}
                       </Menu.Item>
                     )}
                     <Menu.Item
@@ -800,8 +760,8 @@ export function Connections({
                   <div className="connection-confirm" role="alert">
                     <p>
                       {t(
-                        `送信待ちが ${connection.pending ?? 0} 件あります。待たずに進めると、変更はこの端末に残ります。`,
-                        `${connection.pending ?? 0} changes are still waiting to upload. If you proceed now, they stay on this device.`,
+                        `送信待ち ${connection.pending ?? 0} 件はこの端末に残ります。`,
+                        `${connection.pending ?? 0} pending uploads will stay on this device.`,
                       )}
                     </p>
                     <div className="connection-actions">
@@ -849,7 +809,7 @@ export function Connections({
                     }}
                   >
                     <input
-                      aria-label={t('新しいマウント先のフォルダ名', 'New mount folder name')}
+                      aria-label={t('新しい名前', 'New name')}
                       value={newName}
                       disabled={disabled}
                       onChange={(e) => setNewName(e.target.value)}
@@ -868,7 +828,7 @@ export function Connections({
                         className="solid-button"
                         disabled={disabled || !!mountNameError(newName)}
                       >
-                        {t('名前を保存', 'Save name')}
+                        {t('保存', 'Save')}
                       </button>
                     </div>
                     {mountNameError(newName) && (

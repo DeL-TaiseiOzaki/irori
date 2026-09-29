@@ -73,9 +73,7 @@ export function SkillPicker({
           aria-label={t('スキル', 'Skill')}
           className="composer-skill"
           value={value}
-          title={
-            skills.find((s) => s.name === value)?.description ?? t('スキルを使わない', 'No skill')
-          }
+          title={skills.find((s) => s.name === value)?.description ?? t('スキルなし', 'No skill')}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         >

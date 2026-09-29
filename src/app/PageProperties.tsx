@@ -185,18 +185,12 @@ export function PageProperties({
       {declared?.problem && <p className="properties-hint">{declared.problem}</p>}
       {auto.length > 0 && !declared?.actor && !readOnly && (
         <p className="properties-hint">
-          {t(
-            'Git user.email が未設定のため、最終更新者は記録されません。',
-            'Git user.email is not set, so the last editor is not recorded.',
-          )}
+          {t('Git user.email が未設定です。', 'Git user.email is not set.')}
         </p>
       )}
       {parsed.error && (
         <p className="properties-hint" role="alert">
-          {t(
-            'frontmatter を読めません。YAML を直してください: ',
-            'The frontmatter cannot be read. Fix the YAML: ',
-          )}
+          {t('frontmatter を読めません: ', 'Could not read the frontmatter: ')}
           {parsed.error}
         </p>
       )}
@@ -235,10 +229,7 @@ export function PageProperties({
               value={values.description}
               readOnly={readOnly}
               missing={required.has('description') && isEmptyValue(values.description)}
-              placeholder={t(
-                'このページを開くか決めるための一文',
-                'One sentence to decide whether to open this page',
-              )}
+              placeholder={t('一文で', 'One sentence')}
               onCommit={(value) => set(['description'], value)}
             />
           )}
@@ -251,7 +242,7 @@ export function PageProperties({
                 required.has(key) && isEmptyValue(value) && definition?.auto !== 'last-change';
               return (
                 <div key={key} className="properties-row" data-missing={missing || undefined}>
-                  <dt title={definition?.description ?? key}>
+                  <dt>
                     {label(key)}
                     {missing && (
                       <span className="properties-required">{t('必須', 'Required')}</span>
@@ -413,7 +404,6 @@ function Value({
         type="datetime-local"
         aria-label={name}
         value={toLocalInput(value)}
-        title={display(value)}
         readOnly={readOnly}
         onChange={(event) =>
           onSet(event.target.value ? localTimestamp(new Date(event.target.value)) : '')
@@ -424,7 +414,7 @@ function Value({
     return (
       <span className="properties-static">
         {isEmptyValue(value) && definition?.auto === 'last-change'
-          ? t('保存すると記録されます', 'Recorded when saved')
+          ? t('未記録', 'Not recorded')
           : display(value)}
       </span>
     );
@@ -451,9 +441,7 @@ function Value({
       ))}
     </ul>
   ) : (
-    <span className="properties-static empty">
-      {t('なし（YAML で編集）', 'None (edit as YAML)')}
-    </span>
+    <span className="properties-static empty">{t('なし', 'None')}</span>
   );
 }
 

@@ -16,12 +16,7 @@ function metadata(text: string) {
   const body = text.indexOf('\n', close) < 0 ? text.length : text.indexOf('\n', close) + 1;
   const document = parseDocument(block, { schema: 'failsafe', logLevel: 'silent' });
   if (document.errors.length)
-    throw Error(
-      t(
-        'frontmatter の構文を確認してからリンクを更新してください。',
-        'Check the frontmatter syntax before updating links.',
-      ),
-    );
+    throw Error(t('frontmatter の構文が不正です。', 'Invalid frontmatter syntax.'));
   const references: Reference[] = [];
   if (!isMap(document.contents)) return { body, references };
   for (const [key, field] of [

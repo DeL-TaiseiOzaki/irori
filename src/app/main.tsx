@@ -11,12 +11,7 @@ import {
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { appendConversationEvent, withRequests, type QueuedMessage } from '../domain/conversation';
-import {
-  agentAccessOptions,
-  agentAccessLabel,
-  agentAccessDetail,
-  defaultAgentAccess,
-} from '../domain/agent-access';
+import { agentAccessOptions, agentAccessLabel, defaultAgentAccess } from '../domain/agent-access';
 import { ModelPicker } from './ModelPicker';
 import { Dialog } from './Dialog';
 import { SkillPicker } from './SkillPicker';
@@ -145,14 +140,12 @@ const host = window.irori;
 function SessionControls({
   scopeId,
   agent,
-  access,
   running,
   onReset,
   onError,
 }: {
   scopeId: string;
   agent: AgentId;
-  access: AgentAccess;
   running: boolean;
   onReset: () => void;
   onError: (error: unknown) => void;
@@ -187,20 +180,10 @@ function SessionControls({
   }
   return (
     <div className="session-controls">
-      <small role="status">
-        {!session
-          ? t('会話の状態を確認中…', 'Checking the conversation state…')
-          : session.state === 'saved'
-            ? (session.access ?? 'default') === access
-              ? t('会話を継続します。', 'Continues the conversation.')
-              : t('新しい会話を始めます。', 'Starts a new conversation.')
-            : session.state === 'empty'
-              ? t('新しい会話を始めます。', 'Starts a new conversation.')
-              : session.detail}
-      </small>
+      {session?.state === 'unavailable' && <small role="alert">{session.detail}</small>}
       {session && session.state !== 'empty' && (
         <button disabled={running || resetting} onClick={() => void reset()}>
-          {t('会話の継続をリセット', 'Reset conversation continuation')}
+          {t('会話をリセット', 'Reset conversation')}
         </button>
       )}
     </div>
@@ -215,14 +198,7 @@ function navigationNotice(target: Navigation, found: boolean) {
       `${target.line} 行目の${what}を選択しました。`,
       `Selected the ${what} on line ${target.line}.`,
     );
-  return t(
-    `${what}を特定できませんでした。${
-      target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'
-    }`,
-    `Could not locate the ${what}. ${
-      target.link ? `Check line ${target.line}.` : 'Search again to check.'
-    }`,
-  );
+  return t(`${what}を特定できませんでした。`, `Could not locate the ${what}.`);
 }
 /** A set of scope IDs with one added or removed, unchanged when nothing changes. */
 function mark(all: string[], scopeId: string, value: boolean) {
@@ -648,15 +624,8 @@ function App() {
           : 'source',
     );
     setEditorKey((k) => k + 1);
-    setStatus(
-      next.viewer
-        ? t('表示のみ・irori では編集しません', 'View only · irori does not edit this file')
-        : next.readOnly
-          ? t('クラウド資料・読み取り専用', 'Cloud material · Read-only')
-          : next.cloud
-            ? t('Google Drive の資料・編集できます', 'Google Drive material · editable')
-            : t('この端末に保存済み', 'Saved on this device'),
-    );
+    // The stage's save state shows what this document is; the status bar stays quiet.
+    setStatus('');
   }
   /** Loads a document the person chose to open, and shows it on the stage. */
   function show(next: Document, navigation?: Navigation) {
@@ -796,11 +765,7 @@ function App() {
           current.current = { ...current.current, doc: saved, buffer: latest };
           setDoc(saved);
           setBuffer(latest);
-          setStatus(
-            saved.cloud
-              ? t('保存しました（Drive へ自動送信）', 'Saved (auto-uploaded to Drive)')
-              : t('この端末に保存済み', 'Saved on this device'),
-          );
+          setStatus('');
         }
         return true;
       } catch (e) {
@@ -883,10 +848,7 @@ function App() {
       if (!(await save())) return false;
       if (sending && space.scopeId !== active?.scopeId) {
         setError(
-          t(
-            '送信が終わってから hibachi を切り替えてください。',
-            'Switch hibachis after the send finishes.',
-          ),
+          t('送信中は hibachi を切り替えられません。', "Can't switch hibachis while sending."),
         );
         return false;
       }
@@ -925,12 +887,7 @@ function App() {
   }
   async function start() {
     if (active && heldByYou(active.scopeId)) {
-      report(
-        t(
-          'irori agent が作業中のため、終わってから頼んでください。',
-          'The irori agent is working; ask again after it finishes.',
-        ),
-      );
+      report(t('irori agent が作業中です。', 'The irori agent is busy.'));
       return;
     }
     if (
@@ -970,12 +927,7 @@ function App() {
         await sendTurn(message, notePath, fresh);
       }
       if (!(await composer.clear(draftRevision)))
-        report(
-          t(
-            '指示は送信済みです。残った下書きは再送信しないでください。',
-            'The instruction was sent. Do not resend the draft left behind.',
-          ),
-        );
+        report(t('指示は送信済みです。', 'The instruction was sent.'));
       setFresh(false);
     } catch (e) {
       if (!running) markRunning(active!.scopeId, false);
@@ -1169,12 +1121,7 @@ function App() {
         })) {
           if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
             await host.connectCloud(id, connection.mountId).catch(() => {
-              setStatus(
-                t(
-                  '接続できないクラウドがあります（「クラウド接続」で確認）。',
-                  'A cloud could not connect; check "Cloud connection".',
-                ),
-              );
+              setStatus(t('接続できないクラウドがあります。', 'A cloud could not connect.'));
             });
           }
         }
@@ -1245,10 +1192,10 @@ function App() {
     setRevision((value) => value + 1);
     setStatus(
       change.action === 'delete'
-        ? t('Google Drive のゴミ箱に移しました。', "Moved to Google Drive's trash.")
+        ? t('ゴミ箱に移動', 'Moved to trash')
         : change.action === 'rename'
-          ? t('名前を変更しました。', 'Renamed.')
-          : t('移動しました。', 'Moved.'),
+          ? t('名前を変更', 'Renamed')
+          : t('移動', 'Moved'),
     );
   }
   // Pane sizes are the user's, not the stylesheet's: the group remembers each
@@ -1325,9 +1272,7 @@ function App() {
   }
   function leaveWorkspace() {
     if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-      report(
-        t('未保存のノートを保存してから移動してください。', 'Save the unsaved note before moving.'),
-      );
+      report(t('ノートが未保存です。', 'The note is unsaved.'));
       return;
     }
     void flushDrafts()
@@ -1531,10 +1476,7 @@ function App() {
                   beforeAction={async () => {
                     if (brainLocked) {
                       report(
-                        t(
-                          '実行が終わってから Git を操作してください。',
-                          'Operate Git after the run finishes.',
-                        ),
+                        t('実行中は Git を操作できません。', "Can't operate Git while running."),
                       );
                       return false;
                     }
@@ -1576,13 +1518,11 @@ function App() {
                     <Crumbs
                       items={[{ icon: 'cloud', label: `${workspace?.name} · Drive` }]}
                       here={doc.path.split('/').at(-1)}
-                      title={doc.path}
                     />
                   ) : onNote && doc && docLayer ? (
                     <Crumbs
                       space={docSpace}
                       {...fileCrumbs(docSpace, docLayer, doc.path)}
-                      title={doc.path}
                       onBrain={
                         docSpace && docSpace.scopeId === active?.scopeId
                           ? () => setView('home')
@@ -1606,12 +1546,12 @@ function App() {
                     {onNote &&
                       doc &&
                       (doc.viewer ? (
-                        <span className="save-state" role="status" title={status}>
+                        <span className="save-state" role="status">
                           <Icon name="file" size={13} />
                           {t('表示のみ', 'View only')}
                         </span>
                       ) : doc.readOnly ? (
-                        <span className="save-state" role="status" title={status}>
+                        <span className="save-state" role="status">
                           <Icon name="lock" size={13} />
                           {t('読み取り専用', 'Read-only')}
                         </span>
@@ -1619,14 +1559,13 @@ function App() {
                         <button
                           className="save-state pending"
                           disabled={!!external}
-                          title={t('保存（Ctrl+S）', 'Save (Ctrl+S)')}
                           onClick={() => void save()}
                         >
                           <i />
                           {t('保存', 'Save')}
                         </button>
                       ) : (
-                        <span className="save-state" role="status" title={status}>
+                        <span className="save-state" role="status">
                           <Icon name="check" size={13} strokeWidth={2.4} />
                           {t('保存済み', 'Saved')}
                         </span>
@@ -1669,12 +1608,7 @@ function App() {
                       />
                     )}
                     {onNote && doc && (
-                      <NoteInfo
-                        label={t(
-                          'ノートの情報（名前・場所・人の行・記録）',
-                          'Note details (name, location, human lines, records)',
-                        )}
-                      >
+                      <NoteInfo label={t('ノートの情報', 'Note details')}>
                         <h3>{doc.path.split('/').at(-1)}</h3>
                         <dl>
                           <dt>{t('場所', 'Location')}</dt>
@@ -1692,8 +1626,8 @@ function App() {
                           <p className="authorship" role="status">
                             <Icon name="penLine" size={13} />
                             {t(
-                              `人が書いた・直した行: ${personLineCount} 行`,
-                              `Lines a person wrote or edited: ${personLineCount}`,
+                              `人が書いた行 ${personLineCount}`,
+                              `Human-written lines ${personLineCount}`,
                             )}
                           </p>
                         )}
@@ -1826,10 +1760,7 @@ function App() {
                 {external && (
                   <div className="conflict" role="alert">
                     <strong>
-                      {t(
-                        '外部でノートが変更されました。編集は保持されています。',
-                        'The note changed outside irori; your edits are kept.',
-                      )}
+                      {t('外部でノートが変更されました。', 'The note changed outside irori.')}
                     </strong>
                     <div className="versions">
                       <label>
@@ -1837,23 +1768,18 @@ function App() {
                         <pre>{buffer}</pre>
                       </label>
                       <label>
-                        {t('ディスク上の最新版', 'Latest version on disk')}
+                        {t('ディスク版', 'Disk version')}
                         <pre>{external.text}</pre>
                       </label>
                     </div>
                     <button onClick={() => load(external)}>
-                      {t('ディスク版を表示（下書きは保持）', 'Show the disk version (keep draft)')}
+                      {t('ディスク版を表示', 'Show the disk version')}
                     </button>
                     <button
                       onClick={() => {
                         setDoc(external);
                         setExternal(undefined);
-                        setStatus(
-                          t(
-                            '最新版を基準に、編集内容を確認して保存してください',
-                            'Review your edit against the latest version and save',
-                          ),
-                        );
+                        setStatus(t('要確認', 'Needs review'));
                       }}
                     >
                       {t('編集を維持して手動で統合', 'Keep the edit and merge manually')}
@@ -1862,7 +1788,7 @@ function App() {
                 )}
                 {doc?.draft && doc.draft.text !== doc.text && (
                   <div className="hint">
-                    {t('復元できる下書きがあります。', 'A recoverable draft is available.')}
+                    {t('下書きあり', 'Draft available')}
                     <button
                       onClick={() => {
                         setBuffer(doc.draft!.text);
@@ -1912,8 +1838,8 @@ function App() {
                         if (!target && cloudRoot?.scopeId !== source.scopeId)
                           throw Error(
                             t(
-                              '資料のスペースをワークスペースに追加してください。',
-                              'Add this material’s space to the workspace.',
+                              'このスペースはワークスペースにありません。',
+                              "This space isn't in the workspace.",
                             ),
                           );
                         const opened = target
@@ -2091,12 +2017,6 @@ function App() {
                               height="64"
                             />
                           )}
-                          <h1>
-                            {t(
-                              'ここから、考えを広げよう。',
-                              "Let's expand your thinking from here.",
-                            )}
-                          </h1>
                           <div className="welcome-actions">
                             <ArrowFillButton
                               disabled={!active || running || connecting}
@@ -2177,13 +2097,7 @@ function App() {
                   }
                 >
                   <header className="agent-header">
-                    <label
-                      className="agent-picker"
-                      title={t(
-                        'この hibachi の hibachi agent',
-                        'The hibachi agent of this hibachi',
-                      )}
-                    >
+                    <label className="agent-picker">
                       {active && (
                         <span className="agent-mark">
                           <BrainTile space={active} size={26} radius={8} />
@@ -2225,10 +2139,7 @@ function App() {
                     <button
                       className="icon-button"
                       aria-label={t('新しい会話', 'New conversation')}
-                      title={t(
-                        '次の送信から新しい会話',
-                        'Starts a new conversation from the next send',
-                      )}
+                      title={t('新しい会話', 'New conversation')}
                       aria-pressed={fresh}
                       disabled={running || sending || queued.length > 0}
                       onClick={() => {
@@ -2241,8 +2152,8 @@ function App() {
                     <Popover.Root>
                       <Popover.Trigger
                         className="icon-button agent-settings"
-                        aria-label={t('会話と接続の設定', 'Conversation and connection settings')}
-                        title={t('会話と接続の設定', 'Conversation and connection settings')}
+                        aria-label={t('会話と接続', 'Conversation and connection')}
+                        title={t('会話と接続', 'Conversation and connection')}
                       >
                         <Icon name="more" size={16} />
                       </Popover.Trigger>
@@ -2260,7 +2171,7 @@ function App() {
                               </Popover.Title>
                               <Popover.Close
                                 className="icon-button"
-                                aria-label={t('会話の設定を閉じる', 'Close conversation settings')}
+                                aria-label={t('閉じる', 'Close')}
                               >
                                 <Icon name="close" />
                               </Popover.Close>
@@ -2271,21 +2182,14 @@ function App() {
                                 {agentInfo?.version || t('CLIを確認中', 'Checking the CLI')}
                               </span>
                             </p>
-                            <p>{agentInfo?.detail}</p>
-                            {agentInfo?.available && agentInfo.tested === false && (
-                              <p>
-                                {t(
-                                  'このCLIバージョンは未検証です。',
-                                  'This CLI version is untested.',
-                                )}
-                              </p>
+                            {agentInfo?.available === false && (
+                              <p role="alert">{agentInfo.detail}</p>
                             )}
                             {active && (
                               <SessionControls
                                 key={`${active.scopeId}:${agent}`}
                                 scopeId={active.scopeId}
                                 agent={agent}
-                                access={access}
                                 running={
                                   running || sending || queued.length > 0 || !conversationReady
                                 }
@@ -2449,15 +2353,6 @@ function App() {
                         )}
                       </div>
                     )}
-                    {fresh && (
-                      <p className="new-session" role="status">
-                        {t(
-                          '次の送信から新しい会話を始めます。',
-                          'The next send starts a new conversation.',
-                        )}
-                        <button onClick={() => setFresh(false)}>{t('取り消す', 'Undo')}</button>
-                      </p>
-                    )}
                     {heldHere && (
                       <p className="agent-held" role="status">
                         <Icon name="sparkles" size={13} />
@@ -2469,7 +2364,7 @@ function App() {
                     )}
                     <div className="composer-box">
                       <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
-                        <span className="context-chip" title={active?.root}>
+                        <span className="context-chip">
                           {active ? (
                             <BrainTile space={active} size={16} radius={5} />
                           ) : (
@@ -2478,7 +2373,7 @@ function App() {
                           {active?.name ?? t('スペース未選択', 'No space selected')}
                         </span>
                         {noteInContext && (
-                          <span className="context-chip" title={doc!.path}>
+                          <span className="context-chip">
                             <Icon
                               name={
                                 docLayer === 'contents'
@@ -2508,7 +2403,6 @@ function App() {
                         {!!doc && doc.scopeId === active?.scopeId && !noteInContext && (
                           <button
                             className="context-add"
-                            title={doc.path}
                             aria-label={t(
                               `${doc.path} を相談の対象に戻す`,
                               `Put ${doc.path} back in the context`,
@@ -2526,7 +2420,6 @@ function App() {
                             <span
                               className="context-chip reference"
                               key={`${source.scopeId}:${source.path}`}
-                              title={source.path}
                             >
                               {owner ? (
                                 <BrainTile space={owner} size={16} radius={5} />
@@ -2555,10 +2448,6 @@ function App() {
                           className="context-add"
                           aria-label={t('参照に追加', 'Add as reference')}
                           disabled={!doc || sources.length >= 20 || referenced}
-                          title={t(
-                            '開いているノートを参照に追加',
-                            'Add the open note as a reference',
-                          )}
                           onClick={() => {
                             if (!doc) return;
                             void save().then((saved) => {
@@ -2613,7 +2502,6 @@ function App() {
                             <Icon name="shield" size={13} />
                             <select
                               aria-label={t('エージェントのアクセス', 'Agent access')}
-                              aria-describedby="agent-access-detail"
                               value={access}
                               disabled={
                                 sending || gitBusy || agentAccessOptions(agent).length === 1
@@ -2682,8 +2570,8 @@ function App() {
                             }
                             title={
                               running || queued.length
-                                ? t('送信待ちに追加（Enter）', 'Add to pending sends (Enter)')
-                                : t('送信（Enter）', 'Send (Enter)')
+                                ? t('送信待ちに追加', 'Add to pending sends')
+                                : t('送信', 'Send')
                             }
                             disabled={
                               !active ||
@@ -2709,7 +2597,7 @@ function App() {
                       <div className="hint" role="alert">
                         {composer.error}
                         <button onClick={() => void composer.retry()}>
-                          {t('下書き保存を再試行', 'Retry saving draft')}
+                          {t('再試行', 'Retry')}
                         </button>
                       </div>
                     ) : (
@@ -2719,10 +2607,7 @@ function App() {
                           : composer.pending
                             ? t('下書きを保存中…', 'Saving the draft…')
                             : prompt
-                              ? t(
-                                  '未送信の下書きをこの端末に保存済み',
-                                  'The unsent draft is saved on this device',
-                                )
+                              ? t('下書き保存済み', 'Draft saved')
                               : ''}
                       </small>
                     )}
@@ -2739,9 +2624,6 @@ function App() {
                         {retirementNotice(s)}
                       </small>
                     ))}
-                    <small id="agent-access-detail" className="muted access-detail" role="status">
-                      {agentAccessDetail(agent, access)}
-                    </small>
                   </div>
                 </aside>
               </Pane>
@@ -2761,7 +2643,6 @@ function App() {
         terminalOpen={!!terminalSpace}
         terminalDisabled={!active && !terminalSpace}
         onWorkspace={leaveWorkspace}
-        aiTarget={othersActive ? 'overview' : 'panel'}
         onAi={() => {
           if (othersActive) showOverview();
           else {
@@ -2812,10 +2693,7 @@ function App() {
           beforeChange={async () => {
             if (running || sending || queued.length || gitBusy || connecting)
               throw Error(
-                t(
-                  '実行・Git 操作・接続が完了してからノートを整理してください。',
-                  'Organize notes after the run, Git operation, and connection finish.',
-                ),
+                t('作業中はノートを整理できません。', "Can't organize notes while busy."),
               );
             if (!(await save())) return null;
             return current.current.doc ?? null;
@@ -2845,10 +2723,7 @@ function App() {
               notice ??
                 (next
                   ? t('ノートの場所を変更しました。', 'The note has moved.')
-                  : t(
-                      '削除しました（「削除したノートを復元」から戻せます）。',
-                      'Deleted (restore it from "Restore deleted notes").',
-                    )),
+                  : t('削除しました。', 'Deleted.')),
             );
           }}
         />
@@ -2864,10 +2739,7 @@ function App() {
             );
             if (!target)
               throw Error(
-                t(
-                  'この KB をワークスペースに追加してから開いてください。',
-                  'Add this KB to the workspace before opening it.',
-                ),
+                t('この KB はワークスペースにありません。', "This KB isn't in the workspace."),
               );
             const opened = await open(
               target,
@@ -2918,12 +2790,7 @@ function App() {
                 setCreatingNote(true);
                 void (async () => {
                   if (!(await save()))
-                    throw Error(
-                      t(
-                        '現在のノートを保存してから作成してください。',
-                        'Save the current note before creating a new one.',
-                      ),
-                    );
+                    throw Error(t('現在のノートが未保存です。', 'The current note is unsaved.'));
                   return cloudNoteTarget
                     ? host.createCloudNote(
                         cloudNoteTarget.scopeId,
@@ -2958,10 +2825,7 @@ function App() {
               </p>
             ) : (
               <label>
-                {t(
-                  '保存先フォルダー（KB 内の相対パス）',
-                  'Destination folder (path relative to the KB)',
-                )}
+                {t('保存先フォルダー', 'Destination folder')}
                 <input
                   aria-label={t('保存先フォルダー', 'Destination folder')}
                   value={noteDirectory}
@@ -2991,10 +2855,7 @@ function App() {
           beforeChange={async () => {
             if (running || sending || queued.length || gitBusy || connecting)
               throw Error(
-                t(
-                  '実行・Git 操作・接続が完了してから資料を整理してください。',
-                  'Organize materials after the run, Git operation and connection finish.',
-                ),
+                t('作業中は資料を整理できません。', "Can't organize materials while busy."),
               );
             return save();
           }}
@@ -3014,13 +2875,7 @@ function App() {
           onRestored={(next, notice) => {
             setTrashOpen(false);
             show(next);
-            setStatus(
-              notice ??
-                t(
-                  'ノートを元の場所に復元しました。',
-                  'The note was restored to its original location.',
-                ),
-            );
+            setStatus(notice ?? t('復元しました。', 'Restored.'));
             setRevision((value) => value + 1);
           }}
         />
@@ -3034,12 +2889,6 @@ function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div className="app-crash" role="alert">
       <h1>{t('画面の描画でエラーが発生しました', 'The screen failed to render')}</h1>
-      <p>
-        {t(
-          '未保存の編集は失われることがあります（保存済みのノートは影響しません）。',
-          'Unsaved edits may be lost (saved notes are unaffected).',
-        )}
-      </p>
       <pre>{String(error)}</pre>
       <button className="primary" onClick={resetErrorBoundary}>
         {t('再表示', 'Show again')}

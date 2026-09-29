@@ -109,10 +109,7 @@ export class CloudOutbox {
       let record = pendingWrite.parse(await readLocalJson(filename, null));
       if (!record.accountId)
         throw Error(
-          t(
-            '送信準備にアカウント情報がありません。保持版を復元し、送信先を確認して準備し直してください。',
-            'This pending upload has no account. Restore the kept copy, check the destination and prepare it again.',
-          ),
+          t('送信待ちにアカウント情報がありません。', 'This pending upload has no account.'),
         );
       if (
         record.id !== id ||
@@ -146,10 +143,7 @@ export class CloudOutbox {
         if (existing)
           return persist(
             'failed',
-            t(
-              '送信先に異なる版があります。上書きしていません。',
-              'The destination has a different version. Nothing was overwritten.',
-            ),
+            t('送信先に異なる版があります。', 'The destination has a different version.'),
           );
         await persist('uploading');
         await remote.copy(this.knowledge.blobPath(record.source.hash), record.name);
@@ -158,10 +152,7 @@ export class CloudOutbox {
       } catch {
         return persist(
           'failed',
-          t(
-            '送信完了を確認できません。元の版を端末に保持しています。',
-            'Could not confirm the upload finished. The original version is kept on this device.',
-          ),
+          t('送信完了を確認できません。', 'Could not confirm the upload finished.'),
         );
       }
     });

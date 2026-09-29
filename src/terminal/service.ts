@@ -33,8 +33,7 @@ export class TerminalService {
           t('ターミナルは同時に4つまで開けます。', 'Up to 4 terminals can be open at once.'),
         );
       const shell = (await this.available()).find((item) => item.id === shellId);
-      if (!shell)
-        throw Error(t('検出済みのシェルを選択してください。', 'Choose a detected shell.'));
+      if (!shell) throw Error(t('シェルが見つかりません。', 'Shell not found.'));
       const space = await this.files.get(scopeId);
       const cwd = await this.files.resolve(scopeId, '', true);
       const env = agentEnv();

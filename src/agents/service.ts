@@ -207,7 +207,7 @@ export class AgentService {
     if (this.busy(scopeId))
       throw Error(
         t(
-          '実行を停止してから会話の継続をリセットしてください。',
+          '実行を停止してから会話をリセットしてください。',
           'Stop the run before resetting the conversation.',
         ),
       );
@@ -244,26 +244,7 @@ export class AgentService {
                 : id === 'claude'
                   ? v.includes('2.1.232')
                   : false,
-            detail:
-              id === 'pi'
-                ? t(
-                    'Piのネイティブ設定を使用。標準のツール実行には許可ダイアログがありません。プロジェクト拡張はPi側の信頼設定に従います。',
-                    "Uses Pi's native settings. Standard tool runs have no permission dialog. Project extensions follow Pi's trust settings.",
-                  )
-                : id === 'opencode'
-                  ? t(
-                      'OpenCodeのネイティブ認証・モデル・権限設定を使用。ask要求をパネルで確認します。',
-                      "Uses OpenCode's native sign-in, model and permission settings. Its ask requests appear in the panel.",
-                    )
-                  : id === 'hermes'
-                    ? t(
-                        'Hermes Agent のネイティブ設定・プロバイダ・承認設定を使用。1回ごとの実行のため、パネルでの承認や質問はありません。',
-                        "Uses Hermes Agent's native settings, provider and approval rules. Each run is one-shot, so nothing is asked in the panel.",
-                      )
-                    : t(
-                        '既存のCLI認証・設定を使用',
-                        "Uses the CLI's existing sign-in and settings",
-                      ),
+            detail: '',
           };
         } catch (e) {
           return { id, version: '', available: false, tested: false, detail: String(e) };
@@ -655,8 +636,8 @@ export class AgentService {
             run,
             'error',
             t(
-              '前回の会話を引き継ぐ実行に失敗しました。再試行するか、会話の継続をリセットして新しい会話を始めてください。',
-              'The run continuing the previous conversation failed. Try again, or reset the conversation and start a new one.',
+              '前回の会話を引き継げませんでした（会話をリセット）。',
+              'Could not continue the previous conversation (reset the conversation).',
             ),
           );
       }
@@ -686,8 +667,8 @@ export class AgentService {
           outcome === 'completed'
             ? t('完了', 'Completed')
             : outcome === 'cancelled'
-              ? t('停止しました', 'Stopped')
-              : t('実行に失敗しました', 'Run failed'),
+              ? t('停止', 'Stopped')
+              : t('失敗', 'Failed'),
       };
       if (run.recorded) {
         try {

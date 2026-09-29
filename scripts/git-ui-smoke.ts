@@ -271,7 +271,7 @@ try {
     .getByRole('button', { name: 'README', exact: true })
     .click();
   await page.getByRole('button', { name: /^ノートの情報/ }).click();
-  await expect(page.locator('.note-info')).toContainText('人が書いた・直した行: 1 行');
+  await expect(page.locator('.note-info')).toContainText('人が書いた行 1');
   await page.keyboard.press('Escape');
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
@@ -372,10 +372,9 @@ try {
   await expect(panel.locator('.git-history-item')).toContainText('チームKB initial');
   await rail.getByRole('button', { name: /^個人KB・AI/ }).click();
   await panel.getByRole('button', { name: 'Push', exact: true }).click();
-  await expect(panel.getByRole('region', { name: 'Git 操作の確認' })).toContainText(
-    'origin / main',
-  );
-  await panel.getByRole('button', { name: 'Push を実行', exact: true }).click();
+  const confirmation = panel.getByRole('region', { name: 'Git 操作の確認' });
+  await expect(confirmation).toContainText('origin / main');
+  await confirmation.getByRole('button', { name: 'Push', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('送信しました');
   expect(git(remote, 'show', 'main:README.md')).toContain('UI saved 日本語');
   expect(git(remote, 'rev-parse', 'refs/notes/ai')).toBe(git(root, 'rev-parse', 'refs/notes/ai'));
@@ -396,11 +395,11 @@ try {
     '送信待ち 1 commit ・ 受信待ち 1 commit',
   );
   await panel.getByRole('button', { name: 'Pull', exact: true }).click();
-  await panel.getByRole('button', { name: 'Pull を実行', exact: true }).click();
+  await confirmation.getByRole('button', { name: 'Pull', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('分岐');
   await panel.getByLabel('その他の Git 操作').click();
   await panel.getByRole('menuitem', { name: '履歴を統合', exact: true }).click();
-  await panel.getByRole('button', { name: '履歴の統合を開始' }).click();
+  await confirmation.getByRole('button', { name: '統合', exact: true }).click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 1 件');
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toContainText('<<<<<<<');
@@ -621,7 +620,7 @@ try {
   await creation.getByRole('textbox', { name: '新しいフォルダ名' }).fill('new-hibachi');
   await creation.getByRole('textbox', { name: 'スペース名' }).fill('新しい hibachi');
   await expect(creation.getByRole('button', { name: '作成して開く', exact: true })).toBeEnabled();
-  await creation.getByRole('checkbox', { name: 'GitHub にもリポジトリを作成する' }).check();
+  await creation.getByRole('checkbox', { name: 'GitHub にも作成' }).check();
   await expect(creation.getByRole('combobox', { name: 'GitHub アカウント' })).toHaveValue('octo');
   await expect(creation.getByRole('combobox', { name: '公開範囲' })).toHaveValue('private');
   const repositoryName = creation.getByRole('textbox', { name: 'リポジトリ名' });
@@ -690,9 +689,7 @@ try {
     .getByRole('group', { name: 'hibachi の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
-  await expect(
-    panel.getByRole('heading', { name: 'この hibachi は Git で管理されていません' }),
-  ).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Git 未設定' })).toBeVisible();
   await panel.getByRole('button', { name: 'Git を始める', exact: true }).click();
   await expect(panel.getByText('Git を始めました。')).toBeVisible();
   expect(git(plain, 'symbolic-ref', 'HEAD')).toBe('refs/heads/main');

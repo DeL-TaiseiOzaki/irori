@@ -297,7 +297,6 @@ function OverviewMap({
               key={task.id}
               className={`map-pill hand-off ${task.state}`}
               style={at(curve(layout.hearth!, node(task.scopeId)).label)}
-              title={task.label}
             >
               <Icon name="arrow" size={11} strokeWidth={2.4} />
               {task.label}
@@ -327,10 +326,6 @@ function OverviewMap({
             key={`${link.from}>${link.to}`}
             className="map-pill"
             style={at(curve(node(link.from), node(link.to)).label)}
-            title={t(
-              `${space(link.to).name} の hibachi agent が ${space(link.from).name} の ${link.path} を参照（${link.notes} 件）`,
-              `${space(link.to).name}'s hibachi agent read ${link.path} in ${space(link.from).name} (${link.notes})`,
-            )}
           >
             <BrainTile space={space(link.from)} size={14} radius={4} />
             {noteLabel(link.path)}
@@ -460,9 +455,7 @@ function BrainColumn({
         {!!skills.data?.skills.length && (
           <div className="column-skills">
             {skills.data.skills.map((skill) => (
-              <span key={skill.name} title={skill.description}>
-                {skill.name}
-              </span>
+              <span key={skill.name}>{skill.name}</span>
             ))}
           </div>
         )}
@@ -493,7 +486,7 @@ function BrainColumn({
             <Icon name="cloud" size={14} className="layer-icon contents" />
             <span className="column-row-name">{connection.name}</span>
             {connection.access === 'read-only' ? (
-              <span title={t('読み取り専用', 'Read-only')}>
+              <span>
                 <Icon name="lock" size={12} />
               </span>
             ) : (
@@ -835,12 +828,12 @@ export function Overview({
             disabled={!spaces.length}
             onClick={onSearch}
             aria-label={t(
-              `すべての hibachi を検索（${shortcut('K')}）`,
-              `Search all hibachis (${shortcut('K')})`,
+              `hibachi を検索（${shortcut('K')}）`,
+              `Search hibachis (${shortcut('K')})`,
             )}
           >
             <Icon name="search" size={15} />
-            <span>{t('すべての hibachi を検索', 'Search all hibachis')}</span>
+            <span>{t('hibachi を検索', 'Search hibachis')}</span>
             <kbd>{shortcut('K')}</kbd>
           </button>
           <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>

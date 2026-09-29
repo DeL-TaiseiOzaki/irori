@@ -55,18 +55,7 @@ export function RegisterSpace({
     if (!publishing && !result.notice) return onRegistered(result.space);
     // From here the hibachi exists; what follows can only add a notice to it.
     setCreated(result.space);
-    if (result.notice)
-      return setError(
-        publishing
-          ? result.notice.replace(
-              '\n',
-              `\n${t(
-                'GitHub への公開は、commit の後にソース管理から行えます。',
-                'After committing, publish to GitHub from Source control.',
-              )}\n`,
-            )
-          : result.notice,
-      );
+    if (result.notice) return setError(result.notice);
     try {
       const status = await host.gitStatus(result.space.scopeId);
       await host.gitPublish(result.space.scopeId, publish, status.version);
@@ -112,7 +101,7 @@ export function RegisterSpace({
           void submit();
         }}
       >
-        <h2>{t('リポジトリ・KBフォルダを登録', 'Register a repository or KB folder')}</h2>
+        <h2>{t('スペースを登録', 'Register a space')}</h2>
         {!folder && !created && (
           <MagnetTabs
             className="git-registration-mode"
@@ -280,7 +269,7 @@ export function RegisterSpace({
                           ? t('Gitリポジトリ', 'Git repository')
                           : info.kind === 'folder'
                             ? t('ローカルのKBフォルダ', 'Local KB folder')
-                            : t('登録先を確認してください', 'Check the registration destination')}
+                            : t('確認が必要', 'Needs attention')}
                     </strong>
                     {info.branch && (
                       <p>
@@ -310,9 +299,8 @@ export function RegisterSpace({
               />
             </label>
             <details>
-              <summary>{t('表示分類（任意）', 'Display category (optional)')}</summary>
+              <summary>{t('分類', 'Category')}</summary>
               <label>
-                {t('種類', 'Type')}
                 <select
                   aria-label={t('スペースの種類', 'Space type')}
                   value={category}
@@ -338,20 +326,13 @@ export function RegisterSpace({
                         setPublish({ ...publish, name: initialPublish(cloneName).name });
                     }}
                   />
-                  {t('GitHub にもリポジトリを作成する', 'Also create a repository on GitHub')}
+                  {t('GitHub にも作成', 'Also create on GitHub')}
                 </label>
                 {publishing && !created && (
                   <PublishFields value={publish} onChange={setPublish} disabled={busy} />
                 )}
               </>
-            ) : (
-              <p className="muted">
-                {t(
-                  '既存ノートと Git の変更は保持します。',
-                  'Existing notes and Git changes are kept.',
-                )}
-              </p>
-            )}
+            ) : null}
           </>
         )}
         {issue && <ErrorMessage text={issue} />}
@@ -611,9 +592,6 @@ export function Startup({
                 </div>
               );
             })}
-            <p className="start-note">
-              {t('KBフォルダ・ノートは残ります。', 'The KB folder and notes remain.')}
-            </p>
           </div>
         ) : (
           <p className="start-note">
@@ -636,10 +614,7 @@ export function Startup({
                   onChange={(on) => toggle(id, on)}
                 />
                 <span>
-                  {t(
-                    '利用できない hibachi（登録を保持）',
-                    'Unavailable hibachi (registration kept)',
-                  )}
+                  {t('利用できない hibachi', 'Unavailable hibachi')}
                   <small>{id}</small>
                 </span>
               </label>
@@ -712,7 +687,6 @@ export function Startup({
               </span>
               <span>
                 <strong>{t('KBフォルダを開く', 'Open a KB folder')}</strong>
-                <small>{t('既存のフォルダ・チェックアウト', 'Existing folder or checkout')}</small>
               </span>
             </button>
             <button disabled={busy} onClick={() => setAdding('clone')}>
@@ -721,7 +695,6 @@ export function Startup({
               </span>
               <span>
                 <strong>{t('GitHub から取得', 'Clone from GitHub')}</strong>
-                <small>{t('リポジトリをクローン', 'Clone a repository')}</small>
               </span>
             </button>
             <button disabled={busy} onClick={() => setAdding('create')}>
@@ -730,9 +703,6 @@ export function Startup({
               </span>
               <span>
                 <strong>{t('新しく作成', 'Create new')}</strong>
-                <small>
-                  {t('空の hibachi から始めて GitHub へ', 'Start empty, publish to GitHub')}
-                </small>
               </span>
             </button>
           </div>

@@ -110,8 +110,8 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
   await rejects(`${root}/Folder/Inner/Folder`, /自分自身/, `${root}/Folder`);
   await rejects(`${root}/Folder/Folder`, /自分自身/, `${root}/Folder`);
   // The connection folder itself belongs to the connection dialog.
-  await rejects('contents/Renamed', /クラウド接続/, root);
-  await assert.rejects(cloud.deleteEntry(space.scopeId, root), /クラウド接続/);
+  await rejects('contents/Renamed', /接続フォルダ自体/, root);
+  await assert.rejects(cloud.deleteEntry(space.scopeId, root), /接続フォルダ自体/);
   // Another connection of the same KB is a different Drive folder.
   const other = await cloud.add({
     scopeId: space.scopeId,

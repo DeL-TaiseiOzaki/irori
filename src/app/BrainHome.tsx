@@ -182,9 +182,7 @@ export function BrainHome({
                 <i />
               </>
             )}
-            <span className="mono" title={space.root}>
-              {space.root}
-            </span>
+            <span className="mono">{space.root}</span>
             {git?.available && git.branch && (
               <>
                 <i />
@@ -252,7 +250,7 @@ export function BrainHome({
           <div className="home-skills">
             {skills.length ? (
               skills.map((skill) => (
-                <span key={skill.name} className="home-skill" title={skill.description}>
+                <span key={skill.name} className="home-skill">
                   {skill.name}
                 </span>
               ))

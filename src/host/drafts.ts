@@ -85,12 +85,7 @@ export class DraftService {
         throw Error('Conflict draft requires its base version');
       const existing = await this.readTarget(target);
       if ((existing?.revision ?? null) !== expectedRevision)
-        throw Error(
-          t(
-            '別の操作で下書きが更新されました。入力を保持したまま、保存を再試行してください。',
-            'Another action updated the draft. Your input is kept; try saving again.',
-          ),
-        );
+        throw Error(t('別の操作で下書きが更新されました。', 'Another action updated the draft.'));
       const record: DraftRecord = {
         ...value,
         revision: randomUUID(),

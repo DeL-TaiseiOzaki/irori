@@ -80,7 +80,7 @@ test('Moving a page rebases its own OKF references and refuses an unrepaired fol
   const before = await files.read(id, 'Knowledge_Base/wiki/a.md');
   await assert.rejects(
     files.moveNote(before, 'Knowledge_Base/archive/a.md', false),
-    /リンクも更新する/,
+    /リンクを更新せずに/,
   );
   const next = await files.moveNote(before, 'Knowledge_Base/archive/a.md', true);
   const result = await relink(files, search, next, before.path);
@@ -408,7 +408,7 @@ test('Declining the update moves the bytes as they are, and a folder change with
   await write('index.md', '[対象](wiki/target.md)\n');
   await mkdir(path.join(root, 'archive'));
   const ref = await files.read(id, 'wiki/target.md');
-  await assert.rejects(files.moveNote(ref, 'archive/target.md'), /リンクも更新する/);
+  await assert.rejects(files.moveNote(ref, 'archive/target.md'), /リンクを更新せずに/);
   const renamed = await files.moveNote(ref, 'wiki/renamed.md');
   assert.equal(renamed.text, ref.text);
   assert.equal(await read('index.md'), '[対象](wiki/target.md)\n');

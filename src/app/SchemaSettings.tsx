@@ -114,10 +114,7 @@ export function SchemaList({
         title: file,
       })),
       note: settings.incomplete
-        ? t(
-            '上限に達したため、一部のフォルダは調べていません。',
-            'A limit was reached, so some folders were not checked.',
-          )
+        ? t('上限到達・一部未確認', 'Limit reached, some unchecked')
         : undefined,
     },
     {
@@ -257,8 +254,8 @@ function ConfirmDelete({
         <p>{detail}</p>
         <p className="hint">
           {t(
-            'ファイルを削除します。Git に記録済みなら変更パネルから戻せます。',
-            'The files are deleted. If Git has them, the Changes view can bring them back.',
+            'Git に記録済みなら変更パネルから戻せます。',
+            'If Git has them, the Changes view can bring them back.',
           )}
         </p>
         {error && <p role="alert">{error}</p>}
@@ -283,6 +280,7 @@ function TextField({
   disabled,
   onChange,
   hint,
+  labelHidden,
 }: {
   label: string;
   value: string;
@@ -290,10 +288,12 @@ function TextField({
   disabled?: boolean;
   onChange: (value: string) => void;
   hint?: ReactNode;
+  /** The label is still the field's accessible name; a crumb already shows it on screen. */
+  labelHidden?: boolean;
 }) {
   return (
     <label className="schema-field">
-      <span>{label}</span>
+      <span className={labelHidden ? 'sr-only' : undefined}>{label}</span>
       <textarea
         aria-label={label}
         className="schema-text"
@@ -404,12 +404,12 @@ export function SchemaEditor({
           <p className="hint" role="status">
             {space
               ? t(
-                  '実行・Git 操作・接続の間は Schema を変更できません。',
-                  'The Schema cannot change during a run, a Git operation or a connection.',
+                  '実行・Git 操作・接続中は変更できません。',
+                  'Cannot change during a run, a Git operation or a connection.',
                 )
               : t(
-                  'irori agent の実行中は Schema を変更できません。',
-                  'The Schema cannot change while the irori agent runs.',
+                  'irori agent の実行中は変更できません。',
+                  'Cannot change while the irori agent runs.',
                 )}
           </p>
         )}
@@ -571,7 +571,8 @@ function InstructionsForm({
         </label>
       )}
       <TextField
-        label={t('指示（Markdown）', 'Instructions (Markdown)')}
+        label={t('指示', 'Instructions')}
+        labelHidden
         value={value}
         disabled={disabled}
         onChange={setText}
@@ -642,7 +643,8 @@ function RuleForm({ scopeId, target, disabled, run, onSelect, onDelete }: FormPr
         />
       </label>
       <TextField
-        label={t('ルール（Markdown）', 'Rule (Markdown)')}
+        label={t('ルール', 'Rule')}
+        labelHidden
         value={value}
         disabled={disabled}
         onChange={setText}
@@ -741,17 +743,14 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
         </select>
       </label>
       <label className="schema-field">
-        <span>{t('対象（matcher・任意）', 'Matcher (optional)')}</span>
+        <span>{t('対象（matcher）', 'Matcher')}</span>
         <input
-          aria-label={t('対象（matcher・任意）', 'Matcher (optional)')}
+          aria-label={t('対象（matcher）', 'Matcher')}
           value={matcher}
           disabled={disabled}
           placeholder="Edit|Write"
           onChange={(change) => setMatcher(change.target.value)}
         />
-        <small>
-          {t('ツール名の正規表現（空欄で全一致）', 'Regex of tool names (empty = all)')}
-        </small>
       </label>
       {editable ? (
         <label className="schema-field">
@@ -768,8 +767,8 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
       ) : (
         <p className="hint">
           {t(
-            `type: ${current!.type} のフックはファイルとして編集してください。`,
-            `Edit a hook of type ${current!.type} as a file.`,
+            `type: ${current!.type} のフックはここでは編集できません。`,
+            `A hook of type ${current!.type} cannot be edited here.`,
           )}
         </p>
       )}
@@ -848,12 +847,7 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
             placeholder="weekly-review"
             onChange={(event) => change({ name: event.target.value })}
           />
-          <small>
-            {t(
-              '半角小文字・数字・ハイフン（変更でフォルダも変わります）',
-              'Lowercase letters, digits and hyphens (renaming also renames the folder)',
-            )}
-          </small>
+          <small>{t('半角小文字・数字・ハイフン', 'Lowercase letters, digits and hyphens')}</small>
         </label>
         <label className="schema-field">
           <span>{t('説明', 'Description')}</span>
@@ -867,7 +861,7 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
           <small>{t('400 文字まで', 'Up to 400 characters')}</small>
         </label>
         <TextField
-          label={t('手順（Markdown）', 'Instructions (Markdown)')}
+          label={t('手順', 'Instructions')}
           value={form.body}
           disabled={disabled}
           onChange={(body) => change({ body })}
@@ -953,9 +947,7 @@ function Attachments({
   const valid = attachmentPath(name.trim());
   async function importFile(file: File) {
     if (file.size > 2 * 1024 * 1024)
-      throw Error(
-        t('2 MiB までのテキストファイルを選んでください。', 'Choose a text file up to 2 MiB.'),
-      );
+      throw Error(t('ファイルが 2 MiB を超えています。', 'The file is larger than 2 MiB.'));
     const bytes = new Uint8Array(await file.arrayBuffer());
     let value: string;
     try {
@@ -1020,9 +1012,9 @@ function Attachments({
           }}
         >
           <label className="schema-field">
-            <span>{t('ファイル名（フォルダも可）', 'File name (may include folders)')}</span>
+            <span>{t('ファイル名', 'File name')}</span>
             <input
-              aria-label={t('ファイル名（フォルダも可）', 'File name (may include folders)')}
+              aria-label={t('ファイル名', 'File name')}
               className="mono"
               value={name}
               disabled={disabled}

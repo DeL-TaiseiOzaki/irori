@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { agentIds, agentNames, type AgentAccess, type AgentId, type Space } from '../domain/types';
-import { agentAccessDetail, agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
+import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { AgentLog, runTasks } from './AgentLog';
@@ -90,9 +90,7 @@ export function YourAiPanel({
           <Icon name="sparkles" size={24} strokeWidth={2} />
         </span>
         <h2>{t('irori agent', 'irori agent')}</h2>
-        <p className="mono your-ai-path" title={you.root}>
-          {you.root}
-        </p>
+        <p className="mono your-ai-path">{you.root}</p>
         <button className="ember-button" disabled={busy} onClick={() => void act(onCreate)}>
           <Icon name="sparkles" size={14} />
           {t('irori agent を用意する', 'Set up the irori agent')}
@@ -147,11 +145,6 @@ export function YourAiPanel({
             {ai.error}
           </p>
         )}
-        {!ai.events.length && (
-          <div className="agent-empty">
-            <p>{t('hibachi をまたぐ仕事を頼めます。', 'Ask for work across your hibachis.')}</p>
-          </div>
-        )}
         <AgentLog
           events={ai.events}
           activeRun={run?.active ? run.runId : undefined}
@@ -178,7 +171,7 @@ export function YourAiPanel({
         )}
         <textarea
           aria-label={t('irori agent への指示', 'Instruction for the irori agent')}
-          placeholder={t('irori agent に指示…', 'Instruct the irori agent…')}
+          placeholder={t('指示…', 'Instruction…')}
           rows={3}
           value={text}
           maxLength={32000}
@@ -198,10 +191,7 @@ export function YourAiPanel({
         />
         <footer>
           <span className="composer-selects your-ai-selects">
-            <label
-              className="composer-pill"
-              title={t('irori agent の CLI', "The irori agent's CLI")}
-            >
+            <label className="composer-pill">
               <Icon name="sparkles" size={12} />
               <select
                 aria-label={t('irori agent の CLI', "The irori agent's CLI")}
@@ -216,7 +206,7 @@ export function YourAiPanel({
                 ))}
               </select>
             </label>
-            <label className="composer-pill" title={agentAccessDetail(agent, access)}>
+            <label className="composer-pill">
               <Icon name="shield" size={12} />
               <select
                 aria-label={t('irori agent のアクセス', "The irori agent's access")}

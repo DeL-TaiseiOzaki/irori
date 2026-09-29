@@ -64,8 +64,8 @@ export class CloudAccounts {
           if (account.state === 'authorizing') {
             account.state = 'incomplete';
             account.detail = t(
-              '前回の認証が完了していません。再ログインするか、取り消して追加し直してください。',
-              'The previous sign-in did not finish. Sign in again, or cancel it and add the account again.',
+              '前回の認証が完了していません。',
+              'The previous sign-in did not finish.',
             );
           }
       })();
@@ -90,8 +90,8 @@ export class CloudAccounts {
     if (!this.configured)
       throw Error(
         t(
-          'このビルドにはGoogleログイン設定がありません。配布用OAuth設定が必要です。',
-          'This build has no Google sign-in configuration. A distribution OAuth configuration is required.',
+          'このビルドにはGoogleログイン設定がありません。',
+          'This build has no Google sign-in configuration.',
         ),
       );
     const account = accountSchema.parse({
@@ -147,10 +147,7 @@ export class CloudAccounts {
           if (status.finished) {
             if (!status.success)
               throw Error(
-                t(
-                  'Google認証を完了できませんでした。ログインを取り消して再試行してください。',
-                  'Google sign-in could not finish. Cancel the sign-in and try again.',
-                ),
+                t('Google認証を完了できませんでした。', 'Google sign-in could not finish.'),
               );
             output = status.output;
             break;
@@ -180,19 +177,9 @@ export class CloudAccounts {
         }
         if (task.cancelled) return;
         if (!output)
-          throw Error(
-            t(
-              'Google認証がタイムアウトしました。取り消して追加し直してください。',
-              'Google sign-in timed out. Cancel it and add the account again.',
-            ),
-          );
+          throw Error(t('Google認証がタイムアウトしました。', 'Google sign-in timed out.'));
         if (output.Error)
-          throw Error(
-            t(
-              'Google認証を完了できませんでした。取り消して再試行してください。',
-              'Google sign-in could not finish. Cancel it and try again.',
-            ),
-          );
+          throw Error(t('Google認証を完了できませんでした。', 'Google sign-in could not finish.'));
         if (!output.State) {
           account.state = 'ready';
           account.detail = undefined;
@@ -256,8 +243,8 @@ export class CloudAccounts {
     if (!this.configured)
       throw Error(
         t(
-          'このビルドにはGoogleログイン設定がありません。配布用OAuth設定が必要です。',
-          'This build has no Google sign-in configuration. A distribution OAuth configuration is required.',
+          'このビルドにはGoogleログイン設定がありません。',
+          'This build has no Google sign-in configuration.',
         ),
       );
     const account = this.get(id);
@@ -306,10 +293,7 @@ export class CloudAccounts {
     if (task?.again) {
       // The account stays with its bindings; only the new sign-in is abandoned.
       account.state = 'incomplete';
-      account.detail = t(
-        '再ログインを取り消しました。もう一度「再ログイン」を押すと続けられます。',
-        'Signing in again was cancelled. Press “Sign in again” to continue.',
-      );
+      account.detail = t('再ログインを取り消しました。', 'Signing in again was cancelled.');
       if (this.active === task) this.active = undefined;
       await this.persist();
       return;
@@ -388,10 +372,7 @@ export class CloudAccounts {
     const items = await this.folders(id, folder.parentId, folder.driveId);
     if (!items.some((item) => item.id === folder.id))
       throw Error(
-        t(
-          '選択したフォルダの識別情報を確認できません。移動・削除・アクセス権を確認してください。',
-          'Could not verify the selected folder. Check whether it was moved or deleted, and its access rights.',
-        ),
+        t('選択したフォルダの識別情報を確認できません。', 'Could not verify the selected folder.'),
       );
   }
   async close() {

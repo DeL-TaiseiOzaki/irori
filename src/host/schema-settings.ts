@@ -152,12 +152,7 @@ export class SchemaSettingsService {
         return this.read(scopeId, relative);
       }
       const changed = () =>
-        Error(
-          t(
-            'CONFLICT: ファイルが変更されています。開き直して確認してください。',
-            'CONFLICT: The file has changed. Open it again and check.',
-          ),
-        );
+        Error(t('CONFLICT: ファイルが変更されています。', 'CONFLICT: The file has changed.'));
       if (!existing || (await current()) !== expected) throw changed();
       if (text === null) {
         await fs.unlink(filename);

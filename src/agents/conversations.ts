@@ -87,8 +87,8 @@ export class ConversationStore {
         runId: value.activeRunId,
         type: 'error',
         text: t(
-          '前回の実行結果は未確認です。変更内容を確認してください。この指示は再送していません。',
-          'The previous run did not report its result. Review the changes. This instruction was not sent again.',
+          '前回の実行結果は未確認です。この指示は再送していません。',
+          'The previous run did not report its result. This instruction was not sent again.',
         ),
       });
       delete value.activeRunId;
@@ -166,12 +166,7 @@ export class ConversationStore {
           throw Error(t('送信待ちの順序が変わりました。', 'The queue order has changed.'));
         value.queued.shift();
       } else if (value.queued.length)
-        throw Error(
-          t(
-            '送信待ちを再開または取り消してください。',
-            'Resume or cancel the queued instructions.',
-          ),
-        );
+        throw Error(t('送信待ちがあります。', 'There are queued instructions.'));
       messageInput.parse(input);
       value.activeRunId = runId;
       if (input.newSession)

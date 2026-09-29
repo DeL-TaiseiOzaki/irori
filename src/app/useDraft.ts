@@ -22,12 +22,7 @@ export async function flushDrafts(): Promise<void> {
     }),
   );
   if (results.some((saved) => !saved))
-    throw Error(
-      t(
-        '下書きを保存できません。画面の保存エラーを確認して再試行してください。',
-        'Could not save the draft. Check the on-screen save error and try again.',
-      ),
-    );
+    throw Error(t('下書きを保存できません。', 'Could not save the draft.'));
 }
 
 /** Include canonical checkout identity in addition to the key when a renderer target can change. */

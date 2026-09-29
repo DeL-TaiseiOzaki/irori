@@ -54,7 +54,7 @@ try {
 
   // The instructions the agent always reads.
   await group('指示').getByRole('button', { name: 'AGENTS.md', exact: true }).click();
-  const instructions = stage.getByRole('textbox', { name: '指示（Markdown）', exact: true });
+  const instructions = stage.getByRole('textbox', { name: '指示', exact: true });
   await expect(instructions).toHaveValue('# Always\n\nWrite in plain words.\n');
   await instructions.fill('# Always\n\nWrite in plain words.\nCite the source.\n');
   await stage.getByRole('button', { name: '保存', exact: true }).click();
@@ -68,7 +68,7 @@ try {
     .getByRole('textbox', { name: '説明', exact: true })
     .fill('Reviews the week: what moved, what did not.');
   await stage
-    .getByRole('textbox', { name: '手順（Markdown）', exact: true })
+    .getByRole('textbox', { name: '手順', exact: true })
     .fill('Run scripts/collect.py first.');
   await stage.getByRole('button', { name: '作成', exact: true }).click();
   await expect(group('スキル').getByRole('button', { name: 'weekly-review' })).toHaveAttribute(
@@ -79,9 +79,7 @@ try {
     '---\nname: weekly-review\ndescription: "Reviews the week: what moved, what did not."\n---\n\nRun scripts/collect.py first.\n',
   );
   await stage.getByRole('button', { name: 'ファイルを追加', exact: true }).click();
-  await stage
-    .getByRole('textbox', { name: 'ファイル名（フォルダも可）', exact: true })
-    .fill('scripts/collect.py');
+  await stage.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('scripts/collect.py');
   await stage.getByRole('textbox', { name: '内容', exact: true }).fill('print("week")\n');
   await stage.getByRole('button', { name: '追加', exact: true }).click();
   await expect(stage.getByRole('button', { name: 'scripts/collect.py' })).toBeVisible();
@@ -93,9 +91,9 @@ try {
     mimeType: 'text/markdown',
     buffer: Buffer.from('- [ ] Inbox\n'),
   });
-  await expect(
-    stage.getByRole('textbox', { name: 'ファイル名（フォルダも可）', exact: true }),
-  ).toHaveValue('checklist.md');
+  await expect(stage.getByRole('textbox', { name: 'ファイル名', exact: true })).toHaveValue(
+    'checklist.md',
+  );
   await stage.getByRole('button', { name: '追加', exact: true }).click();
   await expect(stage.getByRole('button', { name: 'checklist.md' })).toBeVisible();
   expect(await read('.agents/skills/weekly-review/checklist.md')).toBe('- [ ] Inbox\n');
@@ -123,7 +121,7 @@ try {
   // A rule, created and then deleted after confirmation.
   await schema.getByRole('button', { name: 'ルールを追加', exact: true }).click();
   await stage.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('tone');
-  await stage.getByRole('textbox', { name: 'ルール（Markdown）', exact: true }).fill('Be brief.\n');
+  await stage.getByRole('textbox', { name: 'ルール', exact: true }).fill('Be brief.\n');
   await stage.getByRole('button', { name: '作成', exact: true }).click();
   await expect(group('ルール').getByRole('button', { name: 'tone.md' })).toBeVisible();
   expect(await read('.claude/rules/tone.md')).toBe('Be brief.\n');
@@ -138,9 +136,7 @@ try {
   await stage
     .getByRole('combobox', { name: 'タイミング', exact: true })
     .selectOption('PostToolUse');
-  await stage
-    .getByRole('textbox', { name: '対象（matcher・任意）', exact: true })
-    .fill('Edit|Write');
+  await stage.getByRole('textbox', { name: '対象（matcher）', exact: true }).fill('Edit|Write');
   await stage.getByRole('textbox', { name: 'コマンド', exact: true }).fill('npm run format');
   await stage.getByRole('button', { name: '作成', exact: true }).click();
   await expect(group('フック')).toContainText('PostToolUse · Edit|Write');
@@ -165,7 +161,7 @@ try {
     .getByRole('combobox', { name: '場所', exact: true })
     .selectOption('Knowledge_Base/projects');
   await stage
-    .getByRole('textbox', { name: '指示（Markdown）', exact: true })
+    .getByRole('textbox', { name: '指示', exact: true })
     .fill('Keep one plan per project.\n');
   await stage.getByRole('button', { name: '作成', exact: true }).click();
   await expect(group('指示')).toContainText('Knowledge_Base/projects');

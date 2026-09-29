@@ -43,8 +43,8 @@ const diffOptions = ['--no-ext-diff', '--no-textconv', '--no-renames', '--no-col
 const stale = () =>
   Error(
     t(
-      '確認後に Git またはファイルが変更されました。一覧・差分を更新してから再試行してください。',
-      'Git or the files changed after this was checked. Refresh the list and diff, then try again.',
+      '確認後に Git またはファイルが変更されました。',
+      'Git or the files changed after this was checked.',
     ),
   );
 
@@ -68,19 +68,11 @@ export class GitService {
   private async root(id: string) {
     const s = this.files.get(id);
     if ((await fs.realpath(s.root)) !== s.root)
-      throw Error(
-        t(
-          'スペースの配置が変更されました。登録先を確認してください。',
-          "The space's location has changed. Check where it is registered.",
-        ),
-      );
+      throw Error(t('スペースの配置が変更されました。', "The space's location has changed."));
     const gitRoot = (await this.git(s, ['rev-parse', '--show-toplevel'])).trimEnd();
     if ((await fs.realpath(gitRoot)) !== s.root)
       throw Error(
-        t(
-          'Git 操作にはリポジトリのルートを登録してください。',
-          "Register the repository's root for Git operations.",
-        ),
+        t('リポジトリのルートが登録されていません。', "The repository's root is not registered."),
       );
     return s;
   }
@@ -93,8 +85,8 @@ export class GitService {
       return Promise.reject(
         Error(
           t(
-            '保存・エージェント・接続処理の完了後に Git 操作を再試行してください。',
-            'Try the Git operation again after saving, agent, and connection work finishes.',
+            '保存・エージェント・接続処理の完了後に Git 操作ができます。',
+            'Git operations are available after saving, agent, and connection work finishes.',
           ),
         ),
       );
@@ -104,12 +96,7 @@ export class GitService {
       .catch(() => {})
       .then(async () => {
         if (!this.canMutate())
-          throw Error(
-            t(
-              '別の処理が実行中です。完了後に再試行してください。',
-              'Another operation is running. Try again once it finishes.',
-            ),
-          );
+          throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
         return fn(await resolve(id));
       });
     this.queues.set(key, next);
@@ -158,8 +145,8 @@ export class GitService {
         if (current === path.join(s.root, p) && info.isDirectory())
           throw Error(
             t(
-              'ディレクトリ・submodule は所有するリポジトリ側で操作してください。',
-              'Operate on directories and submodules from their owning repository.',
+              'ディレクトリ・submodule はこのリポジトリでは操作できません。',
+              'Directories and submodules cannot be operated on from this repository.',
             ),
           );
       } catch (error) {
@@ -308,8 +295,8 @@ export class GitService {
       const theirs = parseNote(existing);
       if (!theirs)
         return t(
-          '既存の作者情報ノート（refs/notes/ai）を読めないため、この commit には追記しませんでした。',
-          'Could not read the existing authorship note (refs/notes/ai), so nothing was added to this commit.',
+          '既存の作者情報ノート（refs/notes/ai）を読めませんでした。',
+          'Could not read the existing authorship note (refs/notes/ai).',
         );
       for (const file of files) {
         const own = theirs.files.find((f) => f.path === file.path);
@@ -339,8 +326,8 @@ export class GitService {
       });
     } catch {
       return t(
-        '作者情報ノート（refs/notes/ai）を書き込めませんでした。別のツールが更新中の可能性があります。',
-        'Could not write the authorship note (refs/notes/ai). Another tool may be updating it.',
+        '作者情報ノート（refs/notes/ai）を書き込めませんでした。',
+        'Could not write the authorship note (refs/notes/ai).',
       );
     }
   }
@@ -368,8 +355,8 @@ export class GitService {
       );
     } catch {
       return t(
-        'リポジトリの取得は完了しましたが、作者情報ノート（refs/notes/ai）を受信できませんでした。ソース管理の Fetch で再試行してください。',
-        'The repository was cloned, but the authorship note (refs/notes/ai) could not be received. Retry with Fetch in Source control.',
+        'クローンは完了しましたが、作者情報ノート（refs/notes/ai）を受信できませんでした。',
+        'Cloning finished, but the authorship note (refs/notes/ai) could not be received.',
       );
     }
     try {
@@ -461,10 +448,7 @@ export class GitService {
         initializable: await this.initializable(id, error),
         detail:
           error instanceof GitError
-            ? t(
-                'Git リポジトリを確認できません。GitHub から取得するか、登録先・Git の設定を確認してください。',
-                'Could not find a Git repository. Clone it from GitHub, or check where it is registered and its Git configuration.',
-              )
+            ? t('Git リポジトリを確認できません。', 'Could not find a Git repository.')
             : (error as Error).message,
         changes: [],
         operation: 'none',
@@ -529,12 +513,7 @@ export class GitService {
           conflict: staged[i] === 'U',
         });
     if (changes.length > 4000)
-      throw Error(
-        t(
-          '変更が 4,000 件を超えています。対象を整理してから開いてください。',
-          'There are more than 4,000 changes. Reduce the scope before opening it.',
-        ),
-      );
+      throw Error(t('変更が 4,000 件を超えています。', 'There are more than 4,000 changes.'));
     for (const change of changes) {
       try {
         await this.safePath(s, change.path);
@@ -661,8 +640,8 @@ export class GitService {
       if (!change || change.conflict || state.operation === 'other')
         throw Error(
           t(
-            '競合を解決するか、進行中の Git 操作を完了してください。',
-            'Resolve the conflict, or finish the Git operation in progress.',
+            '競合が未解決か、他の Git 操作が進行中です。',
+            'There is an unresolved conflict, or another Git operation is in progress.',
           ),
         );
       if ((await this.diff(id, p, !stage)).version !== version) throw stale();
@@ -712,8 +691,8 @@ export class GitService {
       if (!state.branch || state.operation === 'other' || state.changes.some((c) => c.conflict))
         throw Error(
           t(
-            'ブランチと未解決の競合を確認してください。',
-            'Check the branch and any unresolved conflicts.',
+            'ブランチがないか、未解決の競合があります。',
+            'There is no branch, or there is an unresolved conflict.',
           ),
         );
       const staged = state.changes.filter((c) => ![' ', '?'].includes(c.index));
@@ -781,8 +760,8 @@ export class GitService {
     if (!state.remote || !state.branch || !state.head)
       throw Error(
         t(
-          'ブランチ・リモート・最初の commit を確認してください。',
-          'Check the branch, remote, and first commit.',
+          'ブランチ・リモート・最初の commit のいずれかがありません。',
+          'Missing a branch, remote, or first commit.',
         ),
       );
     return state.remote;
@@ -799,8 +778,8 @@ export class GitService {
       if (p === '.irori/scope.json')
         throw Error(
           t(
-            '受信内容にスペース定義の変更があります。登録情報への影響を確認してから取り込んでください。',
-            'The incoming content changes the space definition. Check its effect on the registration before merging it in.',
+            '受信内容にスペース定義の変更があります。',
+            'The incoming content changes the space definition.',
           ),
         );
     }
@@ -811,12 +790,7 @@ export class GitService {
       .trimEnd()
       .split('\n');
     if (urls.length !== 1)
-      throw Error(
-        t(
-          '送信先が複数あります。Git のリモート設定を確認してください。',
-          'There are multiple push destinations. Check the Git remote configuration.',
-        ),
-      );
+      throw Error(t('送信先が複数あります。', 'There are multiple push destinations.'));
     if ((await this.config(s, `remote.${remote.name}.mirror`)) === 'true')
       throw Error(
         t(
@@ -859,8 +833,8 @@ export class GitService {
         );
       } catch {
         return t(
-          '作者情報ノート（refs/notes/ai）は送信されませんでした。Fetch で受信・統合してから再度 Push してください。',
-          'The authorship note (refs/notes/ai) was not pushed. Fetch to receive and merge it, then push again.',
+          '作者情報ノート（refs/notes/ai）は送信されませんでした。',
+          'The authorship note (refs/notes/ai) was not pushed.',
         );
       }
   }
@@ -869,20 +843,15 @@ export class GitService {
       const state = await this.checked(s, version),
         remote = this.requireRemote(state);
       if (state.operation !== 'none' && action !== 'fetch')
-        throw Error(
-          t(
-            '進行中の Git 操作を完了してから同期してください。',
-            'Finish the Git operation in progress before syncing.',
-          ),
-        );
+        throw Error(t('別の Git 操作が進行中です。', 'Another Git operation is in progress.'));
       let notice: string | undefined;
       if (action === 'push') notice = await this.push(s, state, remote);
       else {
         if (action !== 'fetch' && state.changes.length)
           throw Error(
             t(
-              'ローカルの変更を commit してから受信してください。未追跡ファイルも保持します。',
-              'Commit local changes before receiving. Untracked files are kept too.',
+              'ローカルに commit していない変更があります。',
+              'There are uncommitted local changes.',
             ),
           );
         const ref = `refs/remotes/${remote.name}/${remote.branch}`;
@@ -929,8 +898,8 @@ export class GitService {
               if (action === 'pull' && error instanceof GitError)
                 throw Error(
                   t(
-                    '履歴が分岐しているか、受信内容を適用できません。一覧を更新し「履歴を統合」を選んで双方を確認してください。',
-                    'The history has diverged, or the incoming content cannot be applied. Refresh the list and choose "Merge history" to review both sides.',
+                    '履歴が分岐しているか、受信内容を適用できません。',
+                    'The history has diverged, or the incoming content cannot be applied.',
                   ),
                 );
               throw error;
@@ -956,8 +925,8 @@ export class GitService {
       detail = editable
         ? undefined
         : t(
-            'rebase・cherry-pick 等は開始した Git ツールで完了してください。',
-            'Finish rebase, cherry-pick, and similar operations in the Git tool that started them.',
+            'rebase・cherry-pick 等はここでは編集できません。',
+            'Cannot be edited here during a rebase, cherry-pick, or similar operation.',
           );
     for (let stage = 1; stage <= 3; stage++) {
       const entry = stages.find((v) => v[2] === String(stage));
@@ -968,8 +937,8 @@ export class GitService {
       if (!['100644', '100755'].includes(entry[0])) {
         editable = false;
         detail = t(
-          'リンク・submodule の競合は外部の Git ツールで解決してください。',
-          'Resolve link and submodule conflicts in an external Git tool.',
+          'リンク・submodule の競合はここでは編集できません。',
+          'Link and submodule conflicts cannot be edited here.',
         );
         blobs.push(undefined);
         continue;
@@ -977,8 +946,8 @@ export class GitService {
       if (Number(await this.git(s, ['cat-file', '-s', entry[1]])) > 2 * 1024 * 1024) {
         editable = false;
         detail = t(
-          '2 MiB を超える競合は外部の Git ツールで解決してください。',
-          'Resolve conflicts over 2 MiB in an external Git tool.',
+          '2 MiB を超える競合はここでは編集できません。',
+          'Conflicts over 2 MiB cannot be edited here.',
         );
         blobs.push(undefined);
         continue;
@@ -989,8 +958,8 @@ export class GitService {
       if (bytes.includes(0) || output.includes('\ufffd')) {
         editable = false;
         detail = t(
-          'バイナリ・UTF-8 以外の競合は外部の Git ツールで解決してください。',
-          'Resolve binary and non-UTF-8 conflicts in an external Git tool.',
+          'バイナリ・UTF-8 以外の競合はここでは編集できません。',
+          'Binary and non-UTF-8 conflicts cannot be edited here.',
         );
       }
       blobs.push(bytes);
@@ -1002,8 +971,8 @@ export class GitService {
     } catch {
       editable = false;
       detail = t(
-        '作業ファイルをテキストとして編集できません。外部の Git ツールで解決してください。',
-        'The working file cannot be edited as text. Resolve it in an external Git tool.',
+        '作業ファイルをテキストとして編集できません。',
+        'The working file cannot be edited as text.',
       );
     }
     if ((await this.snapshot(s)).version !== state.version) throw stale();
@@ -1031,8 +1000,8 @@ export class GitService {
       )
         throw Error(
           t(
-            '競合マーカーを取り除き、2 MiB 以下の統合内容を確認してください。',
-            'Remove the conflict markers and check that the merged content is 2 MiB or smaller.',
+            '統合内容に競合マーカーがあるか、2 MiB を超えています。',
+            'The merged content has conflict markers, or is larger than 2 MiB.',
           ),
         );
       if (text === null && conflict.ours !== undefined && conflict.theirs !== undefined)
@@ -1104,8 +1073,8 @@ export class GitService {
       if (within(s.root, parent))
         throw Error(
           t(
-            '登録済みスペースの外に保存先を選択してください。',
-            'Select a destination outside registered spaces.',
+            '保存先が登録済みスペースの内側です。',
+            'The destination is inside a registered space.',
           ),
         );
       for (const contents of s.contents) {
@@ -1133,24 +1102,14 @@ export class GitService {
       await fs.mkdir(destination);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST')
-        throw Error(
-          t(
-            '同じ名前のフォルダがあります。新しい名前を選択してください。',
-            'A folder with this name already exists. Choose a different name.',
-          ),
-        );
+        throw Error(t('同じ名前のフォルダがあります。', 'A folder with this name already exists.'));
       throw error;
     }
     return { parent, destination };
   }
   async clone(input: CloneRepository): Promise<CloneResult> {
     if (!this.canMutate() || this.busy)
-      throw Error(
-        t(
-          '実行中の処理の完了後に取得してください。',
-          'Clone after the operation in progress finishes.',
-        ),
-      );
+      throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     const repository = githubRepository(input.url);
     if (
       !repository ||
@@ -1159,8 +1118,8 @@ export class GitService {
     )
       throw Error(
         t(
-          'GitHub の HTTPS または SSH のリポジトリ URL を入力してください。認証情報を URL に含めないでください。',
-          'Enter a GitHub HTTPS or SSH repository URL. Do not include credentials in the URL.',
+          'GitHub の HTTPS または SSH のリポジトリ URL を入力してください。',
+          'Enter a GitHub HTTPS or SSH repository URL.',
         ),
       );
     this.pending++;
@@ -1193,8 +1152,8 @@ export class GitService {
         throw Error(
           [
             `${advice}\n${t(
-              '取得途中のフォルダを保持しています。再試行時は別のフォルダ名を選択してください。',
-              'The partially cloned folder is kept. Choose a different folder name when retrying.',
+              '取得途中のフォルダを保持しています。',
+              'The partially cloned folder is kept.',
             )}`,
             ...detail,
           ].join('\n\n'),
@@ -1212,12 +1171,7 @@ export class GitService {
    */
   async create(input: Pick<CreateSpace, 'parent' | 'folder'>): Promise<string> {
     if (!this.canMutate() || this.busy)
-      throw Error(
-        t(
-          '実行中の処理の完了後に作成してください。',
-          'Create it after the operation in progress finishes.',
-        ),
-      );
+      throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     this.pending++;
     try {
       const { destination } = await this.newFolder(input.parent, input.folder, 'create');
@@ -1272,8 +1226,8 @@ export class GitService {
       const [advice, ...detail] = (error as Error).message.split('\n\n');
       return [
         `${t(
-          'hibachi は作成しましたが、最初の commit はできませんでした。ソース管理から commit できます。',
-          'The hibachi was created, but its first commit could not be made. You can commit it from Source control.',
+          'hibachi は作成しましたが、最初の commit はできませんでした。',
+          'The hibachi was created, but its first commit could not be made.',
         )}\n${advice}`,
         ...detail,
       ].join('\n\n');
@@ -1312,24 +1266,14 @@ export class GitService {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version);
       if (!state.head || !state.branch)
-        throw Error(
-          t(
-            '最初の commit を作成してから GitHub に公開してください。',
-            'Make the first commit before publishing to GitHub.',
-          ),
-        );
+        throw Error(t('commit がありません。', 'There is no commit yet.'));
       if (state.operation !== 'none')
-        throw Error(
-          t(
-            '進行中の Git 操作を完了してから公開してください。',
-            'Finish the Git operation in progress before publishing.',
-          ),
-        );
+        throw Error(t('別の Git 操作が進行中です。', 'Another Git operation is in progress.'));
       if (await this.optional(s, ['remote']))
         throw Error(
           t(
-            'この hibachi にはすでにリモートが設定されています。Push で送信してください。',
-            'This hibachi already has a remote. Send it with Push.',
+            'この hibachi にはすでにリモートが設定されています。',
+            'This hibachi already has a remote.',
           ),
         );
       await this.git(s, ['check-ref-format', `refs/heads/${state.branch}`]);
@@ -1350,8 +1294,8 @@ export class GitService {
         throw Error(
           [
             `${t(
-              `GitHub に ${repository} を作成しましたが、送信は完了していません。リモートが設定されていれば Push で再試行できます。`,
-              `${repository} was created on GitHub, but sending did not finish. If the remote is set, retry with Push.`,
+              `GitHub に ${repository} を作成しましたが、送信は完了していません。`,
+              `${repository} was created on GitHub, but sending did not finish.`,
             )}\n${advice}`,
             ...detail,
           ].join('\n\n'),

@@ -79,17 +79,12 @@ export function parseCsv(text: string): CsvTable {
   if (rows.length > 20000 || columns.length > 100)
     throw Error(
       t(
-        'CSV 表示は 20,000 行・100 列までです。ソースで確認してください。',
-        'The CSV view shows up to 20,000 rows and 100 columns. Check the source instead.',
+        'CSV 表示は 20,000 行・100 列までです。',
+        'The CSV view shows up to 20,000 rows and 100 columns.',
       ),
     );
   if (rows.some((row) => row.length !== columns.length))
-    throw Error(
-      t(
-        'CSV の列数が一致しません。ソースで確認してください。',
-        'The CSV rows have different numbers of columns. Check the source.',
-      ),
-    );
+    throw Error(t('CSV の列数が一致しません。', 'The CSV rows have different numbers of columns.'));
   return { columns, rows };
 }
 
@@ -155,12 +150,7 @@ export function ontologyGraph(
           ),
         );
       if (seen.has(parent))
-        throw Error(
-          t(
-            '親子階層に循環があります。CSV を確認してください。',
-            'The parent-child hierarchy has a cycle. Check the CSV.',
-          ),
-        );
+        throw Error(t('親子階層に循環があります。', 'The parent-child hierarchy has a cycle.'));
       seen.add(parent);
       parent = byId.get(parent)!.parent;
     }

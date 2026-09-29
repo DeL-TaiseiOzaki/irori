@@ -94,38 +94,29 @@ export class UploadFailures {
   }
 }
 
-/** One line for the connection card: what is wrong and how many changes it holds back. */
+/**
+ * One line for the connection card: what is wrong. The card shows the pending
+ * count separately, so only `other` (no known cause) states it here.
+ */
 export function uploadErrorMessage(category: UploadErrorCategory, count: number) {
   switch (category) {
     case 'permission':
       return t(
-        `このフォルダに書き込む権限がありません（閲覧のみで共有されている可能性があります）。${count} 件の変更を Google Drive に送信できません。`,
-        `You do not have permission to write to this folder (it may be shared view-only). ${count} changes cannot be uploaded to Google Drive.`,
+        'このフォルダへの書き込み権限がありません。',
+        'No permission to write to this folder.',
       );
     case 'quota':
-      return t(
-        `Google Drive の保存容量がいっぱいです。${count} 件の変更を送信できません。空き容量を確保してください。`,
-        `Google Drive storage is full. ${count} changes cannot be uploaded. Free up space to continue.`,
-      );
+      return t('Google Drive の空き容量が不足しています。', 'Google Drive storage is full.');
     case 'auth':
       return t(
-        `Google へのログインが期限切れか取り消されています。${count} 件の変更を送信できません。アカウントの「書き込みを許可」または「再ログイン」でログインし直してください。`,
-        `The Google sign-in has expired or been revoked. ${count} changes cannot be uploaded. Sign in again with “Allow writing” or “Sign in again” on the account.`,
+        'Google のログインが期限切れか取り消されています。',
+        'The Google sign-in has expired or been revoked.',
       );
     case 'network':
-      return t(
-        `Google Drive に接続できません（オフラインか通信エラー）。${count} 件の変更は接続が戻ると自動で送信されます。`,
-        `Google Drive cannot be reached (offline or a connection error). ${count} changes will be uploaded automatically once the connection is back.`,
-      );
+      return t('Google Drive に接続できません。', 'Cannot reach Google Drive.');
     case 'rateLimit':
-      return t(
-        `Google がリクエストを制限しています。${count} 件の変更は自動で再試行されます。`,
-        `Google is limiting requests. ${count} changes will be retried automatically.`,
-      );
+      return t('Google がリクエストを制限しています。', 'Google is limiting requests.');
     default:
-      return t(
-        `${count} 件の変更を Google Drive に送信できませんでした。自動で再試行しますが、続く場合は irori を再起動してフォルダを接続し直してください。`,
-        `${count} changes could not be uploaded to Google Drive. They are retried automatically; if this continues, restart irori and connect the folder again.`,
-      );
+      return t(`送信失敗 ${count} 件`, `${count} failed uploads`);
   }
 }

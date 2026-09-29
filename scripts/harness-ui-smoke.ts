@@ -58,12 +58,15 @@ try {
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
-  const settings = () => page.getByLabel('会話と接続の設定', { exact: true });
+  const settings = () => page.getByRole('button', { name: '会話と接続', exact: true });
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
-  await expect(page.getByText('次の送信から新しい会話を始めます。')).toBeVisible();
-  await page.getByRole('button', { name: '取り消す', exact: true }).click();
+  await expect(page.getByRole('button', { name: '新しい会話', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByRole('button', { name: '新しい会話', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
@@ -76,9 +79,6 @@ try {
     await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toHaveValue('default');
     if (agent === 'pi') {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
-      await expect(page.locator('#agent-access-detail')).toContainText(
-        '承認ダイアログはありません',
-      );
     }
     await settings().click();
     await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
@@ -201,11 +201,7 @@ try {
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
     await settings().click();
-    await expect(
-      page.getByText('会話を継続します。', {
-        exact: true,
-      }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
     await settings().click();
   }
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain('Fixture OpenCode edit');
@@ -214,13 +210,13 @@ try {
   await page.getByRole('button', { name: 'note', exact: true }).click();
   const editor = page.locator('.ProseMirror');
   await expect(editor).toContainText('Fixture OpenCode edit');
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 1 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 1');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('自分で書いた一文です。');
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 2');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
   await app.close();
   app = await launch();
@@ -230,7 +226,7 @@ try {
   // The record outlives the process that observed it, and a note with such lines
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 2');
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
@@ -259,9 +255,11 @@ try {
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
   // A brain's hibachi agent starts in full access.
   await expect(access).toHaveValue('full-access');
-  await expect(page.locator('#agent-access-detail')).not.toBeEmpty();
-  let doneCount = await page.locator('.message.done').count();
   await page.getByLabel('エージェントへの指示').fill('access fixture');
+  // Count only once OpenCode's saved conversation has loaded.
+  await expect(page.getByText('保存した会話を読み込んでいます…')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '送信', exact: true })).toBeEnabled();
+  let doneCount = await page.locator('.message.done').count();
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done')).toHaveCount(++doneCount);
   // The conversation's history can load after the count above; wait for the run's own session.
@@ -276,9 +274,6 @@ try {
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   await expect(access).toHaveValue('full-access');
   await access.selectOption('default');
-  await settings().click();
-  await expect(page.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
-  await settings().click();
   await page.getByLabel('エージェントへの指示').fill('standard again');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done')).toHaveCount(++doneCount);
@@ -344,11 +339,9 @@ try {
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();
-    await expect(
-      page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
-    await expect(page.getByText('新しい会話を始めます。', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '会話をリセット', exact: true }).click();
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toHaveCount(0);
     await settings().click();
   }
   expect(errors).toEqual([]);

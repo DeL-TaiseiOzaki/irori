@@ -90,14 +90,7 @@ export class Rclone implements RcloneAPI {
         let buffer = '';
         const fail = () => {
           clearTimeout(timer);
-          reject(
-            Error(
-              t(
-                'rcloneを起動できません。インストールと実行権限を確認してください。',
-                'Could not start rclone. Check that it is installed and executable.',
-              ),
-            ),
-          );
+          reject(Error(t('rcloneを起動できません。', 'Could not start rclone.')));
         };
         child.once('error', fail);
         child.once('close', fail);
@@ -153,12 +146,7 @@ export class Rclone implements RcloneAPI {
       return await readJson(response);
     } catch {
       // RC error bodies can contain credentials, input parameters and machine paths.
-      throw Error(
-        t(
-          'クラウド操作に失敗しました。接続・ログイン状態を確認して再試行してください。',
-          'The cloud operation failed. Check the connection and sign-in, then try again.',
-        ),
-      );
+      throw Error(t('クラウド操作に失敗しました。', 'The cloud operation failed.'));
     }
   }
   async close() {

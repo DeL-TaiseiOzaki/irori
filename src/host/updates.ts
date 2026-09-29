@@ -103,17 +103,14 @@ class Cancelled extends Error {}
 const invalid = () =>
   new UpdateError(
     'invalid',
-    t(
-      '公開版の情報を確認できませんでした。時間をおいて再試行してください。',
-      'Could not read the published release information. Try again later.',
-    ),
+    t('公開版の情報を確認できませんでした。', 'Could not read the published release information.'),
   );
 const mismatch = () =>
   new UpdateError(
     'invalid',
     t(
-      'ダウンロードした更新ファイルが公開版と一致しませんでした。もう一度お試しください。',
-      'The downloaded update did not match the published release. Try again.',
+      'ダウンロードした更新ファイルが公開版と一致しませんでした。',
+      'The downloaded update did not match the published release.',
     ),
   );
 
@@ -286,8 +283,8 @@ export class UpdateService {
         status: 'unsupported',
         currentVersion,
         detail: t(
-          `この環境向けのインストール版はまだ公開されていません。現在の配布対象は ${distributedTargets()} です。`,
-          `No installable version for this environment has been published yet. Currently available for ${distributedTargets()}.`,
+          `この環境向けの公開版はまだありません（対応: ${distributedTargets()}）。`,
+          `No published version for this environment yet (supports ${distributedTargets()}).`,
         ),
       };
     }
@@ -305,10 +302,7 @@ export class UpdateService {
     try {
       const releases = await withDeadline(
         this.options.timeoutMs ?? 10000,
-        t(
-          '更新の確認がタイムアウトしました。接続を確認して再試行してください。',
-          'Checking for updates timed out. Check your connection and try again.',
-        ),
+        t('更新の確認がタイムアウトしました。', 'Checking for updates timed out.'),
         (signal) => this.readReleases(signal, current),
       );
       const candidates: (Published & { parsed: NonNullable<ReturnType<typeof version>> })[] = [];
@@ -344,8 +338,8 @@ export class UpdateService {
           currentVersion,
           reason: 'unavailable',
           detail: t(
-            'この環境向けの公開インストーラーが見つかりませんでした。時間をおいて再試行してください。',
-            'No published installer for this environment was found. Try again later.',
+            'この環境向けの公開インストーラーが見つかりませんでした。',
+            'No published installer for this environment was found.',
           ),
         };
       this.published = latest;
@@ -380,10 +374,7 @@ export class UpdateService {
         reason: known ? error.reason : 'offline',
         detail: known
           ? error.message
-          : t(
-              '更新情報に接続できませんでした。インターネット接続を確認して再試行してください。',
-              'Could not reach the update information. Check your internet connection and try again.',
-            ),
+          : t('更新情報に接続できませんでした。', 'Could not reach the update information.'),
       };
     }
   }
@@ -439,18 +430,12 @@ export class UpdateService {
     if (response.status === 403 || response.status === 429)
       throw new UpdateError(
         'rate-limited',
-        t(
-          '更新の確認が混み合っています。時間をおいて再試行してください。',
-          'The update check is busy. Try again later.',
-        ),
+        t('更新の確認が混み合っています。', 'The update check is busy.'),
       );
     if (!response.ok)
       throw new UpdateError(
         'offline',
-        t(
-          '更新情報に接続できませんでした。時間をおいて再試行してください。',
-          'Could not reach the update information. Try again later.',
-        ),
+        t('更新情報に接続できませんでした。', 'Could not reach the update information.'),
       );
     const body = await readBody(response, signal, maxResponseBytes);
     let data: unknown;
@@ -523,8 +508,8 @@ export class UpdateService {
                 error instanceof UpdateError
                   ? error.message
                   : t(
-                      '更新ファイルをダウンロードできませんでした。接続を確認して再試行してください。',
-                      'Could not download the update. Check your connection and try again.',
+                      '更新ファイルをダウンロードできませんでした。',
+                      'Could not download the update.',
                     ),
             });
           return false;
@@ -625,10 +610,7 @@ export class UpdateService {
         void response.body?.cancel().catch(() => {});
         throw new UpdateError(
           'offline',
-          t(
-            '更新ファイルを取得できませんでした。時間をおいて再試行してください。',
-            'Could not fetch the update. Try again later.',
-          ),
+          t('更新ファイルを取得できませんでした。', 'Could not fetch the update.'),
         );
       }
       return response;
@@ -639,10 +621,7 @@ export class UpdateService {
   private async readChecksums(item: Asset, signal: AbortSignal) {
     const body = await withDeadline(
       this.options.timeoutMs ?? 10000,
-      t(
-        '更新ファイルの確認がタイムアウトしました。接続を確認して再試行してください。',
-        'Verifying the update timed out. Check your connection and try again.',
-      ),
+      t('更新ファイルの確認がタイムアウトしました。', 'Verifying the update timed out.'),
       async (bounded) => readBody(await this.request(item.url, bounded), bounded, maxChecksumBytes),
       signal,
     );
@@ -684,10 +663,7 @@ export class UpdateService {
           stop(
             new UpdateError(
               'timeout',
-              t(
-                'ダウンロードが進まなくなりました。接続を確認して再試行してください。',
-                'The download stalled. Check your connection and try again.',
-              ),
+              t('ダウンロードが進まなくなりました。', 'The download stalled.'),
             ),
           ),
         this.options.idleMs ?? 60_000,

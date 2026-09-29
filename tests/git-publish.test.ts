@@ -106,7 +106,7 @@ test('a new hibachi is a repository on main whose first commit holds only what i
   );
   await assert.rejects(
     f.service.create({ parent: root, folder: 'nested' }),
-    /outside registered spaces|登録済みスペースの外/,
+    /inside a registered space|登録済みスペースの内側/,
   );
   await assert.rejects(
     f.service.create({ parent: f.base, folder: '../escape' }),
@@ -210,7 +210,7 @@ test('publishing refuses a hibachi without a commit, and reports what GitHub ref
   const input = { owner: 'octo', name: 'kb', visibility: 'private' } as const;
   await assert.rejects(
     f.service.publish(space.scopeId, input, initialized.version),
-    /first commit|最初の commit/,
+    /no commit|commit がありません/,
   );
   assert.equal((await f.calls()).length, 0, 'gh is not asked before the checks pass');
 

@@ -34,7 +34,7 @@ test(
     assert(shells.length > 0);
     await assert.rejects(
       terminals.open(space.scopeId, '/not-a-detected-shell', 80, 24),
-      /検出済み/,
+      /シェルが見つかりません/,
     );
     await assert.rejects(terminals.open('foreign-scope', shells[0].id, 80, 24));
     const session = await terminals.open(space.scopeId, shells[0].id, 80, 24);

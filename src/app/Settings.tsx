@@ -120,7 +120,7 @@ export function Settings({
       <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
         <Icon name="sliders" size={18} />
         {updateWaiting(updates) && (
-          <span className="rail-badge" aria-label={t('更新があります', 'An update is available')} />
+          <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
         )}
       </Popover.Trigger>
       <Popover.Portal>
@@ -163,7 +163,7 @@ export function Settings({
             </section>
             <button type="button" className="settings-link" onClick={onRecover}>
               <Icon name="cloudUp" size={14} />
-              {t('端末の送信準備を復元', 'Restore pending uploads on this device')}
+              {t('送信待ちを復元', 'Restore pending uploads')}
             </button>
           </Popover.Popup>
         </Popover.Positioner>

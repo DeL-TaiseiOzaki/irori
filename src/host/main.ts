@@ -289,12 +289,7 @@ app
               );
             const source = await knowledge.capture(ref);
             if (source.hash !== ref.hash)
-              throw Error(
-                t(
-                  'ノートが変更されています。開き直して確認してください。',
-                  'The note has changed. Open it again and check.',
-                ),
-              );
+              throw Error(t('ノートが変更されています。', 'The note has changed.'));
             const next = await files.moveNote(ref, destination, links);
             if (next.path === ref.path) return next;
             // The record is rebound to the bytes as moved, before any link is rewritten.
@@ -304,8 +299,8 @@ app
                 () => undefined,
                 () =>
                   t(
-                    'ノートは移動しましたが、資料 ID を再接続できませんでした。「資料と成果物」から移動先を再接続してください。',
-                    'The note moved, but its material IDs could not be reconnected. Reconnect the new location from "Materials & artifacts".',
+                    'ノートは移動しましたが、資料 ID を再接続できませんでした。',
+                    'The note moved, but its material IDs could not be reconnected.',
                   ),
               );
             try {
@@ -685,12 +680,12 @@ app
         await dialog.showMessageBox(window!, {
           message: restart
             ? t(
-                'Git 操作が実行中です。完了後に再起動してください。',
-                'A Git operation is running. Restart after it finishes.',
+                'Git 操作の完了後に再起動してください。',
+                'Restart after the Git operation finishes.',
               )
             : t(
-                'Git 操作が実行中です。完了後にウィンドウを閉じてください。',
-                'A Git operation is running. Close the window after it finishes.',
+                'Git 操作の完了後にウィンドウを閉じてください。',
+                'Close the window after the Git operation finishes.',
               ),
           buttons: [t('戻る', 'Back')],
         });
@@ -704,15 +699,7 @@ app
         if (!window?.webContents.isCrashed()) {
           await dialog.showMessageBox(window!, {
             type: 'error',
-            message: restart
-              ? t(
-                  '下書きを保存できませんでした。再起動せず、ウィンドウを開いたままにします。',
-                  'Could not save the draft. irori will not restart and the window stays open.',
-                )
-              : t(
-                  '下書きを保存できませんでした。ウィンドウを開いたままにします。',
-                  'Could not save the draft. The window stays open.',
-                ),
+            message: t('下書きを保存できませんでした。', 'Could not save the draft.'),
             detail: String(error),
           });
           return false;
@@ -743,13 +730,10 @@ app
       // leaves them in rclone's cache, to be uploaded when the folder is next connected.
       for (let pending = await cloud.pendingUploads(); pending > 0;) {
         const answer = await dialog.showMessageBox(window!, {
-          message: t(
-            `Google Drive への送信待ちが ${pending} 件あります。`,
-            `${pending} saved changes are still waiting to be uploaded to Google Drive.`,
-          ),
+          message: t(`送信待ち ${pending} 件`, `${pending} pending uploads`),
           detail: t(
-            '待たずに終了すると、変更はこの端末に残り、次にそのフォルダを接続したときに送信されます。',
-            'If you quit without waiting, the changes stay on this device and are uploaded the next time that folder is connected.',
+            '待たずに終了すると、変更はこの端末に残ります。',
+            'If you quit without waiting, the changes stay on this device.',
           ),
           buttons: [
             t('戻る', 'Back'),
@@ -775,8 +759,8 @@ app
         await dialog.showMessageBox(window!, {
           type: 'error',
           message: t(
-            '会話履歴を保存できませんでした。再試行してください。',
-            'Could not save the conversation history. Try again.',
+            '会話履歴を保存できませんでした。',
+            'Could not save the conversation history.',
           ),
         });
         return false;
@@ -790,8 +774,8 @@ app
         await dialog.showMessageBox(window!, {
           type: 'error',
           message: t(
-            'クラウド接続を終了できませんでした。再試行してください。',
-            'Could not close the cloud connections. Try again.',
+            'クラウド接続を終了できませんでした。',
+            'Could not close the cloud connections.',
           ),
           detail: String(error),
         });

@@ -106,13 +106,13 @@ try {
   const youGroup = (name: string) =>
     youPanel.getByRole('group', { name: `Schema の${name}`, exact: true });
   const settings = page.getByRole('region', { name: 'Schema の設定' });
-  await expect(
-    settings.getByRole('textbox', { name: '指示（Markdown）', exact: true }),
-  ).toHaveValue(/^# irori agent\n/);
+  await expect(settings.getByRole('textbox', { name: '指示', exact: true })).toHaveValue(
+    /^# irori agent\n/,
+  );
   await youGroup('ルール').getByRole('button', { name: 'ルールを追加', exact: true }).click();
   await settings.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('tone');
   await settings
-    .getByRole('textbox', { name: 'ルール（Markdown）', exact: true })
+    .getByRole('textbox', { name: 'ルール', exact: true })
     .fill('Report in Japanese.\n');
   await settings.getByRole('button', { name: '作成', exact: true }).click();
   await expect(youGroup('ルール').getByRole('button', { name: 'tone.md' })).toBeVisible();
@@ -122,9 +122,7 @@ try {
   await youGroup('スキル').getByRole('button', { name: 'スキルを追加', exact: true }).click();
   await settings.getByRole('textbox', { name: '名前', exact: true }).fill('weekly');
   await settings.getByRole('textbox', { name: '説明', exact: true }).fill('Plans the week.');
-  await settings
-    .getByRole('textbox', { name: '手順（Markdown）', exact: true })
-    .fill('Ask each hibachi.');
+  await settings.getByRole('textbox', { name: '手順', exact: true }).fill('Ask each hibachi.');
   await settings.getByRole('button', { name: '作成', exact: true }).click();
   await expect(youGroup('スキル').getByRole('button', { name: 'weekly' })).toBeVisible();
   expect(await readFile(path.join(you, '.agents', 'skills', 'weekly', 'SKILL.md'), 'utf8')).toBe(
@@ -160,7 +158,7 @@ try {
   // Its Schema waits while it runs, as a hibachi's does during its run.
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
   await expect(page.getByRole('region', { name: 'Schema の設定' })).toContainText(
-    'irori agent の実行中は Schema を変更できません。',
+    'irori agent の実行中は変更できません。',
   );
   await expect(youPanel.getByRole('button', { name: 'ルールを追加', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
@@ -220,7 +218,7 @@ try {
   await expect(
     page
       .getByRole('region', { name: 'Schema の設定' })
-      .getByRole('textbox', { name: '指示（Markdown）', exact: true }),
+      .getByRole('textbox', { name: '指示', exact: true }),
   ).toHaveValue(/^# irori agent\n/);
   await expect(
     definitions.getByRole('button', { name: /^Product の hibachi agent/ }),

@@ -87,16 +87,16 @@ export class SquirrelInstaller implements UpdateInstaller {
     );
     await step(
       t(
-        'Windows の更新処理を完了できませんでした。インストーラーを取得して更新してください。',
-        'The Windows update could not finish. Get the installer to update.',
+        'Windows の更新処理を完了できませんでした。インストーラーを取得してください。',
+        'The Windows update could not finish. Get the installer.',
       ),
       this.commands.run(this.updateExe, ['--update', feed], 15 * 60_000),
     );
     // Update.exe also succeeds when it finds nothing newer to apply.
     await step(
       t(
-        `更新後の irori ${version} が見つかりません。インストーラーを取得して更新してください。`,
-        `The updated irori ${version} was not found. Get the installer to update.`,
+        `更新後の irori ${version} が見つかりません。インストーラーを取得してください。`,
+        `The updated irori ${version} was not found. Get the installer.`,
       ),
       access(path.join(this.root, `app-${version}`, this.exeName)),
     );
@@ -289,8 +289,8 @@ function refused(error: unknown) {
   // App Management refuses an app that modifies another app's bundle with EPERM.
   if (code === 'EPERM')
     return t(
-      'macOS が irori の置き換えを許可しませんでした。「システム設定」→「プライバシーとセキュリティ」→「アプリ管理」で irori を許可してから再試行するか、インストーラーを取得してください。',
-      'macOS did not allow irori to be replaced. Allow irori in System Settings > Privacy & Security > App Management and try again, or get the installer.',
+      'macOS が irori の置き換えを許可しませんでした。',
+      'macOS did not allow irori to be replaced.',
     );
   return t(
     `irori を置き換えられませんでした（${code ?? 'unknown'}）。インストーラーを取得してください。`,

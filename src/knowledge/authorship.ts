@@ -176,8 +176,8 @@ export class AuthorshipStore {
     if (from.scopeId !== to.scopeId || lines.length !== before.split('\n').length)
       throw Error(
         t(
-          '作者情報を移すには同じスペース内で行の対応が保たれている必要があります。',
-          'Authorship can move only within the same space, with the lines still matching.',
+          '別のスペースか、行数が変わっています。',
+          'Different space, or the line count has changed.',
         ),
       );
     const view = await this.view(from, before);

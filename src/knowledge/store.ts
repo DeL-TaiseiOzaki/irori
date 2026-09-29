@@ -63,12 +63,7 @@ export class KnowledgeStore {
       const digest = hash(bytes);
       // Re-read to reject a file that changed while being observed (no filesystem snapshot claim).
       if (hash(await fs.readFile(filename)) !== digest)
-        throw Error(
-          t(
-            '資料が変更中です。保存完了後に再試行してください。',
-            'The material is changing. Try again after it finishes saving.',
-          ),
-        );
+        throw Error(t('資料が変更中です。', 'The material is changing.'));
       const { filename: indexFile, entries: index } = await this.index(ref.scopeId);
       const known = Object.hasOwn(index, ref.path);
       const id = known ? index[ref.path] : randomUUID();
@@ -170,8 +165,8 @@ export class KnowledgeStore {
     if (run.scopeId !== ref.scopeId)
       throw Error(
         t(
-          '成果物は実行したスペースで登録してください。',
-          'Register the output in the space where the run happened.',
+          '成果物が実行したスペースと異なります。',
+          'The output is not in the space where the run happened.',
         ),
       );
     const source = await this.capture(ref);
@@ -241,10 +236,7 @@ export class KnowledgeStore {
       sourceDestination.parse(next);
       if (previous.scopeId !== next.scopeId)
         throw Error(
-          t(
-            '資料 ID は同じスペース内で再接続してください。',
-            'Reconnect a material ID within the same space.',
-          ),
+          t('別のスペースへの再接続はできません。', 'Cannot reconnect to another space.'),
         );
       const { filename: indexFile, entries: index } = await this.index(next.scopeId);
       const current = Object.keys(index).find((key) => index[key] === previous.id);
@@ -262,10 +254,7 @@ export class KnowledgeStore {
       }
       if (!missing)
         throw Error(
-          t(
-            '現在の場所に資料があります。コピーには別の資料 ID を使ってください。',
-            'The material is still at its current location. Use a different material ID for a copy.',
-          ),
+          t('現在の場所に資料があります。', 'The material is still at its current location.'),
         );
       await this.bytes(previous);
       const filename = await this.resolve(next);
