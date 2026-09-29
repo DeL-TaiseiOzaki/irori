@@ -1,238 +1,433 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="irori は、ノートを書き、CLI エージェントと知識を育てるデスクトップアプリ。Windows 64 ビットと Apple シリコン Mac 向けの検証版をダウンロードできます。"
+      content="irori is a desktop knowledge IDE. Keep your notes as plain Markdown and run the AI agents you already use — Claude Code, Codex, OpenCode, Pi and Hermes Agent — right inside them. Free preview for Windows and Apple silicon Macs."
     />
-    <meta name="theme-color" content="#f6f5ef" />
-    <title>irori — ノートから、次の仕事へ。</title>
-    <link rel="icon" type="image/png" href="../assets/irori-icon.png" />
+    <meta name="theme-color" content="#0c0d0f" />
+    <meta name="color-scheme" content="dark" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="irori" />
+    <meta property="og:title" content="irori — From your notes, to what's next." />
+    <meta
+      property="og:description"
+      content="A desktop knowledge IDE where your Markdown notes and your local AI agents work side by side."
+    />
+    <meta property="og:url" content="https://del-taiseiozaki.github.io/irori/" />
+    <meta property="og:image" content="https://del-taiseiozaki.github.io/irori/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>irori — From your notes, to what's next.</title>
+    <link rel="icon" type="image/png" href="../assets/irori-icon-256.png" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <a class="skip" href="#main">本文へ移動</a>
-    <header class="header wrap">
-      <a class="brand" href="#" aria-label="irori ホーム"
-        ><img class="mark" src="../assets/irori-icon.png" alt="" />irori</a
-      >
-      <nav aria-label="メインナビゲーション">
-        <a href="#about">irori について</a
-        ><a href="#download" class="nav-download">ダウンロード <span aria-hidden="true">↘</span></a>
-      </nav>
-    </header>
-    <main id="main">
-      <section class="hero wrap">
-        <p class="eyebrow"><span class="dot"></span> A HOME FOR YOUR KNOWLEDGE</p>
-        <h1>ノートから、<br />次の<span class="warm">仕事</span>へ。</h1>
-        <p class="lead">
-          考えを書きとめる。その続きを、AI と進める。<br
-            class="desktop-break"
-          />あなたの知識を囲んで、一緒につくる場所。
-        </p>
-        <a class="button primary" href="#download"
-          >ダウンロードについて <span aria-hidden="true">↓</span></a
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <div class="wrap header-inner">
+        <a class="brand" href="#" aria-label="irori home"
+          ><img
+            class="mark"
+            src="../assets/irori-icon-256.png"
+            alt=""
+            width="256"
+            height="256"
+          /><span>irori</span></a
         >
-        <p class="caption">Windows 64 ビット・Apple シリコン Mac 検証版を公開中</p>
-        <figure class="app-preview">
-          <div class="window-bar">
-            <div aria-hidden="true" class="window-dots"><i></i><i></i><i></i></div>
-            <span>irori · あなたの知識の作業場</span><span class="preview-tag">PREVIEW</span>
-          </div>
-          <img
-            src="./app-preview.png"
-            alt="irori の実際の開発画面。左にスペースとノート一覧、中央に日本語のノート、右に Codex を選択した AI パネル。"
-            width="1280"
-            height="913"
-            fetchpriority="high"
-          />
-          <figcaption>実際の開発画面です。表示内容は検証用のサンプルです。</figcaption>
-        </figure>
-      </section>
-      <section id="about" class="about wrap">
-        <div class="section-intro">
-          <p class="eyebrow">WRITE. THINK. MAKE.</p>
-          <h2>知識と実行を、<br />同じ場所で。</h2>
-          <p>ノートを書く時間と、何かをつくる時間。<br />その間を、irori がつなぎます。</p>
-        </div>
-        <div class="features">
-          <article>
-            <span class="feature-number">01 / WRITE</span>
-            <h3>いつものノートが、出発点。</h3>
-            <p>
-              見たまま書けるエディタで、ノートを自動保存。画像もそのまま貼り付けて、 手元の KB
-              フォルダに残せます。
-            </p>
-          </article>
-          <article>
-            <span class="feature-number">02 / WORK WITH AI</span>
-            <h3>相談から、実際の編集まで。</h3>
-            <p>
-              Claude Code・Codex
-              が、選んだ作業場所で実際に動きます。ノートの整理や編集、ツールの実行を、AI
-              パネルから依頼できます。
-            </p>
-          </article>
-          <article>
-            <span class="feature-number">03 / SEE CONNECTIONS</span>
-            <h3>CSV から、知識のつながりへ。</h3>
-            <p>
-              CSV
-              を表やグラフで見渡し、階層やグループで絞り込んで、つながるノートへ。エージェントと一緒に育てる知識を、見やすく表示します。
-            </p>
-          </article>
-        </div>
-      </section>
-      <section class="download-section" id="download">
-        <div class="wrap">
-          <p class="eyebrow">BRING IRORI HOME</p>
-          <h2>あなたのパソコンに、irori を。</h2>
-          <p class="download-intro" id="release-status" role="status">
-            Windows・Mac 向け開発プレビュー — 実機での動作確認用です。
+        <nav aria-label="Main">
+          <a href="#features" class="nav-optional">Features</a>
+          <a href="#start" class="nav-optional">Get started</a>
+          <a href="#faq" class="nav-optional">FAQ</a>
+          <a href="https://github.com/DeL-TaiseiOzaki/irori" class="nav-optional">GitHub</a>
+          <a href="#download" class="button small solid">Download</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <div class="wrap hero-copy">
+          <a class="pill" href="#download" id="hero-version"
+            ><span class="pill-dot" aria-hidden="true"></span
+            ><span id="hero-version-text">Testing preview for Windows &amp; Mac</span></a
+          >
+          <h1>From your notes, <br />to <span class="ember-text">what's next.</span></h1>
+          <p class="lead">
+            irori is a desktop knowledge IDE. Keep your notes as plain Markdown in your own folders,
+            then hand the next step to the AI agent you already use — running right inside them.
           </p>
-          <div id="downloads" class="downloads" aria-label="OS 別のダウンロード"></div>
+          <div class="cta">
+            <a class="button ember" id="hero-download" href="#download"
+              >Download irori <span aria-hidden="true">↓</span></a
+            >
+            <a class="button ghost" href="https://github.com/DeL-TaiseiOzaki/irori"
+              >View on GitHub <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <p class="cta-meta" id="hero-meta">Free and open source · MIT License</p>
+        </div>
+        <div class="wrap">
+          <figure class="shot hero-shot">
+            <img
+              src="./screens/note.webp"
+              alt="irori in the dark theme: a hibachi's Schema, Knowledge and Contents on the left, a Markdown note in the middle, and a Codex hibachi agent panel on the right."
+              width="2880"
+              height="1746"
+              fetchpriority="high"
+            />
+          </figure>
+        </div>
+        <div class="wrap agents" aria-label="Supported agent CLIs">
+          <p>Runs the CLI you already have signed in</p>
+          <ul>
+            <li>Claude Code</li>
+            <li>Codex</li>
+            <li>OpenCode</li>
+            <li>Pi</li>
+            <li>Hermes Agent</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="layers wrap" aria-labelledby="layers-title">
+        <div class="section-head">
+          <p class="eyebrow">The hibachi</p>
+          <h2 id="layers-title">One folder. Three layers.<br />An agent that knows its place.</h2>
+          <p>
+            A <strong>hibachi</strong> is a knowledge base: an ordinary folder of Markdown you open
+            in irori. Its agent starts inside it, with the hibachi's own instructions already
+            loaded.
+          </p>
+        </div>
+        <div class="layer-grid">
+          <article class="layer schema">
+            <span class="layer-tag">Schema</span>
+            <h3>How the work is done</h3>
+            <p>
+              Instructions, skills and rules for AI — <code>AGENTS.md</code>,
+              <code>.agents/skills</code> and friends.
+            </p>
+          </article>
+          <article class="layer know">
+            <span class="layer-tag">Knowledge</span>
+            <h3>What you know</h3>
+            <p>
+              Your notes, linked to each other, with properties, backlinks and an ontology you can
+              see.
+            </p>
+          </article>
+          <article class="layer cont">
+            <span class="layer-tag">Contents</span>
+            <h3>What you work from</h3>
+            <p>
+              Materials and outputs: PDFs, slides, spreadsheets — or a connected Google Drive
+              folder.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="features" aria-label="Features">
+        <article class="feature wrap">
+          <div class="feature-copy">
+            <p class="eyebrow">irori mode</p>
+            <h2>One agent across every hibachi.</h2>
+            <p>
+              Combine personal, team and organization hibachis into a workspace and see them on a
+              map. Ask the <strong>irori agent</strong> for work that spans them: it splits the
+              request, hands each part to that hibachi's own agent, and reports back.
+            </p>
+            <ul class="checks">
+              <li>Several hibachi agents can run at once</li>
+              <li>Search runs across every hibachi</li>
+              <li>Queue instructions while an agent works; conversations survive a restart</li>
+            </ul>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screens/irori-mode.webp"
+              alt="irori mode: the irori agent beside three hibachis — Handbook, Product and Research — grouped by organization and team on a map."
+              width="2880"
+              height="1746"
+              loading="lazy"
+            />
+          </figure>
+        </article>
+
+        <article class="feature wrap reverse">
+          <div class="feature-copy">
+            <p class="eyebrow">Notes</p>
+            <h2>Write it down. Watch it connect.</h2>
+            <p>
+              A what-you-see Markdown editor that saves as you type. Follow links, see what links
+              back, and edit a page's properties above its body. CSV opens as a table and an
+              ontology as a hierarchy or a graph.
+            </p>
+            <ul class="checks">
+              <li>Renaming or moving a note rewrites the links to it</li>
+              <li>Today's note opens from your template, where you want it</li>
+              <li>Pasted images land in <code>_assets/</code> next to the note</li>
+            </ul>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screens/graph.webp"
+              alt="An ontology opened as a graph in irori, with Product, Interview and Decision entities connected by parent and 'informs' relations."
+              width="2880"
+              height="1746"
+              loading="lazy"
+            />
+          </figure>
+        </article>
+
+        <article class="feature wrap">
+          <div class="feature-copy">
+            <p class="eyebrow">Records</p>
+            <h2>Every change, on the record.</h2>
+            <p>
+              Whether you or an agent made it, every edit is a Git diff you can read before you
+              commit. Clone from GitHub, or start empty and publish to GitHub when you're ready.
+            </p>
+            <ul class="checks">
+              <li>Diffs, commits and history in the Changes tab</li>
+              <li>irori never force-overwrites and never stashes on its own</li>
+              <li>A built-in terminal opens in the hibachi's folder</li>
+            </ul>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screens/changes.webp"
+              alt="The Changes tab in irori showing a diff that adds a line to interviews.md, with Commit, Pull and Push controls."
+              width="2880"
+              height="1746"
+              loading="lazy"
+            />
+          </figure>
+        </article>
+      </section>
+
+      <section class="more wrap" aria-labelledby="more-title">
+        <h2 id="more-title" class="visually-hidden">More in irori</h2>
+        <div class="more-grid">
+          <article>
+            <h3>Materials in the window</h3>
+            <p>PDF, Word, PowerPoint, Excel and images open right next to your notes.</p>
+          </article>
+          <article>
+            <h3>Google Drive as Contents</h3>
+            <p>Connect a Drive folder; you and the hibachi agent can both edit it.</p>
+          </article>
+          <article>
+            <h3>Your CLI, your rules</h3>
+            <p>
+              Agents use each CLI's own sign-in and permissions. irori needs no account or API key.
+            </p>
+          </article>
+          <article>
+            <h3>Updates in place</h3>
+            <p>irori tells you when a new version is out. Update and restart in one click.</p>
+          </article>
+          <article>
+            <h3>Themes &amp; languages</h3>
+            <p>Hearth, Light and Dark themes, and an interface in English or 日本語.</p>
+          </article>
+          <article>
+            <h3>Plain files, always</h3>
+            <p>Notes stay ordinary Markdown in your folder. Take them anywhere, anytime.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="download-section" id="download" aria-labelledby="download-title">
+        <div class="download-glow" aria-hidden="true"></div>
+        <div class="wrap">
+          <div class="section-head center">
+            <p class="eyebrow">Download</p>
+            <h2 id="download-title">Bring irori home.</h2>
+            <p id="release-status" role="status">
+              Testing preview for Windows and Mac. Free, and open source.
+            </p>
+          </div>
+          <div id="downloads" class="downloads" aria-label="Downloads by platform"></div>
           <noscript
-            ><p>
-              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases">GitHub の配布ページ</a
-              >から Windows 用インストーラーと Mac 用ディスクイメージを取得できます。
+            ><p class="noscript">
+              Get the Windows installer and the Mac disk image from
+              <a href="https://github.com/DeL-TaiseiOzaki/irori/releases">GitHub Releases</a>.
             </p></noscript
           >
-          <p class="release-note">
-            配布用の署名がない検証版です。Windows 11・macOS
-            実機でのインストールと日本語入力は確認待ちです。<br />
-            まずは新しいフォルダや KB のコピーでお試しください。
+          <p class="release-links">
             <a id="release-notes" href="https://github.com/DeL-TaiseiOzaki/irori/releases"
-              >変更点・検証範囲・SHA-256</a
+              >Release notes &amp; SHA-256 <span aria-hidden="true">↗</span></a
+            >
+            <a href="https://github.com/DeL-TaiseiOzaki/irori/releases"
+              >All releases <span aria-hidden="true">↗</span></a
             >
           </p>
-          <ol class="steps">
-            <li>
-              <span>1</span>
-              <div>
-                <strong>Git を準備</strong>
-                <p>
-                  Windows は <a href="https://git-scm.com/downloads/win">Git for Windows</a>、Mac は
-                  <a href="https://git-scm.com/downloads/mac">Git for macOS</a> をインストール
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>2</span>
-              <div>
-                <strong>インストール</strong>
-                <p>Windows は EXE を開く。Mac は DMG を開きアプリケーションへドラッグ</p>
-              </div>
-            </li>
-            <li>
-              <span>3</span>
-              <div>
-                <strong>ワークスペースを作る</strong>
-                <p>検証用の KB フォルダを追加してノートを書く</p>
-              </div>
-            </li>
-          </ol>
-          <div class="first-launch">
-            <strong>Mac ではじめて開くとき</strong>
+          <div class="notice">
+            <strong>This is a testing preview.</strong>
             <p>
-              配布用の署名がないため、初回は開発元を確認できないという理由で開けません。
-              <b>システム設定 → プライバシーとセキュリティ</b> を開き、「セキュリティ」の項目に出る
-              irori のブロック通知の横の <b>「このまま開く」</b>
-              を押してください。2 回目からは通常どおり開けます。表示される文言は macOS
-              のバージョンによって変わります。
+              The installers are not signed for distribution yet, and acceptance on real Windows 11
+              and macOS devices is still in progress. Start with a new folder or a copy of your
+              notes.
             </p>
           </div>
-          <p class="caption">
-            Windows は AMD Ryzen・Intel の x64 向けで、Windows ARM 用ではありません。Mac は Apple
-            シリコン（M シリーズ）専用で、Intel Mac には対応しません。
-          </p>
+          <div class="first-launch">
+            <article>
+              <h3>First launch on Windows</h3>
+              <p>
+                Windows may warn that the publisher cannot be verified. If SmartScreen stops the
+                installer, choose <b>More info</b>, then <b>Run anyway</b>.
+              </p>
+            </article>
+            <article>
+              <h3>First launch on Mac</h3>
+              <p>
+                macOS blocks the first launch. Open <b>System Settings → Privacy &amp; Security</b>,
+                find the message about irori and press <b>Open Anyway</b>. After that, irori opens
+                as usual.
+              </p>
+            </article>
+          </div>
         </div>
       </section>
-      <section class="faq wrap">
-        <div>
-          <p class="eyebrow">GOOD TO KNOW</p>
-          <h2>はじめる前に。</h2>
+
+      <section id="start" class="start wrap" aria-labelledby="start-title">
+        <div class="section-head">
+          <p class="eyebrow">Get started</p>
+          <h2 id="start-title">Up and running in four steps.</h2>
+        </div>
+        <div class="start-body">
+          <ol class="steps">
+            <li>
+              <h3>Prepare</h3>
+              <p>
+                Install <a href="https://git-scm.com/downloads">Git</a>. To use AI, also install and
+                sign in to the CLI you want. Writing notes needs no CLI.
+              </p>
+            </li>
+            <li>
+              <h3>Add a hibachi</h3>
+              <p>
+                <b>Open a KB folder</b>, <b>Clone from GitHub</b>, or <b>Create new</b>. Existing
+                files stay where they are.
+              </p>
+            </li>
+            <li>
+              <h3>Make a workspace</h3>
+              <p>Tick the hibachis you want and press <b>Create workspace</b>.</p>
+            </li>
+            <li>
+              <h3>Write, then ask</h3>
+              <p>Open a note, write, and press <b>AI</b> to hand the next step to an agent.</p>
+            </li>
+          </ol>
+          <figure class="shot">
+            <img
+              src="./screens/start.webp"
+              alt="irori's start screen: choose a workspace, combine hibachis, or add one by opening a folder, cloning from GitHub or creating new."
+              width="2880"
+              height="1746"
+              loading="lazy"
+            />
+          </figure>
+        </div>
+        <p class="template-note">
+          Starting from scratch?
+          <a href="https://github.com/DeL-TaiseiOzaki/irori-templete">irori-templete</a>
+          is the recommended layout for a hibachi.
+        </p>
+      </section>
+
+      <section id="faq" class="faq wrap" aria-labelledby="faq-title">
+        <div class="section-head">
+          <p class="eyebrow">FAQ</p>
+          <h2 id="faq-title">Good to know.</h2>
         </div>
         <div class="questions">
           <details>
-            <summary>ブラウザで使うアプリですか？</summary>
+            <summary>Is irori a web app?</summary>
             <p>
-              irori
-              はパソコンにインストールして使うデスクトップアプリです。このページは、アプリの紹介とダウンロードの入口です。
+              No. irori is a desktop app you install on your computer. This page introduces it and
+              links to the installers.
             </p>
           </details>
           <details>
-            <summary>AI を使うには何が必要ですか？</summary>
+            <summary>What do I need to use AI?</summary>
             <p>
-              使いたい CLI（Claude
-              Code・Codex・OpenCode・Pi）を別途インストールし、対応するアカウントの設定が必要です。AI
-              の利用には各サービスの利用条件・料金が適用されます。ノートの編集は AI
-              を設定せずに試せます。
+              Install the CLI you want — Claude Code, Codex, OpenCode, Pi or Hermes Agent — and sign
+              in to it as usual. irori uses that CLI's own sign-in and settings, so it needs no
+              account or API key of its own. Each service's terms and pricing apply. You can try
+              notes without setting up any AI.
             </p>
           </details>
           <details>
-            <summary>ノートはどこに保存されますか？</summary>
+            <summary>Where are my notes stored?</summary>
             <p>
-              選んだ KB フォルダに、Markdown
-              ファイルとして保存されます。エージェントへの依頼では、処理に必要な内容が利用する AI
-              サービスに送信されることがあります。
+              In the folder you chose, as ordinary Markdown files. When you ask an agent for work,
+              what it needs may be sent to the AI service behind that CLI.
             </p>
           </details>
           <details>
-            <summary>アプリの中でターミナルを使えますか？</summary>
+            <summary>What can the agents do?</summary>
             <p>
-              KB を開き、画面下の「ターミナル」を押すと、その KB のフォルダで起動します。 Windows は
-              PowerShell・コマンドプロンプト・Git Bash、Mac は zsh・bash
-              などのログインシェルを自動検出し、プロセスを停止してから切り替えられます。
+              A hibachi agent starts in full access where its CLI offers it; switch to standard (the
+              CLI's own settings, asking when needed) at any time. When an agent asks for
+              permission, the request appears in the panel. Every change it makes shows up as a Git
+              diff.
             </p>
           </details>
           <details>
-            <summary>Google Drive にはどう接続しますか？</summary>
+            <summary>How do I connect Google Drive?</summary>
             <p>
-              ワークスペース左下の Google Drive の「接続」から、アカウントを追加します。 ブラウザで
-              Google のアクセス許可を確認し、接続するフォルダを選んでください。 Windows
-              でフォルダを開くには <a href="https://winfsp.dev/rel/">WinFsp</a>
-              のインストールが必要です。Mac は追加のインストールなしに、macOS の NFS
-              マウントで接続を試せます。接続画面にも案内があります。
-            </p>
-            <p>
-              現在は読み取り専用の接続テスト版です。Google
-              の設定でテストユーザーに制限している場合は、
-              登録済みのアカウントでお試しください。実アカウントでの接続・再接続は確認待ちです。
+              Connect a Drive folder as a hibachi's Contents, from the hibachi's cloud connection.
+              Your browser asks you to approve access with Google. On Windows, opening the folder
+              needs <a href="https://winfsp.dev/rel/">WinFsp</a>; a Mac needs nothing extra.
             </p>
           </details>
           <details>
-            <summary>すべての機能が使えますか？</summary>
+            <summary>Which computers are supported?</summary>
             <p>
-              ノート編集、Git 操作、CSV
-              の表表示・ソース編集、設定済みオントロジーのグラフ表示、内蔵ターミナルを試せます。
-              Google 接続用の設定と rclone を組み込み、アカウント接続を試せる版になりました。 Git
-              の一括操作や AI への送信予約、資料の版・成果物の登録にも対応しています。 Drive
-              への実送信、端末をまたぐ履歴の共有、Windows 実機での CLI 連携は確認・開発中です。
+              Windows 11 on x64 (Intel or AMD) and Macs with Apple silicon (M series). Windows on
+              ARM and Intel Macs are not supported. On Linux, you can
+              <a href="https://github.com/DeL-TaiseiOzaki/irori/blob/main/docs/DEVELOPMENT.md"
+                >run irori from source</a
+              >.
             </p>
           </details>
           <details>
-            <summary>インストールや動作で困ったら？</summary>
+            <summary>Something went wrong. Where do I report it?</summary>
             <p>
-              配布用の署名がないため、Windows は発行元を、Mac
-              は開発元を確認できない旨を表示します。Mac
-              の初回起動はシステム設定からの許可が必要です（上の「Mac
-              ではじめて開くとき」を参照）。起動できない場合や不具合は、<a
-                href="https://github.com/DeL-TaiseiOzaki/irori/issues"
-                >GitHub Issues</a
-              >へ、アプリのバージョンと表示されたメッセージをお知らせください。ノートの本文や認証情報は載せないでください。
+              Open a <a href="https://github.com/DeL-TaiseiOzaki/irori/issues">GitHub issue</a> with
+              the version shown in the app, your OS and the exact message. Please don't post note
+              contents, credentials or sign-in URLs.
             </p>
           </details>
         </div>
       </section>
     </main>
-    <footer class="wrap footer">
-      <a class="brand" href="#"><img class="mark" src="../assets/irori-icon.png" alt="" />irori</a>
-      <p>知識を囲んで、一緒につくる。</p>
-      <a href="https://github.com/DeL-TaiseiOzaki/irori"
-        >ソースコード・MIT License <span aria-hidden="true">↗</span></a
-      >
+
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <a class="brand" href="#"
+          ><img
+            class="mark"
+            src="../assets/irori-icon-256.png"
+            alt=""
+            width="256"
+            height="256"
+          /><span>irori</span></a
+        >
+        <p>Gather around your knowledge, and make things together.</p>
+        <nav aria-label="Footer">
+          <a href="https://github.com/DeL-TaiseiOzaki/irori">Source</a>
+          <a href="https://github.com/DeL-TaiseiOzaki/irori/releases">Releases</a>
+          <a href="https://github.com/DeL-TaiseiOzaki/irori/issues">Issues</a>
+          <a href="https://github.com/DeL-TaiseiOzaki/irori/blob/main/LICENSE">MIT License</a>
+        </nav>
+      </div>
     </footer>
     <script type="module" src="./main.ts"></script>
   </body>

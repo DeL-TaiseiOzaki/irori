@@ -42,13 +42,13 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.reload();
   await page.locator('.download-card').last().waitFor();
-  assert.equal(await page.title(), 'irori — ノートから、次の仕事へ。');
+  assert.equal(await page.title(), "irori — From your notes, to what's next.");
   await page
     .locator('.brand .mark')
     .first()
     .evaluate(async (image) => {
       await (image as HTMLImageElement).decode();
-      if ((image as HTMLImageElement).naturalWidth !== 1254) throw Error('Brand icon did not load');
+      if ((image as HTMLImageElement).naturalWidth !== 256) throw Error('Brand icon did not load');
     });
   async function checkDownloads(expected: typeof release) {
     assert.equal(
@@ -71,20 +71,25 @@ try {
     }
   }
   await checkDownloads(release);
-  await page.getByRole('link', { name: 'ダウンロードについて' }).click();
+  // No platform is detected in the harness, so the hero link stays on the page.
+  await page.getByRole('link', { name: 'Download irori', exact: true }).click();
   await page.waitForURL('**/#download');
-  await page.getByText('ブラウザで使うアプリですか？', { exact: true }).click();
+  await page.getByText('Is irori a web app?', { exact: true }).click();
   assert(
     await page
       .locator('details[open]')
       .innerText()
-      .then((value) => value.includes('デスクトップアプリ')),
+      .then((value) => value.includes('desktop app')),
   );
-  assert(
-    await page
-      .locator('.app-preview img')
-      .evaluate((image) => (image as HTMLImageElement).naturalWidth > 0),
-  );
+  for (const image of await page.locator('.shot img').all()) {
+    await image.scrollIntoViewIfNeeded();
+    assert(
+      await image.evaluate(async (element) => {
+        await (element as HTMLImageElement).decode();
+        return (element as HTMLImageElement).naturalWidth > 0;
+      }),
+    );
+  }
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-website-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
