@@ -126,7 +126,7 @@ try {
   await expect(page.getByRole('region', { name: 'hibachis side by side' })).toBeVisible();
   await japaneseLeft(page, 'the Overview columns');
   await page.getByRole('button', { name: 'Map', exact: true }).click();
-  await page.getByRole('button', { name: /^Search all hibachis/ }).click();
+  await page.getByRole('button', { name: /^Search hibachis/ }).click();
   await expect(page.getByRole('radio', { name: 'All hibachis', exact: true })).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);

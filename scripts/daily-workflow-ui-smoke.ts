@@ -129,7 +129,7 @@ function brainButton(page: Page, space: Space) {
 }
 /** Opens the note's menu and takes one of its actions. */
 async function noteMenu(page: Page, name: string) {
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name, exact: true }).click();
 }
 async function chooseScope(page: Page, space: Space) {
@@ -201,7 +201,7 @@ try {
     // Restore the exact disposable record before exercising the user's retry action.
     await rm(recordPath, { recursive: true });
     await rename(backup, recordPath);
-    await page.getByRole('button', { name: '下書き保存を再試行', exact: true }).click();
+    await page.getByRole('button', { name: '再試行', exact: true }).click();
     await expect(page.locator('.composer [role="alert"]')).toHaveCount(0);
   }
   await expect
@@ -293,8 +293,8 @@ try {
   );
 
   await noteMenu(page, '名前・場所');
-  let move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
-  await move.getByLabel('ノート名', { exact: true }).fill('名前変更');
+  let move = page.getByRole('dialog', { name: '名前と場所', exact: true });
+  await move.getByLabel('名前', { exact: true }).fill('名前変更');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
   const renamedPath = path.join(root, customDirectory, '名前変更.md');
@@ -305,8 +305,8 @@ try {
   await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
 
   await noteMenu(page, '名前・場所');
-  move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
-  await move.getByLabel('移動先フォルダ', { exact: true }).fill(destination);
+  move = page.getByRole('dialog', { name: '名前と場所', exact: true });
+  await move.getByLabel('移動先', { exact: true }).fill(destination);
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
   const movedPath = path.join(root, destination, '名前変更.md');

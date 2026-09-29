@@ -292,10 +292,6 @@ export function BrainSettings({
                 ]}
                 onChange={(value) => chooseIcon(() => setKind(value))}
               />
-              <span className="brain-sheet-hint">
-                <Icon name="penLine" size={13} />
-                {t('1〜2 文字や絵文字も', 'One or two letters or an emoji')}
-              </span>
             </div>
             {kind === 'glyph' && (
               <fieldset className="glyph-grid">

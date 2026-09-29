@@ -177,7 +177,7 @@ app.on('window-all-closed', () => app.quit());`,
   await expect.poll(async () => (await state()).restarts).toBe(1);
   const restart = page.getByRole('button', { name: '再起動して更新', exact: true });
   await expect(restart).toBeEnabled();
-  await expect(page.getByRole('status')).toContainText('0.1.4 に更新する準備ができました');
+  await expect(page.getByRole('status')).toContainText('更新の準備完了: 0.1.4');
   await restart.click();
   await expect.poll(async () => (await state()).restarts).toBe(2);
   // A refused switch is reported in the host's own words.
@@ -200,7 +200,7 @@ app.on('window-all-closed', () => app.quit());`,
   await expect(page.locator('.update-notice-result[role="alert"]')).toContainText(
     '更新できませんでした。ダウンロードした更新ファイルが公開版と一致しませんでした。',
   );
-  await expect(page.getByRole('button', { name: 'もう一度更新', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '再試行', exact: true })).toBeVisible();
   await installer.click();
   await expect.poll(async () => (await state()).opened).toEqual(['download']);
 

@@ -114,29 +114,27 @@ export function NoteActionDialog({
     }
   }
   const dialogLabel =
-    action === 'move'
-      ? t('ノートの名前と場所', 'Note name and location')
-      : t('ノートを削除', 'Delete note');
+    action === 'move' ? t('名前と場所', 'Name and location') : t('ノートを削除', 'Delete note');
   const linksHint = !links
-    ? t('参照元のリンクは更新しません。', 'Referring links will not be updated.')
+    ? t('参照元リンクは更新しません。', 'Referring links stay as is.')
     : !referring
-      ? t('参照元のリンクを調べています…', 'Checking referring links…')
+      ? t('参照元リンクを確認中…', 'Checking referring links…')
       : 'error' in referring
         ? t(
-            `参照元のリンクを確認できませんでした: ${referring.error}`,
+            `参照元リンクを確認できません: ${referring.error}`,
             `Could not check referring links: ${referring.error}`,
           )
         : t(
             `${
               referring.notes
-                ? `参照元 ${referring.notes} 件のノートの ${referring.links} 件のリンクを更新します。`
-                : 'このノートを参照するリンクはありません。'
-            }${referring.incomplete ? ' 一部確認できていません。' : ''}`,
+                ? `参照元 ${referring.notes} 件・リンク ${referring.links} 件を更新`
+                : '参照するリンクなし'
+            }${referring.incomplete ? '・一部未確認' : ''}`,
             `${
               referring.notes
-                ? `Updates ${referring.links} links in ${referring.notes} referring notes.`
-                : 'No links refer to this note.'
-            }${referring.incomplete ? ' Some could not be checked.' : ''}`,
+                ? `${referring.links} links in ${referring.notes} notes`
+                : 'No referring links'
+            }${referring.incomplete ? ' · Some unchecked' : ''}`,
           );
   return (
     <Dialog label={dialogLabel} busy={busy} onClose={close}>
@@ -152,7 +150,7 @@ export function NoteActionDialog({
         {action === 'move' ? (
           <>
             <label>
-              {t('ノート名', 'Note name')}
+              {t('名前', 'Name')}
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -161,7 +159,7 @@ export function NoteActionDialog({
               />
             </label>
             <label>
-              {t('移動先フォルダ', 'Destination folder')}
+              {t('移動先', 'Destination')}
               <input
                 value={directory}
                 onChange={(event) => setDirectory(event.target.value)}

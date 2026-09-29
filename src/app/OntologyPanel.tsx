@@ -412,7 +412,7 @@ export function OntologyPanel({
             <button className="stage-text-button framed" disabled={busy} onClick={generate}>
               <Icon name="refresh" size={14} />
               {repairModule
-                ? t('ページからグラフ索引を再生成', 'Regenerate graph index from pages')
+                ? t('ページから再生成', 'Regenerate from pages')
                 : t('グラフ索引を更新', 'Update graph index')}
             </button>
           )}

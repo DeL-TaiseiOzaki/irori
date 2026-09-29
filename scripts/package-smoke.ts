@@ -472,7 +472,7 @@ try {
   }
   await expect(page.locator('.ProseMirror')).toHaveAttribute('data-lifecycle', 'packaged');
   // Reload lives in the note's menu.
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '再読み込み', exact: true }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Continuous packaged edit after saving');
   await expect
@@ -484,7 +484,7 @@ try {
         ),
     )
     .toBe(true);
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   await expect(
     page.getByRole('region', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
   ).toHaveCount(4);
@@ -507,7 +507,7 @@ try {
       timeout: 15000,
     })
     .toContain('配布端末から保存');
-  await terminal.getByRole('button', { name: 'ターミナルを終了して閉じる' }).click();
+  await terminal.getByRole('button', { name: '終了して閉じる' }).click();
   const runtime = await application.evaluate(async ({ app }) => {
     const path = process.getBuiltinModule('node:path');
     const { createRequire } = process.getBuiltinModule('node:module');

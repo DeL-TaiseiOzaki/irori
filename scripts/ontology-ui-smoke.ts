@@ -65,7 +65,7 @@ try {
   await page.getByRole('checkbox', { name: /知識の地図/ }).check();
   await page.getByRole('checkbox', { name: /知識の束/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   let panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel.locator('.react-flow__node')).toHaveCount(4);
   await expect(panel.locator('.react-flow__edge')).toHaveCount(5);
@@ -84,7 +84,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-ontology.png' });
   await panel.getByRole('button', { name: '関連ノートを開く' }).click();
   await expect(page.locator('.ProseMirror')).toContainText('知識をつなぐ');
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   // The entity list and the CSV files open from the graph's table button.
   await panel.getByRole('button', { name: 'エンティティとノートの一覧', exact: true }).click();
@@ -98,7 +98,7 @@ try {
   );
   // Table and source are the note's views, chosen from its menu.
   const view = async (name: string) => {
-    await page.getByRole('button', { name: /^その他（/ }).click();
+    await page.getByRole('button', { name: 'その他', exact: true }).click();
     await page.getByRole('menuitemradio', { name, exact: true }).click();
   };
   await view('ソース');
@@ -109,15 +109,13 @@ try {
   await expect(page.getByRole('region', { name: 'CSV の表', exact: true })).toContainText(
     'New entity',
   );
-  await expect(
-    page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }),
-  ).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'グラフ', exact: true }).first()).toBeDisabled();
   await page.getByRole('button', { name: /^保存/ }).click();
   await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
   const saved = await readFile(path.join(root, fixture.declaration.entities.path), 'utf8');
   expect(saved.startsWith(fixture.entities)).toBe(true);
   expect(saved).toContain('new,New entity');
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel.locator('.react-flow__node')).toHaveCount(5);
   await writeFile(
@@ -137,7 +135,7 @@ try {
   await expect(panel.getByRole('alert')).toContainText('重複');
   await expect(
     panel.getByRole('button', {
-      name: /グラフ索引を更新|ページからグラフ索引を再生成|グラフ索引を作成/,
+      name: /グラフ索引を更新|ページから再生成|グラフ索引を作成/,
     }),
   ).toHaveCount(0);
   await expect(panel.locator('.react-flow__node')).toHaveCount(0);
@@ -145,10 +143,8 @@ try {
   await expect(panel.locator('.react-flow__node')).toHaveCount(5);
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-  await expect(
-    page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }),
-  ).toBeFocused();
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'グラフ', exact: true }).first()).toBeFocused();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toHaveValue(/\.irori\/ontology.json/);
   // The bundle KB: no declaration, so the panel offers to generate the graph index.
@@ -156,7 +152,7 @@ try {
     .getByRole('navigation', { name: 'hibachi' })
     .getByRole('button', { name: /^知識の束・AI/ })
     .click();
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel).toContainText('グラフ索引はまだありません');
   await panel.getByRole('button', { name: 'グラフ索引を作成', exact: true }).click();
@@ -203,7 +199,7 @@ try {
   ]) {
     await writeFile(relationsPath, broken);
     await expect(panel.getByRole('alert')).toBeVisible();
-    await panel.getByRole('button', { name: 'ページからグラフ索引を再生成', exact: true }).click();
+    await panel.getByRole('button', { name: 'ページから再生成', exact: true }).click();
     await expect(panel.getByRole('alert')).toHaveCount(0);
     await expect(freshness).toContainText('一致しています');
     await expect(panel.locator('.react-flow__node')).toHaveCount(4);
@@ -218,7 +214,7 @@ try {
     })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('サービス');
-  await page.getByRole('button', { name: 'グラフ（オントロジー）', exact: true }).click();
+  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await panel.locator('.react-flow__node').filter({ hasText: '監視' }).click();
   await expect(panel.getByRole('button', { name: '関連ノートを開く' })).toBeVisible();

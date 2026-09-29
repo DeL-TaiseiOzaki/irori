@@ -390,7 +390,7 @@ export class CloudService {
       if (!binding || account?.state !== 'ready')
         throw Error(
           t(
-            '送信準備にはログイン済みアカウントを紐づけてください。',
+            '送信待ちにはログイン済みアカウントを紐づけてください。',
             'Link a signed-in account before preparing an upload.',
           ),
         );
@@ -819,13 +819,7 @@ export class CloudService {
   private async assertSent(scopeId: string, mountId: string) {
     const mounted = this.mounted.get(this.key(scopeId, mountId));
     const pending = mounted && (await this.pending(mounted));
-    if (pending)
-      throw Error(
-        t(
-          `Google Drive への送信待ちが ${pending} 件あります。`,
-          `${pending} saved changes are still waiting to be uploaded to Google Drive.`,
-        ),
-      );
+    if (pending) throw Error(t(`送信待ち ${pending} 件`, `${pending} pending uploads`));
   }
   /** Saved changes of a writable mount still waiting to reach Google Drive, if rclone can tell. */
   private async pending(mounted: Mounted): Promise<number | undefined> {

@@ -94,38 +94,29 @@ export class UploadFailures {
   }
 }
 
-/** One line for the connection card: what is wrong and how many changes it holds back. */
+/**
+ * One line for the connection card: what is wrong. The card shows the pending
+ * count separately, so only `other` (no known cause) states it here.
+ */
 export function uploadErrorMessage(category: UploadErrorCategory, count: number) {
   switch (category) {
     case 'permission':
       return t(
-        `このフォルダに書き込む権限がありません。${count} 件を送信できません。`,
-        `No permission to write to this folder. ${count} changes cannot be uploaded.`,
+        'このフォルダへの書き込み権限がありません。',
+        'No permission to write to this folder.',
       );
     case 'quota':
-      return t(
-        `Google Drive の空き容量が不足しています。${count} 件を送信できません。`,
-        `Google Drive storage is full. ${count} changes cannot be uploaded.`,
-      );
+      return t('Google Drive の空き容量が不足しています。', 'Google Drive storage is full.');
     case 'auth':
       return t(
-        `Google のログインが期限切れか取り消されています。${count} 件を送信できません。`,
-        `The Google sign-in has expired or been revoked. ${count} changes cannot be uploaded.`,
+        'Google のログインが期限切れか取り消されています。',
+        'The Google sign-in has expired or been revoked.',
       );
     case 'network':
-      return t(
-        `Google Drive に接続できません。${count} 件が送信待ちです。`,
-        `Cannot reach Google Drive. ${count} changes are pending.`,
-      );
+      return t('Google Drive に接続できません。', 'Cannot reach Google Drive.');
     case 'rateLimit':
-      return t(
-        `Google がリクエストを制限しています。${count} 件が送信待ちです。`,
-        `Google is limiting requests. ${count} changes are pending.`,
-      );
+      return t('Google がリクエストを制限しています。', 'Google is limiting requests.');
     default:
-      return t(
-        `${count} 件の変更を Google Drive に送信できませんでした。`,
-        `${count} changes could not be uploaded to Google Drive.`,
-      );
+      return t(`送信失敗 ${count} 件`, `${count} failed uploads`);
   }
 }

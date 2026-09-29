@@ -145,11 +145,6 @@ export function YourAiPanel({
             {ai.error}
           </p>
         )}
-        {!ai.events.length && (
-          <div className="agent-empty">
-            <p>{t('hibachi をまたぐ仕事を頼めます。', 'Ask for work across your hibachis.')}</p>
-          </div>
-        )}
         <AgentLog
           events={ai.events}
           activeRun={run?.active ? run.runId : undefined}
@@ -176,7 +171,7 @@ export function YourAiPanel({
         )}
         <textarea
           aria-label={t('irori agent への指示', 'Instruction for the irori agent')}
-          placeholder={t('irori agent に指示…', 'Instruct the irori agent…')}
+          placeholder={t('指示…', 'Instruction…')}
           rows={3}
           value={text}
           maxLength={32000}

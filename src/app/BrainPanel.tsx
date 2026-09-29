@@ -357,7 +357,7 @@ export function BrainPanel({
         />
         <SectionAction
           icon="graph"
-          label={t('グラフ（オントロジー）', 'Graph (ontology)')}
+          label={t('グラフ', 'Graph')}
           disabled={locked || dirty}
           onClick={onGraph}
         />
@@ -445,7 +445,7 @@ export function BrainPanel({
                   </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onGraph}>
                     <Icon name="graph" size={14} />
-                    {t('グラフ（オントロジー）', 'Graph (ontology)')}
+                    {t('グラフ', 'Graph')}
                   </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onConnect}>
                     <Icon name="cloudConnect" size={14} />

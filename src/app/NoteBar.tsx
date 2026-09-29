@@ -98,10 +98,7 @@ export function NoteInfo({ label, children }: { label: string; children: ReactNo
 
 /** The note's other actions, each shown only where it applies. */
 export function NoteMenu({ children }: { children: ReactNode }) {
-  const label = t(
-    'その他（名前・場所、削除、再読み込み）',
-    'More (name & location, delete, reload)',
-  );
+  const label = t('その他', 'More');
   return (
     <Menu.Root modal={false}>
       <Menu.Trigger className="stage-button" aria-label={label} title={label}>

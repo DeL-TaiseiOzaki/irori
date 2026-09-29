@@ -71,8 +71,8 @@ const errors: string[] = [];
 try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
-  await page.getByRole('button', { name: '端末の送信準備を復元', exact: true }).click();
-  const recovery = page.getByRole('dialog', { name: '端末の送信準備', exact: true });
+  await page.getByRole('button', { name: '送信待ちを復元', exact: true }).click();
+  const recovery = page.getByRole('dialog', { name: '送信待ち', exact: true });
   await expect(recovery).toContainText('orphaned.md');
   const recoveredPath = path.join(base, 'recovered.md');
   await app.evaluate(({ dialog }, filePath) => {
@@ -96,17 +96,17 @@ try {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.type(' saved before navigation');
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   let panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   const search = () => panel.getByLabel('資料・成果物の記録を検索');
   await search().fill('ＲＥＰＯＲＴ.ＰＰＴＸ');
   await expect(panel.locator('details')).toHaveCount(1);
   const artifacts = panel.getByLabel('登録された成果物', { exact: true });
-  await artifacts.getByRole('button', { name: '現在の場所・関連記録', exact: true }).click();
+  await artifacts.getByRole('button', { name: '場所・記録', exact: true }).click();
   let preview = panel.getByLabel('保持した資料の版', { exact: true });
-  await expect(preview).toContainText('現在のファイルは保持版と一致');
-  await expect(preview).toContainText('この資料の成果物登録');
+  await expect(preview).toContainText('保持版と一致');
+  await expect(preview).toContainText('成果物登録');
   await artifacts.getByRole('button', { name: '関連する実行へ', exact: true }).click();
   await expect(search()).toHaveValue('');
   await expect(panel.locator(`[id="run-${first.id}"] > summary`)).toBeFocused();
@@ -114,7 +114,7 @@ try {
   await panel
     .locator(`[id="run-${first.id}"] li`)
     .filter({ hasText: 'reference.md' })
-    .getByRole('button', { name: '現在の場所・関連記録', exact: true })
+    .getByRole('button', { name: '場所・記録', exact: true })
     .click();
   await preview.getByRole('button', { name: '現在のファイルを開く', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('ワークスペースにありません');
@@ -128,8 +128,8 @@ try {
     .getByRole('button', { name: '保持版を見る', exact: true })
     .click();
   await expect(preview).toContainText('Earlier source');
-  await expect(preview).toContainText('ファイルが見つかりません');
-  await preview.getByLabel('資料の移動先のパス').fill('移動先.md');
+  await expect(preview).toContainText('現在の場所に見つかりません');
+  await preview.getByLabel('同じスペース内の移動先').fill('移動先.md');
   await preview.getByRole('button', { name: 'この移動先に再接続' }).click();
   await expect(panel.getByRole('alert')).toContainText('版が一致しません');
   await search().fill(second.id);
@@ -137,10 +137,10 @@ try {
   await panel.locator('details').getByRole('button', { name: '保持版を見る', exact: true }).click();
   await expect(preview).toContainText('Latest source');
   await expect(preview.getByRole('button', { name: '現在のファイルを開く' })).toBeDisabled();
-  await preview.getByLabel('資料の移動先のパス').fill('移動先.md');
+  await preview.getByLabel('同じスペース内の移動先').fill('移動先.md');
   await preview.getByRole('button', { name: 'この移動先に再接続' }).click();
   await expect(panel.getByRole('status')).toContainText('再接続しました');
-  await expect(preview).toContainText('現在の登録先: 移動先.md');
+  await expect(preview).toContainText('登録先: 移動先.md');
   await expect(preview).toContainText('別の版');
   await expect(preview).toContainText('この版');
   // A reverse link also clears an active filter, expands and focuses the selected run.
@@ -167,7 +167,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Record workspace' }).click();
   await page.getByRole('button', { name: '移動先', exact: true }).click();
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
@@ -179,7 +179,7 @@ try {
     .click();
   preview = panel.getByLabel('保持した資料の版', { exact: true });
   await expect(preview).toContainText('Earlier source');
-  await expect(preview).toContainText('現在の登録先: 移動先.md');
+  await expect(preview).toContainText('登録先: 移動先.md');
   await expect(preview).toContainText('保持版から変更');
   const history = await page.evaluate((id) => window.irori.knowledgeHistory(id), space.scopeId);
   expect(history.runs.find((run) => run.id === first.id)?.sources).toEqual(first.sources);
@@ -192,7 +192,7 @@ try {
   await page.getByRole('checkbox', { name: /参照KB/ }).check();
   await page.getByRole('button', { name: '変更を保存して開く', exact: true }).click();
   await page.getByRole('button', { name: '移動先', exact: true }).click();
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '資料と成果物', exact: true }).click();
   panel = page.getByRole('region', { name: '資料と成果物', exact: true });
   await search().fill(first.id);
@@ -200,7 +200,7 @@ try {
   await panel
     .locator('li')
     .filter({ hasText: 'reference.md' })
-    .getByRole('button', { name: '現在の場所・関連記録', exact: true })
+    .getByRole('button', { name: '場所・記録', exact: true })
     .click();
   preview = panel.getByLabel('保持した資料の版', { exact: true });
   await expect(preview).toContainText('所属: 参照KB');

@@ -134,7 +134,7 @@ export function PublishDialog({
           void submit();
         }}
       >
-        <h2>{t('GitHub にリポジトリを作成', 'Create a repository on GitHub')}</h2>
+        <h2>{t('リポジトリを作成', 'Create repository')}</h2>
         <PublishFields value={value} onChange={setValue} disabled={busy} />
         {error && <ErrorMessage text={error} />}
         {busy && <p role="status">{t('GitHub に公開しています…', 'Publishing to GitHub…')}</p>}

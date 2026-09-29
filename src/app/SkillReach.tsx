@@ -75,7 +75,7 @@ export function SkillReach({ scopeId, onClose }: { scopeId: string; onClose: () 
               </tbody>
             </table>
           ) : (
-            <p>{t('このスペースにスキルはありません。', 'There are no skills in this space.')}</p>
+            <p>{t('スキルなし', 'No skills')}</p>
           ))}
         <div className="actions">
           <button type="button" onClick={onClose}>

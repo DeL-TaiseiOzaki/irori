@@ -141,12 +141,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
         </div>
       ) : install.phase === 'ready' ? (
         <div className="update-notice-result" role="status">
-          <p>
-            {t(
-              `${install.version} に更新する準備ができました。`,
-              `Ready to update to ${install.version}.`,
-            )}
-          </p>
+          <p>{t(`更新の準備完了: ${install.version}`, `Ready to update: ${install.version}`)}</p>
           <div className="update-notice-actions">
             <button
               type="button"
@@ -188,9 +183,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                         disabled={!!busy}
                         onClick={update}
                       >
-                        {failed
-                          ? t('もう一度更新', 'Try updating again')
-                          : t('更新して再起動', 'Update and restart')}
+                        {failed ? t('再試行', 'Retry') : t('更新して再起動', 'Update and restart')}
                       </button>
                       <button type="button" disabled={!!busy} onClick={() => open('release')}>
                         {t('変更点を見る', 'View changes')}
@@ -201,9 +194,6 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                         </button>
                       )}
                     </div>
-                    <p className="update-notice-version">
-                      {t('自動で再起動します。', 'Restarts automatically.')}
-                    </p>
                   </>
                 ) : (
                   <>

@@ -63,10 +63,7 @@ function BacklinksList({
           {!result.hits.length && (
             <p className="backlinks-empty">
               {result.incomplete
-                ? t(
-                    '確認できた範囲に、このノートへのリンクはありません。',
-                    'No links to this note within what could be checked.',
-                  )
+                ? t('確認できた範囲にリンクなし', 'No links in the checked range')
                 : t('このノートへのリンクはありません。', 'No links to this note.')}
             </p>
           )}

@@ -54,7 +54,7 @@ try {
   await expect(panel.getByLabel('ターミナルのシェル')).toBeEnabled();
   await panel.getByRole('button', { name: '開く', exact: true }).click();
   await expect(panel.locator('.terminal-state')).toHaveText('実行中');
-  await panel.getByRole('button', { name: 'ターミナルを終了して閉じる' }).click();
+  await panel.getByRole('button', { name: '終了して閉じる' }).click();
   await expect(panel).toHaveCount(0);
   await expect(home).toBeEnabled();
   // Ctrl+` opens the drawer and closes it again, from inside the terminal too.

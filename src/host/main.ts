@@ -730,10 +730,7 @@ app
       // leaves them in rclone's cache, to be uploaded when the folder is next connected.
       for (let pending = await cloud.pendingUploads(); pending > 0;) {
         const answer = await dialog.showMessageBox(window!, {
-          message: t(
-            `Google Drive への送信待ちが ${pending} 件あります。`,
-            `${pending} saved changes are still waiting to be uploaded to Google Drive.`,
-          ),
+          message: t(`送信待ち ${pending} 件`, `${pending} pending uploads`),
           detail: t(
             '待たずに終了すると、変更はこの端末に残ります。',
             'If you quit without waiting, the changes stay on this device.',

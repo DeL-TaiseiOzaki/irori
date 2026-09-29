@@ -179,7 +179,7 @@ try {
   await expect(results).toContainText('ファイルが更新されました');
   await query.fill('not-present');
   await submit.click();
-  await expect(results).toContainText('検索できた範囲に一致する本文はありません。');
+  await expect(results).toContainText('検索した範囲に一致なし');
   await expect(results).toContainText('1 件スキップ');
   await query.fill('orbital');
   await submit.click();

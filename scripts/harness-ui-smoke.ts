@@ -58,7 +58,7 @@ try {
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
-  const settings = () => page.getByLabel('会話と接続の設定', { exact: true });
+  const settings = () => page.getByRole('button', { name: '会話と接続', exact: true });
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
@@ -201,9 +201,7 @@ try {
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
     await settings().click();
-    await expect(
-      page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
     await settings().click();
   }
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain('Fixture OpenCode edit');
@@ -212,13 +210,13 @@ try {
   await page.getByRole('button', { name: 'note', exact: true }).click();
   const editor = page.locator('.ProseMirror');
   await expect(editor).toContainText('Fixture OpenCode edit');
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 1 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 1');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('自分で書いた一文です。');
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 2');
   await page.screenshot({ path: 'test-results/irori-harnesses.png' });
   await app.close();
   app = await launch();
@@ -228,7 +226,7 @@ try {
   // The record outlives the process that observed it, and a note with such lines
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
-  await expect.poll(() => authorship(page)).toContain('人が書いた・直した行: 2 行');
+  await expect.poll(() => authorship(page)).toContain('人が書いた行 2');
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
@@ -341,13 +339,9 @@ try {
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     await settings().click();
-    await expect(
-      page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: '会話の継続をリセット', exact: true }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '会話をリセット', exact: true }).click();
+    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toHaveCount(0);
     await settings().click();
   }
   expect(errors).toEqual([]);

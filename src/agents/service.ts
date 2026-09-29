@@ -207,7 +207,7 @@ export class AgentService {
     if (this.busy(scopeId))
       throw Error(
         t(
-          '実行を停止してから会話の継続をリセットしてください。',
+          '実行を停止してから会話をリセットしてください。',
           'Stop the run before resetting the conversation.',
         ),
       );
@@ -636,8 +636,8 @@ export class AgentService {
             run,
             'error',
             t(
-              '前回の会話を引き継ぐ実行に失敗しました。再試行するか、会話の継続をリセットして新しい会話を始めてください。',
-              'The run continuing the previous conversation failed. Try again, or reset the conversation and start a new one.',
+              '前回の会話を引き継げませんでした（会話をリセット）。',
+              'Could not continue the previous conversation (reset the conversation).',
             ),
           );
       }
@@ -667,8 +667,8 @@ export class AgentService {
           outcome === 'completed'
             ? t('完了', 'Completed')
             : outcome === 'cancelled'
-              ? t('停止しました', 'Stopped')
-              : t('実行に失敗しました', 'Run failed'),
+              ? t('停止', 'Stopped')
+              : t('失敗', 'Failed'),
       };
       if (run.recorded) {
         try {

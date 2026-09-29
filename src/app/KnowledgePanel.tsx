@@ -20,22 +20,11 @@ const stateNames: Record<PendingWrite['state'], () => string> = {
   failed: () => t('再確認が必要・端末に保持', 'Needs reconfirmation · kept on this device'),
 };
 const locationNames: Record<SourceLocation['state'], () => string> = {
-  matching: () =>
-    t('現在のファイルは保持版と一致しています。', 'The current file matches the kept version.'),
-  changed: () =>
-    t(
-      '現在のファイルは保持版から変更されています。',
-      'The current file has changed from the kept version.',
-    ),
-  missing: () =>
-    t('現在の場所にファイルが見つかりません。', 'No file was found at the current location.'),
-  unavailable: () =>
-    t('現在のファイルにアクセスできません。', 'The current file cannot be accessed.'),
-  unbound: () =>
-    t(
-      'この資料 ID の現在の場所は登録されていません。',
-      'No current location is registered for this material ID.',
-    ),
+  matching: () => t('保持版と一致', 'Matches the kept version'),
+  changed: () => t('保持版から変更あり', 'Changed from the kept version'),
+  missing: () => t('現在の場所に見つかりません', 'Not found at the current location'),
+  unavailable: () => t('現在のファイルにアクセス不可', 'Current file inaccessible'),
+  unbound: () => t('現在の場所は未登録', 'No current location registered'),
 };
 export function KnowledgePanel({
   space,
@@ -126,7 +115,7 @@ export function KnowledgePanel({
     return (
       <>
         <button disabled={busy} onClick={() => void perform(() => inspectSource(source))}>
-          {t('現在の場所・関連記録', 'Current location & related records')}
+          {t('場所・記録', 'Location & records')}
         </button>{' '}
         <button disabled={busy} onClick={() => void perform(() => inspectSource(source, true))}>
           {t('保持版を見る', 'View kept version')}
@@ -271,7 +260,7 @@ export function KnowledgePanel({
               <p>
                 {t('所属', 'Belongs to')}:{' '}
                 {sourceNames[preview.source.scopeId] ??
-                  t('現在のワークスペース外の資料', 'Material outside the current workspace')}
+                  t('現在のワークスペース外', 'Outside the current workspace')}
               </p>
               <small>
                 {t('資料 ID', 'Material ID')}: {preview.source.id} · SHA-256: {preview.source.hash}
@@ -280,8 +269,7 @@ export function KnowledgePanel({
               <p>{locationNames[preview.location.state]()}</p>
               {preview.location.state !== 'unbound' && (
                 <p>
-                  {t('現在の登録先', 'Current registered location')}:{' '}
-                  {preview.location.current.path}
+                  {t('登録先', 'Registered location')}: {preview.location.current.path}
                 </p>
               )}
               <button
@@ -327,7 +315,6 @@ export function KnowledgePanel({
                   <label>
                     {t('同じスペース内の移動先', 'New location within the same space')}
                     <input
-                      aria-label={t('資料の移動先のパス', 'Path to the material’s new location')}
                       value={destination}
                       disabled={busy}
                       placeholder={t('フォルダ/資料.md', 'folder/material.md')}
@@ -339,12 +326,7 @@ export function KnowledgePanel({
                   </button>
                 </form>
               )}
-              <p>
-                {t(
-                  'この資料を参照した実行（直近の記録）',
-                  'Runs that referenced this material (recent records)',
-                )}
-              </p>
+              <p>{t('参照した実行', 'Referencing runs')}</p>
               {history.runs
                 .filter((run) =>
                   run.sources.some(
@@ -365,12 +347,7 @@ export function KnowledgePanel({
                       : t('別の版', 'A different version')}
                   </button>
                 ))}
-              <p>
-                {t(
-                  'この資料の成果物登録（直近の記録）',
-                  'Artifact registrations for this material (recent records)',
-                )}
-              </p>
+              <p>{t('成果物登録', 'Artifact registrations')}</p>
               {history.artifacts
                 .filter(
                   (item) =>
@@ -398,20 +375,12 @@ export function KnowledgePanel({
           <section>
             <h3>{t('成果物を登録', 'Register an artifact')}</h3>
             <label>
-              {t('このスペース内のファイル', 'A file within this space')}
-              <input
-                aria-label={t('登録する成果物のパス', 'Path of the artifact to register')}
-                value={filename}
-                onChange={(e) => setFilename(e.target.value)}
-              />
+              {t('ファイル', 'File')}
+              <input value={filename} onChange={(e) => setFilename(e.target.value)} />
             </label>
             <label>
               {t('関連する実行', 'Related run')}
-              <select
-                aria-label={t('成果物に関連する実行', 'Run related to the artifact')}
-                value={runId}
-                onChange={(e) => setRunId(e.target.value)}
-              >
+              <select value={runId} onChange={(e) => setRunId(e.target.value)}>
                 <option value="">{t('実行を選択', 'Select a run')}</option>
                 {history.runs.map((run) => (
                   <option key={run.id} value={run.id}>
@@ -430,19 +399,15 @@ export function KnowledgePanel({
                 )
               }
             >
-              {t('この版を成果物として登録', 'Register this version as an artifact')}
+              {t('この版を登録', 'Register this version')}
             </button>
           </section>
           {cloudOwner && (
             <section>
-              <h3>{t('Drive への送信準備', 'Pending upload to Drive')}</h3>
+              <h3>{t('Drive への送信待ち', 'Pending upload to Drive')}</h3>
               <label>
                 {t('送信先', 'Destination')}
-                <select
-                  aria-label={t('送信準備の Drive フォルダ', 'Drive folder for pending upload')}
-                  value={mountId}
-                  onChange={(e) => setMountId(e.target.value)}
-                >
+                <select value={mountId} onChange={(e) => setMountId(e.target.value)}>
                   <option value="">{t('フォルダを選択', 'Select a folder')}</option>
                   {connections.map((item) => (
                     <option key={item.mountId} value={item.mountId}>
@@ -464,7 +429,7 @@ export function KnowledgePanel({
                   )
                 }
               >
-                {t('送信準備として保持', 'Keep as pending upload')}
+                {t('送信待ちとして保持', 'Keep as pending upload')}
               </button>
               <ul>
                 {pending.map((item) => (

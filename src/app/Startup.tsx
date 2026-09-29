@@ -101,7 +101,7 @@ export function RegisterSpace({
           void submit();
         }}
       >
-        <h2>{t('リポジトリ・KBフォルダを登録', 'Register a repository or KB folder')}</h2>
+        <h2>{t('スペースを登録', 'Register a space')}</h2>
         {!folder && !created && (
           <MagnetTabs
             className="git-registration-mode"
@@ -299,9 +299,8 @@ export function RegisterSpace({
               />
             </label>
             <details>
-              <summary>{t('表示分類（任意）', 'Display category (optional)')}</summary>
+              <summary>{t('分類', 'Category')}</summary>
               <label>
-                {t('種類', 'Type')}
                 <select
                   aria-label={t('スペースの種類', 'Space type')}
                   value={category}
@@ -327,7 +326,7 @@ export function RegisterSpace({
                         setPublish({ ...publish, name: initialPublish(cloneName).name });
                     }}
                   />
-                  {t('GitHub にもリポジトリを作成する', 'Also create a repository on GitHub')}
+                  {t('GitHub にも作成', 'Also create on GitHub')}
                 </label>
                 {publishing && !created && (
                   <PublishFields value={publish} onChange={setPublish} disabled={busy} />
@@ -593,9 +592,6 @@ export function Startup({
                 </div>
               );
             })}
-            <p className="start-note">
-              {t('KBフォルダ・ノートは残ります。', 'The KB folder and notes remain.')}
-            </p>
           </div>
         ) : (
           <p className="start-note">
@@ -618,10 +614,7 @@ export function Startup({
                   onChange={(on) => toggle(id, on)}
                 />
                 <span>
-                  {t(
-                    '利用できない hibachi（登録を保持）',
-                    'Unavailable hibachi (registration kept)',
-                  )}
+                  {t('利用できない hibachi', 'Unavailable hibachi')}
                   <small>{id}</small>
                 </span>
               </label>

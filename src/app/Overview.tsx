@@ -828,12 +828,12 @@ export function Overview({
             disabled={!spaces.length}
             onClick={onSearch}
             aria-label={t(
-              `すべての hibachi を検索（${shortcut('K')}）`,
-              `Search all hibachis (${shortcut('K')})`,
+              `hibachi を検索（${shortcut('K')}）`,
+              `Search hibachis (${shortcut('K')})`,
             )}
           >
             <Icon name="search" size={15} />
-            <span>{t('すべての hibachi を検索', 'Search all hibachis')}</span>
+            <span>{t('hibachi を検索', 'Search hibachis')}</span>
             <kbd>{shortcut('K')}</kbd>
           </button>
           <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>

@@ -87,8 +87,8 @@ export class ConversationStore {
         runId: value.activeRunId,
         type: 'error',
         text: t(
-          '前回の実行結果は未確認です。変更内容を確認してください。この指示は再送していません。',
-          'The previous run did not report its result. Review the changes. This instruction was not sent again.',
+          '前回の実行結果は未確認です。この指示は再送していません。',
+          'The previous run did not report its result. This instruction was not sent again.',
         ),
       });
       delete value.activeRunId;

@@ -183,7 +183,7 @@ function SessionControls({
       {session?.state === 'unavailable' && <small role="alert">{session.detail}</small>}
       {session && session.state !== 'empty' && (
         <button disabled={running || resetting} onClick={() => void reset()}>
-          {t('会話の継続をリセット', 'Reset conversation continuation')}
+          {t('会話をリセット', 'Reset conversation')}
         </button>
       )}
     </div>
@@ -1608,12 +1608,7 @@ function App() {
                       />
                     )}
                     {onNote && doc && (
-                      <NoteInfo
-                        label={t(
-                          'ノートの情報（名前・場所・人の行・記録）',
-                          'Note details (name, location, human lines, records)',
-                        )}
-                      >
+                      <NoteInfo label={t('ノートの情報', 'Note details')}>
                         <h3>{doc.path.split('/').at(-1)}</h3>
                         <dl>
                           <dt>{t('場所', 'Location')}</dt>
@@ -1631,8 +1626,8 @@ function App() {
                           <p className="authorship" role="status">
                             <Icon name="penLine" size={13} />
                             {t(
-                              `人が書いた・直した行: ${personLineCount} 行`,
-                              `Lines a person wrote or edited: ${personLineCount}`,
+                              `人が書いた行 ${personLineCount}`,
+                              `Human-written lines ${personLineCount}`,
                             )}
                           </p>
                         )}
@@ -1773,7 +1768,7 @@ function App() {
                         <pre>{buffer}</pre>
                       </label>
                       <label>
-                        {t('ディスク上の最新版', 'Latest version on disk')}
+                        {t('ディスク版', 'Disk version')}
                         <pre>{external.text}</pre>
                       </label>
                     </div>
@@ -1793,7 +1788,7 @@ function App() {
                 )}
                 {doc?.draft && doc.draft.text !== doc.text && (
                   <div className="hint">
-                    {t('復元できる下書きがあります。', 'A recoverable draft is available.')}
+                    {t('下書きあり', 'Draft available')}
                     <button
                       onClick={() => {
                         setBuffer(doc.draft!.text);
@@ -2022,12 +2017,6 @@ function App() {
                               height="64"
                             />
                           )}
-                          <h1>
-                            {t(
-                              'ここから、考えを広げよう。',
-                              "Let's expand your thinking from here.",
-                            )}
-                          </h1>
                           <div className="welcome-actions">
                             <ArrowFillButton
                               disabled={!active || running || connecting}
@@ -2163,8 +2152,8 @@ function App() {
                     <Popover.Root>
                       <Popover.Trigger
                         className="icon-button agent-settings"
-                        aria-label={t('会話と接続の設定', 'Conversation and connection settings')}
-                        title={t('会話と接続の設定', 'Conversation and connection settings')}
+                        aria-label={t('会話と接続', 'Conversation and connection')}
+                        title={t('会話と接続', 'Conversation and connection')}
                       >
                         <Icon name="more" size={16} />
                       </Popover.Trigger>
@@ -2182,7 +2171,7 @@ function App() {
                               </Popover.Title>
                               <Popover.Close
                                 className="icon-button"
-                                aria-label={t('会話の設定を閉じる', 'Close conversation settings')}
+                                aria-label={t('閉じる', 'Close')}
                               >
                                 <Icon name="close" />
                               </Popover.Close>
@@ -2608,7 +2597,7 @@ function App() {
                       <div className="hint" role="alert">
                         {composer.error}
                         <button onClick={() => void composer.retry()}>
-                          {t('下書き保存を再試行', 'Retry saving draft')}
+                          {t('再試行', 'Retry')}
                         </button>
                       </div>
                     ) : (
@@ -2836,10 +2825,7 @@ function App() {
               </p>
             ) : (
               <label>
-                {t(
-                  '保存先フォルダー（KB 内の相対パス）',
-                  'Destination folder (path relative to the KB)',
-                )}
+                {t('保存先フォルダー', 'Destination folder')}
                 <input
                   aria-label={t('保存先フォルダー', 'Destination folder')}
                   value={noteDirectory}

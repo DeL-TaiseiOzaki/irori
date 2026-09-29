@@ -229,10 +229,7 @@ export function PageProperties({
               value={values.description}
               readOnly={readOnly}
               missing={required.has('description') && isEmptyValue(values.description)}
-              placeholder={t(
-                'このページを開くか決めるための一文',
-                'One sentence to decide whether to open this page',
-              )}
+              placeholder={t('一文で', 'One sentence')}
               onCommit={(value) => set(['description'], value)}
             />
           )}
@@ -444,9 +441,7 @@ function Value({
       ))}
     </ul>
   ) : (
-    <span className="properties-static empty">
-      {t('なし（YAML で編集）', 'None (edit as YAML)')}
-    </span>
+    <span className="properties-static empty">{t('なし', 'None')}</span>
   );
 }
 

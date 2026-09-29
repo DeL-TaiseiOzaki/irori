@@ -106,7 +106,7 @@ try {
   const productAi = ais.getByRole('group', { name: 'Product の hibachi agent' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
   // Search from the Overview covers every brain.
-  await page.getByRole('button', { name: /^すべての hibachi を検索/ }).click();
+  await page.getByRole('button', { name: /^hibachi を検索/ }).click();
   await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -197,7 +197,7 @@ try {
 
   // A result found from the Overview opens in its own brain.
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
-  await page.getByRole('button', { name: /^すべての hibachi を検索/ }).click();
+  await page.getByRole('button', { name: /^hibachi を検索/ }).click();
   const palette = page.getByRole('dialog', { name: 'KB内を検索' });
   await palette.getByLabel('本文を検索', { exact: true }).fill('lantern');
   await palette.getByRole('button', { name: '検索', exact: true }).click();

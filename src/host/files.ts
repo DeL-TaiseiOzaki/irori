@@ -480,12 +480,7 @@ export class FileService {
       );
     const doc = await this.read(ref.scopeId, ref.path);
     if (doc.hash !== ref.hash)
-      throw Error(
-        t(
-          'CONFLICT: ノートが変更されています。開き直してください。',
-          'CONFLICT: The note has changed. Open it again.',
-        ),
-      );
+      throw Error(t('CONFLICT: ノートが変更されています。', 'CONFLICT: The note has changed.'));
     if (doc.draft && doc.draft.text !== doc.text)
       throw Error(t('未保存の下書きがあります。', 'There is an unsaved draft.'));
     return { filename, doc, stat };

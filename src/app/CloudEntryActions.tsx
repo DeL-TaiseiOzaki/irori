@@ -131,12 +131,7 @@ export function CloudEntryDialog({
     setError('');
     try {
       if (!(await beforeChange()))
-        throw Error(
-          t(
-            '開いているノートを保存してからもう一度操作してください。',
-            'Save the open note before trying again.',
-          ),
-        );
+        throw Error(t('開いているノートを保存してください。', 'Save the open note first.'));
       if (action === 'delete') {
         await host.deleteCloudEntry(space.scopeId, entry.path);
         await onDone({ scopeId: space.scopeId, action, from: entry.path });
@@ -195,12 +190,12 @@ export function CloudEntryDialog({
           <p>
             {entry.directory
               ? t(
-                  'Google Drive のゴミ箱に移します（30 日以内なら復元可）。',
-                  "Moves the folder to Google Drive's trash (restorable within 30 days).",
+                  'フォルダをゴミ箱に移します（30 日以内なら復元可）。',
+                  'Moves the folder to trash (restorable within 30 days).',
                 )
               : t(
-                  'Google Drive のゴミ箱に移します（30 日以内なら復元可）。',
-                  "Moves the file to Google Drive's trash (restorable within 30 days).",
+                  'ファイルをゴミ箱に移します（30 日以内なら復元可）。',
+                  'Moves the file to trash (restorable within 30 days).',
                 )}
           </p>
         )}
@@ -211,11 +206,7 @@ export function CloudEntryDialog({
             {t('キャンセル', 'Cancel')}
           </button>
           <button className="primary" disabled={busy || !!problem || unchanged}>
-            {action === 'delete'
-              ? t('ゴミ箱に移す', 'Move to trash')
-              : action === 'rename'
-                ? t('名前を変更', 'Rename')
-                : t('移動する', 'Move')}
+            {action === 'delete' ? t('ゴミ箱に移す', 'Move to trash') : title}
           </button>
         </div>
       </form>

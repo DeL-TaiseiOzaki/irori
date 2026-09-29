@@ -442,7 +442,7 @@ function RepositoryPanel({
   if (!status.available)
     return status.initializable ? (
       <div className="git-empty">
-        <h2>{t('この hibachi は Git で管理されていません', 'This hibachi is not in Git')}</h2>
+        <h2>{t('Git 未設定', 'Not in Git')}</h2>
         {error && <ErrorMessage className="git-notice error" text={error} />}
         <button
           className="solid-button"
@@ -456,7 +456,7 @@ function RepositoryPanel({
       </div>
     ) : (
       <div className="git-empty">
-        <h2>{t('Git リポジトリを開いてください', 'Open a Git repository')}</h2>
+        <h2>{t('Git リポジトリがありません', 'No Git repository')}</h2>
         <p>{status.detail}</p>
       </div>
     );
@@ -474,11 +474,11 @@ function RepositoryPanel({
   const canSync = !!status.remote && !!status.head && !!status.branch;
   const remoteLabel = `${status.remote?.label ?? t('リモート未設定', 'No remote set')} / ${status.remote?.branch ?? ''}`;
   const confirmLabels = {
-    commit: t('この内容を commit', 'Commit these changes'),
-    fetch: t('リモートの状態を取得', 'Fetch remote state'),
-    pull: t('Pull を実行', 'Run pull'),
-    merge: t('履歴の統合を開始', 'Start merging history'),
-    push: t('Push を実行', 'Run push'),
+    commit: t('コミット', 'Commit'),
+    fetch: t('取得', 'Fetch'),
+    pull: t('Pull', 'Pull'),
+    merge: t('統合', 'Merge'),
+    push: t('Push', 'Push'),
   };
   function confirm(action: GitSyncAction) {
     confirmationVersion.current = status!.version;
@@ -658,7 +658,7 @@ function RepositoryPanel({
           aria-label={t('commit メッセージ', 'Commit message')}
           value={message}
           onChange={(e) => messageDraft.setText(e.target.value)}
-          placeholder={t('メッセージを入力してコミット', 'Enter a message and commit')}
+          placeholder={t('メッセージ', 'Message')}
           maxLength={10000}
           disabled={busy || !messageDraft.ready}
           required
@@ -679,7 +679,7 @@ function RepositoryPanel({
           <button
             onClick={() => void Promise.all([messageDraft.retry(), storedResolution.retry()])}
           >
-            {t('下書きの保存を再試行', 'Retry saving the draft')}
+            {t('再試行', 'Retry')}
           </button>
         </div>
       )}
@@ -923,8 +923,8 @@ function RepositoryPanel({
                     {chosen?.conflict
                       ? t('競合', 'Conflict')
                       : selection.staged
-                        ? t('commit に含まれる差分', 'Diff included in the commit')
-                        : t('作業ファイルの差分', 'Diff of the working file')}
+                        ? t('ステージ済み差分', 'Staged diff')
+                        : t('作業差分', 'Working diff')}
                   </span>
                 )}
                 {selection && diff && !chosen?.conflict && (
@@ -945,15 +945,13 @@ function RepositoryPanel({
                             diff.version,
                           ),
                         selection.staged
-                          ? t('commit 対象から外しました。', 'Removed from the commit.')
-                          : t('commit 対象に追加しました。', 'Added to the commit.'),
+                          ? t('ステージから外しました。', 'Unstaged.')
+                          : t('ステージに追加しました。', 'Staged.'),
                       )
                     }
                   >
                     <Icon name={selection.staged ? 'minus' : 'plus'} size={14} />
-                    {selection.staged
-                      ? t('commit 対象から外す', 'Remove from commit')
-                      : t('commit 対象に追加', 'Add to commit')}
+                    {selection.staged ? t('ステージから外す', 'Unstage') : t('ステージ', 'Stage')}
                   </button>
                 )}
                 <button
@@ -982,7 +980,7 @@ function RepositoryPanel({
                 ) : (
                   <div className="git-empty">
                     <Icon name="history" size={32} />
-                    <h2>{t('ノートが変わった道筋を読む', 'Read how the notes have changed')}</h2>
+                    <h2>{t('commit を選ぶ', 'Choose a commit')}</h2>
                   </div>
                 )
               ) : !selection ? (

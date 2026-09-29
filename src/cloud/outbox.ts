@@ -109,7 +109,7 @@ export class CloudOutbox {
       let record = pendingWrite.parse(await readLocalJson(filename, null));
       if (!record.accountId)
         throw Error(
-          t('送信準備にアカウント情報がありません。', 'This pending upload has no account.'),
+          t('送信待ちにアカウント情報がありません。', 'This pending upload has no account.'),
         );
       if (
         record.id !== id ||

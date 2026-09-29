@@ -283,8 +283,8 @@ export class UpdateService {
         status: 'unsupported',
         currentVersion,
         detail: t(
-          `この環境向けのインストール版はまだ公開されていません。現在の配布対象は ${distributedTargets()} です。`,
-          `No installable version for this environment has been published yet. Currently available for ${distributedTargets()}.`,
+          `この環境向けの公開版はまだありません（対応: ${distributedTargets()}）。`,
+          `No published version for this environment yet (supports ${distributedTargets()}).`,
         ),
       };
     }

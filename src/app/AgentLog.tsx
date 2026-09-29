@@ -71,7 +71,7 @@ export function AgentRequest({
     return (
       <div className="request resolved">
         <Icon name="checkCircle" size={13} />
-        {done ? t('回答済み', 'Answered') : t('要求は終了しました', 'The request has ended')}
+        {done ? t('回答済み', 'Answered') : t('終了', 'Ended')}
       </div>
     );
   const target = eventTarget(event.details);
@@ -126,7 +126,7 @@ export function AgentRequest({
           {q.multiple ? (
             <textarea
               aria-label={q.title}
-              placeholder={t('複数の回答は1行ずつ入力', 'Enter multiple answers, one per line')}
+              placeholder={t('1行ずつ入力', 'One per line')}
               value={
                 Array.isArray(answers[q.id])
                   ? (answers[q.id] as string[]).join('\n')

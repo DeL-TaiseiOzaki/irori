@@ -313,10 +313,7 @@ export function SearchPanel({
             {totalHits === 0 && (
               <p className="palette-empty">
                 {incomplete
-                  ? t(
-                      '検索できた範囲に一致する本文はありません。',
-                      'No matching body text within what could be searched.',
-                    )
+                  ? t('検索した範囲に一致なし', 'No matches in the scanned range')
                   : t('一致する本文はありません。', 'No matching body text.')}
               </p>
             )}

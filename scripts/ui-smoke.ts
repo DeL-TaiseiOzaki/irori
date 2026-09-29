@@ -136,7 +136,7 @@ try {
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
-  await page.getByText('表示分類（任意）', { exact: true }).click();
+  await page.getByText('分類', { exact: true }).click();
   await page.getByLabel('スペースの種類').selectOption('team');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
@@ -496,25 +496,25 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
         .toBeGreaterThan(chosenWidth - 12);
       await window.getByRole('button', { name: 'hibachi agent', exact: true }).click();
       await expect(
-        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+        window.getByRole('button', { name: '会話をリセット', exact: true }),
       ).not.toBeVisible();
-      await window.getByLabel('会話と接続の設定', { exact: true }).click();
+      await window.getByRole('button', { name: '会話と接続', exact: true }).click();
       await expect(
-        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+        window.getByRole('button', { name: '会話をリセット', exact: true }),
       ).toBeVisible();
       await window.getByLabel('エージェント', { exact: true }).selectOption('claude');
       if (cycle === 1) {
         await expect(
-          window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+          window.getByRole('button', { name: '会話をリセット', exact: true }),
         ).toBeVisible();
-        await window.getByRole('button', { name: '会話の継続をリセット', exact: true }).click();
+        await window.getByRole('button', { name: '会話をリセット', exact: true }).click();
       }
-      await expect(
-        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
-      ).toHaveCount(0);
+      await expect(window.getByRole('button', { name: '会話をリセット', exact: true })).toHaveCount(
+        0,
+      );
       await window.getByLabel('エージェント', { exact: true }).selectOption('codex');
       await expect(
-        window.getByRole('button', { name: '会話の継続をリセット', exact: true }),
+        window.getByRole('button', { name: '会話をリセット', exact: true }),
       ).toBeVisible();
       if (cycle === 2) await window.screenshot({ path: 'test-results/irori-session-recovery.png' });
       expect(errors).toEqual([]);

@@ -126,11 +126,11 @@ try {
   await writeFile(path.join(root, 'metadata.md'), metadata);
   await page.getByRole('button', { name: 'arrival', exact: true }).click();
   await expect(editor).toContainText('到着点');
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '名前・場所', exact: true }).click();
-  const move = page.getByRole('dialog', { name: 'ノートの名前と場所', exact: true });
-  await expect(move).toContainText('参照元 3 件のノートの 4 件のリンク');
-  await move.getByLabel('ノート名', { exact: true }).fill('到着');
+  const move = page.getByRole('dialog', { name: '名前と場所', exact: true });
+  await expect(move).toContainText('参照元 3 件・リンク 4 件を更新');
+  await move.getByLabel('名前', { exact: true }).fill('到着');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
   const status = page.locator('.status-message');
@@ -161,10 +161,10 @@ try {
   // Moving a page into a folder rewrites its own links so they still lead where they did.
   await page.getByRole('button', { name: 'topic', exact: true }).click();
   await expect(editor).toContainText('出発点');
-  await page.getByRole('button', { name: /^その他（/ }).click();
+  await page.getByRole('button', { name: 'その他', exact: true }).click();
   await page.getByRole('menuitem', { name: '名前・場所', exact: true }).click();
-  await expect(move).toContainText('このノートを参照するリンクはありません。');
-  await move.getByLabel('移動先フォルダ', { exact: true }).fill('wiki');
+  await expect(move).toContainText('参照するリンクなし');
+  await move.getByLabel('移動先', { exact: true }).fill('wiki');
   await move.getByRole('button', { name: '変更する', exact: true }).click();
   await expect(move).toHaveCount(0);
   await expect(status).toContainText('このノート内 2 件のリンクを更新しました。');
