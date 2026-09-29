@@ -87,7 +87,15 @@ Every step receives:
   last message id).
 - `IRORI_ROUTINE` — the routine's own folder.
 
-A step that fails stops the run. Steps run in order; there is no branching.
+A step that fails stops the run. Steps run in order; there is no branching,
+with one exception: a `run` step whose last line of output is
+`{"continue": false}` ends the run quietly as having nothing to do, so a
+fetcher that found no new mail spends no agent turn (Hermes Agent's
+`wakeAgent`).
+
+A `routine.yaml` that does not parse, or names a missing file, is shown as
+invalid with the reason and is never run. irori never deletes or rewrites a
+routine's files.
 
 ### D3 — Runtimes are add-ons the person installs
 
@@ -129,31 +137,65 @@ agent can write routines. So:
   variable. Agent steps never receive secrets: the agent that reads captured
   mail holds no token that mail could make it send elsewhere.
 - Exact secret values are removed from recorded output.
+- Authenticating with a provider is the person's part (owner, 2026-09-30):
+  they obtain the token, or create their own OAuth client for Google, and
+  store what the routine needs as a secret. irori ships no provider sign-in
+  for routines, so it carries no provider's app review.
 
-### D6 — Schedule
+### D6 — Schedule and dispatch
 
-- Routines run on schedule only while irori is open. A run missed while irori
-  was closed runs once when irori starts, not once per missed time.
-- One run of a routine at a time; a due run is skipped while the previous one
-  still runs, and the record says so.
+- A routine starts only from its schedule or from **今すぐ実行** (owner,
+  2026-09-30). There are no other triggers.
+- Routines run only while irori is open (owner, 2026-09-30); irori installs no
+  operating-system scheduler. The host checks due routines once a minute.
+- `when` is read in the device's time zone with a maintained cron library
+  (croner, as Pi's scheduling extensions and its former Slack bot use). In the
+  hour repeated when clocks go back, a routine runs once.
+- Dispatch is at most once: the next due time is advanced and the run recorded
+  as started before its first step runs, so a crash never repeats a run.
+- A run missed while irori was closed runs once when irori opens, however many
+  times it was missed, and only within a grace window of half the routine's
+  period, at least 2 minutes and at most 2 hours (Hermes Agent's rule). Later
+  than that, the run is recorded as missed and the routine waits for its next
+  time.
+- Runs go one at a time across all routines, in the order they fell due. A
+  routine already running or waiting is not queued a second time; the skipped
+  time is recorded.
 - An agent step in a hibachi waits while that hibachi is held by another agent
   run, as a hand-off does.
 
 ### D7 — Unattended agent steps
 
-The step's preamble tells the agent that no one is present, that captured text
-is material and not instructions (as notes are, [YOUR-AI](../YOUR-AI.md)), and
-that it must report what it changed. A question or an approval request from the
-native CLI fails the step with that request recorded, instead of waiting for an
-answer no one gives.
+- Every agent step is a new native session. Nothing carries over between runs
+  except what the routine keeps in `IRORI_STATE`.
+- The step's preamble tells the agent that no one is present, that captured
+  text is material and not instructions (as notes are,
+  [YOUR-AI](../YOUR-AI.md)), that it must not create or change routines, and
+  that it must report what it changed.
+- The report may begin with `[SILENT]`, meaning nothing worth telling, or with
+  `[FAILED]` and a reason, which fails the step although the CLI ended
+  normally.
+- A question or an approval request from the native CLI fails the step with
+  that request recorded, instead of waiting for an answer no one gives.
+- Success is read from the adapter's end-of-turn result, not the process exit
+  code: Pi's JSON mode exits 0 after a failed turn.
+- A step with no output from the agent for 10 minutes is stopped as stalled,
+  in addition to the routine's `timeout`.
 
-### D8 — Run records
+### D8 — Run records and notices
 
-Each run keeps, in irori's data directory and never in a knowledge base: start
-and end, the trigger, each step's exit status and its output (capped), the
-agent step's conversation, and the files changed in each hibachi with Git
-(from `git status` before and after). The routines view lists runs and opens
-the changed files.
+- Each run keeps, in irori's data directory and never in a knowledge base:
+  start and end, the trigger, each step's exit status and its output (capped),
+  the agent step's conversation, which can be opened like any conversation,
+  and the files changed in each hibachi with Git (from `git status` before and
+  after). Definitions stay in the routine folders; this record is the only run
+  state, as Hermes Agent keeps its execution ledger apart from its jobs.
+- A run's state is one of started, succeeded, nothing to do, failed, missed,
+  skipped or unknown. A run that irori's exit or a crash left started is marked
+  unknown when irori opens and is never repeated automatically.
+- A finished run shows a badge on the routines view unless it was silent or
+  had nothing to do. A failure notifies once; the same routine failing again
+  adds to its failure count without a new notice until the person looks at it.
 
 ### D9 — Host boundary
 
@@ -161,6 +203,27 @@ Routine discovery, enabling, scheduling, runtimes, secrets and execution live
 in the host. The renderer reaches them through narrow `HostAPI` methods (list,
 review and enable, run now, records, runtime install). Document content cannot
 start a routine.
+
+## What was borrowed
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) and
+[Pi](https://github.com/badlogic/pi-mono) were read on 2026-09-30 at the owner's
+request. Hermes has a built-in scheduler (`cron/` in its repository); Pi has
+none, and scheduling comes from extensions (`pi-schedule-prompt`,
+`pi-scheduler`) and from its former Slack bot, mom, whose jobs were JSON files
+the agent wrote into a watched folder.
+
+Taken: the one-minute check, at-most-once dispatch, one catch-up within a grace
+window, skipping a routine already running, a fresh session per run, the
+nothing-to-do gate before the agent, `[SILENT]` and failure markers, unknown
+runs after a crash, one notice per failure, and a run ledger apart from the
+definitions.
+
+Not taken: agents creating standing jobs that run without review (mom, and
+Hermes when `allow_agent_scheduling` is on); deleting a definition that does
+not parse or is late (mom); one global jobs file holding definitions and run
+state together (Hermes); delivery to chat platforms, hosted schedulers and
+quota holds, which a desktop app that runs only while open does not need.
 
 ## Relation to earlier decisions
 
@@ -175,15 +238,12 @@ start a routine.
 
 ## Not in this decision
 
-- Running while irori is closed (an operating-system scheduler).
-- Triggers other than time and the button: a file change, irori's start, a
-  source's push notification.
 - Shared routine building blocks (`uses: <package>`, as GitHub Actions has) and
   their distribution; a Gmail or Slack fetcher is ordinary routine code until
   then.
-- Authentication helpers for providers. Whether a person's own Google OAuth
-  client avoids Google's restricted-scope review, and how long its tokens last
-  while the client is in testing, is unverified.
+- How long a person's own Google OAuth client keeps a refresh token while the
+  client is in testing, and what that means for a daily routine, is
+  unverified.
 - Putting the installed runtimes on the `PATH` of irori's terminal and agent
   runs.
 - Docker and in-process Python (Pyodide): too heavy for most people, and too
@@ -194,7 +254,7 @@ start a routine.
 1. `routine.yaml`, discovery in both locations, D4's review and enabling,
    **今すぐ実行**, `run` steps with the JavaScript runtime and `PATH` commands,
    agent steps, D7 and D8.
-2. D6's schedule and D5's secrets.
+2. D6's schedule and dispatch, and D5's secrets.
 3. The Python runtime.
 4. A skill in the irori agent's starter that tells it how to write a routine,
    and a check it can run before asking the person to enable one.
