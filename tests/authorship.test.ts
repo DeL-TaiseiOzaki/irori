@@ -11,7 +11,7 @@ import {
   personLinesChanged,
   personLinesNotice,
 } from '../src/knowledge/authorship';
-import { personLinesSummary } from '../src/domain/knowledge';
+import { personLinesSummary } from '../prompts';
 import { FileService, hash } from '../src/host/files';
 
 const ref = { scopeId: '11111111-2222-3333-4444-555555555555', path: 'Knowledge_Base/note.md' };

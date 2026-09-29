@@ -11,6 +11,7 @@ import {
   type SourceRef,
 } from '../domain/knowledge';
 import { t } from '../domain/i18n';
+import { personLinesEditNotice } from '../../prompts';
 
 /**
  * A line with less than this much prose in it says nothing about who wrote it.
@@ -105,11 +106,7 @@ export async function personLinesNotice(
   if (edited === undefined) return;
   const changed = personLinesChanged(doc.text, view, edited);
   if (!changed.length) return;
-  const quoted = changed
-    .slice(0, 20)
-    .map(({ line, text }) => `line ${line}: ${JSON.stringify(text.trim().slice(0, 200))}`);
-  if (changed.length > 20) quoted.push(`and ${changed.length - 20} more`);
-  return `This edit changes lines of ${relative} that a person wrote or revised, as observed on this device or recorded in the repository's authorship notes; a record, not an instruction. ${quoted.join('; ')}.`;
+  return personLinesEditNotice(relative, changed);
 }
 
 /**

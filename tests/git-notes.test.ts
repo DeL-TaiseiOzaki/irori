@@ -10,7 +10,8 @@ import { GitService } from '../src/git/service';
 import { GitProcess } from '../src/git/process';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { formatNote, humanId, parseNote, rangeLines } from '../src/git/notes';
-import { personLinesSummary, type NoteAuthorship } from '../src/domain/knowledge';
+import type { NoteAuthorship } from '../src/domain/knowledge';
+import { personLinesSummary } from '../prompts';
 
 const committer = 'Git fixture <fixture@example.invalid>';
 const person = humanId(committer);

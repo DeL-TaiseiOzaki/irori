@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { personLinesHeld as held } from '../../prompts';
 
 /** What a file tool call should be told before it runs, or nothing. */
 export type Notice = (tool: string, input: unknown) => Promise<string | undefined>;
@@ -41,8 +42,6 @@ export const IroriPersonLines = async () => ({
 });
 `,
 };
-const held =
-  'The call was held this once so that this is known first; the same call again runs it.';
 
 export async function personLinesBridge(
   dataDir: string,

@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Prompts in one place, 2026-09-30 (**0.1.59**): the owner asked to gather the words irori gives CLI agents
+by situation and to have every mechanism take them from there. They now live in `prompts/` at the
+repository root, one file per situation (the irori agent's handed hibachis and starter Schema, the
+hibachi sub-agent definition and hand-off, selected note, person's lines, comments, sources, skill,
+routine step, refusals), indexed with their order and channel in `prompts/README.md`; `AGENTS.md`
+makes it the rule. The text is unchanged except that Claude Code now hears the same
+"User declined to answer." as Codex. `tests/prompts.test.ts` fails when a prompt file or export is
+missing from the index. Verified with `npm run build`, `npm test` and `xvfb-run -a npm run test:ui`.
+
 Comments, 2026-09-30 (**0.1.58**; [ADR 018](decisions/018-comments.md)): the owner asked to comment
 on any Markdown file and for the irori agent and hibachi agents to read the comments. **コメント** in
 the note's bar (`src/app/NoteComments.tsx`) comments on the selected passage or the whole note;

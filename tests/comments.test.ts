@@ -11,8 +11,13 @@ import {
   readNoteComments,
   removeNoteComment,
 } from '../src/host/comments';
-import { commentsFile, commentsPointer, commentsSummary } from '../src/domain/comments';
-import { brainsCommandPreamble, brainsPreamble } from '../src/domain/you';
+import { commentsFile } from '../src/domain/comments';
+import {
+  brainsCommandPreamble,
+  brainsPreamble,
+  commentsPointer,
+  commentsSummary,
+} from '../prompts';
 import { hostArguments } from '../src/domain/host-requests';
 import { nearest, positionsOf, quoteHead, sourceLineOf } from '../src/editor/search-navigation';
 

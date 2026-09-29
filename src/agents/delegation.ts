@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { handToSubAgent, outsideHibachi, outsideIroriAgent } from '../../prompts';
 
 /**
  * What your AI may reach in one run: its own folder, and the brains handed to
@@ -44,17 +45,12 @@ export function writeDecision(
   if (brain)
     return within(brain.root, absolute)
       ? { allow: true }
-      : {
-          allow: false,
-          reason: `The ${brain.name} hibachi's agent works only inside that hibachi (${brain.root}). Report what else is needed instead.`,
-        };
+      : { allow: false, reason: outsideHibachi(brain) };
   if (within(delegation.you, absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);
   return {
     allow: false,
-    reason: target
-      ? `Hand work in the ${target.name} hibachi to its sub-agent "${target.agent}", which reads that hibachi's Schema first.`
-      : 'The irori agent writes only in its own folder or, through their sub-agents, in the hibachis handed to it.',
+    reason: target ? handToSubAgent(target) : outsideIroriAgent,
   };
 }
 
