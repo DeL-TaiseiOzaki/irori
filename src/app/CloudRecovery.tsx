@@ -31,12 +31,7 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
     try {
       setResult(await window.irori.recoverableCloudWrites());
     } catch {
-      setError(
-        t(
-          '送信準備を読み込めませんでした。端末のデータへのアクセスを確認してください。',
-          'Could not load pending uploads. Check access to the device data.',
-        ),
-      );
+      setError(t('送信準備を読み込めませんでした。', 'Could not load pending uploads.'));
     } finally {
       setBusy(false);
     }
@@ -49,8 +44,8 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
     } catch {
       setError(
         t(
-          '復元できませんでした。保持版と保存先を確認してください。既存ファイルは上書きできません。',
-          'Could not restore. Check the kept version and destination. An existing file cannot be overwritten.',
+          '復元できませんでした（既存のファイルは上書きできません）。',
+          'Could not restore (an existing file cannot be overwritten).',
         ),
       );
     } finally {
@@ -70,25 +65,13 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
             {t('閉じる', 'Close')}
           </button>
         </header>
-        <p>
-          {t(
-            '接続やワークスペースの登録を削除した後も、送信準備として保持した版を別ファイルに復元できます。',
-            'Even after removing a connection or workspace registration, a version kept as a pending upload can be restored to a separate file.',
-          )}
-        </p>
-        <p>
-          {t(
-            '復元後、送信先を確認して準備し直してください。この操作では Drive へ送信しません。',
-            'After restoring, check the destination and prepare it again. This does not send anything to Drive.',
-          )}
-        </p>
         {error && <p role="alert">{error}</p>}
         {!result && busy && <p role="status">{t('読み込み中…', 'Loading…')}</p>}
         {result && result.unreadable > 0 && (
           <p role="alert">
             {t(
-              `読み込めない記録があります（${result.unreadable} 件）。読み込めた記録は復元できます。`,
-              `Some records could not be read (${result.unreadable}). Records that could be read can be restored.`,
+              `読み込めない記録があります（${result.unreadable} 件）。`,
+              `Some records could not be read (${result.unreadable}).`,
             )}
           </p>
         )}

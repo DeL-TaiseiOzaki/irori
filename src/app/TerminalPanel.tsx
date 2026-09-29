@@ -176,7 +176,7 @@ export default function TerminalPanel({ space, onClose }: { space: Space; onClos
           </button>
         )}
         <button
-          title={t('ターミナルのプロセスを終了して閉じる', 'End the terminal process and close it')}
+          title={t('ターミナルを終了して閉じる', 'End and close the terminal')}
           aria-label={t('ターミナルを終了して閉じる', 'End and close the terminal')}
           onClick={onClose}
         >

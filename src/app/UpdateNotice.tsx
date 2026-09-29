@@ -73,10 +73,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
         setError(
           kind === 'update'
             ? message(e)
-            : t(
-                '更新情報を開けませんでした。もう一度お試しください。',
-                'Could not open update information. Please try again.',
-              ),
+            : t('更新情報を開けませんでした。', 'Could not open the update information.'),
         );
     } finally {
       if (alive.current) setBusy('');
@@ -138,9 +135,6 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                   `${install.version} を確認して準備しています`,
                   `Verifying and preparing ${install.version}`,
                 )}
-              </p>
-              <p className="update-notice-version">
-                {t('終わると irori を再起動します。', 'irori will restart once this is done.')}
               </p>
             </>
           )}
@@ -208,10 +202,7 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                       )}
                     </div>
                     <p className="update-notice-version">
-                      {t(
-                        'ダウンロードと確認が終わると、irori を再起動して新しい版を開きます。',
-                        'Once downloading and verification finish, irori will restart into the new version.',
-                      )}
+                      {t('自動で再起動します。', 'Restarts automatically.')}
                     </p>
                   </>
                 ) : (
@@ -229,8 +220,8 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
                     </div>
                     <p className="update-notice-version">
                       {t(
-                        'ブラウザで開きます。取得後、アプリを終了してインストールしてください。',
-                        'Opens in your browser. After downloading, quit the app and install it.',
+                        'ブラウザで開くので、終了してインストールしてください。',
+                        'Opens in your browser; quit the app to install it.',
                       )}
                     </p>
                   </>

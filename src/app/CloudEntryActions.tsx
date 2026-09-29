@@ -176,14 +176,6 @@ export function CloudEntryDialog({
                 required
               />
             </label>
-            {!entry.directory && (
-              <p className="hint">
-                {t(
-                  '拡張子まで含めた名前を入力します。',
-                  'Enter the whole name, including its extension.',
-                )}
-              </p>
-            )}
           </>
         )}
         {action === 'move' && (
@@ -197,24 +189,18 @@ export function CloudEntryDialog({
                 required
               />
             </label>
-            <p className="hint">
-              {t(
-                `${connection} の中にある既存のフォルダを指定します。`,
-                `Specify an existing folder inside ${connection}.`,
-              )}
-            </p>
           </>
         )}
         {action === 'delete' && (
           <p>
             {entry.directory
               ? t(
-                  'このフォルダを Google Drive のゴミ箱に移します。中のファイルとフォルダはそれぞれゴミ箱に入り、Google Drive のゴミ箱から 30 日以内なら元に戻せます。',
-                  "This folder is moved to Google Drive's trash. The files and folders inside reach the trash one by one, and can be restored from Google Drive's trash within 30 days.",
+                  'Google Drive のゴミ箱に移します（30 日以内なら復元可）。',
+                  "Moves the folder to Google Drive's trash (restorable within 30 days).",
                 )
               : t(
-                  'このファイルを Google Drive のゴミ箱に移します。Google Drive のゴミ箱から 30 日以内なら元に戻せます。',
-                  "This file is moved to Google Drive's trash, where it can be restored within 30 days.",
+                  'Google Drive のゴミ箱に移します（30 日以内なら復元可）。',
+                  "Moves the file to Google Drive's trash (restorable within 30 days).",
                 )}
           </p>
         )}

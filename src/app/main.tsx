@@ -192,30 +192,16 @@ function SessionControls({
           ? t('会話の状態を確認中…', 'Checking the conversation state…')
           : session.state === 'saved'
             ? (session.access ?? 'default') === access
-              ? t(
-                  '次の実行で前回の会話を引き継ぎます。履歴はこの端末に保存されます。',
-                  'The next run continues the previous conversation. History is saved on this device.',
-                )
-              : t(
-                  'アクセス設定が変わるため、次の実行で新しい会話を始めます。表示履歴は残ります。',
-                  'Because the access setting changed, the next run starts a new conversation. The displayed history remains.',
-                )
+              ? t('会話を継続します。', 'Continues the conversation.')
+              : t('新しい会話を始めます。', 'Starts a new conversation.')
             : session.state === 'empty'
-              ? t('次の実行で新しい会話を始めます。', 'The next run starts a new conversation.')
+              ? t('新しい会話を始めます。', 'Starts a new conversation.')
               : session.detail}
       </small>
       {session && session.state !== 'empty' && (
-        <>
-          <button disabled={running || resetting} onClick={() => void reset()}>
-            {t('会話の継続をリセット', 'Reset conversation continuation')}
-          </button>
-          <small>
-            {t(
-              'このスペース・エージェントの継続を解除します。ノートと保存した履歴は残ります。',
-              'This clears continuation for this space and agent. Notes and saved history remain.',
-            )}
-          </small>
-        </>
+        <button disabled={running || resetting} onClick={() => void reset()}>
+          {t('会話の継続をリセット', 'Reset conversation continuation')}
+        </button>
       )}
     </div>
   );
@@ -230,10 +216,10 @@ function navigationNotice(target: Navigation, found: boolean) {
       `Selected the ${what} on line ${target.line}.`,
     );
   return t(
-    `${what}を安全に特定できませんでした。ファイルの更新、または表示されない Markdown 記法が含まれる可能性があります。${
+    `${what}を特定できませんでした。${
       target.link ? `${target.line} 行目を確認してください。` : '再検索して確認してください。'
     }`,
-    `Could not safely locate the ${what}. The file may have changed, or it may contain Markdown syntax that isn’t shown. ${
+    `Could not locate the ${what}. ${
       target.link ? `Check line ${target.line}.` : 'Search again to check.'
     }`,
   );
@@ -812,10 +798,7 @@ function App() {
           setBuffer(latest);
           setStatus(
             saved.cloud
-              ? t(
-                  '保存しました。Google Drive へ自動で送信されます。',
-                  'Saved. It is uploaded to Google Drive automatically.',
-                )
+              ? t('保存しました（Drive へ自動送信）', 'Saved (auto-uploaded to Drive)')
               : t('この端末に保存済み', 'Saved on this device'),
           );
         }
@@ -944,8 +927,8 @@ function App() {
     if (active && heldByYou(active.scopeId)) {
       report(
         t(
-          'irori agent が作業中です。終わってからこの hibachi agent に頼んでください。',
-          'The irori agent is working. Ask this hibachi agent after it finishes.',
+          'irori agent が作業中のため、終わってから頼んでください。',
+          'The irori agent is working; ask again after it finishes.',
         ),
       );
       return;
@@ -989,8 +972,8 @@ function App() {
       if (!(await composer.clear(draftRevision)))
         report(
           t(
-            '指示は受け付けられましたが、入力欄の下書きを消去できませんでした。再送信せず、保存を再試行してください。',
-            'The instruction was accepted, but the composer draft could not be cleared. Do not resend; retry saving instead.',
+            '指示は送信済みです。残った下書きは再送信しないでください。',
+            'The instruction was sent. Do not resend the draft left behind.',
           ),
         );
       setFresh(false);
@@ -1188,8 +1171,8 @@ function App() {
             await host.connectCloud(id, connection.mountId).catch(() => {
               setStatus(
                 t(
-                  '接続できないクラウドがあります。「クラウド接続」で確認できます。',
-                  'A cloud could not connect. Check it from "Cloud connection".',
+                  '接続できないクラウドがあります（「クラウド接続」で確認）。',
+                  'A cloud could not connect; check "Cloud connection".',
                 ),
               );
             });
@@ -1680,10 +1663,7 @@ function App() {
                             ));
                           if (!opened)
                             throw Error(
-                              t(
-                                'ノートを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
-                                'Could not open the note. Check the note being edited and the run/connection state.',
-                              ),
+                              t('ノートを開けませんでした。', 'Could not open the note.'),
                             );
                         }}
                       />
@@ -1712,18 +1692,9 @@ function App() {
                           <p className="authorship" role="status">
                             <Icon name="penLine" size={13} />
                             {t(
-                              `人が書いた・直した行: ${personLineCount} 行。`,
-                              `Lines a person wrote or edited: ${personLineCount}.`,
+                              `人が書いた・直した行: ${personLineCount} 行`,
+                              `Lines a person wrote or edited: ${personLineCount}`,
                             )}
-                            {mode === 'source'
-                              ? t(
-                                  '左端の印が該当行です。',
-                                  'The mark on the left edge shows those lines.',
-                                )
-                              : t(
-                                  'ソース表示で行ごとに示します。',
-                                  'Switch to source view to see them line by line.',
-                                )}
                           </p>
                         )}
                         <small>{status}</small>
@@ -1807,10 +1778,6 @@ function App() {
                           <Menu.CheckboxItem
                             checked={editorAssistance}
                             disabled={savingAssistance}
-                            title={t(
-                              '色分け・行番号・折りたたみ・補完などの表示をまとめて切り替えます',
-                              'Toggles syntax highlighting, line numbers, folding, and completion together',
-                            )}
                             onCheckedChange={(next) => {
                               const previous = editorAssistance;
                               setEditorAssistance(next);
@@ -1860,8 +1827,8 @@ function App() {
                   <div className="conflict" role="alert">
                     <strong>
                       {t(
-                        '外部でノートが変更されました。未保存の編集を保持しています。',
-                        'The note changed outside irori. Your unsaved edits are kept.',
+                        '外部でノートが変更されました。編集は保持されています。',
+                        'The note changed outside irori; your edits are kept.',
                       )}
                     </strong>
                     <div className="versions">
@@ -1945,8 +1912,8 @@ function App() {
                         if (!target && cloudRoot?.scopeId !== source.scopeId)
                           throw Error(
                             t(
-                              'この資料のスペースをワークスペースに追加してから開いてください。',
-                              'Add this material’s space to the workspace before opening it.',
+                              '資料のスペースをワークスペースに追加してください。',
+                              'Add this material’s space to the workspace.',
                             ),
                           );
                         const opened = target
@@ -1954,10 +1921,7 @@ function App() {
                           : await openCloud(cloudRoot!, entry);
                         if (!opened)
                           throw Error(
-                            t(
-                              'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
-                              'Could not open the file. Check the note being edited and the run/connection state.',
-                            ),
+                            t('ファイルを開けませんでした。', 'Could not open the file.'),
                           );
                         setView('note');
                       }}
@@ -2133,17 +2097,6 @@ function App() {
                               "Let's expand your thinking from here.",
                             )}
                           </h1>
-                          <p>
-                            {t(
-                              '左のナレッジからノートを開くと、編集を始められます。',
-                              'Open a note from the Knowledge on the left to start editing.',
-                            )}
-                            <br />
-                            {t(
-                              '新しいノートを作ったり、AIと一緒に整理することもできます。',
-                              'You can also create a new note or organize it together with AI.',
-                            )}
-                          </p>
                           <div className="welcome-actions">
                             <ArrowFillButton
                               disabled={!active || running || connecting}
@@ -2172,12 +2125,6 @@ function App() {
                               {t('KBフォルダを開く', 'Open a KB folder')}
                             </button>
                           </div>
-                          <p className="hint">
-                            {t(
-                              'Markdown ファイルは、あなたのフォルダに保存されます。',
-                              'Markdown files are saved to your folder.',
-                            )}
-                          </p>
                         </div>
                       )
                     )}
@@ -2388,8 +2335,8 @@ function App() {
                   {agentInfo?.available === false && (
                     <p className="agent-connection-error" role="alert">
                       {t(
-                        'CLI が見つかりません。インストールとネイティブログインを確認してください。',
-                        'The CLI was not found. Check the installation and native login.',
+                        'CLI が見つかりません（インストールとログインを確認）。',
+                        'The CLI was not found; check the installation and login.',
                       )}
                     </p>
                   )}
@@ -2406,10 +2353,7 @@ function App() {
                   )}
                   {historyTruncated && (
                     <div className="hint">
-                      {t(
-                        '保存上限により、古い履歴や長い出力の一部を省略しています。',
-                        'Older history and part of long output are omitted due to the save limit.',
-                      )}
+                      {t('一部の履歴を省略しています。', 'Some history is omitted.')}
                     </div>
                   )}
                   <div
@@ -2469,12 +2413,7 @@ function App() {
                           {t(`送信待ち ${queued.length} 件`, `${queued.length} pending`)}
                         </strong>
                         {queuePaused && (
-                          <p>
-                            {t(
-                              '送信待ちはこの端末に保存されています。内容を確認して再開してください。',
-                              'Pending sends are saved on this device. Review them and resume.',
-                            )}
-                          </p>
+                          <p>{t('送信待ちを保存しています。', 'Pending sends saved.')}</p>
                         )}
                         {queued.map((item) => (
                           <div key={item.id}>
@@ -2523,8 +2462,8 @@ function App() {
                       <p className="agent-held" role="status">
                         <Icon name="sparkles" size={13} />
                         {t(
-                          'irori agent がこの hibachi にも仕事を渡しています。終わるまでこの hibachi agent は待機します。',
-                          'The irori agent is handing work to this hibachi too. This hibachi agent waits until it finishes.',
+                          'irori agent がこの hibachi でも作業中のため待機します。',
+                          'Waiting: the irori agent is also working in this hibachi.',
                         )}
                       </p>
                     )}
@@ -2670,7 +2609,7 @@ function App() {
                               disabled={sending || gitBusy}
                             />
                           )}
-                          <label className="composer-pill" title={agentAccessDetail(agent, access)}>
+                          <label className="composer-pill">
                             <Icon name="shield" size={13} />
                             <select
                               aria-label={t('エージェントのアクセス', 'Agent access')}
@@ -2708,10 +2647,6 @@ function App() {
                           {personLinesOffered && (
                             <label
                               className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}
-                              title={t(
-                                '開いているノートで、人が書いた・直した行をエージェントに伝えます',
-                                'Tells the agent which lines in the open note a person wrote or edited',
-                              )}
                             >
                               <input
                                 type="checkbox"
@@ -2805,10 +2740,7 @@ function App() {
                       </small>
                     ))}
                     <small id="agent-access-detail" className="muted access-detail" role="status">
-                      {t(
-                        `${agentAccessDetail(agent, access)} 次に送る指示に適用します。 この KB の contents に編集可で接続した Google Drive フォルダは、エージェントも変更できます。`,
-                        `${agentAccessDetail(agent, access)} Applies to the next instruction sent. Google Drive folders connected as editable in this KB's contents can be changed by agents too.`,
-                      )}
+                      {agentAccessDetail(agent, access)}
                     </small>
                   </div>
                 </aside>
@@ -2914,8 +2846,8 @@ function App() {
                 (next
                   ? t('ノートの場所を変更しました。', 'The note has moved.')
                   : t(
-                      'ノートを復元用に保管しました。「削除したノートを復元」から戻せます。',
-                      'The note is kept for restoring. Bring it back from "Restore deleted notes".',
+                      '削除しました（「削除したノートを復元」から戻せます）。',
+                      'Deleted (restore it from "Restore deleted notes").',
                     )),
             );
           }}
@@ -2948,13 +2880,7 @@ function App() {
               },
               { query, line: hit.line, preview: hit.preview },
             );
-            if (!opened)
-              throw Error(
-                t(
-                  'ファイルを開けませんでした。編集中のノートや実行・接続の状態を確認してください。',
-                  'Could not open the file. Check the note being edited and the run/connection state.',
-                ),
-              );
+            if (!opened) throw Error(t('ファイルを開けませんでした。', 'Could not open the file.'));
             setSearchOpen(false);
           }}
           onClose={() => setSearchOpen(false)}
@@ -3110,8 +3036,8 @@ function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
       <h1>{t('画面の描画でエラーが発生しました', 'The screen failed to render')}</h1>
       <p>
         {t(
-          '保存済みのノートには影響しません。未保存の編集は失われることがあります。再表示しても直らない場合は、アプリを再起動してください。',
-          'Saved notes are unaffected. Unsaved edits may be lost. If re-displaying does not fix it, restart the app.',
+          '未保存の編集は失われることがあります（保存済みのノートは影響しません）。',
+          'Unsaved edits may be lost (saved notes are unaffected).',
         )}
       </p>
       <pre>{String(error)}</pre>

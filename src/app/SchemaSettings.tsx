@@ -545,22 +545,6 @@ function InstructionsForm({
         });
       }}
     >
-      <p className="muted">
-        {!space
-          ? t(
-              'irori agent が毎回最初に読む指示です（AGENTS.md）。',
-              'What the irori agent reads first, every time (AGENTS.md).',
-            )
-          : target.key === instructionsFile || (!target.key && !folder)
-            ? t(
-                'この hibachi の hibachi agent が毎回最初に読む指示です（AGENTS.md）。',
-                "What this hibachi's hibachi agent reads first, every time (AGENTS.md).",
-              )
-            : t(
-                'このフォルダで作業するときに AI が読む指示です。',
-                'What the AI reads when it works in this folder.',
-              )}
-      </p>
       {!target.key && (
         <label className="schema-field">
           <span>{t('場所', 'Location')}</span>
@@ -646,12 +630,6 @@ function RuleForm({ scopeId, target, disabled, run, onSelect, onDelete }: FormPr
         });
       }}
     >
-      <p className="muted">
-        {t(
-          'Claude Code がこの hibachi で常に守るルールです（.claude/rules/）。',
-          'Rules Claude Code always follows in this hibachi (.claude/rules/).',
-        )}
-      </p>
       <label className="schema-field">
         <span>{t('ファイル名', 'File name')}</span>
         <input
@@ -709,8 +687,8 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
     if (JSON.stringify(readHooks(file?.text)) !== JSON.stringify(data.hooks))
       throw Error(
         t(
-          'CONFLICT: .claude/settings.json が変更されています。開き直して確認してください。',
-          'CONFLICT: .claude/settings.json has changed. Open it again and check.',
+          'CONFLICT: .claude/settings.json が変更されています。',
+          'CONFLICT: .claude/settings.json has changed.',
         ),
       );
     await host.writeSchemaFile(
@@ -747,12 +725,6 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
         });
       }}
     >
-      <p className="muted">
-        {t(
-          'Claude Code が決まった時点で実行するコマンドです（.claude/settings.json の hooks）。他の CLI のフックはまだ扱いません。',
-          'A command Claude Code runs at a set moment (hooks in .claude/settings.json). Other CLIs’ hooks are not handled yet.',
-        )}
-      </p>
       <label className="schema-field">
         <span>{t('タイミング', 'Event')}</span>
         <select
@@ -778,10 +750,7 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
           onChange={(change) => setMatcher(change.target.value)}
         />
         <small>
-          {t(
-            'ツール名の正規表現。空欄はすべてに一致します。',
-            'A regular expression of tool names; empty matches everything.',
-          )}
+          {t('ツール名の正規表現（空欄で全一致）', 'Regex of tool names (empty = all)')}
         </small>
       </label>
       {editable ? (
@@ -869,12 +838,6 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
           });
         }}
       >
-        <p className="muted">
-          {t(
-            'AI に頼むときに選べる手順です（.agents/skills/ に保存。Codex・OpenCode・Pi も読みます）。',
-            'A procedure you can choose when asking the AI (kept in .agents/skills/; Codex, OpenCode and Pi read it too).',
-          )}
-        </p>
         <label className="schema-field">
           <span>{t('名前', 'Name')}</span>
           <input
@@ -887,8 +850,8 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
           />
           <small>
             {t(
-              '半角の小文字・数字・ハイフン。名前を変えるとフォルダも変わります。',
-              'Lowercase letters, digits and hyphens. Renaming also renames the folder.',
+              '半角小文字・数字・ハイフン（変更でフォルダも変わります）',
+              'Lowercase letters, digits and hyphens (renaming also renames the folder)',
             )}
           </small>
         </label>
@@ -901,12 +864,7 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
             maxLength={400}
             onChange={(event) => change({ description: event.target.value })}
           />
-          <small>
-            {t(
-              'スキルの一覧で名前の横に出ます。400 文字まで。',
-              'Shown beside the name in the skill list; up to 400 characters.',
-            )}
-          </small>
+          <small>{t('400 文字まで', 'Up to 400 characters')}</small>
         </label>
         <TextField
           label={t('手順（Markdown）', 'Instructions (Markdown)')}
@@ -948,14 +906,7 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
           run={run}
           onDelete={onDelete}
         />
-      ) : (
-        <p className="hint">
-          {t(
-            'スキルを作成すると、スクリプトやテンプレートなどのファイルを添付できます。',
-            'Once the skill exists, you can attach files such as scripts and templates.',
-          )}
-        </p>
-      )}
+      ) : null}
     </>
   );
 }
@@ -1035,12 +986,6 @@ function Attachments({
           {t('ファイルを追加', 'Add a file')}
         </button>
       </div>
-      <p className="muted">
-        {t(
-          '手順から相対パスで参照できます（例: scripts/run.py）。',
-          'The instructions can refer to them by relative path (for example scripts/run.py).',
-        )}
-      </p>
       {files.length ? (
         <ul className="schema-files">
           {files.map((file) => (

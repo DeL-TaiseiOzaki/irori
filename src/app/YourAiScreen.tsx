@@ -164,10 +164,7 @@ function FileView({ path, reads }: { path: string; reads: number }) {
         <span className="you-stage-space" />
         <span
           className="you-stage-note"
-          title={t(
-            'ファイルとしては読むだけです。指示・スキル・ルール・フックは Schema の設定で編集できます。',
-            'Files are read-only here. Edit the instructions, skills, rules and hooks in the Schema settings.',
-          )}
+          title={t('Schema の設定で編集できます。', 'Edit in the Schema settings.')}
         >
           <Icon name="lock" size={12} />
           {t('読み取り専用', 'Read-only')}
@@ -312,13 +309,7 @@ export function YourAiScreen({
             </span>
           </div>
           <div className="you-chips">
-            <span
-              className="you-chip"
-              title={t(
-                `irori agent は ${agentNames[agent]} で動きます`,
-                `The irori agent runs in ${agentNames[agent]}`,
-              )}
-            >
+            <span className="you-chip">
               <Icon name="sparkles" size={13} />
               {agentNames[agent]}
             </span>
@@ -448,42 +439,14 @@ export function YourAiScreen({
           {chosenAgent?.definitions.map((file) => (
             <Definition key={file.path} file={file} reads={reads} />
           ))}
-          {chosenAgent &&
-            hasSubAgents(agent) &&
-            !chosenAgent.definitions.some((file) => file.cli === agent) && (
-              <p className="you-definition-note">
-                {t(
-                  `irori agent が ${chosenAgent.name} に初めて仕事を渡すとき、irori が ${subAgentFiles[agent](chosenAgent.agent)} を書きます。`,
-                  `irori writes ${subAgentFiles[agent](chosenAgent.agent)} when the irori agent first hands work to ${chosenAgent.name}.`,
-                )}
-              </p>
-            )}
-          {!hasSubAgents(agent) && (
-            <p className="you-later">
-              <Icon name="info" size={13} />
-              {t(
-                `${agentNames[agent]} はサブエージェントをファイルから読みません。irori agent は hibachi コマンド（hibachi <名前> "<作業>"）で各 hibachi の hibachi agent に仕事を渡します。`,
-                `${agentNames[agent]} loads no sub-agents from files. The irori agent hands work to each hibachi's hibachi agent with the hibachi command (hibachi <name> "<task>").`,
-              )}
-            </p>
-          )}
         </div>
         <footer className="you-update">
           <p className="you-update-state" role="status">
             {running && (
               <>
                 <Icon name="loader" size={12} className="you-spin" />
-                {t(
-                  'irori agent が作業中です。終わると、フォルダと定義を読み直します。',
-                  'The irori agent is working. The folder and the definitions are read again when it finishes.',
-                )}
+                {t('作業中…', 'Working…')}
               </>
-            )}
-          </p>
-          <p className="you-update-hint">
-            {t(
-              'hibachi ごとの定義（.claude/agents・.codex/agents・.opencode/agents）は、irori agent の CLI に合わせて、ファイルがないときだけ irori が書きます。既存の定義は上書きしないので、編集できます。',
-              "irori writes each hibachi's definition for the irori agent's CLI (.claude/agents, .codex/agents, .opencode/agents) only where the file is missing. It never overwrites one, so you can edit them.",
             )}
           </p>
         </footer>

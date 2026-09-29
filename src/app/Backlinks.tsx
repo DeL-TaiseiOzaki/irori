@@ -9,17 +9,15 @@ import { errorText } from './ErrorMessage';
 const host = window.irori;
 
 /**
- * The notes of this KB whose links lead to `path`. The list shows the same scan
- * as the count on the button: one look at the KB, so neither answer cancels
- * the other, and it follows the KB's changes with the count.
+ * The notes of this KB whose links lead to the note. The list shows the same
+ * scan as the count on the button: one look at the KB, so neither answer
+ * cancels the other, and it follows the KB's changes with the count.
  */
 function BacklinksList({
-  path,
   result,
   error: failure,
   onOpen,
 }: {
-  path: string;
   result?: KnowledgeSearch;
   error?: string;
   onOpen: (hit: SearchHit) => Promise<void>;
@@ -42,12 +40,6 @@ function BacklinksList({
   }
   return (
     <>
-      <p className="muted backlinks-lead">
-        {t(
-          `${path} にリンクしている、この KB のノートです。`,
-          `Notes in this KB that link to ${path}.`,
-        )}
-      </p>
       {error && (
         <p className="search-error" role="alert">
           {error}
@@ -65,10 +57,7 @@ function BacklinksList({
         <section aria-label={t('リンク元の一覧', 'List of backlinks')}>
           {result.incomplete && (
             <p className="search-notice">
-              {t(
-                '確認できた範囲の結果です。上限または読めないファイルにより、すべてのノートを確認できていません。',
-                'These are the results within what could be checked. A limit or unreadable files meant not every note could be checked.',
-              )}
+              {t('一部確認できていません。', 'Some notes could not be checked.')}
             </p>
           )}
           {!result.hits.length && (
@@ -140,7 +129,6 @@ export function Backlinks({
               </Popover.Close>
             </div>
             <BacklinksList
-              path={path}
               result={read.data}
               error={read.error}
               onOpen={async (hit) => {

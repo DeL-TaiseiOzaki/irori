@@ -346,10 +346,7 @@ export function BrainSettings({
                   }}
                 />
                 <small>
-                  {t(
-                    'PNG・JPEG・GIF・WebP、2 MB まで。.irori に保存されます。',
-                    'PNG, JPEG, GIF or WebP up to 2 MB, kept in .irori.',
-                  )}
+                  {t('PNG・JPEG・GIF・WebP、2 MB まで', 'PNG, JPEG, GIF or WebP, up to 2 MB')}
                 </small>
               </label>
             )}
@@ -385,13 +382,6 @@ export function BrainSettings({
           )}
         </div>
         <footer className="brain-sheet-footer">
-          <Icon name="users" size={14} />
-          <span>
-            {t(
-              'この hibachi を使う全員に同じ見た目で表示（.irori/scope.json に保存）',
-              'Everyone who uses this hibachi sees the same look (kept in .irori/scope.json)',
-            )}
-          </span>
           <span className="brain-sheet-space" />
           <button type="button" className="stage-text-button" disabled={saving} onClick={onClose}>
             {t('キャンセル', 'Cancel')}

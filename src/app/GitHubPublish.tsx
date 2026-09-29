@@ -72,8 +72,8 @@ export function PublishFields({
       {nameIssue && (
         <p className="muted" role="alert">
           {t(
-            'リポジトリ名には英数字・「-」「_」「.」を使えます（末尾の .git は不可）。',
-            'A repository name may use letters, digits, "-", "_" and "." (not ending in .git).',
+            '使える文字は英数字・「-」「_」「.」（末尾 .git 不可）。',
+            'Use letters, digits, "-", "_" and "." (not ending in .git).',
           )}
         </p>
       )}
@@ -92,18 +92,9 @@ export function PublishFields({
       </label>
       {value.visibility === 'public' && (
         <p className="muted" role="note">
-          {t(
-            '公開リポジトリは誰でも閲覧できます。ノートに個人情報や社外秘が含まれていないか確認してください。',
-            'Anyone can read a public repository. Check that no personal or confidential notes are included.',
-          )}
+          {t('公開リポジトリは誰でも閲覧できます。', 'Anyone can read a public repository.')}
         </p>
       )}
-      <p className="muted">
-        {t(
-          'GitHub CLI（gh）のログインを使って GitHub にリポジトリを作成し、origin に設定して現在のブランチを送信します。contents（クラウド資料）は送信しません。',
-          'Uses your GitHub CLI (gh) sign-in to create the repository on GitHub, sets it as origin and sends the current branch. contents (cloud materials) are not sent.',
-        )}
-      </p>
     </fieldset>
   );
 }

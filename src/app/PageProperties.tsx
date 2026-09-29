@@ -186,8 +186,8 @@ export function PageProperties({
       {auto.length > 0 && !declared?.actor && !readOnly && (
         <p className="properties-hint">
           {t(
-            'Git のメールアドレス（user.email）が未設定なので、保存しても最終更新者は記録されません。',
-            'Git user.email is not set, so saving does not record who changed the page last.',
+            'Git user.email が未設定のため、最終更新者は記録されません。',
+            'Git user.email is not set, so the last editor is not recorded.',
           )}
         </p>
       )}

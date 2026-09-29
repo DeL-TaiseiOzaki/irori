@@ -26,12 +26,7 @@ function linkNotice(update: LinkUpdate) {
           ` Notes that could not be updated: ${update.skipped.join(', ')}.`,
         )
       : '',
-    update.incomplete
-      ? t(
-          '上限または読めないファイルにより、すべての参照元を確認できていません。',
-          ' A limit or unreadable files meant not every referring note could be checked.',
-        )
-      : '',
+    update.incomplete ? t(' 一部確認できていません。', ' Some notes could not be checked.') : '',
   ].join('');
 }
 
@@ -131,10 +126,7 @@ export function NoteActionDialog({
       ? t('ノートの名前と場所', 'Note name and location')
       : t('ノートを削除', 'Delete note');
   const linksHint = !links
-    ? t(
-        '参照元のリンクは更新しません。相対リンクを含むノートは同じフォルダで名前を変更してください。',
-        'Referring links will not be updated. If this note contains relative links, rename it within the same folder.',
-      )
+    ? t('参照元のリンクは更新しません。', 'Referring links will not be updated.')
     : !referring
       ? t('参照元のリンクを調べています…', 'Checking referring links…')
       : 'error' in referring
@@ -145,22 +137,14 @@ export function NoteActionDialog({
         : t(
             `${
               referring.notes
-                ? `参照元 ${referring.notes} 件のノートにある ${referring.links} 件のリンクと、`
+                ? `参照元 ${referring.notes} 件のノートの ${referring.links} 件のリンクを更新します。`
                 : 'このノートを参照するリンクはありません。'
-            }このノート内の相対リンクを移動先に合わせて更新します。${
-              referring.incomplete
-                ? '上限または読めないファイルにより、すべての参照元を確認できていません。'
-                : ''
-            }`,
+            }${referring.incomplete ? ' 一部確認できていません。' : ''}`,
             `${
               referring.notes
-                ? `The ${referring.links} links in ${referring.notes} referring notes and this note's relative links`
-                : "No links refer to this note. This note's relative links"
-            } will be updated to match the destination.${
-              referring.incomplete
-                ? ' A limit or unreadable files meant not every referring note could be checked.'
-                : ''
-            }`,
+                ? `Updates ${referring.links} links in ${referring.notes} referring notes.`
+                : 'No links refer to this note.'
+            }${referring.incomplete ? ' Some could not be checked.' : ''}`,
           );
   return (
     <Dialog label={dialogLabel} busy={busy} onClose={close}>
@@ -192,12 +176,6 @@ export function NoteActionDialog({
                 disabled={busy}
               />
             </label>
-            <p className="hint">
-              {t(
-                '同じスペース内の既存フォルダを指定します。空欄はスペース直下です。',
-                'Specify an existing folder within the same space. Leave it blank for the top of the space.',
-              )}
-            </p>
             <label>
               <input
                 type="checkbox"
@@ -207,21 +185,10 @@ export function NoteActionDialog({
               />{' '}
               {t('リンクも更新する', 'Also update links')}
             </label>
-            <p className="hint">
-              {linksHint}{' '}
-              {t(
-                '本文のリンクと frontmatter の関係・出典が対象です。irori で貼り付けた画像は移動先にも保持します。',
-                'This covers links in the body and the relationship/source in frontmatter. Images pasted in irori are kept at the destination too.',
-              )}
-            </p>
+            <p className="hint">{linksHint}</p>
           </>
         ) : (
-          <p>
-            {t(
-              'この端末の「削除済みノート」から復元できます。画像ファイルは残ります。このノートへのリンクは更新しません。',
-              'You can restore this from "Deleted notes" on this device. Image files are kept. Links to this note are not updated.',
-            )}
-          </p>
+          <p>{t('削除済みノートから復元できます。', 'You can restore it from Deleted notes.')}</p>
         )}
         {error && <p role="alert">{error}</p>}
         <div className="actions">
@@ -284,12 +251,6 @@ export function TrashNotes({
     <Dialog label={t('削除済みノート', 'Deleted notes')} busy={busy} onClose={onClose}>
       <div className="modal">
         <h2>{t('削除済みノート', 'Deleted notes')}</h2>
-        <p>
-          {t(
-            'この端末で削除したノートを元の場所に戻します。同じ場所にファイルがある場合は復元できません。',
-            'Restores notes deleted on this device to their original location. It cannot restore one if a file already exists there.',
-          )}
-        </p>
         {error && <p role="alert">{error}</p>}
         {loading ? (
           <p role="status">{t('読み込み中…', 'Loading…')}</p>
