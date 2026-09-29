@@ -1,6 +1,6 @@
 # File viewer libraries
 
-> **Last Updated**: 2026-09-26
+> **Last Updated**: 2026-09-30
 > **Version Checked**: pdfjs-dist 6.3.289, docx-preview 0.4.1, @jvmr/pptx-to-html 1.1.2, xlsx (SheetJS) 0.20.3
 
 ## Overview
@@ -12,6 +12,13 @@ the 100 MiB limit, and resolves the path with the same scope and Drive checks
 as the editor. Each format's library runs in the sandboxed renderer and is
 loaded only when a file of that format is opened (`src/app/viewers/`).
 Nothing is written back; editing stays in the external application.
+
+These viewers stay view-only by the owner's decision (2026-09-30): people do not
+edit Office files in irori, and agents keep creating and changing them with
+their own tools. An in-app editor is not planned. SheetJS Community Edition
+drops styles, charts and images when it writes a workbook, no maintained
+JavaScript library edits an existing `.pptx`, and the full office suites that
+embed in a page (OnlyOffice, Collabora) are AGPL.
 
 | Format | Extensions | Library | Output |
 | --- | --- | --- | --- |
