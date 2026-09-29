@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+Current development, 2026-09-29: **0.1.54 is published** as
+[v0.1.54-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.54-preview.1)
+(#125; release run `36530029192` from main CI `36529091919` at `f46a187`). A knowledge
+page's frontmatter now opens as properties above the note, driven by the KB's optional
+`.property/property.json`, and saving records the person as the last change
+([ADR 015](decisions/015-page-properties.md) stage 1). Next: stage 2 pickers for files,
+sources and relations, **確認済みにする**, tag suggestions; stage 3 new page from a type.
+Not yet tried with Japanese IME on an installed Windows or Mac build.
+
 Current development, 2026-09-28: **0.1.53 is published** as
 [v0.1.53-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.53-preview.1)
 (#122; release run `36428007641` from main CI `36426700197` at `d54aae9`). A hibachi
