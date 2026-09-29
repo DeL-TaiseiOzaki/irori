@@ -1,15 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Published 2026-09-28: #122 (**0.1.53**) is merged at the owner's word ("マージして公開して")
-and published as
-[v0.1.53-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.53-preview.1)
-by release run `36428007641` from main's CI run `36426700197` (source `d54aae9`).
-The release carries Windows 202,679,296 bytes, Mac 170,128,671 bytes and
-`irori-0.1.53-full.nupkg` 202,039,339 bytes; anonymous downloads matched
-`SHA256SUMS.txt`.
+Published 2026-09-29: #125 (**0.1.54**, page properties) is merged at the owner's word
+("同じ字で公開してください") and published as
+[v0.1.54-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.54-preview.1)
+by release run `36530029192` from main's CI run `36529091919` (source `f46a187`).
+The release carries Windows 202,713,600 bytes, Mac 170,175,782 bytes and
+`irori-0.1.54-full.nupkg` 202,074,276 bytes; anonymous downloads matched
+`SHA256SUMS.txt`. #124 (the design record alone) was closed as carried by #125.
 
-Page properties, 2026-09-29 (branch `feat/page-properties`, not yet merged;
-**0.1.54**; [ADR 015](decisions/015-page-properties.md) stage 1): the owner asked for
+Page properties, 2026-09-29 (**0.1.54**; [ADR 015](decisions/015-page-properties.md) stage 1): the owner asked for
 Notion-like properties above a knowledge page instead of hand-written YAML
 frontmatter. Every Markdown page of the knowledge layer except `index.md` now opens
 with its title and description as the heading and one row per property
@@ -26,6 +25,14 @@ does not loop. Verified with `npm run build`, `npm test` (new
 `scripts/properties-ui-smoke.ts`). Not done: pickers for `resource`, `sources` and
 `relations`, **確認済みにする**, tag suggestions, a new page from a type (stages 2
 and 3), and native IME in the property fields.
+
+Published 2026-09-28: #122 (**0.1.53**) is merged at the owner's word ("マージして公開して")
+and published as
+[v0.1.53-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.53-preview.1)
+by release run `36428007641` from main's CI run `36426700197` (source `d54aae9`).
+The release carries Windows 202,679,296 bytes, Mac 170,128,671 bytes and
+`irori-0.1.53-full.nupkg` 202,039,339 bytes; anonymous downloads matched
+`SHA256SUMS.txt`.
 
 Make a hibachi here and publish it, 2026-09-28 (**0.1.53**): the owner asked for the reverse of cloning — a hibachi
 made in the app that becomes a GitHub repository. **hibachi を追加 → 新しく作成**
