@@ -71,10 +71,10 @@ registration or a successful local build alone.
 
 ## Google ownership verification after site activation
 
-The owner supplied the Search Console TXT value; no matching apex TXT was
-visible at the latest external check. DNS insertion and the Console verification
-result remain pending. Keep the generated value in the registrar/Console flow,
-not application configuration.
+The owner added the Search Console TXT record. A fresh Google DNS response
+returns the exact supplied value at the apex. Search Console ownership
+confirmation remains pending; public DNS visibility alone is not that result.
+Retain the record in DNS, not application configuration.
 
 The Google Cloud project Owner opens Search Console, adds **Domain Property**
 `irori-ai.com` (not a URL-prefix property), and adds the generated

@@ -13,8 +13,8 @@ download targets, both languages, canonical metadata and search. GitHub still re
 HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. Domain
 provisioning was restarted after the DNS repair per GitHub's documented steps.
 [DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
-The owner supplied a Google Domain Property TXT value; it is not yet visible
-in public DNS and Console ownership confirmation is pending.
+The owner added the Google Domain Property TXT record; a fresh Google DNS
+response matches the supplied value. Console ownership confirmation is pending.
 The published desktop remains 0.1.61. Google readiness is separate draft
 [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
 or verification setting has changed.
