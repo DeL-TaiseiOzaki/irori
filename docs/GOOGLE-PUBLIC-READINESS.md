@@ -7,18 +7,17 @@ Search Console, OAuth audience or verification settings have been changed.
 
 Owner-confirmed facts, 2026-09-30: publisher **Taisei Ozaki**, public contact
 **taisei.ozaki.lab@gmail.com**, Google audience **External**, publishing status
-**Testing**, and **no owned domain yet**. Project ID and verification status
-have not been supplied. These are the owner's reported settings, not a Console
+**Testing**, and registration of **irori-ai.com**. Project ID and verification
+status have not been supplied. These are the owner's reported settings, not a Console
 inspection. The implementation and native checks passed in
 [PR #146 CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
 at source `2d596ed`; the PR remains draft and no preview has been published.
 
-The owner selected `getirori.dev` as the first candidate, then asked about
-`irori-ai.com` as an alternative. Both were absent from their official registry
-RDAP records on 2026-09-30; this is not a reservation, checkout availability or
-price guarantee. No domain has been purchased. Either suffix is suitable for
-the website/domain-verification workflow; keep the deployed site's current
-domain until registration and ownership verification are complete.
+The owner registered `irori-ai.com` after considering `getirori.dev`. Registrar
+account access, DNS activation, GitHub Pages cutover and Google Domain Property
+verification remain pending. Website-only cutover work is on the independent
+`docs/custom-domain` branch; do not merge the application candidate merely to
+change the public site's domain. Registration alone is not live-site evidence.
 
 ## Preserve the current features
 
@@ -67,27 +66,27 @@ Do not claim a desktop-only exemption while keeping those features.
 | Audience | External (owner-reported current value). |
 | Publishing status | Testing (owner-reported current value); move to production at the verification stage, without claiming unlimited approved access. |
 | Scope | `https://www.googleapis.com/auth/drive` |
-| Authorized domain | `<OWNED-DOMAIN>` after registration and DNS Domain Property verification. |
-| Homepage | `https://<OWNED-DOMAIN>/` after deployment. |
-| Privacy | `https://<OWNED-DOMAIN>/docs/en/privacy/` after final policy review/deployment. |
-| Terms | `https://<OWNED-DOMAIN>/docs/en/terms/` after final review/deployment. |
+| Authorized domain | `irori-ai.com` after DNS Domain Property verification. |
+| Homepage | `https://irori-ai.com/` after deployment. |
+| Privacy | `https://irori-ai.com/docs/en/privacy/` after final policy review/deployment. |
+| Terms | `https://irori-ai.com/docs/en/terms/` after final review/deployment. |
 
-The domain URLs are templates, not live links. Use the existing GitHub Pages
-hosting; buying a separate web-hosting service is unnecessary for this static
+The domain URLs are intended deployment targets, not confirmed live links. Use
+the existing GitHub Pages hosting; buying a separate web-hosting service is unnecessary for this static
 site. At cutover, update the documented canonical/alternate/sitemap and download
 site URLs, configure Pages and DNS, verify HTTPS and retest both locale paths.
 Do not point OAuth Branding to a domain that has not been acquired and verified.
 
 ### Registration and DNS handoff
 
-The owner registers the final domain in their own registrar account and confirms
-the exact checkout and renewal prices. There is no connected registrar account
-or payment capability in this workspace; the implementation has performed only
-read-only availability lookups. Do not request account passwords or payment
-details in chat. [Porkbun](https://porkbun.com/products/domains) is a candidate,
-not an account already created or a purchase already authorized/completed.
+The owner has registered `irori-ai.com` in their own registrar account. Confirm
+the registrar and authoritative DNS provider before giving provider-specific
+instructions. There is no connected registrar account or payment capability in
+this workspace; the implementation has performed only read-only registry, DNS
+and Pages lookups. Registration was completed by the owner. Do not request
+account passwords or payment details in chat.
 
-After registration, use the actual domain for these steps:
+Use `irori-ai.com` for these steps:
 
 1. Verify it in the owner's GitHub account Settings → Pages using GitHub's
    generated TXT record. Keep that record. Then set the repository Pages custom

@@ -3,7 +3,7 @@ title: Privacy and data handling
 description: Understand where notes, Google Drive files, credentials, and AI conversations are stored or sent.
 ---
 
-> **Review draft.** Publisher and contact details are confirmed. Final policy wording, effective date, owned domain, and Google's review remain pending. This page is public-release preparation; it is not a statement that Google has approved irori.
+> **Review draft.** Publisher and contact details are confirmed. Final policy wording, effective date, domain setup, and Google's review remain pending. This page is public-release preparation; it is not a statement that Google has approved irori.
 
 ## Your notes and local data
 
