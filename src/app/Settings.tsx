@@ -193,6 +193,13 @@ export function Settings({
               <Icon name="cloudUp" size={14} />
               {t('送信待ちを復元', 'Restore pending uploads')}
             </button>
+            <button
+              type="button"
+              className="settings-link"
+              onClick={() => void host.resetDataConsent().catch(onError)}
+            >
+              {t('データ利用を確認し直す', 'Reset data use confirmations')}
+            </button>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

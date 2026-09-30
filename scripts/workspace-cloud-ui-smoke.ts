@@ -16,6 +16,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { KnowledgeStore } from '../src/knowledge/store';
+import { seedDataConsent, createCloudFixtureLauncher } from './data-use-fixture';
 
 // Drive folders belong to KBs from 0.1.37. A workspace's own connections from
 // earlier versions are seeded here as those versions wrote them, and must be
@@ -29,6 +30,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori workspace Drive 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
+const fixtureLauncher = await createCloudFixtureLauncher(base);
 const kb = path.join(base, 'Existing KB');
 await mkdir(kb);
 const space = await files.register(kb, '既存KB', 'personal');
@@ -93,7 +96,7 @@ const env = {
 delete env.ELECTRON_RUN_AS_NODE;
 const launch = () =>
   electron.launch({
-    args: [...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), '.'],
+    args: [...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), fixtureLauncher],
     env,
   });
 const errors: string[] = [];

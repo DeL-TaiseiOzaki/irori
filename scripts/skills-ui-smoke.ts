@@ -1,3 +1,4 @@
+import { seedDataConsent } from '../tests/data-consent-fixture';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,7 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori skills UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
 const root = path.join(base, 'KB skills');
 const plain = path.join(base, 'KB plain');
 // A disposable home stands in for the user's, so the reach view reads nothing real.

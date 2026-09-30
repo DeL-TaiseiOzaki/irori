@@ -6,6 +6,24 @@ external search service is involved. `npm run dev:website` serves both sites and
 `npm run build:website` emits them together into `dist-website/` for the existing
 GitHub Pages workflow.
 
+The `privacy` articles describe the current desktop data flows, full Drive
+scope, retained local copies, external CLI/model transfers, and separate
+deletion controls. They are review drafts until the publisher name, private
+privacy contact, and effective date are confirmed. Do not use them as a final
+policy or submit them for OAuth verification with unresolved identity details.
+Keep storage claims aligned with the implementation: protecting OAuth
+credentials does not encrypt every Drive cache, source copy, note, or history.
+
+The `terms` articles are also review drafts. They summarize the existing MIT
+license and connected-service requirements; they do not establish a new legal
+agreement or invent publisher commitments. Confirm the publisher details and
+approve the final wording before using these links in OAuth Branding. Google's
+[current Branding help](https://support.google.com/cloud/answer/15549049?hl=en)
+says homepage, privacy, and terms links are required for external production
+apps, while its [brand verification guide](https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification)
+still calls terms optional. Preparing the link covers the Console requirement
+without treating either draft as completed verification evidence.
+
 ## Design
 
 Reference sites, consulted on 2026-09-30:

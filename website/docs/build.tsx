@@ -364,6 +364,8 @@ function Document({ article, articles }: { article: Article; articles: Article[]
             </nav>
             <footer className="article-footer">
               <span>{l.preview}</span>
+              <a href={href(file, language, 'privacy')}>{l.privacy}</a>
+              <a href={href(file, language, 'terms')}>{l.terms}</a>
               <a
                 href={`https://github.com/DeL-TaiseiOzaki/irori/blob/main/website/docs/content/${language}/${slug}.md`}
               >

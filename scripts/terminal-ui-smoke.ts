@@ -1,3 +1,4 @@
+import { seedDataConsent } from '../tests/data-consent-fixture';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import { FileService } from '../src/host/files';
 const base = await mkdtemp(path.join(tmpdir(), 'irori terminal UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
 const kb = path.join(base, 'KB with spaces');
 await mkdir(kb);
 await files.register(kb, '端末のKB', 'personal');

@@ -38,6 +38,7 @@ export const hostArguments = {
   restartToUpdate: z.tuple([]),
   openUrl: z.tuple([externalUrl]),
   deviceSettings: z.tuple([]),
+  resetDataConsent: z.tuple([]),
   saveDeviceSettings: z.tuple([
     z.object({
       theme: z.enum(themes).optional(),
@@ -137,7 +138,7 @@ export const hostArguments = {
       access: z.enum(['read-only', 'read-write']).optional(),
     }),
   ]),
-  connectCloud: z.tuple([id, id]),
+  connectCloud: z.tuple([id, id, z.boolean().optional()]),
   disconnectCloud: z.tuple([id, id, z.boolean().optional()]),
   bindCloud: z.tuple([id, id, id]),
   renameCloud: z.tuple([id, id, z.string().max(200)]),

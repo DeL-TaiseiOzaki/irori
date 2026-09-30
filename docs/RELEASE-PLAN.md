@@ -1,5 +1,15 @@
 # Release readiness and remaining work
 
+Public Google preparation, 2026-09-30: **0.1.62 candidate**, isolated branch
+`feat/public-google-readiness`. [Public readiness](GOOGLE-PUBLIC-READINESS.md)
+records the actual full `drive` scope, data paths, owner Console/domain steps and
+remaining verification gates. Candidate changes protect rclone credentials with
+OS-backed storage and add host-enforced first-use data confirmations. Bilingual
+privacy/use-license pages remain review drafts pending publisher/contact details.
+No OAuth project, audience, domain, approval or general-availability status has
+been changed. This work is not yet merged or published.
+
+
 Owner follow-up, 2026-09-23: PR #73 and preview 0.1.26 are published, followed
 by the download manifest in PR #74. The unmerged 0.1.27 branch adds access
 selection and orphaned-preparation recovery. [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)

@@ -3,6 +3,45 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+
+// Exercise the host's migration protocol; this format is a fixture, not rclone's native cipher.
+if (process.argv[2] === 'config') {
+  const config = process.argv[process.argv.indexOf('--config') + 1];
+  if (process.argv[4] === 'set') {
+    let input = '';
+    for await (const bytes of process.stdin) input += bytes;
+    const [password, confirmation] = input.trim().split('\n');
+    if (!password || password !== confirmation) process.exit(1);
+    const nonce = randomBytes(12);
+    const key = createHash('sha256').update(password).digest();
+    const cipher = createCipheriv('aes-256-gcm', key, nonce);
+    const ciphertext = Buffer.concat([cipher.update(fs.readFileSync(config)), cipher.final()]);
+    fs.writeFileSync(
+      config,
+      '# Synthetic rclone encryption fixture\nRCLONE_ENCRYPT_V0:\n' +
+        Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]).toString('base64'),
+      { mode: 0o600 },
+    );
+  } else if (process.argv[4] === 'check') {
+    try {
+      const ciphertext = Buffer.from(
+        fs.readFileSync(config, 'utf8').split('RCLONE_ENCRYPT_V0:\n')[1],
+        'base64',
+      );
+      const key = createHash('sha256')
+        .update(process.env.RCLONE_CONFIG_PASS ?? '')
+        .digest();
+      const decipher = createDecipheriv('aes-256-gcm', key, ciphertext.subarray(0, 12));
+      decipher.setAuthTag(ciphertext.subarray(12, 28));
+      decipher.update(ciphertext.subarray(28));
+      decipher.final();
+    } catch {
+      process.exit(1);
+    }
+  } else process.exit(1);
+  process.exit(0);
+}
 const expected =
   'Basic ' +
   Buffer.from(`${process.env.RCLONE_RC_USER}:${process.env.RCLONE_RC_PASS}`).toString('base64');

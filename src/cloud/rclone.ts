@@ -1,17 +1,25 @@
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
-import { launch, killTree, agentEnv } from '../agents/process';
+import { launch, killTree } from '../agents/process';
 import { readJson } from '../host/http';
 import { t } from '../domain/i18n';
 import { UploadFailures, type UploadFailure } from './upload-errors';
+import {
+  protectRcloneConfig,
+  rcloneEnv,
+  secureStorageAvailable,
+  credentialStorageError,
+  type SecureStorage,
+} from './credentials';
 
 export interface RcloneAPI {
   call(method: string, params?: Record<string, unknown>): Promise<any>;
   close(): Promise<void>;
   /** The last uploads rclone reported as failed, oldest first, when the service can tell. */
   uploadFailures?(): UploadFailure[];
+  /** Check storage before creating or changing an account's persisted metadata. */
+  assertCredentialStorage?(): Promise<void>;
 }
 
 // Only host services have this API. No method names, credentials or RPC endpoint reach IPC.
@@ -21,10 +29,12 @@ export class Rclone implements RcloneAPI {
   private endpoint = '';
   private secret = randomBytes(32).toString('hex');
   private stopped = false;
+  private diagnosticOnly = false;
   private failures = new UploadFailures();
   constructor(
     private dataDir: string,
     private executable = process.env.IRORI_RCLONE_PATH || 'rclone',
+    private secureStorage?: SecureStorage,
   ) {}
   private async start() {
     if (this.stopped)
@@ -40,13 +50,12 @@ export class Rclone implements RcloneAPI {
   }
   private async launch() {
     const dir = path.join(this.dataDir, 'rclone');
-    await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-    const config = path.join(dir, 'rclone.conf');
-    const handle = await fs.open(config, 'a', 0o600);
-    await handle.close();
-    if (process.platform !== 'win32') await fs.chmod(config, 0o600);
-    const env = agentEnv();
-    for (const key of Object.keys(env)) if (key.startsWith('RCLONE_')) delete env[key];
+    // Empty --config is rclone's memory-only configuration; diagnostics never read tokens.
+    const { config, password } = this.diagnosticOnly
+      ? { config: '', password: undefined }
+      : await protectRcloneConfig(dir, this.executable, this.secureStorage);
+    const env = rcloneEnv();
+    if (password) env.RCLONE_CONFIG_PASS = password;
     env.RCLONE_RC_USER = 'irori';
     env.RCLONE_RC_PASS = this.secret;
     const child = launch(
@@ -55,6 +64,7 @@ export class Rclone implements RcloneAPI {
         'rcd',
         '--config',
         config,
+        '--ask-password=false',
         '--rc-addr',
         '127.0.0.1:0',
         '--cache-dir',
@@ -123,9 +133,28 @@ export class Rclone implements RcloneAPI {
       throw error;
     }
   }
-  async call(method: string, params: Record<string, unknown> = {}) {
+  async call(method: string, params: Record<string, unknown> = {}): Promise<any> {
+    if (
+      !this.stopped &&
+      !this.diagnosticOnly &&
+      !secureStorageAvailable(this.secureStorage) &&
+      ['core/version', 'mount/types'].includes(method)
+    ) {
+      const diagnostic = new Rclone(this.dataDir, this.executable);
+      diagnostic.diagnosticOnly = true;
+      try {
+        return await diagnostic.call(method);
+      } finally {
+        await diagnostic.close();
+      }
+    }
     await this.start();
     return this.request(method, params);
+  }
+  async assertCredentialStorage() {
+    if (!secureStorageAvailable(this.secureStorage)) throw credentialStorageError();
+    // Migration/decryption errors must also occur before account metadata is changed.
+    await this.start();
   }
   uploadFailures() {
     return this.failures.list();

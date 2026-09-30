@@ -49,6 +49,22 @@ export async function checkDocumentation(page: Page) {
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(root);
+    await page.locator('footer').getByRole('link', { name: labels.en.privacy }).click();
+    await page.waitForURL(doc('en', 'privacy'));
+    await page.getByRole('link', { name: '日本語', exact: true }).click();
+    await page.waitForURL(doc('ja', 'privacy'));
+    await page.goto(root);
+    await page.locator('footer').getByRole('link', { name: labels.en.terms }).click();
+    await page.waitForURL(doc('en', 'terms'));
+    assert.equal(
+      await page
+        .locator(
+          '.article-body a[href="https://github.com/DeL-TaiseiOzaki/irori/blob/main/LICENSE"]',
+        )
+        .count(),
+      1,
+    );
+    await page.goto(root);
     await page.getByRole('link', { name: 'Docs', exact: true }).click();
     await page.waitForURL(doc('ja'));
     assert.equal(await page.locator('html').getAttribute('lang'), 'ja');
@@ -93,6 +109,32 @@ export async function checkDocumentation(page: Page) {
           await page.locator('.guide-screenshot').evaluate(async (img) => {
             await (img as HTMLImageElement).decode();
           });
+        }
+        if (article.slug === 'privacy') {
+          const text = await page.locator('.article-body').innerText();
+          assert(text.includes('https://www.googleapis.com/auth/drive'));
+          assert(text.includes('CLI'));
+          assert(text.includes(language === 'ja' ? 'コピー' : 'copies'));
+          assert(text.includes(language === 'ja' ? 'すべて暗号化' : 'does not encrypt all'));
+          assert(
+            text.includes(
+              language === 'ja'
+                ? '認証設定ファイルは暗号化'
+                : 'credential configuration is encrypted',
+            ),
+          );
+          assert(
+            text.includes(
+              language === 'ja' ? 'データ利用を確認し直す' : 'Reset data use confirmations',
+            ),
+          );
+          assert.equal(
+            await page
+              .locator('.article-body a[href="https://myaccount.google.com/connections"]')
+              .count(),
+            1,
+            'Revocation controls must remain directly accessible',
+          );
         }
       }
     }

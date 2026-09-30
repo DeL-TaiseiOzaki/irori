@@ -101,8 +101,9 @@ export class CloudService {
     openBrowser: (url: string) => Promise<void>,
     private rpc: RcloneAPI = new Rclone(files.dataDir),
     oauth?: GoogleOAuth,
+    private authorizeData?: { allow: () => Promise<void>; require: () => Promise<void> },
   ) {
-    this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser, oauth);
+    this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser, oauth, authorizeData?.allow);
   }
   get busy() {
     return this.queue.busy;
@@ -146,6 +147,7 @@ export class CloudService {
         throw Error(t('移動先の KB を選んでください。', 'Choose the KB to move it to.'));
       const key = this.key(from, mountId);
       const wasMounted = this.mounted.has(key);
+      if (wasMounted) await this.authorizeData?.require();
       if (wasMounted) {
         await this.assertSent(from, mountId);
         await this.unmount(from, mountId);
@@ -676,6 +678,7 @@ export class CloudService {
     return this.mutate(() => this.mount(scopeId, mountId));
   }
   private async mount(scopeId: string, mountId: string) {
+    await this.authorizeData?.require();
     const key = this.key(scopeId, mountId);
     const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
     if (!record) throw Error('Unknown cloud connection');
@@ -893,6 +896,7 @@ export class CloudService {
       if (record.access === access) return;
       const key = this.key(scopeId, mountId);
       const wasMounted = this.mounted.has(key);
+      if (wasMounted) await this.authorizeData?.require();
       if (wasMounted) {
         if (!leavePending) await this.assertSent(scopeId, mountId);
         await this.unmount(scopeId, mountId);

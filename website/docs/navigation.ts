@@ -27,6 +27,8 @@ export const pages = [
   { slug: 'drive', group: 'connections' },
   { slug: 'git', group: 'connections' },
   { slug: 'settings', group: 'reference' },
+  { slug: 'privacy', group: 'reference' },
+  { slug: 'terms', group: 'reference' },
   { slug: 'troubleshooting', group: 'reference' },
 ] as const;
 
@@ -58,6 +60,8 @@ export const labels = {
     next: '次の記事',
     preview: '検証版のガイド',
     feedback: '問題を報告',
+    privacy: 'プライバシーとデータ',
+    terms: '利用とライセンス',
     step1: 'irori をインストール',
     step2: 'hibachi を追加',
     step3: '書いて、AI に頼む',
@@ -87,6 +91,8 @@ export const labels = {
     next: 'Next',
     preview: 'Preview guide',
     feedback: 'Report an issue',
+    privacy: 'Privacy and data',
+    terms: 'Use and license',
     step1: 'Install irori',
     step2: 'Add a hibachi',
     step3: 'Write, then ask',

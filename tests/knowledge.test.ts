@@ -8,6 +8,7 @@ import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
 import { CloudOutbox, rcloneDelivery } from '../src/cloud/outbox';
 import { Rclone } from '../src/cloud/rclone';
+import { fixtureSecureStorage } from './rclone-fixture';
 import { hostArguments } from '../src/domain/host-requests';
 async function fixture(t: any) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-knowledge-'));
@@ -307,7 +308,7 @@ test(
     const { base, files, note, store } = await fixture(t);
     const remote = path.join(base, 'destination');
     await mkdir(remote);
-    const rpc = new Rclone(files.dataDir, process.env.IRORI_TEST_RCLONE_PATH);
+    const rpc = new Rclone(files.dataDir, process.env.IRORI_TEST_RCLONE_PATH, fixtureSecureStorage);
     t.after(() => rpc.close());
     const target = {
       ownerId: randomUUID(),

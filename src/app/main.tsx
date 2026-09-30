@@ -1146,7 +1146,7 @@ function App() {
           return [];
         })) {
           if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
-            await host.connectCloud(id, connection.mountId).catch(() => {
+            await host.connectCloud(id, connection.mountId, true).catch(() => {
               setStatus(t('接続できないクラウドがあります。', 'A cloud could not connect.'));
             });
           }

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { ontologyFixture } from '../tests/fixtures/ontology';
+import { seedDataConsent } from './data-use-fixture';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
@@ -210,6 +211,7 @@ try {
   env.IRORI_GOOGLE_CLIENT_SECRET = 'synthetic-development-secret';
   // An installed irori checks for updates by itself; this run must not reach GitHub.
   env.IRORI_AUTOMATIC_UPDATE_CHECKS = '0';
+  await seedDataConsent(env.IRORI_DATA_DIR);
   const launchPackaged = () =>
     electron.launch({
       executablePath: path.join(
@@ -257,12 +259,33 @@ try {
   assert.equal(cloudSetup.oauthConfigured, process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1');
   assert.equal(cloudSetup.available, true, cloudSetup.detail);
   assert.equal(cloudSetup.version, 'v1.75.1');
+  // The installed binary keeps its real OS keychain; a Linux CI container may have none.
+  const credentialStorageAvailable = await application.evaluate(({ safeStorage }) => {
+    return (
+      safeStorage.isEncryptionAvailable() &&
+      (process.platform !== 'linux' ||
+        !['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend()))
+    );
+  });
+  if (process.platform !== 'linux')
+    assert.equal(
+      credentialStorageAvailable,
+      true,
+      'Shipping platform must provide secure credential storage',
+    );
   let oauthHandoff: {
     googleAuthorization: boolean;
     driveScope: boolean;
     clientConfigured: boolean;
   } | null = null;
-  if (cloudSetup.oauthConfigured) {
+  if (cloudSetup.oauthConfigured && !credentialStorageAvailable) {
+    await assert.rejects(
+      page.evaluate(() => window.irori.addCloudAccount('Blocked without secure storage')),
+      /キーチェーン|keychain/,
+    );
+    assert.deepEqual(await page.evaluate(() => window.irori.cloudAccounts()), []);
+  }
+  if (cloudSetup.oauthConfigured && credentialStorageAvailable) {
     // Exercise the compiled client through real rclone, stopping before Google consent.
     // Keep OAuth URLs/client values out of logs and evidence; inspect only the local redirect.
     await application.evaluate(({ shell }) => {
@@ -629,13 +652,14 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; native OS credential storage retained, configured OAuth checks local browser handoff/cancellation when available or refusal when unavailable, without Google consent or model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
         macSignature,
         runtime,
         cloudSetup,
+        credentialStorageAvailable,
         oauthHandoff,
         weight,
         inventory,

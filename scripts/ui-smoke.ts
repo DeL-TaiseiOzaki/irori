@@ -1,3 +1,4 @@
+import { seedDataConsent } from '../tests/data-consent-fixture';
 import { _electron as electron, expect } from '@playwright/test';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -22,6 +23,7 @@ await writeFile(
   path.join(kb, 'AGENTS.md'),
   'Only edit the note selected by the user in this disposable fixture KB. Do not access files outside it.\n',
 );
+await seedDataConsent(path.join(base, 'device'));
 const launchStart = Date.now();
 const env: Record<string, string> = Object.fromEntries(
   Object.entries({ ...process.env, IRORI_DATA_DIR: path.join(base, 'device') }).filter(

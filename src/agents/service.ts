@@ -152,6 +152,7 @@ export class AgentService {
     ),
     private authorship = new AuthorshipStore(files.dataDir),
     private you?: YourAiService,
+    private authorize?: (agent: AgentId) => Promise<void>,
   ) {
     this.device = new DeviceIdentity(files.dataDir);
     // An unwritable history is a whole-device fault, so every run stops.
@@ -615,6 +616,8 @@ export class AgentService {
     let resuming = false;
     let record: RunRecord | undefined;
     try {
+      await this.authorize?.(input.agent);
+      if (run.cancelled) throw Error(t('実行を取り消しました。', 'The run was cancelled.'));
       const placed = await this.place(run, input);
       run.conversationId = placed.id;
       // The owner's queue goes first, whichever of its conversations it waits in.

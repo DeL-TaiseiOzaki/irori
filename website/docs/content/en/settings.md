@@ -20,3 +20,7 @@ This documentation site also has an **English / 日本語** switch at the top ri
 Check for a new version under **Updates** in settings. When one is available, choose **Update and restart**.
 
 To use JavaScript in [routines](routines.md), enable it under **Routines** in settings. Choose the AI CLI, model, and access mode in the [AI panel](agents.md).
+
+## Data use confirmations
+
+Choose **Reset data use confirmations** to review the Drive, AI CLI, and program data-use explanations again before the next connection or execution. This resets only their saved confirmation records. It does not stop active work, revoke Google's grant, change CLI tool permissions, or remove cached files and history. See [Privacy and data handling](privacy.md) for disconnection and deletion controls.

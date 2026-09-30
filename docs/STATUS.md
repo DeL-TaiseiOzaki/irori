@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Public Google preparation, 2026-09-30: **0.1.62 candidate**, isolated branch
+`feat/public-google-readiness`. [Public readiness](GOOGLE-PUBLIC-READINESS.md)
+records the actual full `drive` scope, data paths, owner Console/domain steps and
+remaining verification gates. Candidate changes protect rclone credentials with
+OS-backed storage and add host-enforced first-use data confirmations. Bilingual
+privacy/use-license pages remain review drafts pending publisher/contact details.
+No OAuth project, audience, domain, approval or general-availability status has
+been changed. This work is not yet merged or published.
+
+Local verification: `npm run build`; `npm test` with bundled rclone (426 tests,
+421 passed, zero failed, five environment-gated skips); all 27 Electron UI
+suites; `npm run build:website` and website smoke (44 articles, 242 links).
+The final interrupted-migration cleanup changes only host credential handling;
+build/unit checks were repeated and the two affected cloud UI suites rerun.
+Native Windows/macOS packaging and OS keychain acceptance require CI. No real
+Google consent, native Drive mount or model inference was exercised.
+
+
 Published 2026-09-30: **0.1.61** (#142) is merged at the owner's request and
 published as [v0.1.61-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.61-preview.1)
 by release run `36672845624` from main's successful CI run `36671463044`

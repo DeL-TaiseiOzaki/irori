@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } from 'electron';
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
@@ -21,6 +21,7 @@ import { CloudOutbox } from '../cloud/outbox';
 import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
 import { DeviceIdentity } from './device';
+import { DataConsent, dataUseDisclosure } from './data-consent';
 import { migrateConversations } from '../agents/conversation-migration';
 import { brainAgentNames } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
@@ -87,6 +88,20 @@ app
     void updates.cleanup().catch((error) => console.warn('Update cleanup failed', String(error)));
     const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
+    const consent = new DataConsent(files.dataDir, async (purpose) => {
+      if (!window || window.isDestroyed()) return false;
+      const disclosure = dataUseDisclosure(purpose);
+      const choice = await dialog.showMessageBox(window, {
+        type: 'question',
+        message: disclosure.title,
+        detail: disclosure.detail,
+        buttons: [t('取り消す', 'Cancel'), t('同意して続ける', 'Agree and continue')],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return choice.response === 1;
+    });
     const cloud = new CloudService(
       new WorkspaceCloudStorage(files, workspaces),
       (url) => shell.openExternal(url),
@@ -100,8 +115,13 @@ app
               process.platform === 'win32' ? 'rclone.exe' : 'rclone',
             )
           : undefined,
+        safeStorage,
       ),
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
+      {
+        allow: () => consent.allow('google'),
+        require: () => consent.require('google'),
+      },
     );
     files.cloud = cloud;
     const images = new ImageService(files, cloud);
@@ -137,6 +157,7 @@ app
       knowledge,
       authorship,
       you,
+      (agent) => consent.allow(agent),
     );
     let fileMutations = 0;
     const git = new GitService(
@@ -453,6 +474,21 @@ app
         await shell.openExternal(address.href);
       },
       deviceSettings: () => settings.read(),
+      resetDataConsent: async () => {
+        const choice = await dialog.showMessageBox(window!, {
+          type: 'question',
+          message: t('データ利用の確認をリセットしますか？', 'Reset data use confirmations?'),
+          detail: t(
+            '次の接続・実行前に確認し直します。実行中の処理は停止せず、Google の権限や保存済みデータも削除しません。',
+            'Confirm again before the next connection or run. This does not stop active work, revoke Google access or delete retained data.',
+          ),
+          buttons: [t('取り消す', 'Cancel'), t('リセット', 'Reset')],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        });
+        if (choice.response === 1) await consent.reset();
+      },
       saveDeviceSettings: async (patch) => {
         const next = await settings.save(patch);
         nativeTheme.themeSource = nativeThemeSource(next.theme);
@@ -466,7 +502,10 @@ app
             : 'https://rclone.org/install/#installation-with-precompiled-binaries',
         ),
       terminalShells: () => terminals.available(),
-      openTerminal: (...args) => terminals.open(...args),
+      openTerminal: async (...args) => {
+        await consent.allow('programs');
+        return terminals.open(...args);
+      },
       writeTerminal: (...args) => terminals.write(...args),
       resizeTerminal: (...args) => terminals.resize(...args),
       acknowledgeTerminal: (...args) => terminals.acknowledge(...args),
@@ -550,13 +589,24 @@ app
       cloudFolders: (...args) => cloud.accounts.folders(...args),
       cloudConnections: (id) => cloud.connections(id),
       addCloudAttachment: (input) => changeCloud(input.scopeId, () => cloud.add(input)),
-      connectCloud: (...args) => changeCloud(args[0], () => cloud.connect(...args)),
+      connectCloud: async (id, mountId, automatic) => {
+        if (automatic) await consent.require('google');
+        else await consent.allow('google');
+        return changeCloud(id, () => cloud.connect(id, mountId));
+      },
       disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
-      setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
-      moveCloudConnection: (from, mountId, to) =>
-        changeCloud(to, () => changeCloud(from, () => cloud.moveConnection(from, mountId, to))),
+      setCloudAccess: async (...args) => {
+        await consent.allow('google');
+        return changeCloud(args[0], () => cloud.setAccess(...args));
+      },
+      moveCloudConnection: async (from, mountId, to) => {
+        await consent.allow('google');
+        return changeCloud(to, () =>
+          changeCloud(from, () => cloud.moveConnection(from, mountId, to)),
+        );
+      },
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
         if (error) throw Error(error);
@@ -699,7 +749,10 @@ app
       },
       routines: (workspaceId) => routines.list(workspaceId),
       reviewRoutine: (ref) => routines.review(ref),
-      runRoutine: (ref, input) => routines.run(ref, input),
+      runRoutine: async (ref, input) => {
+        await consent.allow('programs');
+        return routines.run(ref, input);
+      },
       stopRoutine: (ref) => routines.stop(ref),
       routineRuns: (ref) => routines.runs(ref),
       cancel: (scopeId) => agents.cancel(scopeId),

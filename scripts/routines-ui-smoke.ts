@@ -1,3 +1,4 @@
+import { seedDataConsent } from '../tests/data-consent-fixture';
 import { _electron as electron, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -21,6 +22,7 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
 const root = path.join(base, 'Product');
 await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(path.join(root, 'Knowledge_Base', 'Product note.md'), '# Product\n');

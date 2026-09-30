@@ -38,6 +38,7 @@ export class CloudAccounts {
       clientId: process.env.IRORI_GOOGLE_CLIENT_ID,
       clientSecret: process.env.IRORI_GOOGLE_CLIENT_SECRET,
     },
+    private authorizeData?: () => Promise<void>,
   ) {}
   get configured() {
     return !!this.oauth.clientId && !!this.oauth.clientSecret;
@@ -79,6 +80,7 @@ export class CloudAccounts {
     return this.accounts.map((item) => ({ ...item }));
   }
   async add(name: string): Promise<CloudAccount> {
+    await this.authorizeData?.();
     await this.init();
     if (this.active)
       throw Error(
@@ -94,6 +96,7 @@ export class CloudAccounts {
           'This build has no Google sign-in configuration.',
         ),
       );
+    await this.rpc.assertCredentialStorage?.();
     const account = accountSchema.parse({
       id: randomUUID(),
       name,
@@ -232,6 +235,7 @@ export class CloudAccounts {
    * keeps its name, so the connections bound to the account keep working afterwards.
    */
   async reauthorize(id: string) {
+    await this.authorizeData?.();
     await this.init();
     if (this.active)
       throw Error(
@@ -247,6 +251,7 @@ export class CloudAccounts {
           'This build has no Google sign-in configuration.',
         ),
       );
+    await this.rpc.assertCredentialStorage?.();
     const account = this.get(id);
     const previous = { ...account };
     account.state = 'authorizing';
@@ -332,6 +337,7 @@ export class CloudAccounts {
     await this.persist();
   }
   async drives(id: string): Promise<CloudFolder[]> {
+    await this.authorizeData?.();
     const fs = await this.filesystem(id);
     const value = await this.rpc.call('backend/command', {
       fs,
@@ -349,6 +355,7 @@ export class CloudAccounts {
     ];
   }
   async folders(id: string, parentId: string, driveId?: string): Promise<CloudFolder[]> {
+    await this.authorizeData?.();
     const fs = await this.filesystem(id, parentId, driveId);
     const value = await this.rpc.call('operations/list', {
       fs,

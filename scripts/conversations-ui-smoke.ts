@@ -1,3 +1,4 @@
+import { seedDataConsent } from '../tests/data-consent-fixture';
 import { _electron as electron, expect, type Page } from '@playwright/test';
 import { mkdtemp, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +21,7 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
 const root = path.join(base, 'KB');
 await mkdir(root);
 await writeFile(path.join(root, 'note.md'), '# Conversation fixture\n');

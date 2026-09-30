@@ -114,6 +114,13 @@ try {
   await reader.getByRole('link', { name: 'English', exact: true }).click();
   await reader.waitForURL('**/docs/en/notes/');
   assert.equal(await reader.locator('h1').innerText(), 'Editing notes');
+  await reader
+    .locator('.article-footer')
+    .getByRole('link', { name: 'Privacy and data', exact: true })
+    .click();
+  await reader.waitForURL('**/docs/en/privacy/');
+  assert.equal(await reader.locator('h1').innerText(), 'Privacy and data handling');
+  assert((await reader.locator('.article-body').innerText()).includes('refresh tokens'));
   await reader.close();
   await page.setViewportSize({ width: 390, height: 844 });
   const available = releaseSchema.parse({

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { Rclone } from '../src/cloud/rclone';
 import { CloudAccounts } from '../src/cloud/accounts';
+import { fixtureSecureStorage } from './rclone-fixture';
 
 test(
   'Real rclone authenticates RC, exposes native config questions and stops without a cloud account',
@@ -16,7 +17,7 @@ test(
   },
   async (t) => {
     const base = await mkdtemp(path.join(tmpdir(), 'irori real rclone '));
-    const rpc = new Rclone(base, process.env.IRORI_TEST_RCLONE_PATH);
+    const rpc = new Rclone(base, process.env.IRORI_TEST_RCLONE_PATH, fixtureSecureStorage);
     t.after(async () => {
       await rpc.close();
       await rm(base, { recursive: true, force: true });
@@ -54,7 +55,7 @@ test(
   },
   async (t) => {
     const base = await mkdtemp(path.join(tmpdir(), 'irori native OAuth control '));
-    const rpc = new Rclone(base, process.env.IRORI_TEST_RCLONE_PATH);
+    const rpc = new Rclone(base, process.env.IRORI_TEST_RCLONE_PATH, fixtureSecureStorage);
     let opened = false;
     const accounts = new CloudAccounts(
       base,

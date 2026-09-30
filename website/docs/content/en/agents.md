@@ -9,6 +9,10 @@ irori runs Claude Code, Codex, OpenCode, Pi, or Hermes Agent using the CLI and a
 
 Choose a CLI and model in the AI panel. Model options come from the installed CLI. For Hermes Agent, enter the model name.
 
+The selected CLI may send requests, notes, and connected Drive materials to its model provider. Check that provider's terms, retention, and training settings before granting access. See [Privacy and data handling](privacy.md).
+
+Before first execution with each CLI, irori asks you to confirm the data-use explanation. The same check covers queued work, routine AI steps, and delegated work. It is separate from that CLI's tool permissions and does not establish provider compliance.
+
 ## Ask a hibachi agent
 
 Open a note, write a request in the AI panel, and send it. The hibachi agent works with that hibachi's Schema and the selected note.

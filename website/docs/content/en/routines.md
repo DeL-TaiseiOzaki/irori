@@ -22,6 +22,8 @@ steps:
 
 Open **irori mode → Routines** and choose **Run**. On the first run and after a file changes, irori shows the contents or diff for review. Choose **Confirm and run** to start.
 
+First use also asks you to confirm how programs can read files and send them to external services. An AI step asks for that CLI's data-use confirmation if it has not been accepted. These explanations are separate from reviewing the routine files or approving individual tool actions. See [Privacy and data handling](privacy.md).
+
 **Stop** ends the current step and skips later ones. There is no automatic schedule, and routines do not run while irori is closed.
 
 ## Write steps

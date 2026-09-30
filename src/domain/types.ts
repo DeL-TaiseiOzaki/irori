@@ -400,7 +400,7 @@ export interface HostAPI {
   cloudFolders(accountId: string, folderId: string, driveId?: string): Promise<CloudFolder[]>;
   cloudConnections(scopeId: string): Promise<CloudConnection[]>;
   addCloudAttachment(input: AddCloudAttachment): Promise<CloudConnection>;
-  connectCloud(scopeId: string, mountId: string): Promise<void>;
+  connectCloud(scopeId: string, mountId: string, automatic?: boolean): Promise<void>;
   /** `leavePending` disconnects although saved changes wait; they upload on the next editable mount. */
   disconnectCloud(scopeId: string, mountId: string, leavePending?: boolean): Promise<void>;
   bindCloud(scopeId: string, mountId: string, accountId: string): Promise<void>;
@@ -508,6 +508,7 @@ export interface HostAPI {
   /** Opens an http or https address from agent output in the user's browser. */
   openUrl(url: string): Promise<void>;
   deviceSettings(): Promise<DeviceSettings>;
+  resetDataConsent(): Promise<void>;
   saveDeviceSettings(patch: Partial<DeviceSettings>): Promise<DeviceSettings>;
   agents(): Promise<AgentInfo[]>;
   /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */

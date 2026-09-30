@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { seedDataConsent, createCloudFixtureLauncher } from './data-use-fixture';
 if (process.platform === 'win32') {
   console.log(
     'Cloud UI protocol fixture uses a POSIX executable; Windows native acceptance remains open.',
@@ -13,6 +14,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori cloud UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+await seedDataConsent(files.dataDir);
+const fixtureLauncher = await createCloudFixtureLauncher(base);
 const roots = [path.join(base, 'Personal KB'), path.join(base, 'Team KB')];
 const spaces = [];
 for (const [i, root] of roots.entries()) {
@@ -48,7 +51,7 @@ const launch = () =>
   electron.launch({
     args: [
       ...(process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : []),
-      '.',
+      fixtureLauncher,
     ],
     env,
   });
