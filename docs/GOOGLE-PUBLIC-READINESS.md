@@ -2,8 +2,10 @@
 
 Reviewed 2026-09-30. This is a preparation packet, not approval to claim general
 Google availability. The latest published preview is 0.1.61; the 0.1.62 candidate
-adds credential protection and data-use confirmations. No Console, DNS,
-Search Console, OAuth audience or verification settings have been changed.
+adds credential protection and data-use confirmations. Google OAuth audience
+and verification settings have not been changed. The owner configured DNS and
+the implementation configured/deployed GitHub Pages for the registered domain;
+HTTPS and Google Domain Property verification remain pending.
 
 Owner-confirmed facts, 2026-09-30: publisher **Taisei Ozaki**, public contact
 **taisei.ozaki.lab@gmail.com**, Google audience **External**, publishing status
@@ -13,11 +15,15 @@ inspection. The implementation and native checks passed in
 [PR #146 CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
 at source `2d596ed`; the PR remains draft and no preview has been published.
 
-The owner registered `irori-ai.com` at XServerドメイン. Registrar account access,
-DNS activation, GitHub Pages cutover and Google Domain Property
-verification remain pending. Website-only cutover work is on the independent
-`docs/custom-domain` branch; do not merge the application candidate merely to
-change the public site's domain. Registration alone is not live-site evidence.
+The owner registered `irori-ai.com` at XServerドメイン and configured its domain
+nameservers plus the four GitHub Pages A records and www CNAME. Website-only
+[PR #147](https://github.com/DeL-TaiseiOzaki/irori/pull/147) is merged; Pages run
+`36691804740` deployed it. HTTP browser acceptance passed on rerun after a
+transient document 503. GitHub reports no certificate yet and strict HTTPS fails
+hostname validation; HTTPS enforcement remains pending. The owner supplied the
+Google Domain Property TXT value, but it is not yet visible externally and no
+Console success has been reported. [PR #148](https://github.com/DeL-TaiseiOzaki/irori/pull/148)
+records cutover evidence. This application candidate remains separate and draft.
 
 ## Preserve the current features
 

@@ -7,9 +7,10 @@ remaining verification gates. Candidate changes protect rclone credentials with
 OS-backed storage and add host-enforced first-use data confirmations. Bilingual
 privacy/use-license pages remain review drafts pending final policy and domain.
 Owner confirmed Taisei Ozaki / taisei.ozaki.lab@gmail.com and External / Testing;
-the owner registered irori-ai.com; DNS/Pages/Google ownership verification remain pending.
-No OAuth project, audience, domain, approval or general-availability status has
-been changed. This work is not yet merged or published.
+the owner registered irori-ai.com; DNS/Pages are configured, while HTTPS and
+Google ownership verification remain pending.
+The website domain is configured in separate PR #147. No OAuth project,
+audience, approval or general-availability status has been changed. This work is not yet merged or published.
 
 
 Owner follow-up, 2026-09-23: PR #73 and preview 0.1.26 are published, followed
