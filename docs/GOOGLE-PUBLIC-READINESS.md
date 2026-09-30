@@ -21,8 +21,9 @@ nameservers plus the four GitHub Pages A records and www CNAME. Website-only
 `36691804740` deployed it. HTTP browser acceptance passed on rerun after a
 transient document 503. GitHub reports no certificate yet and strict HTTPS fails
 hostname validation; HTTPS enforcement remains pending. The owner supplied the
-Google Domain Property TXT value, but it is not yet visible externally and no
-Console success has been reported. [PR #148](https://github.com/DeL-TaiseiOzaki/irori/pull/148)
+Google Domain Property TXT value and added the record; a fresh Google DNS
+response matches it. No Console success has been reported.
+[PR #148](https://github.com/DeL-TaiseiOzaki/irori/pull/148)
 records cutover evidence. This application candidate remains separate and draft.
 
 ## Preserve the current features
