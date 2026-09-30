@@ -577,6 +577,20 @@ try {
   await application.close();
   application = await launchPackaged();
   const restored = await application.firstWindow();
+  // Reload the encrypted config through the new process's actual OS keychain.
+  // Report booleans only: never print a credential config or recovered key.
+  if (credentialStorageAvailable) {
+    const restartedCloud = await restored.evaluate(() => window.irori.cloudSetup());
+    assert.equal(restartedCloud.available, true, restartedCloud.detail);
+    assert.equal(restartedCloud.version, 'v1.75.1');
+    const config = await readFile(path.join(temporary, 'device', 'rclone', 'rclone.conf'));
+    assert(
+      config.includes(Buffer.from('RCLONE_ENCRYPT_V')),
+      'Credential config must remain encrypted',
+    );
+    const sealedKey = await readFile(path.join(temporary, 'device', 'rclone', 'config-key.bin'));
+    assert(sealedKey.length > 0, 'OS-protected config key must persist across restart');
+  }
   restored.on('pageerror', (error) => errors.push(error.message));
   const restoredRecovery = await restored.evaluate(async (recovery) => {
     const composerKey = {
@@ -661,6 +675,7 @@ try {
         cloudSetup,
         credentialStorageAvailable,
         oauthHandoff,
+        encryptedCredentialRestart: credentialStorageAvailable,
         weight,
         inventory,
         artifacts,
