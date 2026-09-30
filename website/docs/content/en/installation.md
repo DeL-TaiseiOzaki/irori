@@ -14,7 +14,7 @@ There are no Windows ARM or Intel Mac distributions. On Linux, [run from source]
 
 ## Install on Windows
 
-1. Get the Windows installer from the [download site](https://del-taiseiozaki.github.io/irori/#download).
+1. Get the Windows installer from the [download site](https://irori-ai.com/#download).
 2. Open the `.exe` and follow the installation steps.
 3. Open irori from the Start menu.
 
@@ -22,7 +22,7 @@ The current preview is unsigned. If SmartScreen appears, verify the download sou
 
 ## Install on Mac
 
-1. Get the Apple silicon build from the [download site](https://del-taiseiozaki.github.io/irori/#download).
+1. Get the Apple silicon build from the [download site](https://irori-ai.com/#download).
 2. Open the `.dmg` and move irori to **Applications**.
 3. Open irori from Applications.
 

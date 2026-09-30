@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { pages, languages, labels } from '../website/docs/navigation';
 
 /** Real built HTML, served under a project subpath without an SPA fallback. */
@@ -148,9 +148,8 @@ export async function checkDocumentation(page: Page) {
     await page.locator('#search-dialog[open]').waitFor();
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#search-dialog[open]').count(), 0);
-    assert(
-      await page.locator('#search-open').evaluate((element) => element === document.activeElement),
-    );
+    // HTMLDialogElement dispatches close asynchronously; wait for its focus restoration.
+    await expect(page.locator('#search-open')).toBeFocused();
     await page.goto(doc('en', 'notes'));
     await page.keyboard.press('Control+k');
     await page.locator('#search-input').fill('pending uploads');
