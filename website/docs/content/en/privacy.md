@@ -3,7 +3,7 @@ title: Privacy and data handling
 description: Understand where notes, Google Drive files, credentials, and AI conversations are stored or sent.
 ---
 
-> **Review draft.** The publisher's identity and privacy contact are awaiting confirmation. This page is preparation for public release; it is not a completed privacy policy or a statement that Google has approved irori.
+> **Review draft.** Publisher and contact details are confirmed. Final policy wording, effective date, owned domain, and Google's review remain pending. This page is public-release preparation; it is not a statement that Google has approved irori.
 
 ## Your notes and local data
 
@@ -52,4 +52,4 @@ Disconnecting Drive, deleting a conversation, removing a hibachi, or uninstallin
 
 ## Publisher and privacy contact
 
-The publisher name, public privacy contact, and final policy effective date must be confirmed before general publication or OAuth verification. Until then, this document remains a review draft. The [public issue tracker](https://github.com/DeL-TaiseiOzaki/irori/issues) can receive non-sensitive bug reports; it is not a private channel for credentials or personal data.
+Publisher: **Taisei Ozaki**. Privacy and support contact: [taisei.ozaki.lab@gmail.com](mailto:taisei.ozaki.lab@gmail.com). These details were confirmed on 2026-09-30. The final policy wording and effective date remain pending review; this document is still a review draft. The [public issue tracker](https://github.com/DeL-TaiseiOzaki/irori/issues) can receive non-sensitive bug reports; it is not a private channel for credentials or personal data.

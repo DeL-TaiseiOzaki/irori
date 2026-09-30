@@ -5,7 +5,9 @@ Public Google preparation, 2026-09-30: **0.1.62 candidate**, isolated branch
 records the actual full `drive` scope, data paths, owner Console/domain steps and
 remaining verification gates. Candidate changes protect rclone credentials with
 OS-backed storage and add host-enforced first-use data confirmations. Bilingual
-privacy/use-license pages remain review drafts pending publisher/contact details.
+privacy/use-license pages remain review drafts pending final policy and domain.
+Owner confirmed Taisei Ozaki / taisei.ozaki.lab@gmail.com and External / Testing;
+no domain is owned yet.
 No OAuth project, audience, domain, approval or general-availability status has
 been changed. This work is not yet merged or published.
 
@@ -14,7 +16,11 @@ Local verification: `npm run build`; `npm test` with bundled rclone (426 tests,
 suites; `npm run build:website` and website smoke (44 articles, 242 links).
 The final interrupted-migration cleanup changes only host credential handling;
 build/unit checks were repeated and the two affected cloud UI suites rerun.
-Native Windows/macOS packaging and OS keychain acceptance require CI. No real
+Native [CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
+passed for source `2d596ed` in draft [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146):
+verify plus Windows, macOS 26 arm64 and Linux packages. Windows/macOS checks
+require real OS secure storage, encrypted config reload after restart, OAuth
+browser handoff and native update checks. No real
 Google consent, native Drive mount or model inference was exercised.
 
 

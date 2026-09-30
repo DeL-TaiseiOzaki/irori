@@ -5,6 +5,21 @@ Google availability. The latest published preview is 0.1.61; the 0.1.62 candidat
 adds credential protection and data-use confirmations. No Console, DNS,
 Search Console, OAuth audience or verification settings have been changed.
 
+Owner-confirmed facts, 2026-09-30: publisher **Taisei Ozaki**, public contact
+**taisei.ozaki.lab@gmail.com**, Google audience **External**, publishing status
+**Testing**, and **no owned domain yet**. Project ID and verification status
+have not been supplied. These are the owner's reported settings, not a Console
+inspection. The implementation and native checks passed in
+[PR #146 CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
+at source `2d596ed`; the PR remains draft and no preview has been published.
+
+The owner selected `getirori.dev` as the first candidate, then asked about
+`irori-ai.com` as an alternative. Both were absent from their official registry
+RDAP records on 2026-09-30; this is not a reservation, checkout availability or
+price guarantee. No domain has been purchased. Either suffix is suitable for
+the website/domain-verification workflow; keep the deployed site's current
+domain until registration and ownership verification are complete.
+
 ## Preserve the current features
 
 `src/cloud/accounts.ts` requests `scope: 'drive'`, meaning
@@ -42,6 +57,56 @@ must still be declared. Google explicitly includes the capability to access
 restricted data through third-party servers in its [security assessment criteria](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification).
 Do not claim a desktop-only exemption while keeping those features.
 
+## Console values to prepare
+
+| Field | Value / remaining action |
+| --- | --- |
+| App name | irori |
+| Publisher | Taisei Ozaki |
+| User support / developer contact | taisei.ozaki.lab@gmail.com; support dropdown must offer the signed-in Google account or an eligible managed group. |
+| Audience | External (owner-reported current value). |
+| Publishing status | Testing (owner-reported current value); move to production at the verification stage, without claiming unlimited approved access. |
+| Scope | `https://www.googleapis.com/auth/drive` |
+| Authorized domain | `<OWNED-DOMAIN>` after registration and DNS Domain Property verification. |
+| Homepage | `https://<OWNED-DOMAIN>/` after deployment. |
+| Privacy | `https://<OWNED-DOMAIN>/docs/en/privacy/` after final policy review/deployment. |
+| Terms | `https://<OWNED-DOMAIN>/docs/en/terms/` after final review/deployment. |
+
+The domain URLs are templates, not live links. Use the existing GitHub Pages
+hosting; buying a separate web-hosting service is unnecessary for this static
+site. At cutover, update the documented canonical/alternate/sitemap and download
+site URLs, configure Pages and DNS, verify HTTPS and retest both locale paths.
+Do not point OAuth Branding to a domain that has not been acquired and verified.
+
+### Registration and DNS handoff
+
+The owner registers the final domain in their own registrar account and confirms
+the exact checkout and renewal prices. There is no connected registrar account
+or payment capability in this workspace; the implementation has performed only
+read-only availability lookups. Do not request account passwords or payment
+details in chat. [Porkbun](https://porkbun.com/products/domains) is a candidate,
+not an account already created or a purchase already authorized/completed.
+
+After registration, use the actual domain for these steps:
+
+1. Verify it in the owner's GitHub account Settings → Pages using GitHub's
+   generated TXT record. Keep that record. Then set the repository Pages custom
+   domain before adding the hosting DNS records.
+2. Point the apex domain to GitHub Pages with four A records:
+   `185.199.108.153`, `185.199.109.153`, `185.199.110.153`,
+   `185.199.111.153`. An optional `www` CNAME points to
+   `del-taiseiozaki.github.io` without a repository path. Use GitHub's
+   [custom-domain instructions](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)
+   and [ownership verification](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages).
+   This site's Actions deployment does not require a CNAME file.
+3. In Google Search Console, the Cloud project Owner adds the root domain as a
+   Domain Property and adds its generated TXT record at the registrar. Verify
+   that property before using the domain in OAuth Branding.
+4. Update the site's canonical, alternate, sitemap and download URLs, deploy,
+   enable/check HTTPS and rerun both-language website checks. DNS and certificate
+   issuance may take time; use the real verification results, not a presumed
+   activation date.
+
 ## Ordered owner and implementation steps
 
 1. **Owner: supply public identity and existing settings.** Confirm publisher
@@ -55,7 +120,9 @@ Do not claim a desktop-only exemption while keeping those features.
    notices only after approval. Publish accessible homepage, privacy and terms
    URLs on the same owned domain. The current github.io project path does not
    provide ownership of github.io. Follow [domain verification](https://support.google.com/cloud/answer/13804266?hl=en)
-   and verify the chosen domain with the project's owner/editor. DNS and hosting
+   and verify a DNS Domain Property using a Google account that is a project
+   Owner. URL-prefix/site verification is not sufficient under the current
+   domain-verification help. DNS and hosting
    changes need the actual domain and account access.
 3. **Implementation + owner: close the data-handling gaps below.** Decide supported
    AI account/provider configurations and document actual recipients, retention,
@@ -75,7 +142,8 @@ Do not claim a desktop-only exemption while keeping those features.
    actual behavior and remaining limitations; hide tokens/private content. Supply
    the required review-accessible video URL and test instructions. See
    [verification submission](https://support.google.com/cloud/answer/13461325?hl=en).
-6. **Owner: submit Brand and restricted Data Access verification.** Attach scope
+6. **Owner: verify and publish Branding, then request restricted Data Access
+   verification in Verification Center.** Attach scope
    justification, video and this data-flow inventory. Answer follow-up requests;
    undertake the assessment Google requires before claiming verification. Google
    determines applicable assessment requirements; do not commission or promise

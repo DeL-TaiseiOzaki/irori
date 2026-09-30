@@ -8,15 +8,16 @@ GitHub Pages workflow.
 
 The `privacy` articles describe the current desktop data flows, full Drive
 scope, retained local copies, external CLI/model transfers, and separate
-deletion controls. They are review drafts until the publisher name, private
-privacy contact, and effective date are confirmed. Do not use them as a final
-policy or submit them for OAuth verification with unresolved identity details.
+deletion controls. The owner confirmed Taisei Ozaki and the public contact
+taisei.ozaki.lab@gmail.com on 2026-09-30. The pages remain review drafts pending
+final wording, effective date, owned-domain publication and data-handling review.
+Do not submit a draft as completed OAuth verification evidence.
 Keep storage claims aligned with the implementation: protecting OAuth
 credentials does not encrypt every Drive cache, source copy, note, or history.
 
 The `terms` articles are also review drafts. They summarize the existing MIT
 license and connected-service requirements; they do not establish a new legal
-agreement or invent publisher commitments. Confirm the publisher details and
+agreement or invent publisher commitments. Publisher details are confirmed;
 approve the final wording before using these links in OAuth Branding. Google's
 [current Branding help](https://support.google.com/cloud/answer/15549049?hl=en)
 says homepage, privacy, and terms links are required for external production

@@ -3,7 +3,7 @@ title: Use and license
 description: Review irori's existing software license, preview status, and connected services before use.
 ---
 
-> **Review draft.** This page summarizes existing license and product facts. It is not a finalized terms-of-service agreement. The publisher's identity, contact, and effective date must be confirmed before this page is used for public release or Google OAuth verification.
+> **Review draft.** This page summarizes existing license and product facts. Publisher and contact details are confirmed; final wording and effective date remain pending review. It is not a finalized terms-of-service agreement or Google verification evidence.
 
 ## Software license
 
@@ -23,4 +23,4 @@ Review [Privacy and data handling](privacy.md) before connecting Drive or runnin
 
 ## Publisher and contact
 
-The publisher identity, public contact channel, and final effective date are awaiting confirmation. Non-sensitive bugs can be reported in the [public issue tracker](https://github.com/DeL-TaiseiOzaki/irori/issues). Do not submit credentials or private files there. Final terms and any additional commitments require the publisher's approval; this draft does not claim that Google has verified the app.
+Publisher: **Taisei Ozaki**. Contact: [taisei.ozaki.lab@gmail.com](mailto:taisei.ozaki.lab@gmail.com). These details were confirmed on 2026-09-30. The final wording and effective date remain pending review. Non-sensitive bugs can be reported in the [public issue tracker](https://github.com/DeL-TaiseiOzaki/irori/issues). Do not submit credentials or private files there. Final terms and any additional commitments require the publisher's approval; this draft does not claim that Google has verified the app.
