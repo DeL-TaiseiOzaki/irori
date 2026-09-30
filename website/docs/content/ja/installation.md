@@ -14,7 +14,7 @@ Windows ARM と Intel Mac の配布版はありません。Linux では[ソー�
 
 ## Windows に入れる
 
-1. [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/#download)で Windows 版を入手します。
+1. [ダウンロードサイト](https://irori-ai.com/#download)で Windows 版を入手します。
 2. `.exe` を開き、インストールを進めます。
 3. スタートメニューから irori を開きます。
 
@@ -22,7 +22,7 @@ Windows ARM と Intel Mac の配布版はありません。Linux では[ソー�
 
 ## Mac に入れる
 
-1. [ダウンロードサイト](https://del-taiseiozaki.github.io/irori/#download)で Apple Silicon 版を入手します。
+1. [ダウンロードサイト](https://irori-ai.com/#download)で Apple Silicon 版を入手します。
 2. `.dmg` を開き、irori を **Applications** に移します。
 3. Applications から irori を開きます。
 

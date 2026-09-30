@@ -1,5 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Custom-domain preparation, 2026-09-30: the owner registered **irori-ai.com**.
+The website-only `docs/custom-domain` branch updates public site URLs and records
+[DNS, Pages and Google ownership steps](CUSTOM-DOMAIN.md). Pages/DNS cutover and
+HTTPS acceptance are pending; registration alone does not establish a live site.
+The published desktop remains 0.1.61. Google readiness work is separate draft
+[PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
+or verification setting has changed.
+
 Published 2026-09-30: **0.1.61** (#142) is merged at the owner's request and
 published as [v0.1.61-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.61-preview.1)
 by release run `36672845624` from main's successful CI run `36671463044`
