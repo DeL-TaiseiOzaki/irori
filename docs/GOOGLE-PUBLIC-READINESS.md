@@ -5,7 +5,8 @@ Google availability. The latest published preview is 0.1.61; the 0.1.62 candidat
 adds credential protection and data-use confirmations. Google OAuth audience
 and verification settings have not been changed. The owner configured DNS and
 the implementation configured/deployed GitHub Pages for the registered domain;
-HTTPS and Google Domain Property verification remain pending.
+HTTPS remains pending. On 2026-10-01 the owner reported successful Google
+Domain Property ownership confirmation in Search Console.
 
 Owner-confirmed facts, 2026-09-30: publisher **Taisei Ozaki**, public contact
 **taisei.ozaki.lab@gmail.com**, Google audience **External**, publishing status
@@ -22,7 +23,8 @@ nameservers plus the four GitHub Pages A records and www CNAME. Website-only
 transient document 503. GitHub reports no certificate yet and strict HTTPS fails
 hostname validation; HTTPS enforcement remains pending. The owner supplied the
 Google Domain Property TXT value and added the record; a fresh Google DNS
-response matches it. No Console success has been reported.
+response matches it. On 2026-10-01 the owner reported that Search Console
+confirmed ownership and opened the Domain Property.
 [PR #148](https://github.com/DeL-TaiseiOzaki/irori/pull/148)
 records cutover evidence. This application candidate remains separate and draft.
 
@@ -73,7 +75,7 @@ Do not claim a desktop-only exemption while keeping those features.
 | Audience | External (owner-reported current value). |
 | Publishing status | Testing (owner-reported current value); move to production at the verification stage, without claiming unlimited approved access. |
 | Scope | `https://www.googleapis.com/auth/drive` |
-| Authorized domain | `irori-ai.com` after DNS Domain Property verification. |
+| Authorized domain | `irori-ai.com`; owner-reported DNS Domain Property verification completed 2026-10-01, but adding it in OAuth Branding remains an owner Console step. |
 | Homepage | `https://irori-ai.com/` after deployment. |
 | Privacy | `https://irori-ai.com/docs/en/privacy/` after final policy review/deployment. |
 | Terms | `https://irori-ai.com/docs/en/terms/` after final review/deployment. |
