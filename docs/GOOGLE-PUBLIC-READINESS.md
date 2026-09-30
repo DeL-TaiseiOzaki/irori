@@ -179,6 +179,10 @@ scope or that optional processing already meets policy.
 
 ## Remaining gates before an honest full-feature submission
 
+The [data policy proposal](GOOGLE-DATA-POLICY-PROPOSAL.md) turns these gates
+into publisher decisions, candidate policy text and the implementation each
+requires.
+
 The following are gaps inferred from source behavior against the
 [Workspace user-data policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy),
 last updated 2026-09-03. Confirm their resolution with the reviewer; none is
