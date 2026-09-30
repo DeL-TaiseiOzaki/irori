@@ -119,8 +119,8 @@ export async function checkDocumentation(page: Page) {
           assert(
             text.includes(
               language === 'ja'
-                ? '認証設定ファイルは暗号化'
-                : 'credential configuration is encrypted',
+                ? '認証設定ファイルを暗号化'
+                : 'candidate encrypts the rclone credential configuration',
             ),
           );
           assert(

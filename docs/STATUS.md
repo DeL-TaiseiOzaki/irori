@@ -1,29 +1,51 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Custom-domain deployment, 2026-09-30: the owner registered **irori-ai.com** at
+XServerドメイン. Website-only [PR #147](https://github.com/DeL-TaiseiOzaki/irori/pull/147)
+is merged at `cb1846b`; [Pages run 36691804740](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36691804740)
+successfully deployed the updated canonical/alternate, social and download URLs.
+GitHub Pages is configured with `irori-ai.com`. The owner corrected nameservers
+and entered DNS records: registry/Google confirm `ns1.xdomain.ne.jp`–`ns3.xdomain.ne.jp`,
+and Google/Cloudflare return the four required A records plus the www CNAME.
+HTTP homepage and the old-site redirect work. Anonymous HTTP browser checks
+passed on rerun after a transient document 503: desktop/mobile, images, current
+download targets, both languages, canonical metadata and search. GitHub still reports no certificate;
+HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. GitHub's
+health result reported a DNS/CAA failure that could not be reproduced against
+any authoritative server or Google/Cloudflare. Provisioning was restarted again
+on 2026-10-01 using GitHub's documented remove/re-add step.
+[DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
+The owner added the Google Domain Property TXT record; a fresh Google DNS
+response matches the supplied value. On 2026-10-01 the owner reported that
+Search Console confirmed ownership and opened the Domain Property.
+The published desktop remains 0.1.61. Google readiness is separate draft
+[PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
+or verification setting has changed.
+
 Public Google preparation, 2026-09-30: **0.1.62 candidate**, isolated branch
 `feat/public-google-readiness`. [Public readiness](GOOGLE-PUBLIC-READINESS.md)
-records the actual full `drive` scope, data paths, owner Console/domain steps and
+records the actual full `drive` scope, data paths, owner Console steps and
 remaining verification gates. Candidate changes protect rclone credentials with
 OS-backed storage and add host-enforced first-use data confirmations. Bilingual
-privacy/use-license pages remain review drafts pending final policy and domain.
-Owner confirmed Taisei Ozaki / taisei.ozaki.lab@gmail.com and External / Testing;
-the owner registered irori-ai.com; DNS/Pages are configured, while HTTPS and
-Google ownership verification remain pending.
-The website domain is configured in separate PR #147. No OAuth project,
-audience, approval or general-availability status has been changed. This work is not yet merged or published.
+privacy/use-license pages remain review drafts pending final policy and release.
+Owner confirmed Taisei Ozaki / taisei.ozaki.lab@gmail.com and External / Testing.
+No OAuth project, audience, approval or general-availability status has been
+changed. This candidate is not yet merged or published.
 
-Local verification: `npm run build`; `npm test` with bundled rclone (426 tests,
-421 passed, zero failed, five environment-gated skips); all 27 Electron UI
-suites; `npm run build:website` and website smoke (44 articles, 242 links).
-The final interrupted-migration cleanup changes only host credential handling;
-build/unit checks were repeated and the two affected cloud UI suites rerun.
-Native [CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
-passed for source `2d596ed` in draft [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146):
-verify plus Windows, macOS 26 arm64 and Linux packages. Windows/macOS checks
-require real OS secure storage, encrypted config reload after restart, OAuth
-browser handoff and native update checks. No real
-Google consent, native Drive mount or model inference was exercised.
-
+Local candidate verification after the latest main merge: `npm run build`;
+`npm test` with bundled rclone (426 tests, 421 passed, zero failed, five
+environment-gated skips); `npm run build:website` and website smoke (44
+articles, 242 links). All 27 Electron UI suites passed before the main merge;
+hosted CI refreshes that integration evidence. The final interrupted-migration
+cleanup changes only host credential handling; build/unit checks were repeated
+and the two affected cloud UI suites rerun. Earlier native
+[CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
+passed for source `2d596ed` in draft
+[PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146): verify plus Windows,
+macOS 26 arm64 and Linux packages. Windows/macOS checks require real OS secure
+storage, encrypted config reload after restart, OAuth browser handoff and native
+update checks. No real Google consent, native Drive mount or model inference was
+exercised.
 
 Published 2026-09-30: **0.1.61** (#142) is merged at the owner's request and
 published as [v0.1.61-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.61-preview.1)

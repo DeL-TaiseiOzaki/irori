@@ -82,7 +82,7 @@ Do not claim a desktop-only exemption while keeping those features.
 
 The domain URLs are intended deployment targets, not confirmed live links. Use
 the existing GitHub Pages hosting; buying a separate web-hosting service is unnecessary for this static
-site. At cutover, update the documented canonical/alternate/sitemap and download
+site. At cutover, update the documented canonical/alternate and download
 site URLs, configure Pages and DNS, verify HTTPS and retest both locale paths.
 Do not point OAuth Branding to a domain that has not been acquired and verified.
 
@@ -90,8 +90,9 @@ Do not point OAuth Branding to a domain that has not been acquired and verified.
 
 The owner has registered `irori-ai.com` at XServerドメイン. Use its domain DNS
 settings and confirm the authoritative nameservers before acceptance. There is no connected registrar account or payment capability in
-this workspace; the implementation has performed only read-only registry, DNS
-and Pages lookups. Registration was completed by the owner. Do not request
+this workspace. Registration and DNS changes were completed by the owner; the
+implementation changed the repository's GitHub Pages setting and performed
+read-only registry and DNS checks. Do not request
 account passwords or payment details in chat.
 
 Use `irori-ai.com` for these steps:
@@ -192,7 +193,9 @@ waived by a privacy notice or blanket user agreement.
   Existing native tool permissions vary by CLI and access mode.
 - Arbitrary CLI/provider/tool settings do not prove Limited Use compliance.
   Qualify supported configurations; Google-derived data must not train general
-  models. The current code cannot establish downstream policy compliance.
+  models. The current code cannot establish downstream policy compliance. The
+  final privacy policy also needs the publisher's affirmative Limited Use
+  commitment, after the supported transfer paths can substantiate it.
 - Review retained copies, cache-header constraints and deletion on request.
   Disconnect, uninstall and conversation deletion do not erase every copy;
   there is no complete product-level erasure control.

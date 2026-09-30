@@ -18,7 +18,7 @@ import {
 import type { Plugin } from 'vite';
 import { groups, pages, languages, labels, type Language, type SearchEntry } from './navigation';
 
-const site = 'https://del-taiseiozaki.github.io/irori/';
+const site = 'https://irori-ai.com/';
 interface Article extends SearchEntry {
   body: string;
   group: string;
