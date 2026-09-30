@@ -72,8 +72,8 @@ registration or a successful local build alone.
 ## Google ownership verification after site activation
 
 The owner added the Search Console TXT record. A fresh Google DNS response
-returns the exact supplied value at the apex. Search Console ownership
-confirmation remains pending; public DNS visibility alone is not that result.
+returns the exact supplied value at the apex, and on 2026-10-01 the owner
+reported that Search Console accepted it and opened the Domain Property.
 Retain the record in DNS, not application configuration.
 
 The Google Cloud project Owner opens Search Console, adds **Domain Property**

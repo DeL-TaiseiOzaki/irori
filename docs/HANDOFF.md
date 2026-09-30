@@ -14,7 +14,8 @@ HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. Domain
 provisioning was restarted after the DNS repair per GitHub's documented steps.
 [DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
 The owner added the Google Domain Property TXT record; a fresh Google DNS
-response matches the supplied value. Console ownership confirmation is pending.
+response matches the supplied value. On 2026-10-01 the owner reported that
+Search Console confirmed ownership and opened the Domain Property.
 The published desktop remains 0.1.61. Google readiness is separate draft
 [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
 or verification setting has changed.
