@@ -74,8 +74,8 @@ Do not claim a desktop-only exemption while keeping those features.
 | User support / developer contact | taisei.ozaki.lab@gmail.com; support dropdown must offer the signed-in Google account or an eligible managed group. |
 | Audience | External (owner-reported current value). |
 | Publishing status | Testing (owner-reported current value); move to production at the verification stage, without claiming unlimited approved access. |
-| Scope | `https://www.googleapis.com/auth/drive` |
-| Authorized domain | `irori-ai.com`; owner-reported DNS Domain Property verification completed 2026-10-01, but adding it in OAuth Branding remains an owner Console step. |
+| Scope | `https://www.googleapis.com/auth/drive`; the owner's Data Access screenshot on 2026-10-01 shows it as the only scope, under restricted scopes, with no sensitive or non-sensitive scopes and no unsaved changes. |
+| Authorized domain | `irori-ai.com`; Search Console Domain Property verified (owner-reported 2026-10-01), and the owner's Branding screenshot on 2026-10-01 shows it as authorized domain 1. |
 | Homepage | `https://irori-ai.com/` after deployment. |
 | Privacy | `https://irori-ai.com/docs/en/privacy/` after final policy review/deployment. |
 | Terms | `https://irori-ai.com/docs/en/terms/` after final review/deployment. |
