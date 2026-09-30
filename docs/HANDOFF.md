@@ -1,15 +1,17 @@
 # irori continuation handoff
 
-Current development, 2026-09-30: **conversations (0.1.60) are on `feat/conversation-history`**,
-[ADR 017](decisions/017-conversation-history.md) stage 1, described in
-[CONVERSATIONS](CONVERSATIONS.md); STATUS has the details. Leave the pull request open until
-the owner says to merge, then publish as usual. It sits on the prompts refactor (#139, 0.1.59),
-which sits on page comments (#136, 0.1.58, [ADR 018](decisions/018-comments.md)): merge #136,
-then #139 and this, each retargeted to `main` once the one below is in. Next, when the owner
-asks: stage 2 (the **会話の保存先** setting and moving conversations, search over titles, notes
-and text), then stage 3 (rewind, clone, rebuilt context, native fork per CLI). Still
+Current development, 2026-09-30: **0.1.60 is published** as
+[v0.1.60-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.60-preview.1)
+(#136, #139, #140; release run `36660235725` from main CI `36658865418` at `a6b53a0`). It
+carries page comments ([ADR 018](decisions/018-comments.md), 0.1.58), the agent prompts
+gathered in `prompts/` (0.1.59) and conversations
+([ADR 017](decisions/017-conversation-history.md) stage 1, described in
+[CONVERSATIONS](CONVERSATIONS.md)); STATUS has the details. Next for conversations, when the
+owner asks: stage 2 (the **会話の保存先** setting and moving conversations, search over titles,
+notes and text), then stage 3 (rewind, clone, rebuilt context, native fork per CLI). Still
 unverified: real CLIs with the new store (Claude Code's `tool_result` capture in particular)
-and an installed app.
+and an installed app. The old `agent-conversations`/`agent-sessions` files are removed in a
+later release.
 
 Current development, 2026-09-30: **0.1.57 is published** as
 [v0.1.57-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.57-preview.1)

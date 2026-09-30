@@ -1,6 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Conversations, 2026-09-30 (**0.1.60**, branch `feat/conversation-history`, not yet merged):
+Published 2026-09-30: #136 (**0.1.58**, comments), #139 (**0.1.59**, prompts) and #140
+(**0.1.60**, conversations) are merged in that order, by the owner's own `gh pr merge` after
+this session's merge was refused by the classifier, and published together as
+[v0.1.60-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.60-preview.1)
+by release run `36660235725` from main's CI run `36658865418` (source `a6b53a0`). 0.1.58 and
+0.1.59 were never published on their own; the release notes are 0.1.60's. The release carries
+Windows 202,725,888 bytes, Mac 170,183,421 bytes and `irori-0.1.60-full.nupkg` 202,086,069
+bytes; anonymous downloads matched `SHA256SUMS.txt`.
+
+Conversations, 2026-09-30 (**0.1.60**, #140):
 [ADR 017](decisions/017-conversation-history.md) stage 1 (D1, D2, D4, D5 without search, D6's
 **新しい会話**, D8), described in [CONVERSATIONS](CONVERSATIONS.md). The owner approved the plan
 on 2026-09-30 and chose, where the ADR was silent or the code differed from it: record tool
