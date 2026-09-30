@@ -114,9 +114,12 @@ try {
     'file-away',
     'weekly-review',
   ]);
-  expect(await read('.agents/skills/file-away/SKILL.md')).toBe(
-    '---\nname: file-away\ndescription: Files yesterday into the library.\nmetadata:\n  roles: editor\n---\n\nOnly ever append.\n',
-  );
+  // The watcher can list the renamed folder before its metadata write finishes.
+  await expect
+    .poll(() => read('.agents/skills/file-away/SKILL.md'))
+    .toBe(
+      '---\nname: file-away\ndescription: Files yesterday into the library.\nmetadata:\n  roles: editor\n---\n\nOnly ever append.\n',
+    );
 
   // A rule, created and then deleted after confirmation.
   await schema.getByRole('button', { name: 'ルールを追加', exact: true }).click();

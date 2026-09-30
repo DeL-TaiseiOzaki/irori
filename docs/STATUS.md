@@ -1,7 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Correctness/performance audit, 2026-09-30: **0.1.61** is prepared on
-`fix/performance-correctness-audit`, based on published 0.1.60 (`b91a1dd`).
+Published 2026-09-30: **0.1.61** (#142) is merged at the owner's request and
+published as [v0.1.61-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.61-preview.1)
+by release run `36672845624` from main's successful CI run `36671463044`
+(attempt 2, source `1d11447`). Windows and Mac package launch/update checks passed;
+Linux package checks passed. The release carries Windows 202,725,888 bytes,
+Mac 170,185,390 bytes and the Windows full update package
+202,086,166 bytes. Anonymous downloads of all six release
+files matched GitHub's asset digests; the three application packages also matched
+`SHA256SUMS.txt` and native package evidence. The website manifest now offers this
+release. Pages deployment and release-sync verification follow its merge.
+
+The first main CI attempt caught an existing Schema UI smoke timing race: the
+watcher could list a renamed skill before its metadata write completed. The
+assertion now polls for the same exact file contents, preserving all checks;
+the focused smoke passed locally. The unmodified source CI passed on attempt 2.
+
+Correctness/performance audit, 2026-09-30: **0.1.61**, based on published
+0.1.60 (`b91a1dd`).
 The [audit](AUDIT-2026-09-30.md) records the current architecture, reproductions,
 measurements and remaining candidates. Small changes across eight application
 files recover transient search/graph read failures, preserve live permission/
@@ -20,8 +36,8 @@ corrections, including a 64 MiB heap-limited history read. Five paired Node 24.2
 measurements on a synthetic 100 MiB history reduced median heap growth from
 148 MiB to 21 MiB and RSS from 201 MiB to 48 MiB; time was 270 ms versus 299 ms,
 so this is a memory improvement rather than a history speedup. Real model
-inference and installed Windows/macOS acceptance were not run. The PR remains
-open for review; this version has not been merged or published.
+inference and installed Windows/macOS device acceptance were not run. Native CI
+package launch and update checks passed before publication.
 
 Published 2026-09-30: #136 (**0.1.58**, comments), #139 (**0.1.59**, prompts) and #140
 (**0.1.60**, conversations) are merged in that order, by the owner's own `gh pr merge` after
