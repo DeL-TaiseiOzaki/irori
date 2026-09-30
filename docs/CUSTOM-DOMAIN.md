@@ -8,11 +8,19 @@ not change the desktop release, Google audience or OAuth verification status.
 ## Cutover state
 
 - Registration: owner-confirmed at XServerドメイン.
-- GitHub Pages: workflow deployment, currently no custom domain configured.
-- Public DNS: an initial lookup returned SERVFAIL, so DNS activation has not been
-  established. Registration and DNS propagation are separate steps.
+- GitHub Pages: custom domain `irori-ai.com` configured. Website PR #147 is
+  merged at `cb1846b`; Pages run `36691804740` successfully deployed that source.
+- Public DNS: the owner reports adding the four A records and www CNAME.
+  Registry delegation still points to `ns1.xserver.jp` through `ns5.xserver.jp`;
+  Google and Cloudflare resolvers report REFUSED / SERVFAIL. Switch delegation
+  to the domain DNS service (`ns1.xdomain.ne.jp` through `ns3.xdomain.ne.jp`)
+  before accepting the entered records. Registrar access is required from the
+  owner; this workspace has no connected registrar account.
 - Canonical, language alternate, social preview and documentation
-  download URLs: prepared for `https://irori-ai.com/` in the cutover branch.
+  download URLs: deployed for `https://irori-ai.com/`. Local build/browser checks
+  and all PR verification/native package jobs passed before merge.
+- HTTPS: no certificate reported yet and enforcement is currently false. DNS
+  resolution, certificate issuance and anonymous HTTPS acceptance remain pending.
 - Privacy/use-license pages and Google review work remain in draft PR #146;
   those pages are not present in the currently deployed site.
 

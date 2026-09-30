@@ -1,10 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Custom-domain preparation, 2026-09-30: the owner registered **irori-ai.com**.
-The website-only `docs/custom-domain` branch updates public site URLs and records
-[DNS, Pages and Google ownership steps](CUSTOM-DOMAIN.md). Pages/DNS cutover and
-HTTPS acceptance are pending; registration alone does not establish a live site.
-The published desktop remains 0.1.61. Google readiness work is separate draft
+Custom-domain deployment, 2026-09-30: the owner registered **irori-ai.com** at
+XServerドメイン. Website-only [PR #147](https://github.com/DeL-TaiseiOzaki/irori/pull/147)
+is merged at `cb1846b`; [Pages run 36691804740](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36691804740)
+successfully deployed the updated canonical/alternate, social and download URLs.
+GitHub Pages is configured with `irori-ai.com`. The owner added DNS records, but
+registry delegation still uses `ns1.xserver.jp`–`ns5.xserver.jp` and public queries
+are refused. Owner action: switch to the domain DNS service's
+`ns1.xdomain.ne.jp`–`ns3.xdomain.ne.jp`. DNS, certificate issuance, HTTPS enforcement
+and anonymous acceptance remain pending; do not claim the site is accessible.
+[DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
+The published desktop remains 0.1.61. Google readiness is separate draft
 [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
 or verification setting has changed.
 
