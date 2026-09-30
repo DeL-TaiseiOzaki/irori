@@ -1,4 +1,24 @@
-# Checkpoint — 0.1.6 through 0.1.9 preview deliveries
+# Publication checkpoints
+
+## Documentation website, 2026-09-30
+
+At the owner's request to merge and publish, [#143](https://github.com/DeL-TaiseiOzaki/irori/pull/143)
+merged as `7b6f736656f1fc6dc40ab648605c0040f05266bf` at 05:53:52 UTC.
+Its verification and Linux, Windows and macOS packaging jobs all passed.
+[Pages run 36675560183](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36675560183)
+deployed that commit successfully at 05:55 UTC.
+
+The live [Japanese guide](https://del-taiseiozaki.github.io/irori/docs/ja/) and
+[English guide](https://del-taiseiozaki.github.io/irori/docs/en/) contain 20 articles
+each. Anonymous HTTP requests to all 40 articles returned 200. A signed-out
+browser verified the download page's documentation entrance, both languages,
+section-preserving language switches, Japanese and English search, image assets,
+theme persistence, mobile navigation and the Japanese default at `/docs/`.
+Public verification completed before 05:58 UTC; screenshots remain in ignored
+`test-results/irori-docs-published-*.png`. The download page still offers
+`v0.1.61-preview.1`; this website-only publication creates no desktop release.
+
+## 0.1.6 through 0.1.9 preview deliveries
 
 ## 0.1.9, a branch that predated the checks
 
