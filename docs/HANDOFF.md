@@ -10,8 +10,10 @@ and Google/Cloudflare return the four required A records plus the www CNAME.
 HTTP homepage and the old-site redirect work. Anonymous HTTP browser checks
 passed on rerun after a transient document 503: desktop/mobile, images, current
 download targets, both languages, canonical metadata and search. GitHub still reports no certificate;
-HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. Domain
-provisioning was restarted after the DNS repair per GitHub's documented steps.
+HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. GitHub's
+health result reported a DNS/CAA failure that could not be reproduced against
+any authoritative server or Google/Cloudflare. Provisioning was restarted again
+on 2026-10-01 using GitHub's documented remove/re-add step.
 [DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
 The owner added the Google Domain Property TXT record; a fresh Google DNS
 response matches the supplied value. On 2026-10-01 the owner reported that

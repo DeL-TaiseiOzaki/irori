@@ -25,10 +25,13 @@ not change the desktop release, Google audience or OAuth verification status.
   download URLs: deployed for `https://irori-ai.com/`. Local build/browser checks
   and all PR verification/native package jobs passed before merge.
 - HTTPS: no certificate reported yet and enforcement is currently false. An
-  enable request returned "The certificate does not exist yet". After DNS was
-  repaired, the custom domain was removed/re-added once following GitHub's
-  provisioning troubleshooting instructions. Certificate issuance and anonymous
-  HTTPS/browser acceptance remain pending; certificate validation is not bypassed.
+  enable request returned "The certificate does not exist yet". GitHub's health
+  result reported `InvalidDNSError` and a CAA `SERVFAIL`, although direct UDP and
+  TCP queries to all three authoritative servers returned authoritative
+  `NOERROR`; Google and Cloudflare also resolve the records. On 2026-10-01 the
+  custom domain was removed and re-added again to restart provisioning after
+  that mismatch. Certificate issuance and anonymous HTTPS/browser acceptance
+  remain pending; certificate validation is not bypassed.
 - Privacy/use-license pages and Google review work remain in draft PR #146;
   those pages are not present in the currently deployed site.
 
