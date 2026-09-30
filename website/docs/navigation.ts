@@ -1,0 +1,100 @@
+export type Language = 'ja' | 'en';
+export const languages: Language[] = ['ja', 'en'];
+export const groups = [
+  { id: 'start', ja: 'はじめに', en: 'Get started' },
+  { id: 'knowledge', ja: 'ノートと知識', en: 'Notes and knowledge' },
+  { id: 'agents', ja: 'AI と仕事を進める', en: 'Work with AI' },
+  { id: 'connections', ja: '資料と共有', en: 'Materials and sharing' },
+  { id: 'reference', ja: '設定とヘルプ', en: 'Settings and help' },
+] as const;
+export const pages = [
+  { slug: 'index', group: 'start' },
+  { slug: 'quickstart', group: 'start' },
+  { slug: 'installation', group: 'start' },
+  { slug: 'workspaces', group: 'start' },
+  { slug: 'layers', group: 'start' },
+  { slug: 'notes', group: 'knowledge' },
+  { slug: 'links', group: 'knowledge' },
+  { slug: 'properties', group: 'knowledge' },
+  { slug: 'comments', group: 'knowledge' },
+  { slug: 'daily-notes', group: 'knowledge' },
+  { slug: 'agents', group: 'agents' },
+  { slug: 'conversations', group: 'agents' },
+  { slug: 'irori-mode', group: 'agents' },
+  { slug: 'schema', group: 'agents' },
+  { slug: 'routines', group: 'agents' },
+  { slug: 'files', group: 'connections' },
+  { slug: 'drive', group: 'connections' },
+  { slug: 'git', group: 'connections' },
+  { slug: 'settings', group: 'reference' },
+  { slug: 'troubleshooting', group: 'reference' },
+] as const;
+
+export interface SearchEntry {
+  language: Language;
+  slug: string;
+  title: string;
+  description: string;
+  text: string;
+}
+
+export const labels = {
+  ja: {
+    docs: 'ドキュメント',
+    download: 'ダウンロード',
+    search: 'ドキュメントを検索',
+    searchPlaceholder: '知りたいことを検索…',
+    navigation: 'ガイド一覧',
+    outline: 'このページの内容',
+    skip: '本文へ移動',
+    theme: 'テーマを切り替え',
+    close: '閉じる',
+    empty: '一致する記事がありません。別の言葉で検索してください。',
+    searchHint: '記事のタイトルや本文を検索できます。',
+    results: '検索結果',
+    searchKeys: '↑ ↓ 選択　Enter 開く　Esc 閉じる',
+    edit: 'このページを編集',
+    previous: '前の記事',
+    next: '次の記事',
+    preview: '検証版のガイド',
+    feedback: '問題を報告',
+    step1: 'irori をインストール',
+    step2: 'hibachi を追加',
+    step3: '書いて、AI に頼む',
+    step1Body: 'Windows と Apple Silicon Mac に対応。',
+    step2Body: '手元のフォルダを知識ベースとして開きます。',
+    step3Body: '最初のノートから、次の仕事につなげます。',
+    schema: 'AI への指示とスキル',
+    knowledge: '書きためるノート',
+    contents: '読み込む資料',
+  },
+  en: {
+    docs: 'Documentation',
+    download: 'Download',
+    search: 'Search documentation',
+    searchPlaceholder: 'What would you like to know?',
+    navigation: 'Browse guides',
+    outline: 'On this page',
+    skip: 'Skip to content',
+    theme: 'Switch theme',
+    close: 'Close',
+    empty: 'No matching articles. Try another word.',
+    searchHint: 'Search article titles and their contents.',
+    results: 'Search results',
+    searchKeys: '↑ ↓ Select　Enter Open　Esc Close',
+    edit: 'Edit this page',
+    previous: 'Previous',
+    next: 'Next',
+    preview: 'Preview guide',
+    feedback: 'Report an issue',
+    step1: 'Install irori',
+    step2: 'Add a hibachi',
+    step3: 'Write, then ask',
+    step1Body: 'For Windows and Apple silicon Macs.',
+    step2Body: 'Open a local folder as your knowledge base.',
+    step3Body: 'Take the next step from your first note.',
+    schema: 'Instructions and skills for AI',
+    knowledge: 'The notes you write',
+    contents: 'Your source materials',
+  },
+} as const;

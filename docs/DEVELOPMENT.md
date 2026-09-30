@@ -25,14 +25,18 @@ npm start
 - A GUI display must actually be visible to you; an SSH or container shell alone will not show an Electron window. For a Linux VM, `npm run preview:vm` starts a private browser viewer of the real desktop ([VM preview](VM-PREVIEW.md)). For headless verification use `xvfb-run -a npm run test:ui`.
 - If the system Node is still 20, `npm ci` prints engine warnings even though later npm scripts use the pinned local Node 24. The Vite chunk-size warning is not a build failure.
 
-## Preview the download site
+## Preview the download and documentation sites
 
 ```sh
 npm run dev:website      # local preview
 npm run build:website    # static output in dist-website/
 ```
 
-`website/` is the distribution entrance; it does not run the desktop application in a browser. Publication steps are in [DISTRIBUTION](DISTRIBUTION.md).
+`website/` contains the download entrance and the user guide at `/docs/ja/`
+and `/docs/en/`. Both build into `dist-website/`; the desktop application does not
+run in the browser. For authoring, translations and website verification, see
+[the documentation website guide](../website/docs/README.md). Publication steps
+are in [DISTRIBUTION](DISTRIBUTION.md).
 
 ## Verification
 

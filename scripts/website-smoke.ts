@@ -5,6 +5,7 @@ import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { release, releaseSchema } from '../website/release';
+import { checkDocumentation } from './website-docs-smoke';
 
 const temporary = await mkdtemp(path.join(tmpdir(), 'irori-website-'));
 const server = await preview({
@@ -95,6 +96,26 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await page.screenshot({ path: 'test-results/irori-website-mobile.png', fullPage: true });
+  await checkDocumentation(page);
+  // An actual JavaScript-disabled window must still read and navigate static guides.
+  const offlineWindow = app.waitForEvent('window');
+  await app.evaluate(({ BrowserWindow }, target) => {
+    const window = new BrowserWindow({
+      width: 1440,
+      height: 1000,
+      webPreferences: { javascript: false, sandbox: true },
+    });
+    void window.loadURL(target);
+  }, `${url}docs/ja/notes/`);
+  const reader = await offlineWindow;
+  await reader.locator('h1').waitFor();
+  assert.equal(await reader.locator('h1').innerText(), 'ノートの編集');
+  assert(await reader.locator('.sidebar-inner').isVisible());
+  await reader.getByRole('link', { name: 'English', exact: true }).click();
+  await reader.waitForURL('**/docs/en/notes/');
+  assert.equal(await reader.locator('h1').innerText(), 'Editing notes');
+  await reader.close();
+  await page.setViewportSize({ width: 390, height: 844 });
   const available = releaseSchema.parse({
     version: '0.1.0-fixture',
     notes: 'https://example.invalid/irori/releases/tag/v0.1.0-fixture',
