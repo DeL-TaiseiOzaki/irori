@@ -13,8 +13,8 @@ inspection. The implementation and native checks passed in
 [PR #146 CI 36680214393](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36680214393)
 at source `2d596ed`; the PR remains draft and no preview has been published.
 
-The owner registered `irori-ai.com` after considering `getirori.dev`. Registrar
-account access, DNS activation, GitHub Pages cutover and Google Domain Property
+The owner registered `irori-ai.com` at XServerドメイン. Registrar account access,
+DNS activation, GitHub Pages cutover and Google Domain Property
 verification remain pending. Website-only cutover work is on the independent
 `docs/custom-domain` branch; do not merge the application candidate merely to
 change the public site's domain. Registration alone is not live-site evidence.
@@ -79,9 +79,8 @@ Do not point OAuth Branding to a domain that has not been acquired and verified.
 
 ### Registration and DNS handoff
 
-The owner has registered `irori-ai.com` in their own registrar account. Confirm
-the registrar and authoritative DNS provider before giving provider-specific
-instructions. There is no connected registrar account or payment capability in
+The owner has registered `irori-ai.com` at XServerドメイン. Use its domain DNS
+settings and confirm the authoritative nameservers before acceptance. There is no connected registrar account or payment capability in
 this workspace; the implementation has performed only read-only registry, DNS
 and Pages lookups. Registration was completed by the owner. Do not request
 account passwords or payment details in chat.
