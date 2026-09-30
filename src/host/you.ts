@@ -7,12 +7,12 @@ import { t } from '../domain/i18n';
 import {
   subAgentDefinition,
   subAgentFiles,
-  yourAiStarter,
   type BrainAgent,
   type SubAgentCli,
   type YourAi,
   type YourAiEntry,
 } from '../domain/you';
+import { yourAiStarter } from '../../prompts';
 import { readTextDocument } from './files';
 import { readLocalJson, writeLocalJson } from './local-json';
 import type { SchemaFolder } from './schema-folder';

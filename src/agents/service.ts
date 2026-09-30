@@ -1,7 +1,7 @@
 import { KnowledgeStore } from '../knowledge/store';
 import { AuthorshipStore, editedPath, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
-import { personLinesSummary, type RunRecord } from '../domain/knowledge';
+import type { RunRecord } from '../domain/knowledge';
 import { randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
@@ -35,18 +35,24 @@ import type { FileService } from '../host/files';
 import { SessionStore, type SessionBinding } from './sessions';
 import { ConversationStore } from './conversations';
 import { startInput, type Conversation } from '../domain/conversation';
-import { promptWithSkill } from '../domain/skills';
-import { commentsPointer, commentsSummary } from '../domain/comments';
+import {
+  brainsCommandPreamble,
+  brainsPreamble,
+  commentsPointer,
+  commentsSummary,
+  handedTask,
+  permissionDenied,
+  personLinesSummary,
+  promptWithSkill,
+  questionDeclined,
+  selectedNote,
+  selectedSources,
+} from '../../prompts';
 import { commentsCount, readNoteComments } from '../host/comments';
 import { parseSkill, requireSkill } from '../host/skills';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
-import {
-  brainAgentNames,
-  brainsCommandPreamble,
-  brainsPreamble,
-  hasSubAgents,
-} from '../domain/you';
+import { brainAgentNames, hasSubAgents } from '../domain/you';
 import { categoryName } from '../domain/brains';
 import {
   brainOfAgent,
@@ -529,9 +535,7 @@ export class AgentService {
       }
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
-        promptParts.push(
-          `The user selected this note in the active KB: ${JSON.stringify(input.notePath)}. Read its current saved bytes before editing.`,
-        );
+        promptParts.push(selectedNote(input.notePath));
         // Only when the person asked: which lines are theirs is not needed on every
         // turn. Line numbers are those of the saved bytes the agent is told to read.
         const note = { scopeId: input.scopeId, path: input.notePath };
@@ -578,19 +582,15 @@ export class AgentService {
       record = await this.knowledge.begin(run.id, input);
       if (record.sources.length)
         promptParts.push(
-          'Explicitly selected source observations (preserve native access permissions):\n' +
-            record.sources
-              .map((source) =>
-                JSON.stringify({
-                  scopeId: source.scopeId,
-                  path: source.path,
-                  sourceId: source.id,
-                  sha256: source.hash,
-                  snapshot: this.knowledge.blobPath(source.hash),
-                }),
-              )
-              .join('\n') +
-            '\nRetained snapshots are read-only references: never modify them. Read these observed bytes when grounding an artifact; report if access is unavailable.',
+          selectedSources(
+            record.sources.map((source) => ({
+              scopeId: source.scopeId,
+              path: source.path,
+              sourceId: source.id,
+              sha256: source.hash,
+              snapshot: this.knowledge.blobPath(source.hash),
+            })),
+          ),
         );
       if (run.step) promptParts.push(run.step.preamble);
       promptParts.push(input.prompt);
@@ -816,7 +816,7 @@ export class AgentService {
         agent: input.agent,
         model: input.model,
         access: defaultAgentAccess(input.agent),
-        prompt: `irori: the irori agent handed you this task. Finish with a short report: what you did, and every file you created or changed, as paths inside this hibachi.\n\n${task}`,
+        prompt: handedTask(task),
       },
       undefined,
       holder.id,
@@ -974,9 +974,7 @@ export class AgentService {
           questions.map((q) => [
             q.id,
             {
-              answers: reply.allow
-                ? [reply.answers?.[q.id] ?? ''].flat()
-                : ['User declined to answer.'],
+              answers: reply.allow ? [reply.answers?.[q.id] ?? ''].flat() : [questionDeclined],
             },
           ]),
         ),
@@ -1186,7 +1184,7 @@ export class AgentService {
                     ),
                   },
                 }
-              : { behavior: 'deny', message: 'User declined to answer' };
+              : { behavior: 'deny', message: questionDeclined };
           }
           const reply = await this.ask(
             run,
@@ -1197,7 +1195,7 @@ export class AgentService {
           );
           return reply.allow
             ? { behavior: 'allow', updatedInput: input }
-            : { behavior: 'deny', message: 'The user denied this operation.' };
+            : { behavior: 'deny', message: permissionDenied };
         },
       },
     });

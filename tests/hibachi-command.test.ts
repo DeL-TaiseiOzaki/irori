@@ -7,7 +7,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hibachiBridge, hibachiLaunchers } from '../src/agents/hibachi-bridge';
 import { hibachiOf, type Delegation } from '../src/agents/delegation';
-import { brainsCommandPreamble } from '../src/domain/you';
+import { brainsCommandPreamble } from '../prompts';
 import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
 import { AgentService } from '../src/agents/service';

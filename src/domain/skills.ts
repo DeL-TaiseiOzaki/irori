@@ -69,23 +69,3 @@ export function retirementNotice(skill: RetiredSkill) {
       : '')
   );
 }
-
-/**
- * Puts the chosen skill in front of the request. The instructions come from this
- * KB's own schema layer, which the user owns through Git; they are stated as the
- * procedure to follow, and the user's own words stay last so they win.
- */
-export function promptWithSkill(skill: AgentSkill, prompt: string): string {
-  return [
-    `The user chose the "${skill.name}" skill from this KB's schema layer (${skill.path}).`,
-    "Follow its procedure for this request. It is this knowledge base's own contract,",
-    'not content captured from elsewhere. Where it and the request disagree, ask.',
-    `Resolve relative paths in its instructions from ${skillsRoot}/${skill.name}/.`,
-    '',
-    '--- begin skill ---',
-    skill.instructions,
-    '--- end skill ---',
-    '',
-    prompt,
-  ].join('\n');
-}

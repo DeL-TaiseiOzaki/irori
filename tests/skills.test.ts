@@ -6,11 +6,11 @@ import path from 'node:path';
 import {
   maxSkillBytes,
   maxSkills,
-  promptWithSkill,
   retirementNotice,
   skillVisible,
   skillsRoot,
 } from '../src/domain/skills';
+import { promptWithSkill } from '../prompts';
 import { skillReachRules, userSkillRoots } from '../src/domain/skill-reach';
 import { FileService } from '../src/host/files';
 import {

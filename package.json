@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -15,7 +15,7 @@
     "test:your-ai": "tsx scripts/your-ai-acceptance.ts",
     "test:routines": "tsx scripts/routines-acceptance.ts",
     "typecheck": "tsc --noEmit",
-    "format:check": "prettier --check src scripts tests",
+    "format:check": "prettier --check src prompts scripts tests",
     "test:lifecycle": "tsx scripts/lifecycle-agents.ts",
     "setup:electron": "node node_modules/electron/install.js",
     "start:container": "node scripts/start.mjs --container",

@@ -35,6 +35,11 @@ the owner why it is not published. The owner has authorized agents to publish
 previews after an authorized merge. Signing identities, notarization, non-preview
 releases and account changes still need separate authorization.
 
+Words irori gives a CLI agent — request preambles, sub-agent definitions,
+hook notices, refusal reasons — live in [prompts/](prompts/README.md), one file
+per situation. Code imports them from there instead of writing its own; a new
+situation adds a file and a row to that README.
+
 Keep filesystem/process operations behind `src/domain/types.ts`'s `HostAPI`.
 Never expose raw IPC, Node access or shell execution to document content.
 Use disposable KBs for mutation tests. Keep credentials, provider transcripts

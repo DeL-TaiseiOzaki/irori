@@ -13,12 +13,8 @@ import { readFolderSkills } from '../src/host/skills';
 import { AgentService } from '../src/agents/service';
 import { defaultAgentAccess } from '../src/domain/agent-access';
 import { writeDecision, type Delegation } from '../src/agents/delegation';
-import {
-  brainAgentNames,
-  brainsPreamble,
-  subAgentDefinition,
-  yourAiStarter,
-} from '../src/domain/you';
+import { brainAgentNames, subAgentDefinition } from '../src/domain/you';
+import { brainsPreamble, yourAiStarter } from '../prompts';
 import type { AgentEvent, Space } from '../src/domain/types';
 
 const fixtureOptions = {
