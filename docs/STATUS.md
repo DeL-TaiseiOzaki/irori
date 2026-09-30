@@ -52,6 +52,9 @@ HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. GitHub'
 health result reported a DNS/CAA failure that could not be reproduced against
 any authoritative server or Google/Cloudflare. Provisioning was restarted again
 on 2026-10-01 using GitHub's documented remove/re-add step.
+After the restart, GitHub's health check still failed while Let's Debug's
+certificate-authority checks passed for both hosts; the support-ready
+[diagnosis](CUSTOM-DOMAIN.md#https-diagnosis-for-github-support) is unsent.
 [DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
 The owner added the Google Domain Property TXT record; a fresh Google DNS
 response matches the supplied value. On 2026-10-01 the owner reported that
