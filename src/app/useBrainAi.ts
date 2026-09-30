@@ -12,22 +12,36 @@ import { errorText } from './ErrorMessage';
 const host = window.irori;
 
 export interface BrainAi {
+  /** The conversation read: the one asked for, or the owner's on show. */
+  id?: string;
+  /** The CLI of that conversation, once it has begun. */
+  agent?: AgentId;
   events: AgentEvent[];
   queued: QueuedMessage[];
+  /** Instructions waiting across the owner's conversations. */
+  pending: number;
   running: boolean;
   ready: boolean;
   error: string;
 }
 
 /**
- * One brain's hibachi agent as the Overview sees it: its conversation with the live
- * requests, its queue, and whether a run is in progress. Events stream in; a
- * run's start or end reads the queue again, since it changes then.
+ * One owner's agent as the Overview sees it: a conversation with the live
+ * requests, its queue, and whether a run is in progress. Without a conversation
+ * id it follows the owner's conversation on show, the one running first. Events
+ * stream in; a run's start or end reads the conversation again, since the queue
+ * and the conversation on show change then.
  */
-export function useBrainAi(scopeId: string, agent: AgentId, refresh = 0): BrainAi {
+export function useBrainAi(
+  scopeId: string,
+  agent: AgentId,
+  refresh = 0,
+  conversationId?: string,
+): BrainAi {
   const [state, setState] = useState<BrainAi>({
     events: [],
     queued: [],
+    pending: 0,
     running: false,
     ready: false,
     error: '',
@@ -35,27 +49,34 @@ export function useBrainAi(scopeId: string, agent: AgentId, refresh = 0): BrainA
   const [reread, setReread] = useState(0);
   useEffect(() => {
     let current = true;
+    let shown = conversationId;
     void host
-      .agentConversation(scopeId, agent)
-      .then(
-        (value) =>
-          current &&
-          setState({
-            events: withRequests(value).slice(-120),
-            queued: value.queued,
-            running: !!value.activeRunId,
-            ready: true,
-            error: '',
-          }),
-      )
+      .agentConversation(scopeId, agent, conversationId)
+      .then((value) => {
+        if (!current) return;
+        shown = value.id;
+        setState({
+          id: value.id,
+          agent: value.summary?.agent,
+          events: withRequests(value).slice(-120),
+          queued: value.queued,
+          pending: value.pending,
+          running: !!value.activeRunId,
+          ready: true,
+          error: '',
+        });
+      })
       .catch(
         (error) => current && setState((previous) => ({ ...previous, error: errorText(error) })),
       );
     const stop = host.onEvent((event) => {
       if (event.type !== 'agent') return;
       const incoming = event.event;
-      if (incoming.scopeId !== scopeId || incoming.agent !== agent) return;
+      if (incoming.scopeId !== scopeId) return;
+      // A run of another conversation shows here only when it is the owner's on show.
       if (incoming.type === 'done' || incoming.role === 'user') setReread((value) => value + 1);
+      else if (conversationId && incoming.conversationId !== conversationId) return;
+      else if (!conversationId && shown && incoming.conversationId !== shown) return;
       else
         setState((previous) => ({
           ...previous,
@@ -67,7 +88,7 @@ export function useBrainAi(scopeId: string, agent: AgentId, refresh = 0): BrainA
       current = false;
       stop();
     };
-  }, [scopeId, agent, refresh, reread]);
+  }, [scopeId, agent, refresh, reread, conversationId]);
   return state;
 }
 

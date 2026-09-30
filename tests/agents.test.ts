@@ -179,8 +179,8 @@ test('A cancelled startup releases the mutation lock without launching a provide
     () => service.start({ ...input, agent: 'pi', access: 'full-access' }),
     /対応していません/,
   );
-  assert.throws(
-    () => service.queueMessage({ ...input, agent: 'pi', access: 'full-access' }),
+  await assert.rejects(
+    service.queueMessage({ ...input, agent: 'pi', access: 'full-access' }),
     /対応していません/,
   );
   assert.throws(() => service.start({ ...input, access: 'invented' as never }));

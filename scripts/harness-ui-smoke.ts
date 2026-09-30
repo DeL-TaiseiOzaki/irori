@@ -62,15 +62,6 @@ try {
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
-  await expect(page.getByRole('button', { name: '新しい会話', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('button', { name: '新しい会話', exact: true }).click();
-  await expect(page.getByRole('button', { name: '新しい会話', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
     // This pass is about native approvals, so OpenCode leaves its default full access.
@@ -200,9 +191,6 @@ try {
       await expect(page.locator('.request')).toHaveCount(0);
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
-    await settings().click();
-    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
-    await settings().click();
   }
   expect(await readFile(path.join(root, 'note.md'), 'utf8')).toContain('Fixture OpenCode edit');
   // The person's line from earlier in the conversation is counted and the line
@@ -266,13 +254,16 @@ try {
   await expect
     .poll(
       async () =>
-        (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId))
-          .access,
+        (await page.evaluate((id) => window.irori.agentConversation(id, 'opencode'), space.scopeId))
+          .session.access,
     )
     .toBe('full-access');
+  // Another CLI is another conversation (ADR 017 D2): back on OpenCode, the log is empty.
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   await expect(access).toHaveValue('full-access');
+  await expect(page.locator('.message.done')).toHaveCount(0);
+  doneCount = 0;
   await access.selectOption('default');
   await page.getByLabel('エージェントへの指示').fill('standard again');
   await page.getByRole('button', { name: '送信', exact: true }).click();
@@ -281,8 +272,8 @@ try {
   await expect
     .poll(
       async () =>
-        (await page.evaluate((id) => window.irori.agentSession(id, 'opencode'), space.scopeId))
-          .access,
+        (await page.evaluate((id) => window.irori.agentConversation(id, 'opencode'), space.scopeId))
+          .session.access,
     )
     .toBe('default');
   // The model pill lists what the installed CLI prints, and the choice reaches it.
@@ -334,16 +325,22 @@ try {
   expect(hermesCall.prompt).toContain('hermes fixture');
   expect(hermesCall.args.slice(5)).toEqual(['-m', 'vendor/model-x', '--yolo']);
   expect(
-    (await page.evaluate((id) => window.irori.agentSession(id, 'hermes'), space.scopeId)).state,
+    (await page.evaluate((id) => window.irori.agentConversation(id, 'hermes'), space.scopeId))
+      .session.state,
   ).toBe('saved');
-  for (const agent of ['pi', 'opencode']) {
-    await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
-    await settings().click();
-    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '会話をリセット', exact: true }).click();
-    await expect(page.getByRole('button', { name: '会話をリセット', exact: true })).toHaveCount(0);
-    await settings().click();
-  }
+  // Each CLI's conversations are in the hibachi's history; opening one shows its log.
+  await page.getByRole('button', { name: '履歴', exact: true }).click();
+  const history = page.getByRole('region', { name: '履歴' });
+  await expect(history.locator('.history-row').filter({ hasText: 'Hermes Agent' })).toHaveCount(1);
+  await history
+    .locator('.history-row')
+    .filter({ hasText: /^dialog/ })
+    .filter({ hasText: 'Pi' })
+    .getByRole('button')
+    .first()
+    .click();
+  await expect(page.getByLabel('エージェント', { exact: true })).toHaveValue('pi');
+  await expect(page.locator('.message.user').first()).toHaveText('dialog');
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/harness-ui-smoke.json',

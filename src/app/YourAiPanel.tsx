@@ -7,6 +7,8 @@ import { AgentLog, runTasks } from './AgentLog';
 import { Icon } from './Icon';
 import type { BrainAi } from './useBrainAi';
 import { ModelPicker } from './ModelPicker';
+import { ConversationHistory } from './ConversationHistory';
+import type { ConversationSummary } from '../domain/conversation';
 
 /** The latest run of a conversation, and whether it is still going. */
 export function latestRun(ai: BrainAi) {
@@ -38,6 +40,10 @@ export function YourAiPanel({
   onAgent,
   onModel,
   onAccess,
+  conversationId,
+  onOpenConversation,
+  onDeletedConversation,
+  onNew,
   onCreate,
   onShow,
   onSend,
@@ -56,6 +62,12 @@ export function YourAiPanel({
   onAgent: (agent: AgentId) => void;
   onModel: (model: string) => void;
   onAccess: (access: AgentAccess) => void;
+  /** The conversation on show (ADR 017 D4): the irori agent's own, never a hibachi's. */
+  conversationId?: string;
+  onOpenConversation: (row: ConversationSummary) => void;
+  onDeletedConversation: (id: string) => void;
+  /** Starts an empty conversation on the same CLI. */
+  onNew: () => Promise<void>;
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
@@ -65,6 +77,7 @@ export function YourAiPanel({
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   // The latest words, hand-offs and reports stay in view.
   useEffect(() => {
@@ -98,7 +111,7 @@ export function YourAiPanel({
       </div>
     );
   const run = latestRun(ai);
-  const behind = ai.running || ai.queued.length > 0;
+  const behind = ai.running || ai.pending > 0;
   const send = async () => {
     if (!text.trim() || busy) return;
     if (await act(() => onSend(text))) setText('');
@@ -116,6 +129,27 @@ export function YourAiPanel({
           </button>
         </span>
         <span className="overview-space" />
+        <button
+          className="icon-button"
+          aria-label={t('新しい会話', 'New conversation')}
+          title={t('新しい会話', 'New conversation')}
+          disabled={busy}
+          onClick={() => {
+            setHistory(false);
+            void act(onNew);
+          }}
+        >
+          <Icon name="squarePen" size={15} />
+        </button>
+        <button
+          className="icon-button"
+          aria-label={t('履歴', 'History')}
+          title={t('履歴', 'History')}
+          aria-pressed={history}
+          onClick={() => setHistory((value) => !value)}
+        >
+          <Icon name="history" size={15} />
+        </button>
         {ai.running && (
           <button
             className="panel-button"
@@ -133,7 +167,20 @@ export function YourAiPanel({
           </span>
         )}
       </header>
+      {history && (
+        <ConversationHistory
+          scopeId={you.id}
+          current={conversationId}
+          onOpen={(row) => {
+            setHistory(false);
+            onOpenConversation(row);
+          }}
+          onDeleted={onDeletedConversation}
+          onError={onError}
+        />
+      )}
       <div
+        hidden={history}
         className="conversation your-ai-log"
         role="log"
         aria-label={t('irori agent との会話', 'Conversation with the irori agent')}
@@ -196,7 +243,7 @@ export function YourAiPanel({
               <select
                 aria-label={t('irori agent の CLI', "The irori agent's CLI")}
                 value={agent}
-                disabled={busy || ai.running || ai.queued.length > 0}
+                disabled={busy}
                 onChange={(event) => onAgent(event.target.value as AgentId)}
               >
                 {agentIds.map((id) => (

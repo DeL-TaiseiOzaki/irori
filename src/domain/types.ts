@@ -78,6 +78,10 @@ export interface Delegate {
   state: 'started' | 'working' | 'reported' | 'failed';
 }
 export interface AgentEvent {
+  /** Stable across the view and the saved conversation; a streamed reply keeps one. */
+  id?: string;
+  /** The conversation the run belongs to (ADR 017). */
+  conversationId?: string;
   scopeId?: string;
   agent?: AgentId;
   role?: 'user';
@@ -90,6 +94,12 @@ export interface AgentEvent {
   outcome?: 'completed' | 'failed' | 'cancelled';
   /** Set on your AI's events that belong to a brain's sub-agent. */
   delegate?: Delegate;
+  /** The tool call a `tool` event starts or reports on, as the CLI names it. */
+  call?: string;
+  /** A tool event carrying the call's result rather than the call. */
+  result?: boolean;
+  /** Bytes the saved `details` had before being kept to their first 1 MiB. */
+  cut?: number;
   /**
    * The request this event ends — answered, declined or cancelled — so every
    * view stops offering it. Such an event is shown nowhere and never saved.
@@ -229,7 +239,8 @@ export interface StartRun {
   model?: string;
   prompt: string;
   notePath?: string;
-  newSession?: boolean;
+  /** The conversation to continue: one of the owner's, or an id `createConversation` gave. */
+  conversationId?: string;
   sources?: import('./knowledge').SourceRef[];
   /** Name of a skill package this KB declares, prepended to the request. */
   skill?: string;
@@ -501,19 +512,40 @@ export interface HostAPI {
   agents(): Promise<AgentInfo[]>;
   /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */
   agentModels(agent: AgentId): Promise<AgentModels>;
-  agentSession(scopeId: string, agent: AgentId): Promise<AgentSession>;
+  /** The owner's conversations (a hibachi's or the irori agent's), pinned first, then by last update. */
+  agentConversations(scopeId: string): Promise<import('./conversation').ConversationRow[]>;
+  /**
+   * One conversation with its queue and the requests its run waits on. Without an
+   * id: the one running, else the one whose queue is oldest, else the latest for this CLI.
+   */
   agentConversation(
     scopeId: string,
     agent: AgentId,
+    conversationId?: string,
   ): Promise<import('./conversation').Conversation>;
+  /** An id for a new conversation; nothing is written before its first instruction. */
+  createConversation(scopeId: string, agent: AgentId): Promise<string>;
+  renameConversation(
+    conversationId: string,
+    title: string,
+  ): Promise<import('./conversation').ConversationSummary>;
+  pinConversation(
+    conversationId: string,
+    pinned: boolean,
+  ): Promise<import('./conversation').ConversationSummary>;
+  archiveConversation(
+    conversationId: string,
+    archived: boolean,
+  ): Promise<import('./conversation').ConversationSummary>;
+  /** Removes irori's copy only; the CLI's own transcript stays where the CLI keeps it. */
+  deleteConversation(conversationId: string): Promise<void>;
   queueAgentMessage(input: StartRun): Promise<import('./conversation').QueuedMessage[]>;
   removeQueuedMessage(
-    scopeId: string,
-    agent: AgentId,
+    conversationId: string,
     id: string,
   ): Promise<import('./conversation').QueuedMessage[]>;
-  startQueuedMessage(scopeId: string, agent: AgentId, id: string): Promise<string>;
-  resetAgentSession(scopeId: string, agent: AgentId): Promise<void>;
+  /** Starts the owner's oldest queued instruction, whichever conversation holds it. */
+  startNextQueued(scopeId: string): Promise<string | null>;
   start(input: StartRun): Promise<string>;
   /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
   yourAi(): Promise<import('./you').YourAi>;

@@ -61,7 +61,7 @@ for (const agent of process.argv[2]
     scopeId: space.scopeId,
     agent,
     notePath: note.path,
-    newSession: true,
+    conversationId: service.createConversation(space.scopeId, agent),
     prompt:
       agent === 'codex'
         ? 'Request explicit user approval for a native shell command that would append DENIAL_SHOULD_PREVENT_THIS to the selected note, using sandbox_permissions=require_escalated. Do not execute the command without that approval. The trial will deny the request. On denial, stop immediately and report it; do not retry or use another tool.'

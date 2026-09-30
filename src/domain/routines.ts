@@ -73,8 +73,8 @@ export interface RoutineStepRun {
   truncated?: boolean;
   /** Why the step failed or waits, in one sentence. */
   detail?: string;
-  /** An agent step's run, kept in that agent's conversation. */
-  conversation?: { scopeId: string; agent: AgentId; runId: string };
+  /** An agent step's run and the conversation of its own it is kept in (ADR 017). */
+  conversation?: { scopeId: string; agent: AgentId; runId: string; conversationId?: string };
 }
 
 /** One run of a routine, kept on this device (D8). */

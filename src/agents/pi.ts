@@ -128,7 +128,9 @@ export async function runPi(ctx: NativeContext) {
       }
       if (event.type === 'tool_execution_start' || event.type === 'tool_execution_end')
         ctx.event('tool', String(event.toolName ?? 'Pi tool'), {
-          details: JSON.stringify(event).slice(0, 16000),
+          details: JSON.stringify(event),
+          call: typeof event.toolCallId === 'string' ? event.toolCallId : undefined,
+          result: event.type === 'tool_execution_end' || undefined,
         });
       if (event.type === 'auto_retry_start')
         ctx.event('status', t('Pi がネイティブの再試行を実行中', 'Pi is retrying natively'));

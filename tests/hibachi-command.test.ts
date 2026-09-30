@@ -12,6 +12,8 @@ import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
 import { AgentService } from '../src/agents/service';
 import type { AgentEvent, Space } from '../src/domain/types';
+import type { ConversationSummary } from '../src/domain/conversation';
+import { conversationMetas } from './fixtures/conversations';
 
 const posixOnly = {
   skip: process.platform === 'win32' && 'POSIX launcher and executable fixtures',
@@ -202,7 +204,25 @@ test(
     const handedPrompt = (await log(product.root)).find((call) => call.type === 'prompt').message;
     assert.match(handedPrompt, /^irori: the irori agent handed you this task\./);
     assert.ok(handedPrompt.endsWith('\n\nTidy the notes.'));
-    const conversation = await service.conversation(product.scopeId, 'pi');
+    // The hand-off is a conversation of the hibachi's own, apart from the person's,
+    // titled with the task and naming the irori agent's conversation it came from.
+    const [handed] = await service.conversationList(product.scopeId);
+    assert.ok(handed && !('damaged' in handed));
+    assert.equal(handed.origin, 'hand-off');
+    assert.equal(handed.title, 'Tidy the notes.');
+    const conversation = await service.conversation(product.scopeId, 'pi', handed.id);
+    const mineId = mine.find((event) => event.conversationId)?.conversationId;
+    const [origin] = (await service.conversationList(id)).filter(
+      (row) => row.id === mineId,
+    ) as ConversationSummary[];
+    assert.ok(origin, 'the irori agent’s conversation is listed as its own');
+    const metas = await conversationMetas(path.join(base, 'device'));
+    assert.ok(metas.some((meta) => meta.handedBy?.conversationId === mineId));
+    assert.deepEqual(
+      metas.find((meta) => meta.id === mineId)?.hibachis,
+      [product.scopeId],
+      'the irori agent’s conversation names the hibachi its hand-off reached',
+    );
     assert.ok(
       conversation.events.some((event) => event.role === 'user' && event.text === handedPrompt),
     );

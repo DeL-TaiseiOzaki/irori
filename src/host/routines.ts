@@ -333,7 +333,12 @@ const runRecord = z.object({
         truncated: z.boolean().optional(),
         detail: z.string().optional(),
         conversation: z
-          .object({ scopeId: z.string(), agent: z.enum(agentIds), runId: z.string() })
+          .object({
+            scopeId: z.string(),
+            agent: z.enum(agentIds),
+            runId: z.string(),
+            conversationId: z.uuid().optional(),
+          })
           .optional(),
       }),
     )
@@ -952,8 +957,8 @@ export class RoutineService {
     for (const scopeId of scopeIds)
       if (this.host.agents.busy(scopeId))
         return t(`${this.nameOf(scopeId)} の実行待ち`, `Waiting for ${this.nameOf(scopeId)}`);
-    const { queued } = await this.host.agents.conversation(scopeIds[0], agent);
-    if (queued.length) return t('送信待ちの指示の後', 'After the queued instructions');
+    if (await this.host.agents.pending(scopeIds[0]))
+      return t('送信待ちの指示の後', 'After the queued instructions');
     return undefined;
   }
   /** Runs an `agent` step as an ordinary run of that agent (D7). */
@@ -978,7 +983,7 @@ export class RoutineService {
     if ('problem' in hibachis) throw Error(hibachis.problem);
     const scopeIds = [scopeId, ...hibachis.scopeIds];
     const signal = active.abort.signal;
-    let started: { runId: string; done: Promise<StepEnd> } | undefined;
+    let started: { runId: string; conversationId: string; done: Promise<StepEnd> } | undefined;
     while (!started) {
       if (signal.aborted) {
         record.state = 'stopped';
@@ -1004,6 +1009,7 @@ export class RoutineService {
                 `Routine: ${active.run.name} (step ${index + 1})`,
               ),
               env,
+              routine: { runId: active.run.id, step: index },
             },
           );
           break;
@@ -1026,7 +1032,7 @@ export class RoutineService {
     try {
       record.state = 'running';
       delete record.detail;
-      record.conversation = { scopeId, agent, runId };
+      record.conversation = { scopeId, agent, runId, conversationId: started.conversationId };
       await this.save(active);
       const end = await started.done;
       record.output = end.report.slice(-outputLimit);

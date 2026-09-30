@@ -1,57 +1,152 @@
-# Conversation history and pending instructions
+# Conversations
 
-Access follow-up, 2026-09-23: pending instructions retain their selected native
-access mode. A change from the saved session's mode starts a fresh native
-conversation and retains the displayed history; the panel explains this before
-sending. Old records without an access field mean native/default mode.
-See [HARNESSES](HARNESSES.md) for the per-provider mapping and
-[actual continuity trials](REAL-AGENT-ACCEPTANCE-2026-09-23.md) for the distinct
-real-model evidence. An application restart still leaves pending work paused.
+What irori keeps of the conversations with hibachi agents and the irori agent,
+as of **0.1.60** ([ADR 017](decisions/017-conversation-history.md) stage 1). Stage 2
+adds the choice of folder and search; stage 3 adds rewind, clone and rebuilt
+context. Earlier behavior (a bounded display window per space, CLI and checkout)
+is described in the history of this file.
 
-Source continuation after Windows preview 0.1.3, 2026-09-14. The published installer is unchanged until a separately verified preview is published.
+## What the person sees
 
-Parallel brains, 2026-09-25 (0.1.41): each brain's AI runs on its own; the
-panel no longer holds the brain on show while a run or a queue is in progress.
-A queue whose brain is not on show goes on when that brain's run completes, as
-it does on show; a stopped or failed run still pauses it. The conversation
-snapshot also carries the permission and question requests the active run
-waits on, which the saved history keeps only as text, so a request stays
-answerable after switching brains, from the Overview, or after reopening the
-panel. The Overview sends and queues with the brain's default access mode.
+- A hibachi and the irori agent each have any number of conversations. The panel
+  shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
+  is written until its first instruction. **履歴** lists the owner's own
+  conversations: a hibachi's list never holds the irori agent's, and the reverse.
+- Choosing another CLI in the panel starts a new conversation: a conversation's
+  CLI is fixed. Opening a conversation from 履歴 switches the panel to its CLI.
+- Opening a panel shows the owner's conversation that is running, else the one
+  whose queued instruction is oldest, else its latest with the chosen CLI
+  (not archived, not a routine's or a hand-off's).
+- **履歴** rows show the title, the CLI, the time of the last turn and the linked
+  note, pinned rows first, then by last update, archived rows in their own
+  section. **ノート別** groups rows by linked note; **このノート** shows only the
+  conversations linked to the note open beside the panel. Each row can be
+  renamed, pinned, archived and deleted. Deleting asks first and says that the
+  CLI's own history stays; it removes irori's folder only. Sending in an archived
+  conversation brings it back.
+- The title is the first line of the first instruction, cut at 50 characters
+  (whole characters, emoji included). A renamed title is never replaced. A
+  routine's step is titled with the routine and step; a hand-off with its task.
+- The separate **会話をリセット** is gone: 新しい会話 replaces it.
 
-Request ends, 2026-09-26 (0.1.42): the host announces each request that ends
-(answered in any view, declined, or cancelled with its run) with an event naming
-it; that event is never shown or saved. Views stop offering a request on that
-event or on its run's end, not because a later event of the run arrived: a tool
-call's message can arrive after the request it raised, and your AI's
-sub-agents in other brains keep working meanwhile ([YOUR-AI](YOUR-AI.md)).
+## Storage
 
-## User behavior
+```
+<data>/conversations/<id>/meta.json     metadata, rewritten atomically
+<data>/conversations/<id>/events.jsonl  events, one per line, appended only
+<data>/conversation-state/<id>.json     this device's queue and run in progress
+<data>/device.json                      this device's id
+```
 
-The AI panel restores its recent display history and accepted pending instructions after restarting irori. Storage belongs to the device, exact canonical checkout, KB scope UUID and selected CLI. Copies or another provider do not inherit a conversation. Existing native session handles continue to use their original independent store.
+- **meta.json** (`conversationMeta` in `src/domain/conversation.ts`): owner
+  (`hibachi` or `irori-agent`, its id and its name then), CLI, model, title and
+  where it came from, times, linked note, the hibachis the irori agent's
+  hand-offs reached, pin and archive, `forkedFrom` (null until stage 3), a
+  routine step's `routine` or a hand-off's `handedBy`, and `native`. Keys a later
+  version adds are read and kept.
+- **events.jsonl** (`storedEvent` in `src/agents/conversations.ts`): each line
+  has an id, the run's id, a time, a role (`user` or `agent`), a type and the
+  text and details. Permission and question requests are kept as status text,
+  never as something to answer. A streamed reply keeps one id; when it spans
+  several writes, its lines share the id and are joined when read.
+- **Event ids** are given when irori sends an event to the views, so the view and
+  the file name the same event.
+- **Details over 1 MiB** (a tool's input or result) are kept to their first
+  1 MiB on a character boundary, with `cut` holding the original byte count; the
+  view shows the first 16,000 characters. Text is kept whole. Claude Code's tool
+  results and Codex's finished items (a command's output, a file change) are
+  recorded as results of their calls; Pi, OpenCode and Hermes Agent already
+  reported theirs. The log shows a result under its call.
+- **Writes** to one conversation go through one queue; conversations write
+  independently. Events are buffered and appended every 250 ms, at the end of a
+  turn before its end is reported, and at shutdown, each append followed by
+  fsync. A line a crash cut short stays a line of its own and is read as damaged.
+- **Device state** stays in the data directory: the instructions waiting to be
+  sent (up to 20 and 1 MiB per conversation) and the run in progress. It is
+  deleted when empty. Claiming a queued instruction removes it from the queue
+  and records the run, with the instruction, in one atomic write before the
+  person's message is appended and the CLI starts.
+- Files are private (0600, folders 0700) and must be ordinary files; a folder
+  that is a link is listed as damaged and deleted as a link only.
 
-During a turn, **送信待ちに追加** saves the instruction, selected note path and explicitly selected source references before acknowledging it. The queue holds up to twenty instructions, with a combined serialized limit of 1 MiB. An oversized addition fails without dropping accepted instructions. **取消** persists before disappearing from the panel. Saved references identify paths; source bytes are captured when the queued turn starts, as before.
+## Native sessions
 
-Successful turns continue the current queue. A failed/stopped turn pauses it. After a host restart, pending instructions always start paused: inspect them and choose **送信を再開**. Opening a workspace or selecting a CLI never submits a model prompt. Resetting the native session requires finishing or cancelling pending instructions and retains the displayed history. **新しい会話** adds a visible boundary before starting a new native session.
+- A conversation keeps its CLI's session handle per device:
+  `native[<deviceId>] = { handle, access, root }`, where `root` is the SHA-256 of
+  the checkout path, so no local path enters the folder. `deviceId` is a random
+  UUID in `device.json`, made once.
+- A turn resumes the handle only on the same device, checkout and access mode.
+  Otherwise it starts a new native session in the same conversation and says
+  why in one line (another device, another folder, or a changed access mode,
+  [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)). Other
+  devices' handles are kept. Stage 1 does not yet give the new session the
+  conversation so far; stage 3 does.
+- A resume that fails before the agent says or does anything is reported, and
+  this device's handle is set aside: the next instruction starts a new session.
+  A turn that fails after the agent worked keeps the handle.
+- A routine's agent step is a conversation of its own and never keeps a handle
+  ([ROUTINES](ROUTINES.md)).
 
-## Durability and interruption
+## Runs and the queue
 
-The trusted host stores schema-validated records under private device `agent-conversations/`, using the existing atomic/fsync writer. Accepted instructions, cancellations and run claims are saved before acknowledgement or provider launch. Claiming a queued instruction and retaining its user message/run ID share one atomic record replacement. Concurrent claims cannot launch the same instruction twice.
+- One run at a time per checkout, whatever the conversation: a space is one
+  registered checkout on a device, so the run map stays keyed by space. Different
+  hibachis run in parallel.
+- A send in any conversation of an owner whose run is in progress, or whose
+  queue is not empty, is queued in that conversation. The owner's queue runs
+  oldest first across its conversations (`startNextQueued`). A completed run
+  sends the next; a failed or stopped run pauses the queue; after a restart the
+  queue is paused until **送信を再開**. A run never passes a waiting queue.
+- A run the host could not see finish is shown as unconfirmed on the next start
+  and never sent again. If the host stopped between claiming a queued
+  instruction and writing it, the message is written from the claim.
+- The irori agent's hand-off to a hibachi through the `hibachi` command
+  continues in one hibachi conversation per irori agent conversation
+  (`handedBy`), apart from the person's own conversations.
 
-Streamed display events are coalesced and saved at a 250 ms scheduling interval, then flushed before reporting turn completion and during orderly shutdown. Sudden host/power failure can lose the latest unflushed output; this is not a full provider transcript or an exactly-once execution guarantee. An unfinished persisted run is shown as having an unconfirmed outcome and is never automatically placed back in the queue. Inspect native history and file changes before deciding what to send next. Native child survival after abrupt host termination remains platform-dependent.
+## Damage
 
-Restored permission/question events are plain historical text without request IDs or answer controls. Reloading or losing the renderer stops its native run and terminal. Electron's native single-instance lock prevents two current hosts from writing the same device profile concurrently. It does not exclude other programs editing KB files; close older irori versions before starting an updated build.
+- A damaged `meta.json` lists the conversation as unreadable, with only
+  **削除**; it is never replaced. Its owner, when still readable, keeps it in the
+  right list; otherwise it is listed for every owner so it can be removed.
+- A damaged line of `events.jsonl` is skipped and counted; the view says how many
+  lines could not be read, and later turns still append.
+- A damaged queue record blocks sends to that conversation with the reason.
+- A damaged `device.json` blocks runs with the reason; it is not replaced.
 
-Malformed, oversized or mismatched records fail visibly and block new submissions for that conversation. The panel offers retry; damaged records are not silently replaced. Output persistence failure stops the active turn, and orderly shutdown remains open if history cannot be flushed. Prompts and output stay outside portable KB metadata and Git. No account token or provider session handle is added to the display-history record; provider-emitted text can still contain private data and should be treated as such.
+## Migration (D8)
 
-## Retention and migration
+On the first start of 0.1.60, each record in `agent-conversations/` becomes one
+conversation titled **以前の会話** with its CLI, holding its events, its queue and
+its unconfirmed run, with the handle from `agent-sessions/` under this device. A
+handle without a record becomes an empty 以前の会話. The same record always
+becomes the same conversation id, so an interrupted migration adds nothing when
+repeated. `conversations-migrated.json` marks it done. Records that cannot be
+read are left in place and named in the mark. The old files stay for one
+release and are then removed. Nothing is sent to a model.
 
-The recent display window retains at most 400 events and 512 KiB of serialized event data. Long output is truncated; the panel displays an omission notice. This bounded window is not an archive. The unsent composer draft, full native transcripts, history export/deletion UI, historical session browsing and live turn steering remain follow-up work.
+## Host boundary
 
-There is no destructive migration. Existing native-session files, notes, source/artifact records and cloud settings remain in place. Display text and pending messages that an older renderer already discarded cannot be reconstructed by this update. No CLI transcript import or model invocation runs during upgrade.
+The store, the queue and native handles live in the host. The renderer reaches
+them through `agentConversations`, `agentConversation`, `createConversation`,
+`renameConversation`, `pinConversation`, `archiveConversation`,
+`deleteConversation`, `queueAgentMessage`, `removeQueuedMessage`,
+`startNextQueued` and `start`, and never receives the folder's path. Agents are
+not given the conversations folder.
 
 ## Verification
 
-Behavior tests cover restart isolation, private file mode, multiple source references, interrupted claims, non-replayable requests, failed record writes, corruption, retention bounds and queue limits. Pi protocol fixtures exercise duplicate-claim rejection, failed persistence before provider launch and native reset boundaries without model inference. Electron tests restart the host twice, verify that no prompt was submitted, persist cancellation, explicitly resume the remaining instruction and reload during a native-shaped question. Packaged smoke tests also restore and remove a pending instruction after a relocated executable restarts without executing it.
-
-Exact completed gates are recorded in [STATUS](STATUS.md) and [HANDOFF](HANDOFF.md). Real provider model-turn/restart acceptance, Windows IME, Google consent/WinFsp and full release gates remain open.
+- `tests/conversations.test.ts`: the folder, title and file modes; appends,
+  streamed ids across writes and the 1 MiB mark; damaged `meta.json`, a damaged
+  and a cut line; the queue across conversations and restart; a claim
+  interrupted before its message; limits; rename, pin, archive and delete.
+- `tests/sessions.test.ts`: the device id; resume only with the same access; a
+  failed resume and the next turn; another device id; another checkout; a
+  damaged device id (Codex protocol fixture).
+- `tests/conversation-migration.test.ts`: records of a hibachi and the irori
+  agent, a handle alone, damaged and misfiled records, the old files unchanged
+  and a second run.
+- `scripts/conversations-ui-smoke.ts`: the migrated conversation, 新しい会話, a
+  send waiting behind another conversation's run, rename, pin, archive, delete,
+  restart, and the irori agent's separate history.
+- Real CLIs were not run for this change.

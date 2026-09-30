@@ -9,7 +9,7 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { GitService } from '../src/git/service';
 import { AgentService } from '../src/agents/service';
-import { SessionStore } from '../src/agents/sessions';
+import { conversationMetas } from '../tests/fixtures/conversations';
 import { RoutineService } from '../src/host/routines';
 import type { AgentEvent, AgentId } from '../src/domain/types';
 import type { RoutineRef, RoutineRun } from '../src/domain/routines';
@@ -83,7 +83,6 @@ const routines = new RoutineService({
   emit: () => {},
 });
 await routines.init();
-const sessions = new SessionStore(files.dataDir);
 
 async function routine(folder: string, contents: Record<string, string>): Promise<RoutineRef> {
   const dir = path.join(root, '.irori', 'routines', folder);
@@ -114,7 +113,6 @@ async function run(ref: RoutineRef): Promise<RoutineRun> {
 const results: Record<string, unknown>[] = [];
 try {
   for (const cli of clis) {
-    const binding = { scopeId: space.scopeId, agent: cli, root: space.root };
     const target = `Knowledge_Base/inbox-${cli}.md`;
     const triage = await routine(`triage-${cli}`, {
       'routine.yaml': `name: Triage (${cli})
@@ -133,9 +131,9 @@ steps:
     const seconds = Math.round((Date.now() - started) / 1000);
     const written = await readFile(path.join(root, target), 'utf8').catch(() => '');
     const step = done.steps[1];
-    const shown = (await agents.conversation(space.scopeId, cli)).events.filter(
-      (event) => event.runId === step.conversation?.runId,
-    );
+    const shown = (
+      await agents.conversation(space.scopeId, cli, step.conversation?.conversationId)
+    ).events.filter((event) => event.runId === step.conversation?.runId);
     const failing = await routine(`failing-${cli}`, {
       'routine.yaml': `name: Failing (${cli})
 steps:
@@ -173,8 +171,11 @@ steps:
       shown.some((event) => event.role === 'user' && event.text.startsWith('Read the file')),
     );
     assert.ok(!shown.some((event) => event.text.includes('IRORI_WORK=')));
-    // The step's native session is never saved over the person's.
-    assert.equal(await sessions.read(binding), undefined);
+    // The step is a conversation of its own whose native session is never saved.
+    const meta = (await conversationMetas(files.dataDir)).find(
+      (item) => item.id === step.conversation?.conversationId,
+    );
+    assert.deepEqual(meta?.native, {});
     assert.equal(failed.state, 'failed', JSON.stringify(failed));
     assert.match(failed.steps[0].output.trimStart(), /^\[FAILED\]/);
   }

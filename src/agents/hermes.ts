@@ -70,7 +70,9 @@ export async function runHermes(ctx: NativeContext) {
     }
     if (event.type === 'tool_use' || event.type === 'tool_result')
       ctx.event('tool', String(event.name ?? t('Hermes のツール', 'Hermes tool')), {
-        details: JSON.stringify(event).slice(0, 16000),
+        details: JSON.stringify(event),
+        call: typeof event.tool_call_id === 'string' ? event.tool_call_id : undefined,
+        result: event.type === 'tool_result' || undefined,
       });
     if (event.type === 'result') {
       result = event;

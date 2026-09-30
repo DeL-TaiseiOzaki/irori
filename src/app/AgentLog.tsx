@@ -178,10 +178,13 @@ export function requestEnded(events: AgentEvent[], index: number) {
 
 function Step({
   event,
+  result,
   running,
   brain,
 }: {
   event: AgentEvent;
+  /** The call's result, when the CLI reported it apart from the call. */
+  result?: AgentEvent;
   running: boolean;
   /** The brain a sub-agent's step works in. */
   brain?: Space;
@@ -200,6 +203,19 @@ function Step({
         {target && <span className="step-target">{target}</span>}
       </summary>
       <pre>{event.details}</pre>
+      {result && (
+        <>
+          <small className="step-result">
+            {result.cut
+              ? t(
+                  `結果（保存は先頭 1 MiB / ${(result.cut / 1048576).toFixed(1)} MiB）`,
+                  `Result (first 1 MiB of ${(result.cut / 1048576).toFixed(1)} MiB kept)`,
+                )
+              : t('結果', 'Result')}
+          </small>
+          <pre>{result.details}</pre>
+        </>
+      )}
     </details>
   );
 }
@@ -299,6 +315,21 @@ export function AgentLog({
   const listed = new Set<string>();
   const items: ReactNode[] = [];
   let steps: AgentEvent[] = [];
+  // A tool call's later reports (its result, or a CLI's progress updates) join its step.
+  const calls = new Map<string, AgentEvent>();
+  const results = new Map<AgentEvent, AgentEvent>();
+  const joined = new Set<AgentEvent>();
+  for (const event of events) {
+    if (event.type !== 'tool' || !event.call) continue;
+    const key = `${event.runId}:${event.call}`;
+    const call = calls.get(key);
+    if (!call) {
+      if (!event.result) calls.set(key, event);
+      continue;
+    }
+    joined.add(event);
+    if (event.result) results.set(call, event);
+  }
   let labelled = '';
   const flushSteps = (key: string) => {
     if (!steps.length) return;
@@ -310,6 +341,7 @@ export function AgentLog({
           <Step
             key={i}
             event={event}
+            result={results.get(event)}
             brain={brainOf(event)}
             running={event.runId === activeRun && event === events.at(-1)}
           />
@@ -369,8 +401,9 @@ export function AgentLog({
       );
       return;
     }
-    if (event.type === 'tool') steps.push(event);
-    else if (event.type === 'permission' || event.type === 'question')
+    if (event.type === 'tool') {
+      if (!joined.has(event)) steps.push(event);
+    } else if (event.type === 'permission' || event.type === 'question')
       items.push(
         <AgentRequest
           key={key}

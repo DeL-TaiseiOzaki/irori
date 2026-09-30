@@ -22,16 +22,17 @@ const host = window.irori;
 export type OverviewView = 'map' | 'columns' | 'routines';
 type AiState = 'running' | 'waiting' | 'queued' | 'idle';
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
-const idle: BrainAi = { events: [], queued: [], running: false, ready: false, error: '' };
+const idle: BrainAi = {
+  events: [],
+  queued: [],
+  pending: 0,
+  running: false,
+  ready: false,
+  error: '',
+};
 
 function aiState(ai: BrainAi): AiState {
-  return openRequest(ai)
-    ? 'waiting'
-    : ai.running
-      ? 'running'
-      : ai.queued.length
-        ? 'queued'
-        : 'idle';
+  return openRequest(ai) ? 'waiting' : ai.running ? 'running' : ai.pending ? 'queued' : 'idle';
 }
 
 function StateWords({ ai }: { ai: BrainAi }) {
@@ -50,7 +51,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
         : state === 'running'
           ? t('実行中', 'Running')
           : state === 'queued'
-            ? t(`送信待ち ${ai.queued.length}`, `${ai.queued.length} pending`)
+            ? t(`送信待ち ${ai.pending}`, `${ai.pending} pending`)
             : t('待機', 'Idle')}
     </span>
   );
@@ -60,15 +61,18 @@ function StateWords({ ai }: { ai: BrainAi }) {
 function AiWatch({
   scopeId,
   agent,
+  conversationId,
   refresh,
   onChange,
 }: {
   scopeId: string;
   agent: AgentId;
+  /** The conversation to follow; the owner's on show when absent. */
+  conversationId?: string;
   refresh: number;
   onChange: (scopeId: string, ai: BrainAi) => void;
 }) {
-  const ai = useBrainAi(scopeId, agent, refresh);
+  const ai = useBrainAi(scopeId, agent, refresh, conversationId);
   useEffect(() => onChange(scopeId, ai), [scopeId, ai]);
   return null;
 }
@@ -586,7 +590,7 @@ function OverviewComposer({
   const space = spaces.find((item) => item.scopeId === target) ?? spaces[0];
   if (!space) return null;
   const ai = ais[space.scopeId] ?? idle;
-  const behind = ai.running || ai.queued.length > 0;
+  const behind = ai.running || ai.pending > 0;
   async function send() {
     if (!text.trim() || sending) return;
     setSending(true);
@@ -704,6 +708,9 @@ export function Overview({
   onYourAgent,
   onYourModel,
   onYourAccess,
+  yourConversation,
+  onShowConversation,
+  onYourNew,
   routineChoices,
   ...actions
 }: {
@@ -734,6 +741,11 @@ export function Overview({
   onYourAgent: (agent: AgentId) => void;
   onYourModel: (model: string) => void;
   onYourAccess: (access: AgentAccess) => void;
+  /** The irori agent's conversation on show. */
+  yourConversation?: string;
+  /** Shows one of an owner's conversations in its panel; `null` lets the host pick. */
+  onShowConversation: (scopeId: string, id: string | null, agent: AgentId) => void;
+  onYourNew: () => Promise<void>;
   /** The CLI and model chosen in each agent's panel, for routine steps that name none. */
   routineChoices: () => RunRoutine['agents'];
 } & Actions) {
@@ -786,9 +798,10 @@ export function Overview({
       ))}
       {you?.state === 'ready' && (
         <AiWatch
-          key={`you:${you.id}:${yourAgent}`}
+          key={`you:${you.id}:${yourAgent}:${yourConversation ?? ''}`}
           scopeId={you.id}
           agent={yourAgent}
+          conversationId={yourConversation}
           refresh={acted}
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
@@ -890,6 +903,12 @@ export function Overview({
             revision={revision}
             choices={routineChoices}
             onOpenConversation={(conversation) => {
+              if (conversation.conversationId)
+                onShowConversation(
+                  conversation.scopeId,
+                  conversation.conversationId,
+                  conversation.agent,
+                );
               const space = spaces.find((item) => item.scopeId === conversation.scopeId);
               if (space) actions.onEnter(space, { ai: true });
               else setIsland('you');
@@ -928,6 +947,12 @@ export function Overview({
               onAgent={onYourAgent}
               onModel={onYourModel}
               onAccess={onYourAccess}
+              conversationId={yourConversation}
+              onOpenConversation={(row) => onShowConversation(you!.id, row.id, row.agent)}
+              onDeletedConversation={(id) => {
+                if (id === yourConversation) onShowConversation(you!.id, null, yourAgent);
+              }}
+              onNew={onYourNew}
               onCreate={onCreateYou}
               onShow={onShowYou}
               onSend={reread(onSendYou)}

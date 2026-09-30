@@ -23,6 +23,8 @@ test('Host requests reject unknown/prototype methods and invalid arguments befor
     ['read', ['not-a-uuid', 'note.md']],
     ['gitStage', ['00000000-0000-4000-8000-000000000000', 'note.md', true, 'stale']],
     ['respond', ['00000000-0000-4000-8000-000000000000', true, { q: [1] }]],
+    ['agentConversation', ['00000000-0000-4000-8000-000000000000', 'pi', 'not-a-uuid']],
+    ['renameConversation', ['00000000-0000-4000-8000-000000000000', 'x'.repeat(1001)]],
   ] as const)
     assert.throws(() => dispatchHost(handlers, method, [...args]));
   assert.deepEqual(calls, []);
@@ -34,9 +36,15 @@ test('Host requests reject unknown/prototype methods and invalid arguments befor
   assert.equal(Object.hasOwn(bridge, 'invoke'), false);
   await bridge.spaces();
   await bridge.saveWorkspace('  Workspace  ', ['00000000-0000-4000-8000-000000000000']);
+  // A view that follows the owner's conversation on show names none.
+  const scope = '00000000-0000-4000-8000-000000000000';
+  await bridge.agentConversation(scope, 'pi', undefined);
+  await bridge.agentConversation(scope, 'pi', scope);
   assert.deepEqual(calls, [
     { name: 'spaces', args: [] },
     { name: 'saveWorkspace', args: ['Workspace', ['00000000-0000-4000-8000-000000000000']] },
+    { name: 'agentConversation', args: [scope, 'pi', undefined] },
+    { name: 'agentConversation', args: [scope, 'pi', scope] },
   ]);
 });
 

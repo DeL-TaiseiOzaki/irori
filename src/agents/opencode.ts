@@ -305,7 +305,11 @@ export async function runOpenCode(ctx: NativeContext) {
       }
       if (event.type === 'message.part.updated' && event.properties.part.type === 'tool') {
         const part = event.properties.part;
-        ctx.event('tool', part.tool, { details: JSON.stringify(part.state).slice(0, 16000) });
+        ctx.event('tool', part.tool, {
+          details: JSON.stringify(part.state),
+          call: part.callID,
+          result: part.state?.status === 'completed' || part.state?.status === 'error' || undefined,
+        });
       }
       if (event.type === 'session.error') ctx.event('error', errorMessage(event.properties.error));
     });

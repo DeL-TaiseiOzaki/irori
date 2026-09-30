@@ -372,6 +372,12 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.step > .step-result {
+  display: block;
+  margin: 0 0 0 24px;
+  color: var(--tx-3);
+  font-size: 11px;
+}
 /* A request that waits for the person arrives with a little overshoot and
    breathes until it is answered. */
 @keyframes request-in {
@@ -1001,4 +1007,126 @@
   flex: none;
   margin-top: 2px;
   color: var(--ember);
+}
+
+/* An owner's conversations (ADR 017 D5), shown in the panel in place of the log. */
+.conversation[hidden] {
+  display: none;
+}
+.conversation-history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 10px 16px;
+  font-size: 12.5px;
+}
+.conversation-history h3,
+.conversation-history summary {
+  margin: 12px 6px 4px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.conversation-history summary {
+  cursor: default;
+}
+.conversation-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-tools {
+  display: flex;
+  gap: 6px;
+  padding: 0 6px 4px;
+}
+.history-tools button {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--tx-2);
+  box-shadow: none;
+  font-size: 11.5px;
+}
+.history-tools button[aria-pressed='true'] {
+  background: var(--ember-soft);
+  color: var(--ember-2);
+}
+.history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  border-radius: 10px;
+}
+.history-row:hover,
+.history-row.current {
+  background: var(--raised);
+}
+.history-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: none;
+  color: var(--tx);
+  box-shadow: none;
+  font-weight: 400;
+  text-align: left;
+}
+.history-open:hover {
+  background: none;
+}
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-title .ui-icon {
+  flex: none;
+  color: var(--ember-2);
+}
+.history-open small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--tx-3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-row.damaged .history-title {
+  color: var(--danger-on-nav);
+}
+.history-rename {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  padding: 5px 6px;
+}
+.history-rename input {
+  flex: 1;
+  min-width: 0;
+}
+.history-confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 8px;
+  color: var(--tx-2);
+}
+.history-confirm span {
+  flex-basis: 100%;
+}
+.conversation-history .danger {
+  color: var(--danger-on-nav);
 }
