@@ -1,15 +1,16 @@
 import path from 'node:path';
-import type { LinkUpdate } from '../domain/note-links';
+import { samePath, type LinkUpdate } from '../domain/note-links';
 import { noteReferenceCount, rewriteNoteReferences } from './note-references';
 import { imagesForNoteMove } from '../domain/note-operations';
 import type { Document } from '../domain/types';
 import type { FileService } from './files';
 import type { SearchService } from './search';
+import { foldsCase } from './links';
 
 /** The other notes whose links lead to `target`, as the backlink scan finds them. */
-async function linking(search: SearchService, scopeId: string, target: string) {
+async function linking(search: SearchService, scopeId: string, target: string, foldCase?: boolean) {
   try {
-    const found = await search.references(scopeId, target);
+    const found = await search.references(scopeId, target, foldCase);
     return { paths: [...new Set(found.hits.map((hit) => hit.path))], incomplete: found.incomplete };
   } catch {
     return { paths: [], incomplete: true };
@@ -23,12 +24,13 @@ export async function referringLinks(
   scopeId: string,
   target: string,
 ): Promise<Pick<LinkUpdate, 'notes' | 'links' | 'incomplete'>> {
-  const found = await linking(search, scopeId, target);
+  const foldCase = await foldsCase(files, scopeId, target);
+  const found = await linking(search, scopeId, target, foldCase);
   const result = { notes: 0, links: 0, incomplete: found.incomplete };
   for (const note of found.paths) {
     let links = 0;
     try {
-      links = noteReferenceCount((await files.read(scopeId, note)).text, note, target);
+      links = noteReferenceCount((await files.read(scopeId, note)).text, note, target, foldCase);
     } catch {
       result.incomplete = true;
     }
@@ -56,10 +58,13 @@ export async function relink(
   const from = path.posix.dirname(previous);
   const to = path.posix.dirname(doc.path);
   const wanted = previous.normalize('NFC');
+  // The previous name is gone: observe the volume through the moved file instead.
+  const foldCase = await foldsCase(files, doc.scopeId, doc.path);
+  const key = (p: string) => (foldCase ? p.normalize('NFC').toLowerCase() : p.normalize('NFC'));
   // Managed images were copied beside the note, so their links keep their text.
   const beside = new Map(
     (from === to ? [] : imagesForNoteMove(doc.text, true)).map((image) => [
-      path.posix.join(from, image).normalize('NFC'),
+      key(path.posix.join(from, image)),
       path.posix.join(to, image),
     ]),
   );
@@ -73,19 +78,21 @@ export async function relink(
     return { doc: saved, links: rewritten.links };
   };
   try {
-    const own = await write(doc, previous, (p) => (p === wanted ? doc.path : (beside.get(p) ?? p)));
+    const own = await write(doc, previous, (p) =>
+      samePath(p, wanted, foldCase) ? doc.path : (beside.get(key(p)) ?? p),
+    );
     doc = own.doc;
     result.self = own.links;
   } catch {
     result.skipped.push(doc.path);
   }
-  const found = await linking(search, doc.scopeId, previous);
+  const found = await linking(search, doc.scopeId, previous, foldCase);
   result.incomplete = found.incomplete;
   for (const note of found.paths) {
     if (note === doc.path) continue;
     try {
       const { links } = await write(await files.read(doc.scopeId, note), note, (p) =>
-        p === wanted ? doc.path : undefined,
+        samePath(p, wanted, foldCase) ? doc.path : undefined,
       );
       if (links) {
         result.notes++;

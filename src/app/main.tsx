@@ -704,7 +704,7 @@ function App() {
     return host.onEvent((event) => {
       if (event.type === 'files') {
         setRevision((r) => r + 1);
-        void reconcile();
+        if (event.scopeId === current.current.doc?.scopeId) void reconcile();
       } else if (event.type === 'agent') {
         const incoming = event.event;
         if (incoming.scopeId) {

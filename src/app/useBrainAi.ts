@@ -50,10 +50,15 @@ export function useBrainAi(
   useEffect(() => {
     let current = true;
     let shown = conversationId;
-    void host
-      .agentConversation(scopeId, agent, conversationId)
-      .then((value) => {
+    let controlRevision = 0;
+    void (async () => {
+      while (current) {
+        const before = controlRevision;
+        const value = await host.agentConversation(scopeId, agent, conversationId);
         if (!current) return;
+        // Request/run controls can race the host snapshot. Reread for them;
+        // ordinary fragments must not restart a full-history read indefinitely.
+        if (before !== controlRevision) continue;
         shown = value.id;
         setState({
           id: value.id,
@@ -65,24 +70,30 @@ export function useBrainAi(
           ready: true,
           error: '',
         });
-      })
-      .catch(
-        (error) => current && setState((previous) => ({ ...previous, error: errorText(error) })),
-      );
+        return;
+      }
+    })().catch(
+      (error) => current && setState((previous) => ({ ...previous, error: errorText(error) })),
+    );
     const stop = host.onEvent((event) => {
       if (event.type !== 'agent') return;
       const incoming = event.event;
       if (incoming.scopeId !== scopeId) return;
+      if (conversationId && incoming.conversationId !== conversationId) return;
       // A run of another conversation shows here only when it is the owner's on show.
-      if (incoming.type === 'done' || incoming.role === 'user') setReread((value) => value + 1);
-      else if (conversationId && incoming.conversationId !== conversationId) return;
-      else if (!conversationId && shown && incoming.conversationId !== shown) return;
-      else
+      if (incoming.type === 'done' || incoming.role === 'user') {
+        controlRevision++;
+        setReread((value) => value + 1);
+      } else if (!conversationId && shown && incoming.conversationId !== shown) return;
+      else {
+        if (incoming.type === 'permission' || incoming.type === 'question' || incoming.resolved)
+          controlRevision++;
         setState((previous) => ({
           ...previous,
           running: true,
           events: appendConversationEvent(previous.events, incoming).slice(-120),
         }));
+      }
     });
     return () => {
       current = false;

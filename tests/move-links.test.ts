@@ -71,6 +71,65 @@ test('Renaming keeps OKF relations and source references without rewriting other
   assert.equal(status.excluded, 0);
 });
 
+test('Moves preserve differently cased body and metadata links where the disk folds case', async (t) => {
+  const { root, files, search, id, write, read } = await fixture(t);
+  // Emulate a case-insensitive volume with real files and inode checks on every platform.
+  const resolve = files.resolve.bind(files);
+  files.resolve = (scopeId, relative, allowRoot) =>
+    resolve(
+      scopeId,
+      relative.replace(/[^/]+\.md$/i, (name) => name.toLowerCase()),
+      allowRoot,
+    );
+  const reader =
+    '---\nrelations: [{ rel: uses, target: TARGET.md }]\nsources: [{ resource: Knowledge_Base/wiki/TARGET.md }]\n---\n[Target](TARGET.md)\n';
+  const original =
+    '---\nrelations: [{ rel: self, target: TARGET.md }]\n---\n[Self](TARGET.md) [Sibling](SIBLING.md)\n';
+  await write('Knowledge_Base/wiki/reader.md', reader);
+  await write('Knowledge_Base/wiki/target.md', original);
+  await write('Knowledge_Base/wiki/sibling.md', '# Sibling\n');
+  const previous = 'Knowledge_Base/wiki/target.md';
+  assert.deepEqual(await referringLinks(files, search, id, previous), {
+    notes: 1,
+    links: 3,
+    incomplete: false,
+  });
+  const renamed = await files.moveNote(
+    await files.read(id, previous),
+    'Knowledge_Base/wiki/renamed.md',
+    true,
+  );
+  const first = await relink(files, search, renamed, previous);
+  assert.equal(first.links.self, 2);
+  assert.equal(first.links.links, 3);
+  assert.deepEqual(first.links.skipped, []);
+  assert.equal(
+    await read('Knowledge_Base/wiki/reader.md'),
+    reader.replaceAll('TARGET.md', 'renamed.md'),
+  );
+  assert.equal(first.doc.text, original.replaceAll('TARGET.md', 'renamed.md'));
+
+  const destination = 'Knowledge_Base/archive/target.md';
+  await mkdir(path.join(root, 'Knowledge_Base/archive'));
+  const relocated = await files.moveNote(first.doc, destination, true);
+  const second = await relink(files, search, relocated, first.doc.path);
+  assert.equal(second.links.self, 3);
+  assert.equal(second.links.links, 3);
+  assert.equal(second.links.incomplete, false);
+  assert.equal(
+    second.doc.text,
+    original.replaceAll('TARGET.md', 'target.md').replace('SIBLING.md', '../wiki/SIBLING.md'),
+  );
+  assert.equal(
+    await read('Knowledge_Base/wiki/reader.md'),
+    reader
+      .replace('target: TARGET.md', 'target: ../archive/target.md')
+      .replace('Knowledge_Base/wiki/TARGET.md', 'Knowledge_Base/archive/target.md')
+      .replace('](TARGET.md)', '](../archive/target.md)'),
+  );
+  assert.equal(linkCount('[Target](TARGET.md)', 'reader.md', 'target.md'), 0);
+});
+
 test('Moving a page rebases its own OKF references and refuses an unrepaired folder move', async (t) => {
   const { root, files, search, id, write, read } = await fixture(t);
   const original =

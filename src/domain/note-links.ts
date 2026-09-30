@@ -245,12 +245,11 @@ function* noteDestinations(text: string) {
 }
 
 /** How many links in `text`, read at `from`, resolve to `target`. */
-export function linkCount(text: string, from: string, target: string) {
-  const wanted = target.normalize('NFC');
+export function linkCount(text: string, from: string, target: string, foldCase = false) {
   let count = 0;
   for (const { written } of noteDestinations(text)) {
     const link = resolveNoteLink(from, unescaped(written));
-    if (link.kind === 'internal' && link.path.normalize('NFC') === wanted) count++;
+    if (link.kind === 'internal' && samePath(link.path, target, foldCase)) count++;
   }
   return count;
 }

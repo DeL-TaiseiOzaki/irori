@@ -110,6 +110,28 @@ async function fixture(t: TestContext, pages = bundle) {
   return { root, files, space, write, read, service };
 }
 
+test('A graph check retries temporary unreadable pages without requiring a file change', async (t) => {
+  const target = 'Knowledge_Base/wiki/a.md';
+  const { files, space, service } = await fixture(t, [
+    [target, page('concept', 'A', ['{ rel: uses, target: b.md }'])],
+    ['Knowledge_Base/wiki/b.md', page('concept', 'B')],
+  ]);
+  const resolve = files.resolve.bind(files);
+  let unavailable = true;
+  files.resolve = async (id, relative, allowRoot) => {
+    if (relative === target && unavailable) throw Error('Temporary read failure');
+    return resolve(id, relative, allowRoot);
+  };
+  const failed = await service.status(space.scopeId);
+  assert.equal(failed.unreadable, 1);
+  assert.equal(failed.relations.rows, 0);
+  unavailable = false;
+  const recovered = await service.status(space.scopeId);
+  assert.equal(recovered.unreadable, 0);
+  assert.equal(recovered.relations.rows, 1);
+  assert.equal(recovered.entities.rows, 2);
+});
+
 test('The graph index is built from the pages alone, in one order, with every exclusion counted', () => {
   const facts: PageFacts[] = [
     pageFacts('Knowledge_Base/wiki/b.md', {

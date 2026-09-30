@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Correctness/performance audit, 2026-09-30: **0.1.61** is prepared on
+`fix/performance-correctness-audit`, based on published 0.1.60 (`b91a1dd`).
+The [audit](AUDIT-2026-09-30.md) records the current architecture, reproductions,
+measurements and remaining candidates. Small changes across eight application
+files recover transient search/graph read failures, preserve live permission/
+question controls across delayed snapshots, avoid repeated history reads during
+ordinary streaming and document reads for another hibachi's file events, and
+repair differently cased body/frontmatter references during moves. Conversation
+reads retain only the existing view window while preserving stored history.
+
+Verification on the isolated branch: `npm run build`, `npm test` with local
+rclone (**399 tests: 394 passed, zero failed, five environment-gated skips**),
+all **26 Electron UI suites**, `npm run format:check`, changed documentation
+links and `git diff --check` passed. The fifth skip is the optional sibling
+irori-templete fixture, absent beside the temporary worktree; the shared checkout
+passed 395 with four skips before isolation. New regressions failed before their
+corrections, including a 64 MiB heap-limited history read. Five paired Node 24.21.0
+measurements on a synthetic 100 MiB history reduced median heap growth from
+148 MiB to 21 MiB and RSS from 201 MiB to 48 MiB; time was 270 ms versus 299 ms,
+so this is a memory improvement rather than a history speedup. Real model
+inference and installed Windows/macOS acceptance were not run. The PR remains
+open for review; this version has not been merged or published.
+
 Published 2026-09-30: #136 (**0.1.58**, comments), #139 (**0.1.59**, prompts) and #140
 (**0.1.60**, conversations) are merged in that order, by the owner's own `gh pr merge` after
 this session's merge was refused by the classifier, and published together as
