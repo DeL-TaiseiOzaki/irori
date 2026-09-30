@@ -8,11 +8,30 @@ not change the desktop release, Google audience or OAuth verification status.
 ## Cutover state
 
 - Registration: owner-confirmed at XServerドメイン.
-- GitHub Pages: workflow deployment, currently no custom domain configured.
-- Public DNS: an initial lookup returned SERVFAIL, so DNS activation has not been
-  established. Registration and DNS propagation are separate steps.
+- GitHub Pages: custom domain `irori-ai.com` configured. Website PR #147 is
+  merged at `cb1846b`; Pages run `36691804740` successfully deployed that source.
+- Public DNS: registry and Google resolver confirm `ns1.xdomain.ne.jp` through
+  `ns3.xdomain.ne.jp`. Google and Cloudflare return exactly the four GitHub Pages
+  A addresses; www points to `del-taiseiozaki.github.io`. No apex AAAA or CAA
+  records were returned by Google's resolver. The owner completed the registrar
+  changes; this workspace has no connected registrar account.
+- HTTP acceptance: homepage and the old GitHub Pages URL return the deployed
+  website; the old URL redirects to `http://irori-ai.com/` while HTTPS is pending.
+  Anonymous HTTP browser acceptance passed on rerun after a transient document
+  503: desktop/mobile, images, current 0.1.61 download targets, both languages,
+  canonical metadata and search. Strict HTTPS still rejects the certificate
+  hostname; successful HTTP checks do not establish HTTPS readiness.
 - Canonical, language alternate, social preview and documentation
-  download URLs: prepared for `https://irori-ai.com/` in the cutover branch.
+  download URLs: deployed for `https://irori-ai.com/`. Local build/browser checks
+  and all PR verification/native package jobs passed before merge.
+- HTTPS: no certificate reported yet and enforcement is currently false. An
+  enable request returned "The certificate does not exist yet". GitHub's health
+  result reported `InvalidDNSError` and a CAA `SERVFAIL`, although direct UDP and
+  TCP queries to all three authoritative servers returned authoritative
+  `NOERROR`; Google and Cloudflare also resolve the records. On 2026-10-01 the
+  custom domain was removed and re-added again to restart provisioning after
+  that mismatch. Certificate issuance and anonymous HTTPS/browser acceptance
+  remain pending; certificate validation is not bypassed.
 - Privacy/use-license pages and Google review work remain in draft PR #146;
   those pages are not present in the currently deployed site.
 
@@ -54,6 +73,11 @@ prior website commit while investigating. Do not declare the domain live from
 registration or a successful local build alone.
 
 ## Google ownership verification after site activation
+
+The owner added the Search Console TXT record. A fresh Google DNS response
+returns the exact supplied value at the apex, and on 2026-10-01 the owner
+reported that Search Console accepted it and opened the Domain Property.
+Retain the record in DNS, not application configuration.
 
 The Google Cloud project Owner opens Search Console, adds **Domain Property**
 `irori-ai.com` (not a URL-prefix property), and adds the generated

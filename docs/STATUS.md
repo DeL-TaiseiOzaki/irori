@@ -1,10 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Custom-domain preparation, 2026-09-30: the owner registered **irori-ai.com**.
-The website-only `docs/custom-domain` branch updates public site URLs and records
-[DNS, Pages and Google ownership steps](CUSTOM-DOMAIN.md). Pages/DNS cutover and
-HTTPS acceptance are pending; registration alone does not establish a live site.
-The published desktop remains 0.1.61. Google readiness work is separate draft
+Custom-domain deployment, 2026-09-30: the owner registered **irori-ai.com** at
+XServerドメイン. Website-only [PR #147](https://github.com/DeL-TaiseiOzaki/irori/pull/147)
+is merged at `cb1846b`; [Pages run 36691804740](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36691804740)
+successfully deployed the updated canonical/alternate, social and download URLs.
+GitHub Pages is configured with `irori-ai.com`. The owner corrected nameservers
+and entered DNS records: registry/Google confirm `ns1.xdomain.ne.jp`–`ns3.xdomain.ne.jp`,
+and Google/Cloudflare return the four required A records plus the www CNAME.
+HTTP homepage and the old-site redirect work. Anonymous HTTP browser checks
+passed on rerun after a transient document 503: desktop/mobile, images, current
+download targets, both languages, canonical metadata and search. GitHub still reports no certificate;
+HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. GitHub's
+health result reported a DNS/CAA failure that could not be reproduced against
+any authoritative server or Google/Cloudflare. Provisioning was restarted again
+on 2026-10-01 using GitHub's documented remove/re-add step.
+[DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
+The owner added the Google Domain Property TXT record; a fresh Google DNS
+response matches the supplied value. On 2026-10-01 the owner reported that
+Search Console confirmed ownership and opened the Domain Property.
+The published desktop remains 0.1.61. Google readiness is separate draft
 [PR #146](https://github.com/DeL-TaiseiOzaki/irori/pull/146); no Google publishing
 or verification setting has changed.
 
