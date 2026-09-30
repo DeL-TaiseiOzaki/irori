@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Comments, 2026-09-30 (**0.1.58**; [ADR 018](decisions/018-comments.md)): the owner asked to comment
+on any Markdown file and for the irori agent and hibachi agents to read the comments. **コメント** in
+the note's bar (`src/app/NoteComments.tsx`) comments on the selected passage or the whole note;
+choosing a quote selects it in the editor (`EditorHandle.selection` / `reveal`), and **解決** removes
+a comment. Comments are kept in the hibachi as `.irori/comments/<path>.json`, committed with it
+(the owner's choice), by `src/host/comments.ts` through the new `HostAPI` methods `noteComments`,
+`addNoteComment` and `removeNoteComment`; unknown fields survive and a broken file is never
+overwritten; a moved note's comments move with it. A hibachi agent's instruction carries the
+comments of its note, or one line saying where the hibachi's comments are; the irori agent's
+hibachi list gives each hibachi's count (`src/domain/comments.ts`, `src/domain/you.ts`). Verified
+with `npm run build`, `npm test` (new `tests/comments.test.ts` and a harness test of the prompt Pi
+receives) and `xvfb-run -a npm run test:ui` (new `scripts/comments-ui-smoke.ts`). Not done: a real
+CLI reading the comments, highlighting passages in the editor, Drive files and the irori agent's folder.
+
 Published 2026-09-30: #137 (**0.1.57**, routines) is merged at the owner's word
 ("mergeして公開まで行きましょう．") and published as
 [v0.1.57-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.57-preview.1)

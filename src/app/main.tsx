@@ -129,6 +129,7 @@ import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
 import { BrainSettings } from './BrainSettings';
 import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
+import { NoteComments } from './NoteComments';
 import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
@@ -1624,6 +1625,26 @@ function App() {
                         }}
                       />
                     )}
+                    {onNote &&
+                      doc &&
+                      !doc.workspaceId &&
+                      !doc.cloud &&
+                      !doc.viewer &&
+                      docSpace &&
+                      /\.md$/i.test(doc.path) && (
+                        <NoteComments
+                          key={`comments:${doc.scopeId}:${doc.path}`}
+                          scopeId={doc.scopeId}
+                          path={doc.path}
+                          revision={revision}
+                          selection={() => editor.current?.selection()}
+                          onReveal={(comment) =>
+                            !!comment.quote &&
+                            view === 'note' &&
+                            !!editor.current?.reveal(comment.quote, comment.line)
+                          }
+                        />
+                      )}
                     {onNote && doc && (
                       <NoteInfo label={t('ノートの情報', 'Note details')}>
                         <h3>{doc.path.split('/').at(-1)}</h3>

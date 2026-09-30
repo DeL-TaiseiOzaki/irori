@@ -445,6 +445,20 @@ export interface HostAPI {
     path: string,
     text: string,
   ): Promise<import('./knowledge').NoteAuthorship>;
+  /** The comments people left on a Markdown file of this KB (`.irori/comments/<path>.json`). */
+  noteComments(scopeId: string, path: string): Promise<import('./comments').NoteComment[]>;
+  /** Adds the person's comment to a Markdown file and returns the file's comments. */
+  addNoteComment(
+    scopeId: string,
+    path: string,
+    comment: import('./comments').NewComment,
+  ): Promise<import('./comments').NoteComment[]>;
+  /** Removes one comment from a Markdown file and returns the rest. */
+  removeNoteComment(
+    scopeId: string,
+    path: string,
+    id: string,
+  ): Promise<import('./comments').NoteComment[]>;
   /** Skill packages this KB declares in `.agents/skills/`, and the ones it retired. */
   skills(scopeId: string): Promise<import('./skills').SkillListing>;
   /** Which user-scope skill directories hold a same-named skill, per declared name. */

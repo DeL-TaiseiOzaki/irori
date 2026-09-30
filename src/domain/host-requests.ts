@@ -14,6 +14,7 @@ import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes } from './routines';
+import { newComment } from './comments';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -184,6 +185,9 @@ export const hostArguments = {
   writeSchemaFile: z.tuple([id, path, text.nullable(), version.nullable()]),
   moveSkill: z.tuple([id, skillName, skillName.nullable()]),
   noteAuthorship: z.tuple([id, path, text]),
+  noteComments: z.tuple([id, path]),
+  addNoteComment: z.tuple([id, path, newComment]),
+  removeNoteComment: z.tuple([id, path, z.string().min(1).max(64)]),
   saveImage: z.tuple([
     id,
     path,

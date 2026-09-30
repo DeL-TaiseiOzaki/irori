@@ -11,6 +11,7 @@ import { SessionStore, sessionKey } from '../src/agents/sessions';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
+import { addNoteComment } from '../src/host/comments';
 import { withRequests } from '../src/domain/conversation';
 import { ModelCatalog, parseOpenCodeModels, parsePiModels } from '../src/agents/models';
 import { piModelArgs } from '../src/agents/pi';
@@ -316,6 +317,43 @@ test(
     const asked = await sent({ personLines: true });
     assert.ok(asked.includes('wrote or revised lines 4 of that note'), asked);
     assert.ok(asked.endsWith('tidy the note'), 'the request stays last');
+  },
+);
+
+test(
+  "A hibachi agent is given its note's comments, and otherwise where the hibachi keeps them",
+  fixtureOptions,
+  async (t) => {
+    const { root, space, files, calls, execute } = await setup(t);
+    await writeFile(path.join(root, 'other.md'), '# Other\n');
+    const sent = async (extra: Partial<StartRun>) => {
+      const run = await execute('pi', 'address the comments', false, extra);
+      assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
+      return (await calls()).filter((call: any) => call.type === 'prompt').at(-1).message as string;
+    };
+    assert.ok(!(await sent({ notePath: 'note.md' })).includes('.irori/comments'), 'none, no words');
+    await addNoteComment(
+      files,
+      { userEmail: async () => 'alice@example.com' },
+      space.scopeId,
+      'note.md',
+      {
+        body: 'Say what the fixture is for.',
+        quote: 'Fixture',
+        line: 1,
+      },
+    );
+    const onNote = await sent({ notePath: 'note.md' });
+    assert.ok(onNote.includes('".irori/comments/note.md.json"'), onNote);
+    assert.ok(
+      onNote.includes('- line 1, on "Fixture" (human:alice): Say what the fixture is for.'),
+      onNote,
+    );
+    assert.ok(onNote.endsWith('address the comments'), 'the request stays last');
+    const elsewhere = await sent({ notePath: 'other.md' });
+    assert.ok(elsewhere.includes('This hibachi has 1 comment from people on 1 file'), elsewhere);
+    assert.ok(!elsewhere.includes('Say what the fixture is for.'), elsewhere);
+    assert.ok((await sent({})).includes('This hibachi has 1 comment'), 'without a note as well');
   },
 );
 

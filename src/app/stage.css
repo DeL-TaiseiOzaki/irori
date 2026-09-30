@@ -582,6 +582,87 @@ button.save-state > i {
   color: var(--term-muted);
 }
 
+/* Comments: the count on the button, a field for a new one and the list, in a popover. */
+.comments-popover {
+  width: 380px;
+  max-height: min(560px, calc(100vh - 120px));
+  overflow: auto;
+}
+.comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.comment-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 60px;
+  font: inherit;
+  font-size: 13px;
+}
+.comment-composer button[type='submit'] {
+  align-self: flex-end;
+}
+.comment-quote {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-left: 3px solid var(--ember);
+  border-radius: 0;
+  background: var(--stage-2);
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+button.comment-quote:hover {
+  color: var(--ink);
+}
+.comment-quote.selected {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.comment-quote.selected span {
+  flex: 1;
+  min-width: 0;
+}
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comment-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.comment-body {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.comment-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-3);
+}
+.comment-missing {
+  color: var(--danger);
+}
+
 /* Backlinks: the count beside the link, and the list in a popover. */
 .backlinks-count {
   font-weight: 600;
