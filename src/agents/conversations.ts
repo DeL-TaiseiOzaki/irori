@@ -635,30 +635,42 @@ export class ConversationStore {
       this.usable(id);
       const meta = await this.meta(id);
       const lines: StoredEvent[] = [];
+      const sizes: number[] = [];
+      let earlier = 0;
+      let bytes = 0;
       const add = (line: StoredEvent) => {
         const last = lines.at(-1);
-        if (line.type === 'text' && last?.type === 'text' && last.id === line.id)
+        if (line.type === 'text' && last?.type === 'text' && last.id === line.id) {
           last.text += line.text;
-        else lines.push({ ...line });
+          const size = Buffer.byteLength(last.text) + (last.details?.length ?? 0);
+          bytes += size - sizes[sizes.length - 1];
+          sizes[sizes.length - 1] = size;
+        } else {
+          // Copy the shortened string: a slice can keep the full tool output alive.
+          const details =
+            line.details && line.details.length > viewDetails
+              ? structuredClone(line.details.slice(0, viewDetails))
+              : line.details;
+          lines.push({ ...line, details });
+          const size = Buffer.byteLength(line.text) + (details?.length ?? 0);
+          sizes.push(size);
+          bytes += size;
+        }
+        // Keep the event crossing the byte limit, as the view did before, and
+        // discard older events while reading instead of retaining the whole file.
+        while (lines.length > viewEvents || (lines.length > 1 && bytes - sizes[0] > viewBytes)) {
+          lines.shift();
+          bytes -= sizes.shift()!;
+          earlier++;
+        }
       };
       const damaged = await this.readLines(id, add);
       for (const line of this.buffers.get(id) ?? []) add(line);
-      let start = Math.max(0, lines.length - viewEvents);
-      let bytes = 0;
-      for (let index = lines.length - 1; index > start; index--) {
-        bytes +=
-          Buffer.byteLength(lines[index].text) +
-          Math.min(lines[index].details?.length ?? 0, viewDetails);
-        if (bytes > viewBytes) {
-          start = index;
-          break;
-        }
-      }
       const state = this.states.get(id);
       return {
         meta,
-        events: lines.slice(start).map((line) => viewEvent(line, meta)),
-        earlier: start,
+        events: lines.map((line) => viewEvent(line, meta)),
+        earlier,
         damaged,
         queued: structuredClone(state?.queued ?? []),
         activeRunId: state?.active?.runId,

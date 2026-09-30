@@ -11,6 +11,60 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import type { Space } from '../src/domain/types';
 
+async function checkUnrelatedFileEvent(
+  app: ElectronApplication,
+  page: Page,
+  scopeId: string,
+  otherScopeId: string,
+) {
+  await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
+  await app.evaluate(({ ipcMain }, scopeId) => {
+    type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+    const original = (
+      ipcMain as unknown as { _invokeHandlers: Map<string, Handler> }
+    )._invokeHandlers.get('irori')!;
+    const fixture = { original, reads: 0, declarations: 0 };
+    (globalThis as unknown as { unrelatedReadFixture: typeof fixture }).unrelatedReadFixture =
+      fixture;
+    ipcMain.removeHandler('irori');
+    ipcMain.handle('irori', (event, method, ...args) => {
+      if (method === 'read' && args[0] === scopeId && args[1] === 'README.md') fixture.reads++;
+      if (method === 'notesDeclaration' && args[0] === scopeId) fixture.declarations++;
+      return original(event, method, ...args);
+    });
+  }, scopeId);
+  const counts = () =>
+    app.evaluate(() => {
+      const { reads, declarations } = (
+        globalThis as unknown as { unrelatedReadFixture: { reads: number; declarations: number } }
+      ).unrelatedReadFixture;
+      return { reads, declarations };
+    });
+  try {
+    await app.evaluate(({ BrowserWindow }, scopeId) => {
+      BrowserWindow.getAllWindows()[0].webContents.send('irori:event', { type: 'files', scopeId });
+    }, otherScopeId);
+    // Declaration refresh proves the renderer received the file event. A file
+    // in another hibachi must not reread the whole document open in this one.
+    await expect.poll(async () => (await counts()).declarations).toBeGreaterThan(0);
+    expect((await counts()).reads).toBe(0);
+    await app.evaluate(({ BrowserWindow }, scopeId) => {
+      BrowserWindow.getAllWindows()[0].webContents.send('irori:event', { type: 'files', scopeId });
+    }, scopeId);
+    await expect.poll(async () => (await counts()).reads).toBe(1);
+  } finally {
+    await app.evaluate(({ ipcMain }) => {
+      const fixture = (
+        globalThis as unknown as {
+          unrelatedReadFixture: { original: (...args: unknown[]) => unknown };
+        }
+      ).unrelatedReadFixture;
+      ipcMain.removeHandler('irori');
+      ipcMain.handle('irori', fixture.original);
+    });
+  }
+}
+
 async function checkConcurrentReconcile(
   app: ElectronApplication,
   page: Page,
@@ -296,6 +350,7 @@ try {
   await expect
     .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
     .toContain('Editing with source control open');
+  await checkUnrelatedFileEvent(app, page, spaces[0].scopeId, spaces[1].scopeId);
   await checkConcurrentReconcile(app, page, root, spaces[0].scopeId);
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();

@@ -56,8 +56,8 @@ export class SearchService {
   }
 
   /** Move previews include the OKF relation and source fields as well as body links. */
-  async references(scopeId: string, target: string): Promise<KnowledgeSearch> {
-    const foldCase = await foldsCase(this.files, scopeId, target);
+  async references(scopeId: string, target: string, foldCase?: boolean): Promise<KnowledgeSearch> {
+    foldCase ??= await foldsCase(this.files, scopeId, target);
     return this.scan(scopeId, target, /\.md$/i, (from, text) =>
       samePath(from, target, foldCase) ? () => null : referencesTo(text, from, target, foldCase),
     );
@@ -153,7 +153,14 @@ export class SearchService {
           }
           const row = known.get(entry.path);
           known.delete(entry.path);
-          if (row && row.size === stat.size && row.mtime === stat.mtimeMs) {
+          // A failed read may be temporary even when size and mtime stay the
+          // same. Retry it; only oversized failures remain known from the stat.
+          if (
+            row &&
+            row.size === stat.size &&
+            row.mtime === stat.mtimeMs &&
+            (!row.unreadable || stat.size > this.limits.fileBytes)
+          ) {
             if (row.unreadable) {
               result.skippedFiles++;
               result.incomplete = true;

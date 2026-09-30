@@ -120,7 +120,7 @@ export class GraphIndexService {
       async ({ path, stat, read }) => {
         const known = previous.get(path);
         let entry: Remembered;
-        if (known && known.size === stat.size && known.mtime === stat.mtimeMs) entry = known;
+        if (known?.facts && known.size === stat.size && known.mtime === stat.mtimeMs) entry = known;
         else {
           entry = { size: stat.size, mtime: stat.mtimeMs };
           try {

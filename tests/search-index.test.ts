@@ -72,6 +72,34 @@ test('A repeat request reads no file; the index is on the device, never in the K
   assert.ok((await stat(indexFile)).size > 0);
 });
 
+test('A temporary read failure is retried after restart without changing the file', async (t) => {
+  const { files, space, write, reads } = await fixture(t);
+  await write('note.md', 'needle\n');
+  const resolve = files.resolve.bind(files);
+  let unavailable = true;
+  files.resolve = async (id, relative, allowRoot) => {
+    if (relative === 'note.md' && unavailable) throw Error('Temporary read failure');
+    return resolve(id, relative, allowRoot);
+  };
+  const failed = await new SearchService(files).search(space.scopeId, 'needle');
+  assert.deepEqual(failed.hits, []);
+  assert.equal(failed.skippedFiles, 1);
+  assert.equal(failed.incomplete, true);
+  assert.equal(reads(), 1);
+
+  unavailable = false;
+  const restarted = new SearchService(files);
+  const recovered = await restarted.search(space.scopeId, 'needle');
+  assert.deepEqual(
+    recovered.hits.map((hit) => hit.path),
+    ['note.md'],
+  );
+  assert.equal(recovered.incomplete, false);
+  assert.equal(reads(), 2);
+  await restarted.search(space.scopeId, 'needle');
+  assert.equal(reads(), 2);
+});
+
 test('Files modified, added, removed or renamed since they were indexed are read afresh', async (t) => {
   const { files, space, write, reads, indexFile } = await fixture(t);
   await write('keep.md', 'needle stays\n');

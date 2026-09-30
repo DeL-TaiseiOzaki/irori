@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+Current correction, 2026-09-30: **0.1.61** is prepared on
+`fix/performance-correctness-audit`, from published 0.1.60 (`b91a1dd`). The
+[audit](AUDIT-2026-09-30.md) maps the current architecture, the reproduced
+failures and the bounded-history memory measurements. This corrects transient
+search/graph failures, delayed live requests, unrelated document rereads and
+case-insensitive move references. See STATUS for verification. The branch needs
+PR review and an authorized merge; it has not been published. Concurrent
+website documentation work stays in its own branch and checkout.
+
 Current development, 2026-09-30: **0.1.60 is published** as
 [v0.1.60-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.60-preview.1)
 (#136, #139, #140; release run `36660235725` from main CI `36658865418` at `a6b53a0`). It

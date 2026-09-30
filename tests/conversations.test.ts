@@ -14,7 +14,9 @@ import {
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { ConversationStore, viewDetails } from '../src/agents/conversations';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { ConversationStore, jsonLine, storedLine, viewDetails } from '../src/agents/conversations';
 import { DeviceIdentity } from '../src/host/device';
 import type { StartRun } from '../src/domain/types';
 
@@ -426,4 +428,90 @@ test('Line and paragraph separators and lone carriage returns stay inside their 
   assert.equal(events[0].text, '区切り を含む指示');
   assert.equal(events[1].text, '日本語 の 応答\rです');
   assert.equal(events[2].details, '{"a":" "}');
+});
+
+test('Long histories keep the newest events, join buffered text and count earlier and damaged events', async (t) => {
+  const { store, placement, input, folder } = await fixture(t);
+  const id = randomUUID();
+  const runId = randomUUID();
+  await store.begin(id, placement, { runId, eventId: randomUUID() }, input('first'));
+  for (let index = 0; index < 1005; index++)
+    store.event(id, { runId, type: 'tool', text: String(index) });
+  const reply = randomUUID();
+  store.event(id, { id: reply, runId, type: 'text', text: 'saved' });
+  await store.flush();
+  await appendFile(path.join(folder(id), 'events.jsonl'), '{broken}\n');
+  store.event(id, { id: reply, runId, type: 'text', text: ' and buffered' });
+  let value = await store.read(id);
+  assert.equal(value.events.length, 1000);
+  assert.equal(value.earlier, 7);
+  assert.equal(value.events[0].text, '6');
+  assert.equal(value.events.at(-1)?.text, 'saved and buffered');
+  assert.equal(value.damaged, 1);
+  await store.finish(id, { runId, type: 'done', text: 'done', outcome: 'completed' });
+  value = await store.read(id);
+  assert.equal(value.events.length, 1000);
+  assert.equal(value.earlier, 8);
+  assert.equal(value.events[0].text, '7');
+  assert.equal(value.damaged, 1);
+});
+
+test('The history byte window keeps whole UTF-8 replies including the event crossing its limit', async (t) => {
+  const { store, placement, input } = await fixture(t);
+  const id = randomUUID();
+  const runId = randomUUID();
+  await store.begin(id, placement, { runId, eventId: randomUUID() }, input('first'));
+  const text = 'あ'.repeat(1024 * 1024);
+  const replies = Array.from({ length: 4 }, () => randomUUID());
+  for (const reply of replies) store.event(id, { id: reply, runId, type: 'text', text });
+  await store.finish(id, { runId, type: 'done', text: 'done', outcome: 'completed' });
+  const value = await store.read(id);
+  assert.equal(value.earlier, 2);
+  assert.equal(value.damaged, 0);
+  assert.deepEqual(
+    value.events.slice(0, -1).map((event) => event.id),
+    replies.slice(1),
+  );
+  assert.ok(value.events.slice(0, -1).every((event) => event.text === text));
+  assert.equal(value.events.at(-1)?.type, 'done');
+});
+
+test('Large tool histories open within a bounded heap while their full details stay on disk', async (t) => {
+  const { dataDir, store, placement, input, folder } = await fixture(t);
+  const id = randomUUID();
+  const runId = randomUUID();
+  await store.begin(id, placement, { runId, eventId: randomUUID() }, input('first'));
+  await store.finish(id, { runId, type: 'done', text: 'done', outcome: 'completed' });
+  const file = path.join(folder(id), 'events.jsonl');
+  const details = 'x'.repeat(256 * 1024);
+  for (let batch = 0; batch < 20; batch++)
+    await appendFile(
+      file,
+      Array.from({ length: 20 }, () =>
+        jsonLine(storedLine({ runId, type: 'tool', text: 'tool', details })),
+      ).join(''),
+    );
+  assert.ok((await stat(file)).size > 100 * 1024 * 1024);
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      '--max-old-space-size=64',
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '-e',
+      `import { ConversationStore } from ${JSON.stringify(new URL('../src/agents/conversations.ts', import.meta.url).href)};
+       import { DeviceIdentity } from ${JSON.stringify(new URL('../src/host/device.ts', import.meta.url).href)};
+       const dataDir = ${JSON.stringify(dataDir)};
+       const value = await new ConversationStore(dataDir, new DeviceIdentity(dataDir)).read(${JSON.stringify(id)});
+       console.log(JSON.stringify({ count: value.events.length, earlier: value.earlier, damaged: value.damaged,
+         details: value.events.filter(event => event.type === 'tool').map(event => event.details.length) }));`,
+    ],
+    { timeout: 30000 },
+  );
+  const value = JSON.parse(stdout);
+  assert.equal(value.count, 402);
+  assert.equal(value.earlier, 0);
+  assert.equal(value.damaged, 0);
+  assert.deepEqual(value.details, Array(400).fill(viewDetails));
 });

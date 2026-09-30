@@ -87,13 +87,13 @@ function scalar(value: string, before: string) {
 }
 
 /** Count actual OKF references and Markdown body links, never a description containing Markdown. */
-export function noteReferenceCount(text: string, from: string, target: string) {
+export function noteReferenceCount(text: string, from: string, target: string, foldCase = false) {
   const { body, references } = metadata(text);
   return (
-    linkCount(text.slice(body), from, target) +
+    linkCount(text.slice(body), from, target, foldCase) +
     references.filter((reference) => {
       const link = resolveNoteLink(origin(from, reference), reference.href);
-      return link.kind === 'internal' && samePath(link.path, target);
+      return link.kind === 'internal' && samePath(link.path, target, foldCase);
     }).length
   );
 }
