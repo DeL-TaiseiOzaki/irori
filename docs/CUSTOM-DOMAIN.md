@@ -7,7 +7,7 @@ not change the desktop release, Google audience or OAuth verification status.
 
 ## Cutover state
 
-- Registration: owner-confirmed; registrar not yet confirmed in this packet.
+- Registration: owner-confirmed at XServerドメイン.
 - GitHub Pages: workflow deployment, currently no custom domain configured.
 - Public DNS: an initial lookup returned SERVFAIL, so DNS activation has not been
   established. Registration and DNS propagation are separate steps.
