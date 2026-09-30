@@ -1,13 +1,25 @@
 # irori continuation handoff
 
-Current correction, 2026-09-30: **0.1.61** is prepared on
-`fix/performance-correctness-audit`, from published 0.1.60 (`b91a1dd`). The
-[audit](AUDIT-2026-09-30.md) maps the current architecture, the reproduced
-failures and the bounded-history memory measurements. This corrects transient
-search/graph failures, delayed live requests, unrelated document rereads and
-case-insensitive move references. See STATUS for verification. The branch needs
-PR review and an authorized merge; it has not been published. Concurrent
-website documentation work stays in its own branch and checkout.
+Published 2026-09-30: **0.1.61** (#142) is merged at the owner's request and
+published as [v0.1.61-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.61-preview.1)
+by release run `36672845624` from main's successful CI run `36671463044`
+(attempt 2, source `1d11447`). Windows and Mac package launch/update checks passed;
+Linux package checks passed. The release carries Windows 202,725,888 bytes,
+Mac 170,185,390 bytes and the Windows full update package
+202,086,166 bytes. Anonymous downloads of all six release
+files matched GitHub's asset digests; the three application packages also matched
+`SHA256SUMS.txt` and native package evidence. The website manifest now offers this
+release. Pages deployment and release-sync verification follow its merge.
+
+The first main CI attempt caught an existing Schema UI smoke timing race: the
+watcher could list a renamed skill before its metadata write completed. The
+assertion now polls for the same exact file contents, preserving all checks;
+the focused smoke passed locally. The unmodified source CI passed on attempt 2.
+
+The [audit](AUDIT-2026-09-30.md) maps the current architecture, reproduced
+failures and bounded-history memory measurements; STATUS records the fixes and
+verification. Real provider inference and installed-device acceptance remain
+unverified. Concurrent website documentation work stays in its own branch.
 
 Current development, 2026-09-30: **0.1.60 is published** as
 [v0.1.60-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.60-preview.1)
