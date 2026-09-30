@@ -8,7 +8,14 @@ Forge packaging and an unsigned CI pipeline are now implemented; see [commands, 
 
 ## Implemented website
 
-`website/` is an independent static entry inside the irori repository. It reuses Vite, TypeScript and Zod, with no new dependencies. Its build emits only public website assets into `dist-website/`. It neither embeds Electron nor exposes the desktop HostAPI. Relative asset URLs support a GitHub Pages project subpath or a custom domain. The page is in English and dark only; it reuses the app's v5 colour tokens and bundled Geist fonts. Its screenshots in `website/public/screens/` are the actual English UI, taken at 2x with `scripts/ui-screens.ts`'s disposable fixture and converted to WebP. When the UI changes noticeably, retake them the same way.
+`website/` is an independent static entry inside the irori repository. It reuses Vite, TypeScript and Zod, with no new dependencies. Its build emits only public website assets into `dist-website/`. It neither embeds Electron nor exposes the desktop HostAPI. Relative asset URLs support a GitHub Pages project subpath or a custom domain. The download page is in English and dark only; it reuses the app's v5 colour tokens and bundled Geist fonts. Its screenshots in `website/public/screens/` are the actual English UI, taken at 2x with `scripts/ui-screens.ts`'s disposable fixture and converted to WebP. When the UI changes noticeably, retake them the same way.
+
+The same build includes the Japanese-first documentation at `docs/ja/` and its
+English edition at `docs/en/`. `docs/` redirects to Japanese. Articles are
+rendered to static HTML from paired Markdown sources, with local search and
+light/dark themes. The language control keeps the article and section. Both
+sites are published together by the existing Pages workflow; this website-only
+change does not require a new desktop preview. See [authoring and verification](../website/docs/README.md).
 
 ```sh
 npm run dev:website

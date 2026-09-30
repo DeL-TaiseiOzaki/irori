@@ -5,4 +5,7 @@ test-results/
 .local/
 *.log
 dist-website/
+website/docs/ja/
+website/docs/en/
+website/docs/index.html
 out/

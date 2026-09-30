@@ -18,6 +18,7 @@ A desktop app that brings together the notes where your knowledge lives and the 
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#download)
 
 [Download](https://del-taiseiozaki.github.io/irori/) ·
+[Documentation](https://del-taiseiozaki.github.io/irori/docs/en/) ·
 [Release notes](https://github.com/DeL-TaiseiOzaki/irori/releases) ·
 [Getting started](#getting-started) ·
 [Feedback](#feedback) ·

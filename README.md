@@ -18,6 +18,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20%7C%20macOS%20arm64-lightgrey.svg)](#ダウンロード)
 
 [ダウンロード](https://del-taiseiozaki.github.io/irori/) ・
+[ドキュメント](https://del-taiseiozaki.github.io/irori/docs/ja/) ・
 [リリースノート](https://github.com/DeL-TaiseiOzaki/irori/releases) ・
 [はじめかた](#はじめかた) ・
 [フィードバック](#フィードバック) ・
