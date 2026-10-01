@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-01: **0.1.62** (#150, folders on this computer) is merged at
+the owner's request and published as
+[v0.1.62-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.62-preview.1)
+by release run `36841492770` from main's successful CI run `36840169441`
+(source `57cf6be`). The release carries Windows 202,728,448 bytes, Mac
+170,211,167 bytes and `irori-0.1.62-full.nupkg` 202,090,938 bytes; anonymous
+downloads of all six release files matched GitHub's asset digests, and the three
+packages matched `SHA256SUMS.txt`. The website manifest now offers this release.
+Owner device checks remain: a real sync-app folder (Drive for desktop, Dropbox,
+iCloud) connected on the installed Mac and Windows builds, editing there, and a
+Claude Code or Codex turn reading and writing it.
+
 Folders on this computer, 2026-10-01 (**0.1.62**,
 [ADR 019](decisions/019-local-folder-connections.md)): Google's restricted-scope
 review and yearly security assessment stand between Drive sign-in and people
