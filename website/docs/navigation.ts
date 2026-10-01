@@ -24,6 +24,7 @@ export const pages = [
   { slug: 'schema', group: 'agents' },
   { slug: 'routines', group: 'agents' },
   { slug: 'files', group: 'connections' },
+  { slug: 'sync-folders', group: 'connections' },
   { slug: 'drive', group: 'connections' },
   { slug: 'git', group: 'connections' },
   { slug: 'settings', group: 'reference' },

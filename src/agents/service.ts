@@ -172,6 +172,16 @@ export class AgentService {
   busy(scopeId: string) {
     return this.runs.has(scopeId) || this.delegated.has(scopeId);
   }
+  /**
+   * The folders on this device that the run's hibachis show in contents through
+   * links: a hibachi agent's own, or those of the hibachis handed to the irori agent.
+   */
+  private localFolders(run: Run) {
+    const scopes = run.delegation
+      ? run.delegation.brains.map((brain) => brain.scopeId)
+      : [run.binding.scopeId];
+    return scopes.flatMap((scopeId) => this.files.cloud?.localFolders?.(scopeId) ?? []);
+  }
   /** Whether `scopeId` is your AI's own id rather than a brain's. */
   private isYou(scopeId: string) {
     return !!this.you?.rootOf(scopeId);
@@ -1106,11 +1116,16 @@ export class AgentService {
       capabilities: { experimentalApi: true },
     });
     rpc.send({ method: 'initialized', params: {} });
+    const folders = this.localFolders(run);
     const params = {
       cwd,
       approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
       approvalsReviewer: 'user',
       sandbox: run.access === 'full-access' ? 'danger-full-access' : 'workspace-write',
+      // A local folder in contents is reached through a link, outside the working
+      // directory the sandbox lets the agent change.
+      ...(run.access !== 'full-access' &&
+        folders.length && { config: { 'sandbox_workspace_write.writable_roots': folders } }),
       ...(model && { model }),
     };
     const thread = await rpc.request(
@@ -1240,10 +1255,11 @@ export class AgentService {
         includePartialMessages: true,
         resume: session,
         ...(model && { model }),
-        ...((delegation || run.step) && {
+        ...((delegation || run.step || this.localFolders(run).length) && {
           additionalDirectories: [
             ...(delegation?.brains.map((brain) => brain.root) ?? []),
             ...(run.step?.directories ?? []),
+            ...this.localFolders(run),
           ],
         }),
         // Told when it matters rather than on every turn: before an edit would

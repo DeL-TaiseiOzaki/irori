@@ -93,6 +93,8 @@ export class FileService {
     /** Writes an edited Drive file in place, hash checked. */
     write?(doc: Document): Promise<void>;
     writable?(scopeId: string, rel: string): boolean;
+    /** The connected folders on this device that a hibachi's contents shows through links. */
+    localFolders?(scopeId: string): string[];
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];

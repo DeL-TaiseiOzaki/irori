@@ -149,7 +149,9 @@ export function Tree({
                 <span className="tree-chevron" />
               )}
               <Icon
-                name={entry.connection ? 'cloud' : entry.directory ? 'folder' : 'file'}
+                name={
+                  entry.connection && !entry.local ? 'cloud' : entry.directory ? 'folder' : 'file'
+                }
                 size={15}
                 className={`tree-icon ${entry.connection ? 'drive' : ''}`}
               />

@@ -1,5 +1,31 @@
 # irori continuation handoff
 
+Folders on this computer, 2026-10-01 (**0.1.62**,
+[ADR 019](decisions/019-local-folder-connections.md)): Google's restricted-scope
+review and yearly security assessment stand between Drive sign-in and people
+outside the test users, and the owner wants no one to set up Google Cloud. The
+owner chose the Obsidian approach: a provider's own sync app (Drive for desktop,
+Dropbox, Box, iCloud, OneDrive) keeps the folder on the device, and irori shows
+a folder from it in contents. The connection dialog offers **このコンピューター**
+first and **Google Drive** second.
+- `CloudService` keeps local connections in `.irori/local-folders.json` (no path)
+  and `local-bindings/` in irori's data (the path). Connecting makes
+  `contents/<name>` a symlink (a junction on Windows); `locate` checks the link's
+  identity and target and the folder's device and inode before following it, and
+  refuses links inside it. Folders overlapping a hibachi or irori's data are
+  refused; deletion goes through `shell.trashItem`. `HostAPI` gains
+  `addLocalFolder` and `bindLocalFolder`; the existing connection methods handle
+  both kinds. Standard-access Claude Code gets the folders as
+  `additionalDirectories`, Codex as `sandbox_workspace_write.writable_roots`.
+- The website gains the bilingual synced-folders guide; the Drive guide says
+  sign-in is for invited testers.
+- Verified with `npm run build`, `npm test`, `xvfb-run -a npm run test:ui`, the
+  website build and smoke, and `npm run format:check`. Codex 0.159.0's app server
+  reported the writable root without running a model. Not verified: real sync
+  apps, installed Windows/macOS builds, Windows junctions, real CLI turns.
+- Google readiness draft PR #146 also claims 0.1.62; whichever merges second
+  takes the next version.
+
 Custom-domain deployment, 2026-09-30: the owner registered **irori-ai.com** at
 XServerドメイン. Website-only [PR #147](https://github.com/DeL-TaiseiOzaki/irori/pull/147)
 is merged at `cb1846b`; [Pages run 36691804740](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/36691804740)

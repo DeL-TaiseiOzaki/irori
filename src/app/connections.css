@@ -687,3 +687,32 @@
     box-shadow: inset 0 1px 0 var(--rule);
   }
 }
+
+/* Where the folder comes from: this computer, or Google Drive */
+.connect-sheet .connect-source {
+  display: flex;
+  gap: 6px;
+}
+.connect-sheet .connect-source button {
+  gap: 6px;
+  color: var(--ink-2);
+}
+.connect-sheet .connect-source button[aria-pressed='true'] {
+  background: var(--stage-2);
+  color: var(--ink);
+}
+.connect-sheet .local-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.connect-sheet .local-pick button {
+  gap: 6px;
+}
+.connect-sheet .local-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--ink-2);
+}

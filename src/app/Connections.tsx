@@ -86,6 +86,11 @@ function MoreMenu({
   );
 }
 
+/** The last component of a folder path on any system. */
+function folderName(folder: string) {
+  return folder.split(/[\\/]/).filter(Boolean).at(-1) ?? folder;
+}
+
 export function Connections({
   space,
   workspaceId,
@@ -106,6 +111,9 @@ export function Connections({
   const [selected, setSelected] = useState<CloudFolder>(),
     [name, setName] = useState(''),
     [contentsRoot, setContentsRoot] = useState(space.contents[0]);
+  // A folder a sync app keeps on this device is the ordinary source; Drive needs an invitation.
+  const [source, setSource] = useState<'local' | 'drive'>('local'),
+    [localPath, setLocalPath] = useState('');
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [revision, setRevision] = useState(0);
@@ -171,7 +179,14 @@ export function Connections({
   }
   const disabled = busy || running;
   const authorizing = accounts.some((item) => item.state === 'authorizing');
-  const invalidName = selected ? mountNameError(name) : undefined;
+  const chosen = source === 'drive' ? selected?.name : localPath && folderName(localPath);
+  const invalidName = chosen ? mountNameError(name) : undefined;
+  async function chooseLocal() {
+    const folder = await host.chooseFolder();
+    if (!folder) return;
+    setLocalPath(folder);
+    setName(folderName(folder));
+  }
   return (
     <Dialog
       label={t('クラウド接続', 'Cloud connection')}
@@ -186,7 +201,7 @@ export function Connections({
             <BrainTile space={space} size={22} radius={6} ring="stage" />
             <span className="connect-title">
               <strong>{space.name}</strong>{' '}
-              {t('の Contents に Google Drive を接続', '· Connect Google Drive to Contents')}
+              {t('の Contents にフォルダを接続', '· Connect folders to Contents')}
             </span>
           </h2>
           <button
@@ -201,34 +216,63 @@ export function Connections({
         </header>
         <div className="connect-body">
           <div className="connect-steps">
+            <div className="connect-source" role="group" aria-label={t('接続元', 'Source')}>
+              {(
+                [
+                  ['local', 'folder', t('このコンピューター', 'This computer')],
+                  ['drive', 'cloud', 'Google Drive'],
+                ] as const
+              ).map(([value, icon, label]) => (
+                <button
+                  key={value}
+                  className="stage-text-button framed small"
+                  aria-pressed={source === value}
+                  disabled={disabled}
+                  onClick={() => {
+                    setSource(value);
+                    setSelected(undefined);
+                    setLocalPath('');
+                    setName('');
+                    setError('');
+                  }}
+                >
+                  <Icon name={icon} size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
             {/* Only a missing prerequisite or an unusable mount is worth a line here;
                 that folders connect read-only is said where one is registered. */}
-            {setup && (!setup.available || !setup.mountAvailable || setup.prerequisite) && (
-              <div className="connect-notice">
-                {(!setup.available || !setup.mountAvailable) && <p role="status">{setup.detail}</p>}
-                {setup.prerequisite && (
-                  <div className="connect-notice-actions">
-                    <button
-                      className="stage-text-button framed small"
-                      onClick={() => void perform(() => host.openCloudSetupHelp())}
-                      disabled={disabled}
-                    >
-                      {setup.prerequisite === 'winfsp'
-                        ? t('WinFsp をダウンロード', 'Download WinFsp')
-                        : t('導入手順を見る', 'View setup instructions')}
-                    </button>
-                    <button
-                      className="stage-text-button framed small"
-                      onClick={() => setRevision((value) => value + 1)}
-                      disabled={disabled}
-                    >
-                      {t('再確認', 'Recheck')}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {setup && !setup.oauthConfigured && (
+            {source === 'drive' &&
+              setup &&
+              (!setup.available || !setup.mountAvailable || setup.prerequisite) && (
+                <div className="connect-notice">
+                  {(!setup.available || !setup.mountAvailable) && (
+                    <p role="status">{setup.detail}</p>
+                  )}
+                  {setup.prerequisite && (
+                    <div className="connect-notice-actions">
+                      <button
+                        className="stage-text-button framed small"
+                        onClick={() => void perform(() => host.openCloudSetupHelp())}
+                        disabled={disabled}
+                      >
+                        {setup.prerequisite === 'winfsp'
+                          ? t('WinFsp をダウンロード', 'Download WinFsp')
+                          : t('導入手順を見る', 'View setup instructions')}
+                      </button>
+                      <button
+                        className="stage-text-button framed small"
+                        onClick={() => setRevision((value) => value + 1)}
+                        disabled={disabled}
+                      >
+                        {t('再確認', 'Recheck')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            {source === 'drive' && setup && !setup.oauthConfigured && (
               <p className="connect-notice">
                 {t(
                   'この検証版では Google 接続を利用できません。',
@@ -241,224 +285,246 @@ export function Connections({
                 {issue}
               </p>
             )}
-            <Step
-              n={1}
-              title={t('Google アカウント', 'Google account')}
-              done={accounts.some((account) => account.state === 'ready')}
-            >
-              {accounts.map((account) => {
-                const [tone, icon, label] = accountState(account);
-                return (
-                  <div className="account-row" key={account.id}>
-                    <span className="account-avatar" aria-hidden="true">
-                      {Array.from(account.name)[0]}
-                    </span>
-                    <div className="account-text">
-                      <span className="account-line">
-                        <strong>{account.name}</strong>
-                        <span className={`account-state ${tone}`}>
-                          <Icon name={icon} size={13} />
-                          {label}
-                        </span>
-                      </span>
-                      {account.detail && <small>{account.detail}</small>}
-                    </div>
-                    {(account.state === 'incomplete' ||
-                      (account.state === 'ready' && !account.writable)) && (
-                      <button
-                        className="stage-text-button framed small"
-                        disabled={disabled || !setup?.oauthConfigured || authorizing}
-                        onClick={() => void perform(() => host.reauthorizeCloudAccount(account.id))}
-                      >
-                        {account.state === 'ready'
-                          ? t('書き込みを許可', 'Allow writing')
-                          : t('再ログイン', 'Sign in again')}
-                      </button>
-                    )}
-                    {account.state !== 'ready' && (
-                      <button
-                        className="stage-text-button framed small"
-                        disabled={disabled}
-                        onClick={() => void perform(() => host.cancelCloudAccount(account.id))}
-                      >
-                        {t('認証を取り消す', 'Cancel authentication')}
-                      </button>
-                    )}
-                    {account.state === 'ready' && (
-                      <MoreMenu label={t('アカウントの操作', 'Account actions')} host={sheet}>
-                        <Menu.Item
-                          disabled={disabled || authorizing}
-                          onClick={() =>
-                            void perform(async () => {
-                              await host.removeCloudAccount(account.id);
-                              if (accountId === account.id) setAccountId('');
-                            })
-                          }
-                        >
-                          <Icon name="trash" size={15} />
-                          {t('登録解除', 'Remove account')}
-                        </Menu.Item>
-                      </MoreMenu>
-                    )}
-                  </div>
-                );
-              })}
-              <form
-                className="account-add"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void perform(async () => {
-                    await host.addCloudAccount(accountName);
-                    setAccountName('');
-                  });
-                }}
-              >
-                <input
-                  aria-label={t('アカウントの表示名', 'Account display name')}
-                  placeholder={t('個人用、仕事用など', 'e.g. Personal, Work')}
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  required
-                />
-                <button
-                  className="stage-text-button small"
-                  disabled={disabled || !setup?.available || !setup.oauthConfigured || authorizing}
+            {source === 'local' ? (
+              <Step n={1} title={t('フォルダ', 'Folder')} done={!!localPath}>
+                <div className="local-pick">
+                  <button
+                    className="stage-text-button framed small"
+                    disabled={disabled}
+                    onClick={() => void perform(chooseLocal)}
+                  >
+                    <Icon name="folderOpen" size={14} />
+                    {t('フォルダを選ぶ', 'Choose folder')}
+                  </button>
+                  {localPath && <span className="mono local-path">{localPath}</span>}
+                </div>
+              </Step>
+            ) : (
+              <>
+                <Step
+                  n={1}
+                  title={t('Google アカウント', 'Google account')}
+                  done={accounts.some((account) => account.state === 'ready')}
                 >
-                  <Icon name="plus" size={14} />
-                  {t('アカウントを追加', 'Add account')}
-                </button>
-              </form>
-            </Step>
-            <Step n={2} title={t('フォルダ', 'Folder')} done={!!selected}>
-              <div className="connect-fields">
-                <label className="connect-field">
-                  {t('アカウント', 'Account')}
-                  <span className="connect-select">
-                    <select
-                      aria-label={t('使用するクラウドアカウント', 'Cloud account to use')}
-                      value={accountId}
-                      disabled={disabled}
-                      onChange={(e) => {
-                        setTrail([]);
-                        setSelected(undefined);
-                        setError('');
-                        setAccountId(e.target.value);
-                      }}
-                    >
-                      <option value="">{t('アカウントを選択', 'Select an account')}</option>
-                      {accounts
-                        .filter((a) => a.state === 'ready')
-                        .map((a) => (
-                          <option value={a.id} key={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                    </select>
-                    <Icon name="chevronDown" size={13} />
-                  </span>
-                </label>
-                {drives.length > 0 && (
-                  <label className="connect-field">
-                    {t('ドライブ', 'Drive')}
-                    <span className="connect-select">
-                      <select
-                        aria-label={t('ドライブ', 'Drive')}
-                        disabled={disabled || loading}
-                        value={trail[0]?.id ?? ''}
-                        onChange={(e) =>
-                          setTrail([drives.find((drive) => drive.id === e.target.value)!])
-                        }
-                      >
-                        {drives.map((drive) => (
-                          <option key={drive.id} value={drive.id}>
-                            {drive.name}
-                          </option>
-                        ))}
-                      </select>
-                      <Icon name="chevronDown" size={13} />
-                    </span>
-                  </label>
-                )}
-              </div>
-              {current && (
-                <div className="folder-box">
-                  <div className="folder-crumbs">
-                    {trail.map((folder, i) => (
-                      <Fragment key={`${folder.id}-${i}`}>
-                        {i > 0 && <Icon name="chevron" size={12} />}
-                        {i === trail.length - 1 ? (
-                          <span className="folder-here" aria-current="location">
-                            {folder.name}
+                  {accounts.map((account) => {
+                    const [tone, icon, label] = accountState(account);
+                    return (
+                      <div className="account-row" key={account.id}>
+                        <span className="account-avatar" aria-hidden="true">
+                          {Array.from(account.name)[0]}
+                        </span>
+                        <div className="account-text">
+                          <span className="account-line">
+                            <strong>{account.name}</strong>
+                            <span className={`account-state ${tone}`}>
+                              <Icon name={icon} size={13} />
+                              {label}
+                            </span>
                           </span>
-                        ) : (
+                          {account.detail && <small>{account.detail}</small>}
+                        </div>
+                        {(account.state === 'incomplete' ||
+                          (account.state === 'ready' && !account.writable)) && (
                           <button
-                            className="stage-button"
-                            disabled={disabled}
-                            onClick={() => setTrail((all) => all.slice(0, i + 1))}
+                            className="stage-text-button framed small"
+                            disabled={disabled || !setup?.oauthConfigured || authorizing}
+                            onClick={() =>
+                              void perform(() => host.reauthorizeCloudAccount(account.id))
+                            }
                           >
-                            {folder.name}
+                            {account.state === 'ready'
+                              ? t('書き込みを許可', 'Allow writing')
+                              : t('再ログイン', 'Sign in again')}
                           </button>
                         )}
-                      </Fragment>
-                    ))}
-                    {/* A drive root has no parent to verify it against, so only folders
-                        reached by opening can be chosen as the folder being viewed. */}
-                    {current.parentId && (
-                      <button
-                        className="stage-button choose-current"
-                        aria-pressed={selected?.id === current.id}
-                        disabled={disabled}
-                        onClick={() => choose(current)}
-                      >
-                        {t('ここを接続先にする', 'Use this folder')}
-                      </button>
+                        {account.state !== 'ready' && (
+                          <button
+                            className="stage-text-button framed small"
+                            disabled={disabled}
+                            onClick={() => void perform(() => host.cancelCloudAccount(account.id))}
+                          >
+                            {t('認証を取り消す', 'Cancel authentication')}
+                          </button>
+                        )}
+                        {account.state === 'ready' && (
+                          <MoreMenu label={t('アカウントの操作', 'Account actions')} host={sheet}>
+                            <Menu.Item
+                              disabled={disabled || authorizing}
+                              onClick={() =>
+                                void perform(async () => {
+                                  await host.removeCloudAccount(account.id);
+                                  if (accountId === account.id) setAccountId('');
+                                })
+                              }
+                            >
+                              <Icon name="trash" size={15} />
+                              {t('登録解除', 'Remove account')}
+                            </Menu.Item>
+                          </MoreMenu>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <form
+                    className="account-add"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void perform(async () => {
+                        await host.addCloudAccount(accountName);
+                        setAccountName('');
+                      });
+                    }}
+                  >
+                    <input
+                      aria-label={t('アカウントの表示名', 'Account display name')}
+                      placeholder={t('個人用、仕事用など', 'e.g. Personal, Work')}
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value)}
+                      required
+                    />
+                    <button
+                      className="stage-text-button small"
+                      disabled={
+                        disabled || !setup?.available || !setup.oauthConfigured || authorizing
+                      }
+                    >
+                      <Icon name="plus" size={14} />
+                      {t('アカウントを追加', 'Add account')}
+                    </button>
+                  </form>
+                </Step>
+                <Step n={2} title={t('フォルダ', 'Folder')} done={!!selected}>
+                  <div className="connect-fields">
+                    <label className="connect-field">
+                      {t('アカウント', 'Account')}
+                      <span className="connect-select">
+                        <select
+                          aria-label={t('使用するクラウドアカウント', 'Cloud account to use')}
+                          value={accountId}
+                          disabled={disabled}
+                          onChange={(e) => {
+                            setTrail([]);
+                            setSelected(undefined);
+                            setError('');
+                            setAccountId(e.target.value);
+                          }}
+                        >
+                          <option value="">{t('アカウントを選択', 'Select an account')}</option>
+                          {accounts
+                            .filter((a) => a.state === 'ready')
+                            .map((a) => (
+                              <option value={a.id} key={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                        </select>
+                        <Icon name="chevronDown" size={13} />
+                      </span>
+                    </label>
+                    {drives.length > 0 && (
+                      <label className="connect-field">
+                        {t('ドライブ', 'Drive')}
+                        <span className="connect-select">
+                          <select
+                            aria-label={t('ドライブ', 'Drive')}
+                            disabled={disabled || loading}
+                            value={trail[0]?.id ?? ''}
+                            onChange={(e) =>
+                              setTrail([drives.find((drive) => drive.id === e.target.value)!])
+                            }
+                          >
+                            {drives.map((drive) => (
+                              <option key={drive.id} value={drive.id}>
+                                {drive.name}
+                              </option>
+                            ))}
+                          </select>
+                          <Icon name="chevronDown" size={13} />
+                        </span>
+                      </label>
                     )}
                   </div>
-                  {loading ? (
-                    <p className="folder-note">
-                      {t('フォルダを読み込んでいます…', 'Loading folders…')}
-                    </p>
-                  ) : (
-                    <div className="folder-rows">
-                      {folders.map((folder) => (
-                        <div
-                          className={`folder-row${selected?.id === folder.id ? ' selected' : ''}`}
-                          key={folder.id}
-                        >
-                          <label className="folder-pick">
-                            <input
-                              type="radio"
-                              name="cloud-folder"
-                              checked={selected?.id === folder.id}
-                              disabled={disabled}
-                              onChange={() => choose(folder)}
-                            />
-                            <Icon name="folder" size={15} />
-                            <span className="folder-name">{folder.name}</span>
-                            <small>…{folder.id.slice(-8)}</small>
-                          </label>
+                  {current && (
+                    <div className="folder-box">
+                      <div className="folder-crumbs">
+                        {trail.map((folder, i) => (
+                          <Fragment key={`${folder.id}-${i}`}>
+                            {i > 0 && <Icon name="chevron" size={12} />}
+                            {i === trail.length - 1 ? (
+                              <span className="folder-here" aria-current="location">
+                                {folder.name}
+                              </span>
+                            ) : (
+                              <button
+                                className="stage-button"
+                                disabled={disabled}
+                                onClick={() => setTrail((all) => all.slice(0, i + 1))}
+                              >
+                                {folder.name}
+                              </button>
+                            )}
+                          </Fragment>
+                        ))}
+                        {/* A drive root has no parent to verify it against, so only folders
+                        reached by opening can be chosen as the folder being viewed. */}
+                        {current.parentId && (
                           <button
-                            className="stage-button"
+                            className="stage-button choose-current"
+                            aria-pressed={selected?.id === current.id}
                             disabled={disabled}
-                            onClick={() => setTrail((all) => [...all, folder])}
+                            onClick={() => choose(current)}
                           >
-                            {t('開く', 'Open')}
-                            <Icon name="chevron" size={12} />
+                            {t('ここを接続先にする', 'Use this folder')}
                           </button>
-                        </div>
-                      ))}
-                      {folders.length === 0 && (
+                        )}
+                      </div>
+                      {loading ? (
                         <p className="folder-note">
-                          {t('フォルダがありません。', 'No folders here.')}
+                          {t('フォルダを読み込んでいます…', 'Loading folders…')}
                         </p>
+                      ) : (
+                        <div className="folder-rows">
+                          {folders.map((folder) => (
+                            <div
+                              className={`folder-row${selected?.id === folder.id ? ' selected' : ''}`}
+                              key={folder.id}
+                            >
+                              <label className="folder-pick">
+                                <input
+                                  type="radio"
+                                  name="cloud-folder"
+                                  checked={selected?.id === folder.id}
+                                  disabled={disabled}
+                                  onChange={() => choose(folder)}
+                                />
+                                <Icon name="folder" size={15} />
+                                <span className="folder-name">{folder.name}</span>
+                                <small>…{folder.id.slice(-8)}</small>
+                              </label>
+                              <button
+                                className="stage-button"
+                                disabled={disabled}
+                                onClick={() => setTrail((all) => [...all, folder])}
+                              >
+                                {t('開く', 'Open')}
+                                <Icon name="chevron" size={12} />
+                              </button>
+                            </div>
+                          ))}
+                          {folders.length === 0 && (
+                            <p className="folder-note">
+                              {t('フォルダがありません。', 'No folders here.')}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
-              )}
-            </Step>
-            <Step n={3} title={t('Contents に置く', 'Place in Contents')}>
-              {selected ? (
+                </Step>
+              </>
+            )}
+            <Step n={source === 'drive' ? 3 : 2} title={t('Contents に置く', 'Place in Contents')}>
+              {chosen ? (
                 <form
                   ref={form}
                   className="attachment-form"
@@ -466,13 +532,27 @@ export function Connections({
                   onSubmit={(e) => {
                     e.preventDefault();
                     void perform(async () => {
+                      const access = editable ? 'read-write' : 'read-only';
+                      if (source === 'local') {
+                        const connection = await host.addLocalFolder({
+                          scopeId: space.scopeId,
+                          path: localPath,
+                          contentsRoot,
+                          name,
+                          access,
+                        });
+                        setLocalPath('');
+                        setName('');
+                        await host.connectCloud(space.scopeId, connection.mountId);
+                        return;
+                      }
                       const connection = await host.addCloudAttachment({
                         scopeId: space.scopeId,
                         accountId,
-                        folder: selected,
+                        folder: selected!,
                         contentsRoot,
                         name,
-                        access: editable ? 'read-write' : 'read-only',
+                        access,
                       });
                       setSelected(undefined);
                       setName('');
@@ -527,8 +607,8 @@ export function Connections({
                     {t('編集を許可', 'Allow editing')}
                   </label>
                   <p className="mount-preview" aria-live="polite">
-                    <Icon name="cloud" size={15} />
-                    <span className="mount-source">{selected.name}</span>
+                    <Icon name={source === 'local' ? 'folder' : 'cloud'} size={15} />
+                    <span className="mount-source">{chosen}</span>
                     <Icon name="arrow" size={14} />
                     <span className="mono">
                       {contentsRoot}/{name}/
@@ -536,8 +616,8 @@ export function Connections({
                   </p>
                   <div className="connect-submit">
                     <button className="solid-button" disabled={disabled || !!invalidName}>
-                      <Icon name="cloud" size={15} />
-                      {setup?.mountAvailable
+                      <Icon name={source === 'local' ? 'folder' : 'cloud'} size={15} />
+                      {source === 'local' || setup?.mountAvailable
                         ? t('登録して接続', 'Register and connect')
                         : t('接続先を登録', 'Register connection')}
                     </button>
@@ -616,7 +696,7 @@ export function Connections({
             {connections.map((connection) => (
               <div className="connection-card" key={connection.mountId}>
                 <div className="connection-head">
-                  <Icon name="cloud" size={16} />
+                  <Icon name={connection.provider === 'local' ? 'folder' : 'cloud'} size={16} />
                   <strong>{connection.name}</strong>
                   <span className="connection-state" data-state={connection.state}>
                     {stateLabel(connection)}
@@ -626,7 +706,11 @@ export function Connections({
                   {connection.contentsRoot}/{connection.name}/
                 </span>
                 <div className="connection-meta">
-                  <span>{connection.accountName ?? t('アカウント未設定', 'Account not set')}</span>
+                  <span>
+                    {connection.provider === 'local'
+                      ? t('このコンピューター', 'This computer')
+                      : (connection.accountName ?? t('アカウント未設定', 'Account not set'))}
+                  </span>
                   <span className="connect-dot" aria-hidden="true" />
                   <span>{connection.folderName}</span>
                   <span className="connect-dot" aria-hidden="true" />
@@ -674,7 +758,9 @@ export function Connections({
                     <button
                       className="stage-text-button framed"
                       disabled={
-                        disabled || connection.state === 'unconfigured' || !setup?.mountAvailable
+                        disabled ||
+                        connection.state === 'unconfigured' ||
+                        (connection.provider !== 'local' && !setup?.mountAvailable)
                       }
                       onClick={() =>
                         void perform(() => host.connectCloud(space.scopeId, connection.mountId))
@@ -717,7 +803,21 @@ export function Connections({
                         {t('接続を解除', 'Disconnect')}
                       </Menu.Item>
                     )}
-                    {connection.state !== 'mounted' && (
+                    {connection.state !== 'mounted' && connection.provider === 'local' && (
+                      <Menu.Item
+                        disabled={disabled}
+                        onClick={() =>
+                          void perform(async () => {
+                            const folder = await host.chooseFolder();
+                            if (folder)
+                              await host.bindLocalFolder(space.scopeId, connection.mountId, folder);
+                          })
+                        }
+                      >
+                        {t('フォルダを選び直す', 'Choose folder again')}
+                      </Menu.Item>
+                    )}
+                    {connection.state !== 'mounted' && connection.provider !== 'local' && (
                       <Menu.Item
                         disabled={disabled || !accountId}
                         onClick={() =>

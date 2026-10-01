@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { mountNameError } from '../src/domain/connections';
+import type { CloudAttachment } from '../src/domain/types';
 import { within } from '../src/domain/scopes';
 import { WorkspaceService, inspectRepository, githubRepository } from '../src/host/workspaces';
 import { FileService, readViewerBytes } from '../src/host/files';
@@ -294,6 +295,7 @@ test('A workspace Drive document saves through the cloud service with its own dr
   const info = await stat(target);
   cloud['mounted'].set(`${workspace.id}:${connection.mountId}`, {
     attachment: connection,
+    entry: target,
     target,
     device: info.dev,
     inode: info.ino,
@@ -555,7 +557,7 @@ test('A workspace connection from before KB-owned Drive folders moves into a KB 
   // The same mount ID keeps rclone's cache of unsent changes for this folder.
   assert.equal(moved.mountId, earlier.mountId);
   assert.equal(moved.access, 'read-only');
-  assert.equal(moved.folderId, 'folder-one');
+  assert.equal((moved as CloudAttachment).folderId, 'folder-one');
   assert.equal(moved.accountName, 'Personal account');
   const declared = JSON.parse(
     await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8'),
@@ -748,8 +750,8 @@ test('Cloud declarations retain user names and provider IDs across restart, acco
     contentsRoot: 'contents',
     name: '共有資料',
   });
-  assert.equal(first.folderId, 'folder-two');
-  assert.equal(second.driveId, 'shared-drive');
+  assert.equal((first as CloudAttachment).folderId, 'folder-two');
+  assert.equal((second as CloudAttachment).driveId, 'shared-drive');
   const portable = await readFile(path.join(space.root, '.irori/cloud-mounts.json'), 'utf8');
   assert.ok(!portable.includes(accountId));
   assert.ok(!portable.includes(base));
@@ -1004,7 +1006,7 @@ test('Cloud rename/removal preserves provider identity, other connections and ex
   const restarted = new CloudService(files, async () => {}, rpc);
   const renamed = (await restarted.connections(space.scopeId))[0];
   assert.deepEqual(
-    [renamed.name, renamed.mountId, renamed.folderId, renamed.accountName],
+    [renamed.name, renamed.mountId, (renamed as CloudAttachment).folderId, renamed.accountName],
     ['新しい 資料', first.mountId, 'folder-one', 'Personal account'],
   );
   await mkdir(path.join(space.root, 'contents/新しい 資料'));

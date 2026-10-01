@@ -102,6 +102,7 @@ app
           : undefined,
       ),
       app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
+      (filename) => shell.trashItem(filename),
     );
     files.cloud = cloud;
     const images = new ImageService(files, cloud);
@@ -568,6 +569,8 @@ app
       deleteCloudEntry: (scopeId, target) =>
         changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target))),
       bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
+      addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
+      bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       spaces: () => files.list(),
       chooseFolder: async () => {
         const choice = await dialog.showOpenDialog(window!, {

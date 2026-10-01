@@ -88,6 +88,7 @@ test('A workspace-scoped Drive note accepts a pasted image', async (t) => {
   // Model a previously verified mount, as tests/connections.test.ts does for a workspace.
   cloud['mounted'].set(`${workspace.id}:${connection.mountId}`, {
     attachment: connection,
+    entry: target,
     target,
     device: info.dev,
     inode: info.ino,
