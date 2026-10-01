@@ -172,6 +172,29 @@ implemented. The Japanese page is translated from the approved English text.
 > so there is nothing further to delete on request; questions go to the contact
 > below.
 
+## Assessment cost estimate
+
+Checked 2026-10-01; USD/JPY 157.3 (open.er-api.com, 2026-10-01 00:02 UTC).
+Google assigns the tier (assurance level), and the assessment repeats every
+12 months. Google's verification itself has no fee. Prices exclude tax and card
+fees and must be confirmed with a quote before purchase.
+
+| Lab and plan | USD per app per year | About JPY |
+| --- | --- | --- |
+| TAC Security Tier 2 Basic (two revalidations) | 675 | 106,000 |
+| TAC Security Tier 2 Premium (unlimited revalidations) | 855 | 134,000 |
+| TAC Security Tier 2 Enterprise | 1,800 | 283,000 |
+| Other Tier 2 labs (third-party survey) | 800–1,500+ | 126,000–236,000+ |
+| TAC Security Tier 3 | 4,500 | 708,000 |
+| Other Tier 3 labs (third-party survey) | 5,000–8,000+ | 787,000–1,258,000+ |
+
+Sources: [TAC Security CASA FAQ](https://tacsecurity.com/esof-appsec-ada-casa-faqs/),
+[Switch Labs provider survey](https://www.switchlabs.dev/post/casa-tier-2-tier-3-security-review-providers-pricing-and-the-cheapest-option),
+[CASA Tier 2 overview](https://appdefensealliance.dev/casa/tier-2/tier2-overview).
+Tier 2 is a developer-run scan validated by the lab; Tier 3 is a lab-run
+penetration test. With no irori server, Tier 2 is the likely assignment, but
+that is Google's decision.
+
 ## Work each recommendation implies
 
 | Item | Owner of the work | Size |
