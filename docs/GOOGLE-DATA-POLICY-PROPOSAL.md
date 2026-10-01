@@ -75,6 +75,12 @@ Consequences:
   confirmation asks the person to use only such an account (done in the
   candidate), and the final privacy page links to where each supported CLI sets
   it.
+- No Google Cloud setup for users (publisher, 2026-10-01): people sign in
+  through irori's own client, so per-user OAuth clients, which would fall under
+  Google's personal-use exemption, are rejected and the assessment is accepted
+  as the route to unlimited public use. Until it passes, the only public option
+  is an unverified production app: at most 100 users in total, each shown
+  Google's unverified-app warning.
 - Rejected alternatives: keeping Drive data away from agents (not "all
   features", and not enforceable against a full-access CLI), or submitting
   without AI first and adding it in a second review.
