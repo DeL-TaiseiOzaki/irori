@@ -68,3 +68,16 @@ export const cloudDeclaration = z
     access: z.enum(['read-only', 'read-write']),
   })
   .strict();
+/** A folder on this device in contents. Its path is kept per device, never here. */
+export const localDeclaration = z
+  .object({
+    schemaVersion: z.literal(1),
+    mountId: z.uuid(),
+    scopeId: z.uuid(),
+    provider: z.literal('local'),
+    folderName: z.string().max(1024),
+    contentsRoot: z.string().min(1).max(4096),
+    name: mountName,
+    access: z.enum(['read-only', 'read-write']),
+  })
+  .strict();

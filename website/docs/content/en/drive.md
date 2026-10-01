@@ -3,6 +3,8 @@ title: Google Drive
 description: Connect Drive folders as hibachi materials to read and update them.
 ---
 
+> Connecting through a Google account is for invited testers. Others can use [synced folders](sync-folders.md).
+
 ## Connect a folder
 
 1. Open the destination hibachi and choose **Connect** or **Cloud connections**.

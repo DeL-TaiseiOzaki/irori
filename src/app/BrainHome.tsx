@@ -298,7 +298,7 @@ export function BrainHome({
           {connections.map((connection) => (
             <div key={connection.mountId} className="home-drive">
               <div className="home-drive-name">
-                <Icon name="cloud" size={16} />
+                <Icon name={connection.provider === 'local' ? 'folder' : 'cloud'} size={16} />
                 <span>{connection.name}</span>
                 {!!connection.pending && (
                   <span className="home-uploads">

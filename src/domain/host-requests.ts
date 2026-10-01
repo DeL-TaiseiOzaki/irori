@@ -140,6 +140,16 @@ export const hostArguments = {
   connectCloud: z.tuple([id, id]),
   disconnectCloud: z.tuple([id, id, z.boolean().optional()]),
   bindCloud: z.tuple([id, id, id]),
+  addLocalFolder: z.tuple([
+    z.object({
+      scopeId: id,
+      path: path.min(1),
+      name: z.string().max(200),
+      contentsRoot: path,
+      access: z.enum(['read-only', 'read-write']).optional(),
+    }),
+  ]),
+  bindLocalFolder: z.tuple([id, id, path.min(1)]),
   renameCloud: z.tuple([id, id, z.string().max(200)]),
   removeCloud: z.tuple([id, id]),
   setCloudAccess: z.tuple([id, id, z.enum(['read-only', 'read-write']), z.boolean().optional()]),

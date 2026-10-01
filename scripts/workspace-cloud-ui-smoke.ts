@@ -108,7 +108,7 @@ try {
   await page.getByRole('button', { name: '既存KB のクラウド接続', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
   await expect(
-    dialog.getByRole('heading', { name: '既存KB の Contents に Google Drive を接続' }),
+    dialog.getByRole('heading', { name: '既存KB の Contents にフォルダを接続' }),
   ).toBeVisible();
   const moving = dialog.locator('.earlier-connections');
   await expect(moving.locator('.connection-card')).toHaveCount(2);

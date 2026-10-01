@@ -125,6 +125,7 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
   const info = await stat(otherTarget);
   cloud['mounted'].set(`${space.scopeId}:${other.mountId}`, {
     attachment: other,
+    entry: otherTarget,
     target: otherTarget,
     device: info.dev,
     inode: info.ino,
@@ -223,6 +224,7 @@ test('A workspace Drive listing marks its files writable too, and its entries mo
   const info = await stat(target);
   cloud['mounted'].set(`${workspace.id}:${connection.mountId}`, {
     attachment: connection,
+    entry: target,
     target,
     device: info.dev,
     inode: info.ino,

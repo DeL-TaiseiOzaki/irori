@@ -79,6 +79,7 @@ export async function mountedFixture(t: any, { writable = false } = {}) {
   // Model a previously verified mount; ordinary test directories are never mounted.
   cloud['mounted'].set(key, {
     attachment: connection,
+    entry: target,
     target,
     device: info.dev,
     inode: info.ino,

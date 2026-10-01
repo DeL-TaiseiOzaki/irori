@@ -409,11 +409,13 @@ export function KnowledgePanel({
                 {t('送信先', 'Destination')}
                 <select value={mountId} onChange={(e) => setMountId(e.target.value)}>
                   <option value="">{t('フォルダを選択', 'Select a folder')}</option>
-                  {connections.map((item) => (
-                    <option key={item.mountId} value={item.mountId}>
-                      {item.name}
-                    </option>
-                  ))}
+                  {connections
+                    .filter((item) => item.provider === 'google-drive')
+                    .map((item) => (
+                      <option key={item.mountId} value={item.mountId}>
+                        {item.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               <button

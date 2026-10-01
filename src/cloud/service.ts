@@ -6,7 +6,13 @@ import { SerialQueue } from '../host/serial-queue';
 import { CloudAccounts } from './accounts';
 import type { GoogleOAuth } from './oauth';
 import { Rclone, type RcloneAPI } from './rclone';
-import { cloudDeclaration, entryNameError, mountNameError, nameKey } from '../domain/connections';
+import {
+  cloudDeclaration,
+  entryNameError,
+  localDeclaration,
+  mountNameError,
+  nameKey,
+} from '../domain/connections';
 import { owner, within } from '../domain/scopes';
 import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, hash, readDocument, textFileByteLimit } from '../host/files';
@@ -16,12 +22,15 @@ import type { WriteTarget } from './outbox';
 import { uploadErrorMessage, type UploadErrorCategory } from './upload-errors';
 import type {
   AddCloudAttachment,
+  AddLocalFolder,
+  Attachment,
   CloudAccess,
   CloudAttachment,
   CloudConnection,
   CloudSetup,
   Document,
   Entry,
+  LocalAttachment,
 } from '../domain/types';
 import { t } from '../domain/i18n';
 
@@ -33,6 +42,15 @@ const bindingSchema = z.object({
   placeholder: z.object({ dev: z.number(), ino: z.number() }).optional(),
 });
 type Binding = z.infer<typeof bindingSchema>;
+// Where a local connection's folder is on this device: a path names the person, and
+// often their account, so it stays here and out of the hibachi's records.
+const localBindingSchema = z.object({
+  scopeId: z.uuid(),
+  mountId: z.uuid(),
+  root: z.string(),
+  path: z.string().min(1),
+});
+type LocalBinding = z.infer<typeof localBindingSchema>;
 /** Settles with the promise, or rejects once `ms` have passed. */
 function bounded<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -78,13 +96,20 @@ const connectionFolderError = () =>
     ),
   );
 type Mounted = {
-  attachment: CloudAttachment;
+  attachment: Attachment;
+  /** Where the connection appears: `contents/<name>` in its hibachi. */
+  entry: string;
+  /** Where its files are: the mount point, which is `entry`, or the chosen local folder. */
   target: string;
+  /** The identity of `target`, checked before each use. */
   device: number;
   inode: number;
-  filesystem: string;
+  /** A Drive mount's rclone file system. */
+  filesystem?: string;
   /** The fs spec the folder was mounted with, for asking Drive directly, past the mount's cache. */
-  remote: Record<string, string>;
+  remote?: Record<string, string>;
+  /** A local folder's link at `entry`, as irori made it. */
+  link?: { device: number; inode: number };
   /** Mounted so that files can be changed: the connection allows it and so does its account. */
   writable: boolean;
 };
@@ -101,6 +126,8 @@ export class CloudService {
     openBrowser: (url: string) => Promise<void>,
     private rpc: RcloneAPI = new Rclone(files.dataDir),
     oauth?: GoogleOAuth,
+    /** Moves a local folder's file to the system trash; without it, nothing local is deleted. */
+    private trash?: (filename: string) => Promise<void>,
   ) {
     this.accounts = new CloudAccounts(files.dataDir, rpc, openBrowser, oauth);
   }
@@ -310,12 +337,15 @@ export class CloudService {
       };
     }
   }
-  private async declarationFile(scopeId: string) {
+  private declarationFile(scopeId: string) {
+    return this.metadataFile(scopeId, 'cloud-mounts.json');
+  }
+  private async metadataFile(scopeId: string, name: string) {
     const space = await this.files.get(scopeId);
     const dir = await this.files.resolve(scopeId, '.irori');
     if (dir !== path.join(space.root, '.irori'))
       throw Error('Cloud metadata directory must not be an alias');
-    const filename = path.join(dir, 'cloud-mounts.json');
+    const filename = path.join(dir, name);
     try {
       if ((await fs.lstat(filename)).isSymbolicLink())
         throw Error('Cloud metadata must not be a symlink');
@@ -403,29 +433,54 @@ export class CloudService {
       };
     });
   }
+  /** Drive connections first, then folders on this device. */
   async connections(scopeId: string): Promise<CloudConnection[]> {
+    const local = await this.localDeclarations(scopeId);
+    return [
+      ...(await this.driveConnections(scopeId)),
+      ...(await Promise.all(
+        local.map(async (record) => {
+          const key = this.key(scopeId, record.mountId);
+          await this.refresh(key);
+          const binding = await this.localBinding(scopeId, record.mountId);
+          const current = this.mounted.get(key);
+          return {
+            ...record,
+            ...(this.states.get(key) ?? {
+              state: binding ? ('disconnected' as const) : ('unconfigured' as const),
+            }),
+            ...(current ? { writable: current.writable } : {}),
+          };
+        }),
+      )),
+    ];
+  }
+  /** Marks a mounted connection lost when its mount or link no longer checks out. */
+  private async refresh(key: string) {
+    const mounted = this.mounted.get(key);
+    if (!mounted) return;
+    try {
+      await this.assertMounted(mounted);
+      if (this.mounted.get(key) === mounted) this.states.set(key, { state: 'mounted' });
+    } catch {
+      if (this.mounted.get(key) === mounted)
+        this.states.set(key, {
+          state: 'error',
+          detail: t(
+            '接続が失われました。再接続してください。',
+            'The connection was lost. Connect again.',
+          ),
+        });
+    }
+  }
+  private async driveConnections(scopeId: string): Promise<CloudConnection[]> {
     const records = await this.declarations(scopeId);
     const accounts = await this.accounts.list();
     return Promise.all(
       records.map(async (record) => {
         const binding = await this.binding(scopeId, record.mountId);
         const key = this.key(scopeId, record.mountId);
-        const mounted = this.mounted.get(key);
-        if (mounted) {
-          try {
-            await this.assertMounted(mounted);
-            if (this.mounted.get(key) === mounted) this.states.set(key, { state: 'mounted' });
-          } catch {
-            if (this.mounted.get(key) === mounted)
-              this.states.set(key, {
-                state: 'error',
-                detail: t(
-                  '接続が失われました。再接続してください。',
-                  'The connection was lost. Connect again.',
-                ),
-              });
-          }
-        }
+        await this.refresh(key);
         const account = accounts.find((item) => item.id === binding?.accountId);
         const current = this.mounted.get(key);
         return {
@@ -440,7 +495,7 @@ export class CloudService {
       }),
     );
   }
-  private async parent(record: Pick<CloudAttachment, 'scopeId' | 'contentsRoot'>, create = false) {
+  private async parent(record: Pick<Attachment, 'scopeId' | 'contentsRoot'>, create = false) {
     const space = await this.files.get(record.scopeId);
     if (!space.contents.includes(record.contentsRoot))
       throw Error('Declared contents root required');
@@ -474,7 +529,7 @@ export class CloudService {
     }
     return current;
   }
-  private async checkVacant(record: CloudAttachment, binding?: Binding) {
+  private async checkVacant(record: Attachment, binding?: Binding) {
     const parent = await this.parent(record);
     if (!parent) return;
     const siblings = await fs.readdir(parent);
@@ -541,6 +596,7 @@ export class CloudService {
         )
       )
         throw Error(t('同じ名前の接続先があります。', 'A connection with the same name exists.'));
+      await this.assertNameFree(record);
       await this.checkVacant(record);
       await this.accounts.verify(input.accountId, input.folder);
       await this.checkVacant(record);
@@ -629,6 +685,10 @@ export class CloudService {
             'Disconnect before renaming or unregistering.',
           ),
         );
+      const local = (await this.localDeclarations(scopeId)).find(
+        (item) => item.mountId === mountId,
+      );
+      if (local) return this.editLocal(local, name);
       const records = await this.declarations(scopeId);
       const record = records.find((item) => item.mountId === mountId);
       if (!record) throw Error('Unknown cloud connection');
@@ -647,6 +707,7 @@ export class CloudService {
           )
         )
           throw Error(t('同じ名前の接続先があります。', 'A connection with the same name exists.'));
+        await this.assertNameFree(replacement);
         await this.checkVacant(replacement);
       }
       const binding = await this.binding(scopeId, mountId);
@@ -672,10 +733,351 @@ export class CloudService {
       this.states.delete(key);
     });
   }
+  async localDeclarations(scopeId: string): Promise<LocalAttachment[]> {
+    const space = await this.files.get(scopeId);
+    if (space.workspace) return [];
+    let records: LocalAttachment[];
+    try {
+      records = z
+        .array(localDeclaration)
+        .max(100)
+        .parse(await readLocalJson(await this.metadataFile(scopeId, 'local-folders.json'), []));
+    } catch (error) {
+      if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
+      throw Error(
+        t(
+          `「${space.name}」のフォルダ接続の記録（.irori/local-folders.json）を読み取れません。`,
+          `Cannot read the folder connection record (.irori/local-folders.json) of "${space.name}".`,
+        ),
+      );
+    }
+    const ids = new Set<string>();
+    const paths = new Set<string>();
+    for (const record of records) {
+      const name = nameKey(`${record.contentsRoot}/${record.name}`);
+      if (
+        record.scopeId !== scopeId ||
+        !space.contents.includes(record.contentsRoot) ||
+        ids.has(record.mountId) ||
+        paths.has(name)
+      )
+        throw Error(
+          t(
+            'フォルダ接続の記録の識別情報またはパスが重複・不一致です。',
+            'A folder connection record has a duplicate or mismatched identity or path.',
+          ),
+        );
+      ids.add(record.mountId);
+      paths.add(name);
+    }
+    return records;
+  }
+  /** Refuses a name another connection of either kind already uses in that contents folder. */
+  private async assertNameFree(record: Attachment) {
+    const key = nameKey(`${record.contentsRoot}/${record.name}`);
+    const others = [
+      ...(await this.declarations(record.scopeId)),
+      ...(await this.localDeclarations(record.scopeId)),
+    ];
+    if (
+      others.some(
+        (item) =>
+          item.mountId !== record.mountId && nameKey(`${item.contentsRoot}/${item.name}`) === key,
+      )
+    )
+      throw Error(t('同じ名前の接続先があります。', 'A connection with the same name exists.'));
+  }
+  private localBindingFile(scopeId: string, mountId: string) {
+    return path.join(this.files.dataDir, 'local-bindings', `${scopeId}-${mountId}.json`);
+  }
+  private async localBinding(scopeId: string, mountId: string): Promise<LocalBinding | undefined> {
+    const value = await readLocalJson(this.localBindingFile(scopeId, mountId), null);
+    if (!value) return;
+    const binding = localBindingSchema.parse(value);
+    if (
+      binding.scopeId !== scopeId ||
+      binding.mountId !== mountId ||
+      binding.root !== (await this.files.get(scopeId)).root
+    )
+      return;
+    return binding;
+  }
+  /**
+   * The folder a local connection may use: an existing directory, by its real path,
+   * that neither holds nor lies inside a hibachi or irori's own data. A hibachi in
+   * it would appear inside another's contents, and irori's data is not material.
+   */
+  private async localTarget(chosen: string) {
+    const missing = () => Error(t('フォルダが見つかりません。', 'The folder was not found.'));
+    if (!path.isAbsolute(chosen)) throw missing();
+    let target: string;
+    try {
+      target = await fs.realpath(chosen);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw missing();
+      // A sync app's virtual drive may not report a final path; the chosen one is used.
+      target = path.resolve(chosen);
+    }
+    const info = await fs.lstat(target).catch(() => {
+      throw missing();
+    });
+    if (!info.isDirectory() || info.isSymbolicLink()) throw missing();
+    const overlaps = (a: string, b: string) => within(a, b) || within(b, a);
+    for (const root of [
+      ...(await this.files.list()).map((item) => item.root),
+      this.files.dataDir,
+    ]) {
+      const actual = await fs.realpath(root).catch(() => root);
+      if (overlaps(root, target) || overlaps(actual, target))
+        throw Error(
+          t(
+            'hibachi や irori のデータと重なるフォルダは選べません。',
+            "This folder overlaps a hibachi or irori's data.",
+          ),
+        );
+    }
+    return target;
+  }
+  /** Registers a folder on this device; it appears in contents once connected. */
+  addLocal(input: AddLocalFolder) {
+    return this.mutate(async () => {
+      const error = mountNameError(input.name);
+      if (error) throw Error(error);
+      const space = await this.files.get(input.scopeId);
+      if (space.workspace) throw Error('Select a hibachi for this operation');
+      if (!space.contents.includes(input.contentsRoot))
+        throw Error(
+          t('contentsの登録先を選択してください。', 'Choose where in contents to register it.'),
+        );
+      const records = await this.localDeclarations(input.scopeId);
+      if (records.length >= 100)
+        throw Error(
+          t(
+            '接続先は1スペースにつき100件まで登録できます。',
+            'Each space can register up to 100 connections.',
+          ),
+        );
+      const target = await this.localTarget(input.path);
+      const record = localDeclaration.parse({
+        schemaVersion: 1,
+        mountId: randomUUID(),
+        scopeId: input.scopeId,
+        provider: 'local',
+        folderName: path.basename(target) || target,
+        contentsRoot: input.contentsRoot,
+        name: input.name,
+        access: input.access ?? 'read-write',
+      });
+      await this.assertNameFree(record);
+      await this.checkVacant(record);
+      await writeLocalJson(await this.metadataFile(input.scopeId, 'local-folders.json'), [
+        ...records,
+        record,
+      ]);
+      await writeLocalJson(this.localBindingFile(record.scopeId, record.mountId), {
+        scopeId: record.scopeId,
+        mountId: record.mountId,
+        root: space.root,
+        path: target,
+      });
+      return (await this.connections(record.scopeId)).find(
+        (item) => item.mountId === record.mountId,
+      )!;
+    });
+  }
+  /** Chooses the folder a local connection uses on this device, for example after a move. */
+  bindLocal(scopeId: string, mountId: string, chosen: string) {
+    return this.mutate(async () => {
+      const key = this.key(scopeId, mountId);
+      if (this.mounted.has(key))
+        throw Error(
+          t(
+            '接続を解除してからフォルダを選び直してください。',
+            'Disconnect before choosing again.',
+          ),
+        );
+      const records = await this.localDeclarations(scopeId);
+      const record = records.find((item) => item.mountId === mountId);
+      if (!record) throw Error('Unknown cloud connection');
+      const target = await this.localTarget(chosen);
+      await this.dropStaleLink(record);
+      await writeLocalJson(this.localBindingFile(scopeId, mountId), {
+        scopeId,
+        mountId,
+        root: (await this.files.get(scopeId)).root,
+        path: target,
+      });
+      const folderName = path.basename(target) || target;
+      if (folderName !== record.folderName)
+        await this.writeLocal(
+          scopeId,
+          records,
+          records.map((item) => (item.mountId === mountId ? { ...item, folderName } : item)),
+        );
+      this.states.delete(key);
+    });
+  }
+  private async writeLocal(scopeId: string, before: LocalAttachment[], after: LocalAttachment[]) {
+    if (JSON.stringify(await this.localDeclarations(scopeId)) !== JSON.stringify(before))
+      throw Error(
+        t(
+          '接続情報が外部で変更されました。再読み込みしてください。',
+          'The connection information changed outside irori. Reload it.',
+        ),
+      );
+    await writeLocalJson(await this.metadataFile(scopeId, 'local-folders.json'), after);
+  }
+  /** Renames a local connection, or unregisters it when no name is given. It must not be connected. */
+  private async editLocal(record: LocalAttachment, name?: string) {
+    const { scopeId, mountId } = record;
+    const records = await this.localDeclarations(scopeId);
+    let replacement: LocalAttachment | undefined;
+    if (name !== undefined) {
+      const error = mountNameError(name);
+      if (error) throw Error(error);
+      if (name === record.name) return;
+      replacement = { ...record, name };
+      await this.assertNameFree(replacement);
+      await this.checkVacant(replacement);
+    }
+    await this.dropStaleLink(record);
+    await this.writeLocal(
+      scopeId,
+      records,
+      records.flatMap((item) =>
+        item.mountId !== mountId ? [item] : replacement ? [replacement] : [],
+      ),
+    );
+    if (!replacement) await fs.rm(this.localBindingFile(scopeId, mountId), { force: true });
+    this.states.delete(this.key(scopeId, mountId));
+  }
+  private async setLocalAccess(record: LocalAttachment, access: CloudAccess) {
+    if (record.access === access) return;
+    const { scopeId, mountId } = record;
+    const wasMounted = this.mounted.has(this.key(scopeId, mountId));
+    if (wasMounted) await this.unmount(scopeId, mountId);
+    const records = await this.localDeclarations(scopeId);
+    await this.writeLocal(
+      scopeId,
+      records,
+      records.map((item) => (item.mountId === mountId ? { ...item, access } : item)),
+    );
+    if (wasMounted) await this.mount(scopeId, mountId);
+  }
+  /** Whether the link at `entry` leads to `target`. */
+  private async pointsTo(entry: string, target: string) {
+    const value = await fs.readlink(entry).catch(() => undefined);
+    if (value === undefined) return false;
+    // Windows reports a junction's target with its \\?\ prefix.
+    const normal = (item: string) => {
+      const resolved = path.resolve(path.dirname(entry), item.replace(/^\\\\\?\\/, ''));
+      return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    };
+    return normal(value) === normal(target);
+  }
+  /**
+   * Shows a local folder at `contents/<name>` through a link (a junction on Windows),
+   * so the person's tools and CLI agents find it there. irori itself reaches it only
+   * through `locate`, which checks the link and the folder first.
+   */
+  private async link(record: LocalAttachment) {
+    const { scopeId, mountId } = record;
+    const key = this.key(scopeId, mountId);
+    const current = this.mounted.get(key);
+    if (current) {
+      try {
+        await this.assertLinked(current);
+        this.states.set(key, { state: 'mounted' });
+        return;
+      } catch {
+        this.mounted.delete(key);
+      }
+    }
+    const binding = await this.localBinding(scopeId, mountId);
+    if (!binding)
+      throw Error(t('この端末のフォルダを選んでください。', 'Choose the folder on this device.'));
+    this.states.set(key, { state: 'connecting' });
+    let made: string | undefined;
+    try {
+      const target = await this.localTarget(binding.path);
+      const folder = await fs.lstat(target);
+      const entry = path.join((await this.parent(record, true))!, record.name);
+      const existing = await fs.lstat(entry).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+        return undefined;
+      });
+      // A link irori left when it last stopped without disconnecting is used again.
+      if (!(existing?.isSymbolicLink() && (await this.pointsTo(entry, target)))) {
+        await this.checkVacant(record);
+        await fs.symlink(target, entry, process.platform === 'win32' ? 'junction' : 'dir');
+        made = entry;
+      }
+      const link = await fs.lstat(entry);
+      const mounted: Mounted = {
+        attachment: record,
+        entry,
+        target,
+        device: folder.dev,
+        inode: folder.ino,
+        link: { device: link.dev, inode: link.ino },
+        writable: record.access === 'read-write',
+      };
+      await this.assertLinked(mounted);
+      this.mounted.set(key, mounted);
+      this.states.set(key, { state: 'mounted' });
+    } catch (error) {
+      if (made) await fs.unlink(made).catch(() => {});
+      this.states.set(key, { state: 'error', detail: (error as Error).message });
+      throw error;
+    }
+  }
+  private async assertLinked(mounted: Mounted) {
+    const changed = () =>
+      Error(t('フォルダの識別情報が変わりました。', 'The identity of the folder has changed.'));
+    const [link, folder] = await Promise.all([
+      fs.lstat(mounted.entry),
+      fs.lstat(mounted.target),
+    ]).catch(() => {
+      throw Error(t('フォルダが見つかりません。', 'The folder was not found.'));
+    });
+    if (
+      !link.isSymbolicLink() ||
+      link.dev !== mounted.link?.device ||
+      link.ino !== mounted.link.inode ||
+      !folder.isDirectory() ||
+      folder.isSymbolicLink() ||
+      folder.dev !== mounted.device ||
+      folder.ino !== mounted.inode ||
+      !(await this.pointsTo(mounted.entry, mounted.target))
+    )
+      throw changed();
+  }
+  /** Removes irori's link to a local folder; anything that replaced it stays. */
+  private async unlink(record: LocalAttachment, target: string) {
+    const entry = path.join((await this.parent(record))!, record.name);
+    const info = await fs.lstat(entry).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+      return undefined;
+    });
+    if (info?.isSymbolicLink() && (await this.pointsTo(entry, target))) await fs.unlink(entry);
+  }
+  /** Removes a link a stop without disconnecting left behind, before a rename or removal. */
+  private async dropStaleLink(record: LocalAttachment) {
+    const binding = await this.localBinding(record.scopeId, record.mountId);
+    if (binding && (await this.parent(record))) await this.unlink(record, binding.path);
+  }
+  /** The local folders connected in a hibachi, for CLI agents to be allowed into. */
+  localFolders(scopeId: string) {
+    return [...this.mounted.values()]
+      .filter((item) => item.attachment.scopeId === scopeId && item.attachment.provider === 'local')
+      .map((item) => item.target);
+  }
   connect(scopeId: string, mountId: string) {
     return this.mutate(() => this.mount(scopeId, mountId));
   }
   private async mount(scopeId: string, mountId: string) {
+    const local = (await this.localDeclarations(scopeId)).find((item) => item.mountId === mountId);
+    if (local) return this.link(local);
     const key = this.key(scopeId, mountId);
     const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
     if (!record) throw Error('Unknown cloud connection');
@@ -766,6 +1168,7 @@ export class CloudService {
         );
       const mounted = {
         attachment: record,
+        entry: target,
         target,
         device: stat.dev,
         inode: stat.ino,
@@ -789,6 +1192,7 @@ export class CloudService {
     }
   }
   private async assertMounted(mounted: Mounted) {
+    if (mounted.attachment.provider === 'local') return this.assertLinked(mounted);
     const records = await this.rpc.call('mount/listmounts');
     if (
       !Array.isArray(records.mountPoints) ||
@@ -823,7 +1227,8 @@ export class CloudService {
   }
   /** Saved changes of a writable mount still waiting to reach Google Drive, if rclone can tell. */
   private async pending(mounted: Mounted): Promise<number | undefined> {
-    if (!mounted.writable) return 0;
+    // A local folder's sync app sends its changes; irori has nothing waiting.
+    if (!mounted.writable || !mounted.filesystem) return 0;
     try {
       const stats = await this.rpc.call('vfs/stats', { fs: mounted.filesystem });
       const count =
@@ -887,6 +1292,10 @@ export class CloudService {
    */
   setAccess(scopeId: string, mountId: string, access: CloudAccess, leavePending = false) {
     return this.mutate(async () => {
+      const local = (await this.localDeclarations(scopeId)).find(
+        (item) => item.mountId === mountId,
+      );
+      if (local) return this.setLocalAccess(local, access);
       const records = await this.declarations(scopeId);
       const record = records.find((item) => item.mountId === mountId);
       if (!record) throw Error('Unknown cloud connection');
@@ -944,7 +1353,7 @@ export class CloudService {
     if (!root) return false;
     const target = path.join(root, rel);
     return [...this.mounted.values()].some(
-      (item) => item.attachment.scopeId === scopeId && item.writable && within(item.target, target),
+      (item) => item.attachment.scopeId === scopeId && item.writable && within(item.entry, target),
     );
   }
   private async assertWritable(scopeId: string, rel: string) {
@@ -1006,6 +1415,7 @@ export class CloudService {
    * uploads the change once it can.
    */
   private async changedInDrive(mounted: Mounted, filename: string, before: Buffer) {
+    if (!mounted.filesystem || !mounted.remote) return false;
     const remote = path.relative(mounted.target, filename).split(path.sep).join('/');
     try {
       const { queue } = await this.rpc.call('vfs/queue', { fs: mounted.filesystem });
@@ -1098,16 +1508,16 @@ export class CloudService {
       if (invalid) throw Error(invalid);
       const info = await fs.lstat(actual);
       const directory = path.posix.dirname(to);
-      const parent = path.join(await this.rootOf(scopeId), directory);
-      if (!within(mounted.target, parent))
+      if (!within(mounted.entry, path.join(await this.rootOf(scopeId), directory)))
         throw Error(
           t(
             '同じ接続フォルダの中にだけ移動できます。',
             'An entry can only be moved within its own connected folder.',
           ),
         );
+      let parent: string;
       try {
-        await this.resolve(scopeId, directory);
+        parent = await this.resolve(scopeId, directory);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         throw Error(t('移動先のフォルダがありません。', 'The destination folder does not exist.'));
@@ -1183,8 +1593,13 @@ export class CloudService {
    */
   deleteEntry(scopeId: string, target: string): Promise<void> {
     return this.mutate(async () => {
-      const { actual } = await this.editable(scopeId, target);
-      if ((await fs.lstat(actual)).isDirectory()) await fs.rm(actual, { recursive: true });
+      const { actual, mounted } = await this.editable(scopeId, target);
+      if (mounted.attachment.provider === 'local') {
+        // A plain folder has no Drive trash behind it: the system's trash keeps the entry.
+        if (!this.trash) throw Error(t('ごみ箱を使えません。', 'The trash is not available.'));
+        await this.trash(actual);
+        await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
+      } else if ((await fs.lstat(actual)).isDirectory()) await fs.rm(actual, { recursive: true });
       else {
         await fs.unlink(actual);
         // The draft would only offer text for a file that is gone. Drafts of files
@@ -1209,7 +1624,10 @@ export class CloudService {
   private async unmount(scopeId: string, mountId: string) {
     const key = this.key(scopeId, mountId);
     const mounted = this.mounted.get(key);
-    if (mounted) {
+    if (mounted?.attachment.provider === 'local') {
+      await this.unlink(mounted.attachment, mounted.target);
+      this.mounted.delete(key);
+    } else if (mounted) {
       let unmountFailed = false;
       try {
         await this.rpc.call('mount/unmount', { mountPoint: mounted.target });
@@ -1259,7 +1677,7 @@ export class CloudService {
     assertCloudPath(rel);
     const target = path.join(await this.rootOf(scopeId), rel);
     const entry = [...this.mounted.values()].find(
-      (item) => item.attachment.scopeId === scopeId && within(item.target, target),
+      (item) => item.attachment.scopeId === scopeId && within(item.entry, target),
     );
     if (!entry)
       throw Error(t('クラウドフォルダは未接続です。', 'The cloud folder is not connected.'));
@@ -1269,8 +1687,9 @@ export class CloudService {
     // cannot be used: on Windows a WinFsp volume mounted on a folder has no DOS
     // name, so GetFinalPathNameByHandleW fails and Node reports UNKNOWN for every
     // path inside the mount.
+    // A local folder's link is followed only here, to the folder verified above.
     let actual = entry.target;
-    for (const part of path.relative(entry.target, target).split(path.sep).filter(Boolean)) {
+    for (const part of path.relative(entry.entry, target).split(path.sep).filter(Boolean)) {
       actual = path.join(actual, part);
       if ((await fs.lstat(actual)).isSymbolicLink())
         throw Error('Cloud path alias escapes its mount');
@@ -1292,6 +1711,7 @@ export class CloudService {
           record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
         ...(record.state === 'mounted' && record.writable ? { writable: true } : {}),
         connection: true,
+        ...(record.provider === 'local' ? { local: true } : {}),
       }));
     const parent = await this.parent({ scopeId, contentsRoot: rel });
     if (parent)

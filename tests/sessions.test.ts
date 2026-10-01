@@ -184,3 +184,26 @@ test(
     assert.ok(refused.events.some((e) => e.type === 'error' && e.text.includes('device.json')));
   },
 );
+
+test(
+  "A hibachi's local folders become Codex writable roots in standard access only",
+  { skip: process.platform === 'win32' && 'POSIX protocol fixture executable', timeout: 30000 },
+  async (t) => {
+    const { root, files, run } = await codex(t);
+    const folder = path.join(root, '..', 'Synced');
+    files.cloud = {
+      resolve: async () => folder,
+      rootEntries: async () => undefined,
+      localFolders: () => [folder],
+    };
+    await run('default', true);
+    await run('full-access', true);
+    const starts = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .filter((m) => m.method === 'thread/start')
+      .map((m) => m.params.config);
+    assert.deepEqual(starts, [{ 'sandbox_workspace_write.writable_roots': [folder] }, undefined]);
+  },
+);

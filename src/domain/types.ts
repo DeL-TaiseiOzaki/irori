@@ -47,6 +47,8 @@ export interface Entry {
    * to the connection dialog, so it is never renamed, moved or deleted as an entry.
    */
   connection?: boolean;
+  /** The connection is a folder on this device rather than a Drive folder. */
+  local?: boolean;
 }
 export interface Document {
   scopeId: string;
@@ -182,8 +184,25 @@ export interface CloudAttachment {
   name: string;
   access: CloudAccess;
 }
+/**
+ * A folder on this device, such as one a Drive, Dropbox, Box, iCloud or OneDrive
+ * app keeps in sync, shown in contents through a link. Its path is device-local.
+ */
+export interface LocalAttachment {
+  schemaVersion: 1;
+  mountId: string;
+  scopeId: string;
+  provider: 'local';
+  /** The chosen folder's own name, for display. */
+  folderName: string;
+  contentsRoot: string;
+  name: string;
+  access: CloudAccess;
+}
+export type Attachment = CloudAttachment | LocalAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
-export interface CloudConnection extends CloudAttachment {
+export type CloudConnection = Attachment & ConnectionState;
+export interface ConnectionState {
   accountName?: string;
   /** The bound account may change Drive files; without it an editable connection mounts read-only. */
   accountWritable?: boolean;
@@ -208,6 +227,14 @@ export interface AddCloudAttachment {
   scopeId: string;
   accountId: string;
   folder: CloudFolder;
+  contentsRoot: string;
+  name: string;
+  access?: CloudAccess;
+}
+export interface AddLocalFolder {
+  scopeId: string;
+  /** The folder's absolute path on this device. */
+  path: string;
   contentsRoot: string;
   name: string;
   access?: CloudAccess;
@@ -404,6 +431,10 @@ export interface HostAPI {
   /** `leavePending` disconnects although saved changes wait; they upload on the next editable mount. */
   disconnectCloud(scopeId: string, mountId: string, leavePending?: boolean): Promise<void>;
   bindCloud(scopeId: string, mountId: string, accountId: string): Promise<void>;
+  /** Registers a folder on this device in contents, shown there through a link. */
+  addLocalFolder(input: AddLocalFolder): Promise<CloudConnection>;
+  /** Chooses the folder a local connection uses on this device. */
+  bindLocalFolder(scopeId: string, mountId: string, path: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
   /** Whether the connection may change its Drive folder; a connected folder is remounted. */

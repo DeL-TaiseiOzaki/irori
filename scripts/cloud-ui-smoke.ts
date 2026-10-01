@@ -1,5 +1,14 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile, copyFile, chmod } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  readFile,
+  copyFile,
+  chmod,
+  readlink,
+  lstat,
+} from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -64,6 +73,11 @@ try {
   await page.screenshot({ path: 'test-results/irori-startup.png' });
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
+  // A folder on this device is offered first; Drive is the other source.
+  await expect(
+    page.getByRole('button', { name: 'このコンピューター', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Google Drive', exact: true }).click();
   await expect(page.getByRole('button', { name: 'アカウントを追加' })).toBeDisabled();
   // An account from before editing existed may only read until it signs in again.
   const olderAccount = page.locator('.account-row').filter({ hasText: '個人アカウント' });
@@ -162,6 +176,36 @@ try {
   // Buttons fade their background, so let the switch settle before the evidence image.
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'test-results/irori-cloud-connections-dark.png' });
+  // A folder a sync app keeps on this device, chosen with the system dialog and shown
+  // in contents through a link.
+  const synced = path.join(base, 'Google Drive 同期', '研究');
+  await mkdir(synced, { recursive: true });
+  await writeFile(path.join(synced, 'memo.md'), '# 同期メモ\n');
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as any;
+  }, synced);
+  await page.getByRole('button', { name: 'このコンピューター', exact: true }).click();
+  await page.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
+  await expect(page.locator('.local-path')).toHaveText(synced);
+  await expect(page.getByLabel('フォルダ名')).toHaveValue('研究');
+  await page.getByRole('button', { name: '登録して接続', exact: true }).click();
+  const localCard = page.locator('.connection-card').filter({ hasText: 'contents/研究/' });
+  await expect(localCard).toContainText('このコンピューター');
+  await expect(localCard).toContainText('接続済み');
+  const link = path.join(spaces[0].root, 'contents', '研究');
+  expect(await readlink(link)).toBe(synced);
+  expect(
+    await readFile(path.join(spaces[0].root, '.irori/local-folders.json'), 'utf8'),
+  ).not.toContain(base);
+  await page.screenshot({ path: 'test-results/irori-local-folder.png' });
+  await localCard.getByRole('button', { name: '接続先の操作' }).click();
+  await page.getByRole('menuitem', { name: '接続を解除' }).click();
+  await expect(localCard).toContainText('未接続');
+  expect(await lstat(link).catch(() => undefined)).toBeUndefined();
+  await localCard.getByRole('button', { name: '接続先の操作' }).click();
+  await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
+  await expect(localCard).toHaveCount(0);
+  expect(await readFile(path.join(synced, 'memo.md'), 'utf8')).toBe('# 同期メモ\n');
 } finally {
   await app.close();
 }
@@ -209,6 +253,7 @@ try {
   await expect(page.locator('.connection-card')).toHaveCount(2);
   await expect(page.locator('.connection-card').first()).toContainText('contents/調査 資料/');
   await expect(page.locator('.connection-card').nth(1)).toContainText('contents/納品物/');
+  await page.getByRole('button', { name: 'Google Drive', exact: true }).click();
   await page
     .locator('.account-row')
     .first()
@@ -289,6 +334,7 @@ try {
           'multi-scope startup profile',
           'two accounts',
           'shared-drive folder selection',
+          'a folder on this device is connected through a link, disconnected and unregistered, keeping its files',
           'an opened folder can itself be connected',
           'editable by default, read-only by choice, switched per connection',
           'an account that may only read offers to allow writing',
