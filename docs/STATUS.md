@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-02: **0.1.63** (#152, conversations side by side) is merged at
+the owner's request and published as
+[v0.1.63-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.63-preview.1)
+by release run `36957402030` from main's successful CI run `36956668641`
+(source `dab3b85`). The release carries Windows 202,729,984 bytes, Mac
+170,215,174 bytes and `irori-0.1.63-full.nupkg` 202,091,092 bytes; anonymous
+downloads of all six release files matched GitHub's asset digests, and the three
+packages matched `SHA256SUMS.txt`. The website manifest now offers this release.
+Owner device checks remain: two Claude Code or Codex conversations of one hibachi
+running at once on the installed Mac and Windows builds. main's CI for #149
+(`76d08fa`, docs only) failed once in `harness-ui-smoke` (a reload during a
+request showed no finished turns); the next run on `dab3b85` passed.
+
 Parallel conversations, 2026-10-02 (**0.1.63**,
 [ADR 020](decisions/020-parallel-conversations.md)): the owner asked for CLI
 agent sessions to run in parallel, the same as Claudian's tabs. This replaces
