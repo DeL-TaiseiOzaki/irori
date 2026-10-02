@@ -1,5 +1,7 @@
 # Distributor Google OAuth setup
 
+> **Retired in 0.1.67** ([ADR 023](decisions/023-retire-drive-sign-in.md)): irori no longer signs in to Google Drive or bundles rclone. A Drive folder is connected through Drive for desktop as a folder on this computer ([ADR 019](decisions/019-local-folder-connections.md)). This page is kept as a record.
+
 irori delegates Drive authentication, refresh and folder APIs to the bundled, checksum-pinned rclone. Ordinary users should only choose **Googleアカウントを追加** and consent in their browser. On 2026-09-13 the owner reported completing the client setup; both repository secret names and update timestamps were verified without reading their values. Version `0.1.2` is the first candidate built with those settings. [CHECKPOINT](CHECKPOINT.md) records its exact build/publication outcome.
 
 Do not fall back to rclone's shared client: rclone states that it is being retired during 2026. Use an application-owned client as described in the [rclone Drive guide](https://rclone.org/drive/#making-your-own-client-id).

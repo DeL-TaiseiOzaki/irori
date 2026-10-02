@@ -17,7 +17,7 @@ import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
 import { ImageService, imageType } from './images';
 import { KnowledgeStore } from '../knowledge/store';
-import { CloudOutbox } from '../cloud/outbox';
+import { DriveLeftovers } from '../cloud/leftovers';
 import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
 import { DeviceIdentity } from './device';
@@ -25,7 +25,6 @@ import { migrateConversations } from '../agents/conversation-migration';
 import { brainAgentNames } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
-import { WorkspaceCloudStorage } from '../cloud/storage';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { gitScope } from '../domain/git';
@@ -40,10 +39,7 @@ import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
-import { Rclone } from '../cloud/rclone';
 import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
-import type { GoogleOAuth } from '../cloud/oauth';
-declare const IRORI_DISTRIBUTION_GOOGLE_OAUTH: GoogleOAuth | null;
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers: FSWatcher[] = [];
@@ -88,32 +84,14 @@ app
     void updates.cleanup().catch((error) => console.warn('Update cleanup failed', String(error)));
     const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
-    const cloud = new CloudService(
-      new WorkspaceCloudStorage(files, workspaces),
-      (url) => shell.openExternal(url),
-      new Rclone(
-        files.dataDir,
-        app.isPackaged
-          ? path.join(
-              app.getAppPath() + '.unpacked',
-              'vendor',
-              'rclone',
-              process.platform === 'win32' ? 'rclone.exe' : 'rclone',
-            )
-          : undefined,
-      ),
-      app.isPackaged ? (IRORI_DISTRIBUTION_GOOGLE_OAUTH ?? {}) : undefined,
-      (filename) => shell.trashItem(filename),
-    );
+    // Folders on this device in contents (ADR 019); Drive is reached through its own app (ADR 023).
+    const cloud = new CloudService(files, (filename) => shell.trashItem(filename));
     files.cloud = cloud;
     const images = new ImageService(files, cloud);
-    const knowledge = new KnowledgeStore(files.dataDir, async (ref) => {
-      if (files.list().some((space) => space.scopeId === ref.scopeId))
-        return files.resolve(ref.scopeId, ref.path);
-      await cloud.workspaceRoot(ref.scopeId);
-      return cloud.resolve(ref.scopeId, ref.path);
-    });
-    const outbox = new CloudOutbox(files.dataDir, knowledge);
+    const knowledge = new KnowledgeStore(files.dataDir, (ref) =>
+      files.resolve(ref.scopeId, ref.path),
+    );
+    const leftovers = new DriveLeftovers(files.dataDir);
     // The notes are read through the Git service declared below, once a note is open.
     const authorship = new AuthorshipStore(files.dataDir, (ref) =>
       git.noted(ref.scopeId, ref.path),
@@ -433,13 +411,18 @@ app
       locateSource: (source) => knowledge.locate(source),
       rebindSource: (source, next) => changeFiles(() => knowledge.rebind(source, next)),
       registerArtifact: (source, runId) => changeFiles(() => knowledge.artifact(source, runId)),
-      pendingCloudWrites: async (id) => {
-        await cloud.declarations(id);
-        return outbox.list(id);
-      },
-      recoverableCloudWrites: () => outbox.recovery(),
-      prepareCloudWrite: async (id, mountId, source) => {
-        return outbox.prepare(await cloud.writeTarget(id, mountId), source);
+      recoverableCloudWrites: () => leftovers.prepared(),
+      unsentDriveChanges: async () => (await leftovers.unsent()).length,
+      exportUnsentDriveChanges: async () => {
+        const choice = await dialog.showOpenDialog(window!, {
+          title: t('保存先のフォルダ', 'Folder to save to'),
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        if (choice.canceled || !choice.filePaths[0]) return null;
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+        const folder = path.join(choice.filePaths[0], `irori-drive-unsent-${stamp}`);
+        const count = await leftovers.exportUnsent(folder);
+        return { folder, count };
       },
       // Validation runs at the boundary; the host checks the address again
       // rather than trusting that it did.
@@ -461,12 +444,6 @@ app
         setLanguage(next.language);
         return next;
       },
-      openCloudSetupHelp: () =>
-        shell.openExternal(
-          process.platform === 'win32'
-            ? 'https://winfsp.dev/rel/'
-            : 'https://rclone.org/install/#installation-with-precompiled-binaries',
-        ),
       terminalShells: () => terminals.available(),
       openTerminal: (...args) => terminals.open(...args),
       writeTerminal: (...args) => terminals.write(...args),
@@ -504,9 +481,8 @@ app
               'Remove it after the current operation finishes.',
             ),
           );
-        await cloud.removeWorkspace(id, () => workspaces.remove(id));
+        await workspaces.remove(id);
       },
-      cloudSetup: () => cloud.setup(),
       ontology: (id) => readOntology(files, id),
       graphIndexStatus: (id) => graphIndex.status(id),
       updateGraphIndex: (id) =>
@@ -530,38 +506,12 @@ app
       writeSchemaFile: (id, rel, text, expected) =>
         changeSchema(id, () => schemaSettings.write(id, rel, text, expected)),
       moveSkill: (id, name, to) => changeSchema(id, () => schemaSettings.moveSkill(id, name, to)),
-      workspaceCloud: (id) => cloud.workspaceRoot(id),
-      cloudEntries: (...args) => cloud.entries(...args),
-      cloudRead: (...args) => cloud.read(...args),
-      openCloudFile: async (id, rel) => {
-        await cloud.workspaceRoot(id);
-        await openFile(await cloud.resolve(id, rel));
-      },
-      cloudAccounts: () => cloud.accounts.list(),
-      addCloudAccount: (name) => cloud.addAccount(name),
-      cancelCloudAccount: (id) => cloud.cancelAccount(id),
-      removeCloudAccount: (id) => {
-        if (agents.anyBusy || git.busy)
-          throw Error(
-            t(
-              '実行を停止してからアカウントを登録解除してください。',
-              'Stop the run before removing the account.',
-            ),
-          );
-        return cloud.removeAccount(id);
-      },
-      reauthorizeCloudAccount: (id) => cloud.reauthorizeAccount(id),
-      cloudDrives: (id) => cloud.accounts.drives(id),
-      cloudFolders: (...args) => cloud.accounts.folders(...args),
       cloudConnections: (id) => cloud.connections(id),
-      addCloudAttachment: (input) => changeCloud(input.scopeId, () => cloud.add(input)),
       connectCloud: (...args) => changeCloud(args[0], () => cloud.connect(...args)),
       disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
-      moveCloudConnection: (from, mountId, to) =>
-        changeCloud(to, () => changeCloud(from, () => cloud.moveConnection(from, mountId, to))),
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
         if (error) throw Error(error);
@@ -572,9 +522,9 @@ app
         changeFiles(() => changed(scopeId, () => cloud.moveEntry(scopeId, from, to))),
       deleteCloudEntry: (scopeId, target) =>
         changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target))),
-      bindCloud: (...args) => changeCloud(args[0], () => cloud.bind(...args)),
       addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
+      switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => files.list(),
       chooseFolder: async () => {
         const choice = await dialog.showOpenDialog(window!, {
@@ -627,33 +577,23 @@ app
       read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),
       readImage: (...args) => images.read(...args),
-      viewerBytes: async (id, rel) => {
-        if (files.list().some((space) => space.scopeId === id))
-          return readViewerBytes(await files.resolve(id, rel), rel);
-        await cloud.workspaceRoot(id);
-        return readViewerBytes(await cloud.resolve(id, rel), rel);
-      },
+      viewerBytes: async (id, rel) => readViewerBytes(await files.resolve(id, rel), rel),
       save: (doc) =>
         changeFiles(async () => {
-          // A workspace's Drive files belong to no KB: the cloud service saves them.
-          if (!files.list().some((space) => space.scopeId === doc.scopeId)) return cloud.save(doc);
           // The bytes this save replaces: only the lines it introduces are the
           // person's, since the file already carried the rest.
           const before = await files.read(doc.scopeId, doc.path).catch(() => undefined);
           const saved = await files.save(doc);
           // The save does not wait on it: the store orders its own reads, so the
           // editor's next request sees this observation either way.
-          // A Drive file is outside the KB's Git history, so it has no authorship record.
+          // A connected folder's file is outside the KB's Git history: no authorship record.
           if (before?.hash === doc.hash && !saved.cloud)
             void authorship
               .observe({ scopeId: saved.scopeId, path: saved.path }, saved.text, before.text)
               .catch(() => {});
           return saved;
         }),
-      draft: (doc) =>
-        files.list().some((space) => space.scopeId === doc.scopeId)
-          ? files.draft(doc)
-          : cloud.draft(doc),
+      draft: (doc) => files.draft(doc),
       createNote: (id, name, directory) =>
         changeFiles(async () =>
           files.createNote(id, name, directory ?? (await noteDirectory(files, id))),
@@ -786,31 +726,6 @@ app
           cancelId: 0,
         });
         if (answer.response !== 1) return false;
-      }
-      // Saved Drive changes upload shortly after they are written. Quitting first
-      // leaves them in rclone's cache, to be uploaded when the folder is next connected.
-      for (let pending = await cloud.pendingUploads(); pending > 0;) {
-        const answer = await dialog.showMessageBox(window!, {
-          message: t(`送信待ち ${pending} 件`, `${pending} pending uploads`),
-          detail: t(
-            '待たずに終了すると、変更はこの端末に残ります。',
-            'If you quit without waiting, the changes stay on this device.',
-          ),
-          buttons: [
-            t('戻る', 'Back'),
-            t('送信を待つ', 'Wait for the upload'),
-            restart
-              ? t('待たずに再起動', 'Restart without waiting')
-              : t('待たずに閉じる', 'Close without waiting'),
-          ],
-          cancelId: 0,
-          defaultId: 1,
-        });
-        if (answer.response === 0) return false;
-        if (answer.response === 2) break;
-        const deadline = Date.now() + 60000;
-        while ((pending = await cloud.pendingUploads()) > 0 && Date.now() < deadline)
-          await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       await routines.stopAll();
       await agents.cancel();

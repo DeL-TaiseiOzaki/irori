@@ -36,7 +36,7 @@ function connectionOf(contents: string[], entryPath: string) {
 }
 const parentOf = (entryPath: string) => entryPath.split('/').slice(0, -1).join('/');
 
-/** The row menu of a file or folder in an editable Drive folder. */
+/** The row menu of a file or folder in an editable connected folder. */
 export function EntryMenu({
   entry,
   onAction,
@@ -65,7 +65,7 @@ export function EntryMenu({
   );
 }
 
-/** The same actions for the open Drive document, in the document toolbar. */
+/** The same actions for the open document of a connected folder, in the document toolbar. */
 export function CloudDocumentActions({ onAction }: { onAction: (action: EntryAction) => void }) {
   return (
     <>
@@ -79,7 +79,7 @@ export function CloudDocumentActions({ onAction }: { onAction: (action: EntryAct
 }
 
 /**
- * Renames, moves or deletes one entry of an editable Drive folder. The host
+ * Renames, moves or deletes one entry of an editable connected folder. The host
  * checks everything again; the checks here only answer before a round trip.
  */
 export function CloudEntryDialog({

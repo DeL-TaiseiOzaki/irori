@@ -31,9 +31,9 @@ export function imagePath(note: string, url: string) {
     );
   return path.posix.normalize(path.posix.join(path.posix.dirname(note), decoded));
 }
-/** What ImageService needs from CloudService to reach into a Drive connection. */
+/** What ImageService needs from CloudService to reach into a connected folder. */
 export interface ImageCloudHooks {
-  /** Resolves a Drive-connected path to its real filesystem location, mount verified. */
+  /** Resolves a path in a connected folder to its real location, link verified. */
   resolve(scopeId: string, rel: string): Promise<string>;
   /** Whether the connection covering rel is mounted so that it can be changed. */
   writable(scopeId: string, rel: string): boolean;
@@ -47,16 +47,11 @@ export class ImageService {
   save(scopeId: string, note: string, bytes: Uint8Array) {
     return this.queue.run(() => this.saveBytes(scopeId, note, bytes));
   }
-  // A workspace scope holds only Drive connections and FileService does not know it;
-  // every other scope is a registered KB, where only its `contents` layer is Drive-backed.
+  // Every scope is a registered KB; its `contents` layer holds the connected folders.
   private resolvePath(scopeId: string, rel: string) {
-    if (this.files.list().some((space) => space.scopeId === scopeId))
-      return this.files.resolve(scopeId, rel);
-    if (!this.cloud) throw Error('Unknown space');
-    return this.cloud.resolve(scopeId, rel);
+    return this.files.resolve(scopeId, rel);
   }
   private isDrive(scopeId: string, note: string) {
-    if (!this.files.list().some((space) => space.scopeId === scopeId)) return true;
     return classify(this.files.get(scopeId), note) === 'contents';
   }
   private async saveBytes(scopeId: string, note: string, bytes: Uint8Array) {

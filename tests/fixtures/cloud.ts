@@ -1,39 +1,19 @@
-// Shared fixtures for the cloud service: a protocol-level rclone stand-in, a KB with
-// two signed-in accounts, and a connection modelled as already mounted.
+// Shared fixtures for the cloud service: a hibachi with a folder outside it, standing
+// for one a sync app keeps on this device, connected the way irori connects it, through
+// a real link at `contents/<name>` (ADR 019). A Google Drive declaration from before
+// 0.1.67 can be written beside it to stand for a retired connection (ADR 023).
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../../src/host/files';
 import { CloudService } from '../../src/cloud/service';
-import type { RcloneAPI } from '../../src/cloud/rclone';
-import type { UploadFailure } from '../../src/cloud/upload-errors';
+import type { CloudAttachment, Space } from '../../src/domain/types';
 
-export class FixtureRclone implements RcloneAPI {
-  calls: { method: string; params: any }[] = [];
-  /** What a real rclone would have read from its log; a test fills it in. */
-  failures: UploadFailure[] = [];
-  folders = [
-    { ID: 'folder-one', Name: 'Drive original name', IsDir: true },
-    { ID: 'folder-two', Name: 'Drive original name', IsDir: true },
-  ];
-  async call(method: string, params: Record<string, any> = {}): Promise<any> {
-    this.calls.push({ method, params });
-    if (method === 'operations/list') return { list: this.folders };
-    if (method === 'operations/fsinfo') return { Name: params.fs._name, Root: '' };
-    if (method === 'core/version') return { version: 'fixture' };
-    if (method === 'mount/types') return { mountTypes: ['mount'] };
-    if (method === 'backend/command') return { result: [{ id: 'shared-drive', name: 'Shared' }] };
-    if (method === 'config/create' || method === 'config/update')
-      return { jobid: this.calls.length };
-    if (method === 'job/status') return { finished: true, success: true, output: {} };
-    return {};
-  }
-  uploadFailures() {
-    return this.failures;
-  }
-  async close() {}
-}
+export const connectionName = 'Connected fixture';
+export const connectionRoot = `contents/${connectionName}`;
+
+/** A hibachi and a cloud service whose trash records each entry and removes it. */
 export async function fixture(t: any) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori cloud 日本語 '));
   t.after(() => rm(base, { recursive: true, force: true }));
@@ -42,71 +22,67 @@ export async function fixture(t: any) {
   const root = path.join(base, 'KB');
   await mkdir(root);
   const space = await files.register(root, 'Personal', 'personal');
-  const accountId = randomUUID(),
-    secondAccountId = randomUUID();
-  await writeFile(
-    path.join(files.dataDir, 'cloud-accounts.json'),
-    JSON.stringify([
-      { id: accountId, name: 'Personal account', provider: 'google-drive', state: 'ready' },
-      { id: secondAccountId, name: 'Team account', provider: 'google-drive', state: 'ready' },
-    ]),
-  );
-  const rpc = new FixtureRclone();
-  const cloud = new CloudService(files, async () => {}, rpc);
+  const trashed: string[] = [];
+  const trash = async (filename: string) => {
+    trashed.push(filename);
+    await rm(filename, { recursive: true });
+  };
+  const cloud = new CloudService(files, trash);
   files.cloud = cloud;
-  return { base, files, space, accountId, secondAccountId, rpc, cloud };
+  return { base, files, space, cloud, trash, trashed };
 }
 
-export async function mountedFixture(t: any, { writable = false } = {}) {
+/** A folder outside the hibachi, as a sync app keeps one, by its real path. */
+export async function syncedFolder(base: string, name = 'Shared folder') {
+  const folder = path.join(base, 'Sync 同期', name);
+  await mkdir(folder, { recursive: true });
+  return realpath(folder);
+}
+
+/**
+ * A folder on this device registered and connected at `contents/Connected fixture`.
+ * `target` is the folder itself; `entry` is the link irori made in contents.
+ */
+export async function connectedFixture(t: any, { writable = false } = {}) {
   const value = await fixture(t);
-  const { cloud, space, accountId, rpc } = value;
-  const connection = await cloud.add({
+  const { base, cloud, space } = value;
+  const target = await syncedFolder(base);
+  const connection = await cloud.addLocal({
     scopeId: space.scopeId,
-    accountId,
-    folder: { id: 'folder-one', parentId: 'root', name: 'Source' },
+    path: target,
     contentsRoot: 'contents',
-    name: 'Mounted fixture',
+    name: connectionName,
+    access: writable ? 'read-write' : 'read-only',
   });
-  const target = path.join(space.root, 'contents', connection.name);
-  await mkdir(target, { recursive: true });
-  const info = await stat(target);
-  const key = `${space.scopeId}:${connection.mountId}`;
-  // The fs spec a real mount is created with; the service asks Drive through it.
-  const remote = {
-    ...(await cloud.accounts.filesystem(accountId, 'folder-one')),
-    description: `irori-mount-${connection.mountId}`,
+  await cloud.connect(space.scopeId, connection.mountId);
+  const entry = path.join(space.root, 'contents', connectionName);
+  return { ...value, connection, target, entry };
+}
+
+/** A Google Drive declaration as irori wrote it before 0.1.67, valid for its schema. */
+export function retiredDeclaration(
+  space: Pick<Space, 'scopeId'>,
+  overrides: Partial<CloudAttachment> = {},
+): CloudAttachment {
+  return {
+    schemaVersion: 1,
+    mountId: randomUUID(),
+    scopeId: space.scopeId,
+    provider: 'google-drive',
+    folderId: 'folder-one',
+    parentId: 'root',
+    folderName: 'Drive original name',
+    contentsRoot: 'contents',
+    name: 'Drive',
+    access: 'read-write',
+    ...overrides,
   };
-  // Model a previously verified mount; ordinary test directories are never mounted.
-  cloud['mounted'].set(key, {
-    attachment: connection,
-    entry: target,
-    target,
-    device: info.dev,
-    inode: info.ino,
-    filesystem: 'fixture:',
-    remote,
-    writable,
-  });
-  cloud['states'].set(key, { state: 'mounted' });
-  const original = rpc.call.bind(rpc);
-  const state = {
-    mounts: [{ MountPoint: target, Fs: 'fixture:' }],
-    listingFails: false,
-    malformedListing: false,
-    unmountFails: false,
-    closed: false,
-  };
-  rpc.call = async (method, params) => {
-    if (method === 'mount/listmounts') {
-      if (state.listingFails) throw Error('Mount listing unavailable');
-      if (state.malformedListing) return {};
-      return { mountPoints: state.mounts };
-    }
-    if (method === 'mount/unmount' && state.unmountFails) throw Error('Unmount failed');
-    return original(method, params);
-  };
-  rpc.close = async () => {
-    state.closed = true;
-  };
-  return { ...value, connection, target, remote, state };
+}
+
+/** Adds retired declarations to a hibachi's `.irori/cloud-mounts.json`. */
+export async function writeRetired(space: Pick<Space, 'root'>, ...records: CloudAttachment[]) {
+  const filename = path.join(space.root, '.irori', 'cloud-mounts.json');
+  const existing = JSON.parse(await readFile(filename, 'utf8').catch(() => '[]'));
+  await mkdir(path.dirname(filename), { recursive: true });
+  await writeFile(filename, JSON.stringify([...existing, ...records]));
 }

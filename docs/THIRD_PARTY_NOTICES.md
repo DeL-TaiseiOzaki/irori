@@ -8,7 +8,6 @@ Two kinds of package ship. The packages the host process loads at run time trave
 |---|---|
 | node-pty, default-shell, which | MIT, each package LICENSE; node-pty ConPTY assets retain upstream notices. Only the target platform's prebuild is packaged; the others cannot be loaded there |
 | xterm.js and FitAddon | MIT, bundled |
-| rclone 1.75.1 | MIT, assets/rclone-LICENSE.txt; also shipped with the binary in vendor/rclone/LICENSE.txt |
 | fflate | MIT, development-only ZIP extraction; package LICENSE |
 | React / React DOM, Base UI, lucide-react, react-error-boundary, react-resizable-panels, react-markdown and remark-gfm with their remark, micromark, mdast and hast dependencies | MIT, bundled |
 | Motion (`motion`, `framer-motion`, `motion-dom`, `motion-utils`) | MIT, bundled; used for ObsidianUI tab indicators |
@@ -55,7 +54,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies and asserts that no Claude SDK native binary package is among them, that only the packages the built host requires — and what they depend on — are packaged, and that `dist/third-party-notices.txt` is present and names every other production dependency at its installed version. The binaries irori still redistributes are rclone and node-pty's native code for the target platform. Native-binary redistribution review, signing and provider-distribution review remain release gates.
+irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers are development tools; their package licenses remain installed with the build dependencies. `electron-squirrel-startup` is MIT licensed and ships as a runtime dependency with its notices. The package smoke emits an inventory of actual packaged dependencies and asserts that no Claude SDK native binary package is among them, that only the packages the built host requires — and what they depend on — are packaged, and that `dist/third-party-notices.txt` is present and names every other production dependency at its installed version. The only native binary irori redistributes is node-pty's native code for the target platform; the rclone binary was retired with the in-app Google Drive sign-in (2026-10-02). Native-binary redistribution review, signing and provider-distribution review remain release gates.
 
 ## ObsidianUI MIT notice (adapted renderer components)
 

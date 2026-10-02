@@ -1,7 +1,7 @@
 // Keep packaging with Forge; only compiled application files and runtime packages ship.
 module.exports = {
   packagerConfig: {
-    asar: { unpack: '{**/node_modules/node-pty/**/*,**/vendor/rclone/**/*}' },
+    asar: { unpack: '**/node_modules/node-pty/**/*' },
     executableName: 'irori',
     icon: require('node:path').resolve('assets/irori-icon'),
     appBundleId: 'io.github.deltaiseiozaki.irori',
@@ -40,10 +40,6 @@ module.exports = {
   rebuildConfig: { ignoreModules: process.platform === 'win32' ? ['node-pty'] : [] },
   plugins: [{ name: '@electron-forge/plugin-auto-unpack-natives', config: {} }],
   hooks: {
-    packageAfterCopy: async (_config, buildPath, _electronVersion, platform, arch) => {
-      const { prepareRclone } = await import('./scripts/prepare-rclone.mjs');
-      await prepareRclone(platform, arch, require('node:path').join(buildPath, 'vendor', 'rclone'));
-    },
     // Two dependencies carry a complete executable for every platform they support, and
     // npm installs whichever ones match the build machine. Runs after pruning, so the
     // production dependency walk still sees the tree npm installed.

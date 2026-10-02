@@ -35,18 +35,9 @@ export const layerNames: Record<Layer, string> = {
 };
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 
-/** What a Drive folder shows beside its name: changes on their way up, or read-only. */
+/** What a connected folder shows beside its name: a lock when it is read-only. */
 function DriveBadge({ connection }: { connection?: CloudConnection }) {
   if (!connection) return null;
-  if (connection.pending)
-    return (
-      <span className="drive-badge pending">
-        <span className="drive-badge-arrow">
-          <Icon name="up" size={11} strokeWidth={2.4} />
-        </span>
-        {connection.pending}
-      </span>
-    );
   if (connection.state === 'mounted' && !connection.writable)
     return (
       <span className="drive-badge">
@@ -78,9 +69,9 @@ export function Tree({
   selected?: Document;
   connections?: CloudConnection[];
   onOpen: (space: Space, entry: Entry) => void;
-  /** Adds a note to an editable Drive folder. */
+  /** Adds a note to an editable connected folder. */
   onCreate?: (space: Space, entry: Entry) => void;
-  /** Renames, moves or deletes an entry of an editable Drive folder. */
+  /** Renames, moves or deletes an entry of an editable connected folder. */
   onAction?: (space: Space, entry: Entry, action: EntryAction) => void;
 }) {
   const listing = useResource(
@@ -114,7 +105,7 @@ export function Tree({
       {data && !data.error && !entries.length && (
         <small className="tree-empty" style={indent}>
           {layer === 'contents' && !depth
-            ? t('Drive フォルダ未接続', 'No Drive folder connected')
+            ? t('フォルダ未接続', 'No folder connected')
             : t('項目がありません', 'No items')}
         </small>
       )}
@@ -397,7 +388,7 @@ export function BrainPanel({
           onOpen={onOpen}
         />
       );
-    // Drive folders sit directly under the section; a second contents root names itself.
+    // Connected folders sit directly under the section; a second contents root names itself.
     if (!contentRoots) return <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>;
     return contentRoots.map((root) => (
       <div key={root.path} className="contents-root">

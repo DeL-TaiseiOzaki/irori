@@ -56,12 +56,12 @@ On PowerShell, set `$env:IRORI_UI_REAL_AGENTS="1"` and run `npm run test:ui` on 
 
 ## Architecture
 
-- React renderer → typed, validated `HostAPI` → Electron preload/main. No renderer Node access, raw IPC export, remote page navigation or document script execution. The host alone controls a private authenticated loopback rclone service.
+- React renderer → typed, validated `HostAPI` → Electron preload/main. No renderer Node access, raw IPC export, remote page navigation or document script execution.
 - Milkdown Crepe for the document editor, CodeMirror 6 for other text and CSV source. Markdown is authoritative; unsupported blocks stay literal in the document.
 - PDF, Office and image viewing: the host hands over only the bytes of a file whose extension has a viewer, up to 100 MiB, and pdf.js, docx-preview, pptx-to-html and SheetJS draw it in the sandboxed renderer. Office output is stripped of scripts, frames and external URLs before it is shown ([viewer libraries](libraries/file-viewers.md)).
 - A Node `FileService` owns canonical paths, scope ownership, portable UUID declarations, local bindings/drafts/backups, bounded lazy directory listing, watchers and version-aware writes.
 - Codex uses the native app-server JSONL protocol; the Claude Agent SDK controls the installed unmodified `claude` binary. Session handles and bounded display history / pending messages persist in device data, bound to scope UUID, provider and canonical checkout root. A failed resume keeps the handle instead of silently starting a new conversation.
-- Device data lives in Electron's standard `userData` (override with `IRORI_DATA_DIR` for tests): workspace selections, account metadata, rclone credentials and cloud bindings. Existing `contents` bytes are never moved or deleted by setup.
+- Device data lives in Electron's standard `userData` (override with `IRORI_DATA_DIR` for tests): workspace selections, and sync-folder bindings. Existing `contents` bytes are never moved or deleted by setup.
 
 Design decisions are recorded in [ADR 001 (host)](decisions/001-initial-host.md) and [ADR 002 (release and workspace)](decisions/002-release-and-workspace.md).
 

@@ -38,16 +38,16 @@ export interface Entry {
   note: boolean;
   blocked?: string;
   /**
-   * Inside an editable Drive connection: the entry can be renamed, moved and
+   * Inside an editable connected folder: the entry can be renamed, moved and
    * deleted, and a folder can take a new note.
    */
   writable?: boolean;
   /**
-   * The folder a Drive connection is mounted on. Its name and registration belong
-   * to the connection dialog, so it is never renamed, moved or deleted as an entry.
+   * The place a connected folder appears in contents. Its name and registration
+   * belong to the connection dialog, so it is never renamed, moved or deleted as an entry.
    */
   connection?: boolean;
-  /** The connection is a folder on this device rather than a Drive folder. */
+  /** The connection is a folder on this device (every connection since 0.1.67). */
   local?: boolean;
 }
 export interface Document {
@@ -56,8 +56,7 @@ export interface Document {
   text: string;
   hash: string;
   readOnly?: boolean;
-  workspaceId?: string;
-  /** The file is inside a Google Drive connection rather than in the KB's own files. */
+  /** The file is inside a connected folder in contents rather than in the KB's own files. */
   cloud?: boolean;
   draft?: { text: string; baseHash: string };
   /** Shown by a viewer rather than edited: `text` is empty and the bytes come from `viewerBytes`. */
@@ -154,23 +153,12 @@ export interface CloudRoot {
   name: string;
   root: string;
   contents: string[];
-  workspace?: boolean;
 }
-export interface CloudAccount {
-  id: string;
-  name: string;
-  provider: 'google-drive';
-  state: 'authorizing' | 'ready' | 'incomplete';
-  detail?: string;
-  /** Signed in with permission to change Drive files. Accounts added before 0.1.35 may read only. */
-  writable?: boolean;
-}
-export interface CloudFolder {
-  id: string;
-  name: string;
-  parentId?: string;
-  driveId?: string;
-}
+/**
+ * A Google Drive folder irori connected itself before 0.1.67. Kept in a hibachi's
+ * `.irori/cloud-mounts.json`, it is listed as retired until it is switched to a
+ * folder on this computer or unregistered (ADR 023).
+ */
 export interface CloudAttachment {
   schemaVersion: 1;
   mountId: string;
@@ -203,33 +191,11 @@ export type Attachment = CloudAttachment | LocalAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
 export type CloudConnection = Attachment & ConnectionState;
 export interface ConnectionState {
-  accountName?: string;
-  /** The bound account may change Drive files; without it an editable connection mounts read-only. */
-  accountWritable?: boolean;
-  state: 'unconfigured' | 'disconnected' | 'connecting' | 'mounted' | 'error';
+  /** `retired`: a Google Drive connection from before 0.1.67, to be switched to a folder. */
+  state: 'unconfigured' | 'disconnected' | 'connecting' | 'mounted' | 'error' | 'retired';
   detail?: string;
-  /** Mounted so that files can be changed. */
+  /** Linked so that files can be changed. */
   writable?: boolean;
-  /** Saved changes still waiting to reach Google Drive. */
-  pending?: number;
-  /** Why saved changes are not reaching Google Drive, in the interface language. */
-  uploadError?: string;
-}
-export interface CloudSetup {
-  available: boolean;
-  version?: string;
-  oauthConfigured: boolean;
-  mountAvailable: boolean;
-  detail: string;
-  prerequisite?: 'winfsp' | 'fuse';
-}
-export interface AddCloudAttachment {
-  scopeId: string;
-  accountId: string;
-  folder: CloudFolder;
-  contentsRoot: string;
-  name: string;
-  access?: CloudAccess;
 }
 export interface AddLocalFolder {
   scopeId: string;
@@ -305,7 +271,12 @@ export interface DeviceSettings {
 }
 
 export interface HostAPI {
+  /** Copies once prepared for upload to Google Drive, before 0.1.67 (ADR 023). */
   recoverableCloudWrites(): Promise<import('./knowledge').CloudWriteRecovery>;
+  /** Changed files a Google Drive connection never uploaded, still on this device. */
+  unsentDriveChanges(): Promise<number>;
+  /** Saves those files to a folder the person chooses; null when nothing was chosen. */
+  exportUnsentDriveChanges(): Promise<{ folder: string; count: number } | null>;
   draftRead(key: import('./drafts').DraftKey): Promise<import('./drafts').DraftRecord | null>;
   draftWrite(
     key: import('./drafts').DraftKey,
@@ -360,12 +331,6 @@ export interface HostAPI {
     source: import('./knowledge').SourceRef,
     runId: string,
   ): Promise<import('./knowledge').ArtifactRecord>;
-  pendingCloudWrites(ownerId: string): Promise<import('./knowledge').PendingWrite[]>;
-  prepareCloudWrite(
-    ownerId: string,
-    mountId: string,
-    source: import('./knowledge').SourceRef,
-  ): Promise<import('./knowledge').PendingWrite>;
   terminalShells(): Promise<TerminalShell[]>;
   openTerminal(
     scopeId: string,
@@ -422,59 +387,29 @@ export interface HostAPI {
   workspaces(): Promise<WorkspaceProfile[]>;
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
   removeWorkspace(id: string): Promise<void>;
-  cloudSetup(): Promise<CloudSetup>;
-  openCloudSetupHelp(): Promise<void>;
-  workspaceCloud(id: string): Promise<CloudRoot>;
-  cloudEntries(id: string, path: string): Promise<Entry[]>;
-  cloudRead(id: string, path: string): Promise<Document>;
-  openCloudFile(id: string, path: string): Promise<void>;
-  cloudAccounts(): Promise<CloudAccount[]>;
-  addCloudAccount(name: string): Promise<CloudAccount>;
-  cancelCloudAccount(id: string): Promise<void>;
-  /** Signs the account in again, now with permission to change Drive files. */
-  reauthorizeCloudAccount(id: string): Promise<void>;
-  removeCloudAccount(id: string): Promise<void>;
-  cloudDrives(accountId: string): Promise<CloudFolder[]>;
-  cloudFolders(accountId: string, folderId: string, driveId?: string): Promise<CloudFolder[]>;
   cloudConnections(scopeId: string): Promise<CloudConnection[]>;
-  addCloudAttachment(input: AddCloudAttachment): Promise<CloudConnection>;
   connectCloud(scopeId: string, mountId: string): Promise<void>;
-  /** `leavePending` disconnects although saved changes wait; they upload on the next editable mount. */
-  disconnectCloud(scopeId: string, mountId: string, leavePending?: boolean): Promise<void>;
-  bindCloud(scopeId: string, mountId: string, accountId: string): Promise<void>;
+  disconnectCloud(scopeId: string, mountId: string): Promise<void>;
   /** Registers a folder on this device in contents, shown there through a link. */
   addLocalFolder(input: AddLocalFolder): Promise<CloudConnection>;
   /** Chooses the folder a local connection uses on this device. */
   bindLocalFolder(scopeId: string, mountId: string, path: string): Promise<void>;
+  /** Switches a retired Google Drive connection to a folder on this device, keeping its name. */
+  switchCloudToLocal(scopeId: string, mountId: string, path: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
-  /** Whether the connection may change its Drive folder; a connected folder is remounted. */
-  setCloudAccess(
-    scopeId: string,
-    mountId: string,
-    access: CloudAccess,
-    leavePending?: boolean,
-  ): Promise<void>;
-  /**
-   * Moves a workspace's Drive connection from before 0.1.37 into a KB's materials.
-   * `duplicate` is true when the KB already connected that folder and the
-   * workspace's connection was only unregistered.
-   */
-  moveCloudConnection(
-    fromScopeId: string,
-    mountId: string,
-    toScopeId: string,
-  ): Promise<{ duplicate: boolean }>;
+  /** Whether the connection may change its folder; a connected folder is linked again. */
+  setCloudAccess(scopeId: string, mountId: string, access: CloudAccess): Promise<void>;
   /** Shows the connected folder in the system file manager, for adding files there. */
   openCloudFolder(scopeId: string, mountId: string): Promise<void>;
-  /** Creates an empty Markdown note in an editable Drive folder and returns it. */
+  /** Creates an empty Markdown note in an editable connected folder and returns it. */
   createCloudNote(scopeId: string, directory: string, name: string): Promise<Document>;
   /**
-   * Renames or moves a file or folder inside one editable Drive connection. `to` is
+   * Renames or moves a file or folder inside one editable connected folder. `to` is
    * the full new path; an existing entry is never replaced. Returns the moved entry.
    */
   moveCloudEntry(scopeId: string, from: string, to: string): Promise<Entry>;
-  /** Moves a file or folder of an editable Drive connection to Google Drive's trash. */
+  /** Moves a file or folder of an editable connected folder to the system trash. */
   deleteCloudEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
@@ -535,7 +470,7 @@ export interface HostAPI {
   moveSkill(scopeId: string, name: string, to: string | null): Promise<void>;
   saveImage(scopeId: string, note: string, bytes: Uint8Array): Promise<string>;
   readImage(scopeId: string, note: string, url: string): Promise<string>;
-  /** The bytes of a file a viewer shows (PDF, Office, image), in a KB or a Drive workspace. */
+  /** The bytes of a file a viewer shows (PDF, Office, image), in a KB. */
   viewerBytes(scopeId: string, path: string): Promise<Uint8Array>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;

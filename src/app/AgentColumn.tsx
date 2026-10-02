@@ -947,10 +947,7 @@ export function AgentColumn({
                     ) : (
                       <Icon name="cloud" size={12} />
                     )}
-                    <span className="context-chip-label">
-                      {owner ? '' : 'Drive / '}
-                      {source.path}
-                    </span>
+                    <span className="context-chip-label">{source.path}</span>
                     <button
                       aria-label={t(
                         `${source.path} を参照から外す`,

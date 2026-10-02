@@ -1,5 +1,7 @@
 # 012 — Editing Google Drive folders in place
 
+> **Retired in 0.1.67** ([ADR 023](023-retire-drive-sign-in.md)): irori no longer signs in to Google Drive or bundles rclone. A Drive folder is connected through Drive for desktop as a folder on this computer ([ADR 019](019-local-folder-connections.md)). This page is kept as a record.
+
 Date: 2026-09-25. Status: owner request accepted and implemented for 0.1.35,
 completed in 0.1.36; trials on Windows 11 and macOS devices are pending.
 

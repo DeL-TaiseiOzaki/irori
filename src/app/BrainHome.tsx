@@ -305,12 +305,6 @@ export function BrainHome({
               <div className="home-drive-name">
                 <Icon name={connection.provider === 'local' ? 'folder' : 'cloud'} size={16} />
                 <span>{connection.name}</span>
-                {!!connection.pending && (
-                  <span className="home-uploads">
-                    <Icon name="up" size={12} strokeWidth={2.4} />
-                    {t(`送信待ち ${connection.pending}`, `${connection.pending} to upload`)}
-                  </span>
-                )}
               </div>
               <div className="home-drive-meta">
                 {connection.state !== 'mounted' ? (
@@ -325,12 +319,6 @@ export function BrainHome({
                     <Icon name="lock" size={12} strokeWidth={2} />
                     {t('読み取り専用', 'Read-only')}
                   </span>
-                )}
-                {connection.accountName && (
-                  <>
-                    <i />
-                    <span>{connection.accountName}</span>
-                  </>
                 )}
               </div>
             </div>

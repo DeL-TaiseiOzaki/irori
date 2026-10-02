@@ -82,8 +82,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 
 **資料**
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。
-- Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同期するフォルダを、hibachi の Contents として接続できます（**このコンピューター**）。irori からも、その hibachi agent からも編集できます。
-- Google アカウントで Drive のフォルダを直接接続する機能は、招待したテストユーザー向けです。Windows では [WinFsp](https://winfsp.dev/rel/) が必要です。
+- Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同期するフォルダを、hibachi の Contents として接続できます。irori からも、その hibachi agent からも編集できます。Google Drive は[パソコン版 Google ドライブ](https://www.google.com/drive/download/)を使います。
 
 **記録と道具**
 - **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。

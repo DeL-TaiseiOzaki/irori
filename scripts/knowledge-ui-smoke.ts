@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
-import { CloudOutbox } from '../src/cloud/outbox';
+import { pendingWrite } from '../src/domain/knowledge';
 
 // Real disposable files and persisted records; no provider/model process is started.
 const base = await mkdtemp(path.join(tmpdir(), 'irori records UI '));
@@ -21,16 +21,24 @@ await writeFile(path.join(root, '資料.md'), '# Earlier source\n');
 await writeFile(path.join(root, 'editing.md'), '# Editing\n');
 await writeFile(path.join(otherRoot, 'reference.md'), '# Separate reference\n');
 const store = new KnowledgeStore(files.dataDir, (ref) => files.resolve(ref.scopeId, ref.path));
-// Neither this owner nor its connection is registered: ordinary connection UI cannot reach it.
+// A copy prepared for upload to a Google Drive connection before 0.1.67 (ADR 023),
+// whose owner and connection are gone: only the start screen's leftovers reach it.
 await writeFile(path.join(root, 'orphaned.md'), 'Retained before connection removal');
-await new CloudOutbox(files.dataDir, store).prepare(
-  {
-    ownerId: randomUUID(),
-    mountId: randomUUID(),
-    folderId: 'removed-folder',
-    accountId: randomUUID(),
-  },
-  { scopeId: space.scopeId, path: 'orphaned.md' },
+const orphan = pendingWrite.parse({
+  id: randomUUID(),
+  ownerId: randomUUID(),
+  mountId: randomUUID(),
+  folderId: 'removed-folder',
+  accountId: randomUUID(),
+  name: 'orphaned.md',
+  source: await store.capture({ scopeId: space.scopeId, path: 'orphaned.md' }),
+  createdAt: new Date().toISOString(),
+  state: 'pending',
+});
+await mkdir(path.join(files.dataDir, 'cloud-outbox', orphan.ownerId), { recursive: true });
+await writeFile(
+  path.join(files.dataDir, 'cloud-outbox', orphan.ownerId, `${orphan.id}.json`),
+  JSON.stringify(orphan),
 );
 await rm(path.join(root, 'orphaned.md'));
 const first = await store.begin(randomUUID(), {
@@ -71,8 +79,8 @@ const errors: string[] = [];
 try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
-  await page.getByRole('button', { name: '送信待ちを復元', exact: true }).click();
-  const recovery = page.getByRole('dialog', { name: '送信待ち', exact: true });
+  await page.getByRole('button', { name: 'Drive の未送信分 1', exact: true }).click();
+  const recovery = page.getByRole('dialog', { name: 'Drive の未送信分', exact: true });
   await expect(recovery).toContainText('orphaned.md');
   const recoveredPath = path.join(base, 'recovered.md');
   await app.evaluate(({ dialog }, filePath) => {

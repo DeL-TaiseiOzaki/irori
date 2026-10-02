@@ -19,8 +19,6 @@ test('Only paths that cannot reach the package are exempt from a release', () =>
     'LICENSE',
     'docs/THIRD_PARTY_NOTICES.md',
     'scripts/build-host.mjs',
-    'scripts/prepare-rclone.mjs',
-    'scripts/rclone.json',
     '.github/workflows/app.yml',
     // A path nobody has classified yet ships until someone decides otherwise.
     'electron-builder.yml',

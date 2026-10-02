@@ -1,16 +1,12 @@
-// Renaming, moving and deleting files and folders inside an editable Drive
-// connection, on a connection modelled as mounted at an ordinary directory.
+// Renaming, moving and deleting files and folders inside an editable connected
+// folder, reached through the link irori makes in contents.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { draftFile } from '../src/host/files';
-import { CloudService } from '../src/cloud/service';
-import { WorkspaceService } from '../src/host/workspaces';
-import { WorkspaceCloudStorage } from '../src/cloud/storage';
-import { fixture, mountedFixture } from './fixtures/cloud';
+import { connectedFixture, connectionRoot as root, syncedFolder } from './fixtures/cloud';
 
-const root = 'contents/Mounted fixture';
 const exists = (filename: string) =>
   stat(filename).then(
     () => true,
@@ -20,8 +16,8 @@ const exists = (filename: string) =>
     },
   );
 
-test('A Drive file is renamed and moved in place, keeping its identity and bytes', async (t) => {
-  const { cloud, space, target } = await mountedFixture(t, { writable: true });
+test('A file is renamed and moved in place, keeping its identity and bytes', async (t) => {
+  const { cloud, space, target } = await connectedFixture(t, { writable: true });
   await writeFile(path.join(target, 'note.md'), '# Remote\n');
   await mkdir(path.join(target, 'Folder'));
   const inode = (await stat(path.join(target, 'note.md'))).ino;
@@ -34,7 +30,7 @@ test('A Drive file is renamed and moved in place, keeping its identity and bytes
     note: true,
     writable: true,
   });
-  // The same file under a new name, so Drive keeps its ID, history and sharing.
+  // The same file under a new name, so a sync app keeps its identity, history and sharing.
   assert.equal((await stat(path.join(target, 'renamed.md'))).ino, inode);
   assert.equal(await readFile(path.join(target, 'renamed.md'), 'utf8'), '# Remote\n');
   assert.equal(await exists(path.join(target, 'note.md')), false);
@@ -46,7 +42,7 @@ test('A Drive file is renamed and moved in place, keeping its identity and bytes
   assert.equal(moved.path, `${root}/Folder/renamed.md`);
   assert.equal((await stat(path.join(target, 'Folder', 'renamed.md'))).ino, inode);
   assert.deepEqual(await readdir(target), ['Folder']);
-  // A change of case alone is a rename as well, whatever the mount makes of case.
+  // A change of case alone is a rename as well, whatever the file system makes of case.
   const cased = await cloud.moveEntry(
     space.scopeId,
     `${root}/Folder/renamed.md`,
@@ -65,7 +61,7 @@ test('A Drive file is renamed and moved in place, keeping its identity and bytes
 });
 
 test('A folder is moved with everything inside it', async (t) => {
-  const { cloud, space, target } = await mountedFixture(t, { writable: true });
+  const { cloud, space, target } = await connectedFixture(t, { writable: true });
   await mkdir(path.join(target, 'Folder', 'Inner'), { recursive: true });
   await mkdir(path.join(target, 'Archive'));
   await writeFile(path.join(target, 'Folder', 'Inner', 'deep.md'), '# Deep\n');
@@ -88,7 +84,7 @@ test('A folder is moved with everything inside it', async (t) => {
 });
 
 test('Moves refuse occupied, foreign and impossible destinations and leave everything in place', async (t) => {
-  const { cloud, space, target, state, accountId } = await mountedFixture(t, { writable: true });
+  const { base, cloud, space, target } = await connectedFixture(t, { writable: true });
   await writeFile(path.join(target, 'a.md'), 'A');
   await writeFile(path.join(target, 'b.md'), 'B');
   await writeFile(path.join(target, 'Équipe.md'), 'E');
@@ -97,7 +93,7 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
     assert.rejects(cloud.moveEntry(space.scopeId, from, to), pattern);
   await rejects(`${root}/b.md`, /同じ名前/);
   await rejects(`${root}/B.MD`, /同じ名前/);
-  await rejects(`${root}/équipe.md`, /同じ名前/);
+  await rejects(`${root}/équipe.md`, /同じ名前/);
   await rejects(`${root}/Folder`, /同じ名前/);
   await rejects('contents/a.md', /同じ接続フォルダ/);
   await rejects('Knowledge_Base/a.md', /同じ接続フォルダ/);
@@ -112,28 +108,15 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
   // The connection folder itself belongs to the connection dialog.
   await rejects('contents/Renamed', /接続フォルダ自体/, root);
   await assert.rejects(cloud.deleteEntry(space.scopeId, root), /接続フォルダ自体/);
-  // Another connection of the same KB is a different Drive folder.
-  const other = await cloud.add({
+  // Another connection of the same hibachi is a different folder.
+  const otherTarget = await syncedFolder(base, 'Other');
+  const other = await cloud.addLocal({
     scopeId: space.scopeId,
-    accountId,
-    folder: { id: 'folder-two', parentId: 'root', name: 'Other' },
+    path: otherTarget,
     contentsRoot: 'contents',
     name: 'Other fixture',
   });
-  const otherTarget = path.join(space.root, 'contents', other.name);
-  await mkdir(otherTarget);
-  const info = await stat(otherTarget);
-  cloud['mounted'].set(`${space.scopeId}:${other.mountId}`, {
-    attachment: other,
-    entry: otherTarget,
-    target: otherTarget,
-    device: info.dev,
-    inode: info.ino,
-    filesystem: 'fixture-two:',
-    remote: { _name: 'fixture-two' },
-    writable: true,
-  });
-  state.mounts.push({ MountPoint: otherTarget, Fs: 'fixture-two:' });
+  await cloud.connect(space.scopeId, other.mountId);
   await rejects(`contents/${other.name}/a.md`, /同じ接続フォルダ/);
   assert.deepEqual((await readdir(target)).sort(), ['Folder', 'a.md', 'b.md', 'Équipe.md']);
   assert.deepEqual(await readdir(otherTarget), []);
@@ -142,7 +125,7 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
 });
 
 test('A read-only connection refuses moves and deletions', async (t) => {
-  const { cloud, space, target } = await mountedFixture(t);
+  const { cloud, space, target, trashed } = await connectedFixture(t);
   await writeFile(path.join(target, 'note.md'), '# Remote\n');
   await assert.rejects(
     cloud.moveEntry(space.scopeId, `${root}/note.md`, `${root}/renamed.md`),
@@ -150,10 +133,11 @@ test('A read-only connection refuses moves and deletions', async (t) => {
   );
   await assert.rejects(cloud.deleteEntry(space.scopeId, `${root}/note.md`), /読み取り専用/);
   assert.deepEqual(await readdir(target), ['note.md']);
+  assert.deepEqual(trashed, []);
 });
 
-test('Files and folders are removed through the mount, and so is the draft of a removed file', async (t) => {
-  const { cloud, files, space, target } = await mountedFixture(t, { writable: true });
+test('Files and folders go to the system trash, and so does the draft of a removed file', async (t) => {
+  const { cloud, files, space, target, trashed } = await connectedFixture(t, { writable: true });
   await writeFile(path.join(target, 'note.md'), '# Remote\n');
   await mkdir(path.join(target, 'Folder', 'Inner'), { recursive: true });
   await writeFile(path.join(target, 'Folder', 'Inner', 'deep.md'), '# Deep\n');
@@ -166,11 +150,13 @@ test('Files and folders are removed through the mount, and so is the draft of a 
   assert.equal(await exists(draftFile(files.dataDir, space.scopeId, `${root}/note.md`)), false);
   await cloud.deleteEntry(space.scopeId, `${root}/Folder`);
   assert.deepEqual(await readdir(target), []);
+  // The trash is handed the folder's own paths, never the link in contents.
+  assert.deepEqual(trashed, [path.join(target, 'note.md'), path.join(target, 'Folder')]);
   await assert.rejects(cloud.deleteEntry(space.scopeId, `${root}/note.md`), { code: 'ENOENT' });
 });
 
 test('A kept draft follows its file when the file is renamed or moved', async (t) => {
-  const { cloud, files, space, target } = await mountedFixture(t, { writable: true });
+  const { cloud, files, space, target } = await connectedFixture(t, { writable: true });
   await writeFile(path.join(target, 'note.md'), '# Remote\n');
   await mkdir(path.join(target, 'Folder'));
   const doc = await files.read(space.scopeId, `${root}/note.md`);
@@ -182,16 +168,23 @@ test('A kept draft follows its file when the file is renamed or moved', async (t
   const moved = await files.read(space.scopeId, `${root}/Folder/renamed.md`);
   assert.equal(moved.draft?.text, 'Unsaved');
   assert.equal(moved.hash, doc.hash);
+  // A change of case alone carries the draft along too.
+  await cloud.moveEntry(space.scopeId, `${root}/Folder/renamed.md`, `${root}/Folder/Renamed.md`);
+  assert.equal(
+    (await files.read(space.scopeId, `${root}/Folder/Renamed.md`)).draft?.text,
+    'Unsaved',
+  );
 });
 
 test('Files and folders of an editable connection are marked writable, and the connection folder is told apart', async (t) => {
-  const { files, space, target } = await mountedFixture(t, { writable: true });
+  const { files, space, target } = await connectedFixture(t, { writable: true });
   await mkdir(path.join(target, 'Folder'));
   await writeFile(path.join(target, 'note.md'), '# Remote\n');
   const [connection] = await files.entries(space.scopeId, 'contents');
-  assert.equal(connection.name, 'Mounted fixture');
+  assert.equal(connection.name, 'Connected fixture');
   assert.equal(connection.writable, true);
   assert.equal(connection.connection, true);
+  assert.equal(connection.local, true);
   assert.deepEqual(
     (await files.entries(space.scopeId, root)).map((entry) => [
       entry.name,
@@ -205,57 +198,14 @@ test('Files and folders of an editable connection are marked writable, and the c
   );
 });
 
-test('A workspace Drive listing marks its files writable too, and its entries move', async (t) => {
-  const { files, rpc, accountId } = await fixture(t);
-  const workspaces = new WorkspaceService(files);
-  const workspace = await workspaces.save('Drive only', []);
-  const cloud = new CloudService(new WorkspaceCloudStorage(files, workspaces), async () => {}, rpc);
-  const root = await cloud.workspaceRoot(workspace.id);
-  const connection = await cloud.add({
-    scopeId: workspace.id,
-    accountId,
-    contentsRoot: 'contents',
-    name: '資料',
-    folder: { id: 'folder-one', name: 'Original', parentId: 'root' },
-  });
-  const target = path.join(root.root, 'contents', '資料');
-  await mkdir(path.join(target, 'Folder'), { recursive: true });
-  await writeFile(path.join(target, 'note.md'), '# Shared\n');
-  const info = await stat(target);
-  cloud['mounted'].set(`${workspace.id}:${connection.mountId}`, {
-    attachment: connection,
-    entry: target,
-    target,
-    device: info.dev,
-    inode: info.ino,
-    filesystem: 'fixture:',
-    remote: { _name: 'fixture' },
-    writable: true,
-  });
-  const original = rpc.call.bind(rpc);
-  rpc.call = async (method, params) =>
-    method === 'mount/listmounts'
-      ? { mountPoints: [{ MountPoint: target, Fs: 'fixture:' }] }
-      : original(method, params);
-  const [top] = await cloud.entries(workspace.id, 'contents');
-  assert.equal(top.connection, true);
-  assert.equal(top.writable, true);
+test('Files of a read-only connection are not marked writable', async (t) => {
+  const { files, space, target } = await connectedFixture(t);
+  await writeFile(path.join(target, 'note.md'), '# Remote\n');
+  const [connection] = await files.entries(space.scopeId, 'contents');
+  assert.equal(connection.blocked, undefined);
+  assert.equal(connection.writable, undefined);
   assert.deepEqual(
-    (await cloud.entries(workspace.id, 'contents/資料')).map((entry) => [
-      entry.name,
-      entry.writable,
-      entry.connection,
-    ]),
-    [
-      ['Folder', true, undefined],
-      ['note.md', true, undefined],
-    ],
+    (await files.entries(space.scopeId, root)).map((entry) => [entry.name, entry.writable]),
+    [['note.md', undefined]],
   );
-  const moved = await cloud.moveEntry(
-    workspace.id,
-    'contents/資料/note.md',
-    'contents/資料/Folder/note.md',
-  );
-  assert.equal(moved.path, 'contents/資料/Folder/note.md');
-  assert.equal(await readFile(path.join(target, 'Folder', 'note.md'), 'utf8'), '# Shared\n');
 });

@@ -34,7 +34,7 @@ export type NoteAction = 'move' | 'trash';
 
 /** Whether a note can be renamed, moved or deleted here: a writable Markdown note of a KB. */
 export function noteActionsApply(doc: Document) {
-  return !doc.readOnly && !doc.workspaceId && /\.md$/i.test(doc.path);
+  return !doc.readOnly && !doc.cloud && /\.md$/i.test(doc.path);
 }
 
 /** Renames and moves a note, or moves it to the deleted notes; opened from the note's menu. */
