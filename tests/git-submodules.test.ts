@@ -97,6 +97,7 @@ test('a submodule is cloned into the hibachi, edited, committed and pushed in it
   const { service, space, root, library, base } = await fixture(t);
   const id = space.scopeId;
   const added = await service.addSubmodule(id, { url: library, path: 'projects/library' });
+  identity(path.join(root, 'projects/library'));
   assert.deepEqual(
     added.submodules.map(({ path, initialized, branch, changed }) => ({
       path,
@@ -153,6 +154,7 @@ test('another device fetches the submodule on its branch and a pull moves it alo
   const f = await fixture(t);
   const id = f.space.scopeId;
   await f.service.addSubmodule(id, { url: f.library, path: 'library' });
+  identity(path.join(f.root, 'library'));
   await commitAll(f.service, id, 'Add the library');
   await push(f.service, id);
   const b = await peer(t, f);
@@ -163,6 +165,7 @@ test('another device fetches the submodule on its branch and a pull moves it alo
   );
   assert.equal((await b.service.status({ scopeId: id, repository: 'library' })).available, false);
   listed = await b.service.initSubmodules(id, 'library');
+  identity(path.join(b.root, 'library'));
   assert.equal(listed.notice, undefined);
   assert.deepEqual(
     listed.submodules.map((m) => [m.path, m.initialized, m.branch]),
@@ -191,10 +194,12 @@ test('a pull leaves a submodule with its own uncommitted edit where it is, and s
   const f = await fixture(t);
   const id = f.space.scopeId;
   await f.service.addSubmodule(id, { url: f.library, path: 'library' });
+  identity(path.join(f.root, 'library'));
   await commitAll(f.service, id, 'Add the library');
   await push(f.service, id);
   const b = await peer(t, f);
   await b.service.initSubmodules(id);
+  identity(path.join(b.root, 'library'));
   await writeFile(path.join(b.root, 'library/doc.md'), '# Library\n\nUnfinished on B\n');
   const subA = { scopeId: id, repository: 'library' };
   await writeFile(path.join(f.root, 'library/doc.md'), '# Library\n\nFrom device A\n');
