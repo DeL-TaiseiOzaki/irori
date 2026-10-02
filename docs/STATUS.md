@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-03: **0.1.67** (#159, Google Drive through Drive for desktop)
+is merged at the owner's request and published as
+[v0.1.67-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.67-preview.1)
+by release run `37030081349` from main's successful CI run `37028344592`
+(source `c0bd6f0`). Without rclone the release carries Windows 174,665,216 bytes,
+Mac 140,262,803 bytes and `irori-0.1.67-full.nupkg` 173,833,979 bytes (about
+28 MB less each); anonymous downloads of the three packages matched
+`SHA256SUMS.txt`. The website manifest now offers this release. Draft #146 was
+closed as superseded. Owner device checks remain: a real Drive for desktop
+folder connected and edited, a retired Drive connection switched, and the
+unsent-change notice on a tester's machine.
+
 Drive through Drive for desktop, 2026-10-02 (**0.1.67**,
 [ADR 023](decisions/023-retire-drive-sign-in.md)): the owner retired irori's own
 Google Drive sign-in. Agents are optional and separate tools, as Claudian is
