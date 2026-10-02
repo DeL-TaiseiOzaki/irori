@@ -44,6 +44,7 @@ export const hostArguments = {
       language: z.enum(languages).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       editorAssistance: z.boolean().optional(),
+      hibachiAgent: z.boolean().optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),

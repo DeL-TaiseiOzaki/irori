@@ -40,6 +40,8 @@ export class DraftService {
         key.scopeId,
         key.kind,
         key.kind === 'composer' ? key.agent : key.kind === 'git-resolution' ? key.path : '',
+        // The first column's drafts keep the identity they had before columns existed.
+        ...(key.kind === 'composer' && key.column ? [key.column] : []),
       ]),
     );
     const directory = path.join(this.files.dataDir, 'drafts');

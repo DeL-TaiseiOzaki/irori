@@ -15,6 +15,10 @@ Select **日本語** or **English** under **Language**. This changes irori's int
 
 This documentation site also has an **English / 日本語** switch at the top right. It opens the corresponding section in the same article. The site's theme button is independent of the app's settings.
 
+## Agents
+
+Turn on the hibachi agent under **Agents**. It is off by default.
+
 ## Updates and routines
 
 Check for a new version under **Updates** in settings. When one is available, choose **Update and restart**.

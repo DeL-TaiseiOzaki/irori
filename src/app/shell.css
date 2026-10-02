@@ -705,3 +705,19 @@
     transform: scale(1.18);
   }
 }
+
+/* The agent dock: conversations side by side, each column an island of its own (ADR 021). */
+.assistant-pane > .agent-dock {
+  flex: 1;
+  min-height: 0;
+}
+.dock-column-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-column-pane > .agent-panel {
+  flex: 1;
+  min-height: 0;
+}

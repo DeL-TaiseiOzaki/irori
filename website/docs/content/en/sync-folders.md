@@ -11,13 +11,13 @@ Each service's own app keeps cloud folders in sync on this computer. irori shows
 
 Install the service's app and sign in.
 
-| Service | App | Usual location |
-| --- | --- | --- |
-| Google Drive | [Google Drive for desktop](https://www.google.com/drive/download/) | Mac: `~/Library/CloudStorage/GoogleDrive-…`, Windows: `G:\My Drive` |
-| Dropbox | [Dropbox](https://www.dropbox.com/install) | `~/Dropbox` |
-| Box | [Box Drive](https://www.box.com/resources/downloads) | `~/Box` |
-| iCloud Drive | Built into macOS, [iCloud for Windows](https://support.apple.com/en-us/103232) | iCloud Drive in Finder |
-| OneDrive | Built into Windows, [for Mac](https://www.microsoft.com/microsoft-365/onedrive/download) | `~/OneDrive` |
+| Service      | App                                                                                      | Usual location                                                      |
+| ------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Google Drive | [Google Drive for desktop](https://www.google.com/drive/download/)                       | Mac: `~/Library/CloudStorage/GoogleDrive-…`, Windows: `G:\My Drive` |
+| Dropbox      | [Dropbox](https://www.dropbox.com/install)                                               | `~/Dropbox`                                                         |
+| Box          | [Box Drive](https://www.box.com/resources/downloads)                                     | `~/Box`                                                             |
+| iCloud Drive | Built into macOS, [iCloud for Windows](https://support.apple.com/en-us/103232)           | iCloud Drive in Finder                                              |
+| OneDrive     | Built into Windows, [for Mac](https://www.microsoft.com/microsoft-365/onedrive/download) | `~/OneDrive`                                                        |
 
 Set the folder you use to keep its files on this computer as well, for example with Google Drive's **Mirror files** or the service's offline setting. Files that exist only in the cloud may not open until they are downloaded.
 

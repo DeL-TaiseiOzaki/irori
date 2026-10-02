@@ -13,6 +13,7 @@ const settings = z.object({
   language: z.enum(languages).default('ja'),
   markdownFont: z.enum(markdownFonts).default('sans'),
   editorAssistance: z.boolean().default(true),
+  hibachiAgent: z.boolean().default(false),
   // The pane library owns this format; it is stored as written and bounded.
   // Keys are the library's: its prefix, the group id and every panel id.
   layouts: z.record(z.string().max(160), z.string().max(4096)).default({}),
@@ -46,6 +47,7 @@ export class SettingsService {
         markdownFont: patch.markdownFont ?? current.markdownFont,
         language: patch.language ?? current.language,
         editorAssistance: patch.editorAssistance ?? current.editorAssistance,
+        hibachiAgent: patch.hibachiAgent ?? current.hibachiAgent,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
         yourAi: patch.yourAi ?? current.yourAi,

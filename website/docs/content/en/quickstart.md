@@ -26,4 +26,4 @@ Keep the note open, open the **AI** panel, and choose a CLI and model. For examp
 
 Permission requests and questions appear in the panel. Review the note and its [changes](git.md) after the agent finishes. For work across knowledge bases, use [irori mode](irori-mode.md).
 
-> A hibachi agent starts with full access when its CLI supports it. This lets it change files; check the panel's access setting before running it. See [access modes](agents.md#section-3).
+> Turn on the hibachi agent in **Settings → Agents**. It starts with full access when its CLI supports it. This lets it change files; check the panel's access setting before running it. See [access modes](agents.md#section-3).

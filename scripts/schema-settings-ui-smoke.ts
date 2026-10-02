@@ -3,12 +3,15 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { SettingsService } from '../src/host/settings';
 
 // The Schema section as settings: every change is made through the forms and
 // checked on disk, in a disposable KB. No model or cloud call is made.
 const base = await mkdtemp(path.join(tmpdir(), 'irori schema settings '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const root = path.join(base, 'KB');
 await mkdir(path.join(root, 'Knowledge_Base', 'projects'), { recursive: true });
 await mkdir(path.join(root, '.agents', 'skills', 'distill'), { recursive: true });

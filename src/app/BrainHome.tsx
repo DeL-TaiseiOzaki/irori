@@ -93,6 +93,7 @@ export function BrainHome({
   git,
   connections,
   skills,
+  schemaLayer,
   daily,
   locked,
   revision,
@@ -112,6 +113,8 @@ export function BrainHome({
   git?: GitStatus;
   connections: CloudConnection[];
   skills: AgentSkill[];
+  /** The Schema card shows only with the hibachi agent (ADR 021). */
+  schemaLayer: boolean;
   daily: boolean;
   /** Actions that change the brain wait (a run, Git or a connection is in progress). */
   locked: boolean;
@@ -217,48 +220,50 @@ export function BrainHome({
         </div>
       </header>
       <div className="home-layers">
-        <Card
-          layer="schema"
-          title="Schema"
-          action={
-            <button
-              className="stage-button"
-              aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
-              title={t('エクスプローラーを更新', 'Refresh explorer')}
-              onClick={onRefresh}
-            >
-              <Icon name="refresh" size={15} />
-            </button>
-          }
-        >
-          {schema.shown.map((entry) => (
-            <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
-          ))}
-          {schema.more > 0 && (
-            <small className="home-more">
-              {t(`ほか ${schema.more} 件`, `${schema.more} more`)}
-            </small>
-          )}
-          <div className="home-row home-skills-row">
-            <Icon name="zap" size={16} className="home-row-icon" />
-            <span className="home-row-name">{t('スキル', 'Skills')}</span>
-            <button className="stage-text-button small" onClick={() => setReach(true)}>
-              <Icon name="checkCircle" size={13} />
-              {t('到達確認', 'Check reach')}
-            </button>
-          </div>
-          <div className="home-skills">
-            {skills.length ? (
-              skills.map((skill) => (
-                <span key={skill.name} className="home-skill">
-                  {skill.name}
-                </span>
-              ))
-            ) : (
-              <small className="home-more">{t('スキルはありません。', 'No skills.')}</small>
+        {schemaLayer && (
+          <Card
+            layer="schema"
+            title="Schema"
+            action={
+              <button
+                className="stage-button"
+                aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
+                title={t('エクスプローラーを更新', 'Refresh explorer')}
+                onClick={onRefresh}
+              >
+                <Icon name="refresh" size={15} />
+              </button>
+            }
+          >
+            {schema.shown.map((entry) => (
+              <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
+            ))}
+            {schema.more > 0 && (
+              <small className="home-more">
+                {t(`ほか ${schema.more} 件`, `${schema.more} more`)}
+              </small>
             )}
-          </div>
-        </Card>
+            <div className="home-row home-skills-row">
+              <Icon name="zap" size={16} className="home-row-icon" />
+              <span className="home-row-name">{t('スキル', 'Skills')}</span>
+              <button className="stage-text-button small" onClick={() => setReach(true)}>
+                <Icon name="checkCircle" size={13} />
+                {t('到達確認', 'Check reach')}
+              </button>
+            </div>
+            <div className="home-skills">
+              {skills.length ? (
+                skills.map((skill) => (
+                  <span key={skill.name} className="home-skill">
+                    {skill.name}
+                  </span>
+                ))
+              ) : (
+                <small className="home-more">{t('スキルはありません。', 'No skills.')}</small>
+              )}
+            </div>
+          </Card>
+        )}
         <Card
           layer="Knowledge_Base"
           title="Knowledge"

@@ -5,13 +5,13 @@ description: Keep AI instructions, accumulated knowledge, and source materials d
 
 ## Schema, Knowledge, and Contents
 
-| Layer     | Role                                  | Examples                          |
-| --------- | ------------------------------------- | --------------------------------- |
-| Schema    | Instructions and settings for AI work | `AGENTS.md`, skills, rules, hooks |
-| Knowledge | Notes you write and maintain          | Markdown, ontology CSV files      |
-| Contents  | Materials your notes draw on          | PDFs, Office files, Google Drive  |
+| Layer     | Role                           | Examples                          |
+| --------- | ------------------------------ | --------------------------------- |
+| Schema    | Instructions for AI (optional) | `AGENTS.md`, skills, rules, hooks |
+| Knowledge | Notes you write and maintain   | Markdown, ontology CSV files      |
+| Contents  | Materials your notes draw on   | PDFs, Office files, Google Drive  |
 
-Read source materials, write your understanding in Knowledge, and keep working instructions in Schema.
+Read source materials and write your understanding in Knowledge. Schema appears only when the hibachi agent is on in **Settings → Agents**.
 
 ## How folders relate
 
@@ -23,6 +23,6 @@ See [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete) for a re
 
 ## What agents use
 
-A hibachi agent works with that hibachi's Schema and notes. It can also use connected Contents within its access to the folder.
+The optional hibachi agent works with that hibachi's Schema and notes. It can also use connected Contents within its access to the folder.
 
 Give cross-hibachi work to the [irori agent](irori-mode.md). See [Schema settings](schema.md) for configuration and [Google Drive](drive.md) for connecting materials.

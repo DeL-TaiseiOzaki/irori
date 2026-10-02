@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { ontologyFixture } from '../tests/fixtures/ontology';
+import { SettingsService } from '../src/host/settings';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
@@ -200,6 +201,9 @@ try {
     string,
     string
   >;
+  // The packaged run exercises the hibachi agent, which is off until turned on (ADR 021).
+  await mkdir(env.IRORI_DATA_DIR, { recursive: true });
+  await new SettingsService(env.IRORI_DATA_DIR).save({ hibachiAgent: true });
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_PATH;
   delete env.NODE_OPTIONS;

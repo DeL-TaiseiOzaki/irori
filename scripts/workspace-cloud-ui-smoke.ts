@@ -16,6 +16,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { KnowledgeStore } from '../src/knowledge/store';
+import { SettingsService } from '../src/host/settings';
 
 // Drive folders belong to KBs from 0.1.37. A workspace's own connections from
 // earlier versions are seeded here as those versions wrote them, and must be
@@ -29,6 +30,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori workspace Drive 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const kb = path.join(base, 'Existing KB');
 await mkdir(kb);
 const space = await files.register(kb, '既存KB', 'personal');

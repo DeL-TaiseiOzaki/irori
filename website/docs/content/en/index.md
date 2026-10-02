@@ -5,15 +5,15 @@ description: Write notes, connect your materials, and take the next step with AI
 
 ## Start here
 
-irori is a desktop app that brings Markdown notes and local AI agents into one screen. Your notes remain ordinary files in your own folders.
+irori is a desktop IDE for editing and reading several knowledge bases (GitHub repositories) and contents, local or in the cloud. Your notes remain ordinary files in your own folders.
 
 Start with the [quickstart](quickstart.md). See [installation](installation.md) to prepare the app, or [hibachis and workspaces](workspaces.md) to open an existing folder.
 
 ## How irori works
 
-A knowledge-base folder is called a **hibachi**. Its AI instructions appear in **Schema**, notes in **Knowledge**, and materials in **Contents**. Learn about the [three layers](layers.md) to understand the role of each.
+A knowledge-base folder is called a **hibachi**. Notes appear in **Knowledge** and materials in **Contents**. AI instructions appear in **Schema**, only when agents are on. See the [three layers](layers.md).
 
-Each hibachi has a **hibachi agent**. The **irori agent** takes on work across several hibachis. [AI agents](agents.md) and [irori mode](irori-mode.md) explain when to use each. You can write notes without setting up AI.
+The **hibachi agent** is optional; turn it on in **Settings → Agents**. The **irori agent** takes on work across several hibachis. See [AI agents](agents.md) and [irori mode](irori-mode.md).
 
 ## Find a guide for your task
 

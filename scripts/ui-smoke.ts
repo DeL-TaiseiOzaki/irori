@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { processTree } from './process-metrics';
 import { FileService } from '../src/host/files';
 import { sessionKey } from '../src/agents/sessions';
+import { SettingsService } from '../src/host/settings';
 const base = await mkdtemp(path.join(tmpdir(), 'irori UI 日本語 '));
 const kb = path.join(base, 'KB folder');
 await mkdir(kb);
@@ -22,6 +23,9 @@ await writeFile(
   path.join(kb, 'AGENTS.md'),
   'Only edit the note selected by the user in this disposable fixture KB. Do not access files outside it.\n',
 );
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await mkdir(path.join(base, 'device'), { recursive: true });
+await new SettingsService(path.join(base, 'device')).save({ hibachiAgent: true });
 const launchStart = Date.now();
 const env: Record<string, string> = Object.fromEntries(
   Object.entries({ ...process.env, IRORI_DATA_DIR: path.join(base, 'device') }).filter(

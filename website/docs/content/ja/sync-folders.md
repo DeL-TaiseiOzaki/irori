@@ -11,13 +11,13 @@ description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同
 
 使うサービスのアプリを入れて、ログインします。
 
-| サービス | アプリ | 主な場所 |
-| --- | --- | --- |
-| Google Drive | [パソコン版 Google ドライブ](https://www.google.com/drive/download/) | Mac: `~/Library/CloudStorage/GoogleDrive-…`、Windows: `G:\マイドライブ` |
-| Dropbox | [Dropbox](https://www.dropbox.com/install) | `~/Dropbox` |
-| Box | [Box Drive](https://www.box.com/resources/downloads) | `~/Box` |
-| iCloud Drive | Mac 標準・[Windows 用 iCloud](https://support.apple.com/ja-jp/103232) | Finder の iCloud Drive |
-| OneDrive | Windows 標準・[Mac 版](https://www.microsoft.com/microsoft-365/onedrive/download) | `~/OneDrive` |
+| サービス     | アプリ                                                                            | 主な場所                                                                |
+| ------------ | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Google Drive | [パソコン版 Google ドライブ](https://www.google.com/drive/download/)              | Mac: `~/Library/CloudStorage/GoogleDrive-…`、Windows: `G:\マイドライブ` |
+| Dropbox      | [Dropbox](https://www.dropbox.com/install)                                        | `~/Dropbox`                                                             |
+| Box          | [Box Drive](https://www.box.com/resources/downloads)                              | `~/Box`                                                                 |
+| iCloud Drive | Mac 標準・[Windows 用 iCloud](https://support.apple.com/ja-jp/103232)             | Finder の iCloud Drive                                                  |
+| OneDrive     | Windows 標準・[Mac 版](https://www.microsoft.com/microsoft-365/onedrive/download) | `~/OneDrive`                                                            |
 
 使うフォルダは、ファイルをこのコンピューターにも保存しておく設定にします（Google ドライブの **ミラーリング**、各サービスのオフライン設定など）。クラウドにだけあるファイルは、ダウンロードされるまで読めないことがあります。
 

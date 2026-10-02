@@ -292,6 +292,8 @@ export interface DeviceSettings {
   markdownFont: MarkdownFont;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
+  /** Offer each hibachi's own agent and its Schema layer; off, irori is an editor with the irori agent. */
+  hibachiAgent: boolean;
   /** The CLI your AI runs on and the model chosen for each CLI ('' or absent: the CLI's default). */
   yourAi: { agent: AgentId; models: Partial<Record<AgentId, string>> };
   /** Pane layouts per group, kept here because file-URL storage is not durable. */

@@ -61,7 +61,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 ## 主な機能
 
 **hibachi とワークスペース**
-- hibachi は **Schema**（AI への指示やスキル）・**Knowledge**（ノート）・**Contents**（資料）の 3 つの層で整理されます。
+- hibachi は **Knowledge**（ノート）と **Contents**（資料）で整理されます。hibachi agent をオンにすると **Schema**（AI への指示やスキル）の層も表示されます（**設定 → エージェント**）。
 - **irori mode**（旧「全体」）で、ワークスペース内の hibachi を地図または並列で見渡せます。検索もすべての hibachi をまたいでできます。
 - hibachi ごとに名前・分類・アイコン・色を設定できます。
 
@@ -73,7 +73,8 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - CSV は表で表示できます。オントロジーは階層やグラフとして表示できます。
 
 **AI エージェント**
-- **hibachi agent**（各 hibachi の AI）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その hibachi の Schema を読み込んだ状態で起動します。複数の hibachi agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
+- 右側の AI パネルには会話を何列でも並べられ、幅も自由に広げられます。本文を隠してエージェントだけを表示することもできます。
+- **hibachi agent**（各 hibachi の AI、オプション）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その hibachi の Schema を読み込んだ状態で起動します。複数の hibachi agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
 - **irori agent**（旧「あなたの AI」）：irori mode で、hibachi をまたぐ仕事を頼めます。どの CLI でも動きます。依頼を hibachi ごとに分け、各 hibachi の hibachi agent に渡します。Claude Code・Codex・OpenCode では irori が定義するサブエージェント（`hibachi-<名前>`）、Pi と Hermes Agent では irori が依頼ごとに用意する `hibachi` コマンドを使います。結果はまとめて報告します。hibachi agent と同じくフルアクセスで始まり、自分の Schema も同じ設定画面で編集できます。
 - 許可の扱いは各 CLI の設定に従います。hibachi agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
 - 会話は hibachi ごと・irori agent ごとにいくつでも持て、この PC に丸ごと残ります。**新しい会話** と **履歴**（名前の変更・ピン留め・アーカイブ・削除）があります。同じ hibachi の会話はタブで開き、それぞれ同時に実行できます。実行中の会話への指示は送信待ちとして予約でき、再起動しても残ります（[CONVERSATIONS](docs/CONVERSATIONS.md)）。

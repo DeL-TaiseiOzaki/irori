@@ -11,6 +11,8 @@ Choose a CLI and model in the AI panel. Model options come from the installed CL
 
 ## Ask a hibachi agent
 
+The hibachi agent is optional. Turn it on in **Settings → Agents**.
+
 Open a note, write a request in the AI panel, and send it. The hibachi agent works with that hibachi's Schema and the selected note.
 
 Try “Extract the decisions from these meeting notes” or “Read the materials and write a note with sources.” Review the text and [Git diff](git.md) afterward. Agents in different hibachis can run at the same time.

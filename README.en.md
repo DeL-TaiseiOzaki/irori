@@ -61,7 +61,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 ## Features
 
 **Hibachis and workspaces**
-- A hibachi is organized in three layers: **Schema** (instructions and skills for AI), **Knowledge** (notes) and **Contents** (materials).
+- A hibachi is organized as **Knowledge** (notes) and **Contents** (materials). Turning the hibachi agent on (**Settings → Agents**) also shows **Schema** (instructions and skills for AI).
 - **irori mode** (formerly the Overview) shows the workspace's hibachis as a map or as columns. Search also runs across every hibachi.
 - Each hibachi has its own name, category, icon and colour.
 
@@ -72,7 +72,8 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - CSV opens as a table, and an ontology as a hierarchy or a graph.
 
 **AI agents**
-- **hibachi agent** (a hibachi's AI): Claude Code, Codex, OpenCode, Pi and Hermes Agent start inside a hibachi, with that hibachi's Schema loaded. Several hibachi agents can run at once. Pick a model from the list the installed CLI gives (type one in for Hermes Agent).
+- The AI pane beside the page holds any number of conversations side by side and widens freely. Hide the page to show only the agents.
+- **hibachi agent** (a hibachi's AI, optional): Claude Code, Codex, OpenCode, Pi and Hermes Agent start inside a hibachi, with that hibachi's Schema loaded. Several hibachi agents can run at once. Pick a model from the list the installed CLI gives (type one in for Hermes Agent).
 - **irori agent** (formerly "your AI"): in irori mode, ask for work that spans hibachis, on any of these CLIs. It splits the request by hibachi and hands each part to that hibachi's hibachi agent: on Claude Code, Codex and OpenCode a sub-agent (`hibachi-<name>`) that irori defines, on Pi and Hermes Agent a `hibachi` command irori provides for the request. It reports back. Like a hibachi agent it starts in full access, and its own Schema is edited with the same settings.
 - Permissions follow each CLI's settings. A hibachi agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Each hibachi and the irori agent keep any number of whole conversations on this PC, with **新しい会話** and a **履歴** list (rename, pin, archive, delete). Instructions can be queued while an agent works, and survive a restart ([CONVERSATIONS](docs/CONVERSATIONS.md)).

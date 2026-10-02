@@ -4,6 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { SettingsService } from '../src/host/settings';
 
 // Every name the fixture supplies is English, so any Japanese left on screen after
 // switching to English is interface text that was not translated.
@@ -13,6 +14,8 @@ await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(path.join(root, 'Knowledge_Base', 'welcome.md'), '# Welcome\n\nPlain notes.\n');
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const space = await files.register(root, 'Research', 'personal');
 await new WorkspaceService(files).save('Lab', [space.scopeId]);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
