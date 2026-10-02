@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-03: **0.1.66** (#157, submodules in a hibachi) is merged at
+the owner's request and published as
+[v0.1.66-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.66-preview.1)
+by release run `37023584666` from main's successful CI run `37021164413`
+(source `e2f2a0d`; its verify job passed on the third attempt after unrelated
+`harness-ui-smoke` and `links-ui-smoke` timing failures). The release carries
+Windows 202,738,688 bytes, Mac 170,217,943 bytes and `irori-0.1.66-full.nupkg`
+202,100,794 bytes; anonymous downloads of the three packages matched
+`SHA256SUMS.txt`. The website manifest now offers this release. Owner checks
+remain: submodules from github.com itself and the installed Mac and Windows
+builds.
+
 Submodules in a hibachi, 2026-10-02 (**0.1.66**,
 [ADR 022](decisions/022-submodules.md)): the owner asked for one hibachi to hold
 several GitHub repositories as submodules, cloned in, edited there and pushed.
