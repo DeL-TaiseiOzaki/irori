@@ -24,6 +24,7 @@ Google review or CASA is needed.
   unsent notice) and `npm run format:check`. Not verified: a real Drive for
   desktop folder, installed Windows/macOS builds.
 - Draft #146 (public Drive sign-in readiness) is superseded.
+
 Published 2026-10-03: **0.1.66** (#157, submodules in a hibachi) is merged at
 the owner's request and published as
 [v0.1.66-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.66-preview.1)
