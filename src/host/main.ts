@@ -28,6 +28,7 @@ import { CloudService } from '../cloud/service';
 import { WorkspaceCloudStorage } from '../cloud/storage';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
+import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
@@ -477,11 +478,14 @@ app
       gitHistory: (...args) => git.history(...args),
       gitCommitDiff: (...args) => git.commitDiff(...args),
       gitConflict: (...args) => git.conflict(...args),
-      gitStage: (...args) => changed(args[0], () => git.stage(...args)),
-      gitStageMany: (...args) => changed(args[0], () => git.stageMany(...args)),
-      gitCommit: (...args) => changed(args[0], () => git.commit(...args)),
-      gitSync: (...args) => changed(args[0], () => git.sync(...args)),
-      gitResolve: (...args) => changed(args[0], () => git.resolve(...args)),
+      gitStage: (...args) => changed(gitScope(args[0]), () => git.stage(...args)),
+      gitStageMany: (...args) => changed(gitScope(args[0]), () => git.stageMany(...args)),
+      gitCommit: (...args) => changed(gitScope(args[0]), () => git.commit(...args)),
+      gitSync: (...args) => changed(gitScope(args[0]), () => git.sync(...args)),
+      gitResolve: (...args) => changed(gitScope(args[0]), () => git.resolve(...args)),
+      gitSubmodules: (id) => git.submodules(id),
+      gitSubmoduleAdd: (...args) => changed(args[0], () => git.addSubmodule(...args)),
+      gitSubmoduleInit: (...args) => changed(args[0], () => git.initSubmodules(...args)),
       gitClone: (input) => git.clone(input),
       gitInit: (id) => changed(id, () => git.init(id)),
       githubAccount: () => git.githubAccount(),

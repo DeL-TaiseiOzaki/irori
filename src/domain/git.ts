@@ -109,3 +109,41 @@ export function suggestRepositoryName(from: string) {
     .slice(0, 100);
   return validRepositoryName(name) ? name : '';
 }
+/**
+ * The repository a Git operation acts on: a hibachi's own checkout (its scope ID
+ * alone), or a submodule inside it named by its path from the hibachi's root.
+ */
+export type GitTarget = string | { scopeId: string; repository: string };
+export function gitScope(target: GitTarget) {
+  return typeof target === 'string' ? target : target.scopeId;
+}
+export function gitRepository(target: GitTarget) {
+  return typeof target === 'string' ? '' : target.repository;
+}
+/** A repository a hibachi holds as a submodule (ADR 022). */
+export interface GitSubmodule {
+  /** Its folder from the hibachi's root. */
+  path: string;
+  name: string;
+  /** owner/name when it comes from GitHub. */
+  repository?: string;
+  /** Its files are here; an uninitialized submodule is an empty folder until fetched. */
+  initialized: boolean;
+  branch?: string;
+  /** It has changes of its own not yet committed. */
+  changed?: boolean;
+}
+export interface GitSubmodules {
+  submodules: GitSubmodule[];
+  /** What an addition or a fetch could not also do. */
+  notice?: string;
+}
+export interface AddSubmodule {
+  url: string;
+  /** The new folder, from the hibachi's root. */
+  path: string;
+}
+/** A folder name suggested from a repository URL: its last segment without `.git`. */
+export function repositoryFolder(url: string) {
+  return /[/:]([\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] ?? '';
+}

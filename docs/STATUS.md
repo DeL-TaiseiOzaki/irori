@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Submodules in a hibachi, 2026-10-02 (**0.1.66**,
+[ADR 022](decisions/022-submodules.md)): the owner asked for one hibachi to hold
+several GitHub repositories as submodules, cloned in, edited there and pushed.
+- `GitTarget` (scope ID, or `{ scopeId, repository }`) names the repository of
+  every Git HostAPI call; `GitService` resolves it to the hibachi's checkout or a
+  submodule it declares in `.gitmodules` and records in its index, and checks
+  layers and ownership on the hibachi-relative path.
+- The hibachi's status ignores submodule-internal edits (`--ignore-submodules=dirty`)
+  and lets a recorded submodule be staged, diffed (`--submodule=log`) and pulled
+  as a gitlink. A pull follows each moved submodule by fast-forward when it is
+  clean and on a branch, fetching the commit when needed; otherwise a notice.
+- `gitSubmodules`, `gitSubmoduleAdd` and `gitSubmoduleInit`; clone fetches
+  submodules. Fetched submodules are put on their branch at the recorded commit.
+  Only GitHub HTTPS/SSH remotes, with `protocol.allow=never` except those two.
+- Changes: a repository picker (shown once a hibachi has submodules), 未取得 with
+  **取得**, and **その他 → submodule を追加…**. Commit drafts per submodule
+  (`DraftKey.repository`).
+- Verified with `npm run build`, `npm test` (new `git-submodules`), every
+  `test:ui` suite under `xvfb-run` (new `submodules-ui-smoke`) and
+  `npm run format:check`. Not verified: fetching submodules from github.com
+  itself, installed Windows/macOS builds.
+
 Published 2026-10-02: **0.1.65** (#155, hibachi agent optional and agents side
 by side) is merged at the owner's request and published as
 [v0.1.65-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.65-preview.1)

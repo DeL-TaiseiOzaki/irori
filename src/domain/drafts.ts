@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { agentIds, type AgentId } from './types';
 import { t } from './i18n';
 
+const relativePath = (value: string) =>
+  !value.includes('\\') &&
+  !value.includes('\0') &&
+  !/^[a-z]:/i.test(value) &&
+  value.split('/').every((part) => part && part !== '.' && part !== '..');
 export const draftKey = z.discriminatedUnion('kind', [
   z
     .object({
@@ -12,28 +17,25 @@ export const draftKey = z.discriminatedUnion('kind', [
       column: z.number().int().min(2).max(64).optional(),
     })
     .strict(),
-  z.object({ scopeId: z.uuid(), kind: z.literal('git-commit') }).strict(),
+  z
+    .object({
+      scopeId: z.uuid(),
+      kind: z.literal('git-commit'),
+      /** A submodule's folder: its commits keep a message of their own (ADR 022). */
+      repository: z.string().min(1).max(1024).refine(relativePath).optional(),
+    })
+    .strict(),
   z
     .object({
       scopeId: z.uuid(),
       kind: z.literal('git-resolution'),
-      path: z
-        .string()
-        .min(1)
-        .max(4096)
-        .refine(
-          (value) =>
-            !value.includes('\\') &&
-            !value.includes('\0') &&
-            !/^[a-z]:/i.test(value) &&
-            value.split('/').every((part) => part && part !== '.' && part !== '..'),
-        ),
+      path: z.string().min(1).max(4096).refine(relativePath),
     })
     .strict(),
 ]);
 export type DraftKey =
   | { scopeId: string; kind: 'composer'; agent: AgentId; column?: number }
-  | { scopeId: string; kind: 'git-commit' }
+  | { scopeId: string; kind: 'git-commit'; repository?: string }
   | { scopeId: string; kind: 'git-resolution'; path: string };
 export const draftValue = z
   .object({
