@@ -80,7 +80,24 @@ the merge commits of a plain merge or in irori's own device records. `git notes
 merge` can also refuse when another tool left a notes merge unfinished in the
 repository; the result names it and the branch operation is unaffected.
 
-**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
+**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, fetches the hibachi's submodules (see below), and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
+
+### Submodules
+
+Since 0.1.66 a hibachi can hold other repositories as submodules
+([ADR 022](decisions/022-submodules.md)). **その他 → submodule を追加…** clones a
+GitHub repository into a new Knowledge folder with `git submodule add`; Git
+stages it with `.gitmodules`. Once a hibachi has submodules, a picker above the
+repository bar chooses the repository the view acts on: the hibachi or one of its
+submodules. A submodule's edits, commits, pushes, pulls and history are its own.
+The hibachi lists a submodule only when it is on a different commit from the one
+recorded, and committing that records the new commit (the diff lists the commits
+moved over). A pull of the hibachi moves a clean submodule to the newly recorded
+commit by fast-forward, fetching it if needed, and otherwise says to pull the
+submodule. Submodules not fetched yet show as 未取得 with **取得**; cloning a
+hibachi fetches them. A fetched submodule is put on its branch at the recorded
+commit when that commit is on it. Only GitHub HTTPS/SSH remotes are fetched,
+with every other Git transport turned off for the command.
 
 ### Making a hibachi here and publishing it
 

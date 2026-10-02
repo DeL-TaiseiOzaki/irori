@@ -22,6 +22,18 @@ const id = z.uuid(),
 const name = z.string().min(1).max(120),
   version = z.string().regex(/^[a-f0-9]{64}$/);
 const document = z.object({ scopeId: id, path, text, hash: version });
+// A submodule's folder from the hibachi's root; the host checks it is one.
+const repository = z
+  .string()
+  .min(1)
+  .max(1024)
+  .refine(
+    (value) =>
+      !value.includes('\\') &&
+      !value.includes('\0') &&
+      value.split('/').every((part) => part && part !== '.' && part !== '..'),
+  );
+const target = z.union([id, z.object({ scopeId: id, repository }).strict()]);
 const cols = z.number().int().min(2).max(500),
   rows = z.number().int().min(1).max(300);
 
@@ -81,18 +93,21 @@ export const hostArguments = {
       .max(2 * 1024 * 1024),
   ]),
   closeTerminal: z.tuple([id]),
-  gitStatus: z.tuple([id]),
-  gitDiff: z.tuple([id, path, z.boolean()]),
-  gitHistory: z.tuple([id, z.number().int().min(0).max(10000)]),
-  gitCommitDiff: z.tuple([id, z.string().regex(/^[a-f0-9]{40,64}$/)]),
-  gitStage: z.tuple([id, path, z.boolean(), version]),
-  gitStageMany: z.tuple([id, z.array(path).min(1).max(4000), z.boolean(), version]),
-  gitCommit: z.tuple([id, z.string().min(1).max(10000), version]),
-  gitSync: z.tuple([id, z.enum(['fetch', 'pull', 'merge', 'push']), version]),
-  gitConflict: z.tuple([id, path]),
-  gitResolve: z.tuple([id, path, text.nullable(), version]),
+  gitStatus: z.tuple([target]),
+  gitDiff: z.tuple([target, path, z.boolean()]),
+  gitHistory: z.tuple([target, z.number().int().min(0).max(10000)]),
+  gitCommitDiff: z.tuple([target, z.string().regex(/^[a-f0-9]{40,64}$/)]),
+  gitStage: z.tuple([target, path, z.boolean(), version]),
+  gitStageMany: z.tuple([target, z.array(path).min(1).max(4000), z.boolean(), version]),
+  gitCommit: z.tuple([target, z.string().min(1).max(10000), version]),
+  gitSync: z.tuple([target, z.enum(['fetch', 'pull', 'merge', 'push']), version]),
+  gitConflict: z.tuple([target, path]),
+  gitResolve: z.tuple([target, path, text.nullable(), version]),
+  gitSubmodules: z.tuple([id]),
+  gitSubmoduleAdd: z.tuple([id, z.object({ url: z.string().max(2048), path: repository })]),
+  gitSubmoduleInit: z.tuple([id, repository.optional()]),
   gitClone: z.tuple([z.object({ url: z.string().max(2048), parent: path, name })]),
-  gitOpenRepository: z.tuple([id]),
+  gitOpenRepository: z.tuple([target]),
   gitInit: z.tuple([id]),
   githubAccount: z.tuple([]),
   gitPublish: z.tuple([

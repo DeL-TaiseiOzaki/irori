@@ -20,7 +20,12 @@ import type {
   GitRemote,
   GitStatus,
   GitSyncAction,
+  GitTarget,
+  GitSubmodule,
+  GitSubmodules,
+  AddSubmodule,
 } from '../domain/git';
+import { gitRepository, gitScope } from '../domain/git';
 import { GitError, GitProcess } from './process';
 import { GitHubCli } from './github';
 import { t } from '../domain/i18n';
@@ -36,6 +41,28 @@ import {
   type NoteFile,
 } from './notes';
 
+/**
+ * A repository a hibachi holds: its own checkout (`prefix` empty) or a submodule
+ * at `prefix` inside it. Paths Git reports are relative to `root`; the hibachi's
+ * layers and ownership are decided on `prefix + path` against `space`.
+ */
+type Repo = Space & { prefix: string; space: Space };
+const main = (space: Space): Repo => ({ ...space, prefix: '', space });
+/** A GitHub repository over HTTPS or SSH, the only remotes irori clones from. */
+export function githubCloneURL(url: string) {
+  return (
+    !!githubRepository(url) &&
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/.test(url) &&
+    !/[?#\s]/.test(url)
+  );
+}
+const cloneURLRequired = () =>
+  Error(
+    t(
+      'GitHub の HTTPS または SSH のリポジトリ URL を入力してください。',
+      'Enter a GitHub HTTPS or SSH repository URL.',
+    ),
+  );
 const literal = (name: string) => `:(top,literal)${name}`;
 const oidPattern = /^[a-f0-9]{40,64}$/;
 const conflictCodes = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
@@ -58,6 +85,8 @@ export class GitService {
     private authorship?: Pick<AuthorshipStore, 'view'>,
     private process = new GitProcess(),
     private github = new GitHubCli(),
+    /** Where a submodule may come from, and the transports Git may use to fetch it. */
+    private submoduleRemotes = { accepts: githubCloneURL, protocols: ['https', 'ssh'] },
   ) {}
   get busy() {
     return this.pending > 0;
@@ -65,21 +94,129 @@ export class GitService {
   private git(s: Pick<Space, 'root'>, args: string[], options?: Parameters<GitProcess['run']>[2]) {
     return this.process.run(s.root, args, options);
   }
-  private async root(id: string) {
-    const s = this.files.get(id);
+  private async repo(target: GitTarget): Promise<Repo> {
+    const s = this.files.get(gitScope(target));
     if ((await fs.realpath(s.root)) !== s.root)
       throw Error(t('スペースの配置が変更されました。', "The space's location has changed."));
-    const gitRoot = (await this.git(s, ['rev-parse', '--show-toplevel'])).trimEnd();
-    if ((await fs.realpath(gitRoot)) !== s.root)
+    const repository = gitRepository(target);
+    const root = repository ? path.join(s.root, repository) : s.root;
+    if (repository) {
+      this.boundary(main(s), repository);
+      if (!(await this.submodulePaths(main(s))).has(repository))
+        throw Error(
+          t(
+            'この hibachi の submodule ではありません。',
+            'This is not a submodule of the hibachi.',
+          ),
+        );
+      try {
+        if ((await fs.realpath(root)) !== root) throw Error('alias');
+      } catch {
+        throw Error(
+          t('submodule のフォルダを確認できません。', "Could not check the submodule's folder."),
+        );
+      }
+      if (!(await this.initialized(root)))
+        throw Error(
+          t(
+            'この submodule はまだ取得されていません。',
+            'This submodule has not been fetched yet.',
+          ),
+        );
+    }
+    const gitRoot = (await this.git({ root }, ['rev-parse', '--show-toplevel'])).trimEnd();
+    if ((await fs.realpath(gitRoot)) !== root)
       throw Error(
         t('リポジトリのルートが登録されていません。', "The repository's root is not registered."),
       );
-    return s;
+    return { ...s, root, prefix: repository ? repository + '/' : '', space: s };
+  }
+  /** A submodule's files are here: its folder is a checkout of its own. */
+  private async initialized(root: string) {
+    try {
+      await fs.lstat(path.join(root, '.git'));
+      const top = await this.optional({ root }, ['rev-parse', '--show-toplevel']);
+      return !!top && (await fs.realpath(top)) === root;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * The submodules `.gitmodules` declares, by name. A declaration whose path is
+   * unusable (outside the hibachi, a Git path, a link) is left out.
+   */
+  private async declared(s: Repo) {
+    const file = path.join(s.root, '.gitmodules');
+    try {
+      if (!(await fs.lstat(file)).isFile()) return [];
+    } catch {
+      return [];
+    }
+    const read = async (key: string) =>
+      new Map(
+        (await this.optional(s, ['config', '--file', '.gitmodules', '-z', '--get-regexp', key]))
+          .split('\0')
+          .filter(Boolean)
+          .map((entry) => {
+            const end = entry.indexOf('\n');
+            return [entry.slice(0, end), entry.slice(end + 1)] as const;
+          }),
+      );
+    const [paths, urls, branches] = await Promise.all([
+      read('^submodule\\..*\\.path$'),
+      read('^submodule\\..*\\.url$'),
+      read('^submodule\\..*\\.branch$'),
+    ]);
+    const found: { name: string; path: string; url: string; branch: string }[] = [];
+    for (const [key, value] of paths) {
+      const name = key.slice('submodule.'.length, -'.path'.length);
+      const p = value.replace(/\/+$/, '');
+      try {
+        this.boundary(s, p);
+      } catch {
+        continue;
+      }
+      found.push({
+        name,
+        path: p,
+        url: urls.get(`submodule.${name}.url`) ?? '',
+        branch: branches.get(`submodule.${name}.branch`) ?? '',
+      });
+    }
+    return found;
+  }
+  /**
+   * The declared submodules the index also records as submodule commits
+   * (gitlinks). Only the declared paths are listed, so a large index is not read.
+   */
+  private async recorded(s: Repo) {
+    if (s.prefix) return [];
+    const declared = await this.declared(s);
+    if (!declared.length) return [];
+    const links = new Set(
+      (
+        await this.optional(s, [
+          'ls-files',
+          '--stage',
+          '-z',
+          '--',
+          ...declared.map((m) => literal(m.path)),
+        ])
+      )
+        .split('\0')
+        .filter((row) => row.startsWith('160000 '))
+        .map((row) => row.slice(row.indexOf('\t') + 1)),
+    );
+    return declared.filter((m) => links.has(m.path));
+  }
+  /** A hibachi's submodules: declared in `.gitmodules` and recorded in its index. */
+  private async submodulePaths(s: Repo) {
+    return new Set((await this.recorded(s)).map((m) => m.path));
   }
   private mutate<T>(
-    id: string,
-    fn: (s: Space) => Promise<T>,
-    resolve: (id: string) => Promise<Space> = (id) => this.root(id),
+    id: GitTarget,
+    fn: (s: Repo) => Promise<T>,
+    resolve: (id: GitTarget) => Promise<Repo> = (id) => this.repo(id),
   ): Promise<T> {
     if (!this.canMutate())
       return Promise.reject(
@@ -90,7 +227,8 @@ export class GitService {
           ),
         ),
       );
-    const key = this.files.get(id).root;
+    // A hibachi's submodules queue with it: committing one moves what the hibachi records.
+    const key = this.files.get(gitScope(id)).root;
     this.pending++;
     const next = (this.queues.get(key) ?? Promise.resolve())
       .catch(() => {})
@@ -117,17 +255,19 @@ export class GitService {
     )
       throw Error(t('この Git パスは操作できません。', 'This Git path cannot be used.'));
   }
-  private boundary(s: Space, p: string) {
+  private boundary(s: Repo, p: string) {
     this.validateName(p);
     const target = path.join(s.root, p);
-    if (classify(s, p) === 'contents')
+    if (classify(s.space, s.prefix + p) === 'contents')
       throw Error(
         t('クラウド資料は Git の対象にできません。', 'Cloud materials cannot be a Git target.'),
       );
-    if (owner(this.files.list(), target)?.scopeId !== s.scopeId)
+    // A clone not registered yet is owned by no space, and its scope ID is empty.
+    if ((owner(this.files.list(), target)?.scopeId ?? '') !== s.scopeId)
       throw Error(t('別のスペースが所有するファイルです。', 'This file belongs to another space.'));
   }
-  private async safePath(s: Space, p: string) {
+  /** `gitlinks` are the submodule paths this repository may name as a whole. */
+  private async safePath(s: Repo, p: string, gitlinks?: Set<string>) {
     this.boundary(s, p);
     const segments = p.split('/');
     let current = s.root;
@@ -142,7 +282,7 @@ export class GitService {
               'Git operations through a link are not supported.',
             ),
           );
-        if (current === path.join(s.root, p) && info.isDirectory())
+        if (current === path.join(s.root, p) && info.isDirectory() && !gitlinks?.has(p))
           throw Error(
             t(
               'ディレクトリ・submodule はこのリポジトリでは操作できません。',
@@ -154,9 +294,12 @@ export class GitService {
       }
     }
   }
-  private exclusions(s: Space) {
+  private exclusions(s: Repo) {
     return [
-      ...s.contents,
+      // Contents are declared from the hibachi's root; a submodule sees those inside it.
+      ...s.space.contents.flatMap((c) =>
+        !s.prefix ? [c] : c.startsWith(s.prefix) ? [c.slice(s.prefix.length)] : [],
+      ),
       ...this.files
         .list()
         .filter((other) => other.scopeId !== s.scopeId && within(s.root, other.root))
@@ -173,12 +316,12 @@ export class GitService {
   }
   /** The person's Git author email for this space's checkout, or '' when unset. */
   async userEmail(id: string): Promise<string> {
-    return this.config(this.files.get(id), 'user.email');
+    return this.config(main(this.files.get(id)), 'user.email');
   }
-  private async config(s: Space, key: string) {
+  private async config(s: Repo, key: string) {
     return this.optional(s, ['config', '--get', key]);
   }
-  private async blob(s: Space, name: string) {
+  private async blob(s: Repo, name: string) {
     try {
       return await this.git(s, ['cat-file', 'blob', name]);
     } catch (error) {
@@ -195,9 +338,15 @@ export class GitService {
    * the person's wherever it has moved since. A note names lines by number in
    * the file as that commit had it, so each noted commit's version is read.
    */
-  async noted(id: string, p: string): Promise<Set<string>> {
-    const s = await this.root(id);
-    this.validateName(p);
+  async noted(id: string, notePath: string): Promise<Set<string>> {
+    this.validateName(notePath);
+    // A note inside a submodule has its history, and its notes, in that repository.
+    const hibachi = main(this.files.get(id));
+    const repository = [...(await this.submodulePaths(hibachi))].find((m) =>
+      notePath.startsWith(m + '/'),
+    );
+    const s = await this.repo(repository ? { scopeId: id, repository } : id);
+    const p = notePath.slice(s.prefix.length);
     const found = new Set<string>();
     const records = (
       await this.optional(s, [
@@ -256,7 +405,7 @@ export class GitService {
    * with irori's after them, and the write is refused rather than forced when
    * the notes ref has moved in between.
    */
-  private async attest(s: Space, oid: string): Promise<string | undefined> {
+  private async attest(s: Repo, oid: string): Promise<string | undefined> {
     if (!this.authorship) return;
     const changed = (
       await this.git(s, [
@@ -272,14 +421,19 @@ export class GitService {
       ])
     )
       .split('\0')
-      .filter((p) => p.endsWith('.md') && !p.includes('\n') && classify(s, p) === 'Knowledge_Base');
+      .filter(
+        (p) =>
+          p.endsWith('.md') &&
+          !p.includes('\n') &&
+          classify(s.space, s.prefix + p) === 'Knowledge_Base',
+      );
     const identity = (await this.git(s, ['log', '-1', '--format=%cn <%ce>', oid])).trim(),
       key = humanId(identity),
       files: NoteFile[] = [];
     for (const p of changed) {
       const text = await this.blob(s, `${oid}:${p}`);
       if (text === undefined) continue;
-      const view = await this.authorship.view({ scopeId: s.scopeId, path: p }, text);
+      const view = await this.authorship.view({ scopeId: s.scopeId, path: s.prefix + p }, text);
       const lines = view.lines.flatMap((mine, index) => (mine ? [index + 1] : []));
       if (lines.length) files.push({ path: p, entries: [{ key, ranges: lineRanges(lines, ',') }] });
     }
@@ -373,7 +527,7 @@ export class GitService {
       );
     }
   }
-  private async gitDirectory(s: Space) {
+  private async gitDirectory(s: Repo) {
     // Git resolves linked worktrees and separate administrative directories.
     return (await this.git(s, ['rev-parse', '--absolute-git-dir'])).trimEnd();
   }
@@ -402,10 +556,7 @@ export class GitService {
     }
     return (await this.gitFile(directory, 'MERGE_HEAD')).length ? 'merge' : 'none';
   }
-  private async remote(
-    s: Space,
-    branch?: string,
-  ): Promise<{ value?: GitRemote; identity: string }> {
+  private async remote(s: Repo, branch?: string): Promise<{ value?: GitRemote; identity: string }> {
     if (!branch) return { identity: '' };
     const configured = await this.config(s, `branch.${branch}.remote`);
     const name = configured || 'origin';
@@ -437,15 +588,15 @@ export class GitService {
     };
     return { value, identity: JSON.stringify([value, url, pushes]) };
   }
-  async status(id: string): Promise<GitStatus> {
-    this.files.get(id);
-    let s: Space;
+  async status(id: GitTarget): Promise<GitStatus> {
+    this.files.get(gitScope(id));
+    let s: Repo;
     try {
-      s = await this.root(id);
+      s = await this.repo(id);
     } catch (error) {
       return {
         available: false,
-        initializable: await this.initializable(id, error),
+        initializable: typeof id === 'string' && (await this.initializable(id, error)),
         detail:
           error instanceof GitError
             ? t('Git リポジトリを確認できません。', 'Could not find a Git repository.')
@@ -469,7 +620,7 @@ export class GitService {
       return (missing as NodeJS.ErrnoException).code === 'ENOENT';
     }
   }
-  private async snapshot(s: Space): Promise<GitStatus> {
+  private async snapshot(s: Repo): Promise<GitStatus> {
     const directory = await this.gitDirectory(s);
     const [head, branch, index, op, mergeHead] = await Promise.all([
       this.optional(s, ['rev-parse', '--verify', 'HEAD']),
@@ -485,7 +636,8 @@ export class GitService {
         '-z',
         '--no-renames',
         '--untracked-files=all',
-        '--ignore-submodules=none',
+        // A submodule's own edits are its repository's; here only the commit it is on shows.
+        '--ignore-submodules=dirty',
         '--',
         '.',
         ...this.exclusions(s),
@@ -493,6 +645,7 @@ export class GitService {
       this.git(s, ['diff', '--cached', '--name-status', '-z', ...diffOptions]),
       this.remote(s, branch || undefined),
     ]);
+    const submodules = await this.submodulePaths(s);
     const changes: GitChange[] = raw
       .split('\0')
       .filter(Boolean)
@@ -516,7 +669,7 @@ export class GitService {
       throw Error(t('変更が 4,000 件を超えています。', 'There are more than 4,000 changes.'));
     for (const change of changes) {
       try {
-        await this.safePath(s, change.path);
+        await this.safePath(s, change.path, submodules);
       } catch (error) {
         change.blocked = (error as Error).message;
       }
@@ -562,16 +715,23 @@ export class GitService {
           trackingOid,
         ]),
       ),
-      fetchedAt: this.fetched.get(s.scopeId),
+      fetchedAt: this.fetched.get(s.root),
     };
   }
-  private async checked(s: Space, version: string) {
+  private async checked(s: Repo, version: string) {
     const status = await this.snapshot(s);
     if (status.version !== version) throw stale();
     return status;
   }
-  private async working(s: Space, p: string): Promise<Buffer | undefined> {
-    await this.safePath(s, p);
+  private async working(s: Repo, p: string): Promise<Buffer | undefined> {
+    const submodules = await this.submodulePaths(s);
+    await this.safePath(s, p, submodules);
+    if (submodules.has(p)) {
+      // A submodule is on a commit, which is what the hibachi records of it.
+      const root = path.join(s.root, p);
+      if (!(await this.initialized(root))) return;
+      return Buffer.from(await this.optional({ root }, ['rev-parse', '--verify', 'HEAD']));
+    }
     try {
       const filename = path.join(s.root, p);
       if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
@@ -591,8 +751,8 @@ export class GitService {
     if (bytes.includes(0)) throw Error(t('バイナリファイルです。', 'This is a binary file.'));
     return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   }
-  async diff(id: string, p: string, staged: boolean): Promise<GitDiff> {
-    const s = await this.root(id),
+  async diff(id: GitTarget, p: string, staged: boolean): Promise<GitDiff> {
+    const s = await this.repo(id),
       state = await this.snapshot(s);
     const change = state.changes.find((c) => c.path === p);
     if (!change) throw stale();
@@ -617,6 +777,8 @@ export class GitService {
       patch = await this.git(s, [
         'diff',
         ...diffOptions,
+        // A submodule's change reads as the commits it moved over.
+        '--submodule=log',
         ...(staged ? ['--cached'] : []),
         '--',
         literal(p),
@@ -633,7 +795,7 @@ export class GitService {
       version: hash(state.version + '\0' + (bytes ? hash(bytes) : 'missing')),
     };
   }
-  async stage(id: string, p: string, stage: boolean, version: string) {
+  async stage(id: GitTarget, p: string, stage: boolean, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.snapshot(s),
         change = state.changes.find((c) => c.path === p);
@@ -648,7 +810,7 @@ export class GitService {
       this.validateName(p);
       if (stage) {
         if (change.blocked) throw Error(change.blocked);
-        await this.safePath(s, p);
+        await this.safePath(s, p, await this.submodulePaths(s));
         await this.git(s, ['add', '-A', '--', literal(p)]);
       } else if (state.head)
         await this.git(s, ['restore', '--staged', '--source=HEAD', '--', literal(p)]);
@@ -656,18 +818,19 @@ export class GitService {
       return this.snapshot(s);
     });
   }
-  async stageMany(id: string, paths: string[], stage: boolean, version: string) {
+  async stageMany(id: GitTarget, paths: string[], stage: boolean, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version);
       if (!paths.length || paths.length > 4000 || state.operation === 'other') throw stale();
       const selected = [...new Set(paths)];
+      const submodules = await this.submodulePaths(s);
       for (const p of selected) {
         this.validateName(p);
         const change = state.changes.find((c) => c.path === p);
         if (!change || change.conflict) throw stale();
         if (stage) {
           if (change.blocked) throw Error(change.blocked);
-          await this.safePath(s, p);
+          await this.safePath(s, p, submodules);
         }
       }
       // One native index transaction, with NUL pathspecs for long/Japanese/option-like names.
@@ -683,7 +846,7 @@ export class GitService {
       return this.snapshot(s);
     });
   }
-  async commit(id: string, message: string, version: string) {
+  async commit(id: GitTarget, message: string, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version);
       if (!message.trim() || message.length > 10000 || message.includes('\0'))
@@ -711,10 +874,10 @@ export class GitService {
       return notice ? { ...status, notice } : status;
     });
   }
-  async history(id: string, offset = 0): Promise<GitHistory> {
+  async history(id: GitTarget, offset = 0): Promise<GitHistory> {
     if (!Number.isInteger(offset) || offset < 0 || offset > 10000)
       throw Error(t('履歴の範囲が不正です。', 'The history range is invalid.'));
-    const s = await this.root(id);
+    const s = await this.repo(id);
     if (!(await this.optional(s, ['rev-parse', '--verify', 'HEAD'])))
       return { commits: [], more: false };
     const fields = (
@@ -739,10 +902,10 @@ export class GitService {
       });
     return { commits: commits.slice(0, 30), more: commits.length > 30 };
   }
-  async commitDiff(id: string, oid: string) {
+  async commitDiff(id: GitTarget, oid: string) {
     if (!oidPattern.test(oid))
       throw Error(t('履歴の ID が不正です。', 'The history ID is invalid.'));
-    const s = await this.root(id);
+    const s = await this.repo(id);
     await this.git(s, ['merge-base', '--is-ancestor', oid, 'HEAD']);
     return this.git(s, [
       'show',
@@ -766,16 +929,34 @@ export class GitService {
       );
     return state.remote;
   }
-  private async checkIncoming(s: Space, head: string, target: string) {
+  /** The submodule paths whose commit differs between two commits of a hibachi. */
+  private async movedSubmodules(s: Repo, from: string, to: string) {
+    const raw = (
+      await this.git(s, ['diff', '--raw', '-z', '--no-renames', '--no-abbrev', from, to, '--'])
+    ).split('\0');
+    const moved = new Map<string, string>();
+    for (let i = 0; i + 1 < raw.length; i += 2) {
+      // `:old-mode new-mode old-oid new-oid status`
+      const [, mode, , oid] = raw[i].split(' ');
+      if (mode === '160000') moved.set(raw[i + 1], oid);
+    }
+    return moved;
+  }
+  private async checkIncoming(s: Repo, head: string, target: string) {
     const base = (await this.git(s, ['merge-base', head, target])).trim();
     const names = (
       await this.git(s, ['diff', '--name-only', '-z', '--no-renames', base, target, '--'])
     )
       .split('\0')
       .filter(Boolean);
+    // A submodule the incoming side records is named as a whole, like one already here.
+    const gitlinks = new Set([
+      ...(await this.submodulePaths(s)),
+      ...(await this.movedSubmodules(s, base, target)).keys(),
+    ]);
     for (const p of names) {
-      await this.safePath(s, p);
-      if (p === '.irori/scope.json')
+      await this.safePath(s, p, gitlinks);
+      if (!s.prefix && p === '.irori/scope.json')
         throw Error(
           t(
             '受信内容にスペース定義の変更があります。',
@@ -784,8 +965,47 @@ export class GitService {
         );
     }
   }
+  /**
+   * After a pull moved the commits the hibachi records for its submodules, moves
+   * each submodule along when that is a fast-forward of its branch with nothing
+   * uncommitted. Returns what it left for the person to do.
+   */
+  private async follow(s: Repo, from: string, to: string): Promise<string | undefined> {
+    const left: string[] = [];
+    for (const [p, oid] of await this.movedSubmodules(s, from, to)) {
+      const root = path.join(s.root, p);
+      if (!oidPattern.test(oid) || !(await this.initialized(root))) continue;
+      const sub = { root };
+      try {
+        const [head, branch, dirty] = await Promise.all([
+          this.optional(sub, ['rev-parse', '--verify', 'HEAD']),
+          this.optional(sub, ['symbolic-ref', '--short', 'HEAD']),
+          this.optional(sub, ['status', '--porcelain', '--ignore-submodules=all']),
+        ]);
+        if (head === oid) continue;
+        if (!branch || dirty) throw Error('unsafe');
+        if (!(await this.ref(sub, `${oid}^{commit}`))) {
+          const remote =
+            (await this.optional(sub, ['config', '--get', `branch.${branch}.remote`])) || 'origin';
+          if (!/^[\w.-]+$/.test(remote)) throw Error('remote');
+          await this.git(sub, ['fetch', '--no-tags', '--no-recurse-submodules', remote], {
+            network: true,
+          });
+        }
+        await this.git(sub, ['merge-base', '--is-ancestor', head, oid]);
+        await this.git(sub, ['merge', '--ff-only', '--no-autostash', oid]);
+      } catch {
+        left.push(p);
+      }
+    }
+    if (left.length)
+      return t(
+        `submodule ${left.join('、')} は記録された commit に移していません。各 submodule で Pull してください。`,
+        `The submodule${left.length === 1 ? '' : 's'} ${left.join(', ')} ${left.length === 1 ? 'was' : 'were'} not moved to the recorded commit. Pull in each submodule.`,
+      );
+  }
   /** Pushes the checked-out commit to its branch on `remote`, and the notes after it. */
-  private async push(s: Space, state: GitStatus, remote: GitRemote): Promise<string | undefined> {
+  private async push(s: Repo, state: GitStatus, remote: GitRemote): Promise<string | undefined> {
     const urls = (await this.git(s, ['remote', 'get-url', '--push', '--all', remote.name]))
       .trimEnd()
       .split('\n');
@@ -838,7 +1058,7 @@ export class GitService {
         );
       }
   }
-  async sync(id: string, action: GitSyncAction, version: string) {
+  async sync(id: GitTarget, action: GitSyncAction, version: string) {
     return this.mutate(id, async (s) => {
       const state = await this.checked(s, version),
         remote = this.requireRemote(state);
@@ -867,7 +1087,7 @@ export class GitService {
           ],
           { network: true },
         );
-        this.fetched.set(id, new Date().toISOString());
+        this.fetched.set(s.root, new Date().toISOString());
         notice = await this.fetchNotes(s, remote.name);
         if (action !== 'fetch') {
           const now = await this.snapshot(s);
@@ -905,16 +1125,20 @@ export class GitService {
               throw error;
             }
           }
+          if (action === 'pull' && !s.prefix) {
+            const left = await this.follow(s, state.head!, target);
+            notice = [notice, left].filter(Boolean).join(' ') || undefined;
+          }
         }
       }
       const status = await this.snapshot(s);
       return notice ? { ...status, notice } : status;
     });
   }
-  async conflict(id: string, p: string): Promise<GitConflict> {
-    const s = await this.root(id),
+  async conflict(id: GitTarget, p: string): Promise<GitConflict> {
+    const s = await this.repo(id),
       state = await this.snapshot(s);
-    await this.safePath(s, p);
+    await this.safePath(s, p, await this.submodulePaths(s));
     if (!state.changes.some((c) => c.path === p && c.conflict)) throw stale();
     const stages = (await this.git(s, ['ls-files', '--stage', '-z', '--', literal(p)]))
       .split('\0')
@@ -987,7 +1211,7 @@ export class GitService {
       detail,
     };
   }
-  async resolve(id: string, p: string, text: string | null, version: string) {
+  async resolve(id: GitTarget, p: string, text: string | null, version: string) {
     return this.mutate(id, async (s) => {
       const conflict = await this.conflict(id, p);
       if (conflict.version !== version) throw stale();
@@ -1015,7 +1239,7 @@ export class GitService {
       await fs.mkdir(backup, { recursive: true, mode: 0o700 });
       await fs.writeFile(
         path.join(backup, randomUUID() + '.json'),
-        JSON.stringify({ scopeId: id, ...conflict }),
+        JSON.stringify({ scopeId: s.scopeId, repository: s.prefix.slice(0, -1), ...conflict }),
         { flag: 'wx', mode: 0o600 },
       );
       if ((await this.conflict(id, p)).version !== version) throw stale();
@@ -1038,8 +1262,189 @@ export class GitService {
       return this.snapshot(s);
     });
   }
-  async repositoryURL(id: string) {
-    const s = await this.root(id),
+  /** The submodules the hibachi holds, with whether each one's files are here. */
+  async submodules(id: string): Promise<GitSubmodules> {
+    let s: Repo;
+    try {
+      s = await this.repo(id);
+    } catch {
+      return { submodules: [] };
+    }
+    return { submodules: await this.listSubmodules(s) };
+  }
+  private async listSubmodules(s: Repo): Promise<GitSubmodule[]> {
+    const list: GitSubmodule[] = [];
+    for (const m of await this.recorded(s)) {
+      const root = path.join(s.root, m.path);
+      const item: GitSubmodule = {
+        path: m.path,
+        name: m.name,
+        repository: githubRepository(m.url),
+        initialized: await this.initialized(root),
+      };
+      if (item.initialized) {
+        const sub: Repo = { ...s, root, prefix: m.path + '/' };
+        item.branch = (await this.optional(sub, ['symbolic-ref', '--short', 'HEAD'])) || undefined;
+        item.changed = !!(await this.optional(sub, [
+          'status',
+          '--porcelain=v1',
+          '--untracked-files=normal',
+          '--ignore-submodules=dirty',
+          '--',
+          '.',
+          ...this.exclusions(sub),
+        ]));
+      }
+      list.push(item);
+    }
+    return list;
+  }
+  /** Git configuration that lets a submodule come only over the allowed transports. */
+  private protocols() {
+    return [
+      '-c',
+      'protocol.allow=never',
+      ...this.submoduleRemotes.protocols.flatMap((p) => ['-c', `protocol.${p}.allow=always`]),
+    ];
+  }
+  /**
+   * Clones a repository into a new folder of the hibachi as a submodule. Git
+   * stages the submodule and `.gitmodules`; committing them is the person's.
+   */
+  async addSubmodule(id: string, input: AddSubmodule): Promise<GitSubmodules> {
+    if (!this.submoduleRemotes.accepts(input.url)) throw cloneURLRequired();
+    return this.mutate(id, async (s) => {
+      const p = input.path.replace(/\/+$/, '');
+      await this.safePath(s, p);
+      if (p.split('/')[0].startsWith('.') || p.split('/')[0] === 'schema')
+        throw Error(
+          t(
+            'submodule は Knowledge のフォルダに置いてください。',
+            'Put a submodule in a Knowledge folder.',
+          ),
+        );
+      try {
+        await fs.lstat(path.join(s.root, p));
+        throw Error(t('同じ名前のフォルダがあります。', 'A folder with this name already exists.'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      await this.git(
+        s,
+        [...this.protocols(), '--literal-pathspecs', 'submodule', 'add', '--', input.url, p],
+        { network: true },
+      );
+      const notes = await this.fetchNotes({ root: path.join(s.root, p) }, 'origin');
+      return { submodules: await this.listSubmodules(s), notice: notes };
+    });
+  }
+  /** Fetches the files of the submodule at `only`, or of every submodule not yet here. */
+  async initSubmodules(id: string, only?: string): Promise<GitSubmodules> {
+    return this.mutate(id, async (s) => {
+      if (only && !(await this.submodulePaths(s)).has(only))
+        throw Error(
+          t(
+            'この hibachi の submodule ではありません。',
+            'This is not a submodule of the hibachi.',
+          ),
+        );
+      const notice = await this.fetchSubmodules(s, only);
+      if (only && notice) throw Error(notice);
+      return { submodules: await this.listSubmodules(s), notice };
+    });
+  }
+  /** A clone before registration, seen with the contents its declaration names. */
+  private async unregistered(root: string): Promise<Repo> {
+    let contents = ['contents'];
+    try {
+      const declared = JSON.parse(
+        await fs.readFile(path.join(root, '.irori', 'scope.json'), 'utf8'),
+      ) as { contents?: unknown };
+      if (Array.isArray(declared.contents) && declared.contents.every((c) => typeof c === 'string'))
+        contents = declared.contents;
+    } catch {
+      /* no declaration yet: registration will write the default */
+    }
+    return main({ schemaVersion: 1, scopeId: '', name: '', contents, root });
+  }
+  /**
+   * Fetches each submodule whose files are not here yet, and returns what could
+   * not be fetched. A submodule comes only from an allowed remote, without its
+   * own submodules, and is put on its branch when the commit the hibachi records
+   * is on it, so it can be committed to and pushed.
+   */
+  private async fetchSubmodules(s: Repo, only?: string): Promise<string | undefined> {
+    const failed: string[] = [];
+    const recorded = await this.recorded(s);
+    const links = new Set(recorded.map((m) => m.path));
+    for (const m of recorded) {
+      if (only && m.path !== only) continue;
+      const root = path.join(s.root, m.path);
+      if (await this.initialized(root)) continue;
+      try {
+        await this.safePath(s, m.path, links);
+        const entries = await fs.readdir(root).catch(() => [] as string[]);
+        if (entries.length) throw Error('occupied');
+        await this.git(s, ['--literal-pathspecs', 'submodule', 'init', '--', m.path]);
+        const url = await this.config(s, `submodule.${m.name}.url`);
+        if (!this.submoduleRemotes.accepts(url)) {
+          await this.optional(s, ['config', '--remove-section', `submodule.${m.name}`]);
+          throw Error('remote');
+        }
+        await this.git(
+          s,
+          [
+            ...this.protocols(),
+            '--literal-pathspecs',
+            'submodule',
+            'update',
+            '--checkout',
+            '--no-recommend-shallow',
+            '--',
+            m.path,
+          ],
+          { network: true },
+        );
+        if (!(await this.initialized(root))) throw Error('missing');
+        await this.attach({ root }, m.branch);
+        await this.fetchNotes({ root }, 'origin');
+      } catch {
+        failed.push(m.path);
+      }
+    }
+    if (failed.length)
+      return t(
+        `submodule ${failed.join('、')} を取得できませんでした。`,
+        `Could not fetch the submodule${failed.length === 1 ? '' : 's'} ${failed.join(', ')}.`,
+      );
+  }
+  /**
+   * Puts a newly fetched submodule on a branch at the commit the hibachi records,
+   * when that commit is on the branch `.gitmodules` names or the remote's default.
+   * Otherwise it stays on the commit itself, where it can be read but not committed to.
+   */
+  private async attach(sub: Pick<Space, 'root'>, declared: string) {
+    const head = await this.ref(sub, 'HEAD');
+    const branch =
+      declared && declared !== '.'
+        ? declared
+        : (
+            await this.optional(sub, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+          ).replace(/^origin\//, '');
+    if (!head || !branch || !(await this.optional(sub, ['check-ref-format', '--branch', branch])))
+      return;
+    const upstream = `refs/remotes/origin/${branch}`;
+    if (!(await this.ref(sub, upstream))) return;
+    try {
+      await this.git(sub, ['merge-base', '--is-ancestor', head, upstream]);
+    } catch {
+      return;
+    }
+    await this.git(sub, ['checkout', '--quiet', '-B', branch, head]);
+    await this.git(sub, ['branch', '--quiet', `--set-upstream-to=origin/${branch}`, branch]);
+  }
+  async repositoryURL(id: GitTarget) {
+    const s = await this.repo(id),
       state = await this.snapshot(s);
     const repository = state.remote?.repository;
     if (!repository)
@@ -1110,18 +1515,7 @@ export class GitService {
   async clone(input: CloneRepository): Promise<CloneResult> {
     if (!this.canMutate() || this.busy)
       throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
-    const repository = githubRepository(input.url);
-    if (
-      !repository ||
-      !/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/.test(input.url) ||
-      /[?#\s]/.test(input.url)
-    )
-      throw Error(
-        t(
-          'GitHub の HTTPS または SSH のリポジトリ URL を入力してください。',
-          'Enter a GitHub HTTPS or SSH repository URL.',
-        ),
-      );
+    if (!githubCloneURL(input.url)) throw cloneURLRequired();
     this.pending++;
     try {
       const { parent, destination } = await this.newFolder(input.parent, input.name, 'clone');
@@ -1159,7 +1553,9 @@ export class GitService {
           ].join('\n\n'),
         );
       }
-      const notice = await this.fetchNotes({ root: destination }, 'origin');
+      const notes = await this.fetchNotes({ root: destination }, 'origin');
+      const fetched = await this.fetchSubmodules(await this.unregistered(destination));
+      const notice = [notes, fetched].filter(Boolean).join(' ') || undefined;
       return { path: destination, notice };
     } finally {
       this.pending--;
@@ -1238,8 +1634,8 @@ export class GitService {
     await this.mutate(
       id,
       async (s) => s,
-      async (id) => {
-        const s = this.files.get(id);
+      async () => {
+        const s = main(this.files.get(id));
         const status = await this.status(id);
         if (!status.initializable)
           throw Error(

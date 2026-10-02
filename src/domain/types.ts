@@ -377,26 +377,35 @@ export interface HostAPI {
   resizeTerminal(id: string, cols: number, rows: number): Promise<void>;
   acknowledgeTerminal(id: string, length: number): Promise<void>;
   closeTerminal(id: string): Promise<void>;
-  gitStatus(scopeId: string): Promise<GitStatus>;
-  gitDiff(scopeId: string, path: string, staged: boolean): Promise<GitDiff>;
-  gitHistory(scopeId: string, offset: number): Promise<GitHistory>;
-  gitCommitDiff(scopeId: string, oid: string): Promise<string>;
-  gitStage(scopeId: string, path: string, staged: boolean, version: string): Promise<GitStatus>;
+  gitStatus(target: GitTarget): Promise<GitStatus>;
+  gitDiff(target: GitTarget, path: string, staged: boolean): Promise<GitDiff>;
+  gitHistory(target: GitTarget, offset: number): Promise<GitHistory>;
+  gitCommitDiff(target: GitTarget, oid: string): Promise<string>;
+  gitStage(target: GitTarget, path: string, staged: boolean, version: string): Promise<GitStatus>;
   gitStageMany(
-    scopeId: string,
+    target: GitTarget,
     paths: string[],
     staged: boolean,
     version: string,
   ): Promise<GitStatus>;
-  gitCommit(scopeId: string, message: string, version: string): Promise<GitStatus>;
-  gitSync(scopeId: string, action: GitSyncAction, version: string): Promise<GitStatus>;
-  gitConflict(scopeId: string, path: string): Promise<GitConflict>;
+  gitCommit(target: GitTarget, message: string, version: string): Promise<GitStatus>;
+  gitSync(target: GitTarget, action: GitSyncAction, version: string): Promise<GitStatus>;
+  gitConflict(target: GitTarget, path: string): Promise<GitConflict>;
   gitResolve(
-    scopeId: string,
+    target: GitTarget,
     path: string,
     text: string | null,
     version: string,
   ): Promise<GitStatus>;
+  /** The repositories the hibachi holds as submodules (ADR 022). */
+  gitSubmodules(scopeId: string): Promise<import('./git').GitSubmodules>;
+  /** Clones a GitHub repository into a new folder of the hibachi as a submodule. */
+  gitSubmoduleAdd(
+    scopeId: string,
+    input: import('./git').AddSubmodule,
+  ): Promise<import('./git').GitSubmodules>;
+  /** Fetches the files of one submodule not yet here, or of every such submodule. */
+  gitSubmoduleInit(scopeId: string, path?: string): Promise<import('./git').GitSubmodules>;
   gitClone(input: CloneRepository): Promise<import('./git').CloneResult>;
   /** Makes a hibachi that is an ordinary folder a Git repository on `main`. */
   gitInit(scopeId: string): Promise<GitStatus>;
@@ -408,7 +417,7 @@ export interface HostAPI {
     input: import('./git').PublishRepository,
     version: string,
   ): Promise<GitStatus>;
-  gitOpenRepository(scopeId: string): Promise<void>;
+  gitOpenRepository(target: GitTarget): Promise<void>;
   repositories(root: string): Promise<RepositoryInfo>;
   workspaces(): Promise<WorkspaceProfile[]>;
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
@@ -622,5 +631,6 @@ import type {
   GitHistory,
   GitConflict,
   GitSyncAction,
+  GitTarget,
   CloneRepository,
 } from './git';

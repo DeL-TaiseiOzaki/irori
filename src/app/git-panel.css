@@ -8,6 +8,20 @@
   overflow: auto;
   font-size: 12.5px;
 }
+/* The hibachi's own repository and those it holds as submodules (ADR 022). */
+.git-repositories {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 4px;
+  color: var(--tx-3);
+}
+.git-repositories select {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
 .git-repository-bar {
   display: flex;
   flex-direction: column;

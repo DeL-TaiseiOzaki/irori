@@ -3,7 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import { classify } from '../domain/scopes';
 import { Crumbs } from './NoteBar';
-import type { GitCommit, GitConflict, GitDiff, GitStatus, GitSyncAction } from '../domain/git';
+import type {
+  GitCommit,
+  GitConflict,
+  GitDiff,
+  GitStatus,
+  GitSubmodule,
+  GitSyncAction,
+  GitTarget,
+} from '../domain/git';
 import { Menu } from '@base-ui/react/menu';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { Icon } from './Icon';
@@ -11,6 +19,7 @@ import { useDraft } from './useDraft';
 import { displayLocale, t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishDialog } from './GitHubPublish';
+import { AddSubmoduleDialog, RepositoryPicker, UnfetchedSubmodule } from './GitSubmodules';
 import './git-panel.css';
 const host = window.irori;
 // A function so each entry is read in the language of the current render.
@@ -152,7 +161,10 @@ function shortFolder(space: Space, folder: string) {
     : folder;
 }
 
-/** The Changes view of the brain on show: its repository, commits and diffs. */
+/**
+ * The Changes view of the brain on show: its repository, commits and diffs, and
+ * those of each repository it holds as a submodule (ADR 022).
+ */
 export function GitPanel({
   space,
   onChanged,
@@ -170,40 +182,142 @@ export function GitPanel({
   revision: number;
   beforeAction: () => Promise<boolean>;
 }) {
+  const [submodules, setSubmodules] = useState<GitSubmodule[]>([]),
+    [repository, setRepository] = useState(''),
+    [adding, setAdding] = useState(false),
+    [fetching, setFetching] = useState(false),
+    [fetchError, setFetchError] = useState(''),
+    [panelBusy, setPanelBusy] = useState(false),
+    [own, setOwn] = useState(0);
+  useEffect(() => {
+    setRepository('');
+    setSubmodules([]);
+  }, [space.scopeId]);
+  useEffect(() => {
+    let cancelled = false;
+    void host
+      .gitSubmodules(space.scopeId)
+      .then((value) => {
+        if (!cancelled) setSubmodules(value.submodules);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [space.scopeId, revision, own]);
+  const shown = submodules.find((m) => m.path === repository);
+  // A submodule that went away (another device removed it) shows the hibachi again.
+  useEffect(() => {
+    if (repository && submodules.length && !shown) setRepository('');
+  }, [submodules]);
+  function busy(value: boolean) {
+    setPanelBusy(value);
+    onBusyChange(value);
+  }
+  async function fetchSubmodule(path: string) {
+    if (fetching || !(await beforeAction())) return;
+    setFetching(true);
+    setFetchError('');
+    onBusyChange(true);
+    try {
+      setSubmodules((await host.gitSubmoduleInit(space.scopeId, path)).submodules);
+    } catch (e) {
+      setFetchError(errorText(e));
+    } finally {
+      setFetching(false);
+      onBusyChange(false);
+      setOwn((n) => n + 1);
+      onChanged();
+    }
+  }
   return (
     <div className="git-sidebar" role="region" aria-label={t('ソース管理', 'Source control')}>
-      <RepositoryPanel
-        key={space.scopeId}
-        space={space}
-        onBusy={onBusyChange}
-        onChanged={onChanged}
-        detailTarget={detailTarget}
-        onReviewChange={onReviewChange}
-        externalRevision={revision}
-        beforeAction={beforeAction}
-      />
+      {submodules.length > 0 && (
+        <RepositoryPicker
+          name={space.name}
+          submodules={submodules}
+          value={repository}
+          disabled={panelBusy || fetching}
+          onChange={(value) => {
+            setFetchError('');
+            setRepository(value);
+          }}
+        />
+      )}
+      {shown && !shown.initialized ? (
+        <UnfetchedSubmodule
+          submodule={shown}
+          busy={fetching}
+          error={fetchError}
+          onFetch={() => void fetchSubmodule(shown.path)}
+        />
+      ) : (
+        <RepositoryPanel
+          key={`${space.scopeId}\0${shown ? shown.path : ''}`}
+          space={space}
+          repository={shown ? shown.path : ''}
+          onBusy={busy}
+          onChanged={() => {
+            setOwn((n) => n + 1);
+            onChanged();
+          }}
+          onAddSubmodule={() => setAdding(true)}
+          detailTarget={detailTarget}
+          onReviewChange={onReviewChange}
+          externalRevision={revision}
+          beforeAction={beforeAction}
+        />
+      )}
+      {adding && (
+        <AddSubmoduleDialog
+          onCancel={() => setAdding(false)}
+          add={async (value) => {
+            if (panelBusy || !(await beforeAction()))
+              throw Error(t('別の操作を実行中です。', 'Another operation is running.'));
+            onBusyChange(true);
+            try {
+              const next = await host.gitSubmoduleAdd(space.scopeId, value);
+              setSubmodules(next.submodules);
+              setAdding(false);
+            } finally {
+              onBusyChange(false);
+              setOwn((n) => n + 1);
+              onChanged();
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function RepositoryPanel({
   space,
+  repository,
   onBusy,
   onChanged,
+  onAddSubmodule,
   detailTarget,
   onReviewChange,
   externalRevision,
   beforeAction,
 }: {
   space: Space;
+  /** A submodule's folder, or empty for the hibachi's own repository. */
+  repository: string;
   onBusy: (busy: boolean) => void;
   onChanged: () => void;
+  onAddSubmodule: () => void;
   detailTarget: HTMLElement | null;
   onReviewChange: (reviewing: boolean) => void;
   externalRevision: number;
   beforeAction: () => Promise<boolean>;
 }) {
   const menuHost = useRef<HTMLDivElement>(null);
+  const target: GitTarget = repository ? { scopeId: space.scopeId, repository } : space.scopeId;
+  // Paths Git reports are the repository's; the hibachi's layers are decided from its root.
+  const prefix = repository ? repository + '/' : '';
+  const label = repository ? `${space.name} / ${repository}` : space.name;
   const [status, setStatus] = useState<GitStatus>(),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
@@ -230,7 +344,12 @@ function RepositoryPanel({
     reviewInFlight = useRef<{ target: string; again: boolean }>(undefined);
   const [reviewRepeat, setReviewRepeat] = useState(0);
   const resolutionDraft = useRef<{ path: string; text: string } | undefined>(undefined);
-  const messageDraft = useDraft({ scopeId: space.scopeId, kind: 'git-commit' }, space.root);
+  const messageDraft = useDraft(
+    repository
+      ? { scopeId: space.scopeId, kind: 'git-commit', repository }
+      : { scopeId: space.scopeId, kind: 'git-commit' },
+    space.root,
+  );
   const message = messageDraft.text;
   const resolutionPath =
     resolutionDraft.current?.path ??
@@ -242,7 +361,7 @@ function RepositoryPanel({
       ? {
           scopeId: space.scopeId,
           kind: 'git-resolution',
-          path: resolutionPath,
+          path: prefix + resolutionPath,
         }
       : null,
     space.root,
@@ -292,7 +411,7 @@ function RepositoryPanel({
     let cancelled = false;
     const generation = ++statusReads.current;
     void host
-      .gitStatus(space.scopeId)
+      .gitStatus(target)
       .then((value) => {
         if (!cancelled && generation === statusReads.current) accept(value);
       })
@@ -328,7 +447,7 @@ function RepositoryPanel({
       if (alive.current) setError(errorText(e));
       // A failed command may still change Git state (for example a merge conflict).
       try {
-        accept(await host.gitStatus(space.scopeId));
+        accept(await host.gitStatus(target));
       } catch (e) {
         if (alive.current) setError(errorText(e));
       }
@@ -358,18 +477,18 @@ function RepositoryPanel({
       setLoadingReview(false);
       return;
     }
-    const target = `${selection.path}:${selection.staged}`;
+    const reviewed = `${selection.path}:${selection.staged}`;
     // A file event re-reads the same target. Replace what is on screen only when
     // the target itself changed; otherwise refresh it in place, so a burst of
     // events cannot leave the reader looking at the loading text.
     // A refresh of the file already being read waits for that read instead of
     // restarting it, and queues one repeat so the newest state still arrives.
-    if (reviewInFlight.current?.target === target) {
+    if (reviewInFlight.current?.target === reviewed) {
       reviewInFlight.current.again = true;
       return;
     }
-    const replacing = shownReview.current !== target;
-    shownReview.current = target;
+    const replacing = shownReview.current !== reviewed;
+    shownReview.current = reviewed;
     const entry = status?.changes.find((c) => c.path === selection.path);
     if (!entry) {
       shownReview.current = '';
@@ -379,7 +498,7 @@ function RepositoryPanel({
     }
     const conflicted = !!entry.conflict && !entry.blocked;
     const generation = ++reads.current;
-    reviewInFlight.current = { target, again: false };
+    reviewInFlight.current = { target: reviewed, again: false };
     // The read is still in flight either way — callers and assistive technology
     // read that from aria-busy — but only a new target blanks what is shown.
     setLoadingReview(true);
@@ -388,7 +507,7 @@ function RepositoryPanel({
     // refresh: it is what re-enables the ordinary status reads.
     if (!resolutionDraft.current && (replacing || !conflicted)) setConflict(undefined);
     const fetch = conflicted
-      ? host.gitConflict(space.scopeId, selection.path).then((value) => {
+      ? host.gitConflict(target, selection.path).then((value) => {
           if (generation === reads.current && alive.current) {
             setConflict(value);
             setResolution(
@@ -398,7 +517,7 @@ function RepositoryPanel({
             );
           }
         })
-      : host.gitDiff(space.scopeId, selection.path, selection.staged).then((value) => {
+      : host.gitDiff(target, selection.path, selection.staged).then((value) => {
           if (generation === reads.current && alive.current) setDiff(value);
         });
     void fetch
@@ -416,7 +535,7 @@ function RepositoryPanel({
       });
   }, [selection, revision, tab, reviewRepeat]);
   async function loadHistory(append = false) {
-    const page = await host.gitHistory(space.scopeId, append ? history.length : 0);
+    const page = await host.gitHistory(target, append ? history.length : 0);
     if (alive.current) {
       setHistory((previous) => (append ? [...previous, ...page.commits] : page.commits));
       setMore(page.more);
@@ -427,7 +546,7 @@ function RepositoryPanel({
     setCommit(value);
     setCommitPatch('');
     try {
-      const patch = await host.gitCommitDiff(space.scopeId, value.oid);
+      const patch = await host.gitCommitDiff(target, value.oid);
       if (generation === commitReads.current && alive.current) setCommitPatch(patch);
     } catch (e) {
       if (generation === commitReads.current && alive.current) setError(errorText(e));
@@ -494,12 +613,12 @@ function RepositoryPanel({
     setLoadingReview(false);
     let value: GitStatus;
     try {
-      value = await host.gitResolve(space.scopeId, selection.path, text, conflict.version);
+      value = await host.gitResolve(target, selection.path, text, conflict.version);
     } catch (error) {
       // The file may have changed underneath. A conflicted file's status stays
       // the same, so read the conflict itself again now: the next attempt then
       // compares with what is on disk, not with a file event still on its way.
-      const fresh = await host.gitConflict(space.scopeId, selection.path).catch(() => undefined);
+      const fresh = await host.gitConflict(target, selection.path).catch(() => undefined);
       if (fresh && alive.current && fresh.path === selection.path) setConflict(fresh);
       throw error;
     }
@@ -528,6 +647,7 @@ function RepositoryPanel({
           </small>
         )}
         {!status.remote &&
+          !repository &&
           (status.head && status.branch ? (
             <button
               className="panel-button git-publish"
@@ -556,7 +676,7 @@ function RepositoryPanel({
           onClick={() =>
             void perform(async () => {
               if (tab === 'history') await loadHistory();
-              return host.gitStatus(space.scopeId);
+              return host.gitStatus(target);
             })
           }
         >
@@ -579,7 +699,7 @@ function RepositoryPanel({
                   disabled={busy || conflictDirty || draftBlocked || !canSync}
                   onClick={() =>
                     void perform(
-                      () => host.gitSync(space.scopeId, 'fetch', status.version),
+                      () => host.gitSync(target, 'fetch', status.version),
                       t('取得しました。', 'Fetched.'),
                     )
                   }
@@ -598,12 +718,18 @@ function RepositoryPanel({
                   <Menu.Item
                     disabled={busy}
                     onClick={() =>
-                      void host
-                        .gitOpenRepository(space.scopeId)
-                        .catch((e) => setError(errorText(e)))
+                      void host.gitOpenRepository(target).catch((e) => setError(errorText(e)))
                     }
                   >
                     {t('GitHub を開く', 'Open on GitHub')}
+                  </Menu.Item>
+                )}
+                {!repository && (
+                  <Menu.Item
+                    disabled={busy || conflictDirty || draftBlocked || status.operation !== 'none'}
+                    onClick={onAddSubmodule}
+                  >
+                    {t('submodule を追加…', 'Add a submodule…')}
                   </Menu.Item>
                 )}
               </Menu.Popup>
@@ -643,7 +769,7 @@ function RepositoryPanel({
           void perform(
             async () => {
               const acknowledged = messageDraft.snapshot().record?.revision;
-              const value = await host.gitCommit(space.scopeId, message, status.version);
+              const value = await host.gitCommit(target, message, status.version);
               if (!(await messageDraft.clear(acknowledged)))
                 throw Error(
                   t('下書きの完了を保存できませんでした。', 'Could not mark the draft complete.'),
@@ -768,7 +894,7 @@ function RepositoryPanel({
                       void perform(
                         () =>
                           host.gitStageMany(
-                            space.scopeId,
+                            target,
                             group.entries
                               .filter(
                                 (entry) => !entry.conflict && (group.staged || !entry.blocked),
@@ -809,12 +935,14 @@ function RepositoryPanel({
                         title={entry.path}
                       >
                         <Icon
-                          name={layerIcon(space, entry.path)}
+                          name={layerIcon(space, prefix + entry.path)}
                           size={14}
-                          className={`git-layer ${classify(space, entry.path)}`}
+                          className={`git-layer ${classify(space, prefix + entry.path)}`}
                         />
                         <span className="git-path">
-                          <span className="git-folder">{shortFolder(space, folder)}</span>
+                          <span className="git-folder">
+                            {prefix ? folder : shortFolder(space, folder)}
+                          </span>
                           {entry.path.slice(folder.length)}
                         </span>
                         <span className={`git-file-state state-${state === '?' ? 'new' : state}`}>
@@ -845,7 +973,7 @@ function RepositoryPanel({
                           void perform(
                             () =>
                               host.gitStageMany(
-                                space.scopeId,
+                                target,
                                 [entry.path],
                                 !group.staged,
                                 status.version,
@@ -938,12 +1066,7 @@ function RepositoryPanel({
                     onClick={() =>
                       void perform(
                         () =>
-                          host.gitStage(
-                            space.scopeId,
-                            selection.path,
-                            !selection.staged,
-                            diff.version,
-                          ),
+                          host.gitStage(target, selection.path, !selection.staged, diff.version),
                         selection.staged
                           ? t('ステージから外しました。', 'Unstaged.')
                           : t('ステージに追加しました。', 'Staged.'),
@@ -1152,7 +1275,7 @@ function RepositoryPanel({
               );
             } catch (e) {
               // A repository may exist on GitHub now even though sending failed.
-              await host.gitStatus(space.scopeId).then(accept, () => {});
+              await host.gitStatus(target).then(accept, () => {});
               throw e;
             } finally {
               active.current = false;
@@ -1171,10 +1294,10 @@ function RepositoryPanel({
             <strong>
               {confirmation === 'commit'
                 ? t(
-                    `${staged.length} 件の変更を ${space.name} に commit`,
-                    `Commit ${staged.length} change${staged.length === 1 ? '' : 's'} to ${space.name}`,
+                    `${staged.length} 件の変更を ${label} に commit`,
+                    `Commit ${staged.length} change${staged.length === 1 ? '' : 's'} to ${label}`,
                   )
-                : `${space.name} / ${status.branch} ${t('と', 'and')} ${confirmation === 'push' ? remoteLabel : `${status.remote?.fetchLabel} / ${status.remote?.branch}`}`}
+                : `${label} / ${status.branch} ${t('と', 'and')} ${confirmation === 'push' ? remoteLabel : `${status.remote?.fetchLabel} / ${status.remote?.branch}`}`}
             </strong>
             <p>
               {confirmation === 'commit'
@@ -1211,7 +1334,7 @@ function RepositoryPanel({
                   async () => {
                     if (confirmation === 'commit') {
                       const acknowledged = messageDraft.snapshot().record?.revision;
-                      const value = await host.gitCommit(space.scopeId, message, status.version);
+                      const value = await host.gitCommit(target, message, status.version);
                       if (!(await messageDraft.clear(acknowledged)))
                         throw Error(
                           t(
@@ -1221,7 +1344,7 @@ function RepositoryPanel({
                         );
                       return value;
                     }
-                    return host.gitSync(space.scopeId, confirmation, confirmationVersion.current);
+                    return host.gitSync(target, confirmation, confirmationVersion.current);
                   },
                   confirmation === 'commit'
                     ? t('コミットしました。', 'Committed.')
