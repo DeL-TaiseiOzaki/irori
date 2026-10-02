@@ -27,13 +27,21 @@ const launch = () =>
     env,
   });
 
-/** Japanese interface text on screen: visible text and accessible names. */
+/**
+ * Japanese interface text on screen: visible text and accessible names. Text
+ * marked as Japanese, such as the button that offers 日本語, is meant to stay.
+ */
 async function japaneseLeft(page: Page, where: string) {
   const found = await page.evaluate(() => {
     const japanese = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
+    const marked = new Set(
+      [...document.querySelectorAll<HTMLElement>('body [lang="ja"]')].map((element) =>
+        element.innerText.trim(),
+      ),
+    );
     const hits: string[] = [];
     for (const line of document.body.innerText.split('\n'))
-      if (japanese.test(line)) hits.push(line.trim());
+      if (japanese.test(line) && !marked.has(line.trim())) hits.push(line.trim());
     for (const element of document.querySelectorAll('[aria-label], [placeholder], [title]'))
       for (const name of ['aria-label', 'placeholder', 'title']) {
         const value = element.getAttribute(name);
@@ -56,6 +64,18 @@ try {
   const page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+
+  // The startup screen has no rail, so it offers the language itself.
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('en');
+  await expect(page.getByRole('textbox', { name: 'Workspace name' })).toHaveValue('My workspace');
+  await japaneseLeft(page, 'the startup screen');
+  visited.push('startup screen');
+  await page.getByRole('button', { name: '日本語', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
+
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toBeVisible();
 

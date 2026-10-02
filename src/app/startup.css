@@ -127,7 +127,8 @@
   color: var(--tx-2);
 }
 .start-footer .update-notice > button,
-.start-footer .cloud-recovery-trigger {
+.start-footer .cloud-recovery-trigger,
+.start-footer .language-switch {
   height: 30px;
   padding: 0 10px;
   border-radius: 9px;
@@ -137,9 +138,15 @@
   font-size: 12.5px;
 }
 .start-footer .update-notice > button:hover:not(:disabled),
-.start-footer .cloud-recovery-trigger:hover {
+.start-footer .cloud-recovery-trigger:hover,
+.start-footer .language-switch:hover {
   background: var(--raised);
   color: var(--tx);
+}
+.start-footer .language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* The panel: saved workspaces, combining brains, adding a brain. */

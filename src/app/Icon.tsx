@@ -28,6 +28,7 @@ import {
   GitBranch,
   House,
   Info,
+  Languages,
   Layers,
   LayoutGrid,
   Link2,
@@ -127,6 +128,7 @@ const icons = {
   hearth: Flame,
   light: Sun,
   dark: Moon,
+  language: Languages,
 } as const;
 export type IconName = keyof typeof icons;
 

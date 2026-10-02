@@ -12,7 +12,9 @@ test that names an element by its Japanese text behave as before.
 - **Where it is chosen.** The display settings menu, beside theme and Markdown
   font, lists **日本語** and **English**, each named in its own language. The
   choice is kept in the device record with the other display settings, not in a
-  knowledge base.
+  knowledge base. The startup screen has no rail, so its footer offers the other
+  language as one button named in that language (added 2026-10-02 for 0.1.64);
+  without it a first launch could only be read in Japanese.
 - **Applying it.** The renderer re-renders from the application root when the
   language changes, so the switch is immediate and keeps component state, open
   notes and drafts. The host sets its own copy when the setting is saved, so its
