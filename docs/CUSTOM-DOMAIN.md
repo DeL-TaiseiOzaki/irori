@@ -16,7 +16,7 @@ not change the desktop release, Google audience or OAuth verification status.
   records were returned by Google's resolver. The owner completed the registrar
   changes; this workspace has no connected registrar account.
 - HTTP acceptance: homepage and the old GitHub Pages URL return the deployed
-  website; the old URL redirects to `http://irori-ai.com/` while HTTPS is pending.
+  website; the old URL redirected to `http://irori-ai.com/` until HTTPS was live.
   Anonymous HTTP browser acceptance passed on rerun after a transient document
   503: desktop/mobile, images, current 0.1.61 download targets, both languages,
   canonical metadata and search. Strict HTTPS still rejects the certificate
@@ -24,22 +24,33 @@ not change the desktop release, Google audience or OAuth verification status.
 - Canonical, language alternate, social preview and documentation
   download URLs: deployed for `https://irori-ai.com/`. Local build/browser checks
   and all PR verification/native package jobs passed before merge.
-- HTTPS: no certificate reported yet and enforcement is currently false. An
-  enable request returned "The certificate does not exist yet". GitHub's health
-  result reported `InvalidDNSError` and a CAA `SERVFAIL`, although direct UDP and
-  TCP queries to all three authoritative servers returned authoritative
-  `NOERROR`; Google and Cloudflare also resolve the records. On 2026-10-01 the
-  custom domain was removed and re-added again to restart provisioning after
-  that mismatch. Certificate issuance and anonymous HTTPS/browser acceptance
-  remain pending; certificate validation is not bypassed.
+- HTTPS: live since 2026-10-02 (see below). The certificate covers
+  `irori-ai.com` and `www.irori-ai.com` and expires 2026-12-31; GitHub renews it.
+  **Enforce HTTPS** is on: `http://irori-ai.com/` and `https://www.irori-ai.com/`
+  redirect to `https://irori-ai.com/`, which returns 200 with a verified
+  certificate.
 - Privacy/use-license pages and Google review work remain in draft PR #146;
   those pages are not present in the currently deployed site.
 
-## HTTPS diagnosis for GitHub Support
+## HTTPS diagnosis and resolution
+
+**Resolved 2026-10-02, without GitHub Support.** Around 02:05 UTC GitHub's Pages
+health check, which had failed for two days, passed for the apex and `www`
+(`dns_resolves: true`, `is_valid: true`, `is_https_eligible: true`,
+`caa_error: null`; only `https_error: peer_failed_verification`, the missing
+certificate). Re-sending the same custom domain changed nothing. Removing it and
+adding it again, with the owner's agreement, got a certificate approved for both
+hosts within seconds (`state: approved`, expires 2026-12-31); it was being
+served within minutes, and **Enforce HTTPS** was then turned on. The DNS
+records were not changed. The likely cause is that GitHub's health checker could
+not reach the `xdomain.ne.jp` nameservers for a while; once it could, provisioning
+had to be started again. If a certificate stops renewing, check
+`gh api repos/DeL-TaiseiOzaki/irori/pages/health` before anything else.
+
+The evidence gathered while it failed:
 
 Rechecked 2026-09-30 17:18–17:28 UTC (2026-10-01 JST), after the remove/re-add
-restart. Nothing below has been sent to GitHub; contact GitHub Support only at
-the owner's instruction.
+restart.
 
 - Repository Pages API: `cname: irori-ai.com`, `https_enforced: false`, no
   `https_certificate` object. Both hosts still present GitHub's `*.github.io`
@@ -64,39 +75,8 @@ the owner's instruction.
   include CAA checks and a Let's Encrypt staging attempt, returned OK for
   `irori-ai.com` (test 3186491) and `www.irori-ai.com` (test 3186492).
 
-The certificate authority's view is therefore healthy; only GitHub's own DNS
-health check fails. Leave the configuration unchanged until about 24 hours
-after the 2026-09-30 DNS change, the propagation time GitHub documents. If the
-certificate is still absent then, the owner can send the message below from
-<https://support.github.com/contact> or move the zone to another DNS host
-(for example Cloudflare, DNS-only, same records) as a fallback that avoids the
-current nameservers.
-
-```text
-Subject: Pages HTTPS certificate not issued for irori-ai.com (health: InvalidDNSError / Dnsruby::ServFail)
-
-Repository: DeL-TaiseiOzaki/irori (Pages via GitHub Actions)
-Custom domain: irori-ai.com (www.irori-ai.com CNAME -> del-taiseiozaki.github.io)
-
-The custom domain has been configured since 2026-09-30 and was removed and
-re-added on 2026-10-01 (JST) as the documentation suggests. No certificate has
-been issued and "Enforce HTTPS" is unavailable. The Pages health API reports
-dns_resolves: false, InvalidDNSError and caa_error: Dnsruby::ServFail for both
-the apex and www.
-
-We cannot reproduce a DNS failure:
-- Authoritative ns1/ns2/ns3.xdomain.ne.jp answer A/AAAA/CAA/TXT/SOA over UDP
-  and TCP, with and without EDNS/DO, with NOERROR (aa=1). No DNSSEC.
-- Google, Cloudflare and NextDNS resolvers return the four Pages A records
-  (185.199.108-111.153), no AAAA, empty CAA; www is a CNAME to
-  del-taiseiozaki.github.io.
-- Let's Debug HTTP-01 checks (including CAA and a Let's Encrypt staging
-  attempt) pass for both hosts (tests 3186491 and 3186492).
-- HTTP is served correctly by Pages at http://irori-ai.com/.
-
-Could you check why the Pages DNS health check fails for this domain and
-retry certificate provisioning?
-```
+Let's Debug, the recursive resolvers and the authoritative servers agreed that
+the records were correct; only GitHub's own check failed until 2026-10-02.
 
 ## GitHub and registrar steps
 
