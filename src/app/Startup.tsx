@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
+import { LanguageSwitch } from './Settings';
 import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
@@ -466,11 +467,13 @@ export function Startup({
 }) {
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
     [selected, setSelected] = useState<string[]>([]);
-  const [name, setName] = useState(t('マイワークスペース', 'My workspace')),
+  // Undefined until edited, so the suggested name follows a language change.
+  const [edited, setName] = useState<string>(),
     [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string>();
+  const name = edited ?? t('マイワークスペース', 'My workspace');
   useEffect(() => {
     void host
       .workspaces()
@@ -525,6 +528,7 @@ export function Startup({
         <footer className="start-footer">
           <UpdateNotice host={host} />
           <CloudRecovery />
+          <LanguageSwitch onError={(e) => setError(errorText(e))} />
         </footer>
       </section>
       <main className="start-main chrome">
@@ -669,7 +673,7 @@ export function Startup({
                 onClick={() => {
                   setEditing(undefined);
                   setSelected([]);
-                  setName(t('マイワークスペース', 'My workspace'));
+                  setName(undefined);
                 }}
               >
                 {t('編集をキャンセル', 'Cancel editing')}

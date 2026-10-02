@@ -120,6 +120,22 @@ function RoutineRuntimes({ onError }: { onError: (e: unknown) => void }) {
 }
 
 /**
+ * The startup screen has no rail, so the language is offered there on its own:
+ * one button naming the other language in that language, which a reader who
+ * cannot read the current one can still find.
+ */
+export function LanguageSwitch({ onError }: { onError: (error: unknown) => void }) {
+  const [language, choose] = useChoice<Language>(currentLanguageChoice, chooseLanguage, onError);
+  const other = languages.find((option) => option !== language) ?? 'ja';
+  return (
+    <button type="button" className="language-switch" lang={other} onClick={() => choose(other)}>
+      <Icon name="language" size={14} />
+      {languageLabels[other]}
+    </button>
+  );
+}
+
+/**
  * The rail's settings: display choices shared by every workspace on this device,
  * updates, and the pending uploads kept on this device.
  */

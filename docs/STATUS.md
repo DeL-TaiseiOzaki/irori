@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Startup language, 2026-10-02 (**0.1.64**,
+[ADR 011](decisions/011-interface-language.md)): the language setting lived only
+in the rail's settings popover, and the startup screen has no rail, so a first
+launch was Japanese-only. `LanguageSwitch` (`src/app/Settings.tsx`) now sits in
+the startup footer as one button naming the other language in itself (`lang`
+set), using the same device setting. The startup's suggested workspace name is
+derived at render time until edited, so it follows the switch. Verified with
+`npm run build`, `npm test`, `xvfb-run -a npm run test:ui` (the language suite
+switches on the startup screen first). Not verified: installed builds.
+
 Published 2026-10-02: **0.1.63** (#152, conversations side by side) is merged at
 the owner's request and published as
 [v0.1.63-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.63-preview.1)
