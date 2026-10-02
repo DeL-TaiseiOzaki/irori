@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { agentIds, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
-import { providerId } from './connections';
 import { agentModel, startInput, yourAiChoice } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
@@ -40,6 +39,8 @@ const cols = z.number().int().min(2).max(500),
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
   recoverableCloudWrites: z.tuple([]),
+  unsentDriveChanges: z.tuple([]),
+  exportUnsentDriveChanges: z.tuple([]),
   draftRead: z.tuple([draftKey]),
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),
@@ -78,8 +79,6 @@ export const hostArguments = {
   locateSource: z.tuple([sourceVersion]),
   rebindSource: z.tuple([sourceVersion, sourceDestination]),
   registerArtifact: z.tuple([sourceRef, id]),
-  pendingCloudWrites: z.tuple([id]),
-  prepareCloudWrite: z.tuple([id, id, sourceRef]),
   terminalShells: z.tuple([]),
   openTerminal: z.tuple([id, path, cols, rows]),
   writeTerminal: z.tuple([id, z.string().max(65536)]),
@@ -124,38 +123,9 @@ export const hostArguments = {
   workspaces: z.tuple([]),
   saveWorkspace: z.tuple([name.trim().min(1), z.array(id).max(100), id.optional()]),
   removeWorkspace: z.tuple([id]),
-  cloudSetup: z.tuple([]),
-  openCloudSetupHelp: z.tuple([]),
-  workspaceCloud: z.tuple([id]),
-  cloudEntries: z.tuple([id, path]),
-  cloudRead: z.tuple([id, path]),
-  openCloudFile: z.tuple([id, path]),
-  cloudAccounts: z.tuple([]),
-  addCloudAccount: z.tuple([name.trim().min(1)]),
-  cancelCloudAccount: z.tuple([id]),
-  reauthorizeCloudAccount: z.tuple([id]),
-  removeCloudAccount: z.tuple([id]),
-  cloudDrives: z.tuple([id]),
-  cloudFolders: z.tuple([id, providerId, providerId.optional()]),
   cloudConnections: z.tuple([id]),
-  addCloudAttachment: z.tuple([
-    z.object({
-      scopeId: id,
-      accountId: id,
-      name: z.string().max(200),
-      contentsRoot: path,
-      folder: z.object({
-        id: providerId,
-        name: z.string().max(1024),
-        parentId: providerId,
-        driveId: providerId.optional(),
-      }),
-      access: z.enum(['read-only', 'read-write']).optional(),
-    }),
-  ]),
   connectCloud: z.tuple([id, id]),
-  disconnectCloud: z.tuple([id, id, z.boolean().optional()]),
-  bindCloud: z.tuple([id, id, id]),
+  disconnectCloud: z.tuple([id, id]),
   addLocalFolder: z.tuple([
     z.object({
       scopeId: id,
@@ -166,11 +136,11 @@ export const hostArguments = {
     }),
   ]),
   bindLocalFolder: z.tuple([id, id, path.min(1)]),
+  switchCloudToLocal: z.tuple([id, id, path.min(1)]),
   renameCloud: z.tuple([id, id, z.string().max(200)]),
   removeCloud: z.tuple([id, id]),
-  setCloudAccess: z.tuple([id, id, z.enum(['read-only', 'read-write']), z.boolean().optional()]),
+  setCloudAccess: z.tuple([id, id, z.enum(['read-only', 'read-write'])]),
   openCloudFolder: z.tuple([id, id]),
-  moveCloudConnection: z.tuple([id, id, id]),
   createCloudNote: z.tuple([id, path, name.trim().min(1)]),
   moveCloudEntry: z.tuple([id, path, path]),
   deleteCloudEntry: z.tuple([id, path]),

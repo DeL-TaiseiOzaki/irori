@@ -500,24 +500,17 @@ function BrainColumn({
           <div key={connection.mountId} className="column-row">
             <Icon name="cloud" size={14} className="layer-icon contents" />
             <span className="column-row-name">{connection.name}</span>
-            {connection.access === 'read-only' ? (
+            {connection.access === 'read-only' && (
               <span>
                 <Icon name="lock" size={12} />
               </span>
-            ) : (
-              !!connection.pending && (
-                <span className="column-upload mono">
-                  <Icon name="up" size={11} />
-                  {connection.pending}
-                </span>
-              )
             )}
           </div>
         ))}
         {connections.data && !connections.data.length && (
           <button className="column-connect" onClick={() => onConnect(space)}>
             <Icon name="cloudConnect" size={14} />
-            {t('Drive を接続', 'Connect Drive')}
+            {t('フォルダを接続', 'Connect a folder')}
           </button>
         )}
       </div>

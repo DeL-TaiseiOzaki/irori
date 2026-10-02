@@ -23,7 +23,7 @@ description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同
 
 ## フォルダを接続する
 
-1. hibachi の **接続** を開き、**このコンピューター** を選びます。
+1. hibachi の **接続** を開きます。
 2. **フォルダを選ぶ** から、同期フォルダの中のフォルダを選びます。
 3. Contents に表示する名前を確認し、**登録して接続** を押します。
 

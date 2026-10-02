@@ -142,13 +142,11 @@ export function LanguageSwitch({ onError }: { onError: (error: unknown) => void 
 export function Settings({
   hibachiAgent,
   onHibachiAgent,
-  onRecover,
   onError,
 }: {
   /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
   hibachiAgent: boolean;
   onHibachiAgent: (on: boolean) => void;
-  onRecover: () => void;
   onError: (error: unknown) => void;
 }) {
   const updates = useUpdateState(host);
@@ -224,10 +222,6 @@ export function Settings({
               <h3>{t('更新', 'Updates')}</h3>
               <UpdateNotice host={host} />
             </section>
-            <button type="button" className="settings-link" onClick={onRecover}>
-              <Icon name="cloudUp" size={14} />
-              {t('送信待ちを復元', 'Restore pending uploads')}
-            </button>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

@@ -6,14 +6,13 @@ import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
 
 /**
- * The workspace, the brain on show with its branch, Drive uploads, the AI
+ * The workspace, the brain on show with its branch, the AI
  * across brains, the terminal and the version, along the window's foot.
  */
 export function StatusBar({
   workspace,
   space,
   git,
-  uploads,
   running,
   waiting,
   status,
@@ -27,8 +26,6 @@ export function StatusBar({
   workspace: string;
   space?: Space;
   git?: GitStatus;
-  /** Saved changes waiting to reach Google Drive in this brain. */
-  uploads: number;
   running: number;
   waiting: number;
   /** The latest message about the workspace, such as a save or a move. */
@@ -58,12 +55,6 @@ export function StatusBar({
           {git.branch}
           {!!git.ahead && <span className="mono">↑{git.ahead}</span>}
           {!!git.behind && <span className="mono">↓{git.behind}</span>}
-        </span>
-      )}
-      {uploads > 0 && (
-        <span className="status-item plain uploads">
-          <Icon name="cloudUp" size={12} className="blink" />
-          {t(`Drive へ送信待ち ${uploads}`, `${uploads} waiting for Drive`)}
         </span>
       )}
       <span className="status-message" role="status">

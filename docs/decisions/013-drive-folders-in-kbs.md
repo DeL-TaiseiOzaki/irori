@@ -1,5 +1,7 @@
 # 013 — Google Drive folders belong to KBs
 
+> **Retired in 0.1.67** ([ADR 023](023-retire-drive-sign-in.md)): irori no longer signs in to Google Drive or bundles rclone. A Drive folder is connected through Drive for desktop as a folder on this computer ([ADR 019](019-local-folder-connections.md)). This page is kept as a record.
+
 Date: 2026-09-25. Status: owner decision; implemented for 0.1.37. Supersedes
 the part of [ADR 002](002-release-and-workspace.md) Q02 that made new Drive
 connections belong to a workspace.

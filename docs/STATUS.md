@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Drive through Drive for desktop, 2026-10-02 (**0.1.67**,
+[ADR 023](decisions/023-retire-drive-sign-in.md)): the owner retired irori's own
+Google Drive sign-in. Agents are optional and separate tools, as Claudian is
+beside Obsidian, and a synced folder covers what the sign-in offered, so no
+Google review or CASA is needed.
+- Removed: the OAuth client and accounts, rclone and its mounts, upload counts
+  and the quit wait, the materials panel's "prepare upload", workspace-level
+  Drive connections, and the packaging, CI and build inputs for rclone and the
+  Google client (`src/cloud/{accounts,oauth,outbox,rclone,upload-errors}.ts`,
+  `scripts/prepare-rclone.mjs`, `workspace-cloud-ui-smoke`).
+- `CloudService` keeps the folders on this computer (ADR 019). A hibachi's
+  `.irori/cloud-mounts.json` records are listed as `retired`;
+  `switchCloudToLocal` turns one into a folder connection under the same id,
+  name, place and access, and removes its device record and the empty mount
+  point irori made. `DriveLeftovers` lists rclone cache items with
+  `Dirty: true` and saves them to a chosen folder without overwriting, and it
+  still restores prepared copies. The start screen shows **Drive の未送信分**
+  only while there is something to save.
+- Verified with `npm run build`, `npm test` (391 tests, new `retired-drive`
+  and `drive-leftovers`, folder tests ported from the Drive fixtures), the UI
+  suites (`cloud-ui-smoke` rewritten for folders, retired switching and the
+  unsent notice) and `npm run format:check`. Not verified: a real Drive for
+  desktop folder, installed Windows/macOS builds.
+- Draft #146 (public Drive sign-in readiness) is superseded.
+
 Published 2026-10-03: **0.1.66** (#157, submodules in a hibachi) is merged at
 the owner's request and published as
 [v0.1.66-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.66-preview.1)

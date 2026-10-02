@@ -112,7 +112,6 @@ try {
     'assets/irori-icon.icns',
     'LICENSE',
     'docs/THIRD_PARTY_NOTICES.md',
-    'vendor/rclone/distribution.json',
   ])
     assert(entries.includes(entry), `Missing packaged file: ${entry}`);
   const roots = new Set([
@@ -207,11 +206,6 @@ try {
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_PATH;
   delete env.NODE_OPTIONS;
-  delete env.IRORI_GOOGLE_CLIENT_ID;
-  delete env.IRORI_GOOGLE_CLIENT_SECRET;
-  // A packaged build must not use a development machine's OAuth environment.
-  env.IRORI_GOOGLE_CLIENT_ID = 'synthetic-development-client';
-  env.IRORI_GOOGLE_CLIENT_SECRET = 'synthetic-development-secret';
   // An installed irori checks for updates by itself; this run must not reach GitHub.
   env.IRORI_AUTOMATIC_UPDATE_CHECKS = '0';
   const launchPackaged = () =>
@@ -257,82 +251,6 @@ try {
   const updateState = await page.evaluate(() => window.irori.updateState());
   assert.deepEqual(updateState.install, { phase: 'idle' });
   assert.equal(updateState.check, undefined);
-  const cloudSetup = await page.evaluate(() => window.irori.cloudSetup());
-  assert.equal(cloudSetup.oauthConfigured, process.env.IRORI_EXPECT_PACKAGED_OAUTH === '1');
-  assert.equal(cloudSetup.available, true, cloudSetup.detail);
-  assert.equal(cloudSetup.version, 'v1.75.1');
-  let oauthHandoff: {
-    googleAuthorization: boolean;
-    driveScope: boolean;
-    clientConfigured: boolean;
-  } | null = null;
-  if (cloudSetup.oauthConfigured) {
-    // Exercise the compiled client through real rclone, stopping before Google consent.
-    // Keep OAuth URLs/client values out of logs and evidence; inspect only the local redirect.
-    await application.evaluate(({ shell }) => {
-      const state = { restore: shell.openExternal, result: null as unknown };
-      Reflect.set(globalThis, 'iroriPackageOAuth', state);
-      shell.openExternal = async (address) => {
-        const result = {
-          googleAuthorization: false,
-          driveScope: false,
-          clientConfigured: false,
-        };
-        try {
-          const local = new URL(address);
-          if (local.origin !== 'http://127.0.0.1:53682' || local.pathname !== '/auth')
-            throw Error('Unexpected local OAuth endpoint');
-          const response = await fetch(local, {
-            redirect: 'manual',
-            signal: AbortSignal.timeout(10000),
-          });
-          const authorization = new URL(response.headers.get('location') ?? '');
-          result.googleAuthorization =
-            response.status === 307 &&
-            authorization.origin === 'https://accounts.google.com' &&
-            ['/o/oauth2/auth', '/o/oauth2/v2/auth'].includes(authorization.pathname);
-          result.driveScope =
-            authorization.searchParams.get('scope') === 'https://www.googleapis.com/auth/drive';
-          const client = authorization.searchParams.get('client_id') ?? '';
-          result.clientConfigured =
-            client.endsWith('.apps.googleusercontent.com') &&
-            client !== 'synthetic-development-client';
-        } catch {
-          // Fixed boolean diagnostics prevent a failed URL assertion from revealing values.
-        }
-        state.result = result;
-      };
-    });
-    let accountId: string | undefined;
-    try {
-      accountId = (await page.evaluate(() => window.irori.addCloudAccount('Packaged OAuth trial')))
-        .id;
-      await expect
-        .poll(
-          () =>
-            application!.evaluate(
-              () => Reflect.get(globalThis, 'iroriPackageOAuth').result !== null,
-            ),
-          { timeout: 20000 },
-        )
-        .toBe(true);
-      oauthHandoff = await application.evaluate(
-        () => Reflect.get(globalThis, 'iroriPackageOAuth').result,
-      );
-      assert.deepEqual(oauthHandoff, {
-        googleAuthorization: true,
-        driveScope: true,
-        clientConfigured: true,
-      });
-    } finally {
-      if (accountId) await page.evaluate((id) => window.irori.cancelCloudAccount(id), accountId);
-      await application.evaluate(({ shell }) => {
-        shell.openExternal = Reflect.get(globalThis, 'iroriPackageOAuth').restore;
-        Reflect.deleteProperty(globalThis, 'iroriPackageOAuth');
-      });
-    }
-    assert.deepEqual(await page.evaluate(() => window.irori.cloudAccounts()), []);
-  }
   const root = path.join(temporary, '検証 KB');
   await mkdir(root);
   await writeFile(path.join(root, 'note.md'), '# Packaged note\n');
@@ -633,14 +551,12 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership and bundled rclone; configured OAuth checks local browser handoff/cancellation only, without Google consent or model inference; not installed-device acceptance',
+          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership; no model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
         macSignature,
         runtime,
-        cloudSetup,
-        oauthHandoff,
         weight,
         inventory,
         artifacts,

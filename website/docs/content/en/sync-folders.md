@@ -23,7 +23,7 @@ Set the folder you use to keep its files on this computer as well, for example w
 
 ## Connect a folder
 
-1. Open the hibachi's **Connect** and choose **This computer**.
+1. Open the hibachi's **Connect**.
 2. Use **Choose folder** to pick a folder inside the synced folder.
 3. Check the name shown in Contents and select **Register and connect**.
 

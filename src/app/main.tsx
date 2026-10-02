@@ -37,7 +37,6 @@ import {
 } from './device-settings';
 import { useLanguage } from './useLanguage';
 import { t } from '../domain/i18n';
-import { CloudRecoveryDialog } from './CloudRecovery';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import {
@@ -161,9 +160,9 @@ function App() {
   const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
-  // An editable Drive folder the next note goes into, instead of the active KB.
+  // An editable connected folder the next note goes into, instead of the active KB.
   const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
-  // A file or folder of an editable Drive folder being renamed, moved or deleted.
+  // A file or folder of an editable connected folder being renamed, moved or deleted.
   const [entryAction, setEntryAction] = useState<{
     space: CloudRoot;
     entry: Entry;
@@ -173,12 +172,10 @@ function App() {
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
-  const [cloudRoot, setCloudRoot] = useState<CloudRoot>(),
-    [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
+  const [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   // The brain panel shows its files or, in place of them, its changes.
   const [brainMode, setBrainMode] = useState<BrainMode>('files');
   const gitOpen = brainMode === 'changes';
-  const [recovering, setRecovering] = useState(false);
   const [brainSettings, setBrainSettings] = useState(false);
   const [noteAction, setNoteAction] = useState<NoteAction>();
   const [gitReview, setGitReview] = useState(false);
@@ -406,7 +403,7 @@ function App() {
   // The open page's declared properties and the person's actor id (ADR 015), read
   // again whenever a note is loaded so an edited declaration takes effect.
   const propertiesRead = useResource(() => host.pageProperties(doc!.scopeId), [doc?.scopeId], {
-    enabled: !!doc && !doc.workspaceId && !doc.cloud,
+    enabled: !!doc && !doc.cloud,
     refresh: editorKey,
   });
   // The brain's top level, shared by its three sections and the hibachi agent's Schema line.
@@ -423,14 +420,13 @@ function App() {
     enabled: !!active,
     refresh: revision,
   });
-  // Drive folders' upload state changes without file events, so it is polled.
+  // A connected folder's link can go away without file events, so it is polled.
   const connectionsRead = useResource(
     () => host.cloudConnections(active!.scopeId),
     [active?.scopeId],
     { enabled: !!active && !startup, refresh: revision, interval: 5000 },
   );
   const connections = connectionsRead.data ?? [];
-  const uploads = connections.reduce((sum, connection) => sum + (connection.pending ?? 0), 0);
   const defaultNoteDirectory = notesDeclared?.newNoteDirectory ?? 'Knowledge_Base/Notes';
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
@@ -622,10 +618,10 @@ function App() {
     if (view === 'schema' && (!hibachiAgent || schemaTarget?.scopeId !== active?.scopeId))
       setView('note');
   }, [active?.scopeId, hibachiAgent]);
-  // Who typed which line of the open note. A Drive file is outside the KB's Git
-  // history and has no record; a failure here leaves the note unmarked rather than unopenable.
+  // Who typed which line of the open note. A connected folder's file is outside the KB's
+  // Git history and has no record; a failure here leaves the note unmarked rather than unopenable.
   useEffect(() => {
-    if (!doc || doc.workspaceId || doc.cloud || doc.viewer) return setAuthorship(undefined);
+    if (!doc || doc.cloud || doc.viewer) return setAuthorship(undefined);
     let current = true;
     const { scopeId, path, text } = doc;
     void host
@@ -635,7 +631,7 @@ function App() {
     return () => {
       current = false;
     };
-  }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
+  }, [doc?.scopeId, doc?.path, doc?.hash]);
   const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
   const editor = useRef<PageEditorHandle>(null);
   const current = useRef({ doc, buffer, external });
@@ -731,9 +727,7 @@ function App() {
     const now = current.current;
     if (!now.doc) return;
     try {
-      const disk = now.doc.workspaceId
-        ? await host.cloudRead(now.doc.workspaceId, now.doc.path)
-        : await host.read(now.doc.scopeId, now.doc.path);
+      const disk = await host.read(now.doc.scopeId, now.doc.path);
       if (
         generation !== reconciliation.current ||
         organizing.current ||
@@ -868,9 +862,9 @@ function App() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [dirty, buffer, doc, external, gitBusy]);
-  // rclone learns of a change made in Drive elsewhere only by polling, so a Drive
-  // document at rest is read again now and then; the change would otherwise show
-  // only when a save ran into it. A failed check ends the checks until the document
+  // A connected folder lies outside the hibachi's watched files, and a sync app
+  // changes it at any time, so its document at rest is read again now and then; the
+  // change would otherwise show only when a save ran into it. A failed check ends the checks until the document
   // changes, so an unreachable folder is reported once rather than every tick.
   useEffect(() => {
     if (!doc?.cloud || dirty) return;
@@ -1056,23 +1050,11 @@ function App() {
     setExternal(undefined);
     setStartup(false);
     setConnecting(true);
-    setCloudRoot(undefined);
     try {
-      setCloudRoot(await host.workspaceCloud(profile.id));
-      // Drive folders belong to KBs; a workspace's own connections from before
-      // that are moved into a KB from its connection dialog, and are not mounted.
+      // The folders of hibachis this workspace leaves are disconnected; its own are connected.
       const nextIds = available.map((space) => space.scopeId);
-      // A workspace removed on the start screen took its own connections with it,
-      // and its ID no longer names anything the host can look up.
-      const previousKept =
-        !!workspace && (await host.workspaces()).some((item) => item.id === workspace.id);
-      for (const previousId of workspace
-        ? [...workspace.scopeIds, ...(previousKept ? [workspace.id] : [])]
-        : []) {
-        if (
-          (previousId === workspace?.id || !nextIds.includes(previousId)) &&
-          (previousId === workspace?.id || spaces.some((space) => space.scopeId === previousId))
-        )
+      for (const previousId of workspace?.scopeIds ?? []) {
+        if (!nextIds.includes(previousId) && spaces.some((space) => space.scopeId === previousId))
           for (const connection of await host.cloudConnections(previousId).catch((error) => {
             report(error);
             return [];
@@ -1085,7 +1067,11 @@ function App() {
           report(error);
           return [];
         })) {
-          if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
+          if (
+            connection.state !== 'unconfigured' &&
+            connection.state !== 'mounted' &&
+            connection.state !== 'retired'
+          ) {
             await host.connectCloud(id, connection.mountId).catch(() => {
               setStatus(t('接続できないクラウドがあります。', 'A cloud could not connect.'));
             });
@@ -1102,22 +1088,7 @@ function App() {
     setConnectionTarget(target);
     setConnectionsOpen(true);
   }
-  async function openCloud(root: CloudRoot, entry: Entry) {
-    if (gitBusy) return false;
-    if (entry.blocked) {
-      setStatus(entry.blocked);
-      return false;
-    }
-    if (connecting || !(await save())) return false;
-    try {
-      if (opensInIrori(entry.path)) show(await host.cloudRead(root.scopeId, entry.path));
-      else await host.openCloudFile(root.scopeId, entry.path);
-      return true;
-    } catch (error) {
-      report(error);
-      return false;
-    }
-  }
+
   // The open document and the references follow a moved entry and leave with a deleted one.
   async function entryChanged(change: EntryChange) {
     const under = (ref: SourceRef) =>
@@ -1132,11 +1103,7 @@ function App() {
       const next = follow(open);
       const reopened =
         next &&
-        (await (
-          open.workspaceId
-            ? host.cloudRead(open.workspaceId, next.path)
-            : host.read(open.scopeId, next.path)
-        ).catch((error) => {
+        (await host.read(open.scopeId, next.path).catch((error) => {
           report(error);
           return undefined;
         }));
@@ -1222,8 +1189,7 @@ function App() {
   // Other brains stay open to choose while this one's AI runs.
   const switchLocked = sending || connecting;
   const anyRunning = runningScopes.length > 0;
-  const docSpace =
-    doc && !doc.workspaceId ? spaces.find((s) => s.scopeId === doc.scopeId) : undefined;
+  const docSpace = doc ? spaces.find((s) => s.scopeId === doc.scopeId) : undefined;
   const docLayer = doc?.cloud
     ? 'contents'
     : docSpace && doc
@@ -1370,12 +1336,7 @@ function App() {
             setSearchOpen(true);
           }}
           settings={
-            <Settings
-              hibachiAgent={hibachiAgent}
-              onHibachiAgent={chooseHibachi}
-              onRecover={() => setRecovering(true)}
-              onError={report}
-            />
+            <Settings hibachiAgent={hibachiAgent} onHibachiAgent={chooseHibachi} onError={report} />
           }
         />
         {(level === 'overview' || scene?.leaving === 'overview') && workspace && (
@@ -1607,12 +1568,7 @@ function App() {
                 hidden={gitReview || view === 'graph' || view === 'records' || view === 'schema'}
               >
                 <header className="stage-bar">
-                  {onNote && doc?.workspaceId ? (
-                    <Crumbs
-                      items={[{ icon: 'cloud', label: `${workspace?.name} · Drive` }]}
-                      here={doc.path.split('/').at(-1)}
-                    />
-                  ) : onNote && doc && docLayer ? (
+                  {onNote && doc && docLayer ? (
                     <Crumbs
                       space={docSpace}
                       {...fileCrumbs(docSpace, docLayer, doc.path)}
@@ -1664,7 +1620,7 @@ function App() {
                         </span>
                       ))}
                     {onNote && <span className="stage-divider" aria-hidden="true" />}
-                    {onNote && doc && !doc.workspaceId && (
+                    {onNote && doc && (
                       <Backlinks
                         key={`${doc.scopeId}:${doc.path}`}
                         scopeId={doc.scopeId}
@@ -1702,7 +1658,6 @@ function App() {
                     )}
                     {onNote &&
                       doc &&
-                      !doc.workspaceId &&
                       !doc.cloud &&
                       !doc.viewer &&
                       docSpace &&
@@ -1767,7 +1722,7 @@ function App() {
                             <Menu.Item
                               key={action}
                               onClick={() => {
-                                const space = doc.workspaceId ? cloudRoot : docSpace;
+                                const space = docSpace;
                                 if (space)
                                   setEntryAction({
                                     space,
@@ -1932,12 +1887,10 @@ function App() {
                       key={active.scopeId}
                       space={active}
                       doc={doc}
-                      cloudOwner={active.scopeId}
                       sourceNames={Object.fromEntries([
                         ...spaces
                           .filter((item) => workspace?.scopeIds.includes(item.scopeId))
                           .map((item) => [item.scopeId, item.name]),
-                        ...(cloudRoot ? [[cloudRoot.scopeId, `${cloudRoot.name} / Drive`]] : []),
                       ])}
                       onOpen={async (source) => {
                         const target = spaces.find(
@@ -1952,16 +1905,14 @@ function App() {
                           note: /\.md$/i.test(source.path),
                           layer: 'Knowledge_Base',
                         };
-                        if (!target && cloudRoot?.scopeId !== source.scopeId)
+                        if (!target)
                           throw Error(
                             t(
                               'このスペースはワークスペースにありません。',
                               "This space isn't in the workspace.",
                             ),
                           );
-                        const opened = target
-                          ? await open(target, entry)
-                          : await openCloud(cloudRoot!, entry);
+                        const opened = await open(target, entry);
                         if (!opened)
                           throw Error(
                             t('ファイルを開けませんでした。', 'Could not open the file.'),
@@ -2053,11 +2004,7 @@ function App() {
                               doc={{ ...doc, viewer: doc.viewer }}
                               load={(scopeId, path) => host.viewerBytes(scopeId, path)}
                               onExternal={() =>
-                                void (
-                                  doc.workspaceId
-                                    ? host.openCloudFile(doc.workspaceId, doc.path)
-                                    : host.openExternal(doc.scopeId, doc.path)
-                                ).catch(report)
+                                void host.openExternal(doc.scopeId, doc.path).catch(report)
                               }
                               onLink={(url) => void host.openUrl(url).catch(report)}
                             />
@@ -2365,7 +2312,6 @@ function App() {
         workspace={workspace?.name ?? t('ワークスペース', 'Workspace')}
         space={active}
         git={gitRead.data}
-        uploads={uploads}
         running={runningScopes.length}
         waiting={openRequestCount}
         status={status}
@@ -2386,7 +2332,6 @@ function App() {
         <Connections
           key={connectionTarget.scopeId}
           space={connectionTarget}
-          workspaceId={workspace?.id}
           running={running}
           onClose={() => {
             setConnectionsOpen(false);
@@ -2394,7 +2339,6 @@ function App() {
           }}
         />
       )}
-      {recovering && <CloudRecoveryDialog onClose={() => setRecovering(false)} />}
       {brainSettings && active && (
         <BrainSettings
           key={active.scopeId}
@@ -2550,8 +2494,7 @@ function App() {
             />
             {cloudNoteTarget ? (
               <p className="mount-preview">
-                {t('保存先（Google Drive）', 'Destination (Google Drive)')}:{' '}
-                {cloudNoteTarget.directory}/
+                {t('保存先', 'Destination')}: {cloudNoteTarget.directory}/
               </p>
             ) : (
               <label>

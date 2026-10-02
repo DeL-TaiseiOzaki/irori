@@ -87,10 +87,9 @@ export class FileService {
   cloud?: {
     resolve(scopeId: string, rel: string): Promise<string>;
     rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined>;
-    isWorkspacePath?(root: string): Promise<boolean>;
-    /** A Drive file with its editability and kept draft. */
+    /** A connected folder's file with its editability and kept draft. */
     document?(scopeId: string, rel: string): Promise<Document>;
-    /** Writes an edited Drive file in place, hash checked. */
+    /** Writes an edited file of a connected folder in place, hash checked. */
     write?(doc: Document): Promise<void>;
     writable?(scopeId: string, rel: string): boolean;
     /** The connected folders on this device that a hibachi's contents shows through links. */
@@ -157,8 +156,6 @@ export class FileService {
     return paths;
   }
   private async validateRoot(candidate: Space) {
-    if (await this.cloud?.isWorkspacePath?.(candidate.root))
-      throw Error('A KB cannot be registered inside workspace cloud storage');
     for (const s of this.spaces) {
       if (s.root === candidate.root || s.scopeId === candidate.scopeId)
         throw Error('This space or identity is already registered');

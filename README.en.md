@@ -81,7 +81,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 
 **Materials**
 - PDF, Word (.docx), PowerPoint (.pptx), spreadsheets such as Excel (.xlsx/.xlsm/.xls/.ods) and images open in the window, without switching apps. They are view only; edit them in their own app.
-- Connect a Google Drive folder as a hibachi's Contents. irori and the hibachi agent can both edit it, and changes are sent to Drive. Windows needs [WinFsp](https://winfsp.dev/rel/).
+- Connect a folder that Google Drive, Dropbox, Box, iCloud or OneDrive keeps in sync as a hibachi's Contents. irori and the hibachi agent can both edit it. For Google Drive, use [Google Drive for desktop](https://www.google.com/drive/download/).
 
 **Records and tools**
 - The **Changes** tab shows diffs, commits and history. irori never force-overwrites and never stashes on its own.

@@ -1,5 +1,7 @@
 # Cloud connection development preview
 
+> **Retired in 0.1.67** ([ADR 023](decisions/023-retire-drive-sign-in.md)): irori no longer signs in to Google Drive or bundles rclone. A Drive folder is connected through Drive for desktop as a folder on this computer ([ADR 019](decisions/019-local-folder-connections.md)). This page is kept as a record.
+
 Date: 2026-09-13. The first onboarding and read-only connection implementation is available locally. Actual Google consent and successful native mounts remain acceptance gates; this is not a released cloud-sync feature.
 
 Configured preview follow-up: the owner has now registered both distributor secrets. Version `0.1.2` passes [native package CI 34761095540](https://github.com/DeL-TaiseiOzaki/irori/actions/runs/34761095540), including compiled-client browser handoff/read-only scope/cancellation with bundled rclone on Windows x64, Mac arm64 and Linux x64. No Google consent or native mount was completed by these tests. The owner declared broader permissions for future writes; the actual request remains `drive.readonly`. See [CHECKPOINT](CHECKPOINT.md) for publication/device status.

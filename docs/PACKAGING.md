@@ -1,5 +1,7 @@
 # Desktop packaging foundation
 
+Retired 2026-10-02: irori no longer ships the rclone binary or a Google OAuth client, so packaging, the package smoke and CI no longer download, bundle, sign or check them, and `npm run setup:cloud` is removed. The dated sections below record what was measured and decided at the time and still describe rclone and distributor OAuth as they stood then.
+
 Packages the application never loads, 2026-09-22: packaging keeps under
 `node_modules` only what the host bundle requires and what those packages
 depend on, and the build writes the notices for what Vite bundled. The Linux
@@ -30,8 +32,7 @@ parser and types, PostCSS, lodash's types), and npm's `.bin` links, hidden
 `.package-lock.json` and Vite's `.vite-temp`, which the copy filter had let
 through. Zod and papaparse are used on both sides and stay. Nothing resolved by
 path at run time is touched: node-pty's binary, the Agent SDK's files and
-OpenCode's `dist/v2/client.js` sit inside kept directories, and `vendor/rclone`
-is outside `node_modules`. The renderer's packages are not moved to
+OpenCode's `dist/v2/client.js` sit inside kept directories. The renderer's packages are not moved to
 `devDependencies`: that would restate the same classification by hand, and
 `npm audit --omit=dev` would then stop reporting on code that runs in the
 application.

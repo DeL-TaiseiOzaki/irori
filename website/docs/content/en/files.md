@@ -26,4 +26,4 @@ PDF and Office viewers are for reading. Edit those documents in their original a
 
 Write [Knowledge notes](notes.md) as you read and leave relative links to the materials. Ask an [AI agent](agents.md) to summarize or organize specific source files.
 
-The agent's access depends on its CLI settings and the connection's state. A disconnected Drive folder cannot be read as though it were connected.
+The agent's access depends on its CLI settings and the connection's state. A disconnected folder cannot be read as though it were connected.

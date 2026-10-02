@@ -15,11 +15,11 @@ Check that the chosen CLI starts from a terminal and is authenticated. irori use
 
 Answer any permission request or question waiting in the panel. Use **Resume sending** if the queue is paused. See [AI agents](agents.md) for model and access settings, and [conversations](conversations.md) for resume conditions.
 
-## Saving or Drive connections fail
+## Saving or folder connections fail
 
 For a save conflict, check whether another app or agent changed the same file. Compare the incoming text with your draft and preserve needed text before resolving it.
 
-For Drive, check the connection state, account authentication, and write permissions. Windows needs WinFsp. Read the reason for pending uploads and reconnect after the problem is resolved. Do not delete connection storage while unsent changes remain. See [Google Drive](drive.md) for the connection steps.
+For a connected folder, check its state and that the original folder still exists, then use **Reconnect** or **Choose folder again**. Check syncing in the service's own app. See [synced folders](sync-folders.md).
 
 ## Report a problem
 

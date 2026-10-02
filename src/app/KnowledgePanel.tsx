@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { StageView } from './StageView';
 import { Crumbs } from './NoteBar';
-import type { CloudConnection, Document, Space } from '../domain/types';
+import type { Document, Space } from '../domain/types';
 import type {
   KnowledgeHistory,
-  PendingWrite,
   SourceVersion,
   SourceLocation,
   SourceRef,
@@ -13,12 +12,6 @@ import { displayLocale, t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
 const host = window.irori;
 // Names are functions so that they are read in the language of each render.
-const stateNames: Record<PendingWrite['state'], () => string> = {
-  pending: () => t('送信待ち・端末に保持', 'Pending upload · kept on this device'),
-  uploading: () => t('送信済み・再確認が必要', 'Uploaded · needs reconfirmation'),
-  confirmed: () => t('送信先の版を確認済み', 'Destination version confirmed'),
-  failed: () => t('再確認が必要・端末に保持', 'Needs reconfirmation · kept on this device'),
-};
 const locationNames: Record<SourceLocation['state'], () => string> = {
   matching: () => t('保持版と一致', 'Matches the kept version'),
   changed: () => t('保持版から変更あり', 'Changed from the kept version'),
@@ -29,22 +22,17 @@ const locationNames: Record<SourceLocation['state'], () => string> = {
 export function KnowledgePanel({
   space,
   doc,
-  cloudOwner,
   sourceNames,
   onOpen,
   onClose,
 }: {
   space: Space;
   doc?: Document;
-  cloudOwner?: string;
   sourceNames: Record<string, string>;
   onOpen: (source: SourceRef) => Promise<void>;
   onClose: () => void;
 }) {
   const [history, setHistory] = useState<KnowledgeHistory>({ runs: [], artifacts: [] });
-  const [connections, setConnections] = useState<CloudConnection[]>([]);
-  const [pending, setPending] = useState<PendingWrite[]>([]);
-  const [mountId, setMountId] = useState('');
   const [runId, setRunId] = useState('');
   const [filename, setFilename] = useState(doc?.scopeId === space.scopeId ? doc.path : '');
   const [preview, setPreview] = useState<{
@@ -62,14 +50,10 @@ export function KnowledgePanel({
   const [busy, setBusy] = useState(false);
   async function refresh() {
     setHistory(await host.knowledgeHistory(space.scopeId));
-    if (cloudOwner) {
-      setConnections(await host.cloudConnections(cloudOwner));
-      setPending(await host.pendingCloudWrites(cloudOwner));
-    }
   }
   useEffect(() => {
     void refresh().catch((e) => setError(errorText(e)));
-  }, [space.scopeId, cloudOwner]);
+  }, [space.scopeId]);
   useEffect(() => {
     if (!runTarget) return;
     const element = document.getElementById(`run-${runTarget.id}`) as HTMLDetailsElement | null;
@@ -402,53 +386,6 @@ export function KnowledgePanel({
               {t('この版を登録', 'Register this version')}
             </button>
           </section>
-          {cloudOwner && (
-            <section>
-              <h3>{t('Drive への送信待ち', 'Pending upload to Drive')}</h3>
-              <label>
-                {t('送信先', 'Destination')}
-                <select value={mountId} onChange={(e) => setMountId(e.target.value)}>
-                  <option value="">{t('フォルダを選択', 'Select a folder')}</option>
-                  {connections
-                    .filter((item) => item.provider === 'google-drive')
-                    .map((item) => (
-                      <option key={item.mountId} value={item.mountId}>
-                        {item.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <button
-                disabled={busy || !mountId || !filename.trim()}
-                onClick={() =>
-                  void perform(
-                    () =>
-                      host.prepareCloudWrite(cloudOwner, mountId, {
-                        scopeId: space.scopeId,
-                        path: filename,
-                      }),
-                    t('送信待ちとして保持しました。', 'Kept as pending.'),
-                  )
-                }
-              >
-                {t('送信待ちとして保持', 'Keep as pending upload')}
-              </button>
-              <ul>
-                {pending.map((item) => (
-                  <li key={item.id}>
-                    {item.name} · {stateNames[item.state]()}
-                    {item.detail && <p>{item.detail}</p>}{' '}
-                    <button
-                      disabled={busy}
-                      onClick={() => void perform(() => host.restoreSource(item.source))}
-                    >
-                      {t('別ファイルに復元', 'Restore to another file')}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </aside>
       </div>
     </StageView>

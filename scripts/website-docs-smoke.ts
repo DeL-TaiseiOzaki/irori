@@ -127,7 +127,7 @@ export async function checkDocumentation(page: Page) {
     // Japanese substrings and English body text both navigate to the right edition.
     await page.goto(doc('ja'));
     await page.getByRole('button', { name: labels.ja.search }).click();
-    await page.locator('#search-input').fill('送信待ち');
+    await page.locator('#search-input').fill('未送信分');
     await page.locator('#search-results a').first().waitFor();
     assert((await page.locator('#search-results').innerText()).includes('Google Drive'));
     await page.locator('#search-input').fill('存在しない検索語xyz');
@@ -152,7 +152,7 @@ export async function checkDocumentation(page: Page) {
     await expect(page.locator('#search-open')).toBeFocused();
     await page.goto(doc('en', 'notes'));
     await page.keyboard.press('Control+k');
-    await page.locator('#search-input').fill('pending uploads');
+    await page.locator('#search-input').fill('not sent to Drive');
     await page.locator('#search-results a').first().waitFor();
     assert(
       (await page.locator('#search-results a').first().getAttribute('href'))?.startsWith(doc('en')),

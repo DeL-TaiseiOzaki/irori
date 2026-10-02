@@ -4,18 +4,23 @@ import {
   mkdir,
   writeFile,
   readFile,
-  copyFile,
-  chmod,
+  readdir,
   readlink,
   lstat,
+  chmod,
+  stat,
 } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { CloudService } from '../src/cloud/service';
+
+// Folders on this computer, shown in contents through a link (ADR 019), and Google
+// Drive connections from before 0.1.67, which irori no longer makes itself (ADR 023).
 if (process.platform === 'win32') {
   console.log(
-    'Cloud UI protocol fixture uses a POSIX executable; Windows native acceptance remains open.',
+    'Cloud UI fixture uses POSIX links and permissions; Windows remains unverified here.',
   );
   process.exit(0);
 }
@@ -23,36 +28,71 @@ const base = await mkdtemp(path.join(tmpdir(), 'irori cloud UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
 const roots = [path.join(base, 'Personal KB'), path.join(base, 'Team KB')];
-const spaces = [];
+const spaces: Awaited<ReturnType<typeof files.register>>[] = [];
 for (const [i, root] of roots.entries()) {
   await mkdir(root);
   spaces.push(
     await files.register(root, i === 0 ? '個人KB' : 'チームKB', i === 0 ? 'personal' : 'team'),
   );
 }
-const accounts = [
-  { id: randomUUID(), name: '個人アカウント', provider: 'google-drive', state: 'ready' },
-  // Signed in with permission to change files; the first account predates that.
-  {
-    id: randomUUID(),
-    name: '仕事アカウント',
-    provider: 'google-drive',
-    state: 'ready',
-    writable: true,
-  },
-];
-await writeFile(path.join(files.dataDir, 'cloud-accounts.json'), JSON.stringify(accounts));
-const executable = path.join(base, 'rclone-fixture');
-await copyFile('tests/fixtures/rclone-ui.mjs', executable);
-await chmod(executable, 0o700);
-const env = {
-  ...process.env,
-  IRORI_DATA_DIR: files.dataDir,
-  IRORI_RCLONE_PATH: executable,
-} as Record<string, string>;
+// Two Drive connections as irori 0.1.66 wrote them; the first had its empty mount point.
+const retired = ['共有 資料', '古い 接続'].map((name, i) => ({
+  schemaVersion: 1,
+  mountId: randomUUID(),
+  scopeId: spaces[0].scopeId,
+  provider: 'google-drive',
+  folderId: `folder-${i}`,
+  parentId: 'root',
+  folderName: `Drive ${name}`,
+  contentsRoot: 'contents',
+  name,
+  access: i === 0 ? 'read-only' : 'read-write',
+}));
+await writeFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), JSON.stringify(retired));
+const placeholder = path.join(spaces[0].root, 'contents', retired[0].name);
+await mkdir(placeholder, { recursive: true });
+const identity = await stat(placeholder);
+await chmod(placeholder, 0);
+await mkdir(path.join(files.dataDir, 'cloud-bindings'));
+const retiredBinding = path.join(
+  files.dataDir,
+  'cloud-bindings',
+  `${spaces[0].scopeId}-${retired[0].mountId}.json`,
+);
+await writeFile(
+  retiredBinding,
+  JSON.stringify({
+    scopeId: spaces[0].scopeId,
+    mountId: retired[0].mountId,
+    root: spaces[0].root,
+    accountId: randomUUID(),
+    placeholder: { dev: identity.dev, ino: identity.ino },
+  }),
+);
+// A change rclone never uploaded, still in its write cache on this device.
+const cache = path.join(files.dataDir, 'rclone', 'cache');
+await mkdir(path.join(cache, 'vfsMeta', 'x'), { recursive: true });
+await mkdir(path.join(cache, 'vfs', 'x'), { recursive: true });
+await writeFile(
+  path.join(cache, 'vfsMeta', 'x', 'a.md'),
+  JSON.stringify({
+    ModTime: '2026-10-01T00:00:00Z',
+    ATime: '2026-10-01T00:00:00Z',
+    Size: 5,
+    Rs: [],
+    Fingerprint: '',
+    Dirty: true,
+  }),
+);
+await writeFile(path.join(cache, 'vfs', 'x', 'a.md'), 'Unsent');
+// Folders a sync app keeps on this device.
+const drive = path.join(base, 'Google Drive 同期', 'マイドライブ', '共有 資料');
+const research = path.join(base, 'Dropbox', '研究');
+for (const folder of [drive, research]) await mkdir(folder, { recursive: true });
+await writeFile(path.join(drive, 'memo.md'), '# 共有メモ\n');
+await writeFile(path.join(research, 'memo.md'), '# 研究メモ\n');
+const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
-delete env.IRORI_GOOGLE_CLIENT_ID;
-delete env.IRORI_GOOGLE_CLIENT_SECRET;
 const launch = () =>
   electron.launch({
     args: [
@@ -64,93 +104,99 @@ const launch = () =>
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
 let app = await launch();
+// The system folder dialog cannot be driven, so the main process answers it.
+const choose = (folder: string) =>
+  app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as any;
+  }, folder);
 try {
   const page = await app.firstWindow();
   page.on('pageerror', (e) => errors.push(String(e)));
+  // The start screen offers what Drive connections left, and saves it to a folder.
+  const leftovers = page.getByRole('button', { name: 'Drive の未送信分 1', exact: true });
+  await leftovers.click();
+  const recovery = page.getByRole('dialog', { name: 'Drive の未送信分', exact: true });
+  await expect(recovery).toContainText('変更されたファイル 1');
+  const saveTo = path.join(base, 'Saved');
+  await mkdir(saveTo);
+  await choose(saveTo);
+  await recovery.getByRole('button', { name: 'フォルダに保存', exact: true }).click();
+  await expect(recovery.getByRole('status')).toContainText('irori-drive-unsent-');
+  await expect(recovery).toContainText('ありません。');
+  const [saved] = await readdir(saveTo);
+  expect(await readFile(path.join(saveTo, saved, 'x', 'a.md'), 'utf8')).toBe('Unsent');
+  await recovery.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(leftovers).toHaveCount(0);
   await page.getByRole('checkbox', { name: /個人KB/ }).check();
   await page.getByRole('checkbox', { name: /チームKB/ }).check();
   await page.getByLabel('ワークスペース名').fill('連携確認');
-  await page.screenshot({ path: 'test-results/irori-startup.png' });
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
-  // A folder on this device is offered first; Drive is the other source.
-  await expect(
-    page.getByRole('button', { name: 'このコンピューター', exact: true }),
-  ).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Google Drive', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'アカウントを追加' })).toBeDisabled();
-  // An account from before editing existed may only read until it signs in again.
-  const olderAccount = page.locator('.account-row').filter({ hasText: '個人アカウント' });
-  await expect(olderAccount).toContainText('読み取りのみ許可');
-  await expect(olderAccount.getByRole('button', { name: '書き込みを許可' })).toBeVisible();
-  await expect(
-    page
-      .locator('.account-row')
-      .filter({ hasText: '仕事アカウント' })
-      .getByRole('button', { name: '書き込みを許可' }),
-  ).toHaveCount(0);
-  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
-  await expect(page.locator('.folder-row')).toHaveCount(2);
-  // A response from an old account must not overwrite the currently displayed folders.
-  await page.locator('.folder-row').nth(1).getByRole('button', { name: '開く' }).click();
-  await expect
-    .poll(() => readFile(path.join(files.dataDir, 'folder-pending'), 'utf8').catch(() => ''))
-    .toBe('pending');
-  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[1].id);
-  await page.getByLabel('ドライブ', { exact: true }).selectOption('shared-fixture');
-  await expect(page.locator('.folder-row')).toHaveCount(1);
-  await expect(page.locator('.folder-row')).toContainText('成果物');
-  await writeFile(path.join(files.dataDir, 'folder-release'), 'release');
-  await expect
-    .poll(() => readFile(path.join(files.dataDir, 'folder-finished'), 'utf8').catch(() => ''))
-    .toBe('finished');
-  await page.waitForTimeout(100);
-  await expect(page.locator('.folder-row')).toHaveCount(1);
-  await expect(page.locator('.folder-row')).toContainText('成果物');
-  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[0].id);
-  await expect(page.locator('.folder-row')).toHaveCount(2);
-  await page.locator('.folder-row').nth(1).getByRole('radio').check();
-  await page.getByLabel('フォルダ名').fill('調査 資料');
-  await expect(page.locator('.mount-preview')).toContainText('contents/調査 資料/');
-  const editable = page.getByLabel('編集を許可');
-  await expect(editable).toBeChecked();
-  await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
-  await expect(page.locator('.connection-card')).toContainText('contents/調査 資料/');
-  await page.locator('.folder-row').first().getByRole('radio').check();
-  await page.getByLabel('フォルダ名').fill('調査 資料');
-  await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('同じ名前');
-  await expect(page.locator('.connection-card')).toHaveCount(1);
-  await page.getByLabel('使用するクラウドアカウント').selectOption(accounts[1].id);
-  await page.getByLabel('ドライブ', { exact: true }).selectOption('shared-fixture');
-  await expect(page.locator('.folder-row')).toHaveCount(1);
-  // Opening a folder must still leave a way to connect that folder itself.
-  await page.locator('.folder-row').getByRole('button', { name: '開く' }).click();
-  await expect(page.getByRole('button', { name: '接続先を登録', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'ここを接続先にする' }).click();
-  await expect(page.locator('.mount-preview .mount-source')).toHaveText('成果物');
-  await page.getByLabel('フォルダ名').fill('納品物');
-  await editable.uncheck();
-  await page.getByRole('button', { name: '接続先を登録', exact: true }).click();
-  await expect(page.locator('.connection-card')).toHaveCount(2);
-  // An editable connection shows that its account may only read.
-  await expect(page.locator('.connection-card').filter({ hasText: '調査 資料' })).toContainText(
-    'アカウントが読み取りのみ',
+  const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
+  // Choosing a folder is the only way to connect one: there is no Drive sign-in.
+  await expect(dialog.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toBeVisible();
+  for (const name of ['Google Drive', 'このコンピューター', 'アカウントを追加'])
+    await expect(dialog.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await expect(dialog.locator('.account-row, .folder-row')).toHaveCount(0);
+  const cards = dialog.locator('.connection-card');
+  await expect(cards).toHaveCount(2);
+  const shared = cards.filter({ hasText: 'contents/共有 資料/' });
+  const old = cards.filter({ hasText: 'contents/古い 接続/' });
+  for (const card of [shared, old]) {
+    await expect(card.locator('.connection-state')).toHaveText('終了');
+    await expect(card).toContainText('Google Drive');
+    await expect(card).toContainText('直接接続は終了しました');
+    await expect(card.getByRole('button', { name: 'フォルダに切り替える' })).toBeVisible();
+    await expect(card.getByRole('button', { name: '再接続' })).toHaveCount(0);
+  }
+  // Let the dialog finish fading in before the evidence image.
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/irori-cloud-retired.png' });
+  // Switched to the same folder as Drive for desktop keeps it, under the same name.
+  await choose(drive);
+  await shared.getByRole('button', { name: 'フォルダに切り替える', exact: true }).click();
+  await expect(shared.locator('.connection-state')).toHaveText('接続済み');
+  await expect(shared).toContainText('このコンピューター');
+  await expect(shared).toContainText('読み取り専用');
+  expect(await readlink(placeholder)).toBe(drive);
+  const local = JSON.parse(
+    await readFile(path.join(spaces[0].root, '.irori/local-folders.json'), 'utf8'),
   );
-  const deliveries = page.locator('.connection-card').filter({ hasText: '納品物' });
-  await deliveries.getByRole('button', { name: '編集を許可' }).click();
-  await expect(deliveries.getByRole('button', { name: '読み取り専用にする' })).toBeVisible();
-  const stored = JSON.parse(
-    await readFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), 'utf8'),
-  );
-  expect(stored.map((item: any) => [item.name, item.folderId, item.driveId, item.access])).toEqual([
-    ['調査 資料', 'folder-second', undefined, 'read-write'],
-    ['納品物', 'shared-folder', 'shared-fixture', 'read-write'],
+  expect(local.map((item: any) => [item.mountId, item.name, item.access])).toEqual([
+    [retired[0].mountId, '共有 資料', 'read-only'],
   ]);
-  expect(JSON.stringify(stored)).not.toContain(accounts[0].id);
-  expect(JSON.stringify(stored)).not.toContain(base);
+  expect(JSON.stringify(local)).not.toContain(base);
+  expect(
+    JSON.parse(await readFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), 'utf8')),
+  ).toEqual([retired[1]]);
+  expect(await lstat(retiredBinding).catch(() => undefined)).toBeUndefined();
+  // The other one is unregistered; its files stay in Drive.
+  await old.getByRole('button', { name: '接続先の操作' }).click();
+  await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  expect(
+    JSON.parse(await readFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), 'utf8')),
+  ).toEqual([]);
+  // A new folder on this computer, registered and connected through a link.
+  await choose(research);
+  await dialog.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
+  await expect(dialog.locator('.local-path')).toHaveText(research);
+  await expect(dialog.getByLabel('フォルダ名')).toHaveValue('研究');
+  await expect(dialog.locator('.mount-preview')).toContainText('contents/研究/');
+  await expect(dialog.getByRole('switch', { name: '編集を許可' })).toBeChecked();
+  await dialog.getByRole('button', { name: '登録して接続', exact: true }).click();
+  const researchCard = cards.filter({ hasText: 'contents/研究/' });
+  await expect(researchCard.locator('.connection-state')).toHaveText('接続済み');
+  await expect(researchCard).toContainText('編集可');
+  const link = path.join(spaces[0].root, 'contents', '研究');
+  expect(await readlink(link)).toBe(research);
+  // The same name again is refused.
+  await dialog.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
+  await dialog.getByRole('button', { name: '登録して接続', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('同じ名前');
+  await expect(cards).toHaveCount(2);
   await page.screenshot({ path: 'test-results/irori-cloud-connections.png' });
-  // Dialog text must stay readable on the dialog's own surface in both themes.
+  // Dialog text must stay readable on the dialog's own surface in every theme.
   const luminance = (colour: string) => {
     const [r, g, b] = colour
       .match(/[\d.]+/g)!
@@ -176,179 +222,77 @@ try {
   // Buttons fade their background, so let the switch settle before the evidence image.
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'test-results/irori-cloud-connections-dark.png' });
-  // A folder a sync app keeps on this device, chosen with the system dialog and shown
-  // in contents through a link.
-  const synced = path.join(base, 'Google Drive 同期', '研究');
-  await mkdir(synced, { recursive: true });
-  await writeFile(path.join(synced, 'memo.md'), '# 同期メモ\n');
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as any;
-  }, synced);
-  await page.getByRole('button', { name: 'このコンピューター', exact: true }).click();
-  await page.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
-  await expect(page.locator('.local-path')).toHaveText(synced);
-  await expect(page.getByLabel('フォルダ名')).toHaveValue('研究');
-  await page.getByRole('button', { name: '登録して接続', exact: true }).click();
-  const localCard = page.locator('.connection-card').filter({ hasText: 'contents/研究/' });
-  await expect(localCard).toContainText('このコンピューター');
-  await expect(localCard).toContainText('接続済み');
-  const link = path.join(spaces[0].root, 'contents', '研究');
-  expect(await readlink(link)).toBe(synced);
-  expect(
-    await readFile(path.join(spaces[0].root, '.irori/local-folders.json'), 'utf8'),
-  ).not.toContain(base);
-  await page.screenshot({ path: 'test-results/irori-local-folder.png' });
-  await localCard.getByRole('button', { name: '接続先の操作' }).click();
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'hearth'));
+  // Disconnecting removes only the link, and unregistering keeps the folder's files.
+  await researchCard.getByRole('button', { name: '接続先の操作' }).click();
   await page.getByRole('menuitem', { name: '接続を解除' }).click();
-  await expect(localCard).toContainText('未接続');
+  await expect(researchCard.locator('.connection-state')).toHaveText('未接続');
   expect(await lstat(link).catch(() => undefined)).toBeUndefined();
-  await localCard.getByRole('button', { name: '接続先の操作' }).click();
+  await researchCard.getByRole('button', { name: '接続先の操作' }).click();
   await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
-  await expect(localCard).toHaveCount(0);
-  expect(await readFile(path.join(synced, 'memo.md'), 'utf8')).toBe('# 同期メモ\n');
+  await expect(researchCard).toHaveCount(0);
+  expect(await readFile(path.join(research, 'memo.md'), 'utf8')).toBe('# 研究メモ\n');
 } finally {
   await app.close();
 }
-// A malformed declaration in one checkout must not prevent attempting the next checkout.
-const declarationFile = path.join(spaces[0].root, '.irori/cloud-mounts.json');
-const originalDeclaration = await readFile(declarationFile, 'utf8');
-const teamConnection = {
-  ...JSON.parse(originalDeclaration)[0],
+// After a restart, one hibachi's unreadable record does not stop another's folder connecting.
+const team = path.join(base, 'Box', 'チーム');
+await mkdir(team, { recursive: true });
+const teamConnection = await new CloudService(files).addLocal({
   scopeId: spaces[1].scopeId,
-  mountId: randomUUID(),
-};
-await writeFile(
-  path.join(spaces[1].root, '.irori/cloud-mounts.json'),
-  JSON.stringify([teamConnection]),
-);
-await writeFile(
-  path.join(files.dataDir, 'cloud-bindings', `${spaces[1].scopeId}-${teamConnection.mountId}.json`),
-  JSON.stringify({
-    scopeId: spaces[1].scopeId,
-    mountId: teamConnection.mountId,
-    root: spaces[1].root,
-    accountId: accounts[0].id,
-  }),
-);
-await writeFile(declarationFile, '{ malformed fixture');
+  path: team,
+  contentsRoot: 'contents',
+  name: 'チーム資料',
+});
+const localFile = path.join(spaces[0].root, '.irori/local-folders.json');
+const original = await readFile(localFile, 'utf8');
+await writeFile(localFile, '{ malformed fixture');
 app = await launch();
 try {
   const page = await app.firstWindow();
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.getByRole('button', { name: '連携確認 を編集', exact: true }).click();
-  await page.getByLabel('ワークスペース名').fill('連携確認・更新');
-  await page.getByRole('button', { name: '変更を保存して開く' }).click();
+  // Nothing is left to save, so the start screen does not offer it.
+  await expect(page.getByRole('button', { name: /Drive の未送信分/ })).toHaveCount(0);
+  await page.locator('.workspace-card').filter({ hasText: '連携確認' }).click();
   await expect(
     page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }),
   ).toBeEnabled();
   await expect(page.getByText('接続を準備中…', { exact: true })).toHaveCount(0);
   expect(
     await page.evaluate(
-      async (id) => (await window.irori.cloudConnections(id))[0].state,
-      spaces[1].scopeId,
+      async ([id, mountId]) =>
+        (await window.irori.cloudConnections(id)).find((item) => item.mountId === mountId)?.state,
+      [spaces[1].scopeId, teamConnection.mountId],
     ),
-  ).toBe('error');
-  await writeFile(declarationFile, originalDeclaration);
+  ).toBe('mounted');
+  expect(await readlink(path.join(spaces[1].root, 'contents', 'チーム資料'))).toBe(team);
+  await writeFile(localFile, original);
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
-  await expect(page.locator('.connection-card')).toHaveCount(2);
-  await expect(page.locator('.connection-card').first()).toContainText('contents/調査 資料/');
-  await expect(page.locator('.connection-card').nth(1)).toContainText('contents/納品物/');
-  await page.getByRole('button', { name: 'Google Drive', exact: true }).click();
-  await page
-    .locator('.account-row')
-    .first()
-    .getByRole('button', { name: 'アカウントの操作' })
-    .click();
-  await page.getByRole('menuitem', { name: '登録解除' }).click();
-  await expect(page.getByRole('dialog', { name: 'クラウド接続' }).getByRole('alert')).toContainText(
-    '接続先があります',
-  );
-  await page
-    .locator('.connection-card')
-    .first()
-    .getByRole('button', { name: '接続先の操作' })
-    .click();
-  await page.getByRole('menuitem', { name: '名前を変更' }).click();
-  const newName = page.getByLabel('新しい名前');
-  await newName.fill('新しい 調査資料');
-  await newName
-    .locator('xpath=ancestor::form[1]')
-    .getByRole('button', { name: '保存', exact: true })
-    .click();
-  await expect(page.locator('.connection-card').first()).toContainText('contents/新しい 調査資料/');
-  await page
-    .locator('.connection-card')
-    .nth(1)
-    .getByRole('button', { name: '接続先の操作' })
-    .click();
-  await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
-  await expect(page.locator('.connection-card')).toHaveCount(1);
-  await page
-    .locator('.account-row')
-    .nth(1)
-    .getByRole('button', { name: 'アカウントの操作' })
-    .click();
-  await page.getByRole('menuitem', { name: '登録解除' }).click();
-  await expect(page.locator('.account-row')).toHaveCount(1);
-  await page
-    .getByRole('dialog', { name: 'クラウド接続' })
-    .getByRole('button', { name: '閉じる', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'ワークスペースを選択', exact: true }).click();
-  await page.getByRole('button', { name: '連携確認・更新 の登録を削除', exact: true }).click();
-  await expect(page.locator('.workspace-card')).toHaveCount(0);
-  expect(JSON.parse(await readFile(path.join(files.dataDir, 'workspaces.json'), 'utf8'))).toEqual(
-    [],
-  );
-  const remaining = JSON.parse(
-    await readFile(path.join(spaces[0].root, '.irori/cloud-mounts.json'), 'utf8'),
-  );
-  expect(remaining.map((item: any) => [item.name, item.folderId])).toEqual([
-    ['新しい 調査資料', 'folder-second'],
-  ]);
-  expect(
-    JSON.parse(await readFile(path.join(spaces[0].root, '.irori/scope.json'), 'utf8')).scopeId,
-  ).toBe(spaces[0].scopeId);
-  // Opening another workspace after removing the one that was open does not look up
-  // the removed workspace: it has no connections left to close. (個人KB's declaration
-  // is still the malformed fixture, which is reported on its own.)
-  await page.getByRole('checkbox', { name: 'チームKB' }).check();
-  await page.getByRole('textbox', { name: 'ワークスペース名' }).fill('残った Brain');
-  await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'ノートを作成', exact: true })).toBeVisible();
-  await page.waitForTimeout(1500);
-  expect(
-    (await page.getByRole('alert').allTextContents()).filter((text) =>
-      text.includes('cloud owner'),
-    ),
-  ).toEqual([]);
+  const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
+  const card = dialog.locator('.connection-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('contents/共有 資料/');
+  await expect(card).toContainText('このコンピューター');
+  await card.getByRole('button', { name: '再接続', exact: true }).click();
+  await expect(card.locator('.connection-state')).toHaveText('接続済み');
+  expect(await readlink(placeholder)).toBe(drive);
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/cloud-ui-smoke.json',
     JSON.stringify(
       {
-        transport: 'explicit rclone protocol fixture',
-        nativeGoogleAuthentication: 'not exercised',
-        nativeMount: 'not exercised',
+        transport: 'folders on this computer through links; no Google Drive connection',
         checks: [
-          'multi-scope startup profile',
-          'two accounts',
-          'shared-drive folder selection',
-          'a folder on this device is connected through a link, disconnected and unregistered, keeping its files',
-          'an opened folder can itself be connected',
-          'editable by default, read-only by choice, switched per connection',
-          'an account that may only read offers to allow writing',
-          'dialog text contrast in light and dark themes',
-          'user-selected Japanese mount names',
+          'start screen offers changes rclone never uploaded and saves them to a chosen folder',
+          'the connection dialog offers only choosing a folder, with no Drive sign-in',
+          'retired Drive connections shown as ended, switched to a folder keeping name and access',
+          'a retired connection unregistered, its empty mount point removed on switching',
+          'a folder on this computer registered and connected through a link',
           'duplicate-name rejection',
-          'provider folder IDs preserved',
-          'restart persistence',
-          'workspace edit and removal preserving scopes',
-          'opening another workspace after removing the open one reports no unknown cloud owner',
-          'cloud rename and removal preserving provider identity',
-          'account removal refuses referenced accounts',
-          'one malformed scope does not stop another scope reconnecting',
-          'credentials excluded from portable declarations',
+          'dialog text contrast in light and dark themes',
+          'disconnect removes only the link; unregistering keeps the folder files',
+          'restart reconnects folders; one unreadable record does not stop another hibachi',
+          'device paths excluded from portable records',
         ],
         errors,
       },
@@ -356,9 +300,7 @@ try {
       2,
     ),
   );
-  console.log(
-    'Cloud UI fixture checks passed; native Google authentication and mount acceptance remain open.',
-  );
+  console.log('Cloud UI fixture checks passed.');
 } finally {
   await app.close();
 }

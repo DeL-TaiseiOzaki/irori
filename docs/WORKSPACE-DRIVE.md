@@ -1,5 +1,7 @@
 # Independent workspace Drive connections
 
+> **Retired in 0.1.67** ([ADR 023](decisions/023-retire-drive-sign-in.md)): irori no longer signs in to Google Drive or bundles rclone. A Drive folder is connected through Drive for desktop as a folder on this computer ([ADR 019](decisions/019-local-folder-connections.md)). This page is kept as a record.
+
 Date: 2026-09-13. Implementation of the workspace ownership part of [ADR 002](decisions/002-release-and-workspace.md). Written as a read-only cloud preview; from 0.1.35 a connection can be editable, as [ADR 012](decisions/012-drive-editing.md) describes. From 0.1.37 Drive folders belong to KBs again ([ADR 013](decisions/013-drive-folders-in-kbs.md)); the workspace connections described here are moved into a KB from its connection dialog.
 
 ## Ordinary flow
