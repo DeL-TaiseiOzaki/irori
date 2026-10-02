@@ -350,13 +350,10 @@ test(
     const { brains, id, service, events, run, fixtureLog } = await delegation(t);
     const [product, research] = brains;
     const pending = run('Write a decision note.');
-    // Both brains are held while your AI works, so no other run shares their checkouts.
+    // Both brains are held while your AI works: irori's own changes there wait.
+    // The person's conversations in them still run beside it (ADR 020).
     assert.equal(service.busy(product.scopeId), true);
     assert.equal(service.busy(research.scopeId), true);
-    assert.throws(
-      () => service.start({ scopeId: product.scopeId, agent: 'pi', prompt: 'meanwhile' }),
-      /already running/,
-    );
     await pending;
     assert.equal(service.busy(product.scopeId), false);
     assert.equal(

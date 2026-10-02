@@ -75,7 +75,11 @@ async function act(page: Page, title: string, action: string) {
   await row(page, title)
     .getByRole('button', { name: `${title} の操作` })
     .click();
-  await page.getByRole('menuitem', { name: action, exact: true }).click();
+  // The row's own menu: another row's may still be closing.
+  await page
+    .getByRole('menu', { name: `${title} の操作` })
+    .getByRole('menuitem', { name: action, exact: true })
+    .click();
 }
 async function send(page: Page, text: string, label = '送信') {
   await panel(page).getByLabel('エージェントへの指示').fill(text);
@@ -103,25 +107,39 @@ try {
   await panel(page).getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(panel(page).locator('.message')).toHaveCount(0);
   await expect(panel(page).getByLabel('エージェント', { exact: true })).toHaveValue('pi');
-  await send(page, '最初の話題\nrun: sleep 4');
-  await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 4']);
+  await send(page, '最初の話題\nrun: sleep 6');
+  await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 6']);
   await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toBeVisible();
-  // Another conversation of the same hibachi waits behind that run (ADR 017 D4).
+  // Another conversation of the same hibachi runs beside that run, in a tab of its own (ADR 020).
   await panel(page).getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
-  await send(page, '二つ目の話題', '送信待ちに追加');
-  await expect(panel(page).getByLabel('送信待ち', { exact: true })).toContainText('二つ目の話題');
-  await expect(panel(page).locator('.message.user')).toHaveText(['二つ目の話題'], {
-    timeout: 30000,
-  });
+  const tabs = panel(page).getByRole('tablist', { name: '開いている会話' });
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  const first = tabs.getByRole('tab', { name: /最初の話題/ });
+  await expect(first.getByRole('img', { name: '実行中' })).toHaveCount(1);
+  // A running conversation keeps its tab.
+  await expect(tabs.getByRole('button', { name: '最初の話題 のタブを閉じる' })).toHaveCount(0);
+  await send(page, '二つ目の話題');
+  await expect(panel(page).locator('.message.user')).toHaveText(['二つ目の話題']);
   await expect(panel(page).locator('.message.done')).toHaveCount(1);
   await expect(panel(page).getByLabel('送信待ち', { exact: true })).toHaveCount(0);
+  await expect(first.getByRole('img', { name: '実行中' })).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/irori-parallel-conversations.png' });
+  await first.click();
+  await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 6']);
+  await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  await expect(panel(page).locator('.message.done')).toHaveCount(1, { timeout: 30000 });
+  await expect(first.getByRole('img')).toHaveCount(0);
+  await tabs.getByRole('button', { name: '以前の会話 のタブを閉じる' }).click();
+  await expect(tabs.getByRole('tab')).toHaveCount(2);
+  await tabs.getByRole('tab', { name: '二つ目の話題' }).click();
+  await expect(panel(page).locator('.message.user')).toHaveText(['二つ目の話題']);
 
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
   await expect(history(page).locator('.history-row')).toHaveCount(3);
   await expect(history(page).locator('.history-title')).toHaveText([
-    '二つ目の話題',
     '最初の話題',
+    '二つ目の話題',
     '以前の会話',
   ]);
   await expect(row(page, '二つ目の話題')).toHaveAttribute('aria-current', 'true');
@@ -144,7 +162,7 @@ try {
   await history(page).getByRole('button', { name: '削除する', exact: true }).click();
   await expect(row(page, '二つ目の話題')).toHaveCount(0);
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
-  await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 4']);
+  await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 6']);
   await page.screenshot({ path: 'test-results/irori-conversations.png' });
   expect((await readdir(path.join(files.dataDir, 'conversations'))).length).toBe(2);
 
@@ -180,7 +198,7 @@ try {
       migrated: 'one conversation from agent-conversations',
       listed: [
         'new conversation',
-        'queued behind another run',
+        'parallel conversations in tabs',
         'rename',
         'pin',
         'archive',

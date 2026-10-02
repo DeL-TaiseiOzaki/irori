@@ -189,13 +189,14 @@ test('A cancelled startup releases the mutation lock without launching a provide
     false,
     'invalid policies are rejected before recording or launching',
   );
-  service.start(input);
-  assert.throws(() => service.start(input), /already running/);
+  const conversationId = service.createConversation(s.scopeId, 'codex');
+  service.start({ ...input, conversationId });
+  assert.throws(() => service.start({ ...input, conversationId }), /会話は実行中/);
   await service.cancel();
   assert.equal(service.busy(s.scopeId), false);
   assert.equal(outcome, 'cancelled');
 });
-test('Each space runs its own agent; a second run in the same space is refused', async (t) => {
+test('Conversations run side by side; a second run in one conversation is refused', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori parallel runs '));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
@@ -206,30 +207,40 @@ test('Each space runs its own agent; a second run in the same space is refused',
   const team = await files.register(roots[1], 'Team', 'team');
   const outcomes = new Map<string, string>();
   const service = new AgentService(files, (e) => {
-    if (e.type === 'done' && e.scopeId) outcomes.set(e.scopeId, e.outcome!);
+    if (e.type === 'done') outcomes.set(e.runId, e.outcome!);
   });
   const instruction = { agent: 'codex' as const, prompt: 'Do nothing' };
-  service.start({ ...instruction, scopeId: personal.scopeId });
-  service.start({ ...instruction, scopeId: team.scopeId });
+  const first = service.createConversation(personal.scopeId, 'codex');
+  const second = service.createConversation(personal.scopeId, 'claude');
+  const runs = [
+    service.start({ ...instruction, scopeId: personal.scopeId, conversationId: first }),
+    service.start({
+      ...instruction,
+      agent: 'claude',
+      scopeId: personal.scopeId,
+      conversationId: second,
+    }),
+    service.start({ ...instruction, scopeId: team.scopeId }),
+  ];
   assert.deepEqual(
     service.runningScopes().sort(),
     [personal.scopeId, team.scopeId].sort(),
-    'both spaces run at once',
+    'both spaces run at once, the personal one in two conversations',
   );
   assert.throws(
-    () => service.start({ ...instruction, agent: 'claude', scopeId: personal.scopeId }),
-    /already running/,
-    'a space that is running refuses a second agent',
+    () => service.start({ ...instruction, scopeId: personal.scopeId, conversationId: first }),
+    /会話は実行中/,
+    'a conversation that is running refuses a second run',
   );
-  // Cancel synchronously, before either run reaches a provider launch.
-  const stopPersonal = service.cancel(personal.scopeId);
-  assert.equal(service.busy(team.scopeId), true, 'one cancellation leaves the other space running');
-  const stopTeam = service.cancel(team.scopeId);
-  await Promise.all([stopPersonal, stopTeam]);
+  // Cancel synchronously, before any run reaches a provider launch.
+  const stopFirst = service.cancel(personal.scopeId, first);
+  assert.equal(service.busy(personal.scopeId), true, "the space's other conversation goes on");
+  const stopRest = [service.cancel(personal.scopeId), service.cancel(team.scopeId)];
+  await Promise.all([stopFirst, ...stopRest]);
   assert.equal(service.anyBusy, false);
   assert.deepEqual(
-    [outcomes.get(personal.scopeId), outcomes.get(team.scopeId)],
-    ['cancelled', 'cancelled'],
+    runs.map((id) => outcomes.get(id)),
+    ['cancelled', 'cancelled', 'cancelled'],
     'each run reports its own outcome',
   );
 });

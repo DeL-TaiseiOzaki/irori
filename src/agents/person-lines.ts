@@ -2,7 +2,8 @@ import http from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
+import writeFileAtomic from 'write-file-atomic';
 import { personLinesHeld as held } from '../../prompts';
 
 /** What a file tool call should be told before it runs, or nothing. */
@@ -51,7 +52,8 @@ export async function personLinesBridge(
 ) {
   const file = path.join(dataDir, 'agents', `person-lines-${agent}.js`);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, scripts[agent]);
+  // Replaced whole: another run's CLI may be loading it at this moment.
+  await writeFileAtomic(file, scripts[agent]);
   const heard = new Set<string>();
   const token = randomBytes(24).toString('hex');
   const server = http.createServer((request, response) => {

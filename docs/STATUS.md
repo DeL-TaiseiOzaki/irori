@@ -1,5 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Parallel conversations, 2026-10-02 (**0.1.63**,
+[ADR 020](decisions/020-parallel-conversations.md)): the owner asked for CLI
+agent sessions to run in parallel, the same as Claudian's tabs. This replaces
+ADR 017 D4's one run per checkout.
+- `AgentService` keys runs by run id: one run per conversation (`begin` also
+  refuses a second claim), any number per hibachi. Each conversation's queue waits
+  only for its own run; `startNextQueued(scopeId, conversationId?)` and
+  `cancel(scopeId?, conversationId?)` gain the conversation. The irori agent no
+  longer keeps the person's runs out of a handed hibachi; a hand-off stays one at
+  a time per irori-agent run and hibachi, and its stop stops only it. `busy(scope)`
+  (any run) still holds Git, settings, reorganizing and routine steps.
+- The hibachi agent's panel keeps open conversations as tabs (shown from two),
+  marking running and waiting ones; running tabs cannot close; a running
+  conversation without a tab gets one. The renderer tracks runs by id.
+- The person-lines and `hibachi` scripts are now written atomically.
+- Verified with `npm run build`, `npm test`, `xvfb-run -a npm run test:ui` and
+  `npm run format:check`. Not verified: real CLI turns running side by side,
+  installed Windows/macOS builds.
+
 Published 2026-10-01: **0.1.62** (#150, folders on this computer) is merged at
 the owner's request and published as
 [v0.1.62-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.62-preview.1)

@@ -136,6 +136,9 @@ the default instead of a constraint.
 
 ### D4 — Many conversations per owner; one run per checkout
 
+> Superseded in part on 2026-10-02 by [ADR 020](020-parallel-conversations.md):
+> an owner's conversations now run side by side, one run per conversation.
+
 - A hibachi and the irori agent each have any number of conversations.
 - The panel shows one conversation at a time with a **履歴** list for its own
   owner. A hibachi's list never shows the irori agent's conversations, and the

@@ -123,6 +123,76 @@
   background: linear-gradient(90deg, transparent, var(--ember), transparent);
   animation: irori-slide 1.9s ease-in-out infinite;
 }
+/* The hibachi's open conversations, each running beside the others (ADR 020). */
+.conversation-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 5px 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.conversation-tab {
+  flex: 0 1 auto;
+  min-width: 72px;
+  max-width: 180px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px 8px 0 0;
+  color: var(--tx-3);
+}
+.conversation-tab.current {
+  background: var(--ember-soft);
+  color: var(--tx);
+}
+.conversation-tab > button[role='tab'] {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.conversation-tab > button[role='tab'] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-tab > button[role='tab'] > i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ember);
+  animation: irori-blink 1.4s ease-in-out infinite;
+}
+.conversation-tab.waiting > button[role='tab'] > i {
+  animation: irori-halo 2.2s ease-out infinite;
+}
+.conversation-tab-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--tx-3);
+  cursor: pointer;
+}
+.conversation-tab-close:hover {
+  background: var(--hair);
+  color: var(--tx);
+}
 .schema-line {
   flex: none;
   display: flex;
@@ -991,24 +1061,6 @@
 .step-brain {
   flex: none;
 }
-.agent-held {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0 0 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--ember-soft);
-  color: var(--tx-2);
-  font-size: 12px;
-  line-height: 1.55;
-}
-.agent-held > .ui-icon {
-  flex: none;
-  margin-top: 2px;
-  color: var(--ember);
-}
-
 /* An owner's conversations (ADR 017 D5), shown in the panel in place of the log. */
 .conversation[hidden] {
   display: none;

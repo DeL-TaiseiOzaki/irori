@@ -223,7 +223,7 @@ export const hostArguments = {
   deleteConversation: z.tuple([id]),
   queueAgentMessage: z.tuple([startInput]),
   removeQueuedMessage: z.tuple([id, id]),
-  startNextQueued: z.tuple([id]),
+  startNextQueued: z.union([z.tuple([id]), z.tuple([id, id])]),
   start: z.tuple([startInput]),
   yourAi: z.tuple([]),
   createYourAi: z.tuple([]),
@@ -244,7 +244,7 @@ export const hostArguments = {
   ]),
   stopRoutine: z.tuple([routineRef]),
   routineRuns: z.tuple([routineRef]),
-  cancel: z.union([z.tuple([]), z.tuple([id])]),
+  cancel: z.union([z.tuple([]), z.tuple([id]), z.tuple([id, id])]),
   respond: z.tuple([
     id,
     z.boolean(),

@@ -599,13 +599,15 @@ export class ConversationStore {
   reservation(id: string) {
     return this.metas.has(id) ? undefined : this.reserved.get(id);
   }
-  private next(owner: string) {
+  private next(owner: string, accept: (conversationId: string) => boolean = () => true) {
     let best: { conversationId: string; agent: AgentId; item: QueuedMessage } | undefined;
     for (const state of this.states.values()) {
       const item = state.queued[0];
       if (
         state.owner === owner &&
         item &&
+        !state.active &&
+        accept(state.conversationId) &&
         !this.damagedStates.has(state.conversationId) &&
         (!best || item.queuedAt < best.item.queuedAt)
       )
@@ -613,10 +615,13 @@ export class ConversationStore {
     }
     return best;
   }
-  /** The owner's oldest queued instruction, whichever conversation holds it. */
-  async nextQueued(owner: string) {
+  /**
+   * The owner's oldest queued instruction in a conversation not running now, of
+   * those `accept` allows. Each conversation's queue waits only for its own run.
+   */
+  async nextQueued(owner: string, accept?: (conversationId: string) => boolean) {
     await this.init();
-    const next = this.next(owner);
+    const next = this.next(owner, accept);
     return next && structuredClone(next);
   }
   /** Instructions waiting across the owner's conversations. */
@@ -729,6 +734,9 @@ export class ConversationStore {
       await this.init();
       this.usable(id);
       const message = messageInput.parse(input);
+      // One run per conversation; the owner's other conversations run beside it.
+      if (this.states.get(id)?.active)
+        throw Error(t('この会話は実行中です。', 'This conversation is already running.'));
       const queued = this.states.get(id)?.queued ?? [];
       if (queuedId) {
         if (queued[0]?.id !== queuedId)

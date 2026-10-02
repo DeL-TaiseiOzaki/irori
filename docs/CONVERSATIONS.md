@@ -8,8 +8,10 @@ is described in the history of this file.
 
 ## What the person sees
 
-- A hibachi and the irori agent each have any number of conversations. The panel
-  shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
+- A hibachi and the irori agent each have any number of conversations, and they
+  run side by side ([ADR 020](decisions/020-parallel-conversations.md)). The
+  hibachi agent's panel keeps the open ones as tabs, shown once there are two;
+  the irori agent's panel shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
   is written until its first instruction. **履歴** lists the owner's own
   conversations: a hibachi's list never holds the irori agent's, and the reverse.
 - Choosing another CLI in the panel starts a new conversation: a conversation's
@@ -89,14 +91,17 @@ is described in the history of this file.
 
 ## Runs and the queue
 
-- One run at a time per checkout, whatever the conversation: a space is one
-  registered checkout on a device, so the run map stays keyed by space. Different
-  hibachis run in parallel.
-- A send in any conversation of an owner whose run is in progress, or whose
-  queue is not empty, is queued in that conversation. The owner's queue runs
-  oldest first across its conversations (`startNextQueued`). A completed run
-  sends the next; a failed or stopped run pauses the queue; after a restart the
-  queue is paused until **送信を再開**. A run never passes a waiting queue.
+- One run at a time per conversation; an owner's conversations run at once in
+  the same checkout, and different hibachis run in parallel. The run map is keyed
+  by run id. irori does not coordinate edits between runs in one checkout.
+- A send to a conversation whose run is in progress, or whose queue is not
+  empty, is queued in that conversation, and waits for that conversation alone.
+  A completed run sends its conversation's next; a failed or stopped run pauses
+  that queue; after a restart queues are paused until **送信を再開**. A run never
+  passes its conversation's waiting queue. `startNextQueued(scopeId,
+  conversationId?)` starts the named conversation's next, or the oldest among
+  conversations not running.
+- **停止** stops the conversation's own run; the owner's other runs go on.
 - A run the host could not see finish is shown as unconfirmed on the next start
   and never sent again. If the host stopped between claiming a queued
   instruction and writing it, the message is written from the claim.

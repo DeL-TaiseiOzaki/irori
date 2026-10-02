@@ -169,8 +169,8 @@ try {
     .getByTestId('stage')
     .getByRole('button', { name: 'hibachi agent', exact: true })
     .click();
-  await expect(page.locator('.agent-held')).toContainText('irori agent がこの hibachi でも作業中');
-  await expect(page.getByRole('button', { name: '送信', exact: true })).toBeDisabled();
+  // The person's own conversation in a handed hibachi is not held (ADR 020).
+  await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toBeEnabled();
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
   // Allowed here, the sub-agent writes in its brain and reports.
