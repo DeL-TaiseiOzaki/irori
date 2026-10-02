@@ -201,6 +201,66 @@ test(
 );
 
 test(
+  "Two conversations of one hibachi run at once, each waiting only for its own queue's run",
+  fixtureOptions,
+  async (t) => {
+    const { space, files } = await setup(t);
+    const events: AgentEvent[] = [];
+    const ends = new Map<string, () => void>();
+    const ended = (runId: string) =>
+      events.some((event) => event.runId === runId && event.type === 'done')
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => ends.set(runId, resolve));
+    const service = new AgentService(files, (event) => {
+      events.push(event);
+      if (event.type === 'done') ends.get(event.runId)?.();
+    });
+    t.after(() => service.cancel());
+    const input = { scopeId: space.scopeId, agent: 'pi' as const };
+    const first = service.createConversation(space.scopeId, 'pi');
+    const second = service.createConversation(space.scopeId, 'pi');
+    const holding = await service.startAccepted({
+      ...input,
+      prompt: 'hold',
+      conversationId: first,
+    });
+    // The second conversation runs to its end while the first one works.
+    const beside = await service.startAccepted({
+      ...input,
+      prompt: 'beside it',
+      conversationId: second,
+    });
+    await ended(beside);
+    assert.equal(events.find((e) => e.runId === beside && e.type === 'done')?.outcome, 'completed');
+    assert.equal((await service.conversation(space.scopeId, 'pi', first)).activeRunId, holding);
+    // A queue waits for its own conversation's run, not for another's.
+    await service.queueMessage({ ...input, prompt: 'afterwards', conversationId: first });
+    assert.equal(await service.startNextQueued(space.scopeId, second), null);
+    assert.equal(await service.startNextQueued(space.scopeId), null);
+    await service.queueMessage({ ...input, prompt: 'second again', conversationId: second });
+    const next = await service.startNextQueued(space.scopeId);
+    assert.ok(next, "the idle conversation's queue starts while the other runs");
+    await ended(next);
+    // Stopping one conversation leaves the space's other runs alone.
+    await service.cancel(space.scopeId, first);
+    assert.equal(
+      events.find((e) => e.runId === holding && e.type === 'done')?.outcome,
+      'cancelled',
+    );
+    const resumed = await service.startNextQueued(space.scopeId, first);
+    assert.ok(resumed);
+    await ended(resumed);
+    assert.equal(service.busy(space.scopeId), false);
+    const words = async (id: string) =>
+      (await service.conversation(space.scopeId, 'pi', id)).events
+        .filter((event) => event.role === 'user')
+        .map((event) => event.text);
+    assert.deepEqual(await words(first), ['hold', 'afterwards']);
+    assert.deepEqual(await words(second), ['beside it', 'second again']);
+  },
+);
+
+test(
   'Durable queue claims launch once, go before new instructions and survive a restart',
   fixtureOptions,
   async (t) => {

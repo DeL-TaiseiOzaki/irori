@@ -10,7 +10,13 @@ import {
 } from './CloudEntryActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
-import { appendConversationEvent, withRequests, type QueuedMessage } from '../domain/conversation';
+import {
+  appendConversationEvent,
+  withRequests,
+  type Conversation,
+  isDamaged,
+  type QueuedMessage,
+} from '../domain/conversation';
 import { agentAccessOptions, agentAccessLabel, defaultAgentAccess } from '../domain/agent-access';
 import { ModelPicker } from './ModelPicker';
 import { Dialog } from './Dialog';
@@ -149,14 +155,10 @@ function navigationNotice(target: Navigation, found: boolean) {
     );
   return t(`${what}を特定できませんでした。`, `Could not locate the ${what}.`);
 }
-/** A set of scope IDs with one added or removed, unchanged when nothing changes. */
-function mark(all: string[], scopeId: string, value: boolean) {
-  return value === all.includes(scopeId)
-    ? all
-    : value
-      ? [...all, scopeId]
-      : all.filter((id) => id !== scopeId);
-}
+/** A run in progress: its space, and its conversation once the host has placed it. */
+type LiveRun = { scopeId: string; conversationId?: string };
+/** A conversation open in an owner's tabs, with its CLI. */
+type Tab = { id: string; agent: AgentId };
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
   // the whole tree from here; component state, drafts and the editor are kept.
@@ -266,18 +268,62 @@ function App() {
   function remember(scopeId: string, next: AgentId) {
     setAgentChoice((choice) => ({ last: next, brains: { ...choice.brains, [scopeId]: next } }));
   }
-  function showConversation(scopeId: string, id: string, next: AgentId) {
+  // The conversations a hibachi keeps open as tabs, as Claudian does (ADR 020): the
+  // one on show is always among them, and the others may run meanwhile.
+  const [tabs, setTabs] = useState<Record<string, Tab[]>>({});
+  function tabsOf(scopeId: string) {
+    const open = tabs[scopeId] ?? [];
+    const on = shown[scopeId];
+    return on && !open.some((tab) => tab.id === on.id) ? [...open, on] : open;
+  }
+  /**
+   * Shows a conversation in its owner's tabs: in its own tab when it has one, else
+   * in a new tab, or with `replace` in place of the conversation on show.
+   */
+  function showConversation(scopeId: string, id: string, next: AgentId, replace = false) {
+    const previous = shown[scopeId];
     setShown((all) => ({ ...all, [scopeId]: { id, agent: next } }));
+    setTabs((all) => {
+      let open = all[scopeId] ?? [];
+      if (previous && !open.some((tab) => tab.id === previous.id)) open = [...open, previous];
+      if (!open.some((tab) => tab.id === id)) {
+        const tab = { id, agent: next };
+        const at = replace && previous ? open.findIndex((item) => item.id === previous.id) : -1;
+        open = at < 0 ? [...open, tab] : open.map((item, index) => (index === at ? tab : item));
+      }
+      return { ...all, [scopeId]: open };
+    });
   }
-  /** Starts an empty conversation for the owner; nothing is kept before its first instruction. */
-  async function newConversation(scopeId: string, next: AgentId) {
-    showConversation(scopeId, await host.createConversation(scopeId, next), next);
+  /** Closes a tab; the run of a conversation never stops with it, so a running one keeps its tab. */
+  function closeTab(scopeId: string, id: string) {
+    const open = tabsOf(scopeId);
+    const rest = open.filter((tab) => tab.id !== id);
+    setTabs((all) => ({ ...all, [scopeId]: rest }));
+    if (shown[scopeId]?.id !== id) return;
+    const neighbour =
+      rest[
+        Math.min(
+          open.findIndex((tab) => tab.id === id),
+          rest.length - 1,
+        )
+      ];
+    if (neighbour) {
+      remember(scopeId, neighbour.agent);
+      setShown((all) => ({ ...all, [scopeId]: neighbour }));
+    } else setShown(({ [scopeId]: _, ...others }) => others);
   }
-  /** Another CLI is another conversation (ADR 017 D2). */
+  /**
+   * Starts an empty conversation for the owner; nothing is kept before its first
+   * instruction. With `replace` it takes the place of the conversation on show.
+   */
+  async function newConversation(scopeId: string, next: AgentId, replace = false) {
+    showConversation(scopeId, await host.createConversation(scopeId, next), next, replace);
+  }
+  /** Another CLI is another conversation (ADR 017 D2); an empty one on show gives way to it. */
   function setAgent(next: AgentId) {
     if (!active || next === agent) return;
     remember(active.scopeId, next);
-    void newConversation(active.scopeId, next).catch(report);
+    void newConversation(active.scopeId, next, shownBlank).catch(report);
   }
   // Each brain keeps the model chosen for each CLI; '' is the CLI's own default.
   const [modelChoice, setModelChoice] = useState<Record<string, string>>({});
@@ -304,8 +350,36 @@ function App() {
     accessSelection?.owner === accessOwner ? accessSelection.value : defaultAgentAccess(agent);
   useEffect(() => setAccessSelection(undefined), [workspace?.id, active?.scopeId, agent]);
   const [events, setEvents] = useState<AgentEvent[]>([]),
-    [runningScopes, setRunningScopes] = useState<string[]>([]),
-    [waitingScopes, setWaitingScopes] = useState<string[]>([]);
+    // Runs in progress by id, and sends on their way to the host by conversation (by
+    // space when none is named). An owner's conversations run side by side (ADR 020),
+    // so a space is running while any of its runs is.
+    [liveRuns, setLiveRuns] = useState<Record<string, LiveRun>>({}),
+    [starting, setStarting] = useState<Record<string, string>>({}),
+    [waitingScopes, setWaitingScopes] = useState<string[]>([]),
+    [waitingRuns, setWaitingRuns] = useState<string[]>([]);
+  const runningScopes = useMemo(
+    () => [
+      ...new Set([
+        ...Object.values(liveRuns).map((run) => run.scopeId),
+        ...Object.values(starting),
+      ]),
+    ],
+    [liveRuns, starting],
+  );
+  const runningConversations = useMemo(
+    () =>
+      new Set([
+        ...Object.values(liveRuns).flatMap((run) =>
+          run.conversationId ? [run.conversationId] : [],
+        ),
+        ...Object.keys(starting),
+      ]),
+    [liveRuns, starting],
+  );
+  const runningNow = useRef(runningConversations);
+  runningNow.current = runningConversations;
+  // Runs whose end has come, so a late start reply cannot mark them running again.
+  const endedRuns = useRef(new Set<string>());
   const [skillRevision, setSkillRevision] = useState(0);
   const [authorship, setAuthorship] = useState<NoteAuthorship>();
   const skillRead = useResource(() => host.skills(active!.scopeId), [active?.scopeId], {
@@ -361,16 +435,13 @@ function App() {
   }
   const [sending, setSending] = useState(false);
   const submitting = useRef(false);
+  // The conversation's own queue: it waits for that conversation's run alone.
   const [queued, setQueued] = useState<QueuedMessage[]>([]);
-  // Instructions waiting across the hibachi's conversations: they go first, oldest first.
-  const [pending, setPending] = useState(0);
   const [queuePaused, setQueuePaused] = useState(false);
   const [conversationReady, setConversationReady] = useState(false);
   const [conversationError, setConversationError] = useState('');
   // Events kept in the conversation but not sent to the view, and lines that could not be read.
   const [omitted, setOmitted] = useState({ earlier: 0, damaged: 0 });
-  // Whether the run in progress is this conversation's, not another of the hibachi's.
-  const [shownRunning, setShownRunning] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyReload, setHistoryReload] = useState(0);
   const eventRevision = useRef(0);
@@ -382,7 +453,7 @@ function App() {
       setHistoryReload((value) => value + 1);
     shownLevel.current = level;
   }, [level]);
-  // Brains whose next queued instruction is being sent, so it is sent once.
+  // Conversations (or spaces) whose next queued instruction is being sent, so it is sent once.
   const draining = useRef(new Set<string>());
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
@@ -392,10 +463,48 @@ function App() {
   function updateEvents(update: (events: AgentEvent[]) => AgentEvent[]) {
     setEvents(update);
   }
-  // A run belongs to one space. Every space's run is tracked so the explorer can
-  // mark them, while the panel's controls follow the selected space alone.
-  function markRunning(scopeId: string, value: boolean) {
-    setRunningScopes((all) => mark(all, scopeId, value));
+  // Every run is tracked so the explorer can mark its space and the panel its
+  // conversation's tab, while the panel's controls follow the conversation on show.
+  function addRun(runId: string, scopeId: string, conversationId?: string) {
+    if (endedRuns.current.has(runId)) return;
+    setLiveRuns((all) =>
+      all[runId] && (!conversationId || all[runId].conversationId === conversationId)
+        ? all
+        : {
+            ...all,
+            [runId]: { scopeId, conversationId: conversationId ?? all[runId]?.conversationId },
+          },
+    );
+  }
+  /** Follows a run from its events: it runs from its first event until its end. */
+  function trackRun(event: AgentEvent) {
+    if (!event.scopeId || !event.runId || event.resolved) return;
+    if (event.type !== 'done') {
+      addRun(event.runId, event.scopeId, event.conversationId);
+      return;
+    }
+    endedRuns.current.add(event.runId);
+    setLiveRuns((all) => {
+      if (!all[event.runId]) return all;
+      const { [event.runId]: _, ...rest } = all;
+      return rest;
+    });
+  }
+  /** Shows a send as running until the host has started its run, or refused it. */
+  async function launch(
+    scopeId: string,
+    conversationId: string | undefined,
+    send: () => Promise<string | null>,
+  ) {
+    const key = conversationId ?? scopeId;
+    setStarting((all) => ({ ...all, [key]: scopeId }));
+    try {
+      const runId = await send();
+      if (runId) addRun(runId, scopeId, conversationId);
+      return runId;
+    } finally {
+      setStarting(({ [key]: _, ...rest }) => rest);
+    }
   }
   // A run waits for the person while a permission or question is open. Each open
   // request names its run and scopes: a sub-agent's request also holds its brain.
@@ -406,6 +515,10 @@ function App() {
     const scopes = new Set([...openRequests.current.values()].flatMap((request) => request.scopes));
     setWaitingScopes((all) =>
       all.length === scopes.size && all.every((scopeId) => scopes.has(scopeId)) ? all : [...scopes],
+    );
+    const runs = new Set([...openRequests.current.values()].map((request) => request.runId));
+    setWaitingRuns((all) =>
+      all.length === runs.size && all.every((runId) => runs.has(runId)) ? all : [...runs],
     );
   }
   function trackRequests(event: AgentEvent) {
@@ -420,10 +533,10 @@ function App() {
       for (const [id, request] of open) if (request.runId === event.runId) open.delete(id);
     showWaiting();
   }
-  /** What a freshly read conversation says is open replaces what this scope held. */
-  function resetRequests(scopeId: string, requests: AgentEvent[] = []) {
+  /** What a freshly read conversation says its run waits on replaces what that run held. */
+  function resetRequests(scopeId: string, runId: string, requests: AgentEvent[] = []) {
     const open = openRequests.current;
-    for (const [id, request] of open) if (request.scopes[0] === scopeId) open.delete(id);
+    for (const [id, request] of open) if (request.runId === runId) open.delete(id);
     for (const request of requests) trackRequests({ ...request, scopeId });
     showWaiting();
   }
@@ -466,9 +579,37 @@ function App() {
         ? 'running'
         : 'idle';
   }
+  // Any run in the hibachi on show holds what irori itself would change there.
   const running = !!active && runningScopes.includes(active.scopeId);
-  const runningNow = useRef<string[]>([]);
-  runningNow.current = runningScopes;
+  // The conversation on show has a run of its own: its sends queue behind it.
+  const shownRunning = !!shownHere && runningConversations.has(shownHere.id);
+  /** Whether a conversation's run waits for the person's answer. */
+  function conversationWaiting(id: string) {
+    return Object.entries(liveRuns).some(
+      ([runId, run]) => run.conversationId === id && waitingRuns.includes(runId),
+    );
+  }
+  const shownWaiting = !!shownHere && conversationWaiting(shownHere.id);
+  // The hibachi's conversations, read again when one begins or a run ends, name the
+  // tabs; one running without a tab, after a reload or from the Overview, gets one.
+  const [tabRevision, setTabRevision] = useState(0);
+  const tabRows = useResource(() => host.agentConversations(active!.scopeId), [active?.scopeId], {
+    enabled: !!active && !startup,
+    refresh: tabRevision,
+  });
+  useEffect(() => {
+    if (!active || !tabRows.data) return;
+    const open = tabsOf(active.scopeId);
+    const missing = tabRows.data.flatMap((row) =>
+      !isDamaged(row) && row.running && !open.some((tab) => tab.id === row.id)
+        ? [{ id: row.id, agent: row.agent }]
+        : [],
+    );
+    if (missing.length) setTabs((all) => ({ ...all, [active.scopeId]: [...open, ...missing] }));
+  }, [tabRows.data]);
+  const tabsHere = active ? tabsOf(active.scopeId) : [];
+  // Nothing has been said in the conversation on show: a new one can take its place.
+  const shownBlank = conversationReady && !events.length && !queued.length && !shownRunning;
   const activeScope = useRef<string | undefined>(undefined);
   activeScope.current = active?.scopeId;
   useEffect(() => {
@@ -476,12 +617,10 @@ function App() {
     conversationKey.current = shownHere?.id ?? '';
     setEvents([]);
     setQueued([]);
-    setPending(0);
     setQueuePaused(true);
     setConversationReady(false);
     setConversationError('');
     setOmitted({ earlier: 0, damaged: 0 });
-    setShownRunning(false);
     if (active)
       void (async () => {
         if (!shownHere) {
@@ -509,16 +648,14 @@ function App() {
           if (revision !== eventRevision.current) continue;
           setEvents(withRequests(value));
           setQueued(value.queued);
-          setPending(value.pending);
-          setShownRunning(!!value.activeRunId);
           // Only the conversation holding the run knows the requests it waits on.
           if (value.activeRunId) {
-            markRunning(active.scopeId, true);
-            resetRequests(active.scopeId, value.requests);
+            addRun(value.activeRunId, active.scopeId, shownHere.id);
+            resetRequests(active.scopeId, value.activeRunId, value.requests);
           }
-          // Work queued behind a run goes on when it ends; a queue left without
-          // one (after a failure or a restart) waits for the person to resume it.
-          setQueuePaused(!value.activeRunId && !runningNow.current.includes(active.scopeId));
+          // Work queued behind the conversation's run goes on when it ends; a queue left
+          // without one (after a failure or a restart) waits for the person to resume it.
+          setQueuePaused(!value.activeRunId && !runningNow.current.has(shownHere.id));
           setOmitted({ earlier: value.earlier, damaged: value.damaged });
           setConversationReady(true);
           return;
@@ -537,7 +674,6 @@ function App() {
     const value = await host.agentConversation(active.scopeId, target.agent, target.id);
     if (conversationKey.current !== target.id) return;
     setQueued(value.queued);
-    setPending(value.pending);
   }
   // A skill choice belongs to one space, even when another space declares the same name.
   useEffect(() => setSkill(''), [active?.scopeId]);
@@ -710,8 +846,13 @@ function App() {
         if (incoming.scopeId) {
           const scopeId = incoming.scopeId;
           // An answered request says only that it ended; the run goes on.
-          if (!incoming.resolved) markRunning(scopeId, incoming.type !== 'done');
+          trackRun(incoming);
           trackRequests(incoming);
+          if (
+            scopeId === activeScope.current &&
+            (incoming.type === 'done' || incoming.role === 'user')
+          )
+            setTabRevision((value) => value + 1);
           // The AI that runs in a brain is that brain's hibachi agent from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
@@ -723,18 +864,18 @@ function App() {
           }
         }
         if (!incoming.conversationId || conversationKey.current !== incoming.conversationId) {
-          // A run's end sends its owner's next queued instruction, whichever
-          // conversation holds it; the brain on show sends its own from the effect below.
-          if (incoming.type === 'done' && incoming.scopeId) {
-            if (incoming.scopeId !== activeScope.current) {
-              if (incoming.outcome === 'completed') void sendNextQueued(incoming.scopeId);
-            } else if (incoming.outcome !== 'completed') setQueuePaused(true);
-          }
+          // A run's end sends the next queued instruction of its own conversation;
+          // the conversation on show sends its own from the effect below.
+          if (
+            incoming.type === 'done' &&
+            incoming.scopeId &&
+            incoming.conversationId &&
+            incoming.outcome === 'completed'
+          )
+            void sendNextQueued(incoming.scopeId, incoming.conversationId);
           return;
         }
         eventRevision.current++;
-        if (incoming.type === 'done') setShownRunning(false);
-        else if (!incoming.resolved) setShownRunning(true);
         updateEvents((all) => {
           const next = appendConversationEvent(all, incoming).slice(-400);
           const last = next.at(-1)!;
@@ -893,25 +1034,22 @@ function App() {
   async function sendTurn(message: string, notePath?: string, selectedSources = sources) {
     setError('');
     followConversation.current = true;
-    markRunning(active!.scopeId, true);
-    await host.start({
-      scopeId: active!.scopeId,
-      agent,
-      conversationId: shownHere?.id,
-      access,
-      model,
-      prompt: message,
-      notePath,
-      sources: selectedSources,
-      skill: skill || undefined,
-      personLines: (personLines && personLinesOffered) || undefined,
-    });
+    await launch(active!.scopeId, shownHere?.id, () =>
+      host.start({
+        scopeId: active!.scopeId,
+        agent,
+        conversationId: shownHere?.id,
+        access,
+        model,
+        prompt: message,
+        notePath,
+        sources: selectedSources,
+        skill: skill || undefined,
+        personLines: (personLines && personLinesOffered) || undefined,
+      }),
+    );
   }
   async function start() {
-    if (active && heldByYou(active.scopeId)) {
-      report(t('irori agent が作業中です。', 'The irori agent is busy.'));
-      return;
-    }
     if (
       !active ||
       !conversationReady ||
@@ -930,8 +1068,8 @@ function App() {
       const draftRevision = composer.snapshot().record?.revision;
       if (!(await save())) return;
       const notePath = noteInContext ? doc!.path : undefined;
-      // Behind the hibachi's run or its queue, whichever conversation they belong to (ADR 017 D4).
-      if (running || pending) {
+      // Behind this conversation's run or its queue; its other conversations run beside it (ADR 020).
+      if (shownRunning || queued.length) {
         setQueued(
           await host.queueAgentMessage({
             scopeId: active.scopeId,
@@ -946,7 +1084,6 @@ function App() {
             personLines: (personLines && personLinesOffered) || undefined,
           }),
         );
-        setPending((value) => value + 1);
       } else {
         setQueuePaused(false);
         await sendTurn(message, notePath);
@@ -954,7 +1091,6 @@ function App() {
       if (!(await composer.clear(draftRevision)))
         report(t('指示は送信済みです。', 'The instruction was sent.'));
     } catch (e) {
-      if (!running) markRunning(active!.scopeId, false);
       report(e);
     } finally {
       submitting.current = false;
@@ -964,20 +1100,22 @@ function App() {
   useEffect(() => {
     if (
       !active ||
+      !shownHere ||
       !conversationReady ||
-      running ||
+      shownRunning ||
       sending ||
       gitBusy ||
       queuePaused ||
       external ||
-      !pending ||
+      !queued.length ||
       submitting.current ||
-      draining.current.has(active.scopeId)
+      draining.current.has(shownHere.id)
     )
       return;
     const scopeId = active.scopeId;
+    const conversationId = shownHere.id;
     submitting.current = true;
-    draining.current.add(scopeId);
+    draining.current.add(conversationId);
     setSending(true);
     void (async () => {
       if (!(await save())) {
@@ -985,42 +1123,43 @@ function App() {
         return;
       }
       try {
-        markRunning(scopeId, true);
         followConversation.current = true;
-        // The hibachi's oldest queued instruction, in whichever of its conversations.
-        if (!(await host.startNextQueued(scopeId))) markRunning(scopeId, false);
+        await launch(scopeId, conversationId, () => host.startNextQueued(scopeId, conversationId));
         await refreshQueue();
       } catch (error) {
-        markRunning(scopeId, false);
         setQueuePaused(true);
         report(error);
       }
     })().finally(() => {
       submitting.current = false;
-      draining.current.delete(scopeId);
+      draining.current.delete(conversationId);
       setSending(false);
     });
-  }, [conversationReady, running, sending, pending, queuePaused, external, gitBusy]);
+  }, [conversationReady, shownRunning, sending, queued.length, queuePaused, external, gitBusy]);
   /**
-   * Sends the next queued instruction of a brain that is not on show: its run
-   * ended while the person looked at another brain or the Overview. The brain on
-   * show sends its own queue from the effect above.
+   * Sends the next queued instruction of a conversation that is not on show: its
+   * run ended while the person looked at another conversation, brain or the
+   * Overview. Without a conversation, of the owner's oldest waiting queue. The
+   * conversation on show sends its own queue from the effect above.
    */
-  async function sendNextQueued(scopeId: string) {
-    if (draining.current.has(scopeId)) return;
-    draining.current.add(scopeId);
+  async function sendNextQueued(scopeId: string, conversationId?: string) {
+    const key = conversationId ?? scopeId;
+    // The owner's queues are being resumed one after another: that picks this one up.
+    if (draining.current.has(key) || draining.current.has(scopeId)) return null;
+    draining.current.add(key);
     try {
       const open = current.current;
       // A note of that brain in conflict must be settled before its AI reads it.
-      if (open.doc?.scopeId === scopeId && open.external) return;
-      if (!(await save())) return;
-      markRunning(scopeId, true);
-      if (!(await host.startNextQueued(scopeId))) markRunning(scopeId, false);
+      if (open.doc?.scopeId === scopeId && open.external) return null;
+      if (!(await save())) return null;
+      return await launch(scopeId, conversationId, () =>
+        host.startNextQueued(scopeId, conversationId),
+      );
     } catch (error) {
-      markRunning(scopeId, false);
       report(error);
+      return null;
     } finally {
-      draining.current.delete(scopeId);
+      draining.current.delete(key);
     }
   }
   /** Sends to a brain's hibachi agent from the Overview, or queues behind its run or its waiting queue. */
@@ -1041,24 +1180,25 @@ function App() {
       model: modelFor(scopeId, agentId),
       prompt: message,
     };
-    if (runningNow.current.includes(scopeId) || value.pending || draining.current.has(scopeId)) {
+    if (behind(input.conversationId, value)) {
       const list = await host.queueAgentMessage(input);
       if (input.conversationId && conversationKey.current === input.conversationId) setQueued(list);
-      // The brain on show sends its queue itself, so it counts this one too.
-      if (scopeId === activeScope.current) setPending((value) => value + 1);
       return;
     }
-    markRunning(scopeId, true);
-    try {
-      await host.start(input);
-    } catch (error) {
-      markRunning(scopeId, false);
-      throw error;
-    }
+    await launch(scopeId, input.conversationId, () => host.start(input));
+  }
+  /** Whether a send to this conversation waits behind its own run or queue. */
+  function behind(conversationId: string | undefined, value: Conversation) {
+    return (
+      !!value.activeRunId ||
+      value.queued.length > 0 ||
+      (!!conversationId &&
+        (runningNow.current.has(conversationId) || draining.current.has(conversationId)))
+    );
   }
   /**
-   * Sends to your AI with the workspace's brains that are free, or queues behind
-   * its run, on the CLI and model chosen for it on this device.
+   * Sends to your AI with the workspace's brains, or queues behind its
+   * conversation's run, on the CLI and model chosen for it on this device.
    */
   async function sendToYou(message: string) {
     if (!you) return;
@@ -1066,9 +1206,7 @@ function App() {
       throw Error(
         t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
       );
-    const brains = workspaceSpaces
-      .map((space) => space.scopeId)
-      .filter((scopeId) => !runningScopes.includes(scopeId));
+    const brains = workspaceSpaces.map((space) => space.scopeId);
     const target = shown[you.id];
     const agentId = target?.agent ?? yourChoice.agent;
     const input = {
@@ -1081,25 +1219,20 @@ function App() {
       brains,
     };
     const value = await host.agentConversation(you.id, agentId, target?.id);
-    if (runningNow.current.includes(you.id) || value.pending || draining.current.has(you.id)) {
+    if (behind(input.conversationId, value)) {
       await host.queueAgentMessage(input);
       return;
     }
-    markRunning(you.id, true);
     setHanded(brains);
-    try {
-      await host.start(input);
-    } catch (error) {
-      markRunning(you.id, false);
-      throw error;
-    }
+    await launch(you.id, input.conversationId, () => host.start(input));
   }
-  /** Resumes a brain's queue from the Overview. */
+  /** Resumes a brain's queues from the Overview: each conversation's, behind its own run. */
   async function resumeQueue(scopeId: string) {
+    while (await sendNextQueued(scopeId));
     if (scopeId === active?.scopeId && conversationReady) {
       await refreshQueue();
       setQueuePaused(false);
-    } else await sendNextQueued(scopeId);
+    }
   }
   async function openWorkspace(profile: WorkspaceProfile) {
     if (gitBusy) return;
@@ -1274,7 +1407,6 @@ function App() {
   // The note's own controls show while the note is what the stage shows.
   const onNote = !!doc && view === 'note';
   const agentInfo = infos.find((i) => i.id === agent);
-  const waiting = !!active && waitingScopes.includes(active.scopeId);
   const instructionFile = (agent === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find(
     (name) => roots?.entries.some((entry) => entry.path === name),
   );
@@ -1378,7 +1510,7 @@ function App() {
             onConnect={(space) => showConnections(space)}
             onSend={sendToBrain}
             onResume={resumeQueue}
-            onStop={(scopeId) => host.cancel(scopeId)}
+            onStop={(scopeId, conversationId) => host.cancel(scopeId, conversationId)}
             you={you}
             onCreateYou={async () => {
               await host.createYourAi();
@@ -1414,8 +1546,8 @@ function App() {
               else delete models[yourChoice.agent];
               chooseYour({ ...yourChoice, models });
             }}
-            onStopYou={async () => {
-              if (you) await host.cancel(you.id);
+            onStopYou={async (conversationId) => {
+              if (you) await host.cancel(you.id, conversationId);
             }}
             routineChoices={() => ({
               ...Object.fromEntries(
@@ -2203,12 +2335,15 @@ function App() {
                       </select>
                       <Icon name="chevronDown" size={12} className="agent-picker-caret" />
                     </label>
-                    {(running || waiting || queued.length > 0) && (
-                      <span className={`agent-state ${waiting ? 'waiting' : ''}`} role="status">
+                    {(shownRunning || shownWaiting || queued.length > 0) && (
+                      <span
+                        className={`agent-state ${shownWaiting ? 'waiting' : ''}`}
+                        role="status"
+                      >
                         <i />
-                        {waiting
+                        {shownWaiting
                           ? t('許可待ち', 'Needs approval')
-                          : running
+                          : shownRunning
                             ? t('実行中', 'Running')
                             : t(`送信待ち ${queued.length}`, `${queued.length} pending`)}
                       </span>
@@ -2221,7 +2356,7 @@ function App() {
                       disabled={!active || sending}
                       onClick={() => {
                         setHistoryOpen(false);
-                        void newConversation(active!.scopeId, agent)
+                        void newConversation(active!.scopeId, agent, shownBlank)
                           .then(() =>
                             document
                               .querySelector<HTMLTextAreaElement>('.composer textarea')
@@ -2295,6 +2430,69 @@ function App() {
                       </span>
                     )}
                   </header>
+                  {active && tabsHere.length > 1 && (
+                    <div
+                      className="conversation-tabs"
+                      role="tablist"
+                      aria-label={t('開いている会話', 'Open conversations')}
+                    >
+                      {tabsHere.map((tab) => {
+                        const row = tabRows.data?.find((item) => item.id === tab.id);
+                        const title =
+                          row && !isDamaged(row) ? row.title : t('新しい会話', 'New conversation');
+                        const state = conversationWaiting(tab.id)
+                          ? 'waiting'
+                          : runningConversations.has(tab.id)
+                            ? 'running'
+                            : '';
+                        const current = tab.id === shownHere?.id;
+                        return (
+                          <div
+                            key={tab.id}
+                            className={`conversation-tab ${current ? 'current' : ''} ${state}`}
+                          >
+                            <button
+                              role="tab"
+                              aria-selected={current}
+                              title={`${title} · ${agentNames[tab.agent]}`}
+                              disabled={sending}
+                              onClick={() => {
+                                if (current) return;
+                                void composer.flush().then((saved) => {
+                                  if (!saved) return;
+                                  setHistoryOpen(false);
+                                  remember(active.scopeId, tab.agent);
+                                  showConversation(active.scopeId, tab.id, tab.agent);
+                                });
+                              }}
+                            >
+                              {state && (
+                                <i
+                                  role="img"
+                                  aria-label={
+                                    state === 'waiting'
+                                      ? t('許可待ち', 'Needs approval')
+                                      : t('実行中', 'Running')
+                                  }
+                                />
+                              )}
+                              <span>{title}</span>
+                            </button>
+                            {!state && (
+                              <button
+                                className="conversation-tab-close"
+                                aria-label={t(`${title} のタブを閉じる`, `Close the ${title} tab`)}
+                                disabled={sending}
+                                onClick={() => closeTab(active.scopeId, tab.id)}
+                              >
+                                <Icon name="close" size={11} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {active && (
                     <div className="schema-line">
                       <Icon name="schema" size={13} />
@@ -2357,9 +2555,16 @@ function App() {
                       onOpen={(row) => {
                         setHistoryOpen(false);
                         remember(active.scopeId, row.agent);
-                        showConversation(active.scopeId, row.id, row.agent);
+                        // An empty conversation on show gives way rather than keeping a tab.
+                        showConversation(active.scopeId, row.id, row.agent, shownBlank);
                       }}
                       onDeleted={(id) => {
+                        setTabs((all) => ({
+                          ...all,
+                          [active.scopeId]: (all[active.scopeId] ?? []).filter(
+                            (tab) => tab.id !== id,
+                          ),
+                        }));
                         if (shownHere?.id !== id) return;
                         // The hibachi shows its next conversation, or a new one.
                         setShown(({ [active.scopeId]: _, ...rest }) => rest);
@@ -2396,7 +2601,7 @@ function App() {
                           ].map((suggestion) => (
                             <button
                               key={suggestion}
-                              disabled={!doc || running}
+                              disabled={!doc || shownRunning}
                               onClick={() => {
                                 setPrompt(suggestion);
                                 document
@@ -2441,10 +2646,7 @@ function App() {
                                 setSending(true);
                                 void host
                                   .removeQueuedMessage(shownHere!.id, item.id)
-                                  .then((list) => {
-                                    setQueued(list);
-                                    setPending((value) => Math.max(0, value - 1));
-                                  })
+                                  .then(setQueued)
                                   .catch(report)
                                   .finally(() => setSending(false));
                               }}
@@ -2456,22 +2658,13 @@ function App() {
                         {queuePaused && (
                           <button
                             className="queue-resume"
-                            disabled={running || sending || !conversationReady}
+                            disabled={shownRunning || sending || !conversationReady}
                             onClick={() => setQueuePaused(false)}
                           >
                             {t('送信を再開', 'Resume sending')}
                           </button>
                         )}
                       </div>
-                    )}
-                    {heldHere && (
-                      <p className="agent-held" role="status">
-                        <Icon name="sparkles" size={13} />
-                        {t(
-                          'irori agent がこの hibachi でも作業中のため待機します。',
-                          'Waiting: the irori agent is also working in this hibachi.',
-                        )}
-                      </p>
                     )}
                     <div className="composer-box">
                       <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
@@ -2666,7 +2859,8 @@ function App() {
                               title={t('停止', 'Stop')}
                               onClick={() => {
                                 setQueuePaused(true);
-                                void host.cancel(active!.scopeId).catch(report);
+                                // This conversation's run alone; the hibachi's others go on.
+                                void host.cancel(active!.scopeId, shownHere?.id).catch(report);
                               }}
                             >
                               <span className="stop-mark" />
@@ -2675,12 +2869,12 @@ function App() {
                           <button
                             className="send-button"
                             aria-label={
-                              running || pending
+                              shownRunning || queued.length > 0
                                 ? t('送信待ちに追加', 'Add to pending sends')
                                 : t('送信', 'Send')
                             }
                             title={
-                              running || pending
+                              shownRunning || queued.length > 0
                                 ? t('送信待ちに追加', 'Add to pending sends')
                                 : t('送信', 'Send')
                             }
@@ -2694,7 +2888,6 @@ function App() {
                               connecting ||
                               !prompt.trim() ||
                               !!external ||
-                              heldHere ||
                               agentInfo?.available !== true
                             }
                             onClick={() => void start()}

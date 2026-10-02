@@ -2,7 +2,8 @@ import http from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { chmod, mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir } from 'node:fs/promises';
+import writeFileAtomic from 'write-file-atomic';
 
 /** Runs one hand-off to a hibachi agent and resolves with its report. */
 export type HandOff = (hibachi: string, task: string, signal: AbortSignal) => Promise<string>;
@@ -106,12 +107,13 @@ export async function hibachiBridge(
   const bin = path.join(directory, 'bin');
   await mkdir(bin, { recursive: true, mode: 0o700 });
   const script = path.join(directory, 'client.cjs');
-  await writeFile(script, client, { mode: 0o600 });
+  // Replaced whole: another run's CLI may be starting from them at this moment.
+  await writeFileAtomic(script, client, { mode: 0o600 });
   const launchers = hibachiLaunchers(runtime, script);
   const posix = path.join(bin, 'hibachi');
-  await writeFile(posix, launchers.posix, { mode: 0o700 });
+  await writeFileAtomic(posix, launchers.posix, { mode: 0o700 });
   await chmod(posix, 0o700);
-  await writeFile(path.join(bin, 'hibachi.cmd'), launchers.windows, { mode: 0o700 });
+  await writeFileAtomic(path.join(bin, 'hibachi.cmd'), launchers.windows, { mode: 0o700 });
   const token = randomBytes(24).toString('hex');
   const server = http.createServer((request, response) => {
     let body = '';

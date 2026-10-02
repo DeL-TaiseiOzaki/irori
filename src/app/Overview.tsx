@@ -83,7 +83,8 @@ interface Actions {
     options?: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } },
   ) => void;
   onResume: (scopeId: string) => Promise<void>;
-  onStop: (scopeId: string) => Promise<void>;
+  /** Stops the run of the conversation the card follows; the brain's others go on. */
+  onStop: (scopeId: string, conversationId?: string) => Promise<void>;
   onError: (error: unknown) => void;
 }
 
@@ -151,7 +152,7 @@ function AiCard({
             <button
               className="panel-button"
               disabled={busy}
-              onClick={() => act(() => onStop(space.scopeId))}
+              onClick={() => act(() => onStop(space.scopeId, ai.id))}
             >
               <Icon name="close" size={13} />
               {t('停止', 'Stop')}
@@ -590,7 +591,8 @@ function OverviewComposer({
   const space = spaces.find((item) => item.scopeId === target) ?? spaces[0];
   if (!space) return null;
   const ai = ais[space.scopeId] ?? idle;
-  const behind = ai.running || ai.pending > 0;
+  // A send waits behind the run or the queue of the conversation it goes to.
+  const behind = ai.running || ai.queued.length > 0;
   async function send() {
     if (!text.trim() || sending) return;
     setSending(true);
@@ -732,7 +734,7 @@ export function Overview({
   onCreateYou: () => Promise<void>;
   onShowYou: () => void;
   onSendYou: (prompt: string) => Promise<void>;
-  onStopYou: () => Promise<void>;
+  onStopYou: (conversationId?: string) => Promise<void>;
   /** The CLI your AI runs on, and the model chosen for it ('' for the CLI's default). */
   yourAgent: AgentId;
   yourModel: string;

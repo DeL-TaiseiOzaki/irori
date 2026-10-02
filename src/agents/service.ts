@@ -128,16 +128,15 @@ type Run = {
   close: () => void;
 };
 export class AgentService {
-  // One run per checkout, whatever its conversation (ADR 017 D4). A space is one
-  // registered checkout on this device, so its runs never touch another's bytes;
-  // two runs in one space would.
+  // Runs by id: one per conversation, and an owner's conversations run side by
+  // side in its checkout, as Claudian's tabs do in one vault (ADR 020).
   private runs = new Map<string, Run>();
   private device: DeviceIdentity;
   private conversations: ConversationStore;
   private catalog = new ModelCatalog();
-  // Brains handed to your AI's run in progress, by the run that holds them. A brain
-  // is busy while its sub-agent may be working in its checkout.
-  private delegated = new Map<string, string>();
+  // Brains handed to the irori agent's runs in progress, with the runs that hold
+  // them. A brain is busy while a sub-agent may be working in its checkout.
+  private delegated = new Map<string, Set<string>>();
   private requests = new Map<
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
@@ -165,12 +164,20 @@ export class AgentService {
             'Could not save the conversation history. Stopping the run.',
           ),
         );
-        void this.cancel(run.binding.scopeId);
+        void this.stop(run);
       }
     });
   }
+  /** Whether any run works in the space, its own or a sub-agent's: irori's own changes there wait. */
   busy(scopeId: string) {
-    return this.runs.has(scopeId) || this.delegated.has(scopeId);
+    return this.scopeRuns(scopeId).length > 0 || this.delegated.has(scopeId);
+  }
+  private scopeRuns(scopeId: string) {
+    return [...this.runs.values()].filter((run) => run.binding.scopeId === scopeId);
+  }
+  /** The run in progress in a conversation, if any. */
+  private conversationRun(id: string) {
+    return [...this.runs.values()].find((run) => run.conversationId === id);
   }
   /**
    * The folders on this device that the run's hibachis show in contents through
@@ -200,7 +207,7 @@ export class AgentService {
     return this.runs.size > 0;
   }
   runningScopes() {
-    return [...this.runs.keys()];
+    return [...new Set([...this.runs.values()].map((run) => run.binding.scopeId))];
   }
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.root(scopeId) };
@@ -305,22 +312,25 @@ export class AgentService {
   pending(scopeId: string) {
     return this.conversations.pending(scopeId);
   }
-  /** Starts the owner's oldest queued instruction, whichever conversation holds it. */
-  async startNextQueued(scopeId: string, canStart = () => {}) {
-    if (this.busy(scopeId)) return null;
-    const next = await this.conversations.nextQueued(scopeId);
+  /**
+   * Starts the oldest queued instruction of one of the owner's conversations
+   * that is not running: of `conversationId` alone when it is given.
+   */
+  async startNextQueued(scopeId: string, conversationId?: string, canStart = () => {}) {
+    const next = await this.conversations.nextQueued(
+      scopeId,
+      (id) => (!conversationId || id === conversationId) && !this.conversationRun(id),
+    );
     if (!next) return null;
     canStart();
-    const runId = this.start(
+    return this.startAccepted(
       { ...next.item, scopeId, agent: next.agent, conversationId: next.conversationId },
       next.item.id,
     );
-    await this.runs.get(scopeId)!.accepted;
-    return runId;
   }
-  async startAccepted(input: StartRun) {
-    const id = this.start(input);
-    await this.runs.get(input.scopeId)!.accepted;
+  async startAccepted(input: StartRun, queuedId?: string) {
+    const id = this.start(input, queuedId);
+    await this.runs.get(id)!.accepted;
     return id;
   }
   flush() {
@@ -362,13 +372,15 @@ export class AgentService {
   ): string {
     input = startInput.parse(input);
     const access = requireAgentAccess(input.agent, input.access);
-    // A brain held by your AI's run takes exactly one run more: the hand-off that run asks for.
-    const handed =
-      holder !== undefined &&
-      this.delegated.get(input.scopeId) === holder &&
-      !this.runs.has(input.scopeId);
-    if (this.busy(input.scopeId) && !handed)
-      throw Error('This space is already running an agent. Stop it before starting another.');
+    if (holder !== undefined && !this.delegated.get(input.scopeId)?.has(holder))
+      throw Error('This hibachi is not handed to that run.');
+    if (input.conversationId && this.conversationRun(input.conversationId))
+      throw Error(
+        t(
+          'この会話は実行中です。停止するか、送信待ちに追加してください。',
+          'This conversation is already running. Stop it or add the instruction to its queue.',
+        ),
+      );
     if (!input.prompt.trim() || input.prompt.length > 32000)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.root(input.scopeId);
@@ -381,16 +393,7 @@ export class AgentService {
             'The irori agent takes hibachis, not notes or materials.',
           ),
         );
-      for (const scopeId of brains) {
-        const space = this.files.get(scopeId);
-        if (this.busy(scopeId))
-          throw Error(
-            t(
-              `${space.name} の hibachi agent が作業中です。終わってから irori agent に渡してください。`,
-              `${space.name}'s hibachi agent is working. Hand it to the irori agent after it finishes.`,
-            ),
-          );
-      }
+      for (const scopeId of brains) this.files.get(scopeId);
     } else if (brains.length) throw Error('Only the irori agent takes hibachis');
     let close!: () => void;
     let accept!: () => void;
@@ -423,8 +426,9 @@ export class AgentService {
       closed,
       close,
     };
-    this.runs.set(input.scopeId, run);
-    for (const scopeId of brains) this.delegated.set(scopeId, run.id);
+    this.runs.set(run.id, run);
+    for (const scopeId of brains)
+      this.delegated.set(scopeId, (this.delegated.get(scopeId) ?? new Set()).add(run.id));
     // Let the IPC caller bind the returned run id before first events arrive.
     setTimeout(() => void this.execute(run, input), 0);
     return run.id;
@@ -449,7 +453,7 @@ export class AgentService {
           'Could not save the conversation history. Stopping the run.',
         ),
       );
-      void this.cancel(run.binding.scopeId);
+      void this.stop(run);
     }
   }
   /**
@@ -522,13 +526,19 @@ export class AgentService {
       this.publish(run, 'status', '', { resolved: id });
     }
   }
-  async cancel(scopeId?: string) {
-    if (scopeId === undefined) {
-      await Promise.all(this.runningScopes().map((id) => this.cancel(id)));
-      return;
-    }
-    const run = this.runs.get(scopeId);
-    if (!run) return;
+  /** Stops the runs in a space, or that of one of its conversations; with neither, every run. */
+  async cancel(scopeId?: string, conversationId?: string) {
+    await Promise.all(
+      [...this.runs.values()]
+        .filter(
+          (run) =>
+            (scopeId === undefined || run.binding.scopeId === scopeId) &&
+            (conversationId === undefined || run.conversationId === conversationId),
+        )
+        .map((run) => this.stop(run)),
+    );
+  }
+  private async stop(run: Run) {
     run.cancelled = true;
     run.abort.abort();
     this.denyRequests(run);
@@ -543,10 +553,10 @@ export class AgentService {
     run.finish?.();
     await run.closed;
   }
-  /** Stops one run by its id while it is still the run in its space. */
+  /** Stops one run by its id while it is still running. */
   async cancelRun(runId: string) {
-    const run = [...this.runs.values()].find((item) => item.id === runId);
-    if (run) await this.cancel(run.binding.scopeId);
+    const run = this.runs.get(runId);
+    if (run) await this.stop(run);
   }
   /**
    * Starts a routine's agent step (ADR 016 D7): an ordinary run, shown in its
@@ -557,7 +567,7 @@ export class AgentService {
     step: StepRun,
   ): { runId: string; conversationId: string; done: Promise<StepEnd> } {
     const runId = this.start(input, undefined, undefined, step);
-    const conversationId = this.runs.get(input.scopeId)!.conversationId!;
+    const conversationId = this.runs.get(runId)!.conversationId!;
     let report = '';
     let after = true;
     const errors: string[] = [];
@@ -597,7 +607,7 @@ export class AgentService {
           ...(run.step.routine && { routine: run.step.routine }),
         },
       };
-    const holder = run.holder && [...this.runs.values()].find((item) => item.id === run.holder);
+    const holder = run.holder && this.runs.get(run.holder);
     if (holder && holder.conversationId) {
       // Work handed from one of the irori agent's conversations continues in one
       // conversation of the hibachi, apart from the person's own.
@@ -626,10 +636,17 @@ export class AgentService {
     let record: RunRecord | undefined;
     try {
       const placed = await this.place(run, input);
+      if (
+        [...this.runs.values()].some((other) => other !== run && other.conversationId === placed.id)
+      )
+        throw Error(
+          t(
+            'この会話は実行中です。停止するか、送信待ちに追加してください。',
+            'This conversation is already running. Stop it or add the instruction to its queue.',
+          ),
+        );
       run.conversationId = placed.id;
-      // The owner's queue goes first, whichever of its conversations it waits in.
-      if (!run.queuedId && (await this.conversations.pending(input.scopeId)))
-        throw Error(t('送信待ちがあります。', 'There are queued instructions.'));
+      // The conversation's own queue goes first; `begin` refuses an instruction sent past it.
       const eventId = randomUUID();
       await this.conversations.begin(
         placed.id,
@@ -937,9 +954,9 @@ export class AgentService {
           );
         }
       }
-      if (this.runs.get(run.binding.scopeId) === run) this.runs.delete(run.binding.scopeId);
-      for (const [scopeId, holder] of this.delegated)
-        if (holder === run.id) this.delegated.delete(scopeId);
+      this.runs.delete(run.id);
+      for (const [scopeId, holders] of this.delegated)
+        if (holders.delete(run.id) && !holders.size) this.delegated.delete(scopeId);
       this.publish(run, 'done', done.text, { outcome: done.outcome, id: done.id });
       run.close();
     }
@@ -949,7 +966,7 @@ export class AgentService {
     await Promise.all(
       [...this.runs.values()]
         .filter((held) => held.holder === run.id)
-        .map((held) => this.cancel(held.binding.scopeId)),
+        .map((held) => this.stop(held)),
     );
   }
   /**
@@ -967,9 +984,13 @@ export class AgentService {
   ) {
     const brain = hibachiOf(holder.delegation!, name);
     if (holder.cancelled || signal.aborted) throw Error('The irori agent’s run has stopped.');
-    if (this.delegated.get(brain.scopeId) !== holder.id)
+    if (!this.delegated.get(brain.scopeId)?.has(holder.id))
       throw Error(`The ${brain.name} hibachi is not handed to this request.`);
-    if (this.runs.has(brain.scopeId))
+    if (
+      [...this.runs.values()].some(
+        (run) => run.holder === holder.id && run.binding.scopeId === brain.scopeId,
+      )
+    )
       throw Error(
         `The ${brain.name} hibachi's agent is already working on a hand-off. Wait for its report before handing it another.`,
       );
@@ -1011,7 +1032,8 @@ export class AgentService {
     });
     const label = task.trim().split('\n')[0].slice(0, 120);
     this.event(holder, 'status', label, delegate('started'));
-    const stop = () => void this.cancel(brain.scopeId);
+    // Only the hand-off stops: the person's own runs in that hibachi go on.
+    const stop = () => void this.cancelRun(runId);
     signal.addEventListener('abort', stop);
     try {
       const outcome = await done;

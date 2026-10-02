@@ -678,7 +678,8 @@ app
       deleteConversation: (id) => agents.deleteConversation(id),
       queueAgentMessage: (input) => agents.queueMessage(input),
       removeQueuedMessage: (...args) => agents.removeQueued(...args),
-      startNextQueued: (scopeId) => agents.startNextQueued(scopeId, canStartAgent),
+      startNextQueued: (scopeId, conversationId) =>
+        agents.startNextQueued(scopeId, conversationId, canStartAgent),
       yourAi: () => you.status(),
       createYourAi: () => you.create(),
       yourAiEntries: (rel) => you.entries(rel),
@@ -705,7 +706,7 @@ app
       runRoutine: (ref, input) => routines.run(ref, input),
       stopRoutine: (ref) => routines.stop(ref),
       routineRuns: (ref) => routines.runs(ref),
-      cancel: (scopeId) => agents.cancel(scopeId),
+      cancel: (scopeId, conversationId) => agents.cancel(scopeId, conversationId),
       respond: (...args) => agents.respond(...args),
     } satisfies HostHandlers;
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {

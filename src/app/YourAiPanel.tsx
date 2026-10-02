@@ -72,7 +72,8 @@ export function YourAiPanel({
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
   onSend: (prompt: string) => Promise<void>;
-  onStop: () => Promise<void>;
+  /** Stops the run of the conversation on show; the irori agent's others go on. */
+  onStop: (conversationId?: string) => Promise<void>;
   onError: (error: unknown) => void;
 }) {
   const [text, setText] = useState('');
@@ -111,7 +112,7 @@ export function YourAiPanel({
       </div>
     );
   const run = latestRun(ai);
-  const behind = ai.running || ai.pending > 0;
+  const behind = ai.running || ai.queued.length > 0;
   const send = async () => {
     if (!text.trim() || busy) return;
     if (await act(() => onSend(text))) setText('');
@@ -154,7 +155,7 @@ export function YourAiPanel({
           <button
             className="panel-button"
             disabled={busy}
-            onClick={() => void act(onStop)}
+            onClick={() => void act(() => onStop(ai.id))}
             aria-label={t('irori agent を停止', 'Stop the irori agent')}
           >
             <Icon name="close" size={13} />

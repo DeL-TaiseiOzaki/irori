@@ -84,8 +84,8 @@ agent's shape. The investigation behind the design is in the
   panel has the same access pill as a hibachi agent's composer; a choice holds
   for the chosen CLI until the CLI changes, like the composer's. Pi offers only
   its own settings. The owner accepts that the irori agent may read any hibachi.
-- irori mode sends each request with the workspace's hibachis that are not
-  busy. The host resolves their folders and puts a preamble before the request
+- irori mode sends each request with the workspace's hibachis, busy or not
+  ([ADR 020](decisions/020-parallel-conversations.md)). The host resolves their folders and puts a preamble before the request
   naming each hibachi and its folder.
 - On Claude Code, Codex and OpenCode the preamble (`brainsPreamble`) also names
   each hibachi's sub-agent and tells the irori agent to hand the hibachi's work
@@ -105,8 +105,8 @@ agent's shape. The investigation behind the design is in the
   irori agent to read a hibachi's `AGENTS.md`: the hibachi agent does that,
   because it runs in that hibachi.
 - While the irori agent's run lasts, every hibachi handed to it is busy, as if
-  its own hibachi agent were running. That hibachi agent, Git operations and
-  hibachi settings wait. The hibachi agent's panel says why.
+  its own hibachi agent were running: Git operations and hibachi settings wait.
+  The person's own conversations in that hibachi run beside it (ADR 020).
 
 ## The `hibachi` command (Pi, Hermes Agent)
 
@@ -128,8 +128,9 @@ agent's shape. The investigation behind the design is in the
 - The host starts a run in that hibachi (`AgentService.handOff`) on the irori
   agent's CLI and model, in `defaultAgentAccess`, with the task after a line
   asking for a short report. The hibachi is held by the irori agent's run; that
-  run, and only it, may start this one run there. One hand-off at a time per
-  hibachi; a second is refused until the first reports. The run is an ordinary
+  run, and only it, may start hand-offs there. One hand-off at a time per
+  irori-agent run and hibachi; a second is refused until the first reports.
+  Stopping the hand-off stops only it. The run is an ordinary
   run of that hibachi, in a conversation of the hibachi's own for this irori
   agent conversation (`handedBy`, [CONVERSATIONS](CONVERSATIONS.md)): the first
   hand-off makes it, titled with the task, and later hand-offs from the same
@@ -278,8 +279,8 @@ agent's shape. The investigation behind the design is in the
 - **No enforced write boundary outside Claude Code.** On Codex, OpenCode, Pi and
   Hermes Agent the hibachis' boundaries are instructions in the preamble and the
   definitions, not a hook: in full access the CLI can write anywhere its own
-  rules allow. Only the busy hold (no other run in a handed hibachi) still
-  applies; a `hibachi` command hand-off is the one run the hold admits.
+  rules allow. Since ADR 020 the busy hold no longer keeps other runs
+  out of a handed hibachi; it holds only irori's own changes there.
 - On those CLIs the person-lines notice reaches Pi and OpenCode only for a
   hibachi's file named by its absolute path; Codex and Hermes Agent have no hook.
 - A definition names the hibachi's folder at the time irori wrote it. irori does
@@ -291,7 +292,7 @@ agent's shape. The investigation behind the design is in the
   and the definition that tells it to read the hibachi's Schema.
 - A hibachi's own `.claude/agents` load too (through `additionalDirectories`), so
   their names can collide with the irori agent's definitions.
-- Every free hibachi of the workspace is held for the whole run. Holding only the
+- Every hibachi of the workspace is held for the whole run. Holding only the
   hibachis a hand-off reaches is later work.
 - Claude Code's `InstructionsLoaded` hook did not fire in the acceptance run, so
   whether a hibachi's `AGENTS.md` loads by itself when a sub-agent reads a file

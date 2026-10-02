@@ -575,8 +575,12 @@ export interface HostAPI {
     conversationId: string,
     id: string,
   ): Promise<import('./conversation').QueuedMessage[]>;
-  /** Starts the owner's oldest queued instruction, whichever conversation holds it. */
-  startNextQueued(scopeId: string): Promise<string | null>;
+  /**
+   * Starts the oldest queued instruction of one of the owner's conversations that
+   * is not running, or of the named conversation alone. Each conversation's queue
+   * waits only for its own run; null when nothing could start.
+   */
+  startNextQueued(scopeId: string, conversationId?: string): Promise<string | null>;
   start(input: StartRun): Promise<string>;
   /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
   yourAi(): Promise<import('./you').YourAi>;
@@ -599,8 +603,8 @@ export interface HostAPI {
   stopRoutine(ref: import('./routines').RoutineRef): Promise<void>;
   /** The routine's runs kept on this device, newest first. */
   routineRuns(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineRun[]>;
-  /** Stops the run in one space, or every run when no space is named. */
-  cancel(scopeId?: string): Promise<void>;
+  /** Stops the run of one conversation, the runs in one space, or every run when neither is named. */
+  cancel(scopeId?: string, conversationId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;
   onEvent(callback: (event: HostEvent) => void): () => void;
 }
