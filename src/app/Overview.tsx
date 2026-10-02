@@ -390,6 +390,7 @@ function BrainColumn({
   space,
   ai,
   agent,
+  hibachiAgent,
   revision,
   onConnect,
   ...actions
@@ -397,6 +398,8 @@ function BrainColumn({
   space: Space;
   ai: BrainAi;
   agent: AgentId;
+  /** The AI and Schema rows show only with the hibachi agent (ADR 021). */
+  hibachiAgent: boolean;
   revision: number;
   onConnect: (space: Space) => void;
 } & Actions) {
@@ -412,6 +415,7 @@ function BrainColumn({
     { enabled: !!knowledgeRoot, refresh: revision },
   );
   const skills = useResource(() => host.skills(space.scopeId), [space.scopeId], {
+    enabled: hibachiAgent,
     refresh: revision,
   });
   const connections = useResource(() => host.cloudConnections(space.scopeId), [space.scopeId], {
@@ -445,28 +449,32 @@ function BrainColumn({
           </span>
         </button>
       </header>
-      <div className="column-cell">
-        <AiCard space={space} ai={ai} agent={agent} {...actions} />
-      </div>
-      <div className="column-cell">
-        {roots.error && <small className="column-note">{roots.error}</small>}
-        {schema.map((entry) => (
-          <button key={entry.path} className="column-row" onClick={() => open(entry)}>
-            <Icon name="file" size={14} className="layer-icon schema" />
-            {entry.name}
-          </button>
-        ))}
-        {!roots.loading && !schema.length && !roots.error && (
-          <small className="column-note">{t('指示ファイルなし', 'No instruction file')}</small>
-        )}
-        {!!skills.data?.skills.length && (
-          <div className="column-skills">
-            {skills.data.skills.map((skill) => (
-              <span key={skill.name}>{skill.name}</span>
-            ))}
-          </div>
-        )}
-      </div>
+      {hibachiAgent && (
+        <div className="column-cell">
+          <AiCard space={space} ai={ai} agent={agent} {...actions} />
+        </div>
+      )}
+      {hibachiAgent && (
+        <div className="column-cell">
+          {roots.error && <small className="column-note">{roots.error}</small>}
+          {schema.map((entry) => (
+            <button key={entry.path} className="column-row" onClick={() => open(entry)}>
+              <Icon name="file" size={14} className="layer-icon schema" />
+              {entry.name}
+            </button>
+          ))}
+          {!roots.loading && !schema.length && !roots.error && (
+            <small className="column-note">{t('指示ファイルなし', 'No instruction file')}</small>
+          )}
+          {!!skills.data?.skills.length && (
+            <div className="column-skills">
+              {skills.data.skills.map((skill) => (
+                <span key={skill.name}>{skill.name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="column-cell">
         {knowledge.shown.map((entry) =>
           entry.directory ? (
@@ -521,6 +529,7 @@ function OverviewColumns({
   spaces,
   ais,
   agentFor,
+  hibachiAgent,
   revision,
   onConnect,
   ...actions
@@ -528,26 +537,31 @@ function OverviewColumns({
   spaces: Space[];
   ais: Record<string, BrainAi>;
   agentFor: (scopeId: string) => AgentId;
+  hibachiAgent: boolean;
   revision: number;
   onConnect: (space: Space) => void;
 } & Actions) {
   return (
     <div
-      className="overview-columns"
+      className={`overview-columns ${hibachiAgent ? '' : 'without-agents'}`}
       role="region"
       aria-label={t('hibachi の並列表示', 'hibachis side by side')}
       style={{ '--columns': spaces.length } as CSSProperties}
     >
       <div className="columns-gutter" aria-hidden="true">
         <span />
-        <span>
-          <Icon name="sparkles" size={15} className="ai-card-spark" />
-          AI
-        </span>
-        <span>
-          <Icon name="schema" size={15} className="layer-icon schema" />
-          Schema
-        </span>
+        {hibachiAgent && (
+          <span>
+            <Icon name="sparkles" size={15} className="ai-card-spark" />
+            AI
+          </span>
+        )}
+        {hibachiAgent && (
+          <span>
+            <Icon name="schema" size={15} className="layer-icon schema" />
+            Schema
+          </span>
+        )}
         <span>
           <Icon name="book" size={15} />
           Knowledge
@@ -563,6 +577,7 @@ function OverviewColumns({
           space={space}
           ai={ais[space.scopeId] ?? idle}
           agent={agentFor(space.scopeId)}
+          hibachiAgent={hibachiAgent}
           revision={revision}
           onConnect={onConnect}
           {...actions}
@@ -694,6 +709,7 @@ export function Overview({
   revision,
   addDisabled,
   agentFor,
+  hibachiAgent,
   onView,
   onSearch,
   onAdd,
@@ -722,6 +738,8 @@ export function Overview({
   revision: number;
   addDisabled: boolean;
   agentFor: (scopeId: string) => AgentId;
+  /** Each hibachi's own agent is offered (ADR 021); otherwise the irori agent alone. */
+  hibachiAgent: boolean;
   onView: (view: OverviewView) => void;
   onSearch: () => void;
   onAdd: () => void;
@@ -753,7 +771,8 @@ export function Overview({
 } & Actions) {
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
-  const [island, setIsland] = useState<'you' | 'brains'>('you');
+  const [islandChoice, setIsland] = useState<'you' | 'brains'>('you');
+  const island = hibachiAgent ? islandChoice : 'you';
   const yourAi = (you && ais[you.id]) ?? idle;
   // What the Overview itself did (a send, a resume) is read back at once.
   const [acted, setActed] = useState(0);
@@ -893,6 +912,7 @@ export function Overview({
             spaces={spaces}
             ais={ais}
             agentFor={agentFor}
+            hibachiAgent={hibachiAgent}
             revision={revision}
             onConnect={onConnect}
             {...shared}
@@ -928,16 +948,18 @@ export function Overview({
               : t('hibachi agent', 'hibachi agents')
           }
         >
-          <MagnetTabs
-            className="overview-island-tabs"
-            label={t('irori mode の AI', 'AIs in irori mode')}
-            value={island}
-            onValueChange={setIsland}
-            options={[
-              { value: 'you', label: t('irori agent', 'irori agent') },
-              { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
-            ]}
-          />
+          {hibachiAgent && (
+            <MagnetTabs
+              className="overview-island-tabs"
+              label={t('irori mode の AI', 'AIs in irori mode')}
+              value={island}
+              onValueChange={setIsland}
+              options={[
+                { value: 'you', label: t('irori agent', 'irori agent') },
+                { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
+              ]}
+            />
+          )}
           {island === 'you' ? (
             <YourAiPanel
               you={you}

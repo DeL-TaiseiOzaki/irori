@@ -7,11 +7,11 @@ description: AI への指示、書きためる知識、元になる資料を分�
 
 | 層        | 役割                               | 例                                  |
 | --------- | ---------------------------------- | ----------------------------------- |
-| Schema    | AI が仕事を進めるための指示や設定  | `AGENTS.md`、スキル、ルール、フック |
+| Schema    | AI への指示や設定（任意）          | `AGENTS.md`、スキル、ルール、フック |
 | Knowledge | 自分たちが書き、更新していくノート | Markdown、オントロジーの CSV        |
 | Contents  | ノートの元になる資料               | PDF、Office ファイル、Google Drive  |
 
-資料を読み、Knowledge に理解を書き、Schema に仕事の進め方を置くのが基本です。
+資料を読み、Knowledge に理解を書きます。Schema は **設定 → エージェント** で hibachi agent をオンにしたときだけ表示されます。
 
 ## フォルダとの関係
 
@@ -23,6 +23,6 @@ description: AI への指示、書きためる知識、元になる資料を分�
 
 ## AI が使うもの
 
-hibachi agent は、その hibachi の Schema とノートを使って働きます。接続済みの Contents も、そのフォルダにアクセスできる範囲で利用できます。
+hibachi agent（任意）は、その hibachi の Schema とノートを使って働きます。接続済みの Contents も、そのフォルダにアクセスできる範囲で利用できます。
 
 別の hibachi も使う依頼は[irori agent](irori-mode.md)に渡します。具体的な設定は[Schema の設定](schema.md)、資料の接続は[Google Drive](drive.md)を参照してください。

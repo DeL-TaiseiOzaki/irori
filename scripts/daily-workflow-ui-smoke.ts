@@ -6,12 +6,15 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import type { AgentId, Space } from '../src/domain/types';
 import { dateTokens } from '../src/domain/notes';
+import { SettingsService } from '../src/host/settings';
 
 // Exercise the actual desktop bridge and disk persistence in disposable KBs.
 // Only provider discovery is stubbed; model starts and update requests are rejected.
 const base = await mkdtemp(path.join(tmpdir(), 'irori daily UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const spaces: Space[] = [];
 for (const [name, category] of [
   ['日常の個人KB', 'personal'],

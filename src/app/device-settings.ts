@@ -14,6 +14,7 @@ let current: DeviceSettings = {
   language: 'ja',
   markdownFont: 'sans',
   editorAssistance: true,
+  hibachiAgent: false,
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
@@ -66,6 +67,16 @@ export function currentEditorAssistance() {
 
 export async function chooseEditorAssistance(editorAssistance: boolean) {
   current = await host.saveDeviceSettings({ editorAssistance });
+  return current;
+}
+
+/** Whether each hibachi's own agent and its Schema layer are offered (ADR 021). */
+export function currentHibachiAgent() {
+  return current.hibachiAgent;
+}
+
+export async function chooseHibachiAgent(hibachiAgent: boolean) {
+  current = await host.saveDeviceSettings({ hibachiAgent });
   return current;
 }
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { SettingsService } from '../src/host/settings';
 
 // Two brains' AIs run at once: switching brains while one runs, a queue per
 // brain that goes on in the background, and the Overview answering, stopping,
@@ -16,6 +17,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori overview UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const roots: string[] = [];
 for (const name of ['Product', 'Research']) {
   const root = path.join(base, name);

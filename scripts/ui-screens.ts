@@ -117,7 +117,7 @@ for (const run of runs) {
   const { files, home } = await fixture(base);
   await writeFile(
     path.join(files.dataDir, 'device-settings.json'),
-    JSON.stringify({ theme: run.theme, language: run.language }),
+    JSON.stringify({ theme: run.theme, language: run.language, hibachiAgent: true }),
   );
   const env = { ...process.env, HOME: home, IRORI_DATA_DIR: files.dataDir } as Record<
     string,

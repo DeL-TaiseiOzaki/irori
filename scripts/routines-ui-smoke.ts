@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { YourAiService } from '../src/host/you';
+import { SettingsService } from '../src/host/settings';
 
 // Routines in irori mode (ADR 016): the review before the first run and after a
 // change, JavaScript added from the row, a run's steps, output and changed
@@ -21,6 +22,8 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const root = path.join(base, 'Product');
 await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(path.join(root, 'Knowledge_Base', 'Product note.md'), '# Product\n');

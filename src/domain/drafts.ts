@@ -8,6 +8,8 @@ export const draftKey = z.discriminatedUnion('kind', [
       scopeId: z.uuid(),
       kind: z.literal('composer'),
       agent: z.enum(agentIds),
+      /** A column after the first in the agent dock keeps a draft of its own. */
+      column: z.number().int().min(2).max(64).optional(),
     })
     .strict(),
   z.object({ scopeId: z.uuid(), kind: z.literal('git-commit') }).strict(),
@@ -30,7 +32,7 @@ export const draftKey = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 export type DraftKey =
-  | { scopeId: string; kind: 'composer'; agent: AgentId }
+  | { scopeId: string; kind: 'composer'; agent: AgentId; column?: number }
   | { scopeId: string; kind: 'git-commit' }
   | { scopeId: string; kind: 'git-resolution'; path: string };
 export const draftValue = z

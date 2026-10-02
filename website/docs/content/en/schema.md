@@ -5,6 +5,8 @@ description: Maintain AI instructions and reusable skills as ordinary files.
 
 ## Open settings
 
+Schema appears only when the hibachi agent is on in **Settings → Agents**.
+
 Select an item in a hibachi's **Schema** to open its form in the center. Use a group's add action to create an item. The folder icon switches to **Show as files**.
 
 | Item         | Stored file                                         |

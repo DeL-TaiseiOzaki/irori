@@ -4,12 +4,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { ontologyFixture as fixture } from '../tests/fixtures/ontology';
+import { SettingsService } from '../src/host/settings';
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori ontology UI 日本語 '));
 const root = path.join(base, 'Knowledge');
 await mkdir(root);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const space = await files.register(root, '知識の地図', 'personal');
 await mkdir(path.join(root, 'ontology'));
 await mkdir(path.join(root, 'notes'));

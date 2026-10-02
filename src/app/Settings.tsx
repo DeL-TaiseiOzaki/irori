@@ -140,9 +140,14 @@ export function LanguageSwitch({ onError }: { onError: (error: unknown) => void 
  * updates, and the pending uploads kept on this device.
  */
 export function Settings({
+  hibachiAgent,
+  onHibachiAgent,
   onRecover,
   onError,
 }: {
+  /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
+  hibachiAgent: boolean;
+  onHibachiAgent: (on: boolean) => void;
   onRecover: () => void;
   onError: (error: unknown) => void;
 }) {
@@ -200,6 +205,20 @@ export function Settings({
               label={(option) => languageLabels[option]}
               onChange={chooseLanguageValue}
             />
+            <fieldset className="settings-choices hibachi-agent">
+              <legend>{t('エージェント', 'Agents')}</legend>
+              <div>
+                <label className="settings-choice" data-checked={hibachiAgent}>
+                  <input
+                    type="checkbox"
+                    checked={hibachiAgent}
+                    onChange={(event) => onHibachiAgent(event.target.checked)}
+                  />
+                  <Icon name="sparkles" size={15} />
+                  <span>hibachi agent</span>
+                </label>
+              </div>
+            </fieldset>
             <RoutineRuntimes onError={onError} />
             <section className="settings-updates" aria-label={t('更新', 'Updates')}>
               <h3>{t('更新', 'Updates')}</h3>

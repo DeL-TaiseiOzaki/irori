@@ -39,6 +39,29 @@
   display: flex;
   flex: none;
 }
+.agent-mark.irori .overview-orb {
+  width: 26px;
+  height: 26px;
+}
+/* With the hibachi agent on, the mark chooses which agent the column shows. */
+.agent-owner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 5px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--quick) ease;
+}
+.agent-owner:hover:not(:disabled) {
+  background: var(--raised);
+}
+.agent-panel {
+  container-type: inline-size;
+}
 .agent-sparkle {
   position: absolute;
   right: -5px;
@@ -1181,4 +1204,14 @@
 }
 .conversation-history .danger {
   color: var(--danger-on-nav);
+}
+/* A narrow column keeps its controls and drops the words beside them. */
+@container (max-width: 360px) {
+  .agent-header {
+    gap: 2px;
+  }
+  .agent-state {
+    font-size: 0;
+    gap: 0;
+  }
 }

@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Optional hibachi agent and the agent dock, 2026-10-02 (**0.1.65**,
+[ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md)): the owner
+put irori first as an IDE for knowledge bases and contents, with the hibachi
+agent as an option, and asked for agent sessions side by side in a sidebar that
+widens easily, with the page hideable.
+- `DeviceSettings.hibachiAgent` (default off, **設定 → エージェント**). Off, the
+  explorer's Schema section, the home's Schema card, the Schema view, the irori
+  mode columns' AI/Schema rows and hibachi agent tab, and the ontology's hibachi
+  agent button are not shown; the dock shows the irori agent.
+- The assistant pane is a dock of columns (`AgentColumn`), each with its own
+  conversation state, tabs, history and composer; a column shows the hibachi
+  agent of the hibachi on show or the irori agent. The first column keeps owners'
+  conversations under the owner id (shared with the Overview); later columns use
+  `<scope>#<column>`. Later columns' drafts use `DraftKey.column`. No dock width
+  limit; **列を追加** widens it.
+- The stage pane is collapsible while the dock is open (**本文を隠す**, or drag);
+  opening a file or closing the dock restores it.
+- Run tracking and requests stay in the window; a run's end sends the next queued
+  instruction unless a column shows that conversation (`display` registry).
+- The website and its docs lead with editing and reading KBs and contents; the
+  hibachi agent and Schema read as optional (Settings → Agents).
+- Verified with `npm run build`, `npm test`, every `test:ui` suite under
+  `xvfb-run` (new `dock-ui-smoke`; suites that use the hibachi agent turn it on
+  first, as does `package-smoke`), `npm run format:check`, `npm run build:website`
+  and `npm run test:website`. Not verified: real CLI turns in two columns,
+  installed Windows/macOS builds.
+
 Startup language, 2026-10-02 (**0.1.64**,
 [ADR 011](decisions/011-interface-language.md)): the language setting lived only
 in the rail's settings popover, and the startup screen has no rail, so a first

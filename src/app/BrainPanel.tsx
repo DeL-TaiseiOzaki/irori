@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import {
   Group as PaneGroup,
@@ -232,6 +232,11 @@ const sections: { layer: Layer; defaultSize: string }[] = [
   { layer: 'Knowledge_Base', defaultSize: '46%' },
   { layer: 'contents', defaultSize: '28%' },
 ];
+// Without the hibachi agent the Schema layer is not shown (ADR 021).
+const editorSections: { layer: Layer; defaultSize: string }[] = [
+  { layer: 'Knowledge_Base', defaultSize: '62%' },
+  { layer: 'contents', defaultSize: '38%' },
+];
 // A folded section keeps its heading line.
 const headingHeight = 36;
 
@@ -300,8 +305,11 @@ export function BrainPanel({
   onSearch: () => void;
   onCreateIn: (space: Space, entry: Entry) => void;
   onEntryAction: (space: Space, entry: Entry, action: EntryAction) => void;
-  /** The Schema section as settings; the files behind it stay one toggle away. */
-  schema: ReactNode;
+  /**
+   * The Schema section as settings; the files behind it stay one toggle away.
+   * Absent while the hibachi agent is off, and the section with it.
+   */
+  schema?: ReactNode;
   /** The Changes view, owned by the caller. */
   children?: ReactNode;
 }) {
@@ -312,9 +320,11 @@ export function BrainPanel({
     Knowledge_Base: usePanelRef(),
     contents: usePanelRef(),
   } satisfies Record<Layer, unknown>;
+  const shown = schema === undefined ? editorSections : sections;
+  const panelIds = useMemo(() => shown.map((section) => section.layer), [shown]);
   const layout = useDefaultLayout({
     id: 'irori-brain-sections',
-    panelIds: sections.map((section) => section.layer),
+    panelIds,
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
@@ -504,7 +514,7 @@ export function BrainPanel({
           defaultLayout={layout.defaultLayout}
           onLayoutChanged={layout.onLayoutChanged}
         >
-          {sections.map(({ layer, defaultSize }, index) => {
+          {shown.map(({ layer, defaultSize }, index) => {
             const open = !folded.includes(layer);
             return [
               index > 0 && (
@@ -512,8 +522,8 @@ export function BrainPanel({
                   key={`${layer}-handle`}
                   className="section-handle"
                   aria-label={t(
-                    `${layerNames[sections[index - 1].layer]} と ${layerNames[layer]} の境界`,
-                    `Border between ${layerNames[sections[index - 1].layer]} and ${layerNames[layer]}`,
+                    `${layerNames[shown[index - 1].layer]} と ${layerNames[layer]} の境界`,
+                    `Border between ${layerNames[shown[index - 1].layer]} and ${layerNames[layer]}`,
                   )}
                 />
               ),

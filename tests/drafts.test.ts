@@ -63,6 +63,10 @@ test('Provider, scope, canonical checkout and conflict path are isolated; base v
   const { base, files, space, service, key } = await fixture(t);
   await service.write(key, { text: 'Claude draft' }, null);
   assert.equal(await service.read({ ...key, kind: 'composer', agent: 'codex' }), null);
+  // A second dock column keeps its own draft beside the first column's.
+  assert.equal(await service.read({ ...key, kind: 'composer', column: 2 }), null);
+  await service.write({ ...key, kind: 'composer', column: 2 }, { text: 'Second column' }, null);
+  assert.equal((await service.read(key))?.text, 'Claude draft');
   await mkdir(path.join(base, 'team'));
   const team = await files.register(path.join(base, 'team'), 'Team', 'team');
   assert.equal(

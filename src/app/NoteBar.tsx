@@ -114,12 +114,21 @@ export function NoteMenu({ children }: { children: ReactNode }) {
 }
 
 /** Opens and closes the brain's hibachi agent; closed, it is the AI's own ember button. */
-export function AiToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+/** Opens and closes the agent dock, named after the agent its first column shows. */
+export function AiToggle({
+  open,
+  name,
+  onToggle,
+}: {
+  open: boolean;
+  name: 'hibachi agent' | 'irori agent';
+  onToggle: () => void;
+}) {
   return open ? (
     <button
       className="ai-toggle open"
       aria-pressed="true"
-      aria-label={t('hibachi agent を閉じる', 'Close hibachi agent')}
+      aria-label={t(`${name} を閉じる`, `Close ${name}`)}
       onClick={onToggle}
     >
       <Icon name="sparkles" size={14} />
@@ -128,7 +137,7 @@ export function AiToggle({ open, onToggle }: { open: boolean; onToggle: () => vo
   ) : (
     <button className="ai-toggle" onClick={onToggle}>
       <Icon name="sparkles" size={14} />
-      {t('hibachi agent', 'hibachi agent')}
+      {name}
     </button>
   );
 }

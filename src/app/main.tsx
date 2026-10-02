@@ -10,27 +10,26 @@ import {
 } from './CloudEntryActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
-import {
-  appendConversationEvent,
-  withRequests,
-  type Conversation,
-  isDamaged,
-  type QueuedMessage,
-} from '../domain/conversation';
-import { agentAccessOptions, agentAccessLabel, defaultAgentAccess } from '../domain/agent-access';
-import { ModelPicker } from './ModelPicker';
+import { type Conversation, isDamaged } from '../domain/conversation';
+import { defaultAgentAccess } from '../domain/agent-access';
 import { Dialog } from './Dialog';
-import { SkillPicker } from './SkillPicker';
-import { retirementNotice } from '../domain/skills';
+import {
+  AgentColumn,
+  type ColumnOwner,
+  type DockColumn,
+  type DockShared,
+  type Tab,
+} from './AgentColumn';
 import { Menu } from '@base-ui/react/menu';
-import { Popover } from '@base-ui/react/popover';
 import {
   applyLanguage,
   applyMarkdownFont,
   applyTheme,
   chooseEditorAssistance,
+  chooseHibachiAgent,
   chooseYourAi,
   currentEditorAssistance,
+  currentHibachiAgent,
   currentYourAi,
   layoutStorage,
   loadDeviceSettings,
@@ -46,6 +45,7 @@ import {
   Panel as Pane,
   Separator as PaneSeparator,
   useDefaultLayout,
+  usePanelRef,
 } from 'react-resizable-panels';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -126,8 +126,6 @@ import { Startup, RegisterSpace } from './Startup';
 import { appIcon } from './branding';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
-import { agentIds, agentNames } from '../domain/types';
-import { AgentLog } from './AgentLog';
 import { BrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
@@ -140,7 +138,6 @@ import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
 import { Overview, type OverviewView } from './Overview';
 import { YourAiScreen } from './YourAiScreen';
-import { ConversationHistory } from './ConversationHistory';
 import { StatusBar } from './StatusBar';
 import { errorText } from './ErrorMessage';
 const host = window.irori;
@@ -157,8 +154,6 @@ function navigationNotice(target: Navigation, found: boolean) {
 }
 /** A run in progress: its space, and its conversation once the host has placed it. */
 type LiveRun = { scopeId: string; conversationId?: string };
-/** A conversation open in an owner's tabs, with its CLI. */
-type Tab = { id: string; agent: AgentId };
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
   // the whole tree from here; component state, drafts and the editor are kept.
@@ -230,12 +225,14 @@ function App() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
-  const [sources, setSources] = useState<SourceRef[]>([]);
-  // The open note the person took out of the AI's context, as `scopeId:path`.
-  const [noteOmitted, setNoteOmitted] = useState('');
-  const [skill, setSkill] = useState('');
-  const [personLines, setPersonLines] = useState(false);
-  const [accessSelection, setAccessSelection] = useState<{ owner: string; value: AgentAccess }>();
+  // The references each dock column sends with its next instruction.
+  const [sources, setSources] = useState<Record<string, SourceRef[]>>({});
+  /** Applies a change to every column's references: a moved file follows, a deleted one leaves. */
+  function updateSources(update: (all: SourceRef[]) => SourceRef[]) {
+    setSources((all) =>
+      Object.fromEntries(Object.entries(all).map(([column, refs]) => [column, update(refs)])),
+    );
+  }
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
@@ -260,46 +257,63 @@ function App() {
   );
   const agentFor = (scopeId?: string) =>
     (scopeId && agentChoice.brains[scopeId]) || agentChoice.last;
-  // The conversation each owner shows, with its CLI (ADR 017 D4). An owner not
-  // in it shows the host's pick: the one running, queued longest, or its latest.
-  const [shown, setShown] = useState<Record<string, { id: string; agent: AgentId }>>({});
+  // Each hibachi's own agent and its Schema layer are optional (ADR 021).
+  const [hibachiAgent, setHibachiAgent] = useState(currentHibachiAgent);
+  function chooseHibachi(next: boolean) {
+    setHibachiAgent(next);
+    void chooseHibachiAgent(next).catch((error) => {
+      setHibachiAgent(!next);
+      report(error);
+    });
+  }
+  // The agent dock's columns (ADR 021). The first stays while the dock is open; a
+  // hibachi column follows the hibachi on show, and shows the irori agent while the
+  // hibachi agent is off.
+  const [columns, setColumns] = useState<DockColumn[]>([{ id: 'main', owner: 'hibachi' }]);
+  const ownerOf = (column: DockColumn): ColumnOwner => (hibachiAgent ? column.owner : 'irori');
+  /** Where a column keeps an owner's conversation and tabs: the first under the owner's id. */
+  const slot = (columnId: string, scopeId: string) =>
+    columnId === 'main' ? scopeId : `${scopeId}#${columnId}`;
+  // The conversation each column shows per owner, with its CLI (ADR 017 D4). An owner
+  // not in it shows the host's pick: the one running, queued longest, or its latest.
+  const [shown, setShown] = useState<Record<string, Tab>>({});
   const shownHere = active ? shown[active.scopeId] : undefined;
   const agent = shownHere?.agent ?? agentFor(active?.scopeId);
   function remember(scopeId: string, next: AgentId) {
     setAgentChoice((choice) => ({ last: next, brains: { ...choice.brains, [scopeId]: next } }));
   }
-  // The conversations a hibachi keeps open as tabs, as Claudian does (ADR 020): the
+  // The conversations a column keeps open as tabs, as Claudian does (ADR 020): the
   // one on show is always among them, and the others may run meanwhile.
   const [tabs, setTabs] = useState<Record<string, Tab[]>>({});
-  function tabsOf(scopeId: string) {
-    const open = tabs[scopeId] ?? [];
-    const on = shown[scopeId];
+  function tabsOf(key: string) {
+    const open = tabs[key] ?? [];
+    const on = shown[key];
     return on && !open.some((tab) => tab.id === on.id) ? [...open, on] : open;
   }
   /**
-   * Shows a conversation in its owner's tabs: in its own tab when it has one, else
+   * Shows a conversation in a column's tabs: in its own tab when it has one, else
    * in a new tab, or with `replace` in place of the conversation on show.
    */
-  function showConversation(scopeId: string, id: string, next: AgentId, replace = false) {
-    const previous = shown[scopeId];
-    setShown((all) => ({ ...all, [scopeId]: { id, agent: next } }));
+  function showConversation(key: string, id: string, next: AgentId, replace = false) {
+    const previous = shown[key];
+    setShown((all) => ({ ...all, [key]: { id, agent: next } }));
     setTabs((all) => {
-      let open = all[scopeId] ?? [];
+      let open = all[key] ?? [];
       if (previous && !open.some((tab) => tab.id === previous.id)) open = [...open, previous];
       if (!open.some((tab) => tab.id === id)) {
         const tab = { id, agent: next };
         const at = replace && previous ? open.findIndex((item) => item.id === previous.id) : -1;
         open = at < 0 ? [...open, tab] : open.map((item, index) => (index === at ? tab : item));
       }
-      return { ...all, [scopeId]: open };
+      return { ...all, [key]: open };
     });
   }
   /** Closes a tab; the run of a conversation never stops with it, so a running one keeps its tab. */
-  function closeTab(scopeId: string, id: string) {
-    const open = tabsOf(scopeId);
+  function closeTab(key: string, id: string, onNeighbour: (agent: AgentId) => void) {
+    const open = tabsOf(key);
     const rest = open.filter((tab) => tab.id !== id);
-    setTabs((all) => ({ ...all, [scopeId]: rest }));
-    if (shown[scopeId]?.id !== id) return;
+    setTabs((all) => ({ ...all, [key]: rest }));
+    if (shown[key]?.id !== id) return;
     const neighbour =
       rest[
         Math.min(
@@ -308,28 +322,21 @@ function App() {
         )
       ];
     if (neighbour) {
-      remember(scopeId, neighbour.agent);
-      setShown((all) => ({ ...all, [scopeId]: neighbour }));
-    } else setShown(({ [scopeId]: _, ...others }) => others);
+      onNeighbour(neighbour.agent);
+      setShown((all) => ({ ...all, [key]: neighbour }));
+    } else setShown(({ [key]: _, ...others }) => others);
   }
   /**
    * Starts an empty conversation for the owner; nothing is kept before its first
    * instruction. With `replace` it takes the place of the conversation on show.
    */
-  async function newConversation(scopeId: string, next: AgentId, replace = false) {
-    showConversation(scopeId, await host.createConversation(scopeId, next), next, replace);
-  }
-  /** Another CLI is another conversation (ADR 017 D2); an empty one on show gives way to it. */
-  function setAgent(next: AgentId) {
-    if (!active || next === agent) return;
-    remember(active.scopeId, next);
-    void newConversation(active.scopeId, next, shownBlank).catch(report);
+  async function newConversation(scopeId: string, key: string, next: AgentId, replace = false) {
+    showConversation(key, await host.createConversation(scopeId, next), next, replace);
   }
   // Each brain keeps the model chosen for each CLI; '' is the CLI's own default.
   const [modelChoice, setModelChoice] = useState<Record<string, string>>({});
   const modelFor = (scopeId: string, agentId: AgentId) =>
     modelChoice[`${scopeId}:${agentId}`] || undefined;
-  const model = active ? modelFor(active.scopeId, agent) : undefined;
   // Your AI's CLI and models are kept on the device.
   const [yourChoice, setYourChoice] = useState(currentYourAi);
   function chooseYour(next: typeof yourChoice) {
@@ -345,15 +352,15 @@ function App() {
     yourAccessSelection?.agent === yourChoice.agent
       ? yourAccessSelection.value
       : defaultAgentAccess(yourChoice.agent);
-  const accessOwner = `${workspace?.id ?? ''}:${active?.scopeId ?? ''}:${agent}`;
-  const access =
-    accessSelection?.owner === accessOwner ? accessSelection.value : defaultAgentAccess(agent);
-  useEffect(() => setAccessSelection(undefined), [workspace?.id, active?.scopeId, agent]);
-  const [events, setEvents] = useState<AgentEvent[]>([]),
-    // Runs in progress by id, and sends on their way to the host by conversation (by
-    // space when none is named). An owner's conversations run side by side (ADR 020),
-    // so a space is running while any of its runs is.
-    [liveRuns, setLiveRuns] = useState<Record<string, LiveRun>>({}),
+  // A hibachi column's access, by where it shows: for its CLI, until that changes.
+  const [accessChoice, setAccessChoice] = useState<
+    Record<string, { agent: AgentId; value: AgentAccess }>
+  >({});
+  useEffect(() => setAccessChoice({}), [workspace?.id]);
+  // Runs in progress by id, and sends on their way to the host by conversation (by
+  // space when none is named). An owner's conversations run side by side (ADR 020),
+  // so a space is running while any of its runs is.
+  const [liveRuns, setLiveRuns] = useState<Record<string, LiveRun>>({}),
     [starting, setStarting] = useState<Record<string, string>>({}),
     [waitingScopes, setWaitingScopes] = useState<string[]>([]),
     [waitingRuns, setWaitingRuns] = useState<string[]>([]);
@@ -429,40 +436,44 @@ function App() {
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
   );
-  const prompt = composer.text;
   function setPrompt(value: string | ((previous: string) => string)) {
     composer.setText(typeof value === 'function' ? value(composer.snapshot().text) : value);
   }
-  const [sending, setSending] = useState(false);
-  const submitting = useRef(false);
-  // The conversation's own queue: it waits for that conversation's run alone.
-  const [queued, setQueued] = useState<QueuedMessage[]>([]);
-  const [queuePaused, setQueuePaused] = useState(false);
-  const [conversationReady, setConversationReady] = useState(false);
-  const [conversationError, setConversationError] = useState('');
-  // Events kept in the conversation but not sent to the view, and lines that could not be read.
-  const [omitted, setOmitted] = useState({ earlier: 0, damaged: 0 });
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyReload, setHistoryReload] = useState(0);
-  const eventRevision = useRef(0);
-  // Back from the Overview, the panel reads its brain's conversation again: the
-  // Overview may have sent to it, queued for it or answered it meanwhile.
+  // What each dock column reports: a send under way, and its conversation's queue.
+  const [columnStatus, setColumnStatus] = useState<
+    Record<string, { sending: boolean; queued: number }>
+  >({});
+  const sending = Object.values(columnStatus).some((status) => status.sending);
+  // Back from the Overview, the columns read their conversations again: the
+  // Overview may have sent to them, queued for them or answered them meanwhile.
+  const [reload, setReload] = useState(0);
   const shownLevel = useRef(level);
   useEffect(() => {
-    if (shownLevel.current === 'overview' && level === 'brain')
-      setHistoryReload((value) => value + 1);
+    if (shownLevel.current === 'overview' && level === 'brain') setReload((value) => value + 1);
     shownLevel.current = level;
   }, [level]);
+  // The Overview changed or resumed an owner's queues; the columns showing them read them again.
+  const [queueSignal, setQueueSignal] = useState<DockShared['queueSignal']>({
+    n: 0,
+    resume: false,
+  });
+  // Conversations on show in a column: their queues are the column's to send.
+  const displayed = useRef(new Map<string, number>());
+  function display(conversationId: string) {
+    const all = displayed.current;
+    all.set(conversationId, (all.get(conversationId) ?? 0) + 1);
+    return () => {
+      const left = (all.get(conversationId) ?? 1) - 1;
+      if (left) all.set(conversationId, left);
+      else all.delete(conversationId);
+    };
+  }
   // Conversations (or spaces) whose next queued instruction is being sent, so it is sent once.
   const draining = useRef(new Set<string>());
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
     [newNote, setNewNote] = useState(false);
-  const conversationKey = useRef('');
-  function updateEvents(update: (events: AgentEvent[]) => AgentEvent[]) {
-    setEvents(update);
-  }
   // Every run is tracked so the explorer can mark its space and the panel its
   // conversation's tab, while the panel's controls follow the conversation on show.
   function addRun(runId: string, scopeId: string, conversationId?: string) {
@@ -581,15 +592,12 @@ function App() {
   }
   // Any run in the hibachi on show holds what irori itself would change there.
   const running = !!active && runningScopes.includes(active.scopeId);
-  // The conversation on show has a run of its own: its sends queue behind it.
-  const shownRunning = !!shownHere && runningConversations.has(shownHere.id);
   /** Whether a conversation's run waits for the person's answer. */
   function conversationWaiting(id: string) {
     return Object.entries(liveRuns).some(
       ([runId, run]) => run.conversationId === id && waitingRuns.includes(runId),
     );
   }
-  const shownWaiting = !!shownHere && conversationWaiting(shownHere.id);
   // The hibachi's conversations, read again when one begins or a run ends, name the
   // tabs; one running without a tab, after a reload or from the Overview, gets one.
   const [tabRevision, setTabRevision] = useState(0);
@@ -600,97 +608,20 @@ function App() {
   useEffect(() => {
     if (!active || !tabRows.data) return;
     const open = tabsOf(active.scopeId);
+    const anywhere = columns.flatMap((column) => tabsOf(slot(column.id, active.scopeId)));
     const missing = tabRows.data.flatMap((row) =>
-      !isDamaged(row) && row.running && !open.some((tab) => tab.id === row.id)
+      !isDamaged(row) && row.running && !anywhere.some((tab) => tab.id === row.id)
         ? [{ id: row.id, agent: row.agent }]
         : [],
     );
     if (missing.length) setTabs((all) => ({ ...all, [active.scopeId]: [...open, ...missing] }));
   }, [tabRows.data]);
-  const tabsHere = active ? tabsOf(active.scopeId) : [];
-  // Nothing has been said in the conversation on show: a new one can take its place.
-  const shownBlank = conversationReady && !events.length && !queued.length && !shownRunning;
-  const activeScope = useRef<string | undefined>(undefined);
-  activeScope.current = active?.scopeId;
+  // A Schema setting belongs to its brain; another brain shows its note instead, and
+  // without the hibachi agent there is no Schema to show (ADR 021).
   useEffect(() => {
-    let current = true;
-    conversationKey.current = shownHere?.id ?? '';
-    setEvents([]);
-    setQueued([]);
-    setQueuePaused(true);
-    setConversationReady(false);
-    setConversationError('');
-    setOmitted({ earlier: 0, damaged: 0 });
-    if (active)
-      void (async () => {
-        if (!shownHere) {
-          // The host's pick, or a new conversation when the hibachi has none for this CLI.
-          const choice = agentFor(active.scopeId);
-          const value = await host.agentConversation(active.scopeId, choice);
-          const id = value.id ?? (await host.createConversation(active.scopeId, choice));
-          if (current)
-            setShown((all) =>
-              all[active.scopeId]
-                ? all
-                : {
-                    ...all,
-                    [active.scopeId]: { id, agent: value.summary?.agent ?? choice },
-                  },
-            );
-          return;
-        }
-        // A renderer reload stops native work. If its final events race the read, reread
-        // the host snapshot instead of overwriting newer events with an older result.
-        while (current) {
-          const revision = eventRevision.current;
-          const value = await host.agentConversation(active.scopeId, shownHere.agent, shownHere.id);
-          if (!current) return;
-          if (revision !== eventRevision.current) continue;
-          setEvents(withRequests(value));
-          setQueued(value.queued);
-          // Only the conversation holding the run knows the requests it waits on.
-          if (value.activeRunId) {
-            addRun(value.activeRunId, active.scopeId, shownHere.id);
-            resetRequests(active.scopeId, value.activeRunId, value.requests);
-          }
-          // Work queued behind the conversation's run goes on when it ends; a queue left
-          // without one (after a failure or a restart) waits for the person to resume it.
-          setQueuePaused(!value.activeRunId && !runningNow.current.has(shownHere.id));
-          setOmitted({ earlier: value.earlier, damaged: value.damaged });
-          setConversationReady(true);
-          return;
-        }
-      })().catch((error) => {
-        if (current) setConversationError(errorText(error));
-      });
-    return () => {
-      current = false;
-    };
-  }, [active?.scopeId, shownHere?.id, historyReload]);
-  /** Reads the queue again after a queued instruction started, leaving the log as it is. */
-  async function refreshQueue() {
-    const target = active && shown[active.scopeId];
-    if (!target) return;
-    const value = await host.agentConversation(active.scopeId, target.agent, target.id);
-    if (conversationKey.current !== target.id) return;
-    setQueued(value.queued);
-  }
-  // A skill choice belongs to one space, even when another space declares the same name.
-  useEffect(() => setSkill(''), [active?.scopeId]);
-  // A Schema setting belongs to its brain; another brain shows its note instead.
-  useEffect(() => {
-    if (view === 'schema' && schemaTarget?.scopeId !== active?.scopeId) setView('note');
-  }, [active?.scopeId]);
-  // A skill that disappeared, or a space that does not declare it, must not be sent.
-  useEffect(() => {
-    if (!skillRead.loading && skill && !skills.some((s) => s.name === skill)) setSkill('');
-  }, [skill, skills, skillRead.loading]);
-  const conversation = useRef<HTMLDivElement>(null);
-  const followConversation = useRef(true);
-  useEffect(() => {
-    if (followConversation.current && conversation.current)
-      conversation.current.scrollTop = conversation.current.scrollHeight;
-  }, [events, panel]);
+    if (view === 'schema' && (!hibachiAgent || schemaTarget?.scopeId !== active?.scopeId))
+      setView('note');
+  }, [active?.scopeId, hibachiAgent]);
   // Who typed which line of the open note. A Drive file is outside the KB's Git
   // history and has no record; a failure here leaves the note unmarked rather than unopenable.
   useEffect(() => {
@@ -706,11 +637,6 @@ function App() {
     };
   }, [doc?.scopeId, doc?.path, doc?.hash, doc?.workspaceId]);
   const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
-  const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
-  // The open note of the active space goes with each instruction unless the person removed it.
-  const noteInContext = !!doc && doc.scopeId === active?.scopeId && noteOmitted !== noteKey;
-  // Offered only for a note of the active space that has such lines to name.
-  const personLinesOffered = personLineCount > 0 && noteInContext;
   const editor = useRef<PageEditorHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
@@ -788,6 +714,8 @@ function App() {
     load(next, navigation);
     setView('note');
     goToLevel('brain');
+    // A file chosen while only the agents show brings the page back.
+    stagePanel.current?.expand();
   }
   async function refreshSpaces() {
     const list = await host.spaces();
@@ -848,10 +776,7 @@ function App() {
           // An answered request says only that it ended; the run goes on.
           trackRun(incoming);
           trackRequests(incoming);
-          if (
-            scopeId === activeScope.current &&
-            (incoming.type === 'done' || incoming.role === 'user')
-          )
+          if (incoming.type === 'done' || incoming.role === 'user')
             setTabRevision((value) => value + 1);
           // The AI that runs in a brain is that brain's hibachi agent from now on.
           if (incoming.agent) {
@@ -863,30 +788,19 @@ function App() {
             );
           }
         }
-        if (!incoming.conversationId || conversationKey.current !== incoming.conversationId) {
-          // A run's end sends the next queued instruction of its own conversation;
-          // the conversation on show sends its own from the effect below.
-          if (
-            incoming.type === 'done' &&
-            incoming.scopeId &&
-            incoming.conversationId &&
-            incoming.outcome === 'completed'
-          )
-            void sendNextQueued(incoming.scopeId, incoming.conversationId);
-          return;
-        }
-        eventRevision.current++;
-        updateEvents((all) => {
-          const next = appendConversationEvent(all, incoming).slice(-400);
-          const last = next.at(-1)!;
-          return [...next.slice(0, -1), { ...last, text: last.text.slice(-200000) }];
-        });
-        if (incoming.type === 'done') {
-          setSkillRevision((value) => value + 1);
-          if (incoming.outcome !== 'completed') setQueuePaused(true);
-          setRevision((r) => r + 1);
-          void reconcile();
-        }
+        if (incoming.type !== 'done') return;
+        setSkillRevision((value) => value + 1);
+        setRevision((r) => r + 1);
+        void reconcile();
+        // A run's end sends the next queued instruction of its own conversation; a
+        // conversation on show in a column sends its own.
+        if (
+          incoming.scopeId &&
+          incoming.conversationId &&
+          incoming.outcome === 'completed' &&
+          !displayed.current.has(incoming.conversationId)
+        )
+          void sendNextQueued(incoming.scopeId, incoming.conversationId);
       }
     });
   }, []);
@@ -1031,111 +945,6 @@ function App() {
       return false;
     }
   }
-  async function sendTurn(message: string, notePath?: string, selectedSources = sources) {
-    setError('');
-    followConversation.current = true;
-    await launch(active!.scopeId, shownHere?.id, () =>
-      host.start({
-        scopeId: active!.scopeId,
-        agent,
-        conversationId: shownHere?.id,
-        access,
-        model,
-        prompt: message,
-        notePath,
-        sources: selectedSources,
-        skill: skill || undefined,
-        personLines: (personLines && personLinesOffered) || undefined,
-      }),
-    );
-  }
-  async function start() {
-    if (
-      !active ||
-      !conversationReady ||
-      !composer.ready ||
-      composer.error ||
-      submitting.current ||
-      gitBusy ||
-      !prompt.trim()
-    )
-      return;
-    submitting.current = true;
-    setSending(true);
-    const message = prompt;
-    try {
-      if (!(await composer.flush())) return;
-      const draftRevision = composer.snapshot().record?.revision;
-      if (!(await save())) return;
-      const notePath = noteInContext ? doc!.path : undefined;
-      // Behind this conversation's run or its queue; its other conversations run beside it (ADR 020).
-      if (shownRunning || queued.length) {
-        setQueued(
-          await host.queueAgentMessage({
-            scopeId: active.scopeId,
-            agent,
-            conversationId: shownHere?.id,
-            access,
-            model,
-            prompt: message,
-            notePath,
-            sources,
-            skill: skill || undefined,
-            personLines: (personLines && personLinesOffered) || undefined,
-          }),
-        );
-      } else {
-        setQueuePaused(false);
-        await sendTurn(message, notePath);
-      }
-      if (!(await composer.clear(draftRevision)))
-        report(t('指示は送信済みです。', 'The instruction was sent.'));
-    } catch (e) {
-      report(e);
-    } finally {
-      submitting.current = false;
-      setSending(false);
-    }
-  }
-  useEffect(() => {
-    if (
-      !active ||
-      !shownHere ||
-      !conversationReady ||
-      shownRunning ||
-      sending ||
-      gitBusy ||
-      queuePaused ||
-      external ||
-      !queued.length ||
-      submitting.current ||
-      draining.current.has(shownHere.id)
-    )
-      return;
-    const scopeId = active.scopeId;
-    const conversationId = shownHere.id;
-    submitting.current = true;
-    draining.current.add(conversationId);
-    setSending(true);
-    void (async () => {
-      if (!(await save())) {
-        setQueuePaused(true);
-        return;
-      }
-      try {
-        followConversation.current = true;
-        await launch(scopeId, conversationId, () => host.startNextQueued(scopeId, conversationId));
-        await refreshQueue();
-      } catch (error) {
-        setQueuePaused(true);
-        report(error);
-      }
-    })().finally(() => {
-      submitting.current = false;
-      draining.current.delete(conversationId);
-      setSending(false);
-    });
-  }, [conversationReady, shownRunning, sending, queued.length, queuePaused, external, gitBusy]);
   /**
    * Sends the next queued instruction of a conversation that is not on show: its
    * run ended while the person looked at another conversation, brain or the
@@ -1181,8 +990,8 @@ function App() {
       prompt: message,
     };
     if (behind(input.conversationId, value)) {
-      const list = await host.queueAgentMessage(input);
-      if (input.conversationId && conversationKey.current === input.conversationId) setQueued(list);
+      await host.queueAgentMessage(input);
+      setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: false }));
       return;
     }
     await launch(scopeId, input.conversationId, () => host.start(input));
@@ -1221,6 +1030,7 @@ function App() {
     const value = await host.agentConversation(you.id, agentId, target?.id);
     if (behind(input.conversationId, value)) {
       await host.queueAgentMessage(input);
+      setQueueSignal((signal) => ({ n: signal.n + 1, scopeId: you.id, resume: false }));
       return;
     }
     setHanded(brains);
@@ -1229,16 +1039,13 @@ function App() {
   /** Resumes a brain's queues from the Overview: each conversation's, behind its own run. */
   async function resumeQueue(scopeId: string) {
     while (await sendNextQueued(scopeId));
-    if (scopeId === active?.scopeId && conversationReady) {
-      await refreshQueue();
-      setQueuePaused(false);
-    }
+    setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: true }));
   }
   async function openWorkspace(profile: WorkspaceProfile) {
     if (gitBusy) return;
     setBrainMode('files');
     setGitReview(false);
-    setSources([]);
+    setSources({});
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
     setWorkspace(profile);
     setScene(undefined);
@@ -1341,7 +1148,7 @@ function App() {
         setExternal(undefined);
       }
     }
-    setSources((all) =>
+    updateSources((all) =>
       all.flatMap((ref) => {
         if (!under(ref)) return [ref];
         const moved = follow(ref);
@@ -1382,6 +1189,18 @@ function App() {
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
+  // The dock's columns keep their widths per set of columns.
+  const dockPanes = useMemo(() => columns.map((column) => column.id), [columns]);
+  const dockLayout = useDefaultLayout({
+    id: 'irori-dock',
+    panelIds: dockPanes,
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
+  // The stage folds away beside the dock, so only the agents show (ADR 021).
+  const stagePanel = usePanelRef();
+  const dockPanel = usePanelRef();
+  const [stageHidden, setStageHidden] = useState(false);
   if (startup)
     return (
       <Startup
@@ -1393,7 +1212,13 @@ function App() {
   // A run, a send, queued work or a connection holds what changes the brain on show.
   // Your AI's run holds the brains handed to it as a brain's own run holds it.
   const heldHere = !!active && heldByYou(active.scopeId);
-  const brainLocked = running || sending || queued.length > 0 || connecting || heldHere;
+  // The queues of the hibachi columns' conversations, which follow the hibachi on show.
+  const queuedHere = columns.reduce(
+    (sum, column) =>
+      ownerOf(column) === 'hibachi' ? sum + (columnStatus[column.id]?.queued ?? 0) : sum,
+    0,
+  );
+  const brainLocked = running || sending || queuedHere > 0 || connecting || heldHere;
   // Other brains stay open to choose while this one's AI runs.
   const switchLocked = sending || connecting;
   const anyRunning = runningScopes.length > 0;
@@ -1406,12 +1231,72 @@ function App() {
       : undefined;
   // The note's own controls show while the note is what the stage shows.
   const onNote = !!doc && view === 'note';
-  const agentInfo = infos.find((i) => i.id === agent);
-  const instructionFile = (agent === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find(
-    (name) => roots?.entries.some((entry) => entry.path === name),
-  );
-  const referenced =
-    !!doc && sources.some((ref) => ref.scopeId === doc.scopeId && ref.path === doc.path);
+  const instructionFile = (agentId: AgentId) =>
+    (agentId === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find((name) =>
+      roots?.entries.some((entry) => entry.path === name),
+    );
+  /** Opens the dock; with an owner, its first column shows that agent. */
+  function openDock(owner?: ColumnOwner) {
+    setPanel(true);
+    if (owner)
+      setColumns((all) =>
+        all.map((column) => (column.id === 'main' ? { ...column, owner } : column)),
+      );
+  }
+  function closeDock() {
+    stagePanel.current?.expand();
+    setPanel(false);
+    setStageHidden(false);
+  }
+  function toggleStage() {
+    const pane = stagePanel.current;
+    if (!pane) return;
+    if (pane.isCollapsed()) pane.expand();
+    else
+      void save().then((saved) => {
+        if (saved) pane.collapse();
+      });
+  }
+  /** Adds a column beside `after`, showing the same agent, and widens the dock for it. */
+  function splitColumn(after: DockColumn) {
+    const used = columns.map((column) => Number(column.id)).filter(Number.isFinite);
+    const id = String(Math.max(1, ...used) + 1);
+    if (Number(id) > 64) return;
+    const width = dockPanel.current?.getSize().inPixels ?? 0;
+    setColumns((all) => {
+      const at = all.findIndex((column) => column.id === after.id);
+      return [...all.slice(0, at + 1), { id, owner: after.owner }, ...all.slice(at + 1)];
+    });
+    requestAnimationFrame(() => dockPanel.current?.resize(width + 340));
+  }
+  function closeColumn(column: DockColumn) {
+    if (column.id === 'main') return closeDock();
+    setColumns((all) => all.filter((item) => item.id !== column.id));
+    setSources(({ [column.id]: _, ...rest }) => rest);
+    setColumnStatus(({ [column.id]: _, ...rest }) => rest);
+  }
+  const dockShared: DockShared = {
+    infos,
+    spaces,
+    doc,
+    docLayer,
+    personLineCount,
+    gitBusy,
+    connecting,
+    external: !!external,
+    runningConversations,
+    conversationWaiting,
+    draining,
+    save,
+    launch,
+    addRun,
+    resetRequests,
+    display,
+    report,
+    reload,
+    queueSignal,
+    tabRevision,
+  };
   // Another brain's hibachi agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
@@ -1426,7 +1311,7 @@ function App() {
     const selected = options.entry ? await open(space, options.entry) : await selectSpace(space);
     if (!selected) return;
     goToLevel('brain', options.origin);
-    if (options.ai) setPanel(true);
+    if (options.ai) openDock(hibachiAgent ? 'hibachi' : 'irori');
   }
   function leaveWorkspace() {
     if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
@@ -1484,7 +1369,14 @@ function App() {
             setSearchAll(level === 'overview');
             setSearchOpen(true);
           }}
-          settings={<Settings onRecover={() => setRecovering(true)} onError={report} />}
+          settings={
+            <Settings
+              hibachiAgent={hibachiAgent}
+              onHibachiAgent={chooseHibachi}
+              onRecover={() => setRecovering(true)}
+              onError={report}
+            />
+          }
         />
         {(level === 'overview' || scene?.leaving === 'overview') && workspace && (
           <Overview
@@ -1501,6 +1393,7 @@ function App() {
             revision={revision}
             addDisabled={anyRunning || dirty || connecting}
             agentFor={agentFor}
+            hibachiAgent={hibachiAgent}
             onView={setOverviewView}
             onSearch={() => {
               setSearchAll(true);
@@ -1528,7 +1421,7 @@ function App() {
               if (next === yourChoice.agent) return;
               chooseYour({ ...yourChoice, agent: next });
               // Another CLI is another conversation (ADR 017 D2).
-              if (you) void newConversation(you.id, next).catch(report);
+              if (you) void newConversation(you.id, you.id, next).catch(report);
             }}
             yourConversation={you ? shown[you.id]?.id : undefined}
             onShowConversation={(scopeId, id, next) => {
@@ -1538,7 +1431,7 @@ function App() {
               else setShown(({ [scopeId]: _, ...rest }) => rest);
             }}
             onYourNew={async () => {
-              if (you) await newConversation(you.id, yourChoice.agent);
+              if (you) await newConversation(you.id, you.id, yourChoice.agent);
             }}
             onYourModel={(next) => {
               const models = { ...yourChoice.models };
@@ -1635,26 +1528,28 @@ function App() {
                 }}
                 onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
                 schema={
-                  <SchemaList
-                    scopeId={active.scopeId}
-                    space={active}
-                    revision={revision}
-                    selected={
-                      view === 'schema' && schemaTarget?.scopeId === active.scopeId
-                        ? schemaTarget
-                        : undefined
-                    }
-                    locked={brainLocked || gitBusy}
-                    onSelect={(target) => {
-                      // The note being edited is saved first, as before the graph or materials.
-                      void save().then((saved) => {
-                        if (!saved) return;
-                        setSchemaTarget({ ...target, scopeId: active.scopeId });
-                        setView('schema');
-                      });
-                    }}
-                    onOpenFile={(entry) => void open(active, entry)}
-                  />
+                  hibachiAgent ? (
+                    <SchemaList
+                      scopeId={active.scopeId}
+                      space={active}
+                      revision={revision}
+                      selected={
+                        view === 'schema' && schemaTarget?.scopeId === active.scopeId
+                          ? schemaTarget
+                          : undefined
+                      }
+                      locked={brainLocked || gitBusy}
+                      onSelect={(target) => {
+                        // The note being edited is saved first, as before the graph or materials.
+                        void save().then((saved) => {
+                          if (!saved) return;
+                          setSchemaTarget({ ...target, scopeId: active.scopeId });
+                          setView('schema');
+                        });
+                      }}
+                      onOpenFile={(entry) => void open(active, entry)}
+                    />
+                  ) : undefined
                 }
               >
                 <GitPanel
@@ -1697,8 +1592,16 @@ function App() {
             className="island-handle"
             aria-label={t('hibachi パネルの幅', 'hibachi panel width')}
           />
-          <Pane id="stage" className="stage-pane" minSize={360}>
-            <main id="editor-main" className="stage on-stage" tabIndex={-1}>
+          <Pane
+            id="stage"
+            className="stage-pane"
+            minSize={360}
+            panelRef={stagePanel}
+            collapsible={panel}
+            collapsedSize={0}
+            onResize={(size) => setStageHidden(size.inPixels < 1)}
+          >
+            <main id="editor-main" className="stage on-stage" tabIndex={-1} inert={stageHidden}>
               <div
                 className="stage-top"
                 hidden={gitReview || view === 'graph' || view === 'records' || view === 'schema'}
@@ -1953,7 +1856,11 @@ function App() {
                       </NoteMenu>
                     )}
                     {onNote && <span className="stage-divider" aria-hidden="true" />}
-                    <AiToggle open={panel} onToggle={() => setPanel((p) => !p)} />
+                    <AiToggle
+                      open={panel}
+                      name={ownerOf(columns[0]) === 'irori' ? 'irori agent' : 'hibachi agent'}
+                      onToggle={() => (panel ? closeDock() : openDock())}
+                    />
                   </div>
                 </header>
                 {!doc && status && (
@@ -2094,15 +2001,19 @@ function App() {
                         space={active}
                         revision={revision}
                         onClose={() => setView('note')}
-                        onConfigure={() => {
-                          setView('note');
-                          setPanel(true);
-                          const request =
-                            'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
-                          setPrompt((previous) =>
-                            previous ? `${previous}\n\n${request}` : request,
-                          );
-                        }}
+                        onConfigure={
+                          hibachiAgent
+                            ? () => {
+                                setView('note');
+                                openDock('hibachi');
+                                const request =
+                                  'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
+                                setPrompt((previous) =>
+                                  previous ? `${previous}\n\n${request}` : request,
+                                );
+                              }
+                            : undefined
+                        }
                         onOpen={(relative) => {
                           setView('note');
                           void open(active, {
@@ -2195,6 +2106,7 @@ function App() {
                         git={gitRead.data}
                         connections={connections}
                         skills={skills}
+                        schemaLayer={hibachiAgent}
                         daily={!!notesDeclared?.daily}
                         locked={brainLocked || gitBusy}
                         revision={revision}
@@ -2289,647 +2201,161 @@ function App() {
             <>
               <PaneSeparator
                 className="island-handle"
-                aria-label={t('hibachi agent の幅', 'hibachi agent width')}
+                aria-label={t('エージェントの幅', 'Agents width')}
               />
               <Pane
                 id="assistant"
                 className="assistant-pane"
+                panelRef={dockPanel}
                 defaultSize={352}
                 minSize={300}
-                maxSize={620}
               >
-                <aside
-                  className="agent-panel chrome"
-                  aria-label={
-                    active
-                      ? t(`${active.name} の hibachi agent`, `${active.name}'s hibachi agent`)
-                      : 'AI'
-                  }
+                <PaneGroup
+                  className="agent-dock"
+                  orientation="horizontal"
+                  defaultLayout={dockLayout.defaultLayout}
+                  onLayoutChanged={dockLayout.onLayoutChanged}
                 >
-                  <header className="agent-header">
-                    <label className="agent-picker">
-                      {active && (
-                        <span className="agent-mark">
-                          <BrainTile space={active} size={26} radius={8} />
-                          <span className="agent-sparkle">
-                            <Icon name="sparkles" size={10} strokeWidth={2.2} />
-                          </span>
-                        </span>
-                      )}
-                      <select
-                        aria-label={t('エージェント', 'Agent')}
-                        value={agent}
-                        disabled={sending || gitBusy || !conversationReady}
-                        onChange={(e) => {
-                          const next = e.target.value as AgentId;
-                          void composer.flush().then((saved) => {
-                            if (saved) setAgent(next);
-                          });
-                        }}
+                  {columns.map((column, index) => {
+                    const owner = ownerOf(column);
+                    const irori = owner === 'irori';
+                    const scopeId = irori ? you?.id : active?.scopeId;
+                    const key = scopeId ? slot(column.id, scopeId) : '';
+                    const target = key ? shown[key] : undefined;
+                    const columnAgent =
+                      target?.agent ?? (irori ? yourChoice.agent : agentFor(active?.scopeId));
+                    const access = irori
+                      ? yourAccess
+                      : accessChoice[key]?.agent === columnAgent
+                        ? accessChoice[key].value
+                        : defaultAgentAccess(columnAgent);
+                    const rememberAgent = (next: AgentId) => {
+                      if (irori) chooseYour({ ...yourChoice, agent: next });
+                      else if (active) remember(active.scopeId, next);
+                    };
+                    return [
+                      index > 0 && (
+                        <PaneSeparator
+                          key={`${column.id}-handle`}
+                          className="island-handle dock-handle"
+                          aria-label={t('列の幅', 'Column width')}
+                        />
+                      ),
+                      <Pane
+                        key={column.id}
+                        id={column.id}
+                        className="dock-column-pane"
+                        minSize={280}
                       >
-                        {agentIds.map((id) => (
-                          <option key={id} value={id}>
-                            {agentNames[id]}
-                          </option>
-                        ))}
-                      </select>
-                      <Icon name="chevronDown" size={12} className="agent-picker-caret" />
-                    </label>
-                    {(shownRunning || shownWaiting || queued.length > 0) && (
-                      <span
-                        className={`agent-state ${shownWaiting ? 'waiting' : ''}`}
-                        role="status"
-                      >
-                        <i />
-                        {shownWaiting
-                          ? t('許可待ち', 'Needs approval')
-                          : shownRunning
-                            ? t('実行中', 'Running')
-                            : t(`送信待ち ${queued.length}`, `${queued.length} pending`)}
-                      </span>
-                    )}
-                    <span className="agent-header-space" />
-                    <button
-                      className="icon-button"
-                      aria-label={t('新しい会話', 'New conversation')}
-                      title={t('新しい会話', 'New conversation')}
-                      disabled={!active || sending}
-                      onClick={() => {
-                        setHistoryOpen(false);
-                        void newConversation(active!.scopeId, agent, shownBlank)
-                          .then(() =>
-                            document
-                              .querySelector<HTMLTextAreaElement>('.composer textarea')
-                              ?.focus(),
-                          )
-                          .catch(report);
-                      }}
-                    >
-                      <Icon name="squarePen" size={16} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={t('履歴', 'History')}
-                      title={t('履歴', 'History')}
-                      aria-pressed={historyOpen}
-                      disabled={!active}
-                      onClick={() => setHistoryOpen((value) => !value)}
-                    >
-                      <Icon name="history" size={16} />
-                    </button>
-                    <Popover.Root>
-                      <Popover.Trigger
-                        className="icon-button agent-settings"
-                        aria-label={t('会話と接続', 'Conversation and connection')}
-                        title={t('会話と接続', 'Conversation and connection')}
-                      >
-                        <Icon name="more" size={16} />
-                      </Popover.Trigger>
-                      <Popover.Portal>
-                        <Popover.Positioner side="bottom" align="end" sideOffset={6}>
-                          {/* Opening with the pointer left the close button focused.
-                              Keyboard users still get the default focus move. */}
-                          <Popover.Popup
-                            className="agent-settings-sheet"
-                            initialFocus={(interaction) => interaction === 'keyboard'}
-                          >
-                            <div className="agent-settings-heading">
-                              <Popover.Title render={<strong />}>
-                                {t('会話と接続', 'Conversation and connection')}
-                              </Popover.Title>
-                              <Popover.Close
-                                className="icon-button"
-                                aria-label={t('閉じる', 'Close')}
-                              >
-                                <Icon name="close" />
-                              </Popover.Close>
-                            </div>
-                            <p>
-                              {agentNames[agent]}{' '}
-                              <span>
-                                {agentInfo?.version || t('CLIを確認中', 'Checking the CLI')}
-                              </span>
-                            </p>
-                            {agentInfo?.available === false && (
-                              <p role="alert">{agentInfo.detail}</p>
-                            )}
-                          </Popover.Popup>
-                        </Popover.Positioner>
-                      </Popover.Portal>
-                    </Popover.Root>
-                    <button
-                      className="icon-button"
-                      aria-label={t('hibachi agent を閉じる', 'Close hibachi agent')}
-                      onClick={() => setPanel(false)}
-                    >
-                      <Icon name="close" size={16} />
-                    </button>
-                    {shownRunning && (
-                      <span className="agent-progress" aria-hidden="true">
-                        <span />
-                      </span>
-                    )}
-                  </header>
-                  {active && tabsHere.length > 1 && (
-                    <div
-                      className="conversation-tabs"
-                      role="tablist"
-                      aria-label={t('開いている会話', 'Open conversations')}
-                    >
-                      {tabsHere.map((tab) => {
-                        const row = tabRows.data?.find((item) => item.id === tab.id);
-                        const title =
-                          row && !isDamaged(row) ? row.title : t('新しい会話', 'New conversation');
-                        const state = conversationWaiting(tab.id)
-                          ? 'waiting'
-                          : runningConversations.has(tab.id)
-                            ? 'running'
-                            : '';
-                        const current = tab.id === shownHere?.id;
-                        return (
-                          <div
-                            key={tab.id}
-                            className={`conversation-tab ${current ? 'current' : ''} ${state}`}
-                          >
-                            <button
-                              role="tab"
-                              aria-selected={current}
-                              title={`${title} · ${agentNames[tab.agent]}`}
-                              disabled={sending}
-                              onClick={() => {
-                                if (current) return;
-                                void composer.flush().then((saved) => {
-                                  if (!saved) return;
-                                  setHistoryOpen(false);
-                                  remember(active.scopeId, tab.agent);
-                                  showConversation(active.scopeId, tab.id, tab.agent);
-                                });
-                              }}
-                            >
-                              {state && (
-                                <i
-                                  role="img"
-                                  aria-label={
-                                    state === 'waiting'
-                                      ? t('許可待ち', 'Needs approval')
-                                      : t('実行中', 'Running')
-                                  }
-                                />
-                              )}
-                              <span>{title}</span>
-                            </button>
-                            {!state && (
-                              <button
-                                className="conversation-tab-close"
-                                aria-label={t(`${title} のタブを閉じる`, `Close the ${title} tab`)}
-                                disabled={sending}
-                                onClick={() => closeTab(active.scopeId, tab.id)}
-                              >
-                                <Icon name="close" size={11} />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {active && (
-                    <div className="schema-line">
-                      <Icon name="schema" size={13} />
-                      <span className="schema-owner">
-                        {t(`${active.name} の Schema`, `${active.name}'s Schema`)}
-                      </span>
-                      <span className="mono">
-                        {instructionFile ?? t('指示ファイルなし', 'No instruction file')}
-                      </span>
-                      <i aria-hidden="true" />
-                      <span>
-                        {t(
-                          `スキル ${skills.length}`,
-                          `${skills.length} skill${skills.length === 1 ? '' : 's'}`,
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {agentInfo?.available === false && (
-                    <p className="agent-connection-error" role="alert">
-                      {t(
-                        'CLI が見つかりません（インストールとログインを確認）。',
-                        'The CLI was not found; check the installation and login.',
-                      )}
-                    </p>
-                  )}
-                  {!conversationReady && (
-                    <div className="hint" role="status">
-                      {conversationError ||
-                        t('保存した会話を読み込んでいます…', 'Loading the saved conversation…')}
-                      {conversationError && (
-                        <button onClick={() => setHistoryReload((value) => value + 1)}>
-                          {t('再試行', 'Retry')}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {!historyOpen && omitted.earlier > 0 && (
-                    <div className="hint">
-                      {t(
-                        `以前の ${omitted.earlier} 件を省略`,
-                        `${omitted.earlier} earlier events omitted`,
-                      )}
-                    </div>
-                  )}
-                  {!historyOpen && omitted.damaged > 0 && (
-                    <div className="hint" role="alert">
-                      {t(
-                        `読み込めない行 ${omitted.damaged}`,
-                        `${omitted.damaged} unreadable lines`,
-                      )}
-                    </div>
-                  )}
-                  {historyOpen && active && (
-                    <ConversationHistory
-                      key={active.scopeId}
-                      scopeId={active.scopeId}
-                      current={shownHere?.id}
-                      note={doc?.scopeId === active.scopeId ? doc.path : undefined}
-                      onOpen={(row) => {
-                        setHistoryOpen(false);
-                        remember(active.scopeId, row.agent);
-                        // An empty conversation on show gives way rather than keeping a tab.
-                        showConversation(active.scopeId, row.id, row.agent, shownBlank);
-                      }}
-                      onDeleted={(id) => {
-                        setTabs((all) => ({
-                          ...all,
-                          [active.scopeId]: (all[active.scopeId] ?? []).filter(
-                            (tab) => tab.id !== id,
-                          ),
-                        }));
-                        if (shownHere?.id !== id) return;
-                        // The hibachi shows its next conversation, or a new one.
-                        setShown(({ [active.scopeId]: _, ...rest }) => rest);
-                      }}
-                      onError={report}
-                    />
-                  )}
-                  <div
-                    hidden={historyOpen}
-                    className="conversation"
-                    role="log"
-                    aria-label={t('会話', 'Conversation')}
-                    aria-live="polite"
-                    ref={conversation}
-                    onScroll={() => {
-                      const element = conversation.current!;
-                      followConversation.current =
-                        element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-                    }}
-                  >
-                    {events.length === 0 && (
-                      <div className="agent-empty">
-                        <p>{t('ノートについて相談する', 'Ask about the note')}</p>
-                        <div className="prompt-suggestions">
-                          {[
-                            t(
-                              'このノートの要点をまとめて',
-                              'Summarize the key points of this note',
-                            ),
-                            t(
-                              'この内容から次のアクションを整理して',
-                              'Work out the next actions from this content',
-                            ),
-                          ].map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              disabled={!doc || shownRunning}
-                              onClick={() => {
-                                setPrompt(suggestion);
-                                document
-                                  .querySelector<HTMLTextAreaElement>('.composer textarea')
-                                  ?.focus();
-                              }}
-                            >
-                              {suggestion}
-                              <Icon name="arrow" size={13} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <AgentLog
-                      events={events}
-                      activeRun={shownRunning ? events.at(-1)?.runId : undefined}
-                      onError={report}
-                    />
-                  </div>
-                  <div className="composer">
-                    {queued.length > 0 && (
-                      <div className="message-queue" aria-label={t('送信待ち', 'Pending send')}>
-                        <strong>
-                          <Icon name="clock" size={13} />
-                          {t(`送信待ち ${queued.length} 件`, `${queued.length} pending`)}
-                        </strong>
-                        {queuePaused && (
-                          <p>{t('送信待ちを保存しています。', 'Pending sends saved.')}</p>
-                        )}
-                        {queued.map((item) => (
-                          <div key={item.id}>
-                            <span>{item.prompt}</span>
-                            <small>{agentAccessLabel(agent, item.access)}</small>
-                            <button
-                              disabled={sending}
-                              aria-label={t(
-                                `送信待ち ${item.id} を削除`,
-                                `Remove pending send ${item.id}`,
-                              )}
-                              onClick={() => {
-                                setSending(true);
-                                void host
-                                  .removeQueuedMessage(shownHere!.id, item.id)
-                                  .then(setQueued)
-                                  .catch(report)
-                                  .finally(() => setSending(false));
-                              }}
-                            >
-                              {t('取消', 'Cancel')}
-                            </button>
-                          </div>
-                        ))}
-                        {queuePaused && (
-                          <button
-                            className="queue-resume"
-                            disabled={shownRunning || sending || !conversationReady}
-                            onClick={() => setQueuePaused(false)}
-                          >
-                            {t('送信を再開', 'Resume sending')}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <div className="composer-box">
-                      <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
-                        <span className="context-chip">
-                          {active ? (
-                            <BrainTile space={active} size={16} radius={5} />
-                          ) : (
-                            <Icon name="folder" size={12} />
-                          )}
-                          {active?.name ?? t('スペース未選択', 'No space selected')}
-                        </span>
-                        {noteInContext && (
-                          <span className="context-chip">
-                            <Icon
-                              name={
-                                docLayer === 'contents'
-                                  ? 'cloud'
-                                  : docLayer === 'schema'
-                                    ? 'schema'
-                                    : 'book'
-                              }
-                              size={13}
-                              className={`layer-icon ${docLayer ?? ''}`}
-                            />
-                            <span className="context-chip-label">
-                              {doc!.path.split('/').at(-1)}
-                            </span>
-                            <button
-                              aria-label={t(
-                                `${doc!.path} を相談の対象から外す`,
-                                `Remove ${doc!.path} from the context`,
-                              )}
-                              disabled={sending}
-                              onClick={() => setNoteOmitted(noteKey)}
-                            >
-                              <Icon name="close" size={12} />
-                            </button>
-                          </span>
-                        )}
-                        {!!doc && doc.scopeId === active?.scopeId && !noteInContext && (
-                          <button
-                            className="context-add"
-                            aria-label={t(
-                              `${doc.path} を相談の対象に戻す`,
-                              `Put ${doc.path} back in the context`,
-                            )}
-                            disabled={sending}
-                            onClick={() => setNoteOmitted('')}
-                          >
-                            <Icon name="plus" size={13} />
-                            {doc.path.split('/').at(-1)}
-                          </button>
-                        )}
-                        {sources.map((source) => {
-                          const owner = spaces.find((space) => space.scopeId === source.scopeId);
-                          return (
-                            <span
-                              className="context-chip reference"
-                              key={`${source.scopeId}:${source.path}`}
-                            >
-                              {owner ? (
-                                <BrainTile space={owner} size={16} radius={5} />
-                              ) : (
-                                <Icon name="cloud" size={12} />
-                              )}
-                              <span className="context-chip-label">
-                                {owner ? '' : 'Drive / '}
-                                {source.path}
-                              </span>
-                              <button
-                                aria-label={t(
-                                  `${source.path} を参照から外す`,
-                                  `Remove ${source.path} from references`,
-                                )}
-                                onClick={() =>
-                                  setSources((all) => all.filter((ref) => ref !== source))
-                                }
-                              >
-                                <Icon name="close" size={12} />
-                              </button>
-                            </span>
-                          );
-                        })}
-                        <button
-                          className="context-add"
-                          aria-label={t('参照に追加', 'Add as reference')}
-                          disabled={!doc || sources.length >= 20 || referenced}
-                          onClick={() => {
-                            if (!doc) return;
-                            void save().then((saved) => {
-                              if (saved)
-                                setSources((all) => [
-                                  ...all,
-                                  { scopeId: doc.scopeId, path: doc.path },
-                                ]);
-                            });
-                          }}
-                        >
-                          <Icon name="plus" size={13} />
-                          {t('参照', 'Reference')}
-                        </button>
-                      </div>
-                      <textarea
-                        aria-label={t('エージェントへの指示', 'Instruction to the agent')}
-                        placeholder={t(
-                          'ノートについて相談、編集を依頼…',
-                          'Ask about the note, request an edit…',
-                        )}
-                        value={prompt}
-                        rows={3}
-                        disabled={!composer.ready || sending}
-                        maxLength={100000}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === 'Enter' &&
-                            !e.shiftKey &&
-                            !e.nativeEvent.isComposing &&
-                            e.keyCode !== 229
-                          ) {
-                            e.preventDefault();
-                            void start();
+                        <AgentColumn
+                          key={`${column.id}:${owner}`}
+                          column={{ ...column, owner }}
+                          number={column.id === 'main' ? 1 : Number(column.id)}
+                          shared={dockShared}
+                          space={irori ? undefined : active}
+                          you={you}
+                          brains={workspaceSpaces.map((space) => space.scopeId)}
+                          target={target}
+                          tabs={key ? tabsOf(key) : []}
+                          agent={columnAgent}
+                          model={
+                            irori
+                              ? yourChoice.models[columnAgent] || undefined
+                              : active && modelFor(active.scopeId, columnAgent)
                           }
-                        }}
-                      />
-                      <div className="composer-actions">
-                        <div className="composer-selects">
-                          {active && (skills.length > 0 || skillsRetired.length > 0) && (
-                            <SkillPicker
-                              key={active.scopeId}
-                              scopeId={active.scopeId}
-                              skills={skills}
-                              value={skill}
-                              onChange={setSkill}
-                              disabled={sending || gitBusy}
-                            />
-                          )}
-                          <label className="composer-pill">
-                            <Icon name="shield" size={13} />
-                            <select
-                              aria-label={t('エージェントのアクセス', 'Agent access')}
-                              value={access}
-                              disabled={
-                                sending || gitBusy || agentAccessOptions(agent).length === 1
-                              }
-                              onChange={(e) =>
-                                setAccessSelection({
-                                  owner: accessOwner,
-                                  value: e.target.value as AgentAccess,
-                                })
-                              }
-                            >
-                              {agentAccessOptions(agent).map((value) => (
-                                <option key={value} value={value}>
-                                  {agentAccessLabel(agent, value)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <ModelPicker
-                            agent={agent}
-                            value={model ?? ''}
-                            disabled={sending || gitBusy}
-                            onChange={(next) =>
-                              active &&
+                          access={access}
+                          skills={irori ? [] : skills}
+                          skillsRetired={irori ? [] : skillsRetired}
+                          skillProblems={irori ? [] : skillProblems}
+                          instructionFile={irori ? undefined : instructionFile(columnAgent)}
+                          sources={sources[column.id] ?? []}
+                          ownerChoice={hibachiAgent}
+                          stage={
+                            index === 0 ? { hidden: stageHidden, onToggle: toggleStage } : undefined
+                          }
+                          onModel={(next) => {
+                            if (irori) {
+                              const models = { ...yourChoice.models };
+                              if (next) models[columnAgent] = next;
+                              else delete models[columnAgent];
+                              chooseYour({ ...yourChoice, models });
+                            } else if (active)
                               setModelChoice((all) => ({
                                 ...all,
-                                [`${active.scopeId}:${agent}`]: next,
-                              }))
-                            }
-                          />
-                          {personLinesOffered && (
-                            <label
-                              className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={personLines}
-                                disabled={sending || gitBusy}
-                                onChange={(e) => setPersonLines(e.target.checked)}
-                              />
-                              <Icon name="penLine" size={13} />
-                              {t('人の行を伝える', "Share the person's lines")}
-                            </label>
-                          )}
-                        </div>
-                        <div className="composer-send">
-                          {shownRunning && (
-                            <button
-                              className="icon-button stop"
-                              aria-label={t('停止', 'Stop')}
-                              title={t('停止', 'Stop')}
-                              onClick={() => {
-                                setQueuePaused(true);
-                                // This conversation's run alone; the hibachi's others go on.
-                                void host.cancel(active!.scopeId, shownHere?.id).catch(report);
-                              }}
-                            >
-                              <span className="stop-mark" />
-                            </button>
-                          )}
-                          <button
-                            className="send-button"
-                            aria-label={
-                              shownRunning || queued.length > 0
-                                ? t('送信待ちに追加', 'Add to pending sends')
-                                : t('送信', 'Send')
-                            }
-                            title={
-                              shownRunning || queued.length > 0
-                                ? t('送信待ちに追加', 'Add to pending sends')
-                                : t('送信', 'Send')
-                            }
-                            disabled={
-                              !active ||
-                              !conversationReady ||
-                              !composer.ready ||
-                              !!composer.error ||
-                              sending ||
-                              gitBusy ||
-                              connecting ||
-                              !prompt.trim() ||
-                              !!external ||
-                              agentInfo?.available !== true
-                            }
-                            onClick={() => void start()}
-                          >
-                            <Icon name="up" size={17} strokeWidth={2.2} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    {composer.error ? (
-                      <div className="hint" role="alert">
-                        {composer.error}
-                        <button onClick={() => void composer.retry()}>
-                          {t('再試行', 'Retry')}
-                        </button>
-                      </div>
-                    ) : (
-                      <small className="muted" role="status">
-                        {!composer.ready
-                          ? t('下書きを読み込み中…', 'Loading the draft…')
-                          : composer.pending
-                            ? t('下書きを保存中…', 'Saving the draft…')
-                            : prompt
-                              ? t('下書き保存済み', 'Draft saved')
-                              : ''}
-                      </small>
-                    )}
-                    {skillProblems.length > 0 && (
-                      <small className="muted" role="status">
-                        {t(
-                          `読み込めないスキル: ${skillProblems.map((p) => p.directory).join('、')}`,
-                          `Skills that failed to load: ${skillProblems.map((p) => p.directory).join(', ')}`,
-                        )}
-                      </small>
-                    )}
-                    {skillsRetired.map((s) => (
-                      <small key={s.name} className="muted" role="status">
-                        {retirementNotice(s)}
-                      </small>
-                    ))}
-                  </div>
-                </aside>
+                                [`${active.scopeId}:${columnAgent}`]: next,
+                              }));
+                          }}
+                          onAccess={(value) => {
+                            if (irori) setYourAccessSelection({ agent: columnAgent, value });
+                            else
+                              setAccessChoice((all) => ({
+                                ...all,
+                                [key]: { agent: columnAgent, value },
+                              }));
+                          }}
+                          onAgent={(next, replace) => {
+                            if (!scopeId) return;
+                            rememberAgent(next);
+                            // Another CLI is another conversation (ADR 017 D2).
+                            void newConversation(scopeId, key, next, replace).catch(report);
+                          }}
+                          onPick={(tab) => {
+                            if (!key) return;
+                            if (irori && column.id === 'main' && tab.agent !== yourChoice.agent)
+                              chooseYour({ ...yourChoice, agent: tab.agent });
+                            setShown((all) => (all[key] ? all : { ...all, [key]: tab }));
+                          }}
+                          onShow={(tab, replace) => {
+                            if (!key) return;
+                            rememberAgent(tab.agent);
+                            showConversation(key, tab.id, tab.agent, replace);
+                          }}
+                          onCloseTab={(id) => key && closeTab(key, id, rememberAgent)}
+                          onNew={async (replace) => {
+                            if (scopeId) await newConversation(scopeId, key, columnAgent, replace);
+                          }}
+                          onDeleted={(id) => {
+                            if (!key) return;
+                            setTabs((all) => ({
+                              ...all,
+                              [key]: (all[key] ?? []).filter((tab) => tab.id !== id),
+                            }));
+                            // The column shows the owner's next conversation, or a new one.
+                            if (shown[key]?.id === id) setShown(({ [key]: _, ...rest }) => rest);
+                          }}
+                          onSources={(update) =>
+                            setSources((all) => ({
+                              ...all,
+                              [column.id]: update(all[column.id] ?? []),
+                            }))
+                          }
+                          onOwner={(next) =>
+                            setColumns((all) =>
+                              all.map((item) =>
+                                item.id === column.id ? { ...item, owner: next } : item,
+                              ),
+                            )
+                          }
+                          onSplit={() => splitColumn({ ...column, owner })}
+                          onClose={() => closeColumn(column)}
+                          onStatus={(status) =>
+                            setColumnStatus((all) =>
+                              all[column.id]?.sending === status.sending &&
+                              all[column.id]?.queued === status.queued
+                                ? all
+                                : { ...all, [column.id]: status },
+                            )
+                          }
+                          onCreateYou={async () => {
+                            await host.createYourAi();
+                            setYouRevision((value) => value + 1);
+                          }}
+                          onStarted={setHanded}
+                        />
+                      </Pane>,
+                    ];
+                  })}
+                </PaneGroup>
               </Pane>
             </>
           )}
@@ -2951,7 +2377,7 @@ function App() {
           if (othersActive) showOverview();
           else {
             goToLevel('brain');
-            setPanel(true);
+            openDock();
           }
         }}
         onTerminal={() => setTerminalSpace((value) => (value ? undefined : active))}
@@ -2995,7 +2421,7 @@ function App() {
             if (!busy) void reconcile();
           }}
           beforeChange={async () => {
-            if (running || sending || queued.length || gitBusy || connecting)
+            if (running || sending || queuedHere || gitBusy || connecting)
               throw Error(
                 t('作業中はノートを整理できません。', "Can't organize notes while busy."),
               );
@@ -3006,7 +2432,7 @@ function App() {
             const previous = doc;
             if (next) {
               load(next);
-              setSources((all) =>
+              updateSources((all) =>
                 all.map((ref) =>
                   ref.scopeId === previous.scopeId && ref.path === previous.path
                     ? { scopeId: next.scopeId, path: next.path }
@@ -3018,7 +2444,7 @@ function App() {
               setDoc(undefined);
               setBuffer('');
               setExternal(undefined);
-              setSources((all) =>
+              updateSources((all) =>
                 all.filter((ref) => ref.scopeId !== previous.scopeId || ref.path !== previous.path),
               );
             }
@@ -3157,7 +2583,7 @@ function App() {
           entry={entryAction.entry}
           action={entryAction.action}
           beforeChange={async () => {
-            if (running || sending || queued.length || gitBusy || connecting)
+            if (running || sending || queuedHere || gitBusy || connecting)
               throw Error(
                 t('作業中は資料を整理できません。', "Can't organize materials while busy."),
               );

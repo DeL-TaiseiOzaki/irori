@@ -347,7 +347,8 @@ export function OntologyPanel({
   revision: number;
   onClose: () => void;
   onOpen: (path: string) => void;
-  onConfigure: () => void;
+  /** Asks the hibachi agent to set the ontology up; absent while it is off. */
+  onConfigure?: () => void;
 }) {
   const [refresh, setRefresh] = useState(0);
   const [table, setTable] = useState(false);
@@ -435,10 +436,12 @@ export function OntologyPanel({
           >
             <Icon name="refresh" size={16} />
           </button>
-          <button className="stage-text-button ask-ai" onClick={onConfigure}>
-            <Icon name="sparkles" size={14} />
-            {t('hibachi agent', 'hibachi agent')}
-          </button>
+          {onConfigure && (
+            <button className="stage-text-button ask-ai" onClick={onConfigure}>
+              <Icon name="sparkles" size={14} />
+              {t('hibachi agent', 'hibachi agent')}
+            </button>
+          )}
         </>
       }
     >

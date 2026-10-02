@@ -6,6 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { sessionKey } from '../src/agents/sessions';
+import { SettingsService } from '../src/host/settings';
 
 // A hibachi's conversations (ADR 017 stage 1): a record from before is migrated,
 // new conversations are listed, renamed, pinned, archived and deleted, a send in
@@ -20,6 +21,8 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const root = path.join(base, 'KB');
 await mkdir(root);
 await writeFile(path.join(root, 'note.md'), '# Conversation fixture\n');

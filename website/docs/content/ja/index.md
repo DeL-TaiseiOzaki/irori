@@ -5,15 +5,15 @@ description: ノートを書き、資料をつなぎ、AI と次の仕事を進�
 
 ## ここからはじめる
 
-irori は、Markdown のノートとローカルの AI エージェントをひとつの画面で扱うデスクトップアプリです。ノートは手元のフォルダにある普通のファイルとして残ります。
+irori は、複数の知識ベース（GitHub のリポジトリ）と、手元やクラウドにある資料を編集し、読むためのデスクトップ IDE です。ノートは手元のフォルダにある普通のファイルとして残ります。
 
 初めて使う方は、[クイックスタート](quickstart.md)から。アプリの準備は[インストール](installation.md)、既存のフォルダを開く方法は[hibachi とワークスペース](workspaces.md)で紹介しています。
 
 ## irori のしくみ
 
-知識ベースのフォルダを **hibachi** と呼びます。その中の AI への指示は **Schema**、ノートは **Knowledge**、資料は **Contents** として表示されます。[3つの層](layers.md)を知ると、ノートと資料の役割がわかります。
+知識ベースのフォルダを **hibachi** と呼びます。ノートは **Knowledge**、資料は **Contents** として表示されます。AI への指示は **Schema** で、エージェントをオンにしたときだけ表示されます。[3つの層](layers.md)を参照してください。
 
-各 hibachi には **hibachi agent** があり、複数の hibachi をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)で使い分けを説明しています。ノートを書くために AI の設定は必要ありません。
+**hibachi agent** は任意の機能で、**設定 → エージェント** でオンにします。複数の hibachi をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)を参照してください。
 
 ## 目的から探す
 

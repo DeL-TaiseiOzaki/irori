@@ -5,10 +5,13 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { FileService } from '../src/host/files';
 import type { Category } from '../src/domain/types';
+import { SettingsService } from '../src/host/settings';
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori layers '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const spaces = [];
 for (const [name, category] of [
   ['個人KB', 'personal'],

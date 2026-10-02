@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
+import { SettingsService } from '../src/host/settings';
 
 /** The note's human-line count, read from its details popover. */
 async function authorship(page: import('@playwright/test').Page) {
@@ -22,6 +23,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori harness UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
+// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ hibachiAgent: true });
 const root = path.join(base, 'KB');
 await mkdir(root);
 const space = await files.register(root, 'ハーネス検証', 'personal');
