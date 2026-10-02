@@ -47,12 +47,14 @@ and entered DNS records: registry/Google confirm `ns1.xdomain.ne.jp`–`ns3.xdom
 and Google/Cloudflare return the four required A records plus the www CNAME.
 HTTP homepage and the old-site redirect work. Anonymous HTTP browser checks
 passed on rerun after a transient document 503: desktop/mobile, images, current
-download targets, both languages, canonical metadata and search. GitHub still reports no certificate;
-HTTPS enforcement and anonymous HTTPS/browser acceptance remain pending. GitHub's
-health result reported a DNS/CAA failure that could not be reproduced against
-any authoritative server or Google/Cloudflare. Provisioning was restarted again
-on 2026-10-01 using GitHub's documented remove/re-add step.
-[DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence and next action.
+download targets, both languages, canonical metadata and search. **HTTPS is
+live since 2026-10-02**: GitHub's DNS health check, which had reported a
+DNS/CAA failure nobody could reproduce, began passing for both hosts; one more
+remove/re-add of the custom domain then got a certificate for `irori-ai.com`
+and `www.irori-ai.com` (until 2026-12-31), and **Enforce HTTPS** is on. HTTP and
+`www` redirect to `https://irori-ai.com/`. GitHub Support was not contacted
+([HTTPS diagnosis and resolution](CUSTOM-DOMAIN.md#https-diagnosis-and-resolution)).
+[DNS and ownership steps](CUSTOM-DOMAIN.md) record the evidence.
 The owner added the Google Domain Property TXT record; a fresh Google DNS
 response matches the supplied value. On 2026-10-01 the owner reported that
 Search Console confirmed ownership and opened the Domain Property.
