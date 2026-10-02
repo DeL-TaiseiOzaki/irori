@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-02: **0.1.65** (#155, hibachi agent optional and agents side
+by side) is merged at the owner's request and published as
+[v0.1.65-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.65-preview.1)
+by release run `36988096815` from main's successful CI run `36986846360`
+(source `1b7b281`). It also carries 0.1.64 (#154, startup language), which was
+merged but never published. The release carries Windows 202,732,544 bytes, Mac
+170,216,335 bytes and `irori-0.1.65-full.nupkg` 202,095,725 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner device checks remain: the dock's columns and the
+hidden page on the installed Mac and Windows builds, and real CLI turns in two
+columns.
+
 Optional hibachi agent and the agent dock, 2026-10-02 (**0.1.65**,
 [ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md)): the owner
 put irori first as an IDE for knowledge bases and contents, with the hibachi
