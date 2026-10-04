@@ -1,5 +1,21 @@
 # irori continuation handoff
 
+Groups of hibachis in the rail, 2026-10-04 (**0.1.69**): the owner asked for
+a toggle that gathers hibachis, each group with its own name.
+- Right-click a hibachi in the rail: **新しいグループ** (named in a dialog),
+  **「name」に入れる**, **グループから外す**. The group's button opens and
+  closes it; right-click it to **名前を変更** or **グループを解除**. Closed, a
+  group is one folder of small tiles that shows its hibachis' AI state (ring,
+  approval dot) and the bar when it holds the hibachi on show.
+- `WorkspaceProfile.groups` in the device's `workspaces.json`
+  (`saveWorkspaceGroups`); a group stands where its first hibachi is in the
+  workspace order (`src/domain/hibachi-groups.ts`). Editing the workspace keeps
+  groups for the hibachis that stay; an empty group goes.
+- Verified with `npm run build`, `npm test` (new `hibachi-groups`), the UI
+  suites including the new `rail-groups-ui-smoke` (group, close, restart, rename,
+  ungroup) and `npm run format:check`. Not verified: installed Windows/macOS
+  builds.
+
 Published 2026-10-04: **0.1.68** (#161, connected folders named for agents) is
 merged at the owner's request and published as
 [v0.1.68-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.68-preview.1)

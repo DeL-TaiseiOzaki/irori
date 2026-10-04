@@ -123,6 +123,19 @@ export const hostArguments = {
   workspaces: z.tuple([]),
   saveWorkspace: z.tuple([name.trim().min(1), z.array(id).max(100), id.optional()]),
   removeWorkspace: z.tuple([id]),
+  saveWorkspaceGroups: z.tuple([
+    id,
+    z
+      .array(
+        z.object({
+          id,
+          name: name.trim().min(1),
+          scopeIds: z.array(id).max(100),
+          open: z.boolean(),
+        }),
+      )
+      .max(100),
+  ]),
   cloudConnections: z.tuple([id]),
   connectCloud: z.tuple([id, id]),
   disconnectCloud: z.tuple([id, id]),

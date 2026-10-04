@@ -289,6 +289,63 @@
 [data-ai='waiting'] .rail-label-state > i {
   background: var(--ember);
 }
+/* A named group of brains: closed, one folder of small tiles; open, a band
+   behind its brains with the folder on top. */
+.rail .rail-group {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--raised);
+}
+.rail .rail-group:hover {
+  background: var(--raised-2);
+}
+.rail .rail-group.open {
+  height: 30px;
+  background: none;
+  color: var(--tx-3);
+}
+.rail .rail-group.open:hover {
+  color: var(--tx);
+}
+.rail-folder {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 15px);
+  grid-auto-rows: 15px;
+  gap: 3px;
+  padding: 1px;
+  border-radius: 12px;
+  background: var(--raised);
+}
+.rail-group-open {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.rail-group-open::before {
+  content: '';
+  position: absolute;
+  inset: 0 6px;
+  border-radius: 16px;
+  background: var(--raised);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.rail-group-open > .rail-group-slot {
+  height: 34px;
+}
+.rail-group-open > .rail-group-slot .rail-label {
+  top: 2px;
+}
 .rail .rail-add {
   margin-top: 6px;
   width: 40px;
