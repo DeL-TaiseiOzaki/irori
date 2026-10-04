@@ -43,6 +43,8 @@ test('A local folder appears in contents through a link and is edited in place',
   assert((await lstat(entry)).isSymbolicLink());
   assert.equal(await readlink(entry), folder);
   assert.deepEqual(cloud.localFolders(space.scopeId), [folder]);
+  // Agents are told where it appears: searches that walk the hibachi skip the link.
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/調査']);
   const [listed] = await files.entries(space.scopeId, 'contents');
   assert.equal(listed.blocked, undefined);
   assert.equal(listed.writable, true);
@@ -59,6 +61,7 @@ test('A local folder appears in contents through a link and is edited in place',
   await assert.rejects(lstat(entry), { code: 'ENOENT' });
   assert.deepEqual((await readdir(folder)).sort(), ['Plan.md', 'note.md']);
   assert.deepEqual(cloud.localFolders(space.scopeId), []);
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
   await assert.rejects(files.read(space.scopeId, rel), /未接続/);
 });
 

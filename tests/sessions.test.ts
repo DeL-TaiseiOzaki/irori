@@ -195,9 +195,22 @@ test(
       resolve: async () => folder,
       rootEntries: async () => undefined,
       localFolders: () => [folder],
+      linkedPaths: () => ['contents/Synced'],
     };
     await run('default', true);
     await run('full-access', true);
+    // Each request names where the folder appears, since searches skip the link.
+    const requests = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .filter((m) => m.method === 'turn/start')
+      .map((m) => JSON.stringify(m.params));
+    assert.equal(requests.length, 2);
+    for (const request of requests) {
+      assert.match(request, /connected folders in this hibachi's contents: \\"contents\/Synced\\"/);
+      assert.match(request, /rg -L/);
+    }
     const starts = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
       .trim()
       .split('\n')

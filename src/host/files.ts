@@ -94,6 +94,8 @@ export class FileService {
     writable?(scopeId: string, rel: string): boolean;
     /** The connected folders on this device that a hibachi's contents shows through links. */
     localFolders?(scopeId: string): string[];
+    /** Where those folders appear, as paths inside the hibachi. */
+    linkedPaths?(scopeId: string): string[];
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];

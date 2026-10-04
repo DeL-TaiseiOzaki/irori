@@ -4,6 +4,7 @@ export * from './irori-agent';
 export * from './irori-agent-starter';
 export * from './hibachi-agent';
 export * from './note';
+export * from './connected-folders';
 export * from './person-lines';
 export * from './comments';
 export * from './sources';
