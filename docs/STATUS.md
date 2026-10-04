@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-04: **0.1.69** (#163, groups of hibachis in the rail) is
+merged at the owner's request and published as
+[v0.1.69-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.69-preview.1)
+by release run `37208653832` from main's successful CI run `37207993644`
+(source `21d2a36`). The release carries Windows 174,666,240 bytes, Mac
+140,265,537 bytes and `irori-0.1.69-full.nupkg` 173,836,041 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: the installed builds.
+
 Groups of hibachis in the rail, 2026-10-04 (**0.1.69**): the owner asked for
 a toggle that gathers hibachis, each group with its own name.
 - Right-click a hibachi in the rail: **新しいグループ** (named in a dialog),
