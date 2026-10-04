@@ -6,12 +6,20 @@ import { SerialQueue } from './serial-queue';
 import { GitProcess } from '../git/process';
 import { readLocalJson, writeLocalJson } from './local-json';
 import type { FileService } from './files';
-import type { WorkspaceProfile, RepositoryInfo } from '../domain/types';
+import type { HibachiGroup, WorkspaceProfile, RepositoryInfo } from '../domain/types';
+import { normalizeGroups } from '../domain/hibachi-groups';
 import { t } from '../domain/i18n';
+const group = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(120),
+  scopeIds: z.array(z.uuid()).max(100),
+  open: z.boolean(),
+});
 const profile = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
   scopeIds: z.array(z.uuid()).max(100),
+  groups: z.array(group).max(100).optional(),
 });
 
 export class WorkspaceService {
@@ -32,7 +40,14 @@ export class WorkspaceService {
       scopeIds.forEach((scopeId) => {
         if (!previous?.scopeIds.includes(scopeId)) this.files.get(scopeId);
       });
-      const value = profile.parse({ id: id ?? randomUUID(), name, scopeIds });
+      // Groups follow the hibachis that stay; one left empty goes.
+      const groups = normalizeGroups(previous?.groups ?? [], scopeIds);
+      const value = profile.parse({
+        id: id ?? randomUUID(),
+        name,
+        scopeIds,
+        ...(groups.length && { groups }),
+      });
       if (current.some((item) => item.id !== id && item.name === value.name))
         throw Error(
           t('同じ名前のワークスペースがあります。', 'A workspace with the same name exists.'),
@@ -41,6 +56,21 @@ export class WorkspaceService {
         ...current.filter((item) => item.id !== id),
         value,
       ]);
+      return value;
+    });
+  }
+  saveGroups(id: string, groups: HibachiGroup[]) {
+    return this.queue.run(async () => {
+      const current = await this.list();
+      const previous = current.find((item) => item.id === id);
+      if (!previous) throw Error('Unknown workspace');
+      const kept = normalizeGroups(z.array(group).max(100).parse(groups), previous.scopeIds);
+      const { name, scopeIds } = previous;
+      const value = profile.parse({ id, name, scopeIds, ...(kept.length && { groups: kept }) });
+      await writeLocalJson(
+        path.join(this.files.dataDir, 'workspaces.json'),
+        current.map((item) => (item.id === id ? value : item)),
+      );
       return value;
     });
   }

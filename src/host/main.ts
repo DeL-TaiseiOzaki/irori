@@ -473,6 +473,7 @@ app
       repositories: inspectRepository,
       workspaces: () => workspaces.list(),
       saveWorkspace: (...args) => workspaces.save(...args),
+      saveWorkspaceGroups: (...args) => workspaces.saveGroups(...args),
       removeWorkspace: async (id) => {
         if (cloud.busy || agents.anyBusy || git.busy)
           throw Error(

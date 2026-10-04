@@ -1335,6 +1335,19 @@ function App() {
             setSearchAll(level === 'overview');
             setSearchOpen(true);
           }}
+          groups={workspace?.groups ?? []}
+          onGroups={(groups) => {
+            if (!workspace) return;
+            const before = workspace;
+            setWorkspace({ ...workspace, groups });
+            void host
+              .saveWorkspaceGroups(workspace.id, groups)
+              .then(setWorkspace)
+              .catch((error) => {
+                setWorkspace(before);
+                report(error);
+              });
+          }}
           settings={
             <Settings hibachiAgent={hibachiAgent} onHibachiAgent={chooseHibachi} onError={report} />
           }

@@ -143,10 +143,18 @@ export interface RepositoryInfo {
   changed?: boolean;
   detail?: string;
 }
+/** Hibachis gathered under a name in the rail; a closed group shows as one folder. */
+export interface HibachiGroup {
+  id: string;
+  name: string;
+  scopeIds: string[];
+  open: boolean;
+}
 export interface WorkspaceProfile {
   id: string;
   name: string;
   scopeIds: string[];
+  groups?: HibachiGroup[];
 }
 export interface CloudRoot {
   scopeId: string;
@@ -387,6 +395,8 @@ export interface HostAPI {
   workspaces(): Promise<WorkspaceProfile[]>;
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
   removeWorkspace(id: string): Promise<void>;
+  /** Replaces the workspace's groups; members it does not hold are dropped. */
+  saveWorkspaceGroups(id: string, groups: HibachiGroup[]): Promise<WorkspaceProfile>;
   cloudConnections(scopeId: string): Promise<CloudConnection[]>;
   connectCloud(scopeId: string, mountId: string): Promise<void>;
   disconnectCloud(scopeId: string, mountId: string): Promise<void>;

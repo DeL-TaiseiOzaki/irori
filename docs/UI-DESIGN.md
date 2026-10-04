@@ -11,7 +11,11 @@ Everything below this section is the history of the earlier layout.
   Knowledge and Contents, its home, changes, graph and records) → Note.
 - **Shell.** A 64 px rail on the graphite backdrop holds the irori mark (back to
   the workspace choice), the Overview entry, the workspace's brains in their
-  order as 40 px tiles, adding a brain, search and settings. Islands sit on the
+  order as 40 px tiles, adding a brain, search and settings. A brain's context
+  menu gathers it into a named group; the group's button opens and closes it
+  (closed, one 40 px folder of small tiles that carries its brains' AI state;
+  open, a band behind its brains). Groups and their state are kept per
+  workspace on the device. Islands sit on the
   backdrop with 8 px gaps and a 14 px radius: the brain panel (280 px), the
   paper stage and the brain's AI panel (352 px), all resizable and remembered on
   the device. A 28 px status bar carries the workspace, the current brain, its
