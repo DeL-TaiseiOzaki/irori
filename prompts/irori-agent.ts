@@ -7,8 +7,12 @@
  */
 import type { BrainAgent, SubAgentCli } from '../src/domain/you';
 import { commentsDirectory } from '../src/domain/comments';
+import { handedConnectedFolders } from './connected-folders';
 
-type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'>;
+type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
+  /** Folders connected in its contents, as paths inside the hibachi. */
+  linked?: string[];
+};
 
 /** The words that start a request to the irori agent: the hibachis handed to it. */
 const handedHeader =
@@ -24,6 +28,15 @@ const handOff: Record<SubAgentCli, string> = {
     "Hand work in a hibachi to that hibachi's sub-agent with the task tool, naming that sub-agent. Do not change a hibachi's files yourself.",
 };
 
+const linkedList = (brain: Handed) =>
+  brain.linked?.length
+    ? `, connected folders ${brain.linked.map((item) => JSON.stringify(item)).join(', ')}`
+    : '';
+/** How connected folders are searched, said only when a handed hibachi has any. */
+const linkedNote = (brains: Handed[]) => {
+  const first = brains.find((brain) => brain.linked?.length)?.linked?.[0];
+  return first ? [handedConnectedFolders(first)] : [];
+};
 const commentCount = (count = 0) =>
   count ? `, ${count} comment${count === 1 ? '' : 's'} from people` : '';
 /** Where a handed hibachi keeps people's comments, said only when one has any. */
@@ -42,9 +55,15 @@ const commentsNote = (comments: number[]) =>
 export function brainsPreamble(brains: Handed[], cli: SubAgentCli, comments: number[] = []) {
   const lines = brains.map(
     (brain, index) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, sub-agent "${brain.agent}"${commentCount(comments[index])}`,
+      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, sub-agent "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
   );
-  return [handedHeader, ...lines, handOff[cli], ...commentsNote(comments)].join('\n');
+  return [
+    handedHeader,
+    ...lines,
+    handOff[cli],
+    ...linkedNote(brains),
+    ...commentsNote(comments),
+  ].join('\n');
 }
 
 /**
@@ -56,7 +75,7 @@ export function brainsPreamble(brains: Handed[], cli: SubAgentCli, comments: num
 export function brainsCommandPreamble(brains: Handed[], cli: string, comments: number[] = []) {
   const lines = brains.map(
     (brain, index) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"${commentCount(comments[index])}`,
+      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
   );
   return [
     handedHeader,
@@ -64,6 +83,7 @@ export function brainsCommandPreamble(brains: Handed[], cli: string, comments: n
     `You run on ${cli} for this request, which loads no sub-agents from files. Hand work in a hibachi to that hibachi's agent with the \`hibachi\` command in your shell: hibachi <hibachi agent or hibachi name> "<task>" (or the task on standard input).`,
     'The command runs the hibachi agent inside that hibachi, waits until it finishes, however long that takes, and prints its report. A non-zero exit status means the hand-off did not complete; the reason is on standard error.',
     "Hand one task at a time to a hibachi, and wait for its report before handing it another. Do not change a hibachi's files yourself.",
+    ...linkedNote(brains),
     ...commentsNote(comments),
   ].join('\n');
 }

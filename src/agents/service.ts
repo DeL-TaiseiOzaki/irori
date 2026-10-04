@@ -52,6 +52,7 @@ import {
   promptWithSkill,
   questionDeclined,
   selectedNote,
+  connectedFolders,
   selectedSources,
 } from '../../prompts';
 import { commentsCount, readNoteComments } from '../host/comments';
@@ -678,6 +679,7 @@ export class AgentService {
             category: brain.category && categoryName(brain.category),
             agent: names.get(brain.scopeId)!,
             root: brain.root,
+            linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
           };
         });
         const comments = await Promise.all(
@@ -706,6 +708,9 @@ export class AgentService {
           promptParts.push(brainsPreamble(brains, cli, comments));
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
+      // Searches that walk the hibachi skip the links its connected folders appear through.
+      const linked = you ? [] : (this.files.cloud?.linkedPaths?.(input.scopeId) ?? []);
+      if (linked.length) promptParts.push(connectedFolders(linked));
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
         promptParts.push(selectedNote(input.notePath));

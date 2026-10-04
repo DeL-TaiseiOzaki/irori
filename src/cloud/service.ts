@@ -694,6 +694,13 @@ export class CloudService {
     const binding = await this.localBinding(record.scopeId, record.mountId);
     if (binding && (await this.parent(record))) await this.unlink(record, binding.path);
   }
+  /** Where a hibachi's connected folders appear, as paths inside it, for CLI agents to be told. */
+  linkedPaths(scopeId: string) {
+    return [...this.mounted.values()]
+      .filter((item) => item.attachment.scopeId === scopeId)
+      .map((item) => `${item.attachment.contentsRoot}/${item.attachment.name}`)
+      .sort();
+  }
   /** The local folders connected in a hibachi, for CLI agents to be allowed into. */
   localFolders(scopeId: string) {
     return [...this.mounted.values()]

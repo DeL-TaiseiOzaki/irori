@@ -1,5 +1,22 @@
 # irori continuation handoff
 
+Connected folders named for agents, 2026-10-04 (**0.1.68**): a connected
+folder appears in contents through a link, and searches that walk the hibachi
+skip links. ripgrep 15.2 (which Claude Code's search and Codex use) found nothing
+in a linked folder from the hibachi root or with `rg --files`; it did with the
+link's path named or `rg -L`. With rclone the mount was a plain directory, so
+this was new with ADR 023.
+- `prompts/connected-folders.ts`: a hibachi agent's request names its connected
+  folders (`CloudService.linkedPaths`, `contents/<name>` of each linked folder) and
+  says to name the path or use `rg -L`; the irori agent hears each handed
+  hibachi's folders in its line, and the advice once.
+- Verified with `npm run build`, `npm test` (prompt wording, `linkedPaths`, a
+  Codex protocol fixture whose requests carry the list). Not verified: a real
+  CLI searching a Drive for desktop folder.
+- Not addressed (owner: acceptable): Google Docs/Sheets are `.gdoc`/`.gsheet`
+  links in a synced folder, so agents cannot read their content; a Google
+  Workspace CLI may cover that later.
+
 Published 2026-10-03: **0.1.67** (#159, Google Drive through Drive for desktop)
 is merged at the owner's request and published as
 [v0.1.67-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.67-preview.1)
