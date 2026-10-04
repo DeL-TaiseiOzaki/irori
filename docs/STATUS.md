@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-04: **0.1.68** (#161, connected folders named for agents) is
+merged at the owner's request and published as
+[v0.1.68-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.68-preview.1)
+by release run `37196539796` from main's successful CI run `37195900117`
+(source `df6fe06`). The release carries Windows 174,664,192 bytes, Mac
+140,264,124 bytes and `irori-0.1.68-full.nupkg` 173,832,931 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: a real CLI searching a connected
+Drive for desktop folder.
+
 Connected folders named for agents, 2026-10-04 (**0.1.68**): a connected
 folder appears in contents through a link, and searches that walk the hibachi
 skip links. ripgrep 15.2 (which Claude Code's search and Codex use) found nothing
