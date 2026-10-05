@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-In review 2026-10-05: **0.1.72** (#PRNUM, routine secrets) is open and not
+In review 2026-10-05: **0.1.72** (#169, routine secrets) is open and not
 merged. It is ADR 016 stage 2, after the
 [secrets spike](research/spike-external-tool-credentials.md) and the owner's
 three answers: refuse on a device without an OS-held key, write-back in stage
