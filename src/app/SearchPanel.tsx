@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { layerLabel } from '../domain/layers';
 import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import type { Space } from '../domain/types';
 import { Dialog } from './Dialog';
@@ -50,6 +51,10 @@ export function SearchPanel({
   const request = useRef(0);
   const queryInput = useRef<HTMLInputElement>(null);
   const allBrains = scopeId === ALL_BRAINS;
+  const knowledgeLabel = layerLabel(
+    allBrains ? undefined : spaces.find((space) => space.scopeId === scopeId),
+    'Knowledge_Base',
+  );
   const member = allBrains ? spaces.length > 0 : spaces.some((space) => space.scopeId === scopeId);
   // The latest membership list for the "files changed" listener below, without
   // resubscribing it on every render (the parent passes a fresh array each time).
@@ -279,7 +284,7 @@ export function SearchPanel({
           </fieldset>
           <span className="palette-where" id="search-scope-help">
             <Icon name="book" size={13} />
-            {t('Knowledge の本文', 'Knowledge text')}
+            {t(`${knowledgeLabel} の本文`, `${knowledgeLabel} text`)}
           </span>
         </div>
         {error && (

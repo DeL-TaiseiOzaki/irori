@@ -1,4 +1,5 @@
 import { classify, isPropertyPage } from '../domain/scopes';
+import { knowledgeFolder, layerFolder, renamedPath } from '../domain/layers';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
@@ -427,7 +428,8 @@ function App() {
     { enabled: !!active && !startup, refresh: revision, interval: 5000 },
   );
   const connections = connectionsRead.data ?? [];
-  const defaultNoteDirectory = notesDeclared?.newNoteDirectory ?? 'Knowledge_Base/Notes';
+  const defaultNoteDirectory =
+    notesDeclared?.newNoteDirectory ?? `${knowledgeFolder(active ?? {})}/Notes`;
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
@@ -2358,11 +2360,38 @@ function App() {
           space={active}
           spaces={workspaceSpaces}
           onClose={() => setBrainSettings(false)}
-          onSaved={(next) => {
+          beforeRename={save}
+          onSaved={(next, renamed) => {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
             setActive(next);
             setBrainSettings(false);
-            setStatus(t('hibachi の設定を保存しました。', "Saved the hibachi's settings."));
+            const notices = renamed.flatMap((item) => [
+              ...(item.notice ? [item.notice] : []),
+              ...(item.skipped.length
+                ? [
+                    t(
+                      `${item.skipped.length} 件のファイルのリンクを更新できませんでした。`,
+                      `Links in ${item.skipped.length} files could not be updated.`,
+                    ),
+                  ]
+                : []),
+            ]);
+            if (notices.length) setError(notices.join(' '));
+            else setStatus(t('hibachi の設定を保存しました。', "Saved the hibachi's settings."));
+            // The note on show follows its folder to the new name.
+            const open = current.current.doc;
+            for (const item of renamed) {
+              const moved =
+                open?.scopeId === next.scopeId
+                  ? renamedPath(open.path, item.previous, layerFolder(next, item.layer))
+                  : undefined;
+              if (moved)
+                void host
+                  .read(next.scopeId, moved)
+                  .then((doc) => show(doc))
+                  .catch(report);
+            }
+            if (renamed.length) setRevision((v) => v + 1);
           }}
         />
       )}

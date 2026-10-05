@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Layer names, 2026-10-05 (**0.1.70**, [ADR 024](decisions/024-layer-names.md)):
+the owner asked for Knowledge and Contents to be renamable, Schema aside; both
+the shown name and the folder, set separately, for each hibachi.
+- **hibachi の設定 → 層**: 表示名 (`labels` in `.irori/scope.json`) and フォルダ
+  (`knowledge`, absent meaning `Knowledge_Base`; the first `contents` entry).
+  `src/domain/layers.ts` holds the defaults, the name rules and `layerLabel`.
+- A rename (`renameLayerFolder`, `src/host/layer-folders.ts`) moves the folder
+  when it exists (only the declaration otherwise), disconnects and relinks
+  connected folders, rewrites the connection records, moves drafts, material
+  IDs, person-line records, comments and `.irori/notes.json` paths, then rewrites
+  links into the folder in every Markdown file outside contents. Skipped files
+  are reported. `.gitignore` gains the new contents line and keeps the old one.
+- The knowledge folder replaces `Knowledge_Base` in the new-note default, home
+  and overview lists, tree, Changes view, OKF `sources` roots and the graph index
+  (`<folder>/ontology/`).
+- Verified with `npm run build`, `npm test` (new `layer-names`), the UI suites
+  with `brain-settings-ui-smoke` renaming the Knowledge layer and its folder, and
+  `npm run format:check`. `links-ui-smoke` fails intermittently at the rename
+  dialog's reference count (参照するリンクなし・一部未確認), on `main` as often
+  as on this branch (2 of 3 runs each); it passed on one run here. Not verified:
+  installed Windows/macOS builds, a rename on a case-insensitive volume, a second
+  device following a contents rename.
+
 Published 2026-10-04: **0.1.69** (#163, groups of hibachis in the rail) is
 merged at the owner's request and published as
 [v0.1.69-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.69-preview.1)

@@ -1,9 +1,10 @@
 import Papa from 'papaparse';
 import { resolveNoteLink } from './note-links';
 import { ontologyDeclaration, parseCsv } from './ontology';
+import { defaultKnowledgeFolder } from './layers';
 
 /**
- * The graph index a knowledge base carries: `Knowledge_Base/ontology/`, a CSV
+ * The graph index a knowledge base carries: `ontology/` in its knowledge folder, a CSV
  * node table and a CSV edge table that irori generates from the pages of the
  * bundle — each page's `type`, `title` and `relations` in its frontmatter — and
  * the person commits, so every device shows the same graph for the same commit
@@ -12,24 +13,33 @@ import { ontologyDeclaration, parseCsv } from './ontology';
  * `.irori/ontology.json` still wins; irori neither reads nor generates the
  * module while one exists.
  */
-export const bundleRoot = 'Knowledge_Base';
-export const graphIndexFolder = `${bundleRoot}/ontology`;
-export const graphIndexFiles = {
-  entities: `${graphIndexFolder}/entities.csv`,
-  relations: `${graphIndexFolder}/relations.csv`,
-  index: `${graphIndexFolder}/index.md`,
-} as const;
+export const bundleRoot = defaultKnowledgeFolder;
+/** The module's folder and files in a bundle rooted at a hibachi's knowledge folder (ADR 024). */
+export function graphIndexAt(root: string = bundleRoot) {
+  const folder = `${root}/ontology`;
+  return {
+    folder,
+    files: {
+      entities: `${folder}/entities.csv`,
+      relations: `${folder}/relations.csv`,
+      index: `${folder}/index.md`,
+    },
+  } as const;
+}
+export const graphIndexFolder = graphIndexAt().folder;
+export const graphIndexFiles = graphIndexAt().files;
 export const entityColumns = ['id', 'label', 'note', 'parentId', 'group'] as const;
 export const relationColumns = ['sourceId', 'relation', 'targetId'] as const;
 /** What the graph reader accepts (`ontologyGraph`); a larger index is refused, never truncated. */
 export const graphIndexLimits = { entities: 2000, relations: 10000 } as const;
 
 /** The declaration the module is read with, as if `.irori/ontology.json` named it. */
-export function graphIndexDeclaration(relations: boolean) {
+export function graphIndexDeclaration(relations: boolean, root: string = bundleRoot) {
+  const files = graphIndexAt(root).files;
   return ontologyDeclaration.parse({
     schemaVersion: 1,
     entities: {
-      path: graphIndexFiles.entities,
+      path: files.entities,
       id: 'id',
       label: 'label',
       note: 'note',
@@ -38,7 +48,7 @@ export function graphIndexDeclaration(relations: boolean) {
     },
     ...(relations && {
       relations: {
-        path: graphIndexFiles.relations,
+        path: files.relations,
         source: 'sourceId',
         target: 'targetId',
         label: 'relation',
@@ -48,21 +58,21 @@ export function graphIndexDeclaration(relations: boolean) {
 }
 
 /**
- * A page of the bundle: a `.md` under `Knowledge_Base/` that is neither a
+ * A page of the bundle: a `.md` under the knowledge folder that is neither a
  * folder's `index.md` nor inside the module itself.
  */
-export function bundlePage(path: string) {
+export function bundlePage(path: string, root: string = bundleRoot) {
   return (
-    path.startsWith(`${bundleRoot}/`) &&
+    path.startsWith(`${root}/`) &&
     /\.md$/i.test(path) &&
     !/(^|\/)index\.md$/i.test(path) &&
-    !path.startsWith(`${graphIndexFolder}/`)
+    !path.startsWith(`${graphIndexAt(root).folder}/`)
   );
 }
 
 /** A page's id in the index: its path inside the bundle without `.md`. */
-export function pageId(path: string) {
-  return path.slice(bundleRoot.length + 1).replace(/\.md$/i, '');
+export function pageId(path: string, root: string = bundleRoot) {
+  return path.slice(root.length + 1).replace(/\.md$/i, '');
 }
 
 /**
@@ -153,11 +163,12 @@ export interface GraphIndexTables {
  * by id, relations by source, relation and target — so the order the pages
  * were met in leaves no trace.
  */
-export function buildGraphIndex(pages: PageFacts[]): GraphIndexTables {
+export function buildGraphIndex(pages: PageFacts[], root: string = bundleRoot): GraphIndexTables {
+  const id = (path: string) => pageId(path, root);
   const byPath = new Map<string, PageFacts>();
   for (const page of pages) {
     const path = page.path.normalize('NFC');
-    if (bundlePage(path)) byPath.set(path, { ...page, path });
+    if (bundlePage(path, root)) byPath.set(path, { ...page, path });
   }
   const kept = new Map<string, string[]>();
   let excluded = 0;
@@ -169,16 +180,16 @@ export function buildGraphIndex(pages: PageFacts[]): GraphIndexTables {
         excluded++;
         continue;
       }
-      const row = [pageId(page.path), rel, pageId(found.path)];
+      const row = [id(page.path), rel, id(found.path)];
       kept.set(row.join('\0'), row);
     }
   const relations = [...kept.values()].sort(compareRows);
   const taking = new Set(relations.flatMap(([source, , target]) => [source, target]));
   const entities = [...byPath.values()]
-    .filter((page) => taking.has(pageId(page.path)))
+    .filter((page) => taking.has(id(page.path)))
     .map((page) => [
-      pageId(page.path),
-      page.title?.trim() ? page.title : pageId(page.path).split('/').at(-1)!,
+      id(page.path),
+      page.title?.trim() ? page.title : id(page.path).split('/').at(-1)!,
       page.path,
       '',
       page.type ?? '',
@@ -193,23 +204,25 @@ export function renderTable(columns: readonly string[], rows: string[][]) {
   return text.endsWith('\n') ? text : `${text}\n`;
 }
 
-export const graphIndexReadme = `# ontology
+export const graphIndexReadmeFor = (root: string) => `# ontology
 
 The files in this folder are the graph index irori generates from the pages of
 this bundle — each page's \`type\`, \`title\` and \`relations\` in its
 frontmatter. Regenerate them in irori (オントロジー → グラフ索引を更新) rather
 than editing them.
 
-- \`entities.csv\`: one row per page that takes part in a relation — \`id\` (the page's path inside \`Knowledge_Base/\` without \`.md\`), \`label\` (its title), \`note\` (its path from the repository root), \`parentId\` (empty) and \`group\` (its type).
+- \`entities.csv\`: one row per page that takes part in a relation — \`id\` (the page's path inside \`${root}/\` without \`.md\`), \`label\` (its title), \`note\` (its path from the repository root), \`parentId\` (empty) and \`group\` (its type).
 - \`relations.csv\`: one row per relation — \`sourceId\`, \`relation\` and \`targetId\`.
 `;
 
+export const graphIndexReadme = graphIndexReadmeFor(bundleRoot);
+
 /** The bytes of the three module files for these tables. */
-export function renderGraphIndex(tables: GraphIndexTables) {
+export function renderGraphIndex(tables: GraphIndexTables, root: string = bundleRoot) {
   return {
     entities: renderTable(entityColumns, tables.entities),
     relations: renderTable(relationColumns, tables.relations),
-    index: graphIndexReadme,
+    index: graphIndexReadmeFor(root),
   } satisfies Record<keyof typeof graphIndexFiles, string>;
 }
 

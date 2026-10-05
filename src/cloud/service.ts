@@ -720,6 +720,28 @@ export class CloudService {
   disconnect(scopeId: string, mountId: string) {
     return this.mutate(() => this.unmount(scopeId, mountId));
   }
+  /**
+   * Disconnects every connected folder of a hibachi before its contents folder is
+   * renamed (ADR 024), and returns which were connected, for `resume` to link again.
+   */
+  suspend(scopeId: string) {
+    return this.mutate(async () => {
+      const ids = [...this.mounted.values()]
+        .filter((item) => item.attachment.scopeId === scopeId)
+        .map((item) => item.attachment.mountId);
+      for (const mountId of ids) await this.unmount(scopeId, mountId);
+      return ids;
+    });
+  }
+  /** Links again, under the contents folder's current name, the folders `suspend` disconnected. */
+  resume(scopeId: string, mountIds: string[]) {
+    return this.mutate(async () => {
+      const failed: string[] = [];
+      for (const mountId of mountIds)
+        await this.mount(scopeId, mountId).catch(() => failed.push(mountId));
+      return failed;
+    });
+  }
   /** Whether a connection may change its folder; a connected folder is linked again. */
   setAccess(scopeId: string, mountId: string, access: CloudAccess) {
     return this.mutate(async () => {

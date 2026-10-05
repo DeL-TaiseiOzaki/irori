@@ -16,6 +16,7 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { selectSubgraph, type OntologyView } from '../domain/ontology';
 import type { GraphIndexStatus } from '../domain/graph-index';
+import { knowledgeFolder, layerLabel } from '../domain/layers';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
@@ -314,7 +315,7 @@ function OntologyContent({
 }
 
 /** The freshness line for the graph index the KB carries, as the host reports it. */
-function describeGraphIndex(status: GraphIndexStatus) {
+function describeGraphIndex(status: GraphIndexStatus, folder: string) {
   const detailJa = [
     status.excluded ? `除外した関係 ${status.excluded} 件。` : '',
     status.unreadable ? `読めないページ ${status.unreadable} 件。` : '',
@@ -325,13 +326,13 @@ function describeGraphIndex(status: GraphIndexStatus) {
   ].join(' ');
   if (status.current)
     return t(
-      `グラフ索引（Knowledge_Base/ontology/）はページと一致しています。${detailJa}`,
-      `The graph index (Knowledge_Base/ontology/) matches the pages.${detailEn ? ` ${detailEn}` : ''}`,
+      `グラフ索引（${folder}）はページと一致しています。${detailJa}`,
+      `The graph index (${folder}) matches the pages.${detailEn ? ` ${detailEn}` : ''}`,
     );
   return t(
-    `グラフ索引（Knowledge_Base/ontology/）はページと一致しません。更新するとエンティティ +${status.entities.added} / −${status.entities.removed}、` +
+    `グラフ索引（${folder}）はページと一致しません。更新するとエンティティ +${status.entities.added} / −${status.entities.removed}、` +
       `関係 +${status.relations.added} / −${status.relations.removed}。${detailJa}`,
-    `The graph index (Knowledge_Base/ontology/) does not match the pages. Updating would change entities +${status.entities.added} / −${status.entities.removed}, ` +
+    `The graph index (${folder}) does not match the pages. Updating would change entities +${status.entities.added} / −${status.entities.removed}, ` +
       `relations +${status.relations.added} / −${status.relations.removed}.${detailEn ? ` ${detailEn}` : ''}`,
   );
 }
@@ -383,6 +384,8 @@ export function OntologyPanel({
     }
   }
   const indexed = module || repairModule;
+  // The module lives in the hibachi's knowledge folder (ADR 024).
+  const indexFolder = `${knowledgeFolder(space)}/ontology/`;
   return (
     <StageView
       label={t('オントロジー', 'Ontology')}
@@ -392,7 +395,13 @@ export function OntologyPanel({
       crumbs={
         <Crumbs
           space={space}
-          items={[{ icon: 'book', label: 'Knowledge', className: 'layer Knowledge_Base' }]}
+          items={[
+            {
+              icon: 'book',
+              label: layerLabel(space, 'Knowledge_Base'),
+              className: 'layer Knowledge_Base',
+            },
+          ]}
           here={t('グラフ', 'Graph')}
         />
       }
@@ -401,7 +410,7 @@ export function OntologyPanel({
           {indexed && status.data && (
             <span
               className={`index-state ${status.data.current ? 'current' : ''}`}
-              title={describeGraphIndex(status.data)}
+              title={describeGraphIndex(status.data, indexFolder)}
             >
               <Icon name={status.data.current ? 'checkCircle' : 'refresh'} size={13} />
               {status.data.current
@@ -449,15 +458,15 @@ export function OntologyPanel({
         <p className="graph-index-line muted" role="status">
           {status.loading
             ? t(
-                'グラフ索引（Knowledge_Base/ontology/）とページの整合性を確認しています…',
-                'Checking that the graph index (Knowledge_Base/ontology/) matches the pages…',
+                `グラフ索引（${indexFolder}）とページの整合性を確認しています…`,
+                `Checking that the graph index (${indexFolder}) matches the pages…`,
               )
             : status.error
               ? t(
                   `グラフ索引を確認できません: ${status.error}`,
                   `Cannot check the graph index: ${status.error}`,
                 )
-              : status.data && describeGraphIndex(status.data)}
+              : status.data && describeGraphIndex(status.data, indexFolder)}
         </p>
       )}
       {notice && <p className="hint">{notice}</p>}

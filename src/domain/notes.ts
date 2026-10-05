@@ -1,17 +1,21 @@
 import { z } from 'zod';
 import { kbPath } from './ontology';
 import { t } from './i18n';
+import { defaultKnowledgeFolder, knowledgeFolder } from './layers';
 
 /** Where a KB asks irori to put notes: `.irori/notes.json`, tracked with the KB. */
 export const notesDeclarationFile = '.irori/notes.json';
-export const defaultNoteDirectory = 'Knowledge_Base/Notes';
+export const defaultNoteDirectory = `${defaultKnowledgeFolder}/Notes`;
+/** Where a hibachi without a declaration puts new notes: `Notes` in its knowledge folder. */
+export const defaultNoteDirectoryOf = (space: { knowledge?: string }) =>
+  `${knowledgeFolder(space)}/Notes`;
 
 const tokenPattern = /\{\{(yyyy|MM|dd|date|datetime)\}\}/g;
 const notePath = kbPath.refine((value) => /\.md$/i.test(value), 'A Markdown note is required');
 
 export const notesDeclaration = z.object({
   schemaVersion: z.literal(1),
-  /** Directory offered by the new-note dialog instead of `Knowledge_Base/Notes`. */
+  /** Directory offered by the new-note dialog instead of `Notes` in the knowledge folder. */
   newNoteDirectory: kbPath.optional(),
   /** Today's note: a path with date tokens, filled from an optional template note. */
   daily: z

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { knowledgeFolder } from '../domain/layers';
 import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import { classify } from '../domain/scopes';
@@ -156,8 +157,9 @@ function layerIcon(space: Space, path: string) {
 
 /** The folder part shown dimmed before the name, without the Knowledge layer's own root. */
 function shortFolder(space: Space, folder: string) {
-  return classify(space, folder + 'x') === 'Knowledge_Base' && folder.startsWith('Knowledge_Base/')
-    ? folder.slice('Knowledge_Base/'.length)
+  const root = knowledgeFolder(space) + '/';
+  return classify(space, folder + 'x') === 'Knowledge_Base' && folder.startsWith(root)
+    ? folder.slice(root.length)
     : folder;
 }
 

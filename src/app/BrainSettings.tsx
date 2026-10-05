@@ -10,7 +10,14 @@ import {
   type BrainGlyph,
   type BrainLook,
 } from '../domain/brains';
-import type { Category, Space } from '../domain/types';
+import type { Category, LayerFolderRename, Space } from '../domain/types';
+import {
+  defaultLayerLabel,
+  layerFolder,
+  layerFolderProblem,
+  layerLabel,
+  type NamedLayer,
+} from '../domain/layers';
 import { t } from '../domain/i18n';
 import { BrainTile, glyphs } from './BrainTile';
 import { Dialog } from './Dialog';
@@ -82,8 +89,12 @@ function Segments<T extends string>({
   );
 }
 
+const namedLayers: NamedLayer[] = ['Knowledge_Base', 'contents'];
+const layerIcons = { Knowledge_Base: 'book', contents: 'cloud' } as const;
+
 /**
- * A brain's name, category, icon and colour. They are kept in the KB's
+ * A brain's name, category, icon and colour, and the names of its Knowledge and
+ * Contents layers and their folders. They are kept in the KB's
  * `.irori/scope.json`, so everyone who opens the brain sees the same tile.
  */
 export function BrainSettings({
@@ -91,12 +102,16 @@ export function BrainSettings({
   spaces,
   onSaved,
   onClose,
+  beforeRename,
 }: {
   space: Space;
   /** The workspace's brains, for the rail preview. */
   spaces: Space[];
-  onSaved: (space: Space) => void;
+  /** `renamed` holds the layer folders the save renamed, in order. */
+  onSaved: (space: Space, renamed: (LayerFolderRename & { layer: NamedLayer })[]) => void;
   onClose: () => void;
+  /** Saves the open note before a folder it may be in moves; false stops the save. */
+  beforeRename?: () => Promise<boolean>;
 }) {
   const current = brainAppearance(space);
   const [name, setName] = useState(space.name);
@@ -114,6 +129,18 @@ export function BrainSettings({
   const [color, setColor] = useState<BrainColor>(current.color);
   // Whether the person chose an icon; an untouched one stays derived rather than written down.
   const [touched, setTouched] = useState({ icon: false });
+  const [labels, setLabels] = useState(() => ({
+    Knowledge_Base: space.labels?.Knowledge_Base ?? '',
+    contents: space.labels?.contents ?? '',
+  }));
+  const [folders, setFolders] = useState(() => ({
+    Knowledge_Base: layerFolder(space, 'Knowledge_Base'),
+    contents: layerFolder(space, 'contents').split('/').at(-1)!,
+  }));
+  const folderProblems = Object.fromEntries(
+    namedLayers.map((layer) => [layer, layerFolderProblem(folders[layer].trim()) ?? '']),
+  ) as Record<NamedLayer, string>;
+  const folderProblem = namedLayers.some((layer) => folderProblems[layer]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const textProblem =
@@ -133,6 +160,7 @@ export function BrainSettings({
           : undefined;
   const draft: Space = {
     ...space,
+    labels,
     name: name.trim() || space.name,
     appearance: {
       icon: kind === 'image' && picked ? undefined : icon,
@@ -160,7 +188,7 @@ export function BrainSettings({
     chooseIcon(() => setPicked({ bytes, url }));
   }
   async function save() {
-    if (saving || textProblem || imageMissing || !name.trim()) return;
+    if (saving || textProblem || imageMissing || folderProblem || !name.trim()) return;
     setSaving(true);
     setError('');
     try {
@@ -170,12 +198,25 @@ export function BrainSettings({
           : icon;
       // The colour shown is written down; an untouched icon stays derived from the name.
       const look = { icon: saved, color };
-      const next = await host.updateSpace(space.scopeId, {
+      let next = await host.updateSpace(space.scopeId, {
         name: name.trim(),
         category: category === 'none' ? null : category,
         appearance: look,
+        labels: {
+          Knowledge_Base: labels.Knowledge_Base || null,
+          contents: labels.contents || null,
+        },
       });
-      onSaved(next);
+      const renamed: (LayerFolderRename & { layer: NamedLayer })[] = [];
+      for (const layer of namedLayers) {
+        const folder = folders[layer].trim();
+        if (folder === layerFolder(next, layer).split('/').at(-1)) continue;
+        if (beforeRename && !(await beforeRename())) break;
+        const result = await host.renameLayerFolder(space.scopeId, layer, folder);
+        next = result.space;
+        renamed.push({ ...result, layer });
+      }
+      onSaved(next, renamed);
     } catch (error) {
       setError(errorText(error));
     } finally {
@@ -274,8 +315,52 @@ export function BrainSettings({
                 {draft.name}
                 <Icon name="chevron" size={12} />
                 <Icon name="book" size={14} />
-                Knowledge
+                {layerLabel(draft, 'Knowledge_Base')}
               </div>
+            </div>
+          </section>
+          <section className="brain-sheet-layers">
+            <h3>{t('層', 'Layers')}</h3>
+            <div className="brain-sheet-layer-grid">
+              <span />
+              <span className="brain-sheet-layer-head">{t('表示名', 'Shown as')}</span>
+              <span className="brain-sheet-layer-head">{t('フォルダ', 'Folder')}</span>
+              {namedLayers.map((layer) => (
+                <div
+                  key={layer}
+                  className="brain-sheet-layer"
+                  role="group"
+                  aria-label={defaultLayerLabel(layer)}
+                >
+                  <Icon name={layerIcons[layer]} size={15} className={`layer-icon ${layer}`} />
+                  <input
+                    value={labels[layer]}
+                    maxLength={40}
+                    placeholder={defaultLayerLabel(layer)}
+                    aria-label={t(
+                      `${defaultLayerLabel(layer)} の表示名`,
+                      `${defaultLayerLabel(layer)} shown as`,
+                    )}
+                    onChange={(event) =>
+                      setLabels((value) => ({ ...value, [layer]: event.target.value }))
+                    }
+                  />
+                  <input
+                    className="mono"
+                    value={folders[layer]}
+                    maxLength={64}
+                    aria-label={t(
+                      `${defaultLayerLabel(layer)} のフォルダ`,
+                      `${defaultLayerLabel(layer)} folder`,
+                    )}
+                    aria-invalid={!!folderProblems[layer]}
+                    onChange={(event) =>
+                      setFolders((value) => ({ ...value, [layer]: event.target.value }))
+                    }
+                  />
+                  {folderProblems[layer] && <small role="alert">{folderProblems[layer]}</small>}
+                </div>
+              ))}
             </div>
           </section>
           <section className="brain-sheet-icons">
@@ -384,7 +469,7 @@ export function BrainSettings({
           </button>
           <button
             className="solid-button"
-            disabled={saving || !!textProblem || imageMissing || !name.trim()}
+            disabled={saving || !!textProblem || imageMissing || folderProblem || !name.trim()}
           >
             <Icon name="check" size={14} />
             {saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}

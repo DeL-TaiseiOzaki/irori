@@ -5,12 +5,10 @@ import { parse as parseYaml } from 'yaml';
 import {
   buildGraphIndex,
   bundlePage,
-  bundleRoot,
   declaredGraphIndex,
   entityColumns,
   frontmatterBlock,
-  graphIndexFiles,
-  graphIndexFolder,
+  graphIndexAt,
   graphIndexLimits,
   pageFacts,
   relationColumns,
@@ -25,6 +23,7 @@ import { textFileByteLimit, type FileService } from './files';
 import { knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
 import { t } from '../domain/i18n';
+import { knowledgeFolder } from '../domain/layers';
 
 /** A page's facts at the size and modification time they were read. */
 interface Remembered {
@@ -73,6 +72,7 @@ export class GraphIndexService {
         ),
       );
     const built = await this.build(scopeId);
+    const graphIndexFiles = this.at(scopeId).files;
     const written: string[] = [];
     const keys = ['entities', 'relations', 'index'] as const;
     const previous = await Promise.all(
@@ -88,7 +88,13 @@ export class GraphIndexService {
     return { ...(await this.compare(scopeId, built)), written };
   }
 
+  /** The module in this hibachi's knowledge folder. */
+  private at(scopeId: string) {
+    return graphIndexAt(knowledgeFolder(this.files.get(scopeId)));
+  }
+
   private async compare(scopeId: string, built: Built): Promise<GraphIndexStatus> {
+    const graphIndexFiles = this.at(scopeId).files;
     const [entities, relations] = await Promise.all(
       [graphIndexFiles.entities, graphIndexFiles.relations].map((relative) =>
         moduleFile(this.files, scopeId, relative),
@@ -111,12 +117,13 @@ export class GraphIndexService {
     const next = new Map<string, Remembered>();
     const pages: PageFacts[] = [];
     let unreadable = 0;
+    const root = knowledgeFolder(this.files.get(scopeId));
+    const { folder, files: graphIndexFiles } = graphIndexAt(root);
     const walk = await this.search.walk(
       scopeId,
-      bundlePage,
+      (path) => bundlePage(path, root),
       (directory) =>
-        (directory === bundleRoot || directory.startsWith(`${bundleRoot}/`)) &&
-        directory !== graphIndexFolder,
+        (directory === root || directory.startsWith(`${root}/`)) && directory !== folder,
       async ({ path, stat, read }) => {
         const known = previous.get(path);
         let entry: Remembered;
@@ -143,7 +150,7 @@ export class GraphIndexService {
           'The Knowledge layer could not be read completely, so the graph index cannot be checked.',
         ),
       );
-    const tables = buildGraphIndex(pages);
+    const tables = buildGraphIndex(pages, root);
     if (
       tables.entities.length > graphIndexLimits.entities ||
       tables.relations.length > graphIndexLimits.relations
@@ -154,7 +161,7 @@ export class GraphIndexService {
           `The graph index holds up to ${graphIndexLimits.entities.toLocaleString('en-US')} entities and ${graphIndexLimits.relations.toLocaleString('en-US')} relations (now ${tables.entities.length.toLocaleString('en-US')} entities and ${tables.relations.length.toLocaleString('en-US')} relations). Stopped without writing.`,
         ),
       );
-    const texts = renderGraphIndex(tables);
+    const texts = renderGraphIndex(tables, root);
     // Validate every output before publishing the first: long paths repeated in
     // edge rows can exceed the byte limit even when both row counts fit.
     for (const [key, text] of Object.entries(texts)) {

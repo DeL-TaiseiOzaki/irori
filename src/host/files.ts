@@ -18,6 +18,16 @@ import {
   type TrashedNote,
 } from '../domain/note-operations';
 import { defaultNoteDirectory } from '../domain/notes';
+import {
+  defaultKnowledgeFolder,
+  knowledgeFolder,
+  layerFolderName,
+  layerFolderProblem,
+  layerLabels,
+  layerRoots,
+  renamedPath,
+  type NamedLayer,
+} from '../domain/layers';
 import { t } from '../domain/i18n';
 import { textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
 const relative = z
@@ -35,6 +45,8 @@ const declaration = z.object({
   name: z.string().min(1).max(120),
   category: z.enum(['personal', 'team', 'organization']).optional(),
   contents: z.array(relative).min(1),
+  knowledge: layerFolderName.optional(),
+  labels: layerLabels.optional(),
   appearance: brainLook.optional(),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
@@ -242,6 +254,16 @@ export class FileService {
         if (change[key] === null) delete raw[key];
         else if (change[key] !== undefined) raw[key] = change[key];
       }
+      if (change.labels !== undefined) {
+        const labels: Record<string, string> =
+          change.labels === null ? {} : { ...(raw.labels as Record<string, string>) };
+        for (const [layer, label] of Object.entries(change.labels ?? {})) {
+          if (label?.trim()) labels[layer] = label.trim();
+          else if (label !== undefined) delete labels[layer];
+        }
+        if (Object.keys(labels).length) raw.labels = labels;
+        else delete raw.labels;
+      }
       const next: Space = { ...declaration.parse(raw), root: s.root };
       // A file of the KB keeps its own mode; only device records are made private.
       await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
@@ -263,6 +285,154 @@ export class FileService {
       await writeFileAtomic(path.join(directory, path.basename(relative)), Buffer.from(bytes));
       return relative;
     });
+  }
+  /**
+   * Renames the knowledge or contents folder (ADR 024). A folder that exists moves
+   * to the new name, which must be free; one not there yet changes only in the
+   * declaration, so a KB can name a folder it already has. The connection records
+   * that name the contents folder follow it, and so do the kept drafts of the
+   * knowledge files. Returns the knowledge files that moved, by their previous
+   * paths; links, comments and device records are the caller's to carry.
+   */
+  async renameLayerFolder(id: string, layer: NamedLayer, name: string) {
+    return this.queue.run(async () => {
+      const problem = layerFolderProblem(name);
+      if (problem) throw Error(problem);
+      const s = this.get(id);
+      const previous = layer === 'contents' ? s.contents[0] : knowledgeFolder(s);
+      // A contents folder declared inside another folder keeps its place.
+      const parent = layer === 'contents' ? path.posix.dirname(previous) : '.';
+      const next = parent === '.' ? name : `${parent}/${name}`;
+      if (next === previous) return { space: s, previous, files: [] as string[] };
+      const overlaps = (a: string, b: string) =>
+        a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+      const others =
+        layer === 'contents' ? [knowledgeFolder(s), ...s.contents.slice(1)] : s.contents;
+      if (
+        others.some((other) => overlaps(other, next)) ||
+        owner(this.spaces, path.join(s.root, next))?.scopeId !== id
+      )
+        throw Error(
+          t(
+            'その名前は別の層か別の hibachi のフォルダです。',
+            "That name is another layer's or another hibachi's folder.",
+          ),
+        );
+      const from = path.join(s.root, previous);
+      const to = path.join(s.root, next);
+      const stat = (filename: string) =>
+        fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+      const [before, after] = [await stat(from), await stat(to)];
+      // On a case-insensitive volume a change of case finds the folder itself.
+      const sameEntry = !!before && !!after && before.ino === after.ino && before.dev === after.dev;
+      const notFolder = Error(
+        t(
+          'フォルダの alias / シンボリックリンクは名前を変えられません。',
+          'Folder aliases and symbolic links cannot be renamed.',
+        ),
+      );
+      if (before && (before.isSymbolicLink() || !before.isDirectory())) throw notFolder;
+      if (!before && after && (after.isSymbolicLink() || !after.isDirectory())) throw notFolder;
+      if (before && after && !sameEntry)
+        throw Error(
+          t(
+            '同じ名前のファイルかフォルダが既にあります。',
+            'A file or folder with that name already exists.',
+          ),
+        );
+      const moved = before && layer === 'Knowledge_Base' ? await this.walk(from, previous) : [];
+      const meta = await this.metadata(s.root);
+      const original = await fs.readFile(meta, 'utf8');
+      const raw = JSON.parse(original) as Record<string, unknown>;
+      if (raw.scopeId !== s.scopeId) throw Error('Scope identity changed');
+      if (layer === 'contents') raw.contents = [next, ...s.contents.slice(1)];
+      else if (next === defaultKnowledgeFolder) delete raw.knowledge;
+      else raw.knowledge = next;
+      const space: Space = { ...declaration.parse(raw), root: s.root };
+      const records =
+        layer === 'contents' ? await this.contentsRecords(path.dirname(meta), previous, next) : [];
+      if (before) await fs.rename(from, to);
+      try {
+        await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
+        for (const record of records) await writeFileAtomic(record.filename, record.next);
+      } catch (error) {
+        // The folder and its declaration change together or not at all.
+        await writeFileAtomic(meta, original).catch(() => {});
+        for (const record of records)
+          await writeFileAtomic(record.filename, record.original).catch(() => {});
+        if (before) await fs.rename(to, from).catch(() => {});
+        throw error;
+      }
+      this.spaces = this.spaces.map((item) => (item.scopeId === id ? space : item));
+      if (layer === 'contents') await this.ignoreContents(s.root, previous, next);
+      for (const file of moved) {
+        const target = renamedPath(file, previous, next)!;
+        await fs
+          .rename(draftFile(this.dataDir, id, file), draftFile(this.dataDir, id, target))
+          .catch(() => {});
+      }
+      return { space, previous, files: moved };
+    });
+  }
+  /** The files under a folder, by their paths in the hibachi; links are not followed. */
+  private async walk(directory: string, rel: string) {
+    const out: string[] = [];
+    const visit = async (dir: string, prefix: string) => {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        if (out.length > 100_000)
+          throw Error(
+            t(
+              'ファイルが多すぎるため、このフォルダは名前を変えられません。',
+              'This folder holds too many files to be renamed.',
+            ),
+          );
+        const p = `${prefix}/${entry.name}`;
+        if (entry.isDirectory() && !['.git', 'node_modules'].includes(entry.name))
+          await visit(path.join(dir, entry.name), p);
+        else if (entry.isFile()) out.push(p);
+      }
+    };
+    await visit(directory, rel);
+    return out;
+  }
+  /** The connection records whose folders appear in `previous`, rewritten to appear in `next`. */
+  private async contentsRecords(directory: string, previous: string, next: string) {
+    const out: { filename: string; original: string; next: string }[] = [];
+    for (const name of ['local-folders.json', 'cloud-mounts.json']) {
+      const filename = path.join(directory, name);
+      const stat = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      if (!stat) continue;
+      if (stat.isSymbolicLink()) throw Error('Cloud metadata must not be a symlink');
+      const original = await fs.readFile(filename, 'utf8');
+      const records = JSON.parse(original) as unknown;
+      if (!Array.isArray(records)) continue;
+      let changed = false;
+      for (const record of records)
+        if (record && typeof record === 'object' && record.contentsRoot === previous) {
+          record.contentsRoot = next;
+          changed = true;
+        }
+      if (changed) out.push({ filename, original, next: JSON.stringify(records, null, 2) + '\n' });
+    }
+    return out;
+  }
+  /**
+   * Ignores the renamed contents folder as the previous name was. The previous
+   * line stays: another device keeps its own folder of links under that name
+   * until it follows, and those links must not reach the KB's history.
+   */
+  private async ignoreContents(root: string, previous: string, next: string) {
+    const ignore = path.join(root, '.gitignore');
+    const stat = await fs.lstat(ignore).catch(() => undefined);
+    if (!stat?.isFile()) return;
+    const before = await fs.readFile(ignore, 'utf8');
+    const lines = before.split(/\r?\n/);
+    if (!lines.includes(`/${previous}/`) || lines.includes(`/${next}/`)) return;
+    await fs.appendFile(ignore, `${before && !before.endsWith('\n') ? '\n' : ''}/${next}/\n`);
   }
   /** The KB's own `.irori/scope.json`, refusing a link that leads out of it. */
   private async metadata(root: string) {
@@ -640,6 +810,7 @@ export class FileService {
           ref.path,
           destinationPath,
           (p) => copied.get(p) ?? p,
+          layerRoots(this.get(ref.scopeId)),
         );
         if (!rewriting && references.links)
           throw Error(

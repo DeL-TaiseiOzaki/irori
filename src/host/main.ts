@@ -11,6 +11,7 @@ import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
 import { referringLinks, relink } from './relink';
+import { renameLayerFolder } from './layer-folders';
 import { DraftService } from './drafts';
 import { UpdateService } from './updates';
 import { platformInstaller } from './update-installers';
@@ -181,7 +182,10 @@ app
           const rel = path.relative(space.root, p).replaceAll('\\', '/');
           return (
             rel.split('/').some((x) => ['.git', 'node_modules'].includes(x)) ||
-            space.contents.some((c) => rel === c || rel.startsWith(c + '/'))
+            // The declaration as it is now: its contents folder can be renamed (ADR 024).
+            (files.list().find((item) => item.scopeId === space.scopeId) ?? space).contents.some(
+              (c) => rel === c || rel.startsWith(c + '/'),
+            )
           );
         },
       });
@@ -572,6 +576,19 @@ app
           );
         return changeFiles(() => files.update(scopeId, change));
       },
+      renameLayerFolder: (scopeId, layer, name) =>
+        changeFiles(() =>
+          changed(scopeId, async () => {
+            if (agents.busy(scopeId) || cloud.busy)
+              throw Error(
+                t(
+                  '実行と接続の準備が終わってからフォルダ名を変えてください。',
+                  'Wait for runs and connection setup to finish before renaming the folder.',
+                ),
+              );
+            return renameLayerFolder({ files, cloud, knowledge, authorship }, scopeId, layer, name);
+          }),
+        ),
       saveSpaceIcon: (scopeId, bytes) =>
         changeFiles(() => files.saveIcon(scopeId, bytes, imageType(bytes))),
       entries: (...args) => files.entries(...args),

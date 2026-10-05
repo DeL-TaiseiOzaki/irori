@@ -19,6 +19,7 @@ import {
 } from '../domain/knowledge';
 import type { StartRun } from '../domain/types';
 import { t } from '../domain/i18n';
+import { renamedPath } from '../domain/layers';
 
 /** Private immutable bytes and observations. No transcripts or cross-KB metadata are published. */
 export class KnowledgeStore {
@@ -228,6 +229,20 @@ export class KnowledgeStore {
           current,
         };
       }
+    });
+  }
+  /** Keeps the material IDs of a renamed layer folder's files at their new paths (ADR 024). */
+  renameFolder(scopeId: string, from: string, to: string) {
+    return this.queue.run(async () => {
+      const { filename, entries } = await this.index(scopeId);
+      let changed = false;
+      const next: Record<string, string> = {};
+      for (const [key, id] of Object.entries(entries)) {
+        const moved = renamedPath(key, from, to);
+        if (moved !== undefined) changed = true;
+        next[moved ?? key] = id;
+      }
+      if (changed) await writeLocalJson(filename, next);
     });
   }
   rebind(previous: SourceVersion, next: SourceRef) {

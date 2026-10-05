@@ -90,6 +90,31 @@ try {
   await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
   expect((await scope()).appearance.color).toBe('ai');
 
+  // The Knowledge layer's shown name and folder; a folder name is checked before saving.
+  const brain = page.locator('.brain-panel');
+  await expect(brain.getByRole('region', { name: 'Knowledge', exact: true })).toBeVisible();
+  await open();
+  const save = sheet.getByRole('button', { name: '保存', exact: true });
+  await sheet.getByRole('textbox', { name: 'Knowledge の表示名' }).fill('知識');
+  const contentsFolder = sheet.getByRole('textbox', { name: 'Contents のフォルダ' });
+  await contentsFolder.fill('.hidden');
+  await expect(sheet.getByRole('alert')).toBeVisible();
+  await expect(save).toBeDisabled();
+  await contentsFolder.fill('contents');
+  await sheet.getByRole('textbox', { name: 'Knowledge のフォルダ' }).fill('wiki');
+  await page.screenshot({ path: 'test-results/irori-brain-settings-layers.png' });
+  await save.click();
+  await expect(sheet).toHaveCount(0);
+  await expect(brain.getByRole('region', { name: '知識', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '知識', level: 2, exact: true })).toBeVisible();
+  await expect(
+    brain.getByRole('region', { name: '知識', exact: true }).getByText('note', { exact: true }),
+  ).toBeVisible();
+  const layers = await scope();
+  expect(layers.knowledge).toBe('wiki');
+  expect(layers.labels).toEqual({ Knowledge_Base: '知識' });
+  expect(await readFile(path.join(roots[0], 'wiki', 'note.md'), 'utf8')).toBe('# Product\n');
+
   // An image, kept in .irori and shown on the rail.
   await open();
   await sheet.getByRole('radio', { name: '画像', exact: true }).check();
@@ -137,7 +162,7 @@ try {
   ).toHaveLength(1);
   expect(errors).toEqual([]);
   console.log(
-    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, image icon, restart.',
+    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart.',
   );
 } finally {
   await app.close();
