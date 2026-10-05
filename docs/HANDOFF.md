@@ -1,8 +1,39 @@
 # irori continuation handoff
 
-In review 2026-10-05: **0.1.74** (#171, resizable irori agent) is open and
-not merged. In irori mode the AI island beside the map and the routines was a
-fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
+In review 2026-10-05: **0.1.75** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
+routines in the rail) is open and not merged. Routines has a dedicated button
+between irori mode and the hibachis, its own heading, the device's JavaScript
+setting, secrets and the existing run/review/history controls. The agent panel
+stays beside it, even without hibachis. irori mode offers map and columns and
+keeps the chosen layout across visits. The new GPT Image icon uses folded
+charcoal cycle arrows and an orange flame, with the source and prompts in
+`assets/`. Definitions remain `routine.yaml` and accompanying files.
+- Verified: `npm run build`, `npm test` (419 tests; 415 passed, 4 skipped),
+  `npm run format:check`, all 28 individual UI suites under Xvfb,
+  `npm run build:website`, `npm run test:website` (42 articles, 224 links),
+  local document links and release policy. The whole `npm run test:ui` stopped
+  at `links-ui-smoke`'s known intermittent rename reference-count failure;
+  an isolated retry failed too, then the third run passed. The 15 suites after
+  it passed in order. Main's unchanged links suite passed in two comparison
+  runs. The routines smoke adds direct navigation, rail order/selection/icon,
+  layout restoration, all-hibachi search, JavaScript settings and an empty
+  workspace to the existing execution, review, secrets and conversation checks.
+- After merging main at `32ca15c` into this branch, `npm run build`,
+  `npm test` (424 tests; 420 passed, 4 skipped), `npm run format:check` and the
+  routines, brain-settings (including removal), overview and dock UI smokes passed.
+- After merging main at `0287359`, build, unit tests (424 tests; 420 passed,
+  4 skipped), format and the routines, your-ai, overview, dock and brain-settings
+  UI smokes passed. Routines now checks dragging the shared agent pane and
+  retaining its width across visits to columns. Version 0.1.75 follows main's
+  resizable-agent release 0.1.74.
+- Not verified: installed Windows/macOS builds or real CLI inference. CI was
+  still running when this record was written. The branch includes hibachi removal
+  (#172) and the resizable irori agent (#171), both now merged on main.
+  No routines merge or publication has been performed yet.
+
+Merged 2026-10-05: **0.1.74** (#171, resizable irori agent), awaiting
+preview publication when this record was written. In irori mode the AI island
+beside the map and the routines was a fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
 300px; the map side keeps at least 360px). The handle is the 8px gap, styled
 like the hibachi islands' `island-handle`. Its layout is saved as
 `irori-overview` with the other device layouts.

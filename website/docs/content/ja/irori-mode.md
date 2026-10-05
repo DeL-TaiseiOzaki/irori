@@ -19,4 +19,4 @@ irori agent は依頼を分け、必要な hibachi の hibachi agent に渡し�
 
 irori agent も CLI とモデルを選んで使います。フルアクセスで始まり、自分の Schema は[同じ設定画面](schema.md)から編集できます。
 
-[会話と履歴](conversations.md)で仕事ごとに会話を分けられます。決まった手順を動かす場合は、irori mode の **ルーティン** を開いて[実行](routines.md)します。
+[会話と履歴](conversations.md)で仕事ごとに会話を分けられます。決まった手順を動かす場合は、左のレールの irori mode の下にある **ルーティン** を開いて[実行](routines.md)します。

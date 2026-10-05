@@ -188,9 +188,8 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   // The palette opened from the Overview searches every brain.
   const [searchAll, setSearchAll] = useState(false);
-  // The workspace's level: every brain at once, or the brain on show.
-  // The Your AI screen is a level of its own beside the Overview.
-  const [level, setLevel] = useState<'overview' | 'brain' | 'you'>('brain');
+  // The workspace's map, routines, one hibachi, or the irori agent's Schema.
+  const [level, setLevel] = useState<'overview' | 'routines' | 'brain' | 'you'>('brain');
   const levelNow = useRef(level);
   levelNow.current = level;
   // Moving between the Overview and a brain is a zoom: the Overview grows away
@@ -200,7 +199,7 @@ function App() {
     origin?: { x: number; y: number };
   }>();
   const sceneTimer = useRef<number | undefined>(undefined);
-  function goToLevel(next: 'overview' | 'brain' | 'you', origin?: { x: number; y: number }) {
+  function goToLevel(next: typeof level, origin?: { x: number; y: number }) {
     const from = levelNow.current;
     if (from === next) return;
     window.clearTimeout(sceneTimer.current);
@@ -447,7 +446,11 @@ function App() {
   const [reload, setReload] = useState(0);
   const shownLevel = useRef(level);
   useEffect(() => {
-    if (shownLevel.current === 'overview' && level === 'brain') setReload((value) => value + 1);
+    if (
+      (shownLevel.current === 'overview' || shownLevel.current === 'routines') &&
+      level === 'brain'
+    )
+      setReload((value) => value + 1);
     shownLevel.current = level;
   }, [level]);
   // The Overview changed or resumed an owner's queues; the columns showing them read them again.
@@ -899,7 +902,7 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !startup && !searchOpen) {
         e.preventDefault();
         if (workspaceSpaces.length && !connecting) {
-          setSearchAll(level === 'overview');
+          setSearchAll(level === 'overview' || level === 'routines');
           setSearchOpen(true);
         }
       }
@@ -1331,8 +1334,9 @@ function App() {
       <div className="app-body">
         <Rail
           spaces={workspaceSpaces}
-          activeId={active?.scopeId}
+          activeId={level === 'brain' ? active?.scopeId : undefined}
           overview={level === 'overview'}
+          routines={level === 'routines'}
           aiState={aiState}
           locked={switchLocked || gitBusy}
           homeDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
@@ -1340,10 +1344,11 @@ function App() {
           searchDisabled={!workspaceSpaces.length || connecting}
           onHome={leaveWorkspace}
           onOverview={showOverview}
+          onRoutines={() => goToLevel('routines')}
           onSelect={(space) => void enterBrain(space)}
           onAdd={() => setAdd(true)}
           onSearch={() => {
-            setSearchAll(level === 'overview');
+            setSearchAll(level === 'overview' || level === 'routines');
             setSearchOpen(true);
           }}
           groups={workspace?.groups ?? []}
@@ -1363,91 +1368,93 @@ function App() {
             <Settings hibachiAgent={hibachiAgent} onHibachiAgent={chooseHibachi} onError={report} />
           }
         />
-        {(level === 'overview' || scene?.leaving === 'overview') && workspace && (
-          <Overview
-            scene={
-              scene?.leaving === 'overview'
-                ? { kind: 'leave', origin: scene.origin }
-                : scene?.leaving === 'brain'
-                  ? { kind: 'return' }
-                  : undefined
-            }
-            workspace={workspace}
-            spaces={workspaceSpaces}
-            view={overviewView}
-            revision={revision}
-            addDisabled={anyRunning || dirty || connecting}
-            agentFor={agentFor}
-            hibachiAgent={hibachiAgent}
-            onView={setOverviewView}
-            onSearch={() => {
-              setSearchAll(true);
-              setSearchOpen(true);
-            }}
-            onAdd={() => setAdd(true)}
-            onConnect={(space) => showConnections(space)}
-            onSend={sendToBrain}
-            onResume={resumeQueue}
-            onStop={(scopeId, conversationId) => host.cancel(scopeId, conversationId)}
-            you={you}
-            onCreateYou={async () => {
-              await host.createYourAi();
-              setYouRevision((value) => value + 1);
-            }}
-            onShowYou={() => {
-              if (you?.state === 'ready') goToLevel('you');
-            }}
-            onSendYou={(prompt) => sendToYou(prompt)}
-            yourAgent={yourChoice.agent}
-            yourModel={yourChoice.models[yourChoice.agent] ?? ''}
-            yourAccess={yourAccess}
-            onYourAccess={(value) => setYourAccessSelection({ agent: yourChoice.agent, value })}
-            onYourAgent={(next) => {
-              if (next === yourChoice.agent) return;
-              chooseYour({ ...yourChoice, agent: next });
-              // Another CLI is another conversation (ADR 017 D2).
-              if (you) void newConversation(you.id, you.id, next).catch(report);
-            }}
-            yourConversation={you ? shown[you.id]?.id : undefined}
-            onShowConversation={(scopeId, id, next) => {
-              if (scopeId === you?.id) chooseYour({ ...yourChoice, agent: next });
-              else remember(scopeId, next);
-              if (id) showConversation(scopeId, id, next);
-              else setShown(({ [scopeId]: _, ...rest }) => rest);
-            }}
-            onYourNew={async () => {
-              if (you) await newConversation(you.id, you.id, yourChoice.agent);
-            }}
-            onYourModel={(next) => {
-              const models = { ...yourChoice.models };
-              if (next) models[yourChoice.agent] = next;
-              else delete models[yourChoice.agent];
-              chooseYour({ ...yourChoice, models });
-            }}
-            onStopYou={async (conversationId) => {
-              if (you) await host.cancel(you.id, conversationId);
-            }}
-            routineChoices={() => ({
-              ...Object.fromEntries(
-                workspaceSpaces.map((space) => {
-                  const agentId = agentFor(space.scopeId);
-                  return [
-                    space.scopeId,
-                    { agent: agentId, model: modelFor(space.scopeId, agentId) },
-                  ];
+        {(level === 'overview' || level === 'routines' || scene?.leaving === 'overview') &&
+          workspace && (
+            <Overview
+              routines={level === 'routines'}
+              scene={
+                scene?.leaving === 'overview'
+                  ? { kind: 'leave', origin: scene.origin }
+                  : scene?.leaving === 'brain'
+                    ? { kind: 'return' }
+                    : undefined
+              }
+              workspace={workspace}
+              spaces={workspaceSpaces}
+              view={overviewView}
+              revision={revision}
+              addDisabled={anyRunning || dirty || connecting}
+              agentFor={agentFor}
+              hibachiAgent={hibachiAgent}
+              onView={setOverviewView}
+              onSearch={() => {
+                setSearchAll(true);
+                setSearchOpen(true);
+              }}
+              onAdd={() => setAdd(true)}
+              onConnect={(space) => showConnections(space)}
+              onSend={sendToBrain}
+              onResume={resumeQueue}
+              onStop={(scopeId, conversationId) => host.cancel(scopeId, conversationId)}
+              you={you}
+              onCreateYou={async () => {
+                await host.createYourAi();
+                setYouRevision((value) => value + 1);
+              }}
+              onShowYou={() => {
+                if (you?.state === 'ready') goToLevel('you');
+              }}
+              onSendYou={(prompt) => sendToYou(prompt)}
+              yourAgent={yourChoice.agent}
+              yourModel={yourChoice.models[yourChoice.agent] ?? ''}
+              yourAccess={yourAccess}
+              onYourAccess={(value) => setYourAccessSelection({ agent: yourChoice.agent, value })}
+              onYourAgent={(next) => {
+                if (next === yourChoice.agent) return;
+                chooseYour({ ...yourChoice, agent: next });
+                // Another CLI is another conversation (ADR 017 D2).
+                if (you) void newConversation(you.id, you.id, next).catch(report);
+              }}
+              yourConversation={you ? shown[you.id]?.id : undefined}
+              onShowConversation={(scopeId, id, next) => {
+                if (scopeId === you?.id) chooseYour({ ...yourChoice, agent: next });
+                else remember(scopeId, next);
+                if (id) showConversation(scopeId, id, next);
+                else setShown(({ [scopeId]: _, ...rest }) => rest);
+              }}
+              onYourNew={async () => {
+                if (you) await newConversation(you.id, you.id, yourChoice.agent);
+              }}
+              onYourModel={(next) => {
+                const models = { ...yourChoice.models };
+                if (next) models[yourChoice.agent] = next;
+                else delete models[yourChoice.agent];
+                chooseYour({ ...yourChoice, models });
+              }}
+              onStopYou={async (conversationId) => {
+                if (you) await host.cancel(you.id, conversationId);
+              }}
+              routineChoices={() => ({
+                ...Object.fromEntries(
+                  workspaceSpaces.map((space) => {
+                    const agentId = agentFor(space.scopeId);
+                    return [
+                      space.scopeId,
+                      { agent: agentId, model: modelFor(space.scopeId, agentId) },
+                    ];
+                  }),
+                ),
+                ...(you && {
+                  [you.id]: {
+                    agent: yourChoice.agent,
+                    model: yourChoice.models[yourChoice.agent] || undefined,
+                  },
                 }),
-              ),
-              ...(you && {
-                [you.id]: {
-                  agent: yourChoice.agent,
-                  model: yourChoice.models[yourChoice.agent] || undefined,
-                },
-              }),
-            })}
-            onEnter={(space, options) => void enterBrain(space, options)}
-            onError={report}
-          />
-        )}
+              })}
+              onEnter={(space, options) => void enterBrain(space, options)}
+              onError={report}
+            />
+          )}
         {level === 'you' && workspace && you?.state === 'ready' && (
           <YourAiScreen
             you={you}

@@ -27,7 +27,7 @@ import type { RunRoutine } from '../domain/routines';
 import './overview.css';
 
 const host = window.irori;
-export type OverviewView = 'map' | 'columns' | 'routines';
+export type OverviewView = 'map' | 'columns';
 type AiState = 'running' | 'waiting' | 'queued' | 'idle';
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 const idle: BrainAi = {
@@ -703,6 +703,7 @@ function OverviewComposer({
  * side by side, with a way to answer, stop, resume and instruct each AI.
  */
 export function Overview({
+  routines,
   scene,
   workspace,
   spaces,
@@ -733,6 +734,8 @@ export function Overview({
   routineChoices,
   ...actions
 }: {
+  /** The rail's dedicated routines page, sharing this workspace's agent panel. */
+  routines: boolean;
   workspace: WorkspaceProfile;
   spaces: Space[];
   view: OverviewView;
@@ -797,7 +800,7 @@ export function Overview({
     onStop: reread(actions.onStop),
   };
   // The AI island beside the map and the routines is as wide as the person drags it.
-  const beside = view !== 'columns' && !!spaces.length;
+  const beside = routines || (view !== 'columns' && !!spaces.length);
   const panes = useMemo(
     () => (beside ? ['overview-main', 'overview-ai'] : ['overview-main']),
     [beside],
@@ -810,7 +813,7 @@ export function Overview({
   });
   return (
     <div
-      className={`overview chrome ${view} ${scene ? `level-${scene.kind}` : ''}`}
+      className={`overview chrome ${routines ? 'routines' : view} ${scene ? `level-${scene.kind}` : ''}`}
       inert={scene?.kind === 'leave'}
       style={
         scene?.origin
@@ -848,7 +851,7 @@ export function Overview({
       >
         <Pane id="overview-main" className="overview-main" minSize={360}>
           <header className="overview-header">
-            <h1>{t('irori mode', 'irori mode')}</h1>
+            <h1>{routines ? t('ルーティン', 'Routines') : t('irori mode', 'irori mode')}</h1>
             <span className="overview-sub">
               {workspace.name} ·{' '}
               {t(
@@ -856,87 +859,60 @@ export function Overview({
                 `${spaces.length} hibachi${spaces.length === 1 ? '' : 's'}`,
               )}
             </span>
-            <MagnetTabs
-              className="overview-views"
-              label={t('irori mode の表示', 'irori mode layout')}
-              value={view}
-              onValueChange={onView}
-              options={[
-                {
-                  value: 'map',
-                  label: (
-                    <>
-                      <Icon name="map" size={14} /> {t('地図', 'Map')}
-                    </>
-                  ),
-                },
-                {
-                  value: 'columns',
-                  label: (
-                    <>
-                      <Icon name="columns" size={14} /> {t('並列', 'Columns')}
-                    </>
-                  ),
-                },
-                {
-                  value: 'routines',
-                  label: (
-                    <>
-                      <Icon name="routine" size={14} /> {t('ルーティン', 'Routines')}
-                    </>
-                  ),
-                },
-              ]}
-            />
+            {!routines && (
+              <MagnetTabs
+                className="overview-views"
+                label={t('irori mode の表示', 'irori mode layout')}
+                value={view}
+                onValueChange={onView}
+                options={[
+                  {
+                    value: 'map',
+                    label: (
+                      <>
+                        <Icon name="map" size={14} /> {t('地図', 'Map')}
+                      </>
+                    ),
+                  },
+                  {
+                    value: 'columns',
+                    label: (
+                      <>
+                        <Icon name="columns" size={14} /> {t('並列', 'Columns')}
+                      </>
+                    ),
+                  },
+                ]}
+              />
+            )}
             <span className="overview-space" />
-            <button
-              className="overview-search"
-              disabled={!spaces.length}
-              onClick={onSearch}
-              aria-label={t(
-                `hibachi を検索（${shortcut('K')}）`,
-                `Search hibachis (${shortcut('K')})`,
-              )}
-            >
-              <Icon name="search" size={15} />
-              <span>{t('hibachi を検索', 'Search hibachis')}</span>
-              <kbd>{shortcut('K')}</kbd>
-            </button>
-            <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>
-              <Icon name="plus" size={14} />
-              {t('hibachi を追加', 'Add a hibachi')}
-            </button>
+            {!routines && (
+              <>
+                <button
+                  className="overview-search"
+                  disabled={!spaces.length}
+                  onClick={onSearch}
+                  aria-label={t(
+                    `hibachi を検索（${shortcut('K')}）`,
+                    `Search hibachis (${shortcut('K')})`,
+                  )}
+                >
+                  <Icon name="search" size={15} />
+                  <span>{t('hibachi を検索', 'Search hibachis')}</span>
+                  <kbd>{shortcut('K')}</kbd>
+                </button>
+                <button
+                  className="panel-button overview-add"
+                  disabled={addDisabled}
+                  onClick={onAdd}
+                >
+                  <Icon name="plus" size={14} />
+                  {t('hibachi を追加', 'Add a hibachi')}
+                </button>
+              </>
+            )}
           </header>
-          {!spaces.length ? (
-            <div className="overview-empty">
-              <p>
-                {t(
-                  'このワークスペースに hibachi がありません。',
-                  'This workspace has no hibachi yet.',
-                )}
-              </p>
-            </div>
-          ) : view === 'map' ? (
-            <OverviewMap
-              spaces={spaces}
-              ais={ais}
-              refresh={revision}
-              you={you}
-              yourAi={yourAi}
-              onShowYou={onShowYou}
-              onEnter={actions.onEnter}
-            />
-          ) : view === 'columns' ? (
-            <OverviewColumns
-              spaces={spaces}
-              ais={ais}
-              agentFor={agentFor}
-              hibachiAgent={hibachiAgent}
-              revision={revision}
-              onConnect={onConnect}
-              {...shared}
-            />
-          ) : (
+          {routines ? (
             <RoutinesView
               workspaceId={workspace.id}
               spaces={spaces}
@@ -955,6 +931,35 @@ export function Overview({
                 else setIsland('you');
               }}
               onError={actions.onError}
+            />
+          ) : !spaces.length ? (
+            <div className="overview-empty">
+              <p>
+                {t(
+                  'このワークスペースに hibachi がありません。',
+                  'This workspace has no hibachi yet.',
+                )}
+              </p>
+            </div>
+          ) : view === 'map' ? (
+            <OverviewMap
+              spaces={spaces}
+              ais={ais}
+              refresh={revision}
+              you={you}
+              yourAi={yourAi}
+              onShowYou={onShowYou}
+              onEnter={actions.onEnter}
+            />
+          ) : (
+            <OverviewColumns
+              spaces={spaces}
+              ais={ais}
+              agentFor={agentFor}
+              hibachiAgent={hibachiAgent}
+              revision={revision}
+              onConnect={onConnect}
+              {...shared}
             />
           )}
         </Pane>
@@ -976,7 +981,11 @@ export function Overview({
                 {hibachiAgent && (
                   <MagnetTabs
                     className="overview-island-tabs"
-                    label={t('irori mode の AI', 'AIs in irori mode')}
+                    label={
+                      routines
+                        ? t('ルーティンの AI', 'Routine agents')
+                        : t('irori mode の AI', 'AIs in irori mode')
+                    }
                     value={island}
                     onValueChange={setIsland}
                     options={[

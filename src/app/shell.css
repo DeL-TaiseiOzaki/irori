@@ -142,25 +142,35 @@
   background: var(--raised);
   color: var(--tx);
 }
-.rail-overview {
+.rail-overview,
+.rail-routines {
   border-radius: 12px;
 }
-.rail-overview img {
+.rail-overview img,
+.rail-routines img {
   width: 40px;
   height: 40px;
   display: block;
   opacity: 0.72;
   transition: opacity 0.15s;
 }
-.rail .rail-overview:hover:not(:disabled) {
+.rail .rail-overview:hover:not(:disabled),
+.rail .rail-routines:hover:not(:disabled) {
   background: none;
 }
 .rail-overview:hover:not(:disabled) img,
-.rail-overview[aria-current] img {
+.rail-overview[aria-current] img,
+.rail-routines:hover:not(:disabled) img,
+.rail-routines[aria-current] img {
   opacity: 1;
 }
-.rail-overview:disabled img {
+.rail-overview:disabled img,
+.rail-routines:disabled img {
   opacity: 0.35;
+}
+/* Keep the generated tile's silhouette smooth at the rail's small size. */
+.rail-routines img {
+  clip-path: inset(6.4% round 17%);
 }
 .rail-slot {
   position: relative;

@@ -23,4 +23,4 @@ Turn on the hibachi agent under **Agents**. It is off by default.
 
 Check for a new version under **Updates** in settings. When one is available, choose **Update and restart**.
 
-To use JavaScript in [routines](routines.md), enable it under **Routines** in settings. Choose the AI CLI, model, and access mode in the [AI panel](agents.md).
+To use JavaScript in [routines](routines.md), open **Routines** in the left rail and enable **Use JavaScript on this device** under **Runtimes**. Choose the AI CLI, model, and access mode in the [AI panel](agents.md).

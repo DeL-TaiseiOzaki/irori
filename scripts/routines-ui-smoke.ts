@@ -9,7 +9,8 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { YourAiService } from '../src/host/you';
 import { SettingsService } from '../src/host/settings';
 
-// Routines in irori mode (ADR 016): the review before the first run and after a
+// Routines from their own rail entry (ADR 016): navigation and device settings,
+// the review before the first run and after a
 // change, JavaScript added from the row, a run's steps, output and changed
 // files, the nothing-to-do gate, 停止, an agent step's request answered in its
 // step, and its conversation. A secret is entered from its row, hidden in the
@@ -39,6 +40,7 @@ git('add', '.');
 git('commit', '-q', '-m', 'Start');
 const product = await files.register(root, 'Product', 'team');
 await new WorkspaceService(files).save('Lab', [product.scopeId]);
+await new WorkspaceService(files).save('Empty', []);
 const you = new YourAiService(files.dataDir, home);
 await you.create();
 const youRoot = (await you.load()).root;
@@ -112,8 +114,25 @@ try {
   page.setDefaultTimeout(20000);
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   const rail = page.getByRole('navigation', { name: 'hibachi' });
-  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
-  await page.getByRole('button', { name: 'ルーティン', exact: true }).click();
+  const modeButton = rail.getByRole('button', { name: 'irori mode', exact: true });
+  const routinesButton = rail.getByRole('button', { name: 'ルーティン', exact: true });
+  const productButton = rail.getByRole('button', { name: /^Product・AI/ });
+  // Home, irori mode, routines, then the hibachis; the new icon loads at its bundled size.
+  expect(
+    await rail
+      .locator('.rail-home, .rail-overview, .rail-routines, .rail-brain')
+      .evaluateAll((buttons) => buttons.map((button) => button.className)),
+  ).toEqual(['rail-home', 'rail-button rail-overview', 'rail-button rail-routines', 'rail-brain']);
+  await expect
+    .poll(() => routinesButton.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(256);
+  // The routines page opens directly from a hibachi, with its own heading and selection.
+  await routinesButton.click();
+  await expect(page.getByRole('heading', { name: 'ルーティン', exact: true })).toBeVisible();
+  await expect(routinesButton).toHaveAttribute('aria-current', 'page');
+  await expect(modeButton).not.toHaveAttribute('aria-current');
+  await expect(productButton).not.toHaveAttribute('aria-current');
+  await expect(page.getByRole('group', { name: 'irori mode の表示' })).toHaveCount(0);
   const view = page.getByRole('region', { name: 'ルーティン', exact: true });
   const card = (name: string) => view.getByRole('article', { name, exact: true });
   /** The state of a routine's latest run, as its row shows it. */
@@ -123,6 +142,42 @@ try {
   await expect(view.getByRole('region', { name: 'Product' })).toContainText('Collect');
   // The agent panel stays beside the routines.
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
+  // The irori mode layout survives a visit to routines; routines is no longer a layout tab.
+  await modeButton.click();
+  await expect(view).toHaveCount(0);
+  const layouts = page.getByRole('group', { name: 'irori mode の表示' });
+  await expect(layouts.getByRole('button', { name: 'ルーティン', exact: true })).toHaveCount(0);
+  await layouts.getByRole('button', { name: '並列', exact: true }).click();
+  await routinesButton.click();
+  await expect(view).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
+  await modeButton.click();
+  await expect(layouts.getByRole('button', { name: '並列', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await routinesButton.click();
+  // Routines keeps the shared agent's resizable pane across the columns layout.
+  const agentPanel = page.getByRole('complementary', { name: 'irori agent' });
+  const narrow = (await agentPanel.boundingBox())!.width;
+  const handle = (await page.getByRole('separator', { name: 'エージェントの幅' }).boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x - 160, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await agentPanel.boundingBox())!.width)
+    .toBeGreaterThan(narrow + 120);
+  await modeButton.click();
+  await routinesButton.click();
+  await expect
+    .poll(async () => (await agentPanel.boundingBox())!.width)
+    .toBeGreaterThan(narrow + 120);
+  // Rail search from routines covers the workspace, as irori mode's does.
+  await rail.getByRole('button', { name: /^検索/ }).click();
+  await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: '閉じる', exact: true }).click();
+  await page.screenshot({ path: 'test-results/routines-navigation.png' });
 
   // An invalid routine says why and cannot run.
   await expect(card('Broken')).toContainText('無効');
@@ -135,6 +190,17 @@ try {
   await expect(collect).toContainText('JavaScript が必要です。');
   await expect(collect.getByRole('button', { name: '実行' })).toBeDisabled();
   await collect.getByRole('button', { name: 'JavaScript を追加' }).click();
+  await expect(collect).not.toContainText('JavaScript が必要です。');
+  expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([
+    'javascript',
+  ]);
+  // The page's runtime setting follows the row's addition and persists either choice.
+  const javascript = view.getByRole('checkbox', { name: 'この端末で JavaScript を使用' });
+  await expect(javascript).toBeChecked();
+  await javascript.uncheck();
+  await expect(collect.getByRole('button', { name: '実行' })).toBeDisabled();
+  expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([]);
+  await javascript.check();
   await expect(collect).not.toContainText('JavaScript が必要です。');
   expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([
     'javascript',
@@ -272,6 +338,19 @@ try {
   await ask.getByRole('button', { name: '会話' }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Product');
   await expect(page.getByRole('log').first()).toContainText('ルーティン: Ask（ステップ 1）');
+  await expect(productButton).toHaveAttribute('aria-current', 'true');
+  await expect(routinesButton).not.toHaveAttribute('aria-current');
+
+  // An empty workspace still offers the irori agent's routines and device settings.
+  await rail.getByRole('button', { name: 'ワークスペースを選択' }).click();
+  await page.locator('.workspace-card').filter({ hasText: 'Empty' }).click();
+  await expect(modeButton).toBeDisabled();
+  await expect(routinesButton).toBeEnabled();
+  await routinesButton.click();
+  await expect(view.getByRole('region', { name: 'irori agent' })).toContainText('Git version');
+  await expect(view.getByRole('region', { name: 'Product', exact: true })).toHaveCount(0);
+  await expect(javascript).toBeChecked();
+  await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
     'Routines UI passed: invalid routine with its reason, JavaScript added from the row, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',

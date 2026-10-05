@@ -269,6 +269,12 @@ decisions above left open:
   **ルーティン**, beside the map and the columns. It lists the irori agent's
   routines and those of the open workspace's hibachis, grouped by owner, with
   the agent panel beside it.
+  Updated by the owner on 2026-10-05: routines has its own button in the rail,
+  between irori mode and the hibachis. Its page retains the owner groups,
+  agent panel and secrets, and now owns the device's JavaScript switch.
+  irori mode offers only the map and columns. The new GPT Image mark matches
+  the existing sculpted-paper icons, with circular charcoal arrows around an
+  orange flame.
 - **Names and defaults.** `hibachis: all` and hibachi names resolve within the
   open workspace. A step without `cli` or `model` takes the ones chosen in that
   agent's panel when **実行** is pressed.

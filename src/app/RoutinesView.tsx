@@ -579,7 +579,7 @@ function RoutineCard({
 }
 
 /**
- * The routines view of irori mode (ADR 016): the irori agent's routines and each
+ * The rail's routines page (ADR 016): the irori agent's routines and each
  * hibachi's, started and stopped only here.
  */
 export function RoutinesView({
@@ -602,6 +602,24 @@ export function RoutinesView({
 }) {
   const [reads, setReads] = useState(0);
   const reread = () => setReads((value) => value + 1);
+  const [javascript, setJavascript] = useState(() =>
+    currentRoutineRuntimes().includes('javascript'),
+  );
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
+  async function chooseJavascript(on: boolean) {
+    const previous = javascript;
+    setJavascript(on);
+    setRuntimeBusy(true);
+    try {
+      await chooseRoutineRuntimes(on ? ['javascript'] : []);
+      reread();
+    } catch (error) {
+      setJavascript(previous);
+      onError(error);
+    } finally {
+      setRuntimeBusy(false);
+    }
+  }
   // Read again now and then: nothing watches the irori agent's folder, and an agent may edit a routine.
   const list = useResource(() => host.routines(workspaceId), [workspaceId], {
     refresh: revision + reads,
@@ -646,6 +664,19 @@ export function RoutinesView({
     .filter((group) => group.routines.length);
   return (
     <section className="routines-view" aria-label={t('ルーティン', 'Routines')}>
+      <section className="routine-settings" aria-label={t('実行環境', 'Runtimes')}>
+        <h2>{t('実行環境', 'Runtimes')}</h2>
+        <label>
+          <input
+            type="checkbox"
+            checked={javascript}
+            disabled={runtimeBusy}
+            onChange={(event) => void chooseJavascript(event.target.checked)}
+          />
+          <Icon name="code" size={15} />
+          <span>{t('この端末で JavaScript を使用', 'Use JavaScript on this device')}</span>
+        </label>
+      </section>
       {list.error && (
         <p className="routine-problem" role="alert">
           {list.error}
@@ -704,6 +735,7 @@ export function RoutinesView({
                     await chooseRoutineRuntimes([
                       ...new Set([...currentRoutineRuntimes(), 'javascript' as const]),
                     ]);
+                    setJavascript(true);
                     reread();
                   })
                 }

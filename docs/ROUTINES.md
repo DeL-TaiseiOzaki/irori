@@ -44,8 +44,13 @@ steps:
 
 ## Running one
 
-irori mode → **ルーティン** lists the irori agent's routines and those of the
-workspace's hibachis, grouped by owner. The agent panel stays beside it, so a
+The left rail's **ルーティン** / **Routines** button, between irori mode and the
+hibachis, opens the dedicated routines page. It lists the irori agent's routines
+and those of the workspace's hibachis, grouped by owner. The page also holds the
+device's **JavaScript** switch under **実行環境** / **Runtimes**, and the
+**シークレット** / **Secrets** list. irori mode keeps its map and columns,
+remembering the chosen view when you return. The routines page also works in
+a workspace without hibachis. The agent panel stays beside it, so a
 routine's agent steps can be followed in their conversations. The list is read
 again every five seconds and whenever a hibachi's files change.
 
@@ -61,7 +66,7 @@ again every five seconds and whenever a hibachi's files change.
   runs a changed routine only with the digest of the files the review showed.
 - **What a device needs** is named in the row before a run: **JavaScript が必要です。**
   with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in the
-  settings under ルーティン), `<command> が見つかりません。` for a missing `PATH`
+  page under 実行環境), `<command> が見つかりません。` for a missing `PATH`
   command, **Python はまだ使えません。** for `.py`, and
   **シークレット <NAME> がありません。** with **<NAME> を入力** for a secret not
   stored yet. On a device whose OS keeps no key, the row says

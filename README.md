@@ -78,7 +78,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - **irori agent**（旧「あなたの AI」）：irori mode で、hibachi をまたぐ仕事を頼めます。どの CLI でも動きます。依頼を hibachi ごとに分け、各 hibachi の hibachi agent に渡します。Claude Code・Codex・OpenCode では irori が定義するサブエージェント（`hibachi-<名前>`）、Pi と Hermes Agent では irori が依頼ごとに用意する `hibachi` コマンドを使います。結果はまとめて報告します。hibachi agent と同じくフルアクセスで始まり、自分の Schema も同じ設定画面で編集できます。
 - 許可の扱いは各 CLI の設定に従います。hibachi agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
 - 会話は hibachi ごと・irori agent ごとにいくつでも持て、この PC に丸ごと残ります。**新しい会話** と **履歴**（名前の変更・ピン留め・アーカイブ・削除）があります。同じ hibachi の会話はタブで開き、それぞれ同時に実行できます。実行中の会話への指示は送信待ちとして予約でき、再起動しても残ります（[CONVERSATIONS](docs/CONVERSATIONS.md)）。
-- **ルーティン**：irori mode の **ルーティン** で、決めた手順を「実行」ボタンで動かせます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か hibachi の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
+- **ルーティン**：左のレールの irori mode と hibachi の間にある **ルーティン** で、JavaScript の使用設定、シークレットの管理、決めた手順の「実行」ができます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か hibachi の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
 
 **資料**
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。

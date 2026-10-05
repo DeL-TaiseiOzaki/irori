@@ -5,3 +5,6 @@ export { version as appVersion } from '../../package.json';
 export const appIcon = new URL('../../assets/irori-icon-256.png', import.meta.url).href;
 // irori mode's own mark, drawn at 40 CSS pixels on the rail.
 export const iroriModeIcon = new URL('../../assets/irori-mode-icon-256.png', import.meta.url).href;
+// Routines shares the rail's sculpted-paper icon family at 40 CSS pixels.
+export const routinesIcon = new URL('../../assets/irori-routines-icon-256.png', import.meta.url)
+  .href;
