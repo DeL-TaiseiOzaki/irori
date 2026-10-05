@@ -1,35 +1,25 @@
 # irori continuation handoff
 
-In review 2026-10-05: **0.1.75** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
-routines in the rail) is open and not merged. Routines has a dedicated button
-between irori mode and the hibachis, its own heading, the device's JavaScript
-setting, secrets and the existing run/review/history controls. The agent panel
-stays beside it, even without hibachis. irori mode offers map and columns and
-keeps the chosen layout across visits. The new GPT Image icon uses folded
-charcoal cycle arrows and an orange flame, with the source and prompts in
-`assets/`. Definitions remain `routine.yaml` and accompanying files.
-- Verified: `npm run build`, `npm test` (419 tests; 415 passed, 4 skipped),
-  `npm run format:check`, all 28 individual UI suites under Xvfb,
-  `npm run build:website`, `npm run test:website` (42 articles, 224 links),
-  local document links and release policy. The whole `npm run test:ui` stopped
-  at `links-ui-smoke`'s known intermittent rename reference-count failure;
-  an isolated retry failed too, then the third run passed. The 15 suites after
-  it passed in order. Main's unchanged links suite passed in two comparison
-  runs. The routines smoke adds direct navigation, rail order/selection/icon,
-  layout restoration, all-hibachi search, JavaScript settings and an empty
-  workspace to the existing execution, review, secrets and conversation checks.
-- After merging main at `32ca15c` into this branch, `npm run build`,
-  `npm test` (424 tests; 420 passed, 4 skipped), `npm run format:check` and the
-  routines, brain-settings (including removal), overview and dock UI smokes passed.
-- After merging main at `0287359`, build, unit tests (424 tests; 420 passed,
-  4 skipped), format and the routines, your-ai, overview, dock and brain-settings
-  UI smokes passed. Routines now checks dragging the shared agent pane and
-  retaining its width across visits to columns. Version 0.1.75 follows main's
-  resizable-agent release 0.1.74.
-- Not verified: installed Windows/macOS builds or real CLI inference. CI was
-  still running when this record was written. The branch includes hibachi removal
-  (#172) and the resizable irori agent (#171), both now merged on main.
-  No routines merge or publication has been performed yet.
+Published 2026-10-05: **0.1.75** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
+routines in the rail) merged at the owner's request as `a49fad2` and is published
+as [v0.1.75-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.75-preview.1)
+by release run `37300125737` from main's successful CI run `37298872609`.
+- Routines has its own button between irori mode and the hibachis, a GPT Image
+  icon matching the existing paper/flame family, the device's JavaScript
+  setting, secrets, review/run controls and history. Definitions remain
+  `routine.yaml` and accompanying files.
+- The agent pane stays beside routines without hibachis and retains its
+  adjustable width across visits to irori mode. The map/columns choice also
+  survives visits to routines. Hibachi removal (#172) and the resizable agent
+  (#171) are preserved.
+- Main CI passed build, formatting, unit tests (424 tests; 419 passed,
+  5 skipped), all 28 UI suites, website build/smoke (42 articles, 224 links),
+  and Linux, Windows and macOS package and native update checks.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,145,920 bytes,
+  Mac 141,767,695 bytes and `irori-0.1.75-full.nupkg` 175,314,550 bytes.
+  The website manifest now offers 0.1.75 and its four screenshots are fresh
+  English UI captures at 2x, converted to WebP.
+- Installed device acceptance and real CLI inference remain owner checks.
 
 Merged 2026-10-05: **0.1.74** (#171, resizable irori agent), awaiting
 preview publication when this record was written. In irori mode the AI island
