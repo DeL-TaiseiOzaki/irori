@@ -293,6 +293,12 @@ function ReviewDialog({
             'This routine runs programs and agents with your permissions.',
           )}
         </p>
+        {!!data?.secrets.length && (
+          <p className="review-secrets">
+            {t('受け取るシークレット', 'Secrets it receives')}:{' '}
+            <span className="mono">{data.secrets.join(', ')}</span>
+          </p>
+        )}
         {review.loading && <p role="status">{t('読み込み中…', 'Loading…')}</p>}
         {(review.error || data?.problem || error) && (
           <p className="routine-problem" role="alert">
@@ -341,6 +347,133 @@ function ReviewDialog({
   );
 }
 
+/** Takes a secret's value; it goes to the host and is never shown again (ADR 016 D5). */
+function SecretDialog({
+  name,
+  onClose,
+  onSaved,
+}: {
+  name: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const label = t(`シークレット ${name}`, `Secret ${name}`);
+  return createPortal(
+    <Dialog label={label} busy={busy} onClose={onClose}>
+      <form
+        className="modal routine-secret-form"
+        aria-label={label}
+        onSubmit={(event) => {
+          event.preventDefault();
+          setBusy(true);
+          setError('');
+          host
+            .setSecret(name, value.trim())
+            .then(() => {
+              onSaved();
+              onClose();
+            })
+            .catch((reason) => {
+              setError(errorText(reason));
+              setBusy(false);
+            });
+        }}
+      >
+        <h2 className="mono">{name}</h2>
+        <label>
+          {t('値', 'Value')}
+          <input
+            type="password"
+            aria-label={t('値', 'Value')}
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+            value={value}
+            disabled={busy}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </label>
+        {error && (
+          <p className="routine-problem" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={onClose}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button type="submit" className="primary" disabled={busy || value.trim().length < 8}>
+            {t('保存', 'Save')}
+          </button>
+        </div>
+      </form>
+    </Dialog>,
+    document.body,
+  );
+}
+
+/** The device's secrets by name, to replace or delete; values are never shown. */
+function Secrets({
+  revision,
+  onEnter,
+  onChanged,
+}: {
+  revision: number;
+  onEnter: (name: string) => void;
+  onChanged: () => void;
+}) {
+  const list = useResource(() => host.secrets(), [], { refresh: revision });
+  const [removing, setRemoving] = useState<string>();
+  const [error, setError] = useState('');
+  const names = list.data?.names ?? [];
+  if (!names.length) return null;
+  return (
+    <section className="routine-group routine-secrets" aria-label={t('シークレット', 'Secrets')}>
+      <h2>
+        <Icon name="lock" size={13} />
+        {t('シークレット', 'Secrets')}
+      </h2>
+      {error && (
+        <p className="routine-problem" role="alert">
+          {error}
+        </p>
+      )}
+      <ul>
+        {names.map((name) => (
+          <li key={name}>
+            <span className="mono">{name}</span>
+            <span className="routine-space" />
+            {list.data?.available && (
+              <button className="panel-button" onClick={() => onEnter(name)}>
+                {t('置き換え', 'Replace')}
+              </button>
+            )}
+            <button
+              className="panel-button"
+              onClick={() => {
+                if (removing !== name) return setRemoving(name);
+                setError('');
+                host
+                  .deleteSecret(name)
+                  .then(onChanged)
+                  .catch((reason) => setError(errorText(reason)))
+                  .finally(() => setRemoving(undefined));
+              }}
+              onBlur={() => setRemoving((value) => (value === name ? undefined : value))}
+            >
+              <Icon name="trash" size={13} />
+              {removing === name ? t('削除する', 'Delete it') : t('削除', 'Delete')}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function RoutineCard({
   routine,
   live,
@@ -350,6 +483,7 @@ function RoutineCard({
   onRun,
   onStop,
   onAddRuntime,
+  onEnterSecret,
   onOpenConversation,
   onError,
 }: {
@@ -361,6 +495,7 @@ function RoutineCard({
   onRun: () => void;
   onStop: () => void;
   onAddRuntime: () => void;
+  onEnterSecret: (name: string) => void;
   onOpenConversation: (conversation: Conversation) => void;
   onError: (error: unknown) => void;
 }) {
@@ -418,6 +553,12 @@ function RoutineCard({
               {t('JavaScript を追加', 'Add JavaScript')}
             </button>
           )}
+          {routine.needs.secrets?.map((name) => (
+            <button key={name} className="panel-button" onClick={() => onEnterSecret(name)}>
+              <Icon name="lock" size={13} />
+              {t(`${name} を入力`, `Enter ${name}`)}
+            </button>
+          ))}
         </p>
       )}
       {error && (
@@ -470,6 +611,7 @@ export function RoutinesView({
   const [open, setOpen] = useState<string>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [reviewing, setReviewing] = useState<Routine>();
+  const [entering, setEntering] = useState<string>();
   useEffect(
     () =>
       host.onEvent((event) => {
@@ -565,6 +707,7 @@ export function RoutinesView({
                     reread();
                   })
                 }
+                onEnterSecret={setEntering}
                 onOpenConversation={onOpenConversation}
                 onError={onError}
               />
@@ -572,6 +715,10 @@ export function RoutinesView({
           })}
         </section>
       ))}
+      <Secrets revision={reads} onEnter={setEntering} onChanged={reread} />
+      {entering && (
+        <SecretDialog name={entering} onClose={() => setEntering(undefined)} onSaved={reread} />
+      )}
       {reviewing && (
         <ReviewDialog
           routine={reviewing}

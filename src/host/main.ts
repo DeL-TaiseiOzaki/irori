@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } from 'electron';
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
@@ -38,6 +38,7 @@ import { addNoteComment, moveNoteComments, readNoteComments, removeNoteComment }
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
+import { reversibleStorage, SecretStore } from './keystore';
 import { AgentSetup } from './agent-setup';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
@@ -126,6 +127,14 @@ app
       () => !agents.anyBusy && !cloud.busy && fileMutations === 0 && !routines.busy,
       authorship,
     );
+    // Secrets are sealed with the OS-held key. A source run may stand in a reversible
+    // store for the UI smoke, whose display has no keychain; a packaged app never does.
+    const secrets = new SecretStore(
+      path.join(files.dataDir, 'secrets.json'),
+      !app.isPackaged && process.env.IRORI_TEST_KEYSTORE === 'reversible'
+        ? reversibleStorage
+        : safeStorage,
+    );
     // Routines run only when the person presses 実行; their records stay on this device.
     const routines = new RoutineService({
       dataDir: files.dataDir,
@@ -135,6 +144,7 @@ app
       workspaces: () => workspaces.list(),
       settings: () => settings.read(),
       gitStatus: (id) => git.status(id),
+      secrets,
       canStart: canStartAgent,
       emit: (run) => emit({ type: 'routine', run }),
       runtime: process.execPath,
@@ -688,6 +698,9 @@ app
       runRoutine: (ref, input) => routines.run(ref, input),
       stopRoutine: (ref) => routines.stop(ref),
       routineRuns: (ref) => routines.runs(ref),
+      secrets: () => secrets.list(),
+      setSecret: (name, value) => secrets.set(name, value),
+      deleteSecret: (name) => secrets.delete(name),
       cancel: (scopeId, conversationId) => agents.cancel(scopeId, conversationId),
       respond: (...args) => agents.respond(...args),
     } satisfies HostHandlers;

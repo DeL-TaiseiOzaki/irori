@@ -1,5 +1,34 @@
 # irori continuation handoff
 
+In review 2026-10-05: **0.1.72** (#169, routine secrets) is open and not
+merged. It is ADR 016 stage 2, after the
+[secrets spike](research/spike-external-tool-credentials.md) and the owner's
+three answers: refuse on a device without an OS-held key, write-back in stage
+2, and agent-side Slack/Teams left to each CLI's own MCP sign-in.
+- `src/host/keystore.ts` holds `SecretStore` (`secrets.json`, values sealed
+  with synchronous `safeStorage`). It refuses Linux `basic_text`/`unknown`,
+  because the async API accepts those. The same file has `Redactor` (hides
+  values in streamed output) and `readWriteBack`.
+- `RoutineService` gives each named secret only to its `run` step, along with
+  `IRORI_SECRETS_OUT` (under `routines/out/`, outside `IRORI_WORK`). It keeps
+  declared `NAME=value` lines whether or not the step succeeded; a failed step
+  drops an unfinished last line, and a refused line fails the step. Values are
+  hidden in output, reports and details.
+- `needs` names missing secrets, or a device without a keychain. The review
+  lists the secrets a routine receives.
+- `HostAPI` gains `secrets()`, `setSecret` and `deleteSecret`; none returns a
+  value. The routines view adds **<NAME> を入力**, a password dialog, and the
+  **シークレット** list with **置き換え**/**削除**.
+- `IRORI_TEST_KEYSTORE=reversible` stands in a non-protecting store, and only
+  on a source run, for the UI smoke.
+- Verified: `npm run build`, `npm test` (419 tests, 415 passed, 4 skipped;
+  new `keystore` tests and two routines tests), `xvfb-run -a npm run test:ui`
+  (routines smoke enters, reviews, hides, writes back and deletes a secret).
+  `harness-ui-smoke` failed once on `.message.done` (0 of 5), then passed twice
+  alone, and the 24 suites after it passed.
+  and `npm run format:check`. Not verified: macOS Keychain, Windows DPAPI and
+  a Linux secret service on installed builds.
+
 Published 2026-10-05: **0.1.71** (#167, the irori agent sets up hibachis) is
 merged at the owner's request and published as
 [v0.1.71-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.71-preview.1)

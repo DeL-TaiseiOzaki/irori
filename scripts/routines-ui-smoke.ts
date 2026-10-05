@@ -1,6 +1,6 @@
 import { _electron as electron, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,7 +12,9 @@ import { SettingsService } from '../src/host/settings';
 // Routines in irori mode (ADR 016): the review before the first run and after a
 // change, JavaScript added from the row, a run's steps, output and changed
 // files, the nothing-to-do gate, 停止, an agent step's request answered in its
-// step, and its conversation. `pi` is a protocol fixture; no model runs.
+// step, and its conversation. A secret is entered from its row, hidden in the
+// output, written back and deleted; the display has no keychain, so the app
+// runs with its reversible test store. `pi` is a protocol fixture; no model runs.
 if (process.platform === 'win32') {
   console.log('Routines UI executable fixtures are POSIX only.');
   process.exit(0);
@@ -71,6 +73,12 @@ await routine(path.join(routines, 'ask'), {
 await routine(path.join(routines, 'broken'), {
   'routine.yaml': 'name: Broken\nsteps:\n  - agent: hibachi\n    prompt: go\n',
 });
+await routine(path.join(routines, 'token'), {
+  'routine.yaml': 'name: Token\nsteps:\n  - run: use.sh\n    secrets: [SLACK_TOKEN]\n',
+  'use.sh':
+    '#!/bin/sh\necho "got $SLACK_TOKEN"\nprintf "SLACK_TOKEN=xoxe-rotated-ui-2\\n" >> "$IRORI_SECRETS_OUT"\n',
+});
+await chmod(path.join(routines, 'token', 'use.sh'), 0o700);
 await routine(path.join(youRoot, 'routines', 'version'), {
   'routine.yaml': 'name: Git version\nsteps:\n  - run: [git, --version]\n',
 });
@@ -86,6 +94,7 @@ const env = {
   HOME: home,
   PATH: bin + path.delimiter + process.env.PATH,
   IRORI_DATA_DIR: files.dataDir,
+  IRORI_TEST_KEYSTORE: 'reversible',
 } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
@@ -195,6 +204,38 @@ try {
   await version.locator('.routine-step').getByText('出力', { exact: true }).click();
   await expect(version.locator('.routine-output pre')).toContainText('git version');
 
+  // A secret is entered from the row that needs it, never shown again, and hidden in output.
+  const token = card('Token');
+  await expect(token).toContainText('シークレット SLACK_TOKEN がありません。');
+  await expect(token.getByRole('button', { name: '実行' })).toBeDisabled();
+  await token.getByRole('button', { name: 'SLACK_TOKEN を入力' }).click();
+  const entry = page.getByRole('dialog', { name: 'シークレット SLACK_TOKEN' });
+  await expect(entry.getByRole('button', { name: '保存' })).toBeDisabled();
+  await entry.getByLabel('値').fill('xoxb-entered-in-ui-1');
+  await page.screenshot({ path: 'test-results/routines-keystore.png' });
+  await entry.getByRole('button', { name: '保存' }).click();
+  await expect(entry).toHaveCount(0);
+  await expect(token).not.toContainText('がありません');
+  const kept = view.getByRole('region', { name: 'シークレット', exact: true });
+  await expect(kept).toContainText('SLACK_TOKEN');
+  await token.getByRole('button', { name: '実行' }).click();
+  await expect(review).toContainText('受け取るシークレット: SLACK_TOKEN');
+  await review.getByRole('button', { name: '確認して実行' }).click();
+  await last('Token', 'succeeded');
+  await token.locator('.routine-step').getByText('出力', { exact: true }).click();
+  await expect(token.locator('.routine-output pre')).toHaveText('got ***\n');
+  expect(await page.content()).not.toContain('xoxb-entered-in-ui-1');
+  // The step wrote a new value back; the test store's sealing is reversible.
+  const sealed = JSON.parse(await readFile(path.join(files.dataDir, 'secrets.json'), 'utf8'));
+  expect(Buffer.from(sealed.values.SLACK_TOKEN, 'base64').toString()).toBe(
+    'test:xoxe-rotated-ui-2',
+  );
+  // 削除 asks once more, and the row needs the secret again.
+  await kept.getByRole('button', { name: '削除' }).click();
+  await kept.getByRole('button', { name: '削除する' }).click();
+  await expect(kept).toHaveCount(0);
+  await expect(token).toContainText('シークレット SLACK_TOKEN がありません。');
+
   // An agent step's request is answered in the step, and its conversation opens.
   const ask = card('Ask');
   await ask.getByRole('button', { name: '実行' }).click();
@@ -233,7 +274,7 @@ try {
   await expect(page.getByRole('log').first()).toContainText('ルーティン: Ask（ステップ 1）');
   expect(errors).toEqual([]);
   console.log(
-    'Routines UI passed: invalid routine with its reason, JavaScript added from the row, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',
+    'Routines UI passed: invalid routine with its reason, JavaScript added from the row, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',
   );
 } finally {
   // A routine or run left by a failure would hold the window open behind a confirmation.
@@ -241,7 +282,7 @@ try {
   await first
     ?.evaluate(
       async ([owner]) => {
-        for (const folder of ['collect', 'quiet', 'long', 'ask'])
+        for (const folder of ['collect', 'quiet', 'long', 'token', 'ask'])
           await window.irori.stopRoutine({ owner, folder });
         await window.irori.cancel();
       },

@@ -14,6 +14,7 @@ import { GitService } from '../src/git/service';
 import { AgentService } from '../src/agents/service';
 import { conversationMetas } from './fixtures/conversations';
 import { failedReport, nothingToDo, parseRoutine, RoutineService } from '../src/host/routines';
+import { reversibleStorage, SecretStore } from '../src/host/keystore';
 import { lineDiff, type RoutineRef, type RoutineRun } from '../src/domain/routines';
 import type { AgentEvent } from '../src/domain/types';
 
@@ -140,7 +141,7 @@ test('the gate, the failure marker and the review difference are read exactly', 
   ]);
 });
 
-async function setup(t: TestContext, { javascript = true } = {}) {
+async function setup(t: TestContext, { javascript = true, keychain = true } = {}) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori routines '));
   const bin = path.join(base, 'bin');
   await mkdir(bin);
@@ -181,6 +182,10 @@ async function setup(t: TestContext, { javascript = true } = {}) {
   if (javascript) await settings.save({ routineRuntimes: ['javascript'] });
   const gitService = new GitService(files);
   const emitted: RoutineRun[] = [];
+  const secrets = new SecretStore(
+    path.join(files.dataDir, 'secrets.json'),
+    keychain ? reversibleStorage : undefined,
+  );
   const host = {
     dataDir: files.dataDir,
     files,
@@ -189,6 +194,7 @@ async function setup(t: TestContext, { javascript = true } = {}) {
     workspaces: () => workspaces.list(),
     settings: () => settings.read(),
     gitStatus: (id: string) => gitService.status(id),
+    secrets,
     canStart: () => {},
     emit: (run: RoutineRun) => emitted.push(structuredClone(run)),
   };
@@ -249,6 +255,7 @@ async function setup(t: TestContext, { javascript = true } = {}) {
     settings,
     routines,
     host,
+    secrets,
     emitted,
     routine,
     listed,
@@ -474,7 +481,10 @@ test(
     const secret = await routine('secret', {
       'routine.yaml': 'name: S\nsteps: [{run: [echo, hi], secrets: [TOKEN]}]\n',
     });
-    assert.equal((await listed(secret)).needs?.text, 'シークレットはまだ使えません。');
+    assert.deepEqual((await listed(secret)).needs, {
+      text: 'シークレット TOKEN がありません。',
+      secrets: ['TOKEN'],
+    });
     const missing = await routine('missing', {
       'routine.yaml': 'name: M\nsteps: [{run: [irori-no-such-command, x]}]\n',
     });
@@ -496,6 +506,83 @@ test(
     assert.match((await listed(plain)).problem ?? '', /tool に実行権限がありません/);
   },
 );
+
+test(
+  'secrets reach only the run steps naming them, stay out of records and are written back',
+  fixtureOptions,
+  async (t) => {
+    const { routine, listed, routines, start, ended, secrets, files } = await setup(t);
+    const ref = await routine('rotate', {
+      'routine.yaml': `name: Rotate
+steps:
+  - run: refresh.sh
+    secrets: [SLACK_TOKEN]
+  - run: other.sh
+  - run: use.sh
+    secrets: [SLACK_TOKEN]
+`,
+      'refresh.sh': `#!/bin/sh
+echo "old $SLACK_TOKEN"
+echo "out $IRORI_SECRETS_OUT" >&2
+printf 'SLACK_TOKEN=xoxe-rotated-2\n' >> "$IRORI_SECRETS_OUT"
+echo "new xoxe-rotated-2"
+`,
+      'other.sh': '#!/bin/sh\necho "other ${SLACK_TOKEN:-none} ${IRORI_SECRETS_OUT:-none}"\n',
+      'use.sh': '#!/bin/sh\n[ "$SLACK_TOKEN" = xoxe-rotated-2 ] && echo used\n',
+    });
+    assert.deepEqual((await listed(ref)).needs, {
+      text: 'シークレット SLACK_TOKEN がありません。',
+      secrets: ['SLACK_TOKEN'],
+    });
+    assert.deepEqual((await routines.review(ref)).secrets, ['SLACK_TOKEN']);
+    await assert.rejects(start(ref), /シークレット SLACK_TOKEN がありません/);
+    await secrets.set('SLACK_TOKEN', 'xoxb-original-1');
+    assert.equal((await listed(ref)).needs, undefined);
+    const run = await ended(ref, await start(ref));
+    assert.equal(run.state, 'succeeded', JSON.stringify(run));
+    assert.match(run.steps[0].output, /^old \*\*\*$/m);
+    assert.match(run.steps[0].output, /^new \*\*\*$/m);
+    assert.equal(run.steps[1].output, 'other none none\n');
+    assert.equal(run.steps[2].output, 'used\n');
+    assert.deepEqual(await secrets.values(['SLACK_TOKEN']), { SLACK_TOKEN: 'xoxe-rotated-2' });
+    const out = /^out (.+)$/m.exec(run.steps[0].output)![1];
+    assert.equal(existsSync(path.dirname(out)), false);
+    const kept = path.join(files.dataDir, 'routines', 'runs');
+    for (const dir of await readdir(kept))
+      for (const name of await readdir(path.join(kept, dir))) {
+        const text = await readFile(path.join(kept, dir, name), 'utf8');
+        assert.doesNotMatch(text, /xoxb-original-1|xoxe-rotated-2/);
+      }
+
+    // Undeclared names are refused without their text; a failed step keeps finished lines only.
+    const bad = await routine('bad', {
+      'routine.yaml': 'name: Bad\nsteps:\n  - run: bad.sh\n    secrets: [SLACK_TOKEN]\n',
+      'bad.sh': `#!/bin/sh
+printf 'SLACK_TOKEN=xoxe-third-33\nGH_TOKEN=ghp-should-not-1\nSLACK_TOKEN=xoxe-cut' >> "$IRORI_SECRETS_OUT"
+exit 3
+`,
+    });
+    const failed = await ended(bad, await start(bad));
+    assert.equal(failed.state, 'failed');
+    assert.equal(
+      failed.steps[0].detail,
+      '終了コード 3 · 書き戻せない行: 2 行目（GH_TOKEN は宣言されていません）',
+    );
+    assert.deepEqual(await secrets.values(['SLACK_TOKEN']), { SLACK_TOKEN: 'xoxe-third-33' });
+    assert.deepEqual((await secrets.list()).names, ['SLACK_TOKEN']);
+  },
+);
+
+test('a device without the OS keychain names it before a run', fixtureOptions, async (t) => {
+  const { routine, listed, start } = await setup(t, { keychain: false });
+  const ref = await routine('locked', {
+    'routine.yaml': 'name: Locked\nsteps: [{run: [echo, hi], secrets: [SLACK_TOKEN]}]\n',
+  });
+  assert.deepEqual((await listed(ref)).needs, {
+    text: 'この端末ではシークレットを保存できません。OS のキーチェーンが必要です。',
+  });
+  await assert.rejects(start(ref), /OS のキーチェーンが必要です/);
+});
 
 test('a run records the files each hibachi Git status shows changed', fixtureOptions, async (t) => {
   const { routine, start, ended, root, space } = await setup(t);

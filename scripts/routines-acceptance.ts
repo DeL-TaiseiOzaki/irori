@@ -11,6 +11,7 @@ import { GitService } from '../src/git/service';
 import { AgentService } from '../src/agents/service';
 import { conversationMetas } from '../tests/fixtures/conversations';
 import { RoutineService } from '../src/host/routines';
+import { SecretStore } from '../src/host/keystore';
 import type { AgentEvent, AgentId } from '../src/domain/types';
 import type { RoutineRef, RoutineRun } from '../src/domain/routines';
 
@@ -78,6 +79,8 @@ const routines = new RoutineService({
   agents,
   workspaces: () => workspaces.list(),
   settings: () => settings.read(),
+  // No step here names a secret; the store stays without a key.
+  secrets: new SecretStore(path.join(files.dataDir, 'secrets.json')),
   gitStatus: (id) => gitService.status(id),
   canStart: () => {},
   emit: () => {},

@@ -349,3 +349,27 @@
   color: var(--ink-3);
   font-size: 12px;
 }
+.routine-secrets ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routine-secrets li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.routine-secret-form h2 {
+  overflow-wrap: anywhere;
+}
+.review-secrets {
+  margin: 0;
+  font-size: 12.5px;
+}
