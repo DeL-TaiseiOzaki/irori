@@ -1354,6 +1354,9 @@ button.home-row:hover {
 .brain-sheet-space {
   flex: 1;
 }
+.brain-sheet-footer .danger {
+  color: var(--danger);
+}
 .brain-sheet-footer .solid-button {
   height: 34px;
   padding: 0 14px;

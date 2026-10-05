@@ -89,6 +89,70 @@ function Segments<T extends string>({
   );
 }
 
+/** Removes a hibachi from irori, and its folder too when the person asks for that. */
+function RemoveHibachi({
+  space,
+  onRemoved,
+  onClose,
+  beforeRemove,
+}: {
+  space: Space;
+  onRemoved: () => void;
+  onClose: () => void;
+  beforeRemove?: () => Promise<boolean>;
+}) {
+  const [trash, setTrash] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const label = t(`${space.name} を削除`, `Remove ${space.name}`);
+  async function remove() {
+    setBusy(true);
+    setError('');
+    try {
+      if (beforeRemove && !(await beforeRemove())) return;
+      await host.removeSpace(space.scopeId, trash);
+      onRemoved();
+    } catch (error) {
+      setError(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog label={label} busy={busy} onClose={onClose}>
+      <form
+        className="modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void remove();
+        }}
+      >
+        <h2>{label}</h2>
+        <p>{t('irori とワークスペースから外します。', 'It leaves irori and its workspaces.')}</p>
+        <label>
+          <input
+            type="checkbox"
+            checked={trash}
+            disabled={busy}
+            onChange={(event) => setTrash(event.target.checked)}
+          />{' '}
+          {t('フォルダもゴミ箱に移す', 'Also move the folder to the trash')}
+        </label>
+        <p className="hint mono">{space.root}</p>
+        {error && <p role="alert">{error}</p>}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={onClose}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button className="primary" disabled={busy}>
+            {t('削除', 'Remove')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 const namedLayers: NamedLayer[] = ['Knowledge_Base', 'contents'];
 const layerIcons = { Knowledge_Base: 'book', contents: 'cloud' } as const;
 
@@ -103,6 +167,7 @@ export function BrainSettings({
   onSaved,
   onClose,
   beforeRename,
+  onRemoved,
 }: {
   space: Space;
   /** The workspace's brains, for the rail preview. */
@@ -112,6 +177,8 @@ export function BrainSettings({
   onClose: () => void;
   /** Saves the open note before a folder it may be in moves; false stops the save. */
   beforeRename?: () => Promise<boolean>;
+  /** The hibachi left irori; without it, the sheet offers no removal. */
+  onRemoved?: () => void;
 }) {
   const current = brainAppearance(space);
   const [name, setName] = useState(space.name);
@@ -143,6 +210,7 @@ export function BrainSettings({
   const folderProblem = namedLayers.some((layer) => folderProblems[layer]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [removing, setRemoving] = useState(false);
   const textProblem =
     kind === 'text' && (!text.trim() || graphemes(text.trim()) > 2)
       ? t('1〜2 文字にしてください。', 'Use one or two characters.')
@@ -223,6 +291,15 @@ export function BrainSettings({
       setSaving(false);
     }
   }
+  if (removing && onRemoved)
+    return (
+      <RemoveHibachi
+        space={space}
+        beforeRemove={beforeRename}
+        onRemoved={onRemoved}
+        onClose={() => setRemoving(false)}
+      />
+    );
   const glow = { '--glow': `var(--t-${color})` } as CSSProperties;
   const others = spaces.filter((item) => item.scopeId !== space.scopeId).slice(0, 3);
   return (
@@ -463,6 +540,17 @@ export function BrainSettings({
           )}
         </div>
         <footer className="brain-sheet-footer">
+          {onRemoved && (
+            <button
+              type="button"
+              className="stage-text-button danger"
+              disabled={saving}
+              onClick={() => setRemoving(true)}
+            >
+              <Icon name="trash" size={14} />
+              {t('hibachi を削除', 'Remove hibachi')}
+            </button>
+          )}
           <span className="brain-sheet-space" />
           <button type="button" className="stage-text-button" disabled={saving} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
