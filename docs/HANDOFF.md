@@ -11,6 +11,16 @@ like the hibachi islands' `island-handle`. Its layout is saved as
   (`your-ai-ui-smoke` drags the handle and finds the saved layout). The whole
   `npm run test:ui` and `npm test` were not run for this renderer-only change.
 
+Published 2026-10-05: **0.1.73** (#172, removing a hibachi) is merged at the
+owner's request and published as
+[v0.1.73-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.73-preview.1)
+by release run `37296627070` from main's successful CI run `37295341200`
+(source `32ca15c`). The release carries Windows 174,688,768 bytes, Mac
+140,342,561 bytes and `irori-0.1.73-full.nupkg` 173,855,723 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: moving a folder to a real system
+trash, on the installed Windows and Mac builds.
+
 Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
 owner's request and published as
 [v0.1.72-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.72-preview.1)
