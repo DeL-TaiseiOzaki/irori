@@ -169,6 +169,7 @@ export const hostArguments = {
       category: z.enum(['personal', 'team', 'organization']),
     }),
   ]),
+  removeSpace: z.tuple([id, z.boolean()]),
   updateSpace: z.tuple([
     id,
     z

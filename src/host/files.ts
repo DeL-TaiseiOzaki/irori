@@ -239,6 +239,20 @@ export class FileService {
     });
   }
   /**
+   * Takes a hibachi off this device's list. Its folder and `.irori/scope.json`
+   * stay as they are, so registering the folder again brings the same hibachi back.
+   */
+  async unregister(id: string): Promise<Space> {
+    return this.queue.run(async () => {
+      const s = this.get(id);
+      const bindings = this.bindings.filter((b) => b.scopeId !== id);
+      await writeLocalJson(path.join(this.dataDir, 'spaces.json'), bindings);
+      this.bindings = bindings;
+      this.spaces = this.spaces.filter((item) => item.scopeId !== id);
+      return s;
+    });
+  }
+  /**
    * Changes a brain's name, category or look in its `.irori/scope.json`, keeping
    * every other field of the file as written — another tool's or a later
    * version's included. The write replaces the file atomically.

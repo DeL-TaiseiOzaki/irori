@@ -90,6 +90,15 @@ export class TerminalService {
       /* The process may already have exited. */
     }
   }
+  /** Closes the terminals open in a hibachi, before it is removed. */
+  async closeScope(scopeId: string) {
+    await this.queue.run(async () => {
+      const ids = [...this.running.values()]
+        .filter((session) => session.info.scopeId === scopeId)
+        .map((session) => session.info.id);
+      await Promise.all(ids.map((id) => this.close(id)));
+    });
+  }
   async closeAll() {
     await this.queue.run(async () => {
       await Promise.all([...this.running.keys()].map((id) => this.close(id)));
