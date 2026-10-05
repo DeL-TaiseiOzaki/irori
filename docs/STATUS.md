@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-In review 2026-10-05: **0.1.74** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
+In review 2026-10-05: **0.1.75** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
 routines in the rail) is open and not merged. Routines has a dedicated button
 between irori mode and the hibachis, its own heading, the device's JavaScript
 setting, secrets and the existing run/review/history controls. The agent panel
@@ -23,7 +23,7 @@ charcoal cycle arrows and an orange flame, with the source and prompts in
   routines, brain-settings (including removal), overview and dock UI smokes passed.
 - Not verified: installed Windows/macOS builds or real CLI inference. CI was
   still running when this record was written. The branch now includes the hibachi removal merged in #172;
-  the resizable irori agent PR #171 stays separate. No routines merge or
+  the resizable irori agent PR #171 has now also merged on main. No routines merge or
   publication has been performed yet.
 
 Removing a hibachi, 2026-10-05 (**0.1.73**): the owner asked how to delete a
