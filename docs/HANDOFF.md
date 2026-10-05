@@ -21,10 +21,27 @@ charcoal cycle arrows and an orange flame, with the source and prompts in
 - After merging main at `32ca15c` into this branch, `npm run build`,
   `npm test` (424 tests; 420 passed, 4 skipped), `npm run format:check` and the
   routines, brain-settings (including removal), overview and dock UI smokes passed.
+- After merging main at `0287359`, build, unit tests (424 tests; 420 passed,
+  4 skipped), format and the routines, your-ai, overview, dock and brain-settings
+  UI smokes passed. Routines now checks dragging the shared agent pane and
+  retaining its width across visits to columns. Version 0.1.75 follows main's
+  resizable-agent release 0.1.74.
 - Not verified: installed Windows/macOS builds or real CLI inference. CI was
-  still running when this record was written. The branch now includes the hibachi removal merged in #172;
-  the resizable irori agent PR #171 has now also merged on main. No routines merge or
-  publication has been performed yet.
+  still running when this record was written. The branch includes hibachi removal
+  (#172) and the resizable irori agent (#171), both now merged on main.
+  No routines merge or publication has been performed yet.
+
+Merged 2026-10-05: **0.1.74** (#171, resizable irori agent), awaiting
+preview publication when this record was written. In irori mode the AI island beside the map and the routines was a
+fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
+300px; the map side keeps at least 360px). The handle is the 8px gap, styled
+like the hibachi islands' `island-handle`. Its layout is saved as
+`irori-overview` with the other device layouts.
+- Verified: `npm run build`, `npm run format:check`, and the `your-ai`,
+  `overview`, `routines` and `dock` UI smokes under `xvfb-run`
+  (`your-ai-ui-smoke` drags the handle and finds the saved layout). The whole
+  `npm run test:ui` and `npm test` were not run for this renderer-only change.
+
 
 Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
 owner's request and published as

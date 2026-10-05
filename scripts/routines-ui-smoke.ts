@@ -157,6 +157,22 @@ try {
     'true',
   );
   await routinesButton.click();
+  // Routines keeps the shared agent's resizable pane across the columns layout.
+  const agentPanel = page.getByRole('complementary', { name: 'irori agent' });
+  const narrow = (await agentPanel.boundingBox())!.width;
+  const handle = (await page.getByRole('separator', { name: 'エージェントの幅' }).boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x - 160, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await agentPanel.boundingBox())!.width)
+    .toBeGreaterThan(narrow + 120);
+  await modeButton.click();
+  await routinesButton.click();
+  await expect
+    .poll(async () => (await agentPanel.boundingBox())!.width)
+    .toBeGreaterThan(narrow + 120);
   // Rail search from routines covers the workspace, as irori mode's does.
   await rail.getByRole('button', { name: /^検索/ }).click();
   await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();
