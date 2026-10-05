@@ -63,10 +63,9 @@ directory and in the window's state.
 
 - The irori agent can carry the journey from a list of repositories to a
   workspace of hibachis with their cloud folders, and report what failed.
-- `new-hibachi` creates a GitHub repository from
-  `DeL-TaiseiOzaki/irori-templete` with `gh repo create --template`, which
-  needs that repository marked as a template on GitHub. Until it is, the skill
-  falls back to `irori create` and `gh repo create --source`.
+- `new-hibachi` starts a hibachi with `irori create` and, when the person wants,
+  puts it on GitHub with `gh repo create --source`. It does not use
+  `irori-templete`: the owner decided on 2026-10-05 not to use the template yet.
 - A hibachi registered during a request is handed to the irori agent from the
   next request; in the same request its folder is reachable only through the
   shell.

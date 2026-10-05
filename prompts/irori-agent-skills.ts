@@ -72,24 +72,16 @@ and suggest a next step, such as reading each hibachi's AGENTS.md.
   ),
   'new-hibachi': skill(
     'new-hibachi',
-    'Starts a new hibachi, on GitHub from the irori template or as a local folder. Use when the person wants a knowledge base that does not exist yet.',
+    'Starts a new hibachi with irori create, and puts it on GitHub when the person wants. Use when the person wants a knowledge base that does not exist yet.',
     `
 # Start a new hibachi
 
 Ask for its name and whether it should be on GitHub (private unless the
 person says public), and whose account or organization owns it.
 
-On GitHub, from the irori template, which gives the hibachi its knowledge
-folders and agent conventions:
-
-1. \`gh repo create <owner>/<name> --private --template DeL-TaiseiOzaki/irori-templete\`
-2. \`irori clone <owner>/<name>\`
-
-If GitHub refuses the template, or the person wants no GitHub repository:
-
 1. \`irori create <folder name> --name <hibachi name>\`. It makes the folder a
    Git repository on main with a first commit.
-2. To put it on GitHub later:
+2. On GitHub too, when the person wants it:
    \`gh repo create <owner>/<name> --private --source <folder> --remote origin --push\`
 
 Report the hibachi's folder and its GitHub repository, if any.

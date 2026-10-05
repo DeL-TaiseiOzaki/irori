@@ -33,9 +33,10 @@ skills already in place.
   failure on `main`; it passed on the others.
 - Not verified: real CLIs running the command (PATH and environment kept by
   their shell tools; Codex's sandbox and the loopback connection), a real
-  GitHub clone, installed Windows/macOS builds. `new-hibachi`'s
-  `gh repo create --template` needs `irori-templete` marked as a template
-  repository; until then the skill falls back to `irori create`.
+  GitHub clone, installed Windows/macOS builds. `new-hibachi` uses
+  `irori create` and `gh repo create --source`, not `irori-templete` (owner:
+  the template is not used yet).
+
 Published 2026-10-05: **0.1.70** (#165, layer names) is merged at the owner's
 request and published as
 [v0.1.70-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.70-preview.1)

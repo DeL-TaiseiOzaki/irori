@@ -304,8 +304,7 @@ agent sets up the person's hibachis.
 
 - **The `irori` command is unverified on real CLIs.** Whether each CLI's shell
   tool keeps irori's `PATH` and `IRORI_COMMAND`, and whether Codex's sandbox in
-  the standard mode allows its loopback connection, are unverified. A real
-  `gh repo create --template` needs `irori-templete` marked as a template.
+  the standard mode allows its loopback connection, are unverified.
 
 - **Unverified on real CLIs:** the owner verifies real CLIs himself. Not run: a
   real Claude Code irori agent in `bypassPermissions` (the hook and inheritance
