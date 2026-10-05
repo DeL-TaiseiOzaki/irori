@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import {
+  Group as PaneGroup,
+  Panel as Pane,
+  Separator as PaneSeparator,
+  useDefaultLayout,
+} from 'react-resizable-panels';
 import { knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
@@ -8,6 +14,7 @@ import { t } from '../domain/i18n';
 import { AgentRequest, eventTarget } from './AgentLog';
 import { firstEntries } from './BrainHome';
 import { BrainTile } from './BrainTile';
+import { layoutStorage } from './device-settings';
 import { Icon } from './Icon';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { shortcut } from './shortcuts';
@@ -789,6 +796,18 @@ export function Overview({
     onResume: reread(actions.onResume),
     onStop: reread(actions.onStop),
   };
+  // The AI island beside the map and the routines is as wide as the person drags it.
+  const beside = view !== 'columns' && !!spaces.length;
+  const panes = useMemo(
+    () => (beside ? ['overview-main', 'overview-ai'] : ['overview-main']),
+    [beside],
+  );
+  const layout = useDefaultLayout({
+    id: 'irori-overview',
+    panelIds: panes,
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
   return (
     <div
       className={`overview chrome ${view} ${scene ? `level-${scene.kind}` : ''}`}
@@ -821,204 +840,219 @@ export function Overview({
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
       )}
-      <div className="overview-main">
-        <header className="overview-header">
-          <h1>{t('irori mode', 'irori mode')}</h1>
-          <span className="overview-sub">
-            {workspace.name} ·{' '}
-            {t(
-              `${spaces.length} hibachi`,
-              `${spaces.length} hibachi${spaces.length === 1 ? '' : 's'}`,
-            )}
-          </span>
-          <MagnetTabs
-            className="overview-views"
-            label={t('irori mode の表示', 'irori mode layout')}
-            value={view}
-            onValueChange={onView}
-            options={[
-              {
-                value: 'map',
-                label: (
-                  <>
-                    <Icon name="map" size={14} /> {t('地図', 'Map')}
-                  </>
-                ),
-              },
-              {
-                value: 'columns',
-                label: (
-                  <>
-                    <Icon name="columns" size={14} /> {t('並列', 'Columns')}
-                  </>
-                ),
-              },
-              {
-                value: 'routines',
-                label: (
-                  <>
-                    <Icon name="routine" size={14} /> {t('ルーティン', 'Routines')}
-                  </>
-                ),
-              },
-            ]}
-          />
-          <span className="overview-space" />
-          <button
-            className="overview-search"
-            disabled={!spaces.length}
-            onClick={onSearch}
-            aria-label={t(
-              `hibachi を検索（${shortcut('K')}）`,
-              `Search hibachis (${shortcut('K')})`,
-            )}
-          >
-            <Icon name="search" size={15} />
-            <span>{t('hibachi を検索', 'Search hibachis')}</span>
-            <kbd>{shortcut('K')}</kbd>
-          </button>
-          <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>
-            <Icon name="plus" size={14} />
-            {t('hibachi を追加', 'Add a hibachi')}
-          </button>
-        </header>
-        {!spaces.length ? (
-          <div className="overview-empty">
-            <p>
+      <PaneGroup
+        className="overview-panes"
+        orientation="horizontal"
+        defaultLayout={layout.defaultLayout}
+        onLayoutChanged={layout.onLayoutChanged}
+      >
+        <Pane id="overview-main" className="overview-main" minSize={360}>
+          <header className="overview-header">
+            <h1>{t('irori mode', 'irori mode')}</h1>
+            <span className="overview-sub">
+              {workspace.name} ·{' '}
               {t(
-                'このワークスペースに hibachi がありません。',
-                'This workspace has no hibachi yet.',
+                `${spaces.length} hibachi`,
+                `${spaces.length} hibachi${spaces.length === 1 ? '' : 's'}`,
               )}
-            </p>
-          </div>
-        ) : view === 'map' ? (
-          <OverviewMap
-            spaces={spaces}
-            ais={ais}
-            refresh={revision}
-            you={you}
-            yourAi={yourAi}
-            onShowYou={onShowYou}
-            onEnter={actions.onEnter}
-          />
-        ) : view === 'columns' ? (
-          <OverviewColumns
-            spaces={spaces}
-            ais={ais}
-            agentFor={agentFor}
-            hibachiAgent={hibachiAgent}
-            revision={revision}
-            onConnect={onConnect}
-            {...shared}
-          />
-        ) : (
-          <RoutinesView
-            workspaceId={workspace.id}
-            spaces={spaces}
-            you={you}
-            revision={revision}
-            choices={routineChoices}
-            onOpenConversation={(conversation) => {
-              if (conversation.conversationId)
-                onShowConversation(
-                  conversation.scopeId,
-                  conversation.conversationId,
-                  conversation.agent,
-                );
-              const space = spaces.find((item) => item.scopeId === conversation.scopeId);
-              if (space) actions.onEnter(space, { ai: true });
-              else setIsland('you');
-            }}
-            onError={actions.onError}
-          />
-        )}
-      </div>
-      {view !== 'columns' && !!spaces.length && (
-        <aside
-          className="overview-ai chrome"
-          aria-label={
-            island === 'you'
-              ? t('irori agent', 'irori agent')
-              : t('hibachi agent', 'hibachi agents')
-          }
-        >
-          {hibachiAgent && (
+            </span>
             <MagnetTabs
-              className="overview-island-tabs"
-              label={t('irori mode の AI', 'AIs in irori mode')}
-              value={island}
-              onValueChange={setIsland}
+              className="overview-views"
+              label={t('irori mode の表示', 'irori mode layout')}
+              value={view}
+              onValueChange={onView}
               options={[
-                { value: 'you', label: t('irori agent', 'irori agent') },
-                { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
+                {
+                  value: 'map',
+                  label: (
+                    <>
+                      <Icon name="map" size={14} /> {t('地図', 'Map')}
+                    </>
+                  ),
+                },
+                {
+                  value: 'columns',
+                  label: (
+                    <>
+                      <Icon name="columns" size={14} /> {t('並列', 'Columns')}
+                    </>
+                  ),
+                },
+                {
+                  value: 'routines',
+                  label: (
+                    <>
+                      <Icon name="routine" size={14} /> {t('ルーティン', 'Routines')}
+                    </>
+                  ),
+                },
               ]}
             />
-          )}
-          {island === 'you' ? (
-            <YourAiPanel
+            <span className="overview-space" />
+            <button
+              className="overview-search"
+              disabled={!spaces.length}
+              onClick={onSearch}
+              aria-label={t(
+                `hibachi を検索（${shortcut('K')}）`,
+                `Search hibachis (${shortcut('K')})`,
+              )}
+            >
+              <Icon name="search" size={15} />
+              <span>{t('hibachi を検索', 'Search hibachis')}</span>
+              <kbd>{shortcut('K')}</kbd>
+            </button>
+            <button className="panel-button overview-add" disabled={addDisabled} onClick={onAdd}>
+              <Icon name="plus" size={14} />
+              {t('hibachi を追加', 'Add a hibachi')}
+            </button>
+          </header>
+          {!spaces.length ? (
+            <div className="overview-empty">
+              <p>
+                {t(
+                  'このワークスペースに hibachi がありません。',
+                  'This workspace has no hibachi yet.',
+                )}
+              </p>
+            </div>
+          ) : view === 'map' ? (
+            <OverviewMap
+              spaces={spaces}
+              ais={ais}
+              refresh={revision}
               you={you}
-              brains={spaces}
-              ai={yourAi}
-              agent={yourAgent}
-              model={yourModel}
-              access={yourAccess}
-              onAgent={onYourAgent}
-              onModel={onYourModel}
-              onAccess={onYourAccess}
-              conversationId={yourConversation}
-              onOpenConversation={(row) => onShowConversation(you!.id, row.id, row.agent)}
-              onDeletedConversation={(id) => {
-                if (id === yourConversation) onShowConversation(you!.id, null, yourAgent);
-              }}
-              onNew={onYourNew}
-              onCreate={onCreateYou}
-              onShow={onShowYou}
-              onSend={reread(onSendYou)}
-              onStop={reread(onStopYou)}
-              onError={actions.onError}
+              yourAi={yourAi}
+              onShowYou={onShowYou}
+              onEnter={actions.onEnter}
+            />
+          ) : view === 'columns' ? (
+            <OverviewColumns
+              spaces={spaces}
+              ais={ais}
+              agentFor={agentFor}
+              hibachiAgent={hibachiAgent}
+              revision={revision}
+              onConnect={onConnect}
+              {...shared}
             />
           ) : (
-            <>
-              <header className="overview-ai-head">
-                <span className="overview-orb" aria-hidden="true">
-                  <Icon name="sparkles" size={15} strokeWidth={2.1} />
-                </span>
-                <span>
-                  <strong>{t('hibachi agent', 'hibachi agents')}</strong>
-                  <small>
-                    {running || waiting
-                      ? [
-                          running && t(`実行中 ${running}`, `${running} running`),
-                          waiting && t(`許可待ち ${waiting}`, `${waiting} need approval`),
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')
-                      : t('すべて待機中', 'All idle')}
-                  </small>
-                </span>
-              </header>
-              <div className="overview-ai-list">
-                {spaces.map((space) => (
-                  <AiCard
-                    key={space.scopeId}
-                    space={space}
-                    ai={ais[space.scopeId] ?? idle}
-                    agent={agentFor(space.scopeId)}
-                    named
-                    {...shared}
-                  />
-                ))}
-              </div>
-              <OverviewComposer
-                spaces={spaces}
-                ais={ais}
-                agentFor={agentFor}
-                onSend={reread(onSend)}
-              />
-            </>
+            <RoutinesView
+              workspaceId={workspace.id}
+              spaces={spaces}
+              you={you}
+              revision={revision}
+              choices={routineChoices}
+              onOpenConversation={(conversation) => {
+                if (conversation.conversationId)
+                  onShowConversation(
+                    conversation.scopeId,
+                    conversation.conversationId,
+                    conversation.agent,
+                  );
+                const space = spaces.find((item) => item.scopeId === conversation.scopeId);
+                if (space) actions.onEnter(space, { ai: true });
+                else setIsland('you');
+              }}
+              onError={actions.onError}
+            />
           )}
-        </aside>
-      )}
+        </Pane>
+        {beside && (
+          <>
+            <PaneSeparator
+              className="island-handle"
+              aria-label={t('エージェントの幅', 'Agents width')}
+            />
+            <Pane id="overview-ai" className="overview-ai-pane" defaultSize={360} minSize={300}>
+              <aside
+                className="overview-ai chrome"
+                aria-label={
+                  island === 'you'
+                    ? t('irori agent', 'irori agent')
+                    : t('hibachi agent', 'hibachi agents')
+                }
+              >
+                {hibachiAgent && (
+                  <MagnetTabs
+                    className="overview-island-tabs"
+                    label={t('irori mode の AI', 'AIs in irori mode')}
+                    value={island}
+                    onValueChange={setIsland}
+                    options={[
+                      { value: 'you', label: t('irori agent', 'irori agent') },
+                      { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
+                    ]}
+                  />
+                )}
+                {island === 'you' ? (
+                  <YourAiPanel
+                    you={you}
+                    brains={spaces}
+                    ai={yourAi}
+                    agent={yourAgent}
+                    model={yourModel}
+                    access={yourAccess}
+                    onAgent={onYourAgent}
+                    onModel={onYourModel}
+                    onAccess={onYourAccess}
+                    conversationId={yourConversation}
+                    onOpenConversation={(row) => onShowConversation(you!.id, row.id, row.agent)}
+                    onDeletedConversation={(id) => {
+                      if (id === yourConversation) onShowConversation(you!.id, null, yourAgent);
+                    }}
+                    onNew={onYourNew}
+                    onCreate={onCreateYou}
+                    onShow={onShowYou}
+                    onSend={reread(onSendYou)}
+                    onStop={reread(onStopYou)}
+                    onError={actions.onError}
+                  />
+                ) : (
+                  <>
+                    <header className="overview-ai-head">
+                      <span className="overview-orb" aria-hidden="true">
+                        <Icon name="sparkles" size={15} strokeWidth={2.1} />
+                      </span>
+                      <span>
+                        <strong>{t('hibachi agent', 'hibachi agents')}</strong>
+                        <small>
+                          {running || waiting
+                            ? [
+                                running && t(`実行中 ${running}`, `${running} running`),
+                                waiting && t(`許可待ち ${waiting}`, `${waiting} need approval`),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')
+                            : t('すべて待機中', 'All idle')}
+                        </small>
+                      </span>
+                    </header>
+                    <div className="overview-ai-list">
+                      {spaces.map((space) => (
+                        <AiCard
+                          key={space.scopeId}
+                          space={space}
+                          ai={ais[space.scopeId] ?? idle}
+                          agent={agentFor(space.scopeId)}
+                          named
+                          {...shared}
+                        />
+                      ))}
+                    </div>
+                    <OverviewComposer
+                      spaces={spaces}
+                      ais={ais}
+                      agentFor={agentFor}
+                      onSend={reread(onSend)}
+                    />
+                  </>
+                )}
+              </aside>
+            </Pane>
+          </>
+        )}
+      </PaneGroup>
     </div>
   );
 }

@@ -90,6 +90,19 @@ try {
   ).toContain('name: irori-setup');
   const map = page.getByRole('region', { name: 'hibachi の地図' });
   await expect(map.getByRole('button', { name: 'irori agent の Schema を開く' })).toBeVisible();
+  // The island beside the map widens by its handle, and keeps that width on the device.
+  const narrow = (await island.boundingBox())!.width;
+  const handle = (await page.getByRole('separator', { name: 'エージェントの幅' }).boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x - 160, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await island.boundingBox())!.width).toBeGreaterThan(narrow + 120);
+  await expect
+    .poll(async () =>
+      Object.keys((await page.evaluate(() => window.irori.deviceSettings())).layouts),
+    )
+    .toContainEqual(expect.stringContaining('irori-overview'));
 
   // Before any hand-off the Your AI screen says irori writes the definitions;
   // one the person already wrote is kept as it is.
@@ -338,7 +351,7 @@ try {
   expect(lab?.scopeIds.length).toBe(3);
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its hibachi agent with the hibachi command, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its hibachi agent with the hibachi command, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, and the irori agent island widened by its handle. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();
