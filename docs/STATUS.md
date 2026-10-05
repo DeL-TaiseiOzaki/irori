@@ -1,7 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
-In review 2026-10-05: **0.1.72** (#169, routine secrets) is open and not
-merged. It is ADR 016 stage 2, after the
+Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
+owner's request and published as
+[v0.1.72-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.72-preview.1)
+by release run `37283036702` from main's successful CI run `37281943491`
+(source `ad0f325`). The release carries Windows 174,687,232 bytes, Mac
+140,314,782 bytes and `irori-0.1.72-full.nupkg` 173,855,977 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: the installed builds with a real
+OS keychain (macOS Keychain, Windows DPAPI) and a real token-refreshing routine.
+
+Routine secrets, 2026-10-05 (**0.1.72**, ADR 016 stage 2). It follows the
 [secrets spike](research/spike-external-tool-credentials.md) and the owner's
 three answers: refuse on a device without an OS-held key, write-back in stage
 2, and agent-side Slack/Teams left to each CLI's own MCP sign-in.
