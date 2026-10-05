@@ -1,4 +1,4 @@
-/* irori mode's routines: each owner's routines, their steps, runs and review. */
+/* The routines page: device settings, each owner's routines, steps, runs and review. */
 
 .routines-view {
   flex: 1;
@@ -16,6 +16,31 @@
   margin: 0;
   color: var(--tx-3);
   font-size: 12.5px;
+}
+.routine-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hair);
+}
+.routine-settings h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx-2);
+}
+.routine-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tx-2);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.routine-settings input {
+  accent-color: var(--ember);
 }
 .routines-empty {
   margin: auto;

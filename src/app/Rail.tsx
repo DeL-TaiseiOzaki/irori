@@ -11,7 +11,7 @@ import {
   ungroup,
 } from '../domain/hibachi-groups';
 import { t } from '../domain/i18n';
-import { appIcon, iroriModeIcon } from './branding';
+import { appIcon, iroriModeIcon, routinesIcon } from './branding';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
@@ -30,12 +30,13 @@ export function aiStateWords(state: BrainAiState) {
 /**
  * The workspace's brains in their owner's order, some gathered into named
  * groups that open and close, with the way back to the workspace choice, the
- * Overview, adding a brain, search and settings.
+ * Overview, routines, adding a brain, search and settings.
  */
 export function Rail({
   spaces,
   activeId,
   overview,
+  routines,
   aiState,
   locked,
   homeDisabled,
@@ -43,6 +44,7 @@ export function Rail({
   searchDisabled,
   onHome,
   onOverview,
+  onRoutines,
   onSelect,
   onAdd,
   onSearch,
@@ -54,6 +56,8 @@ export function Rail({
   activeId?: string;
   /** The Overview is on show instead of a brain. */
   overview: boolean;
+  /** The workspace's routines are on show. */
+  routines: boolean;
   aiState: (scopeId: string) => BrainAiState;
   /** Another brain cannot be chosen now (a send or a connection is in progress). */
   locked: boolean;
@@ -62,6 +66,7 @@ export function Rail({
   searchDisabled: boolean;
   onHome: () => void;
   onOverview: () => void;
+  onRoutines: () => void;
   onSelect: (space: Space) => void;
   onAdd: () => void;
   onSearch: () => void;
@@ -163,6 +168,20 @@ export function Rail({
         </button>
         <span className="rail-label" aria-hidden="true">
           {t('irori mode', 'irori mode')}
+        </span>
+      </div>
+      <div className={`rail-slot ${routines ? 'active' : ''}`}>
+        {routines && <span className="rail-bar" aria-hidden="true" />}
+        <button
+          className="rail-button rail-routines"
+          aria-label={t('ルーティン', 'Routines')}
+          aria-current={routines ? 'page' : undefined}
+          onClick={onRoutines}
+        >
+          <img src={routinesIcon} alt="" width="40" height="40" />
+        </button>
+        <span className="rail-label" aria-hidden="true">
+          {t('ルーティン', 'Routines')}
         </span>
       </div>
       <span className="rail-rule" aria-hidden="true" />

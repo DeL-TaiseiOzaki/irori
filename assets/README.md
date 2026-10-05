@@ -7,3 +7,12 @@ The app/website branding and favicons, Electron window/Dock and VM viewer share 
 # irori mode icon
 
 `irori-mode-icon.png` (2048 × 2048, RGBA) is the rail mark for irori mode, made from the user's `irori-agent-mode.png` (1254 × 1254). The artwork was upscaled with Real-ESRGAN (`RealESRGAN_x4plus`), and its ragged background-removal edge was replaced: the tile takes `irori-icon.png`'s own silhouette and transparent surround, with the same top-lit falloff carried onto the white tile. `irori-mode-icon-256.png` is the size the renderer bundles.
+
+# Routines icon
+
+`irori-routines-icon.png` (1254 × 1254, RGBA) is the dedicated routines rail
+mark, generated with GPT Image using the Home and irori mode icons as style
+references: folded charcoal cycle arrows around an orange flame on an ivory
+tile. `irori-routines-icon-256.png` is its resampled renderer asset, displayed
+at 40 CSS pixels with a smooth rounded-square clip. The original artwork,
+references and prompts are recorded in [the generation notes](irori-routines-icon-prompt.md).
