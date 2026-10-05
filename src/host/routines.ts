@@ -15,6 +15,7 @@ import { within } from '../domain/scopes';
 import {
   lineDiff,
   routineKey,
+  secretName,
   routineRef,
   routineRunStates,
   routineStepStates,
@@ -32,6 +33,7 @@ import {
 import type { AgentService, StepEnd } from '../agents/service';
 import { agentEnv, killTree, launch } from '../agents/process';
 import { readLocalJson, writeLocalJson } from './local-json';
+import { readWriteBack, Redactor, unavailableText, type SecretStore } from './keystore';
 import type { FileService } from './files';
 import type { YourAiService } from './you';
 import { stepPreamble } from '../../prompts';
@@ -44,6 +46,8 @@ const textLimit = 256 * 1024;
 /** Texts kept with a review, so the next one can show what changed. */
 const keptTextLimit = 1024 * 1024;
 const outputLimit = 16 * 1024;
+/** The most a step may write back to `IRORI_SECRETS_OUT`. */
+const writeBackLimit = 64 * 1024;
 const keptRuns = 20;
 const javascript = ['.js', '.mjs', '.cjs'];
 /** Files the system writes into folders it shows, never run by a routine. */
@@ -73,10 +77,7 @@ const runStep = z
         .max(64)
         .refine((argv) => commandName.safeParse(argv[0]).success),
     ]),
-    secrets: z
-      .array(z.string().regex(/^[A-Z_][A-Z0-9_]{0,63}$/))
-      .max(20)
-      .optional(),
+    secrets: z.array(secretName).min(1).max(20).optional(),
   })
   .strict();
 const agentStep = z
@@ -268,6 +269,11 @@ function handed(spec: 'all' | string[] | undefined, workspace: Space[]) {
   return { scopeIds: [...scopeIds] };
 }
 
+/** The secrets a routine's `run` steps name, each once. */
+function secretsOf(steps: RoutineStep[]) {
+  return [...new Set(steps.flatMap((step) => (step.kind === 'run' && step.secrets) || []))];
+}
+
 const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
 const message = (error: unknown) =>
@@ -377,6 +383,8 @@ interface Active {
   workspace: Space[];
   input: RunRoutine;
   abort: AbortController;
+  /** Hides the values this run handed out or got back from its record. */
+  redactor: Redactor;
   finished?: Promise<void>;
   timer?: NodeJS.Timeout;
 }
@@ -389,6 +397,8 @@ export interface RoutineHost {
   workspaces: () => Promise<WorkspaceProfile[]>;
   settings: () => Promise<DeviceSettings>;
   gitStatus: (scopeId: string) => Promise<GitStatus>;
+  /** The device's secrets, handed to the `run` steps that name them (D5). */
+  secrets: SecretStore;
   /** Throws while Git, a save or a cloud connection keeps agents from starting. */
   canStart: () => void;
   emit: (run: RoutineRun) => void;
@@ -425,6 +435,7 @@ export class RoutineService {
    */
   async init() {
     await fs.rm(path.join(this.dir, 'work'), { recursive: true, force: true });
+    await fs.rm(path.join(this.dir, 'out'), { recursive: true, force: true });
     const runs = path.join(this.dir, 'runs');
     for (const folder of await fs.readdir(runs).catch(() => [])) {
       for (const name of await fs.readdir(path.join(runs, folder)).catch(() => [])) {
@@ -558,10 +569,22 @@ export class RoutineService {
   private async needs(steps: RoutineStep[], workspace: Space[], settings: DeviceSettings) {
     const env = agentEnv();
     const searchPath = Object.entries(env).find(([key]) => key.toLowerCase() === 'path')?.[1];
+    const named = secretsOf(steps);
+    if (named.length) {
+      const stored = await this.host.secrets.list();
+      if (!stored.available) return { text: unavailableText() };
+      const missing = named.filter((name) => !stored.names.includes(name));
+      if (missing.length)
+        return {
+          text: t(
+            `シークレット ${missing.join(', ')} がありません。`,
+            `Needs the secret ${missing.join(', ')}.`,
+          ),
+          secrets: missing,
+        };
+    }
     for (const step of steps) {
       if (step.kind === 'run') {
-        if (step.secrets?.length)
-          return { text: t('シークレットはまだ使えません。', 'Secrets are not available yet.') };
         if (Array.isArray(step.run)) {
           if (!(await which(step.run[0], { nothrow: true, path: searchPath })))
             return {
@@ -687,6 +710,7 @@ export class RoutineService {
       digest: found.digest,
       confirmedBefore: !!reviewed,
       files,
+      secrets: secretsOf(found.steps),
       problem: found.problem,
     };
   }
@@ -744,6 +768,7 @@ export class RoutineService {
         workspace,
         input,
         abort: new AbortController(),
+        redactor: new Redactor(),
       };
       const runs = [run, ...(await this.runs(ref))];
       for (const old of runs.splice(keptRuns))
@@ -838,7 +863,7 @@ export class RoutineService {
           else await this.agent(active, step, record, env, index);
         } catch (error) {
           record.state = 'failed';
-          record.detail = message(error);
+          record.detail = active.redactor.hide(message(error));
         }
         record.endedAt = now();
         await this.save(active);
@@ -868,8 +893,12 @@ export class RoutineService {
       this.active.delete(key);
     }
   }
-  /** Runs a `run` step; true when it printed `{"continue": false}` last. */
-  private program(
+  /**
+   * Runs a `run` step; true when it printed `{"continue": false}` last. Only
+   * this step receives the secrets it names, with a fresh private file to write
+   * new values to (D5); the file is read once the program has ended.
+   */
+  private async program(
     active: Active,
     step: Extract<RoutineStep, { kind: 'run' }>,
     record: RoutineStepRun,
@@ -877,11 +906,70 @@ export class RoutineService {
   ) {
     const env: NodeJS.ProcessEnv = { ...agentEnv(), ...vars };
     delete env.ELECTRON_RUN_AS_NODE;
+    let back: string | undefined;
+    if (step.secrets) {
+      const values = await this.host.secrets.values(step.secrets);
+      for (const value of Object.values(values)) active.redactor.add(value);
+      Object.assign(env, values);
+      // Outside IRORI_WORK, which agent steps are given.
+      const dir = path.join(this.dir, 'out', randomUUID());
+      await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+      back = path.join(dir, 'values');
+      await fs.writeFile(back, '', { mode: 0o600, flag: 'wx' });
+      env.IRORI_SECRETS_OUT = back;
+    }
+    try {
+      const nothing = await this.spawn(active, step, record, env, vars.IRORI_ROUTINE);
+      if (back) await this.writeBack(active, step.secrets!, record, back);
+      return nothing && record.state === 'succeeded';
+    } finally {
+      if (back) await fs.rm(path.dirname(back), { recursive: true, force: true });
+    }
+  }
+  /** Keeps what a step wrote to `IRORI_SECRETS_OUT`; a refused line fails the step. */
+  private async writeBack(
+    active: Active,
+    declared: string[],
+    record: RoutineStepRun,
+    file: string,
+  ) {
+    const stat = await fs.lstat(file).catch(() => undefined);
+    // A step that removed or replaced the file wrote nothing back.
+    if (!stat?.isFile() || !stat.size) return;
+    if (stat.size > writeBackLimit) {
+      record.state = 'failed';
+      record.detail = t('書き戻しが 64 KiB を超えています。', 'The write-back exceeds 64 KiB.');
+      return;
+    }
+    const written = readWriteBack(
+      await fs.readFile(file, 'utf8'),
+      declared,
+      record.state === 'succeeded',
+    );
+    for (const value of Object.values(written.values)) active.redactor.add(value);
+    record.output = active.redactor.hide(record.output);
+    if (Object.keys(written.values).length) await this.host.secrets.update(written.values);
+    if (written.refused.length) {
+      record.state = 'failed';
+      const refused = t(
+        `書き戻せない行: ${written.refused.join(', ')}`,
+        `Not written back: ${written.refused.join(', ')}`,
+      );
+      record.detail = record.detail ? `${record.detail} · ${refused}` : refused;
+    }
+  }
+  private spawn(
+    active: Active,
+    step: Extract<RoutineStep, { kind: 'run' }>,
+    record: RoutineStepRun,
+    env: NodeJS.ProcessEnv,
+    folder: string,
+  ) {
     let command: string;
     let args: string[];
     if (Array.isArray(step.run)) [command, ...args] = step.run;
     else {
-      const file = path.join(vars.IRORI_ROUTINE, step.run);
+      const file = path.join(folder, step.run);
       if (javascript.includes(path.extname(file).toLowerCase())) {
         command = this.host.runtime ?? process.execPath;
         args = [file];
@@ -896,6 +984,8 @@ export class RoutineService {
       const child = launch(command, args, active.owner.root, env);
       const out = new StringDecoder('utf8');
       const err = new StringDecoder('utf8');
+      const shownOut = active.redactor.stream();
+      const shownErr = active.redactor.stream();
       let stdout = '';
       const append = (text: string) => {
         if (!text) return;
@@ -909,9 +999,9 @@ export class RoutineService {
       child.stdout!.on('data', (bytes: Buffer) => {
         const text = out.write(bytes);
         stdout = (stdout + text).slice(-8192);
-        append(text);
+        append(shownOut.write(text));
       });
-      child.stderr!.on('data', (bytes: Buffer) => append(err.write(bytes)));
+      child.stderr!.on('data', (bytes: Buffer) => append(shownErr.write(err.write(bytes))));
       child.stdin?.on('error', () => {});
       child.stdin?.end();
       const stop = () => void killTree(child);
@@ -921,7 +1011,7 @@ export class RoutineService {
         if (settled) return;
         settled = true;
         signal.removeEventListener('abort', stop);
-        append(out.end() + err.end());
+        append(shownOut.end(out.end()) + shownErr.end(err.end()));
         record.state = signal.aborted ? 'stopped' : state;
         if (detail && !signal.aborted) record.detail = detail;
         resolve(nothing && !signal.aborted);
@@ -1037,13 +1127,17 @@ export class RoutineService {
       record.conversation = { scopeId, agent, runId, conversationId: started.conversationId };
       await this.save(active);
       const end = await started.done;
-      record.output = end.report.slice(-outputLimit);
-      record.truncated = end.report.length > outputLimit || undefined;
-      const failed = failedReport(end.report);
+      // A value an earlier step received can reach the agent through IRORI_WORK.
+      const report = active.redactor.hide(end.report);
+      record.output = report.slice(-outputLimit);
+      record.truncated = report.length > outputLimit || undefined;
+      const failed = failedReport(report);
       if (end.outcome === 'cancelled') record.state = 'stopped';
       else if (end.outcome === 'failed') {
         record.state = 'failed';
-        record.detail = end.error ?? t('失敗しました。', 'Failed.');
+        record.detail = end.error
+          ? active.redactor.hide(end.error)
+          : t('失敗しました。', 'Failed.');
       } else if (failed) {
         record.state = 'failed';
         record.detail = failed;

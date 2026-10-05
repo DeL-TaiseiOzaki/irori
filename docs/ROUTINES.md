@@ -4,9 +4,9 @@ A routine is a job a person or an agent defines and the person starts with a
 button: it runs programs and instructs agents, in order. It is irori's general
 way to gather what a person holds in other tools, such as mail and chat, and
 anything else that repeats. The decisions are in
-[ADR 016](decisions/016-routines.md); this page describes what stage 1 (0.1.57)
-does. Secrets (stage 2), Python (stage 3) and the irori agent's skill for
-writing routines (stage 4) are not built yet.
+[ADR 016](decisions/016-routines.md); this page describes what stages 1
+(0.1.57) and 2 (secrets, 0.1.72) do. Python (stage 3) and the irori agent's
+skill for writing routines (stage 4) are not built yet.
 
 ## A routine
 
@@ -22,6 +22,7 @@ name: Mail triage
 steps:
   - run: fetch.js # a file in the routine folder
   - run: [gh, api, notifications] # a command on PATH and its arguments
+    secrets: [GH_TOKEN] # given to this step only
   - agent: irori
     hibachis: all # or a list of hibachi names
     access: full-access # or default; required
@@ -61,8 +62,10 @@ again every five seconds and whenever a hibachi's files change.
 - **What a device needs** is named in the row before a run: **JavaScript が必要です。**
   with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in the
   settings under ルーティン), `<command> が見つかりません。` for a missing `PATH`
-  command, **Python はまだ使えません。** for `.py`, and **シークレットはまだ使えません。**
-  for `secrets:`.
+  command, **Python はまだ使えません。** for `.py`, and
+  **シークレット <NAME> がありません。** with **<NAME> を入力** for a secret not
+  stored yet. On a device whose OS keeps no key, the row says
+  **この端末ではシークレットを保存できません。OS のキーチェーンが必要です。**
 
 ## Steps
 
@@ -102,6 +105,43 @@ again every five seconds and whenever a hibachi's files change.
 - While a routine runs, Git operations wait, as they do for an agent run.
   Closing irori asks before stopping running routines.
 
+## Secrets
+
+A token or API key a program needs is a secret: entered in irori, kept on the
+device and given only to the `run` steps that name it. Agent steps never
+receive one. The person obtains the token or creates their own OAuth client;
+irori signs in to no provider.
+
+- **Entering.** **<NAME> を入力** on a routine's row opens a password field.
+  The value goes to the host and is never shown again. Stored names are listed
+  under **シークレット** at the end of the routines view, each with **置き換え**
+  and **削除** (pressed twice). A name is an environment variable name that is
+  not `IRORI_*`, `PATH`, `HOME` or another variable that changes how a program
+  starts. A value is one line of 8 to 8192 characters.
+- **Storage.** `secrets.json` in irori's data directory holds each value
+  sealed with the key the OS keeps (Keychain on macOS, DPAPI on Windows, the
+  secret service on Linux). Without such a key, as on Linux with only
+  `basic_text`, irori stores none and routines naming one do not run.
+- **Review.** **ルーティンの確認** lists the secrets the routine receives.
+  `secrets:` is part of `routine.yaml`, so changing it needs a new review.
+- **In the step.** Each named secret is an environment variable. The step also
+  gets `IRORI_SECRETS_OUT`, the path of an empty private file.
+- **Write-back.** For a token that rotates, the step writes `NAME=value`
+  lines to `IRORI_SECRETS_OUT` for names it declared. irori keeps them once
+  the program ends, whether or not it succeeded, and later steps receive the
+  new value. If the step failed or was stopped, an unfinished last line is
+  ignored. A line for an undeclared name, or with an invalid value, fails the
+  step, named by its line number only.
+
+  ```sh
+  #!/bin/sh
+  # refresh.sh: exchange the refresh token and keep the new pair
+  ...
+  printf 'SLACK_TOKEN=%s\nSLACK_REFRESH=%s\n' "$access" "$refresh" >> "$IRORI_SECRETS_OUT"
+  ```
+- **Records.** Every value a run handed out or got back shows as `***` in its
+  record: program output, agent reports and failure details.
+
 ## Records
 
 A run's record stays on the device, never in a knowledge base: start and end,
@@ -123,6 +163,8 @@ Files in irori's data directory:
 | `routines/runs/<sha256 of owner/folder>/<run id>.json` | one run's record |
 | `routines/state/<sha256 of owner/folder>/` | `IRORI_STATE` |
 | `routines/work/<run id>/` | `IRORI_WORK`, removed after the run and when irori opens |
+| `routines/out/<id>/values` | `IRORI_SECRETS_OUT`, removed after its step and when irori opens |
+| `secrets.json` | the secrets, each value sealed with the OS-held key |
 
 ## Host boundary
 
@@ -132,6 +174,9 @@ Discovery, review, execution and records are `src/host/routines.ts`
 `routines(workspaceId)`, `reviewRoutine(ref)`, `runRoutine(ref, { workspaceId,
 digest, agents })`, `stopRoutine(ref)`, `routineRuns(ref)`, and `routine`
 events carrying a run. JavaScript is the device setting `routineRuntimes`.
+Secrets are `src/host/keystore.ts` (`SecretStore`, the hiding of values, the
+write-back reader), reached through `secrets()`, `setSecret(name, value)` and
+`deleteSecret(name)`; no method returns a value.
 Agent steps go through `AgentService.startStep`, an ordinary run with a
 `StepRun` (preamble, directories, environment and the conversation's routine
 line) and no saved session. Document content cannot start a routine.
@@ -144,17 +189,26 @@ line) and no saved session. Document content cannot start a routine.
   difference after a change and a refused run with an old digest; steps in order
   sharing `IRORI_WORK`, `IRORI_STATE` kept across runs, the work folder removed;
   links and missing files; the nothing-to-do gate, a failing step and **停止**
-  (the program ended); what a device lacks (JavaScript, Python, secrets, a
-  missing command) and a `#!` program; the Git change record including a path
+  (the program ended); what a device lacks (JavaScript, Python, a missing
+  secret, a device without a keychain, a missing command) and a `#!` program;
+  secrets given only to the steps naming them, hidden in output and kept
+  records, written back for later steps, and a refused or unfinished
+  write-back line; the Git change record including a path
   dirty before the run; an agent step in a fresh session that leaves the
   person's session, with the preamble, the environment and its conversation
   line; a `[FAILED]` report; a step waiting for the hibachi and **停止** during
   an agent step; an irori agent routine handing a named hibachi; an
   unfinished run marked unknown and not repeated.
 - `tests/settings.test.ts`: `routineRuntimes` kept and bounded.
+- `tests/keystore.test.ts`: the secure-storage check (Linux `basic_text`
+  refused), names and values, the store sealing, listing, refusing without a
+  key and keeping concurrent write-backs, hiding values that arrive in pieces,
+  and the write-back reader.
 - `scripts/routines-ui-smoke.ts` in the app: an invalid routine's reason,
   JavaScript added from the row, the review and the difference, a run's steps,
-  output, changed files and history, the gate, **停止**, an agent step's request
+  output, changed files and history, the gate, **停止**, a secret entered from
+  its row, listed in the review, hidden in the output, written back and
+  deleted (with the reversible test store, since the display has no keychain), an agent step's request
   answered in the step and its conversation opened in its hibachi, and an irori
   agent routine.
 - `npm run test:routines` (`scripts/routines-acceptance.ts`) runs real Claude
@@ -167,8 +221,14 @@ line) and no saved session. Document content cannot start a routine.
 
 ## Limits
 
-- Stage 1 only: no secrets, no Python, no skill telling the irori agent how to
-  write routines, no timed runs.
+- No Python, no skill telling the irori agent how to write routines, no timed
+  runs.
+- A secret given to a step is readable by other processes of the same user
+  while the step runs. A value printed before the step writes it back shows in
+  the live output until the step ends; the kept record hides it.
+- Secrets were checked with a stand-in store only. Electron's `safeStorage`
+  was measured refusing a Linux display without a keychain; the Keychain,
+  DPAPI and a Linux secret service have not been tried.
 - Changes under a hibachi's contents folders and in hibachis that are not Git
   repositories are not in the change record.
 - Agent steps ran on real Claude Code 2.1.280 and Codex 0.156.1 only

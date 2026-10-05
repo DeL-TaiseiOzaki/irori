@@ -591,6 +591,11 @@ export interface HostAPI {
   stopRoutine(ref: import('./routines').RoutineRef): Promise<void>;
   /** The routine's runs kept on this device, newest first. */
   routineRuns(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineRun[]>;
+  /** The secrets kept on this device, by name only. */
+  secrets(): Promise<import('./routines').SecretList>;
+  /** Stores or replaces a secret; its value never comes back. */
+  setSecret(name: string, value: string): Promise<void>;
+  deleteSecret(name: string): Promise<void>;
   /** Stops the run of one conversation, the runs in one space, or every run when neither is named. */
   cancel(scopeId?: string, conversationId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;

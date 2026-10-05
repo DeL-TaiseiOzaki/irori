@@ -13,7 +13,7 @@ import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
 import { layerFolderName } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
-import { routineRef, routineRuntimes } from './routines';
+import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
 
 const id = z.uuid(),
@@ -254,6 +254,9 @@ export const hostArguments = {
   ]),
   stopRoutine: z.tuple([routineRef]),
   routineRuns: z.tuple([routineRef]),
+  secrets: z.tuple([]),
+  setSecret: z.tuple([secretName, secretValue]),
+  deleteSecret: z.tuple([secretName]),
   cancel: z.union([z.tuple([]), z.tuple([id]), z.tuple([id, id])]),
   respond: z.tuple([
     id,

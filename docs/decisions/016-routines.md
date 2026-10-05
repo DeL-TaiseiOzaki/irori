@@ -1,7 +1,8 @@
 # 016 — Routines: jobs a person defines and starts
 
 Date: 2026-09-30. Status: owner direction accepted; stage 1 implemented in
-0.1.57 ([ROUTINES](../ROUTINES.md), and "Stage 1 as built" below).
+0.1.57 ([ROUTINES](../ROUTINES.md), and "Stage 1 as built" below); stage 2
+(secrets) in 0.1.72 ("Stage 2 as built").
 The owner chose the name **routines** (ルーティン) on 2026-09-30 over "tasks",
 which a second brain's reader takes for to-do items.
 
@@ -143,6 +144,17 @@ agent can write routines. So:
   they obtain the token, or create their own OAuth client for Google, and
   store what the routine needs as a secret. irori ships no provider sign-in
   for routines, so it carries no provider's app review.
+- Owner decisions on 2026-10-05, after the
+  [secrets spike](../research/spike-external-tool-credentials.md):
+  - A device whose OS keeps no key (Linux without a secret service, where
+    Electron falls back to `basic_text`) stores no secrets; routines that name
+    one say so and do not run.
+  - A step can write new values back, so tokens that rotate (Slack token
+    rotation, Microsoft Graph refresh tokens) keep working. This is part of
+    stage 2.
+  - Agents reach Slack, Teams and similar tools through their own CLI's MCP
+    configuration and sign-in for now. irori holds none of those tokens and
+    brokers no tool calls.
 
 ### D6 — Starting and stopping
 
@@ -263,8 +275,8 @@ decisions above left open:
 - **Other files.** A `run` file that is not JavaScript or Python runs as a
   program itself: its `#!` line names the interpreter, found on `PATH`, and it
   must be executable. A command in an argv array is looked up on `PATH` before
-  the run and named when missing. `.py` steps and `secrets:` are read but keep
-  the routine from running until stages 3 and 2.
+  the run and named when missing. `.py` steps are read but keep the routine
+  from running until stage 3.
 - **The review** keeps, beside the digest, the text of the files as confirmed
   (up to 1 MiB in all), so a change is shown line by line; a binary or large
   file is shown as changed without its text. A routine folder holds at most
@@ -289,12 +301,61 @@ decisions above left open:
 - **Run records**: the last 20 runs of each routine, each step's output kept to
   its last 16 KiB.
 
+## Stage 2 as built
+
+- **The store** (`src/host/keystore.ts`, `SecretStore`) keeps
+  `secrets.json` in irori's data directory: each name with its value sealed by
+  Electron's synchronous `safeStorage`. It refuses to store or hand out values
+  when `isEncryptionAvailable()` is false or, on Linux, the backend is
+  `basic_text` or `unknown`. The asynchronous API is not used: on Electron
+  44.3.0 it reports itself available and seals with the public key on such a
+  device (measured in the spike). Changes are made one at a time, so two
+  routines writing back keep each other's values.
+- **Names and values.** A name is an environment variable name
+  (`^[A-Z_][A-Z0-9_]{0,63}$`), not `IRORI_*` and not one that changes how a
+  program starts (`PATH`, `HOME`, `NODE_OPTIONS`, `ELECTRON_RUN_AS_NODE`,
+  `LD_PRELOAD` and similar). A value is one line of 8 to 8192 characters. The
+  lower bound keeps hiding it from records from hiding ordinary words.
+- **Entering them.** A routine row that needs a secret says which, with
+  **<NAME> を入力**. It opens a password field whose value goes to the host and
+  is never shown again. Stored names are listed under **シークレット** in the
+  routines view, each with **置き換え** and **削除** (which asks once more).
+  The `HostAPI` methods are `secrets()` (names and whether the device can keep
+  them), `setSecret(name, value)` and `deleteSecret(name)`; none returns a
+  value. The review lists the secrets the routine receives. Changing a step's
+  `secrets:` changes `routine.yaml`, so it needs a new review.
+- **Handing them out.** A `run` step that names secrets gets each as an
+  environment variable. It also gets `IRORI_SECRETS_OUT`, an empty file in a
+  fresh `0700` folder under the data directory's `routines/out/`, outside
+  `IRORI_WORK`. Other steps, and agent steps, get neither.
+- **Write-back.** After the program ends, irori reads `NAME=value` lines from
+  that file for the names the step declared; the last line of a name wins.
+  Lines are kept whether or not the step succeeded, since a refreshed token
+  may already have replaced the old one. When the step did not succeed, an
+  unfinished last line is ignored. A line naming an undeclared name, or with
+  an invalid value, fails the step. The detail names it by line number, never
+  by its text. The file and its folder are removed on every outcome; a link or
+  a replaced file counts as nothing written. Later steps naming the secret
+  receive the new value.
+- **Records.** Every value a run handed out or got back is replaced by `***`
+  in each step's output, agent reports and failure details. Program output is
+  hidden as it streams, holding back an end that could begin a value.
+  - A value printed before it is written back can show in the live output
+    until the step ends; the kept record hides it.
+  - Agents never receive values, but a value a step writes into `IRORI_WORK`
+    can reach a later agent step; its report is hidden too.
+- **Limits.** A value given to a step is readable by other processes of the
+  same user while the step runs (`/proc/<pid>/environ`, Windows DPAPI's
+  per-user scope). On a source run, `IRORI_TEST_KEYSTORE=reversible` stands in
+  a store that protects nothing, so the UI smoke runs on a display without a
+  keychain. A packaged app ignores it.
+
 ## Stages
 
 1. `routine.yaml`, discovery in both locations, D4's review, **実行** and
    **停止**, `run` steps with the JavaScript runtime and `PATH` commands, agent
    steps, D7 and D8. Done in 0.1.57.
-2. D5's secrets.
+2. D5's secrets, with write-back. Done in 0.1.72.
 3. The Python runtime.
 4. A skill in the irori agent's starter that tells it how to write a routine,
    and a check it can run before asking the person to run one.

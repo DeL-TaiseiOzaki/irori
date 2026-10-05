@@ -22,6 +22,43 @@ export type RoutineRef = z.infer<typeof routineRef>;
 export const routineRuntimes = ['javascript'] as const;
 export type RoutineRuntime = (typeof routineRuntimes)[number];
 
+/** Names a secret cannot take: they would change how irori or the program starts. */
+const reservedNames = [
+  'PATH',
+  'HOME',
+  'USERPROFILE',
+  'SHELL',
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  'NODE_OPTIONS',
+  'ELECTRON_RUN_AS_NODE',
+  'LD_PRELOAD',
+  'LD_LIBRARY_PATH',
+  'DYLD_INSERT_LIBRARIES',
+];
+/** A secret's name: the environment variable a `run` step receives it in (ADR 016 D5). */
+export const secretName = z
+  .string()
+  .regex(/^[A-Z_][A-Z0-9_]{0,63}$/)
+  .refine((value) => !value.startsWith('IRORI_') && !reservedNames.includes(value));
+/**
+ * A secret's value: one line, as an environment variable and a write-back line
+ * hold it. Eight characters at least, since every copy of it in a record is hidden.
+ */
+export const secretValue = z
+  .string()
+  .min(8)
+  .max(8192)
+  .refine((value) => !/[\x00-\x1f\x7f]/.test(value));
+
+/** The secrets kept on this device, by name; their values never leave the host. */
+export interface SecretList {
+  /** Whether the OS keeps the key that protects them (ADR 016 D5). */
+  available: boolean;
+  names: string[];
+}
+
 export type RoutineStep =
   | {
       kind: 'run';
@@ -103,7 +140,7 @@ export interface Routine {
   /** Why `routine.yaml` or the folder cannot be used; such a routine never runs. */
   problem?: string;
   /** What this device or workspace lacks before the routine can run. */
-  needs?: { text: string; runtime?: RoutineRuntime };
+  needs?: { text: string; runtime?: RoutineRuntime; secrets?: string[] };
   /** Whether the person confirmed its files as they are now on this device (D4). */
   review: 'unreviewed' | 'changed' | 'reviewed';
   /** The run in progress. */
@@ -135,6 +172,8 @@ export interface RoutineReview {
   /** Confirmed before on this device, in some version. */
   confirmedBefore: boolean;
   files: RoutineReviewFile[];
+  /** The secrets its `run` steps receive. */
+  secrets: string[];
   problem?: string;
 }
 
