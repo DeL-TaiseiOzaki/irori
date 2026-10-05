@@ -447,6 +447,11 @@ export interface HostAPI {
   register(root: string, name: string, category: Category): Promise<Space>;
   /** Makes a new folder a Git repository and registers it as a hibachi. */
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
+  /**
+   * Removes a hibachi from this device and from every workspace. With `trash`,
+   * its folder goes to the system trash; otherwise the folder stays as it is.
+   */
+  removeSpace(scopeId: string, trash: boolean): Promise<void>;
   /** Changes a brain's name, category or look in its `.irori/scope.json`. */
   updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
   /**

@@ -18,9 +18,34 @@ charcoal cycle arrows and an orange flame, with the source and prompts in
   runs. The routines smoke adds direct navigation, rail order/selection/icon,
   layout restoration, all-hibachi search, JavaScript settings and an empty
   workspace to the existing execution, review, secrets and conversation checks.
+- After merging main at `32ca15c` into this branch, `npm run build`,
+  `npm test` (424 tests; 420 passed, 4 skipped), `npm run format:check` and the
+  routines, brain-settings (including removal), overview and dock UI smokes passed.
 - Not verified: installed Windows/macOS builds or real CLI inference. CI was
-  still running when this record was written. The open 0.1.73 feature PRs stay
-  separate; no merge or publication was performed.
+  still running when this record was written. The branch now includes the hibachi removal merged in #172;
+  the resizable irori agent PR #171 stays separate. No routines merge or
+  publication has been performed yet.
+
+Removing a hibachi, 2026-10-05 (**0.1.73**): the owner asked how to delete a
+hibachi, learned irori had no way to, and asked for one.
+- **hibachi の設定** gains **hibachi を削除**, which opens a confirmation with
+  **フォルダもゴミ箱に移す** (off by default). `HostAPI.removeSpace(scopeId,
+  trash)` refuses while that hibachi's run, a Git operation, a connection or a
+  routine is in progress.
+- `src/host/remove-space.ts` orders the removal: refuse the trash for a folder
+  holding another registered hibachi, the irori agent's folder or irori's data;
+  let go (close the hibachi's terminals, `cloud.suspend`, close its watcher);
+  move the folder with `shell.trashItem`; then `FileService.unregister` and
+  `WorkspaceService.forget` (every workspace and rail group). A failed trash
+  watches and reconnects again and leaves the hibachi registered.
+- The folder's `.irori/scope.json` is untouched, so adding a kept folder again
+  brings back the same scope id, and with it the device's conversations, drafts
+  and search index, which removal leaves in place.
+- Verified: `npm run build`, `npm test` (424 tests, 419 passed, 5 skipped; new
+  `remove-space` tests), `xvfb-run -a npm run test:ui` (all 28 suites; the
+  brain-settings suite removes a hibachi, keeping its folder) and
+  `npm run format:check`. Not verified: moving a folder to a real system
+  trash (the tests use a stand-in), and Windows and macOS.
 
 Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
 owner's request and published as

@@ -18,9 +18,13 @@ charcoal cycle arrows and an orange flame, with the source and prompts in
   runs. The routines smoke adds direct navigation, rail order/selection/icon,
   layout restoration, all-hibachi search, JavaScript settings and an empty
   workspace to the existing execution, review, secrets and conversation checks.
+- After merging main at `32ca15c` into this branch, `npm run build`,
+  `npm test` (424 tests; 420 passed, 4 skipped), `npm run format:check` and the
+  routines, brain-settings (including removal), overview and dock UI smokes passed.
 - Not verified: installed Windows/macOS builds or real CLI inference. CI was
-  still running when this record was written. The open 0.1.73 feature PRs stay
-  separate; no merge or publication was performed.
+  still running when this record was written. The branch now includes the hibachi removal merged in #172;
+  the resizable irori agent PR #171 stays separate. No routines merge or
+  publication has been performed yet.
 
 Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
 owner's request and published as

@@ -2385,6 +2385,32 @@ function App() {
           spaces={workspaceSpaces}
           onClose={() => setBrainSettings(false)}
           beforeRename={save}
+          onRemoved={() => {
+            const removed = active.scopeId;
+            setBrainSettings(false);
+            void (async () => {
+              const [list, profiles] = await Promise.all([host.spaces(), host.workspaces()]);
+              const next = profiles.find((profile) => profile.id === workspace?.id);
+              setSpaces(list);
+              if (next) setWorkspace(next);
+              // The next hibachi of the workspace comes on show.
+              setActive(
+                (next?.scopeIds ?? []).flatMap((id) =>
+                  list.filter((space) => space.scopeId === id),
+                )[0],
+              );
+              if (current.current.doc?.scopeId === removed) {
+                current.current = { doc: undefined, buffer: '', external: undefined };
+                setDoc(undefined);
+                setBuffer('');
+                setExternal(undefined);
+              }
+              updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
+              setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
+              setRevision((value) => value + 1);
+              setStatus(t('hibachi を削除しました。', 'Removed the hibachi.'));
+            })().catch(report);
+          }}
           onSaved={(next, renamed) => {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
             setActive(next);

@@ -63,7 +63,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 **Hibachis and workspaces**
 - A hibachi is organized as **Knowledge** (notes) and **Contents** (materials). Turning the hibachi agent on (**Settings → Agents**) also shows **Schema** (instructions and skills for AI).
 - **irori mode** (formerly the Overview) shows the workspace's hibachis as a map or as columns. Search also runs across every hibachi.
-- Each hibachi has its own name, category, icon and colour.
+- Each hibachi has its own name, category, icon and colour. The same sheet removes a hibachi, keeping its folder or moving it to the trash.
 
 **Notes**
 - A what-you-see Markdown editor that saves automatically. Pasted images go to `_assets/` next to the note.

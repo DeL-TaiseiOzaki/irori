@@ -160,9 +160,35 @@ try {
   expect(
     (await readdir(path.join(roots[0], '.irori'))).filter((name) => name.startsWith('icon-')),
   ).toHaveLength(1);
+
+  // Removing a hibachi takes it off the rail and the workspace; its folder stays.
+  const railAgain = page.getByRole('navigation', { name: 'hibachi' });
+  await railAgain.getByRole('button', { name: /^Research・AI/ }).click();
+  await expect(page.locator('.brain-names strong')).toHaveText('Research');
+  await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'hibachi の設定', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'hibachi の設定' })
+    .getByRole('button', { name: 'hibachi を削除', exact: true })
+    .click();
+  const removal = page.getByRole('dialog', { name: 'Research を削除' });
+  await expect(removal.getByRole('checkbox', { name: 'フォルダもゴミ箱に移す' })).not.toBeChecked();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/irori-remove-hibachi.png' });
+  await removal.getByRole('button', { name: '削除', exact: true }).click();
+  await expect(removal).toHaveCount(0);
+  await expect(railAgain.getByRole('button', { name: /^Research・AI/ })).toHaveCount(0);
+  await expect(page.locator('.brain-names')).toHaveText('Product Lab');
+  const bindings = JSON.parse(await readFile(path.join(files.dataDir, 'spaces.json'), 'utf8'));
+  expect(bindings.map((item: { scopeId: string }) => item.scopeId)).toEqual([product.scopeId]);
+  const profiles = JSON.parse(await readFile(path.join(files.dataDir, 'workspaces.json'), 'utf8'));
+  expect(profiles[0].scopeIds).toEqual([product.scopeId]);
+  expect(
+    JSON.parse(await readFile(path.join(roots[1], '.irori', 'scope.json'), 'utf8')).scopeId,
+  ).toBe(research.scopeId);
   expect(errors).toEqual([]);
   console.log(
-    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart.',
+    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal.',
   );
 } finally {
   await app.close();

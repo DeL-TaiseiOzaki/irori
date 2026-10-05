@@ -40,12 +40,13 @@ import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
 import { reversibleStorage, SecretStore } from './keystore';
 import { AgentSetup } from './agent-setup';
+import { removeSpace } from './remove-space';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
 import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
 let window: BrowserWindow | undefined;
 let closing = false;
-const watchers: FSWatcher[] = [];
+const watchers = new Map<string, FSWatcher>();
 if (process.platform === 'win32') app.setAppUserModelId('com.squirrel.irori.irori');
 if (squirrelStartup) app.quit();
 if (process.env.IRORI_DATA_DIR) app.setPath('userData', path.resolve(process.env.IRORI_DATA_DIR));
@@ -205,7 +206,7 @@ app
         timer = setTimeout(() => emit({ type: 'files', scopeId: space.scopeId }), 150);
       });
       watcher.on('error', (error) => console.warn('Watcher error', String(error)));
-      watchers.push(watcher);
+      watchers.set(space.scopeId, watcher);
     }
     files.list().forEach(watch);
     // The irori agent's `irori` command: hibachis it registers join the request's workspace.
@@ -605,6 +606,37 @@ app
           );
         return changeFiles(() => files.update(scopeId, change));
       },
+      removeSpace: async (scopeId, trash) => {
+        if (agents.busy(scopeId) || cloud.busy || git.busy || routines.busy)
+          throw Error(
+            t(
+              '実行・Git 操作・接続が終わってから hibachi を削除してください。',
+              'Remove the hibachi after the run, Git operation and connection finish.',
+            ),
+          );
+        await changeFiles(() =>
+          removeSpace(
+            {
+              files,
+              workspaces,
+              keep: async () => [(await you.load()).root, files.dataDir],
+              release: async (space) => {
+                await terminals.closeScope(space.scopeId);
+                const connected = await cloud.suspend(space.scopeId);
+                await watchers.get(space.scopeId)?.close();
+                watchers.delete(space.scopeId);
+                return async () => {
+                  watch(space);
+                  await cloud.resume(space.scopeId, connected);
+                };
+              },
+              trash: (folder) => shell.trashItem(folder),
+            },
+            scopeId,
+            trash,
+          ),
+        );
+      },
       renameLayerFolder: (scopeId, layer, name) =>
         changeFiles(() =>
           changed(scopeId, async () => {
@@ -809,7 +841,7 @@ app
         });
         return false;
       }
-      await Promise.all(watchers.map((w) => w.close()));
+      await Promise.all([...watchers.values()].map((w) => w.close()));
       return true;
     }
     window.on('close', (event) => {

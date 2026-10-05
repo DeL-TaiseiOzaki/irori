@@ -74,6 +74,23 @@ export class WorkspaceService {
       return value;
     });
   }
+  /** Takes a removed hibachi out of every workspace and its groups. */
+  forget(scopeId: string) {
+    return this.queue.run(async () => {
+      const current = await this.list();
+      if (!current.some((item) => item.scopeIds.includes(scopeId))) return;
+      await writeLocalJson(
+        path.join(this.files.dataDir, 'workspaces.json'),
+        current.map((item) => {
+          if (!item.scopeIds.includes(scopeId)) return item;
+          const { groups: previous = [], ...rest } = item;
+          const scopeIds = item.scopeIds.filter((id) => id !== scopeId);
+          const groups = normalizeGroups(previous, scopeIds);
+          return profile.parse({ ...rest, scopeIds, ...(groups.length && { groups }) });
+        }),
+      );
+    });
+  }
   remove(id: string) {
     return this.queue.run(async () => {
       const current = await this.list();
