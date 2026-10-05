@@ -1,5 +1,42 @@
 # irori continuation handoff
 
+The irori agent sets up hibachis, 2026-10-05 (**0.1.71**,
+[ADR 025](decisions/025-irori-agent-setup.md)): the owner described the
+journey (download, a working folder, GitHub and a cloud folder, connect them,
+start) and asked for the irori agent to do the connecting, with standard
+skills already in place.
+- Every irori agent run, on every CLI, has an `irori` command on its PATH
+  (`src/agents/irori-bridge.ts` over the bridge it now shares with the
+  `hibachi` command, `command-bridge.ts`): `list`, `clone <GitHub URL or
+  owner/name>`, `create <folder>`, `add <folder>`, `connect <hibachi> <folder>`.
+  `AgentSetup` (`src/host/agent-setup.ts`) only adds: it registers the hibachi
+  and adds it to the request's workspace (`StartRun.workspace`; a routine's
+  for its irori agent steps), or links a folder into the hibachi's contents. A
+  repository or folder already registered just joins. New hibachis go beside
+  the irori agent's folder (`~/irori`) unless `--parent` says otherwise.
+- Clone, new folder and first commit take `duringRuns` in `GitService`, since
+  the irori agent's own run would otherwise hold them back. The window follows
+  a `hibachis` host event.
+- Standard skills `irori-setup`, `add-hibachis`, `new-hibachi` and
+  `connect-folder` (`prompts/irori-agent-skills.ts`) are written with the
+  starter; for an older folder the + beside Schema on the irori agent's screen
+  (標準スキルを追加) writes the missing ones. None is ever replaced.
+- Verified: `npm run build`, `npm test` (412 tests, 407 passed, 5 skipped;
+  new `irori-command`: the command's forms, clone through a local stand-in for
+  GitHub, create and add into the request's workspace while Git refuses other
+  work, connect, the launcher, the standard skills, and the irori agent on Pi's
+  protocol fixture running `irori add`), the UI suites with `your-ai-ui-smoke`
+  offering a deleted standard skill again and registering a folder through the
+  command into the rail and the map, and `npm run format:check`.
+  `links-ui-smoke` failed at the rename dialog's reference count
+  (参照するリンクなし・一部未確認) in 3 of 5 runs, the known intermittent
+  failure on `main`; it passed on the others.
+- Not verified: real CLIs running the command (PATH and environment kept by
+  their shell tools; Codex's sandbox and the loopback connection), a real
+  GitHub clone, installed Windows/macOS builds. `new-hibachi` uses
+  `irori create` and `gh repo create --source`, not `irori-templete` (owner:
+  the template is not used yet).
+
 Published 2026-10-05: **0.1.70** (#165, layer names) is merged at the owner's
 request and published as
 [v0.1.70-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.70-preview.1)

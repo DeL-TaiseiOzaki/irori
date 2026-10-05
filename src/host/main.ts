@@ -38,6 +38,7 @@ import { addNoteComment, moveNoteComments, readNoteComments, removeNoteComment }
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
+import { AgentSetup } from './agent-setup';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
 import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
@@ -197,6 +198,24 @@ app
       watchers.push(watcher);
     }
     files.list().forEach(watch);
+    // The irori agent's `irori` command: hibachis it registers join the request's workspace.
+    const setup = new AgentSetup({
+      files,
+      git,
+      workspaces,
+      cloud,
+      defaultParent: async () => path.dirname((await you.load()).root),
+      register: (root, name, category) =>
+        changeFiles(async () => {
+          const space = await files.register(root, name, category);
+          watch(space);
+          return space;
+        }),
+      running: (scopeId) => agents.running(scopeId),
+      announce: ({ workspace, scopeId }) =>
+        emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),
+    });
+    agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
     const entry = await realpath(path.resolve(__dirname, '../dist/index.html'));
     const icon = path.resolve(__dirname, '../assets/irori-icon.png');
     app.dock?.setIcon(icon);
@@ -644,6 +663,7 @@ app
         agents.startNextQueued(scopeId, conversationId, canStartAgent),
       yourAi: () => you.status(),
       createYourAi: () => you.create(),
+      addYourAiSkills: () => you.addStandardSkills(),
       yourAiEntries: (rel) => you.entries(rel),
       yourAiRead: (rel) => you.read(rel),
       yourAiBrains: async (scopeIds) => {

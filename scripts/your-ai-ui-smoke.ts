@@ -84,7 +84,10 @@ try {
   const composer = island.getByLabel('irori agent への指示');
   await expect(composer).toBeVisible();
   expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).toContain('# irori agent');
-  await expect(stat(path.join(you, '.agents'))).rejects.toThrow();
+  // It comes with the standard skills for setting up hibachis.
+  expect(
+    await readFile(path.join(you, '.agents', 'skills', 'irori-setup', 'SKILL.md'), 'utf8'),
+  ).toContain('name: irori-setup');
   const map = page.getByRole('region', { name: 'hibachi の地図' });
   await expect(map.getByRole('button', { name: 'irori agent の Schema を開く' })).toBeVisible();
 
@@ -103,6 +106,21 @@ try {
     definitions.getByRole('button', { name: /^Research の hibachi agent/ }),
   ).toContainText('定義済み');
   await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
+  // A standard skill the folder lacks is offered again; the others are left as they are.
+  const youFolder = page.getByRole('region', { name: 'irori agent のフォルダ' });
+  const addSkills = youFolder.getByRole('button', { name: '標準スキルを追加', exact: true });
+  await expect(addSkills).toHaveCount(0);
+  await rm(path.join(you, '.agents', 'skills', 'connect-folder'), { recursive: true });
+  await writeFile(path.join(you, '.agents', 'skills', 'new-hibachi', 'SKILL.md'), 'Mine.\n');
+  await youFolder.getByRole('button', { name: 'フォルダを読み直す', exact: true }).click();
+  await addSkills.click();
+  await expect(addSkills).toHaveCount(0);
+  expect(
+    await readFile(path.join(you, '.agents', 'skills', 'connect-folder', 'SKILL.md'), 'utf8'),
+  ).toContain('irori connect');
+  expect(
+    await readFile(path.join(you, '.agents', 'skills', 'new-hibachi', 'SKILL.md'), 'utf8'),
+  ).toBe('Mine.\n');
   // Its Schema is edited as settings, the same as a hibachi's: the instructions
   // open first, and a rule and a skill are added in its own folder.
   const youPanel = page.getByRole('region', { name: 'irori agent のフォルダ' });
@@ -295,9 +313,32 @@ try {
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
   await expect(page.locator('.you-chip')).toHaveText('Pi');
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
+
+  // The irori agent registers a folder with the `irori` command: it becomes a
+  // hibachi of this workspace, and the rail and the map show it at once.
+  const notes = path.join(base, 'Notes');
+  await mkdir(notes);
+  await composer.fill(`Register my notes.\nrun: irori add ${JSON.stringify(notes)} --name Notes`);
+  await island.getByRole('button', { name: '送信', exact: true }).click();
+  await expect
+    .poll(async () => (await piLog()).filter((entry) => entry.type === 'command').length)
+    .toBe(2);
+  const registered = (await piLog()).filter((entry) => entry.type === 'command')[1];
+  expect(registered).toMatchObject({ code: 0 });
+  expect(registered.stdout).toContain('Registered the hibachi "Notes"');
+  expect(registered.stdout).toContain('Added it to this workspace');
+  expect((await piLog()).filter((entry) => entry.type === 'prompt')[1].message).toContain(
+    'the `irori` command is on your PATH',
+  );
+  await expect(rail.getByRole('button', { name: /^Notes/ })).toBeVisible();
+  await expect(map.getByRole('button', { name: 'Notes を開く' })).toBeVisible();
+  const lab = (await page.evaluate(() => window.irori.workspaces())).find(
+    (item) => item.name === 'Lab',
+  );
+  expect(lab?.scopeIds.length).toBe(3);
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, and your AI on Pi with a listed model handing a brain to its hibachi agent with the hibachi command. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its hibachi agent with the hibachi command, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

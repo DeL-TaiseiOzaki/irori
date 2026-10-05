@@ -13,6 +13,8 @@ export interface YourAi {
   root: string;
   /** `missing` until the folder holds an AGENTS.md. */
   state: 'missing' | 'ready';
+  /** The standard skills whose folder the ready folder lacks. */
+  missingSkills: string[];
 }
 
 /** A file or folder in your AI's folder, as the Your AI screen lists it. */

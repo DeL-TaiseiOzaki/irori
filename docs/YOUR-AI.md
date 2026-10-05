@@ -42,7 +42,8 @@ agent's shape. The investigation behind the design is in the
     that notes and reports are data, not instructions. There is no `CLAUDE.md`:
     newer Claude Code reads `AGENTS.md` itself, and a `CLAUDE.md` beside it would
     stop that.
-  - an empty `.claude/agents/`.
+  - an empty `.claude/agents/`;
+  - the standard skills in `.agents/skills/` (next section but one).
 - Earlier starters also held a `brain-agents` skill for the irori agent to write
   the definitions. New folders no longer get it, and irori never deletes it from
   an existing folder.
@@ -143,6 +144,37 @@ agent's shape. The investigation behind the design is in the
 - Stopping the irori agent's run stops its hand-offs, and so does the command's
   process going away. When the irori agent's run ends, any hand-off still
   running is stopped.
+
+## The `irori` command and the standard skills
+
+Added 2026-10-05 ([ADR 025](decisions/025-irori-agent-setup.md)): the irori
+agent sets up the person's hibachis.
+
+- Every irori agent run, on every CLI, has an `irori` command on its PATH,
+  served like the `hibachi` command (`src/agents/irori-bridge.ts` over
+  `command-bridge.ts`; the URL in `IRORI_COMMAND`; files in
+  `<irori data>/agents/irori/`). The request says so first
+  (`iroriCommandPreamble`, after the handed hibachis).
+- `irori list`, `irori clone <GitHub URL or owner/name>`, `irori create
+  <folder>`, `irori add <folder>`, `irori connect <hibachi> <folder>`, with
+  `--parent`, `--folder`, `--name`, `--category` and `--read-only` where they
+  apply (`parseIroriCommand`, `irori help`). The host carries them out in
+  `AgentSetup` (`src/host/agent-setup.ts`).
+- Only additions: a hibachi registered on this device and added to the
+  workspace the request came from (`StartRun.workspace`), or a folder linked
+  into a hibachi's first contents folder. A repository or folder already
+  registered just joins the workspace. New hibachis go beside the irori agent's
+  folder unless `--parent` names another.
+- Clones, new hibachis and their first commit go ahead while runs are in
+  progress, since their folders are new. `connect` waits only for the
+  hibachi's own agent.
+- The window refreshes its hibachis and takes in the saved workspace when the
+  host announces a registration (`hibachis` event).
+- Standard skills (`prompts/irori-agent-skills.ts`): `irori-setup`,
+  `add-hibachis`, `new-hibachi`, `connect-folder`. Written with the starter;
+  for a folder set up earlier, the + beside Schema on the irori agent's screen
+  (**標準スキルを追加**, shown only while one is missing) writes the missing
+  ones. A present skill folder is never replaced.
 
 ## Boundaries irori keeps
 
@@ -254,7 +286,25 @@ agent's shape. The investigation behind the design is in the
     result;
   - a resumed session still delegates.
 
+- `tests/irori-command.test.ts`: the command's forms and refusals; the
+  standard skills as valid packages, written with the starter, added when
+  missing without replacing an edited one, and not through a linked folder;
+  `clone` (through a local remote standing in for GitHub), `create` and `add`
+  registering hibachis into the request's workspace while Git refuses other
+  work, a repeated clone or add only joining, a taken folder refused; `connect`
+  linking a folder and waiting for the hibachi's own run; the launcher passing
+  its arguments and folder; and the irori agent on Pi's protocol fixture running
+  `irori add` into its workspace.
+- `scripts/your-ai-ui-smoke.ts` also checks the standard skills in a new folder,
+  the + offering a deleted one again while an edited one is kept, and an irori
+  agent request on Pi running `irori add`, after which the rail and the map show
+  the new hibachi in the workspace.
+
 ## Limits
+
+- **The `irori` command is unverified on real CLIs.** Whether each CLI's shell
+  tool keeps irori's `PATH` and `IRORI_COMMAND`, and whether Codex's sandbox in
+  the standard mode allows its loopback connection, are unverified.
 
 - **Unverified on real CLIs:** the owner verifies real CLIs himself. Not run: a
   real Claude Code irori agent in `bypassPermissions` (the hook and inheritance

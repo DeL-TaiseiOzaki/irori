@@ -1,9 +1,4 @@
-import http from 'node:http';
-import path from 'node:path';
-import type { AddressInfo } from 'node:net';
-import { randomBytes } from 'node:crypto';
-import { chmod, mkdir } from 'node:fs/promises';
-import writeFileAtomic from 'write-file-atomic';
+import { commandBridge, commandLaunchers, type BridgeCommand } from './command-bridge';
 
 /** Runs one hand-off to a hibachi agent and resolves with its report. */
 export type HandOff = (hibachi: string, task: string, signal: AbortSignal) => Promise<string>;
@@ -73,93 +68,41 @@ const read = () =>
 })().catch((error) => fail(String(error && error.message ? error.message : error)));
 `;
 
-/** A POSIX shell word for any path: single quotes, with each quote closed and escaped. */
-const shellWord = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
-/** A cmd.exe word: double quotes, with % doubled so a path is never expanded. */
-const cmdWord = (value: string) => `"${value.replaceAll('%', '%%')}"`;
+const hibachiCommand: BridgeCommand = {
+  name: 'hibachi',
+  purpose: 'hands a task to a hibachi agent and prints its report.',
+  client,
+  variable: 'IRORI_HIBACHI',
+  limit: handOffTaskLimit * 4,
+};
 
 export function hibachiLaunchers(runtime: string, script: string) {
-  return {
-    posix: `#!/bin/sh\n# irori: hands a task to a hibachi agent and prints its report.\nELECTRON_RUN_AS_NODE=1 exec ${shellWord(runtime)} ${shellWord(script)} "$@"\n`,
-    windows: `@echo off\r\nrem irori: hands a task to a hibachi agent and prints its report.\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n${cmdWord(runtime)} ${cmdWord(script)} %*\r\n`,
-  };
-}
-
-/** The environment with `directory` first on its search path, whatever the key's case. */
-function withPath(env: NodeJS.ProcessEnv, directory: string) {
-  const key = Object.keys(env).find((name) => name.toUpperCase() === 'PATH') ?? 'PATH';
-  return { ...env, [key]: [directory, env[key]].filter(Boolean).join(path.delimiter) };
+  return commandLaunchers(hibachiCommand.purpose, runtime, script);
 }
 
 /**
- * Serves one irori agent run's `hibachi` command. The launchers and the client
- * live in irori's data directory, never in a KB or the irori agent's folder;
- * the URL with its random token is only in the returned environment. A request
- * whose client goes away cancels its hand-off.
+ * Serves one irori agent run's `hibachi` command (see `commandBridge`). A
+ * request whose client goes away cancels its hand-off.
  */
-export async function hibachiBridge(
+export function hibachiBridge(
   dataDir: string,
   handOff: HandOff,
   env: NodeJS.ProcessEnv,
   runtime = process.execPath,
 ) {
-  const directory = path.join(dataDir, 'agents', 'hibachi');
-  const bin = path.join(directory, 'bin');
-  await mkdir(bin, { recursive: true, mode: 0o700 });
-  const script = path.join(directory, 'client.cjs');
-  // Replaced whole: another run's CLI may be starting from them at this moment.
-  await writeFileAtomic(script, client, { mode: 0o600 });
-  const launchers = hibachiLaunchers(runtime, script);
-  const posix = path.join(bin, 'hibachi');
-  await writeFileAtomic(posix, launchers.posix, { mode: 0o700 });
-  await chmod(posix, 0o700);
-  await writeFileAtomic(path.join(bin, 'hibachi.cmd'), launchers.windows, { mode: 0o700 });
-  const token = randomBytes(24).toString('hex');
-  const server = http.createServer((request, response) => {
-    let body = '';
-    request.on('data', (chunk) => {
-      body = (body + chunk).slice(0, handOffTaskLimit * 4);
-    });
-    request.on('end', async () => {
-      if (request.method !== 'POST' || request.url !== `/${token}`) {
-        response.writeHead(404, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ ok: false, error: 'Not found' }));
-        return;
-      }
-      const gone = new AbortController();
-      response.on('close', () => {
-        if (!response.writableFinished) gone.abort();
-      });
-      // The answer may take as long as the hibachi agent works.
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.flushHeaders();
-      let reply: { ok: true; report: string } | { ok: false; error: string };
-      try {
-        const { hibachi, task } = JSON.parse(body) as { hibachi?: unknown; task?: unknown };
-        if (typeof hibachi !== 'string' || !hibachi.trim() || typeof task !== 'string')
-          throw Error('Name a hibachi and a task.');
-        if (!task.trim()) throw Error('The task is empty.');
-        if (task.length > handOffTaskLimit)
-          throw Error(`A task is at most ${handOffTaskLimit} characters.`);
-        reply = { ok: true, report: await handOff(hibachi.trim(), task, gone.signal) };
-      } catch (error) {
-        reply = { ok: false, error: error instanceof Error ? error.message : String(error) };
-      }
-      if (!response.destroyed) response.end(JSON.stringify(reply));
-    });
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/${token}`;
-  return {
-    env: withPath({ ...env, IRORI_HIBACHI: url }, bin),
-    url,
-    bin,
-    close: () => {
-      server.closeAllConnections();
-      server.close();
+  return commandBridge(
+    dataDir,
+    hibachiCommand,
+    async (request, signal) => {
+      const { hibachi, task } = request as { hibachi?: unknown; task?: unknown };
+      if (typeof hibachi !== 'string' || !hibachi.trim() || typeof task !== 'string')
+        throw Error('Name a hibachi and a task.');
+      if (!task.trim()) throw Error('The task is empty.');
+      if (task.length > handOffTaskLimit)
+        throw Error(`A task is at most ${handOffTaskLimit} characters.`);
+      return handOff(hibachi.trim(), task, signal);
     },
-  };
+    env,
+    runtime,
+  );
 }

@@ -247,7 +247,9 @@ export type HostEvent =
   | { type: 'agent'; event: AgentEvent }
   | { type: 'terminal'; event: TerminalEvent }
   | { type: 'update'; state: import('./updates').UpdateState }
-  | { type: 'routine'; run: import('./routines').RoutineRun };
+  | { type: 'routine'; run: import('./routines').RoutineRun }
+  /** The irori agent registered a hibachi; `workspace` is the one it joined, as saved. */
+  | { type: 'hibachis'; workspace?: WorkspaceProfile };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -266,6 +268,8 @@ export interface StartRun {
   personLines?: boolean;
   /** Brains handed to your AI for this request; only your AI's runs take them. */
   brains?: string[];
+  /** The workspace an irori agent request was sent in: hibachis it registers join it. */
+  workspace?: string;
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
@@ -568,6 +572,8 @@ export interface HostAPI {
   yourAi(): Promise<import('./you').YourAi>;
   /** Writes the starter into an absent or empty folder; never over existing files. */
   createYourAi(): Promise<import('./you').YourAi>;
+  /** Writes the standard skills the irori agent's folder lacks; never over a present one. */
+  addYourAiSkills(): Promise<import('./you').YourAi>;
   yourAiEntries(path: string): Promise<import('./you').YourAiEntry[]>;
   yourAiRead(path: string): Promise<{ path: string; text: string }>;
   /** The sub-agent each brain gets from your AI, and whether its definition exists. */
