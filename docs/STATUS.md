@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+In review 2026-10-05: **0.1.74** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
+routines in the rail) is open and not merged. Routines has a dedicated button
+between irori mode and the hibachis, its own heading, the device's JavaScript
+setting, secrets and the existing run/review/history controls. The agent panel
+stays beside it, even without hibachis. irori mode offers map and columns and
+keeps the chosen layout across visits. The new GPT Image icon uses folded
+charcoal cycle arrows and an orange flame, with the source and prompts in
+`assets/`. Definitions remain `routine.yaml` and accompanying files.
+- Verified: `npm run build`, `npm test` (419 tests; 415 passed, 4 skipped),
+  `npm run format:check`, all 28 individual UI suites under Xvfb,
+  `npm run build:website`, `npm run test:website` (42 articles, 224 links),
+  local document links and release policy. The whole `npm run test:ui` stopped
+  at `links-ui-smoke`'s known intermittent rename reference-count failure;
+  an isolated retry failed too, then the third run passed. The 15 suites after
+  it passed in order. Main's unchanged links suite passed in two comparison
+  runs. The routines smoke adds direct navigation, rail order/selection/icon,
+  layout restoration, all-hibachi search, JavaScript settings and an empty
+  workspace to the existing execution, review, secrets and conversation checks.
+- Not verified: installed Windows/macOS builds or real CLI inference. CI was
+  still running when this record was written. The open 0.1.73 feature PRs stay
+  separate; no merge or publication was performed.
+
 Published 2026-10-05: **0.1.72** (#169, routine secrets) is merged at the
 owner's request and published as
 [v0.1.72-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.72-preview.1)
