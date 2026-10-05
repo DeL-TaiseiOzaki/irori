@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-05: **0.1.71** (#167, the irori agent sets up hibachis) is
+merged at the owner's request and published as
+[v0.1.71-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.71-preview.1)
+by release run `37275509637` from main's successful CI run `37274540132`
+(source `ee07460`). The release carries Windows 174,684,160 bytes, Mac
+140,282,202 bytes and `irori-0.1.71-full.nupkg` 173,852,302 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: the installed builds and a real
+CLI running the `irori` command.
+
 The irori agent sets up hibachis, 2026-10-05 (**0.1.71**,
 [ADR 025](decisions/025-irori-agent-setup.md)): the owner described the
 journey (download, a working folder, GitHub and a cloud folder, connect them,
