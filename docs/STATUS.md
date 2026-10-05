@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+In review 2026-10-05: **0.1.73** (#PRNUM, resizable irori agent) is open and
+not merged. In irori mode the AI island beside the map and the routines was a
+fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
+300px; the map side keeps at least 360px). The handle is the 8px gap, styled
+like the hibachi islands' `island-handle`. Its layout is saved as
+`irori-overview` with the other device layouts.
+- Verified: `npm run build`, `npm run format:check`, and the `your-ai`,
+  `overview`, `routines` and `dock` UI smokes under `xvfb-run`
+  (`your-ai-ui-smoke` drags the handle and finds the saved layout). The whole
+  `npm run test:ui` and `npm test` were not run for this renderer-only change.
 Removing a hibachi, 2026-10-05 (**0.1.73**): the owner asked how to delete a
 hibachi, learned irori had no way to, and asked for one.
 - **hibachi の設定** gains **hibachi を削除**, which opens a confirmation with
