@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-In review 2026-10-05: **0.1.73** (#PRNUM, resizable irori agent) is open and
+In review 2026-10-05: **0.1.73** (#171, resizable irori agent) is open and
 not merged. In irori mode the AI island beside the map and the routines was a
 fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
 300px; the map side keeps at least 360px). The handle is the 8px gap, styled
