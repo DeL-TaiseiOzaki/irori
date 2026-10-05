@@ -21,16 +21,28 @@ by release run `37300125737` from main's successful CI run `37298872609`.
   English UI captures at 2x, converted to WebP.
 - Installed device acceptance and real CLI inference remain owner checks.
 
-Merged 2026-10-05: **0.1.74** (#171, resizable irori agent), awaiting
-preview publication when this record was written. In irori mode the AI island
-beside the map and the routines was a fixed 360px; it is now a `react-resizable-panels` pane (default 360px, at least
-300px; the map side keeps at least 360px). The handle is the 8px gap, styled
-like the hibachi islands' `island-handle`. Its layout is saved as
+Published 2026-10-05: **0.1.74** (#171, resizable irori agent) is merged at
+the owner's request and published as
+[v0.1.74-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.74-preview.1)
+by release run `37297909463` from main's successful CI run `37296848050`
+(source `0287359`). The release carries Windows 174,688,768 bytes, Mac
+140,342,048 bytes and `irori-0.1.74-full.nupkg` 173,857,520 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website went
+from 0.1.73 straight to 0.1.75 (#176), which includes this change, so its
+manifest never offered 0.1.74. Owner checks remain: dragging the island on
+the installed builds.
+
+Resizable irori agent, 2026-10-05 (**0.1.74**). In irori mode the AI island
+beside the map and the routines was a fixed 360px; it is now a
+`react-resizable-panels` pane (default 360px, at least 300px; the map side
+keeps at least 360px). The handle is the 8px gap, styled like the hibachi
+islands' `island-handle`. Its layout is saved as
 `irori-overview` with the other device layouts.
 - Verified: `npm run build`, `npm run format:check`, and the `your-ai`,
   `overview`, `routines` and `dock` UI smokes under `xvfb-run`
   (`your-ai-ui-smoke` drags the handle and finds the saved layout). The whole
   `npm run test:ui` and `npm test` were not run for this renderer-only change.
+
 Published 2026-10-05: **0.1.73** (#172, removing a hibachi) is merged at the
 owner's request and published as
 [v0.1.73-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.73-preview.1)
