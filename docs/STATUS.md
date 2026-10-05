@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-05: **0.1.70** (#165, layer names) is merged at the owner's
+request and published as
+[v0.1.70-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.70-preview.1)
+by release run `37269397238` from main's successful CI run `37268658288`
+(source `16389b7`). The release carries Windows 174,672,896 bytes, Mac
+140,283,023 bytes and `irori-0.1.70-full.nupkg` 173,843,183 bytes; anonymous
+downloads of the three packages matched `SHA256SUMS.txt`. The website manifest
+now offers this release. Owner checks remain: the installed builds.
+
 Layer names, 2026-10-05 (**0.1.70**, [ADR 024](decisions/024-layer-names.md)):
 the owner asked for Knowledge and Contents to be renamable, Schema aside; both
 the shown name and the folder, set separately, for each hibachi.
