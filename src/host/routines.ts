@@ -1000,6 +1000,8 @@ export class RoutineService {
               model,
               prompt: step.prompt,
               brains: hibachis.scopeIds.length ? hibachis.scopeIds : undefined,
+              // Hibachis the irori agent registers join the routine's workspace.
+              workspace: active.owner.kind === 'irori' ? active.input.workspaceId : undefined,
             },
             {
               preamble: stepPreamble(active.run.name, env),

@@ -14,7 +14,7 @@ import { AgentService } from '../src/agents/service';
 import { defaultAgentAccess } from '../src/domain/agent-access';
 import { writeDecision, type Delegation } from '../src/agents/delegation';
 import { brainAgentNames, subAgentDefinition } from '../src/domain/you';
-import { brainsPreamble, yourAiStarter } from '../prompts';
+import { brainsPreamble, iroriAgentSkills, yourAiStarter } from '../prompts';
 import type { AgentEvent, Space } from '../src/domain/types';
 
 const fixtureOptions = {
@@ -134,7 +134,12 @@ test('your AI’s folder is one per device record, and the starter never overwri
   assert.deepEqual(await readdir(path.join(ready.root, '.claude', 'agents')), []);
   // No brain-agents skill any more: irori writes the definitions itself.
   assert.deepEqual(Object.keys(yourAiStarter), ['AGENTS.md']);
-  assert.equal(existsSync(path.join(ready.root, '.agents')), false);
+  // The standard skills, and nothing else, under .agents.
+  assert.deepEqual(
+    (await readdir(path.join(ready.root, '.agents', 'skills'))).sort(),
+    Object.keys(iroriAgentSkills).sort(),
+  );
+  assert.deepEqual(ready.missingSkills, []);
   assert.equal(existsNoClaudeMd(await readdir(ready.root)), true);
   // A folder that already holds something else is left alone.
   const other = new YourAiService(path.join(base, 'other-device'), path.join(base, 'other'));
@@ -216,14 +221,16 @@ test('the irori agent’s folder takes the same Schema settings as a hibachi, co
   const after = await service.list(id);
   assert.deepEqual(after.rules, ['.claude/rules/tone.md']);
   assert.equal(after.claudeSettings, true);
-  // Its skills are listed from its own .agents/skills, as a hibachi's are.
+  // Its skills are listed from its own .agents/skills, as a hibachi's are,
+  // the standard skills irori wrote when the folder was made among them.
+  const standard = Object.keys(iroriAgentSkills);
   const skills = await readFolderSkills(await you.schemaFolder());
-  assert.deepEqual(
-    skills.skills.map((skill) => skill.name),
-    ['plan'],
-  );
+  assert.deepEqual(skills.skills.map((skill) => skill.name).sort(), [...standard, 'plan'].sort());
   await service.moveSkill(id, 'plan', 'weekly');
-  assert.deepEqual(await readdir(path.join(root, '.agents', 'skills')), ['weekly']);
+  assert.deepEqual(
+    (await readdir(path.join(root, '.agents', 'skills'))).sort(),
+    [...standard, 'weekly'].sort(),
+  );
   // A definition irori wrote is not a setting, and no alias leads out of the folder.
   await you.writeDefinitions('claude', [{ name: 'P', agent: 'hibachi-p', root: '/kb/p' }]);
   await assert.rejects(

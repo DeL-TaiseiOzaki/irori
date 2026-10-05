@@ -12,7 +12,7 @@ import {
   type YourAi,
   type YourAiEntry,
 } from '../domain/you';
-import { yourAiStarter } from '../../prompts';
+import { iroriAgentSkills, yourAiStarter } from '../../prompts';
 import { readTextDocument } from './files';
 import { readLocalJson, writeLocalJson } from './local-json';
 import type { SchemaFolder } from './schema-folder';
@@ -30,6 +30,9 @@ const relative = z
         !value.includes('\0') &&
         value.split('/').every((part) => part && part !== '.' && part !== '..')),
   );
+
+/** Where a standard skill's package is in the irori agent's folder. */
+const standardSkill = (name: string) => `.agents/skills/${name}`;
 
 function within(root: string, file: string) {
   const rel = path.relative(root, file);
@@ -77,7 +80,12 @@ export class YourAiService {
       .stat(path.join(root, 'AGENTS.md'))
       .then((stat) => stat.isFile())
       .catch(() => false);
-    return { id, root, state: ready ? 'ready' : 'missing' };
+    const missingSkills: string[] = [];
+    if (ready)
+      for (const name of Object.keys(iroriAgentSkills))
+        if (!(await fs.lstat(path.join(root, standardSkill(name))).catch(() => undefined)))
+          missingSkills.push(name);
+    return { id, root, state: ready ? 'ready' : 'missing', missingSkills };
   }
   async create(): Promise<YourAi> {
     const current = await this.status();
@@ -96,7 +104,47 @@ export class YourAiService {
       await fs.writeFile(file, text, { flag: 'wx' });
     }
     await fs.mkdir(path.join(current.root, '.claude', 'agents'), { recursive: true });
+    await this.writeSkills();
     return this.status();
+  }
+  /**
+   * Writes each standard skill whose folder is absent, for a folder set up
+   * before irori had them. A present folder is left as it is, edited, retired
+   * or emptied, and the person's own skills are never touched.
+   */
+  async addStandardSkills(): Promise<YourAi> {
+    if ((await this.status()).state !== 'ready')
+      throw Error(t('irori agent を用意してください。', 'Set up the irori agent first.'));
+    await this.writeSkills();
+    return this.status();
+  }
+  private async writeSkills() {
+    const { root } = await this.load();
+    for (const [name, text] of Object.entries(iroriAgentSkills)) {
+      const rel = standardSkill(name);
+      if (await fs.lstat(path.join(root, rel)).catch(() => undefined)) continue;
+      await this.folders(`${rel}/SKILL.md`);
+      await fs.writeFile(path.join(root, rel, 'SKILL.md'), text, { flag: 'wx' });
+    }
+  }
+  /**
+   * Makes the folders on the way to `rel` inside the irori agent's folder; a
+   * link or a file in their place stops the write.
+   */
+  private async folders(rel: string) {
+    const { root } = await this.load();
+    relative.parse(rel);
+    let dir = root;
+    for (const part of rel.split('/').slice(0, -1)) {
+      dir = path.join(dir, part);
+      const stat = await fs.lstat(dir).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return undefined;
+        throw error;
+      });
+      if (!stat) await fs.mkdir(dir);
+      else if (!stat.isDirectory())
+        throw Error(`${dir} is not a folder inside the irori agent’s folder`);
+    }
   }
   private async resolve(rel: string) {
     const { root } = await this.load();
@@ -186,19 +234,7 @@ export class YourAiService {
     const written: string[] = [];
     for (const brain of brains) {
       const rel = subAgentFiles[cli](brain.agent);
-      relative.parse(rel);
-      const parts = rel.split('/');
-      let dir = root;
-      for (const part of parts.slice(0, -1)) {
-        dir = path.join(dir, part);
-        const stat = await fs.lstat(dir).catch((error: NodeJS.ErrnoException) => {
-          if (error.code === 'ENOENT') return undefined;
-          throw error;
-        });
-        if (!stat) await fs.mkdir(dir);
-        else if (!stat.isDirectory())
-          throw Error(`${dir} is not a folder inside the irori agent’s folder`);
-      }
+      await this.folders(rel);
       try {
         await fs.writeFile(path.join(root, rel), subAgentDefinition(cli, brain), { flag: 'wx' });
         written.push(rel);

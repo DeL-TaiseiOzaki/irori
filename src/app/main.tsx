@@ -765,6 +765,14 @@ function App() {
       if (event.type === 'files') {
         setRevision((r) => r + 1);
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();
+      } else if (event.type === 'hibachis') {
+        // The irori agent registered a hibachi; the workspace on show takes it in.
+        const joined = event.workspace;
+        void refreshSpaces()
+          .then(() => {
+            if (joined) setWorkspace((open) => (open?.id === joined.id ? joined : open));
+          })
+          .catch(report);
       } else if (event.type === 'agent') {
         const incoming = event.event;
         if (incoming.scopeId) {
@@ -1022,6 +1030,7 @@ function App() {
       model: yourChoice.models[agentId] || undefined,
       prompt: message,
       brains,
+      workspace: workspace?.id,
     };
     const value = await host.agentConversation(you.id, agentId, target?.id);
     if (behind(input.conversationId, value)) {
@@ -1447,6 +1456,14 @@ function App() {
             running={yourAiRunning}
             revision={revision}
             onBack={() => goToLevel('overview')}
+            onAddSkills={async () => {
+              try {
+                await host.addYourAiSkills();
+              } catch (error) {
+                report(error);
+              }
+              setYouRevision((value) => value + 1);
+            }}
           />
         )}
         <PaneGroup

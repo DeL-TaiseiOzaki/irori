@@ -28,6 +28,7 @@ import { runHermes } from './hermes';
 import { ModelCatalog } from './models';
 import { personLinesBridge } from './person-lines';
 import { hibachiBridge } from './hibachi-bridge';
+import { iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
@@ -43,6 +44,7 @@ import {
 import { DeviceIdentity } from '../host/device';
 import {
   brainsCommandPreamble,
+  iroriCommandPreamble,
   brainsPreamble,
   commentsPointer,
   commentsSummary,
@@ -125,6 +127,9 @@ type Run = {
   turnId?: string;
   finish?: () => void;
   bridge?: () => void;
+  /** For your AI: the environment with the `irori` command, and its closing. */
+  env?: NodeJS.ProcessEnv;
+  commands?: () => void;
   closed: Promise<void>;
   close: () => void;
 };
@@ -138,6 +143,11 @@ export class AgentService {
   // Brains handed to the irori agent's runs in progress, with the runs that hold
   // them. A brain is busy while a sub-agent may be working in its checkout.
   private delegated = new Map<string, Set<string>>();
+  /**
+   * Carries out the irori agent's `irori` command (its arguments, the folder it
+   * ran in, and the request's workspace). Without it the command is not offered.
+   */
+  setup?: (argv: string[], cwd: string, context: { workspaceId?: string }) => Promise<string>;
   private requests = new Map<
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
@@ -168,6 +178,10 @@ export class AgentService {
         void this.stop(run);
       }
     });
+  }
+  /** Whether a run of the brain's own agent is in progress, apart from your AI's holds. */
+  running(scopeId: string) {
+    return this.scopeRuns(scopeId).length > 0;
   }
   /** Whether any run works in the space, its own or a sub-agent's: irori's own changes there wait. */
   busy(scopeId: string) {
@@ -395,7 +409,7 @@ export class AgentService {
           ),
         );
       for (const scopeId of brains) this.files.get(scopeId);
-    } else if (brains.length) throw Error('Only the irori agent takes hibachis');
+    } else if (brains.length || input.workspace) throw Error('Only the irori agent takes hibachis');
     let close!: () => void;
     let accept!: () => void;
     let reject!: (error: unknown) => void;
@@ -669,6 +683,17 @@ export class AgentService {
           }
         : this.files.get(input.scopeId);
       const promptParts: string[] = [];
+      // Every CLI the irori agent runs on gets the `irori` command for setup work.
+      if (you && this.setup) {
+        const setup = this.setup;
+        const commands = await iroriBridge(
+          this.files.dataDir,
+          ({ argv, cwd }) => setup(argv, cwd, { workspaceId: input.workspace }),
+          agentEnv(),
+        );
+        run.env = commands.env;
+        run.commands = commands.close;
+      }
       if (you && input.brains?.length) {
         const names = brainAgentNames(this.files.list());
         const brains = input.brains.map((scopeId) => {
@@ -708,6 +733,7 @@ export class AgentService {
           promptParts.push(brainsPreamble(brains, cli, comments));
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
+      if (run.commands) promptParts.push(iroriCommandPreamble);
       // Searches that walk the hibachi skip the links its connected folders appear through.
       const linked = you ? [] : (this.files.cloud?.linkedPaths?.(input.scopeId) ?? []);
       if (linked.length) promptParts.push(connectedFolders(linked));
@@ -859,7 +885,7 @@ export class AgentService {
                     ? personLinesNotice(this.files, this.authorship, brain.scopeId, tool, edit)
                     : undefined;
                 },
-                agentEnv(),
+                run.env ?? agentEnv(),
               );
         run.bridge = bridge?.close;
         // Pi and Hermes Agent load no sub-agents from files: your AI hands a
@@ -869,7 +895,7 @@ export class AgentService {
             ? await hibachiBridge(
                 this.files.dataDir,
                 (name, task, signal) => this.handOff(run, input, name, task, signal),
-                bridge?.env ?? agentEnv(),
+                bridge?.env ?? run.env ?? agentEnv(),
               )
             : undefined;
         if (command)
@@ -884,8 +910,8 @@ export class AgentService {
           access: run.access,
           model: input.model,
           env: run.step
-            ? { ...(command?.env ?? bridge?.env ?? agentEnv()), ...run.step.env }
-            : (command?.env ?? bridge?.env),
+            ? { ...(command?.env ?? bridge?.env ?? run.env ?? agentEnv()), ...run.step.env }
+            : (command?.env ?? bridge?.env ?? run.env),
           args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
@@ -923,6 +949,7 @@ export class AgentService {
       await this.cancelHeld(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();
+      run.commands?.();
       run.rpc?.fail(Error('Run finished'));
       if (run.cancelled) outcome = 'cancelled';
       if (record)
@@ -1070,7 +1097,7 @@ export class AgentService {
     model?: string,
   ) {
     const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd, {
-      ...agentEnv(),
+      ...(run.env ?? agentEnv()),
       ...run.step?.env,
     });
     run.child = child;
@@ -1274,7 +1301,7 @@ export class AgentService {
       options: {
         cwd,
         pathToClaudeCodeExecutable: 'claude',
-        env: { ...agentEnv(), ...run.step?.env },
+        env: { ...(run.env ?? agentEnv()), ...run.step?.env },
         settingSources: ['user', 'project', 'local'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',

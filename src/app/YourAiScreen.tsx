@@ -220,6 +220,7 @@ export function YourAiScreen({
   running,
   revision,
   onBack,
+  onAddSkills,
 }: {
   you: YourAi;
   /** The CLI your AI runs on. */
@@ -230,13 +231,19 @@ export function YourAiScreen({
   /** Counts the host's file changes, the Schema settings' own writes among them. */
   revision: number;
   onBack: () => void;
+  /** Writes the standard skills the folder lacks, which `you.missingSkills` names. */
+  onAddSkills: () => Promise<void>;
 }) {
   // Every read of the folder and the brains follows this count.
   const [local, setReads] = useState(0);
   const reads = local + revision;
   const reread = () => setReads((value) => value + 1);
+  // Which standard skills the folder lacks follows the folder, as the files do.
+  const status = useResource(() => host.yourAi(), [], { refresh: reads });
+  const missingSkills = status.data?.missingSkills ?? you.missingSkills;
   // The Schema settings first, as in a hibachi; the folder's files are one click away.
   const [schemaFiles, setSchemaFiles] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [target, setTarget] = useState<SchemaTarget | undefined>({
     kind: 'instructions',
     key: 'AGENTS.md',
@@ -310,6 +317,22 @@ export function YourAiScreen({
               <Icon name="schema" size={15} strokeWidth={1.9} />
               Schema
             </h2>
+            {missingSkills.length > 0 && (
+              <button
+                className="you-action"
+                disabled={running || adding}
+                aria-label={t('標準スキルを追加', 'Add the standard skills')}
+                title={`${t('標準スキルを追加', 'Add the standard skills')}: ${missingSkills.join(', ')}`}
+                onClick={() => {
+                  setAdding(true);
+                  void onAddSkills()
+                    .then(reread)
+                    .finally(() => setAdding(false));
+                }}
+              >
+                <Icon name="plus" size={14} />
+              </button>
+            )}
             <button
               className="you-action"
               aria-pressed={schemaFiles}

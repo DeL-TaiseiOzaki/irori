@@ -213,12 +213,17 @@ export class GitService {
   private async submodulePaths(s: Repo) {
     return new Set((await this.recorded(s)).map((m) => m.path));
   }
+  /**
+   * `fresh`: the repository is a hibachi just made in a new folder, which no
+   * run, save or connection can be working in, so it waits for none of them.
+   */
   private mutate<T>(
     id: GitTarget,
     fn: (s: Repo) => Promise<T>,
     resolve: (id: GitTarget) => Promise<Repo> = (id) => this.repo(id),
+    fresh = false,
   ): Promise<T> {
-    if (!this.canMutate())
+    if (!fresh && !this.canMutate())
       return Promise.reject(
         Error(
           t(
@@ -233,7 +238,7 @@ export class GitService {
     const next = (this.queues.get(key) ?? Promise.resolve())
       .catch(() => {})
       .then(async () => {
-        if (!this.canMutate())
+        if (!fresh && !this.canMutate())
           throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
         return fn(await resolve(id));
       });
@@ -1512,8 +1517,12 @@ export class GitService {
     }
     return { parent, destination };
   }
-  async clone(input: CloneRepository): Promise<CloneResult> {
-    if (!this.canMutate() || this.busy)
+  /**
+   * Clones into a new folder. `duringRuns`: the irori agent asked from its run,
+   * and a new folder is out of every run's reach, so runs do not stop it.
+   */
+  async clone(input: CloneRepository, duringRuns = false): Promise<CloneResult> {
+    if ((!duringRuns && !this.canMutate()) || this.busy)
       throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     if (!githubCloneURL(input.url)) throw cloneURLRequired();
     this.pending++;
@@ -1565,8 +1574,8 @@ export class GitService {
    * The folder of a new hibachi: created empty and made a Git repository on
    * `main`, ready for registration. Nothing is committed yet.
    */
-  async create(input: Pick<CreateSpace, 'parent' | 'folder'>): Promise<string> {
-    if (!this.canMutate() || this.busy)
+  async create(input: Pick<CreateSpace, 'parent' | 'folder'>, duringRuns = false): Promise<string> {
+    if ((!duringRuns && !this.canMutate()) || this.busy)
       throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     this.pending++;
     try {
@@ -1603,21 +1612,26 @@ export class GitService {
    * The first commit of a hibachi made here: only the files registration wrote.
    * Returns why it was not made (no author identity, a hook, signing) instead of failing.
    */
-  async firstCommit(id: string): Promise<string | undefined> {
+  async firstCommit(id: string, duringRuns = false): Promise<string | undefined> {
     try {
-      await this.mutate(id, async (s) => {
-        const paths = ['.irori/scope.json', '.gitignore'];
-        for (const p of paths) this.boundary(s, p);
-        await this.git(s, ['add', '--', ...paths.map(literal)]);
-        await this.git(s, [
-          'commit',
-          '--quiet',
-          '-m',
-          t(`hibachi「${s.name}」を作成`, `Create the hibachi ${s.name}`),
-          '--',
-          ...paths.map(literal),
-        ]);
-      });
+      await this.mutate(
+        id,
+        async (s) => {
+          const paths = ['.irori/scope.json', '.gitignore'];
+          for (const p of paths) this.boundary(s, p);
+          await this.git(s, ['add', '--', ...paths.map(literal)]);
+          await this.git(s, [
+            'commit',
+            '--quiet',
+            '-m',
+            t(`hibachi「${s.name}」を作成`, `Create the hibachi ${s.name}`),
+            '--',
+            ...paths.map(literal),
+          ]);
+        },
+        undefined,
+        duringRuns,
+      );
     } catch (error) {
       const [advice, ...detail] = (error as Error).message.split('\n\n');
       return [

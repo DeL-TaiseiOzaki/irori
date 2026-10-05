@@ -236,6 +236,7 @@ export const hostArguments = {
   start: z.tuple([startInput]),
   yourAi: z.tuple([]),
   createYourAi: z.tuple([]),
+  addYourAiSkills: z.tuple([]),
   yourAiEntries: z.tuple([path]),
   yourAiRead: z.tuple([path]),
   yourAiBrains: z.tuple([z.array(id).max(50)]),

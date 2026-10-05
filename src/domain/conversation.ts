@@ -31,6 +31,8 @@ export const messageInput = z.object({
   personLines: z.boolean().optional(),
   /** Brains handed to your AI; refused for a brain's own AI. */
   brains: z.array(z.uuid()).max(50).optional(),
+  /** The workspace an irori agent request was sent in; refused for a brain's own AI. */
+  workspace: z.uuid().optional(),
 });
 export const startInput = messageInput.extend({
   scopeId: z.uuid(),
