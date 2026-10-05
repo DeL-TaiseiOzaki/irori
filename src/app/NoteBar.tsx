@@ -4,7 +4,7 @@ import { Popover } from '@base-ui/react/popover';
 import type { Layer, Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
-import { layerNames } from './BrainPanel';
+import { knowledgeFolder, layerLabel } from '../domain/layers';
 import { Icon, type IconName } from './Icon';
 
 const layerIcons: Record<Layer, IconName> = {
@@ -20,13 +20,13 @@ export function fileCrumbs(space: Space | undefined, layer: Layer, path: string)
   const parts = path.split('/');
   const file = parts.pop()!.replace(/\.md$/i, '');
   const folders =
-    layer === 'Knowledge_Base' && parts[0] === 'Knowledge_Base'
+    layer === 'Knowledge_Base' && space && parts[0] === knowledgeFolder(space)
       ? parts.slice(1)
       : layer === 'contents' && space?.contents.includes(parts[0])
         ? parts.slice(1)
         : parts;
   const items: Crumb[] = [
-    { icon: layerIcons[layer], label: layerNames[layer], className: `layer ${layer}` },
+    { icon: layerIcons[layer], label: layerLabel(space, layer), className: `layer ${layer}` },
     ...folders.map((folder) => ({ label: folder, className: 'folder' })),
   ];
   return { items, here: file };

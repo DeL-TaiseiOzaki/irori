@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readLocalJson, writeLocalJson } from '../host/local-json';
@@ -160,6 +161,18 @@ export class AuthorshipStore {
       if (added) await writeLocalJson(this.file(ref), bounded(record, text));
       // A record this store cannot read back is the same as none at all, so the
       // write is checked here rather than discovered as silent forgetting later.
+    });
+  }
+  /**
+   * Keeps the records of a renamed layer folder's files under their new paths
+   * (ADR 024). The bytes did not change, so each record moves as it is.
+   */
+  renameFiles(scopeId: string, moves: [from: string, to: string][]) {
+    return this.queue.run(async () => {
+      for (const [from, to] of moves)
+        await fs
+          .rename(this.file({ scopeId, path: from }), this.file({ scopeId, path: to }))
+          .catch(() => {});
     });
   }
   /**

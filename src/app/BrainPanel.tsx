@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { knowledgeFolder, layerLabel } from '../domain/layers';
 import { Menu } from '@base-ui/react/menu';
 import {
   Group as PaneGroup,
@@ -27,11 +28,6 @@ const layerIcons: Record<Layer, IconName> = {
   schema: 'schema',
   Knowledge_Base: 'book',
   contents: 'cloud',
-};
-export const layerNames: Record<Layer, string> = {
-  schema: 'Schema',
-  Knowledge_Base: 'Knowledge',
-  contents: 'Contents',
 };
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 
@@ -82,7 +78,7 @@ export function Tree({
       refresh: revision,
     },
   );
-  const [expanded, setExpanded] = useState<string[]>(directory ? [] : ['Knowledge_Base']);
+  const [expanded, setExpanded] = useState<string[]>(directory ? [] : [knowledgeFolder(space)]);
   const data =
     roots ??
     (listing.data || listing.error
@@ -380,6 +376,8 @@ export function BrainPanel({
     if (layer !== 'contents')
       return (
         <Tree
+          // Opened again on the knowledge folder under its new name (ADR 024).
+          key={`${layer}:${knowledgeFolder(space)}`}
           space={space}
           layer={layer}
           roots={roots}
@@ -513,8 +511,8 @@ export function BrainPanel({
                   key={`${layer}-handle`}
                   className="section-handle"
                   aria-label={t(
-                    `${layerNames[shown[index - 1].layer]} と ${layerNames[layer]} の境界`,
-                    `Border between ${layerNames[shown[index - 1].layer]} and ${layerNames[layer]}`,
+                    `${layerLabel(space, shown[index - 1].layer)} と ${layerLabel(space, layer)} の境界`,
+                    `Border between ${layerLabel(space, shown[index - 1].layer)} and ${layerLabel(space, layer)}`,
                   )}
                 />
               ),
@@ -538,7 +536,7 @@ export function BrainPanel({
                   );
                 }}
               >
-                <section className={`brain-section ${layer}`} aria-label={layerNames[layer]}>
+                <section className={`brain-section ${layer}`} aria-label={layerLabel(space, layer)}>
                   <div className="section-heading">
                     <button
                       className="section-toggle"
@@ -556,7 +554,7 @@ export function BrainPanel({
                         strokeWidth={1.9}
                         className="layer-icon"
                       />
-                      <span>{layerNames[layer]}</span>
+                      <span>{layerLabel(space, layer)}</span>
                     </button>
                     {actions[layer]}
                   </div>

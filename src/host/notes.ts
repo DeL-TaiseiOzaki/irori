@@ -5,13 +5,14 @@ import { classify } from '../domain/scopes';
 import {
   dailyNotePath,
   dateTokens,
-  defaultNoteDirectory,
+  defaultNoteDirectoryOf,
   expandTokens,
   notesDeclaration,
   notesDeclarationFile,
   type NotesDeclaration,
 } from '../domain/notes';
 import { t } from '../domain/i18n';
+import { renamedPath } from '../domain/layers';
 
 async function insideKnowledge(files: FileService, scopeId: string, relative: string) {
   const space = files.get(scopeId);
@@ -66,9 +67,50 @@ export async function readNotesDeclaration(
   return declaration;
 }
 
+/**
+ * Keeps `.irori/notes.json` pointing at the same places after the knowledge
+ * folder is renamed (ADR 024). Only the paths change; the rest of the file stays
+ * as written. Returns whether the file was rewritten.
+ */
+export async function renameInNotesDeclaration(
+  files: FileService,
+  scopeId: string,
+  from: string,
+  to: string,
+) {
+  let doc: Document;
+  try {
+    doc = await files.read(scopeId, notesDeclarationFile);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+  const raw = JSON.parse(doc.text.replace(/^\uFEFF/, '')) as {
+    newNoteDirectory?: unknown;
+    daily?: { path?: unknown; template?: unknown };
+  };
+  let changed = false;
+  const carry = (value: unknown) => {
+    const next = typeof value === 'string' ? renamedPath(value, from, to) : undefined;
+    if (next !== undefined) changed = true;
+    return next ?? value;
+  };
+  if (raw.newNoteDirectory !== undefined) raw.newNoteDirectory = carry(raw.newNoteDirectory);
+  if (raw.daily && typeof raw.daily === 'object') {
+    if (raw.daily.path !== undefined) raw.daily.path = carry(raw.daily.path);
+    if (raw.daily.template !== undefined) raw.daily.template = carry(raw.daily.template);
+  }
+  if (!changed) return false;
+  await files.save({ ...doc, text: JSON.stringify(raw, null, 2) + '\n' });
+  return true;
+}
+
 /** The directory the new-note dialog offers for this KB. */
 export async function noteDirectory(files: FileService, scopeId: string): Promise<string> {
-  return (await readNotesDeclaration(files, scopeId))?.newNoteDirectory ?? defaultNoteDirectory;
+  return (
+    (await readNotesDeclaration(files, scopeId))?.newNoteDirectory ??
+    defaultNoteDirectoryOf(files.get(scopeId))
+  );
 }
 
 /**

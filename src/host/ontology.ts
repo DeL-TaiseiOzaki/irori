@@ -3,7 +3,8 @@ import type { FileService } from './files';
 import { classify } from '../domain/scopes';
 import type { Document, Entry } from '../domain/types';
 import { ontologyDeclaration, ontologyGraph, type OntologyView } from '../domain/ontology';
-import { graphIndexDeclaration, graphIndexFiles } from '../domain/graph-index';
+import { graphIndexAt, graphIndexDeclaration } from '../domain/graph-index';
+import { knowledgeFolder } from '../domain/layers';
 import { t } from '../domain/i18n';
 
 /** Refuses a path outside this KB's knowledge layer or reached through an alias, without opening it. */
@@ -81,7 +82,7 @@ function moduleNoteResolver(files: FileService, scopeId: string) {
 /**
  * The graph a KB shows: the pair `.irori/ontology.json` declares when there is
  * one, else the graph index the knowledge base carries when
- * `Knowledge_Base/ontology/entities.csv` exists, read with the module's own
+ * `ontology/entities.csv` in its knowledge folder exists, read with the module's own
  * column mapping and the relation table when present. Both go through the same
  * parser and validations.
  */
@@ -107,10 +108,12 @@ export async function readOntology(
       }),
     );
   } else {
+    const root = knowledgeFolder(files.get(scopeId));
+    const graphIndexFiles = graphIndexAt(root).files;
     const entities = await knowledgeFile(files, scopeId, graphIndexFiles.entities);
     if (!entities) return null;
     const relations = await knowledgeFile(files, scopeId, graphIndexFiles.relations);
-    declaration = graphIndexDeclaration(relations !== undefined);
+    declaration = graphIndexDeclaration(relations !== undefined, root);
     source = 'module';
     documents = relations ? [entities, relations] : [entities];
   }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
 import { categoryName } from '../domain/brains';
@@ -407,11 +408,11 @@ function BrainColumn({
     refresh: revision,
   });
   const knowledgeRoot = roots.data?.some(
-    (entry) => entry.path === 'Knowledge_Base' && entry.directory,
+    (entry) => entry.path === knowledgeFolder(space) && entry.directory,
   );
   const knowledgeRead = useResource(
-    () => host.entries(space.scopeId, 'Knowledge_Base'),
-    [space.scopeId],
+    () => host.entries(space.scopeId, knowledgeFolder(space)),
+    [space.scopeId, knowledgeFolder(space)],
     { enabled: !!knowledgeRoot, refresh: revision },
   );
   const skills = useResource(() => host.skills(space.scopeId), [space.scopeId], {

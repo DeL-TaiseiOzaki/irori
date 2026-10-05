@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { samePath, type LinkUpdate } from '../domain/note-links';
 import { noteReferenceCount, rewriteNoteReferences } from './note-references';
@@ -6,6 +7,8 @@ import type { Document } from '../domain/types';
 import type { FileService } from './files';
 import type { SearchService } from './search';
 import { foldsCase } from './links';
+import { layerRoots, renamedPath } from '../domain/layers';
+import { owner } from '../domain/scopes';
 
 /** The other notes whose links lead to `target`, as the backlink scan finds them. */
 async function linking(search: SearchService, scopeId: string, target: string, foldCase?: boolean) {
@@ -30,7 +33,13 @@ export async function referringLinks(
   for (const note of found.paths) {
     let links = 0;
     try {
-      links = noteReferenceCount((await files.read(scopeId, note)).text, note, target, foldCase);
+      links = noteReferenceCount(
+        (await files.read(scopeId, note)).text,
+        note,
+        target,
+        foldCase,
+        layerRoots(files.get(scopeId)),
+      );
     } catch {
       result.incomplete = true;
     }
@@ -71,7 +80,13 @@ export async function relink(
   const result: LinkUpdate = { self: 0, notes: 0, links: 0, skipped: [], incomplete: false };
   const write = async (note: Document, at: string, moved: (path: string) => string | undefined) => {
     if (note.draft && note.draft.text !== note.text) throw Error('Unsaved text');
-    const rewritten = rewriteNoteReferences(note.text, at, note.path, moved);
+    const rewritten = rewriteNoteReferences(
+      note.text,
+      at,
+      note.path,
+      moved,
+      layerRoots(files.get(note.scopeId)),
+    );
     if (!rewritten.links) return { doc: note, links: 0 };
     const saved = await files.save({ ...note, text: rewritten.text });
     await onSaved?.(note, saved);
@@ -103,4 +118,62 @@ export async function relink(
     }
   }
   return { doc, links: result };
+}
+
+/**
+ * After a layer folder rename (ADR 024): rewrites every link in the hibachi's
+ * Markdown files that led into `from` so it leads to the same file under `to`,
+ * including the links of the moved files themselves. Contents is not walked: its
+ * files are the originals of other places. Each write is the ordinary
+ * hash-checked save, so a file changed meanwhile or holding unsaved text is
+ * skipped rather than overwritten.
+ */
+export async function relinkFolder(
+  files: FileService,
+  scopeId: string,
+  from: string,
+  to: string,
+  onSaved?: (before: Document, after: Document) => Promise<void>,
+) {
+  const space = files.get(scopeId);
+  const roots = [...layerRoots(space), from];
+  const pages: string[] = [];
+  const visit = async (directory: string, prefix: string) => {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const p = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (
+          ['.git', 'node_modules'].includes(entry.name) ||
+          space.contents.some((root) => p === root) ||
+          owner(files.list(), path.join(space.root, p))?.scopeId !== scopeId
+        )
+          continue;
+        await visit(path.join(directory, entry.name), p);
+      } else if (entry.isFile() && /\.md$/i.test(entry.name)) pages.push(p);
+    }
+  };
+  await visit(space.root, '');
+  const result = { notes: 0, links: 0, skipped: [] as string[] };
+  for (const page of pages) {
+    try {
+      const note = await files.read(scopeId, page);
+      if (note.draft && note.draft.text !== note.text) throw Error('Unsaved text');
+      const at = renamedPath(page, to, from) ?? page;
+      const rewritten = rewriteNoteReferences(
+        note.text,
+        at,
+        page,
+        (p) => renamedPath(p, from, to),
+        roots,
+      );
+      if (!rewritten.links) continue;
+      const saved = await files.save({ ...note, text: rewritten.text });
+      await onSaved?.(note, saved);
+      result.notes++;
+      result.links += rewritten.links;
+    } catch {
+      result.skipped.push(page);
+    }
+  }
+  return result;
 }

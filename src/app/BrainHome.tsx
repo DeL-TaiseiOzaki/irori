@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { knowledgeFolder, layerLabel } from '../domain/layers';
 import type { CloudConnection, Entry, Layer, Space } from '../domain/types';
 import type { GitStatus } from '../domain/git';
 import type { AgentSkill } from '../domain/skills';
@@ -132,11 +133,11 @@ export function BrainHome({
 }) {
   const [reach, setReach] = useState(false);
   const knowledgeRoot = roots?.entries.some(
-    (entry) => entry.path === 'Knowledge_Base' && entry.directory,
+    (entry) => entry.path === knowledgeFolder(space) && entry.directory,
   );
   const knowledgeRead = useResource(
-    () => host.entries(space.scopeId, 'Knowledge_Base'),
-    [space.scopeId],
+    () => host.entries(space.scopeId, knowledgeFolder(space)),
+    [space.scopeId, knowledgeFolder(space)],
     { enabled: !!knowledgeRoot, refresh: revision },
   );
   const history = useResource(() => host.knowledgeHistory(space.scopeId), [space.scopeId], {
@@ -266,7 +267,7 @@ export function BrainHome({
         )}
         <Card
           layer="Knowledge_Base"
-          title="Knowledge"
+          title={layerLabel(space, 'Knowledge_Base')}
           action={
             <button className="stage-text-button framed small" disabled={locked} onClick={onGraph}>
               <Icon name="graph" size={14} />
@@ -288,7 +289,7 @@ export function BrainHome({
         </Card>
         <Card
           layer="contents"
-          title="Contents"
+          title={layerLabel(space, 'contents')}
           action={
             <button
               className="stage-text-button framed small"

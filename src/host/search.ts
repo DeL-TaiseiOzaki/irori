@@ -10,6 +10,7 @@ import { FileService, textFilePattern } from './files';
 import { foldsCase } from './links';
 import { SearchIndex, trigramQuery } from './search-index';
 import { referencesTo } from './note-references';
+import { layerRoots } from '../domain/layers';
 import { t } from '../domain/i18n';
 
 export const searchLimits = {
@@ -58,8 +59,11 @@ export class SearchService {
   /** Move previews include the OKF relation and source fields as well as body links. */
   async references(scopeId: string, target: string, foldCase?: boolean): Promise<KnowledgeSearch> {
     foldCase ??= await foldsCase(this.files, scopeId, target);
+    const roots = layerRoots(this.files.get(scopeId));
     return this.scan(scopeId, target, /\.md$/i, (from, text) =>
-      samePath(from, target, foldCase) ? () => null : referencesTo(text, from, target, foldCase),
+      samePath(from, target, foldCase)
+        ? () => null
+        : referencesTo(text, from, target, foldCase, roots),
     );
   }
 

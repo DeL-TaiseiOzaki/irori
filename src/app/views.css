@@ -1267,6 +1267,38 @@ button.home-row:hover {
   opacity: 0;
   cursor: pointer;
 }
+.brain-sheet-layers h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.brain-sheet-layer-grid {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+  max-width: 520px;
+}
+.brain-sheet-layer {
+  display: contents;
+}
+.brain-sheet-layer-head {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.brain-sheet-layer input {
+  min-width: 0;
+}
+.brain-sheet-layer small[role='alert'] {
+  grid-column: 2 / -1;
+  font-size: 12px;
+  color: var(--del-ink);
+}
+.brain-sheet-layer .layer-icon.Knowledge_Base {
+  color: var(--know);
+}
+.brain-sheet-layer .layer-icon.contents {
+  color: var(--cont);
+}
 .brain-sheet-colors h3 {
   margin: 0 0 12px;
   font-size: 14px;

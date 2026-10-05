@@ -18,6 +18,10 @@ export interface ScopeDeclaration {
   /** personal / team / organization; a brain may carry none (ADR 014). */
   category?: Category;
   contents: string[];
+  /** The knowledge folder when it is not `Knowledge_Base` (ADR 024). */
+  knowledge?: string;
+  /** The names the Knowledge and Contents layers are shown under (ADR 024). */
+  labels?: Partial<Record<import('./layers').NamedLayer, string>>;
   /** The brain's tile as everyone who opens the KB sees it. */
   appearance?: import('./brains').BrainLook;
 }
@@ -26,6 +30,19 @@ export interface SpaceChange {
   name?: string;
   category?: Category | null;
   appearance?: import('./brains').BrainLook | null;
+  /** Each layer's shown name; an empty or `null` one returns to irori's. */
+  labels?: Partial<Record<import('./layers').NamedLayer, string | null>> | null;
+}
+/** What a layer folder rename did, and what it could not carry over. */
+export interface LayerFolderRename {
+  space: Space;
+  previous: string;
+  /** Links rewritten, and in how many files. */
+  links: number;
+  notes: number;
+  /** Files whose links could not be rewritten: changed meanwhile, unsaved, or unreadable. */
+  skipped: string[];
+  notice?: string;
 }
 export interface Space extends ScopeDeclaration {
   root: string;
@@ -428,6 +445,15 @@ export interface HostAPI {
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
   /** Changes a brain's name, category or look in its `.irori/scope.json`. */
   updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
+  /**
+   * Renames the hibachi's knowledge or contents folder on disk and in its
+   * declaration, carrying the links, comments and records that name its paths.
+   */
+  renameLayerFolder(
+    scopeId: string,
+    layer: import('./layers').NamedLayer,
+    name: string,
+  ): Promise<LayerFolderRename>;
   /** Keeps an image in the brain's `.irori/` as its icon and returns its path. */
   saveSpaceIcon(scopeId: string, bytes: Uint8Array): Promise<string>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;

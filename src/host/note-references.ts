@@ -2,11 +2,15 @@ import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
 import { frontmatterBlock } from '../domain/graph-index';
 import { linkCount, linksTo, resolveNoteLink, rewriteLinks, samePath } from '../domain/note-links';
 import { t } from '../domain/i18n';
+import { defaultContentsFolder, defaultKnowledgeFolder } from '../domain/layers';
+
+/** The layer folders an OKF `sources` path may start from instead of from its page. */
+const defaultRoots: readonly string[] = [defaultKnowledgeFolder, defaultContentsFolder];
 
 type Reference = { start: number; end: number; href: string; rooted: boolean };
 
 /** Read scalar locations, not a reserialised YAML document: comments and unrelated bytes stay. */
-function metadata(text: string) {
+function metadata(text: string, roots: readonly string[]) {
   const block = frontmatterBlock(text);
   if (block === undefined) return { body: 0, references: [] as Reference[] };
   const start =
@@ -57,11 +61,12 @@ function metadata(text: string) {
             'Multi-line frontmatter references cannot be updated automatically.',
           ),
         );
+      const href = value.value;
       references.push({
         start: start + from,
         end: start + to,
-        href: value.value,
-        rooted: key === 'sources' && /^(?:Knowledge_Base|contents)\//.test(value.value),
+        href,
+        rooted: key === 'sources' && roots.some((root) => href.startsWith(root + '/')),
       });
     }
   }
@@ -87,8 +92,14 @@ function scalar(value: string, before: string) {
 }
 
 /** Count actual OKF references and Markdown body links, never a description containing Markdown. */
-export function noteReferenceCount(text: string, from: string, target: string, foldCase = false) {
-  const { body, references } = metadata(text);
+export function noteReferenceCount(
+  text: string,
+  from: string,
+  target: string,
+  foldCase = false,
+  roots = defaultRoots,
+) {
+  const { body, references } = metadata(text, roots);
   return (
     linkCount(text.slice(body), from, target, foldCase) +
     references.filter((reference) => {
@@ -99,8 +110,14 @@ export function noteReferenceCount(text: string, from: string, target: string, f
 }
 
 /** A line matcher for the existing guarded/indexed scan used by move previews and updates. */
-export function referencesTo(text: string, from: string, target: string, foldCase = false) {
-  const { body, references } = metadata(text);
+export function referencesTo(
+  text: string,
+  from: string,
+  target: string,
+  foldCase = false,
+  roots = defaultRoots,
+) {
+  const { body, references } = metadata(text, roots);
   const at = new Set<number>();
   for (const reference of references) {
     const link = resolveNoteLink(origin(from, reference), reference.href);
@@ -132,8 +149,9 @@ export function rewriteNoteReferences(
   from: string,
   to: string,
   moved: (path: string) => string | undefined,
+  roots = defaultRoots,
 ) {
-  const { body, references } = metadata(text);
+  const { body, references } = metadata(text, roots);
   let output = '',
     cursor = 0,
     links = 0;

@@ -11,6 +11,7 @@ import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
+import { layerFolderName } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes } from './routines';
 import { newComment } from './comments';
@@ -175,9 +176,18 @@ export const hostArguments = {
         name: name.optional(),
         category: z.enum(['personal', 'team', 'organization']).nullable().optional(),
         appearance: brainLook.nullable().optional(),
+        labels: z
+          .object({
+            Knowledge_Base: z.string().max(40).nullable().optional(),
+            contents: z.string().max(40).nullable().optional(),
+          })
+          .strict()
+          .nullable()
+          .optional(),
       })
       .strict(),
   ]),
+  renameLayerFolder: z.tuple([id, z.enum(['Knowledge_Base', 'contents']), layerFolderName]),
   saveSpaceIcon: z.tuple([
     id,
     z.instanceof(Uint8Array).refine((value) => value.length <= 2 * 1024 * 1024),
