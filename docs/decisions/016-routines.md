@@ -271,7 +271,8 @@ decisions above left open:
   the agent panel beside it.
   Updated by the owner on 2026-10-05: routines has its own button in the rail,
   between irori mode and the hibachis. Its page retains the owner groups,
-  agent panel and secrets, and now owns the device's JavaScript switch.
+  agent panel and secrets, and now owns the device's JavaScript switch
+  (moved to the settings in stage 4).
   irori mode offers only the map and columns. The new GPT Image mark matches
   the existing sculpted-paper icons, with circular charcoal arrows around an
   orange flame.
@@ -356,6 +357,30 @@ decisions above left open:
   a store that protects nothing, so the UI smoke runs on a display without a
   keychain. A packaged app ignores it.
 
+## Stage 4 as built
+
+Implemented on 2026-10-06 (0.1.77). The owner found the routines page hard to
+use: it offered no way to make a routine, opened on a JavaScript switch that
+meant nothing without one, and listed folder paths instead. They chose both
+ways of making one:
+
+- **On the page.** **新しいルーティン** makes a folder in the irori agent's
+  `routines/` or a hibachi's `.irori/routines/` with a `routine.yaml` whose one
+  agent step has an empty `prompt`, so it is invalid until the person writes
+  it, and opens it in an editor. The editor (also on each row) saves
+  `routine.yaml` only, refusing a save over a change made since it opened.
+  This narrows "irori never writes into a routine's folder" to: never during a
+  run, and otherwise only a folder the person makes or a `routine.yaml` the
+  person saves. D4 still applies: a saved change is reviewed before the next
+  run.
+- **Through the irori agent.** **irori agent に頼む** puts the start of a
+  request in its message box. The standard skill `write-routine` gives the
+  format and its limits, and `irori routines` reports each routine as the host
+  reads it (`list` with the request's workspace, or the irori agent's alone).
+  The command only reads; the person still starts every run.
+- **The JavaScript switch** moved from the page to the settings, under
+  **ルーティン**; a row that needs JavaScript still offers it.
+
 ## Stages
 
 1. `routine.yaml`, discovery in both locations, D4's review, **実行** and
@@ -364,7 +389,8 @@ decisions above left open:
 2. D5's secrets, with write-back. Done in 0.1.72.
 3. The Python runtime.
 4. A skill in the irori agent's starter that tells it how to write a routine,
-   and a check it can run before asking the person to run one.
+   and a check it can run before asking the person to run one. Done in 0.1.77,
+   with making and editing a routine on the routines page.
 
 Each stage runs `npm run build`, `npm test` and `xvfb-run -a npm run test:ui`,
 with disposable folders for routines that write files.

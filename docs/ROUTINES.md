@@ -5,8 +5,8 @@ button: it runs programs and instructs agents, in order. It is irori's general
 way to gather what a person holds in other tools, such as mail and chat, and
 anything else that repeats. The decisions are in
 [ADR 016](decisions/016-routines.md); this page describes what stages 1
-(0.1.57) and 2 (secrets, 0.1.72) do. Python (stage 3) and the irori agent's
-skill for writing routines (stage 4) are not built yet.
+(0.1.57), 2 (secrets, 0.1.72) and 4 (making one, 0.1.77) do. Python (stage 3)
+is not built yet.
 
 ## A routine
 
@@ -40,15 +40,36 @@ steps:
   sentence, and it never runs.
 - Up to 20 steps. The folder holds at most 100 files and 5 MiB, and no links;
   `.DS_Store` is ignored.
-- irori never writes into a routine's folder.
+- irori writes into a routine's folder only when the person makes a routine
+  or saves its `routine.yaml` on the routines page (below); never during a run.
+
+## Making one
+
+The routines page's header has **新しいルーティン** and **irori agent に頼む**.
+
+- **新しいルーティン** asks for a name and a place: the irori agent (once it is
+  set up) or a hibachi of the workspace. irori makes a new folder named after
+  it (characters a file system refuses become `-`; a taken name gets ` 2`,
+  ` 3`…) holding a `routine.yaml` with one agent step whose `prompt` is empty,
+  so it cannot run until the person writes it. The editor opens at once.
+- **The editor** (the pencil on a routine's row) edits `routine.yaml` in place.
+  **保存** writes it unless it changed since it was opened, then shows why the
+  routine still cannot run, if it cannot, and stays open; otherwise it closes.
+  The next **実行** reviews the change as after any other.
+- **irori agent に頼む** switches the agent panel to the irori agent and puts
+  **ルーティンを作って：** in its message box for the person to finish. The irori
+  agent's standard skill `write-routine` (in `.agents/skills/`, added to an
+  older folder with the other missing skills) says how to write one, and
+  `irori routines` lists every routine as irori reads it: ready, what the
+  device needs, or why it cannot run.
 
 ## Running one
 
 The left rail's **ルーティン** / **Routines** button, between irori mode and the
 hibachis, opens the dedicated routines page. It lists the irori agent's routines
-and those of the workspace's hibachis, grouped by owner. The page also holds the
-device's **JavaScript** switch under **実行環境** / **Runtimes**, and the
-**シークレット** / **Secrets** list. irori mode keeps its map and columns,
+and those of the workspace's hibachis, grouped by owner. The page also holds
+the **シークレット** / **Secrets** list. The device's **JavaScript** switch is
+in **設定** under **ルーティン**. irori mode keeps its map and columns,
 remembering the chosen view when you return. The routines page also works in
 a workspace without hibachis. The agent panel stays beside it, so a
 routine's agent steps can be followed in their conversations. The list is read
@@ -65,8 +86,8 @@ again every five seconds and whenever a hibachi's files change.
   **変更あり** and the next **実行** shows the difference line by line. The host
   runs a changed routine only with the digest of the files the review showed.
 - **What a device needs** is named in the row before a run: **JavaScript が必要です。**
-  with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in the
-  page under 実行環境), `<command> が見つかりません。` for a missing `PATH`
+  with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in
+  設定 under ルーティン), `<command> が見つかりません。` for a missing `PATH`
   command, **Python はまだ使えません。** for `.py`, and
   **シークレット <NAME> がありません。** with **<NAME> を入力** for a secret not
   stored yet. On a device whose OS keeps no key, the row says
@@ -176,9 +197,11 @@ Files in irori's data directory:
 Discovery, review, execution and records are `src/host/routines.ts`
 (`RoutineService`); the types, the difference and step labels are
 `src/domain/routines.ts`. The renderer reaches them through `HostAPI`:
-`routines(workspaceId)`, `reviewRoutine(ref)`, `runRoutine(ref, { workspaceId,
-digest, agents })`, `stopRoutine(ref)`, `routineRuns(ref)`, and `routine`
-events carrying a run. JavaScript is the device setting `routineRuntimes`.
+`routines(workspaceId)`, `createRoutine(owner, name)`, `routineSource(ref)`,
+`saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
+`runRoutine(ref, { workspaceId, digest, agents })`, `stopRoutine(ref)`,
+`routineRuns(ref)`, and `routine` events carrying a run. The irori agent's
+`irori routines` reads the same list (`src/host/agent-setup.ts`). JavaScript is the device setting `routineRuntimes`.
 Secrets are `src/host/keystore.ts` (`SecretStore`, the hiding of values, the
 write-back reader), reached through `secrets()`, `setSecret(name, value)` and
 `deleteSecret(name)`; no method returns a value.
@@ -203,14 +226,20 @@ line) and no saved session. Document content cannot start a routine.
   person's session, with the preamble, the environment and its conversation
   line; a `[FAILED]` report; a step waiting for the hibachi and **停止** during
   an agent step; an irori agent routine handing a named hibachi; an
-  unfinished run marked unknown and not repeated.
+  unfinished run marked unknown and not repeated; a new routine's folder
+  name and template, an edit refused after a crossing change, and
+  `irori routines` with and without a workspace.
+- `tests/irori-command.test.ts`: `irori routines` parsed, and the
+  `write-routine` skill a valid package.
 - `tests/settings.test.ts`: `routineRuntimes` kept and bounded.
 - `tests/keystore.test.ts`: the secure-storage check (Linux `basic_text`
   refused), names and values, the store sealing, listing, refusing without a
   key and keeping concurrent write-backs, hiding values that arrive in pieces,
   and the write-back reader.
 - `scripts/routines-ui-smoke.ts` in the app: an invalid routine's reason,
-  JavaScript added from the row, the review and the difference, a run's steps,
+  a routine made from **新しいルーティン** and saved from the editor (with a
+  reason shown while it still cannot run), **irori agent に頼む** filling the
+  message box, JavaScript added from the row and switched in 設定, the review and the difference, a run's steps,
   output, changed files and history, the gate, **停止**, a secret entered from
   its row, listed in the review, hidden in the output, written back and
   deleted (with the reversible test store, since the display has no keychain), an agent step's request

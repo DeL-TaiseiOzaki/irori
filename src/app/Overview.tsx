@@ -22,7 +22,7 @@ import { useResource } from './useResource';
 import { currentStep, lastRun, openRequest, useBrainAi, type BrainAi } from './useBrainAi';
 import type { YourAi } from '../domain/you';
 import { openTasks, YourAiPanel } from './YourAiPanel';
-import { RoutinesView } from './RoutinesView';
+import { routineOwners, RoutinesView } from './RoutinesView';
 import type { RunRoutine } from '../domain/routines';
 import './overview.css';
 
@@ -776,6 +776,9 @@ export function Overview({
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
   const [islandChoice, setIsland] = useState<'you' | 'brains'>('you');
+  const [creatingRoutine, setCreatingRoutine] = useState(false);
+  // Words put in the irori agent's message box by 「irori agent に頼む」; `key` places them again.
+  const [yourSeed, setYourSeed] = useState<{ text: string; key: number }>();
   const island = hibachiAgent ? islandChoice : 'you';
   const yourAi = (you && ais[you.id]) ?? idle;
   // What the Overview itself did (a send, a resume) is read back at once.
@@ -886,6 +889,31 @@ export function Overview({
               />
             )}
             <span className="overview-space" />
+            {routines && (
+              <>
+                <button
+                  className="panel-button"
+                  onClick={() => {
+                    setIsland('you');
+                    setYourSeed((seed) => ({
+                      text: t('ルーティンを作って：', 'Write a routine: '),
+                      key: (seed?.key ?? 0) + 1,
+                    }));
+                  }}
+                >
+                  <Icon name="sparkles" size={14} />
+                  {t('irori agent に頼む', 'Ask the irori agent')}
+                </button>
+                <button
+                  className="panel-button overview-add"
+                  disabled={!routineOwners(you, spaces).length}
+                  onClick={() => setCreatingRoutine(true)}
+                >
+                  <Icon name="plus" size={14} />
+                  {t('新しいルーティン', 'New routine')}
+                </button>
+              </>
+            )}
             {!routines && (
               <>
                 <button
@@ -918,6 +946,8 @@ export function Overview({
               spaces={spaces}
               you={you}
               revision={revision}
+              creating={creatingRoutine}
+              onCloseCreate={() => setCreatingRoutine(false)}
               choices={routineChoices}
               onOpenConversation={(conversation) => {
                 if (conversation.conversationId)
@@ -1005,6 +1035,7 @@ export function Overview({
                     onAgent={onYourAgent}
                     onModel={onYourModel}
                     onAccess={onYourAccess}
+                    seed={yourSeed}
                     conversationId={yourConversation}
                     onOpenConversation={(row) => onShowConversation(you!.id, row.id, row.agent)}
                     onDeletedConversation={(id) => {

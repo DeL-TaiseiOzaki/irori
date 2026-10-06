@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Making routines, 2026-10-06 (**0.1.77**, [ADR 016](decisions/016-routines.md) stage 4):
+the owner found the routines page hard to use (no way to make a routine, a
+JavaScript switch first, folder paths as the empty state) and chose both a
+template on the page and the irori agent.
+- The page's header has **irori agent に頼む** (the irori agent's message box
+  gets **ルーティンを作って：**) and **新しいルーティン** (a name and a place:
+  the irori agent or a hibachi). `RoutineService.create` makes a new folder
+  with a `routine.yaml` whose prompt is empty and the editor opens; each row's
+  pencil edits `routine.yaml` (`routineSource`, `saveRoutineSource`, refused
+  after a crossing change, reporting why it still cannot run).
+- The irori agent's standard skill `write-routine` and `irori routines`
+  (each routine as the host reads it) are stage 4. The empty state is one
+  line; the JavaScript switch is in **設定 → ルーティン**.
+- Verified: `npm run build`, `npm run format:check`, `npm test` (429 tests,
+  425 passed, 4 skipped; new routine creation/editing and `irori routines`
+  tests) and all 29 UI suites under `xvfb-run` (`routines-ui-smoke` makes a
+  routine from the template, saves it from the editor, asks the irori agent
+  and switches JavaScript in the settings). Not verified: a real CLI writing a
+  routine with the skill, Windows and macOS.
+
 Published 2026-10-06: **0.1.76** ([#177](https://github.com/DeL-TaiseiOzaki/irori/pull/177),
 the GitHub account carries the environment, [ADR 026](decisions/026-github-account-environment.md))
 merged at the owner's request as `ab8a526` and is published as

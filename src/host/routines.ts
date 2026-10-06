@@ -26,6 +26,7 @@ import {
   type RoutineReviewFile,
   type RoutineRun,
   type RoutineRunState,
+  type RoutineSource,
   type RoutineStep,
   type RoutineStepRun,
   type RunRoutine,
@@ -219,6 +220,38 @@ export function parseRoutine(
     steps.push({ kind: 'agent', ...step.data });
   }
   return { name, steps };
+}
+
+/** A folder name for a new routine: its name without what a file system refuses. */
+export function routineFolderName(name: string) {
+  const folder = name
+    .normalize('NFC')
+    .replace(/[\\/:*?"<>|\x00-\x1f\x7f]/g, '-')
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 80)
+    .trim();
+  if (!folder) return 'routine';
+  // Windows reserves these names for devices.
+  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(folder) ? `${folder}-routine` : folder;
+}
+
+/** A new routine's `routine.yaml`: one agent step whose prompt the person writes. */
+export function routineTemplate(name: string, owner: Routine['owner']) {
+  return [
+    `name: ${JSON.stringify(name)}`,
+    'steps:',
+    t(
+      '  # プログラムを先に動かすとき: - run: fetch.js または - run: [gh, api, notifications]',
+      '  # To run a program first: - run: fetch.js or - run: [gh, api, notifications]',
+    ),
+    `  - agent: ${owner}`,
+    ...(owner === 'irori'
+      ? [t('    # hibachis: all  # 渡す hibachi', '    # hibachis: all  # hibachis to hand over')]
+      : []),
+    '    access: default # or full-access',
+    '    prompt: |',
+    '',
+  ].join('\n');
 }
 
 /** Whether a program's last line of standard output is `{"continue": false}`. */
@@ -634,9 +667,12 @@ export class RoutineService {
       files: recorded,
     });
   }
-  /** The irori agent's routines and those of the workspace's hibachis. */
-  async list(workspaceId: string): Promise<Routine[]> {
-    const workspace = await this.workspace(workspaceId);
+  /**
+   * The irori agent's routines and those of the workspace's hibachis; with no
+   * workspace, the irori agent's alone.
+   */
+  async list(workspaceId: string | undefined): Promise<Routine[]> {
+    const workspace = workspaceId ? await this.workspace(workspaceId) : [];
     const settings = await this.host.settings();
     const owners = [await this.owner((await this.host.you.load()).id)];
     for (const space of workspace) owners.push(await this.owner(space.scopeId));
@@ -678,6 +714,87 @@ export class RoutineService {
       }
     }
     return routines;
+  }
+  /**
+   * Starts a routine for the person: a new folder in the owner's routines with
+   * a `routine.yaml` whose prompt is still to be written, so it cannot run yet.
+   * irori writes only a folder that did not exist.
+   */
+  async create(ownerId: string, name: string): Promise<RoutineRef> {
+    const title = name.trim();
+    if (!title || title.length > 120)
+      throw Error(
+        t('名前を 120 文字以内で入力してください。', 'Enter a name of up to 120 characters.'),
+      );
+    const owner = await this.owner(ownerId);
+    if (owner.kind === 'irori' && (await this.host.you.status()).state !== 'ready')
+      throw Error(t('irori agent が用意されていません。', 'The irori agent is not set up.'));
+    await fs.mkdir(owner.dir, { recursive: true });
+    if (!within(await fs.realpath(owner.root), await fs.realpath(owner.dir)))
+      throw Error(
+        t('フォルダが持ち主のフォルダの外にあります。', "The folder leaves its owner's."),
+      );
+    const base = routineFolderName(title);
+    for (let n = 1; n <= 100; n++) {
+      const folder = n === 1 ? base : `${base} ${n}`;
+      try {
+        await fs.mkdir(path.join(owner.dir, folder));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue;
+        throw error;
+      }
+      await fs.writeFile(
+        path.join(owner.dir, folder, 'routine.yaml'),
+        routineTemplate(title, owner.kind),
+        { flag: 'wx' },
+      );
+      return { owner: owner.id, folder };
+    }
+    throw Error(t('同じ名前のルーティンが多すぎます。', 'Too many routines share this name.'));
+  }
+  /** The routine's `routine.yaml` and its version, for the person to edit. */
+  async source(ref: RoutineRef): Promise<RoutineSource> {
+    const file = await this.yamlFile(ref);
+    const text = await fs.readFile(file, 'utf8');
+    return { text, version: sha256(text) };
+  }
+  /**
+   * Saves the person's `routine.yaml`, unless it changed since `version` was
+   * read, and returns why the routine still cannot run, if it cannot. The next
+   * run is reviewed as after any change (D4).
+   */
+  async saveSource(ref: RoutineRef, text: string, version: string) {
+    if (Buffer.byteLength(text) > yamlLimit)
+      throw Error(t('routine.yaml が大きすぎます。', 'routine.yaml is too large.'));
+    const key = routineKey(ref);
+    if (this.active.has(key) || this.starting.has(key))
+      throw Error(t('このルーティンは実行中です。', 'This routine is already running.'));
+    const file = await this.yamlFile(ref);
+    if (sha256(await fs.readFile(file, 'utf8')) !== version)
+      throw Error(
+        t(
+          'routine.yaml がほかで変更されました。開き直してください。',
+          'routine.yaml changed elsewhere. Open it again.',
+        ),
+      );
+    await fs.writeFile(file, text);
+    const owner = await this.owner(ref.owner);
+    return { version: sha256(text), problem: (await this.inspect(owner, ref.folder)).problem };
+  }
+  /** The routine's `routine.yaml`, refusing a link or a folder that leaves its owner's. */
+  private async yamlFile(ref: RoutineRef) {
+    const owner = await this.owner(ref.owner);
+    const dir = path.join(owner.dir, ref.folder);
+    const file = path.join(dir, 'routine.yaml');
+    const [folder, yaml] = await Promise.all([fs.lstat(dir), fs.lstat(file)]);
+    if (folder.isSymbolicLink() || yaml.isSymbolicLink())
+      throw Error(t('リンクは使えません。', 'Links are not allowed.'));
+    if (!yaml.isFile()) throw Error(t('routine.yaml がありません。', 'routine.yaml is missing.'));
+    if (!within(await fs.realpath(owner.root), await fs.realpath(dir)))
+      throw Error(
+        t('フォルダが持ち主のフォルダの外にあります。', "The folder leaves its owner's."),
+      );
+    return file;
   }
   /** The routine's files as they are now, and what changed since the person confirmed them. */
   async review(ref: RoutineRef): Promise<RoutineReview> {

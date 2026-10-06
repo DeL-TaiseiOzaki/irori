@@ -10,13 +10,13 @@
 
 /** Said on every irori agent request that has the command. */
 export const iroriCommandPreamble = [
-  'irori: the `irori` command is on your PATH for this request. It registers hibachis on this computer and adds them to the workspace this request came from: `irori list`, `irori clone <GitHub URL or owner/name>`, `irori create <folder>`, `irori add <folder>`, `irori connect <hibachi> <folder>`. Run `irori help` for the options.',
-  "Use it when the person asks you to set up or add hibachis; your folder's .agents/skills holds procedures for that work. A hibachi you register is handed to you from the next request.",
+  'irori: the `irori` command is on your PATH for this request. It registers hibachis on this computer and adds them to the workspace this request came from: `irori list`, `irori clone <GitHub URL or owner/name>`, `irori create <folder>`, `irori add <folder>`, `irori connect <hibachi> <folder>`. `irori routines` checks the routines as irori reads them. Run `irori help` for the options.',
+  "Use it when the person asks you to set up or add hibachis, or to write a routine; your folder's .agents/skills holds procedures for that work. A hibachi you register is handed to you from the next request.",
 ].join('\n');
 
 /** `irori help`: every form of the command, with where new hibachis go by default. */
 export function iroriCommandHelp(defaultParent: string) {
-  return `irori — set up hibachis for the person. Each command only adds; nothing is removed.
+  return `irori — set up hibachis for the person. Each command only adds or reads; nothing is removed.
 
 irori list
   The hibachis on this computer: name, folder, GitHub repository, and whether
@@ -34,6 +34,11 @@ irori create <folder name> [--parent <folder>] [--name <hibachi name>] [--catego
 irori add <folder> [--name <hibachi name>] [--category ...]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
+
+irori routines
+  The routines of your folder (routines/) and of this workspace's hibachis
+  (.irori/routines/), as irori reads them: whether each can run, and if not,
+  why. Run it after writing or changing a routine.
 
 irori connect <hibachi> <folder> [--name <name in contents>] [--read-only]
   Connects a folder on this computer, such as one Google Drive for desktop,
@@ -94,4 +99,38 @@ export function folderConnected(
   connection: { name: string; contentsRoot: string; readOnly: boolean; folder: string },
 ) {
   return `Connected ${JSON.stringify(connection.folder)} to the hibachi "${hibachi}" as ${connection.contentsRoot}/${connection.name}${connection.readOnly ? ', read-only' : ''}. Agents see it through a link: name that path, or use rg -L.`;
+}
+
+/** One routine in `irori routines`. */
+export interface ListedRoutine {
+  name: string;
+  owner: 'irori' | 'hibachi';
+  /** The hibachi's name, for a hibachi's routine. */
+  hibachi?: string;
+  path: string;
+  problem?: string;
+  needs?: { text: string };
+  review: 'unreviewed' | 'changed' | 'reviewed';
+}
+
+/** `irori routines`: each routine, whether it can run, and what the person does next. */
+export function routineList(routines: ListedRoutine[], workspace: string | undefined) {
+  const lines = routines.map((routine) => {
+    const state = routine.problem
+      ? `cannot run: ${routine.problem}`
+      : routine.needs
+        ? `needs on this device: ${routine.needs.text}`
+        : routine.review === 'reviewed'
+          ? 'ready'
+          : 'ready; the person reviews its files before the next run';
+    return `- ${JSON.stringify(routine.name)} (${routine.owner === 'irori' ? 'irori agent' : `hibachi ${routine.hibachi}`}) at ${JSON.stringify(routine.path)}: ${state}`;
+  });
+  return [
+    routines.length ? 'Routines:' : 'No routines yet.',
+    ...lines,
+    workspace
+      ? `Hibachi routines are those of the workspace "${workspace}".`
+      : 'This request came from no workspace: only your own routines are listed.',
+    'Only the person starts a routine, with 実行 (Run) on the routines page.',
+  ].join('\n');
 }
