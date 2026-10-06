@@ -88,6 +88,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。
 - hibachi のフォルダで開く内蔵ターミナルがあります。
 - テーマ（システムに合わせる・いろり・ライト・ダーク）、Markdown のフォント、表示言語（日本語 / English）を切り替えられます。
+- **設定 → アカウント** に、irori が使う GitHub アカウント（GitHub CLI `gh` のログイン）を表示します。**環境を保存** で、GitHub にある hibachi・ワークスペース・表示と AI の設定を、そのアカウントの非公開リポジトリ `irori-settings` に保存します。別の PC では起動画面の **GitHub から環境を復元** で、まとめて取得できます。
 
 <div align="center">
 <img src="docs/images/readme/ja-overview.png" alt="irori mode の画面。irori agent と、チーム・組織に分かれた 3 つの hibachi を地図で表示している。" width="860">

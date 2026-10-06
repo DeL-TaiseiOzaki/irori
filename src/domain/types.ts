@@ -411,6 +411,14 @@ export interface HostAPI {
     input: import('./git').PublishRepository,
     version: string,
   ): Promise<GitStatus>;
+  /** The account, this device's environment and the one saved on GitHub (ADR 026). */
+  environment(): Promise<import('./environment').EnvironmentState>;
+  /** Replaces the environment saved on the GitHub account with this device's. */
+  saveEnvironment(): Promise<import('./environment').EnvironmentState>;
+  /** Adds the saved environment to this device: clones, workspaces and preferences. */
+  restoreEnvironment(
+    input: import('./environment').RestoreEnvironment,
+  ): Promise<import('./environment').EnvironmentRestore>;
   gitOpenRepository(target: GitTarget): Promise<void>;
   repositories(root: string): Promise<RepositoryInfo>;
   workspaces(): Promise<WorkspaceProfile[]>;

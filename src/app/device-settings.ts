@@ -183,3 +183,12 @@ export const layoutStorage = {
     }, 250);
   },
 };
+
+/** Reads the device record again and applies it, after the host changed it (ADR 026). */
+export async function reloadDeviceSettings() {
+  current = await host.deviceSettings();
+  applyTheme();
+  applyMarkdownFont();
+  applyLanguage();
+  return current;
+}

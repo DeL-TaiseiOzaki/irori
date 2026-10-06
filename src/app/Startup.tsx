@@ -13,6 +13,7 @@ import { LanguageSwitch } from './Settings';
 import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
+import { RestoreEnvironment } from './AccountSync';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
@@ -470,6 +471,7 @@ export function Startup({
   // Undefined until edited, so the suggested name follows a language change.
   const [edited, setName] = useState<string>(),
     [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
+    [restoring, setRestoring] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string>();
@@ -709,10 +711,27 @@ export function Startup({
                 <strong>{t('新しく作成', 'Create new')}</strong>
               </span>
             </button>
+            <button disabled={busy} onClick={() => setRestoring(true)}>
+              <span className="start-add-icon">
+                <Icon name="user" size={20} />
+              </span>
+              <span>
+                <strong>{t('GitHub から環境を復元', 'Restore from GitHub')}</strong>
+              </span>
+            </button>
           </div>
         </section>
         {error && <p role="alert">{error}</p>}
       </main>
+      {restoring && (
+        <RestoreEnvironment
+          onClose={() => setRestoring(false)}
+          onRestored={async () => {
+            await refresh();
+            setProfiles(await host.workspaces());
+          }}
+        />
+      )}
       {adding && (
         <RegisterSpace
           mode={adding}

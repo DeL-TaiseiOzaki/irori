@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Icon } from './Icon';
 import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
+import { AccountSection, RestoreEnvironment } from './AccountSync';
 import {
   chooseLanguage,
   chooseMarkdownFont,
@@ -110,19 +111,24 @@ export function LanguageSwitch({ onError }: { onError: (error: unknown) => void 
 
 /**
  * The rail's settings: display choices shared by every workspace on this device,
- * updates, and the pending uploads kept on this device.
+ * the GitHub account with the environment saved there, and updates.
  */
 export function Settings({
   hibachiAgent,
   onHibachiAgent,
+  onRestored,
   onError,
 }: {
   /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
   hibachiAgent: boolean;
   onHibachiAgent: (on: boolean) => void;
+  /** The environment saved on the account was restored here (ADR 026). */
+  onRestored: () => Promise<void>;
   onError: (error: unknown) => void;
 }) {
   const updates = useUpdateState(host);
+  const [open, setOpen] = useState(false),
+    [restoring, setRestoring] = useState(false);
   const [theme, chooseThemeValue] = useChoice(currentTheme, chooseTheme, onError);
   const [font, chooseFont] = useChoice(currentMarkdownFont, chooseMarkdownFont, onError);
   const [language, chooseLanguageValue] = useChoice<Language>(
@@ -135,68 +141,79 @@ export function Settings({
     `Settings (theme: ${themeLabels[theme]()}, Markdown: ${fontLabels[font]()}, language: ${languageLabels[language]})`,
   );
   return (
-    <Popover.Root>
-      <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
-        <Icon name="sliders" size={18} />
-        {updateWaiting(updates) && (
-          <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
-        )}
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner side="right" align="end" sideOffset={12}>
-          <Popover.Popup className="settings-popover">
-            <Popover.Title render={<h2 />}>{t('設定', 'Settings')}</Popover.Title>
-            <Choices
-              legend={t('テーマ', 'Theme')}
-              name="theme"
-              value={theme}
-              options={themes}
-              label={(option) => themeLabels[option]()}
-              render={(option) => <Icon name={option} size={15} />}
-              onChange={chooseThemeValue}
-            />
-            <Choices
-              legend={t('Markdown フォント', 'Markdown font')}
-              name="markdown-font"
-              value={font}
-              options={markdownFonts}
-              label={(option) => fontLabels[option]()}
-              render={(option) => (
-                <span className={`font-swatch font-${option}`} aria-hidden="true">
-                  文
-                </span>
-              )}
-              onChange={chooseFont}
-            />
-            <Choices
-              legend={t('言語', 'Language')}
-              name="language"
-              value={language}
-              options={languages}
-              label={(option) => languageLabels[option]}
-              onChange={chooseLanguageValue}
-            />
-            <fieldset className="settings-choices hibachi-agent">
-              <legend>{t('エージェント', 'Agents')}</legend>
-              <div>
-                <label className="settings-choice" data-checked={hibachiAgent}>
-                  <input
-                    type="checkbox"
-                    checked={hibachiAgent}
-                    onChange={(event) => onHibachiAgent(event.target.checked)}
-                  />
-                  <Icon name="sparkles" size={15} />
-                  <span>hibachi agent</span>
-                </label>
-              </div>
-            </fieldset>
-            <section className="settings-updates" aria-label={t('更新', 'Updates')}>
-              <h3>{t('更新', 'Updates')}</h3>
-              <UpdateNotice host={host} />
-            </section>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+    <>
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
+          <Icon name="sliders" size={18} />
+          {updateWaiting(updates) && (
+            <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
+          )}
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner side="right" align="end" sideOffset={12}>
+            <Popover.Popup className="settings-popover">
+              <Popover.Title render={<h2 />}>{t('設定', 'Settings')}</Popover.Title>
+              <Choices
+                legend={t('テーマ', 'Theme')}
+                name="theme"
+                value={theme}
+                options={themes}
+                label={(option) => themeLabels[option]()}
+                render={(option) => <Icon name={option} size={15} />}
+                onChange={chooseThemeValue}
+              />
+              <Choices
+                legend={t('Markdown フォント', 'Markdown font')}
+                name="markdown-font"
+                value={font}
+                options={markdownFonts}
+                label={(option) => fontLabels[option]()}
+                render={(option) => (
+                  <span className={`font-swatch font-${option}`} aria-hidden="true">
+                    文
+                  </span>
+                )}
+                onChange={chooseFont}
+              />
+              <Choices
+                legend={t('言語', 'Language')}
+                name="language"
+                value={language}
+                options={languages}
+                label={(option) => languageLabels[option]}
+                onChange={chooseLanguageValue}
+              />
+              <fieldset className="settings-choices hibachi-agent">
+                <legend>{t('エージェント', 'Agents')}</legend>
+                <div>
+                  <label className="settings-choice" data-checked={hibachiAgent}>
+                    <input
+                      type="checkbox"
+                      checked={hibachiAgent}
+                      onChange={(event) => onHibachiAgent(event.target.checked)}
+                    />
+                    <Icon name="sparkles" size={15} />
+                    <span>hibachi agent</span>
+                  </label>
+                </div>
+              </fieldset>
+              <AccountSection
+                onRestore={() => {
+                  setOpen(false);
+                  setRestoring(true);
+                }}
+              />
+              <section className="settings-updates" aria-label={t('更新', 'Updates')}>
+                <h3>{t('更新', 'Updates')}</h3>
+                <UpdateNotice host={host} />
+              </section>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
+      {restoring && (
+        <RestoreEnvironment onClose={() => setRestoring(false)} onRestored={onRestored} />
+      )}
+    </>
   );
 }

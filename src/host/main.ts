@@ -28,6 +28,8 @@ import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
+import { GitHubCli } from '../git/github';
+import { EnvironmentService } from './environment';
 import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
@@ -43,7 +45,13 @@ import { AgentSetup } from './agent-setup';
 import { removeSpace } from './remove-space';
 import { spaceFolder } from './schema-folder';
 import { TerminalService } from '../terminal/service';
-import { nativeThemeSource, type HostEvent, type Space } from '../domain/types';
+import {
+  nativeThemeSource,
+  type Category,
+  type DeviceSettings,
+  type HostEvent,
+  type Space,
+} from '../domain/types';
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers = new Map<string, FSWatcher>();
@@ -66,6 +74,12 @@ app
     const settings = new SettingsService(app.getPath('userData'));
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
+    const saveSettings = async (patch: Partial<DeviceSettings>) => {
+      const next = await settings.save(patch);
+      nativeTheme.themeSource = nativeThemeSource(next.theme);
+      setLanguage(next.language);
+      return next;
+    };
     const device = await settings.read();
     nativeTheme.themeSource = nativeThemeSource(device.theme);
     // Dialogs and messages the host writes follow the reader's language too.
@@ -123,10 +137,13 @@ app
       you,
     );
     let fileMutations = 0;
+    const github = new GitHubCli();
     const git = new GitService(
       files,
       () => !agents.anyBusy && !cloud.busy && fileMutations === 0 && !routines.busy,
       authorship,
+      undefined,
+      github,
     );
     // Secrets are sealed with the OS-held key. A source run may stand in a reversible
     // store for the UI smoke, whose display has no keychain; a packaged app never does.
@@ -209,24 +226,38 @@ app
       watchers.set(space.scopeId, watcher);
     }
     files.list().forEach(watch);
+    const defaultParent = async () => path.dirname((await you.load()).root);
+    const registerWatched = (root: string, name: string, category: Category) =>
+      changeFiles(async () => {
+        const space = await files.register(root, name, category);
+        watch(space);
+        return space;
+      });
     // The irori agent's `irori` command: hibachis it registers join the request's workspace.
     const setup = new AgentSetup({
       files,
       git,
       workspaces,
       cloud,
-      defaultParent: async () => path.dirname((await you.load()).root),
-      register: (root, name, category) =>
-        changeFiles(async () => {
-          const space = await files.register(root, name, category);
-          watch(space);
-          return space;
-        }),
+      defaultParent,
+      register: registerWatched,
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
         emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
+    // The environment kept on the GitHub account (ADR 026).
+    const environment = new EnvironmentService({
+      files,
+      workspaces,
+      github,
+      git,
+      settings: { read: () => settings.read(), save: (patch) => saveSettings(patch) },
+      agentRoot: async () => (await you.load()).root,
+      register: registerWatched,
+      defaultParent,
+      appVersion,
+    });
     const entry = await realpath(path.resolve(__dirname, '../dist/index.html'));
     const icon = path.resolve(__dirname, '../assets/irori-icon.png');
     app.dock?.setIcon(icon);
@@ -472,12 +503,7 @@ app
         await shell.openExternal(address.href);
       },
       deviceSettings: () => settings.read(),
-      saveDeviceSettings: async (patch) => {
-        const next = await settings.save(patch);
-        nativeTheme.themeSource = nativeThemeSource(next.theme);
-        setLanguage(next.language);
-        return next;
-      },
+      saveDeviceSettings: (patch) => saveSettings(patch),
       terminalShells: () => terminals.available(),
       openTerminal: (...args) => terminals.open(...args),
       writeTerminal: (...args) => terminals.write(...args),
@@ -500,6 +526,20 @@ app
       gitClone: (input) => git.clone(input),
       gitInit: (id) => changed(id, () => git.init(id)),
       githubAccount: () => git.githubAccount(),
+      environment: () => environment.state(),
+      saveEnvironment: () => environment.save(),
+      restoreEnvironment: async (input) => {
+        if (agents.anyBusy || cloud.busy || git.busy)
+          throw Error(
+            t(
+              '実行中の処理が終わってから環境を復元してください。',
+              'Restore the environment after the running operations finish.',
+            ),
+          );
+        const result = await environment.restore(input);
+        emit({ type: 'hibachis' });
+        return result;
+      },
       gitPublish: (...args) => changed(args[0], () => git.publish(...args)),
       gitOpenRepository: async (id) => {
         await shell.openExternal(await git.repositoryURL(id));
