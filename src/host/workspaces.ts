@@ -15,7 +15,7 @@ const group = z.object({
   scopeIds: z.array(z.uuid()).max(100),
   open: z.boolean(),
 });
-const profile = z.object({
+export const workspaceProfile = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(120),
   scopeIds: z.array(z.uuid()).max(100),
@@ -27,7 +27,7 @@ export class WorkspaceService {
   constructor(private files: FileService) {}
   async list(): Promise<WorkspaceProfile[]> {
     return z
-      .array(profile)
+      .array(workspaceProfile)
       .parse(await readLocalJson(path.join(this.files.dataDir, 'workspaces.json'), []));
   }
   save(name: string, scopeIds: string[], id?: string) {
@@ -42,7 +42,7 @@ export class WorkspaceService {
       });
       // Groups follow the hibachis that stay; one left empty goes.
       const groups = normalizeGroups(previous?.groups ?? [], scopeIds);
-      const value = profile.parse({
+      const value = workspaceProfile.parse({
         id: id ?? randomUUID(),
         name,
         scopeIds,
@@ -66,7 +66,12 @@ export class WorkspaceService {
       if (!previous) throw Error('Unknown workspace');
       const kept = normalizeGroups(z.array(group).max(100).parse(groups), previous.scopeIds);
       const { name, scopeIds } = previous;
-      const value = profile.parse({ id, name, scopeIds, ...(kept.length && { groups: kept }) });
+      const value = workspaceProfile.parse({
+        id,
+        name,
+        scopeIds,
+        ...(kept.length && { groups: kept }),
+      });
       await writeLocalJson(
         path.join(this.files.dataDir, 'workspaces.json'),
         current.map((item) => (item.id === id ? value : item)),
@@ -86,9 +91,50 @@ export class WorkspaceService {
           const { groups: previous = [], ...rest } = item;
           const scopeIds = item.scopeIds.filter((id) => id !== scopeId);
           const groups = normalizeGroups(previous, scopeIds);
-          return profile.parse({ ...rest, scopeIds, ...(groups.length && { groups }) });
+          return workspaceProfile.parse({ ...rest, scopeIds, ...(groups.length && { groups }) });
         }),
       );
+    });
+  }
+  /**
+   * Takes in workspaces saved on another device (ADR 026). A workspace this
+   * device has under the same id keeps its own hibachis beside the saved ones;
+   * a different workspace with the same name keeps its name and the saved one
+   * gets a numbered name. Hibachis not on this device stay as unavailable.
+   * Returns how many workspaces were added or changed.
+   */
+  adopt(saved: WorkspaceProfile[]) {
+    return this.queue.run(async () => {
+      const current = await this.list();
+      let changed = 0;
+      for (const incoming of saved) {
+        const index = current.findIndex((item) => item.id === incoming.id);
+        const previous = current[index];
+        const scopeIds = [...new Set([...incoming.scopeIds, ...(previous?.scopeIds ?? [])])].slice(
+          0,
+          100,
+        );
+        const groups = normalizeGroups(
+          [...(incoming.groups ?? []), ...(previous?.groups ?? [])],
+          scopeIds,
+        );
+        let name = previous?.name ?? incoming.name;
+        const taken = (candidate: string) =>
+          current.some((item) => item.id !== incoming.id && item.name === candidate);
+        for (let n = 2; taken(name); n++) name = `${incoming.name.slice(0, 110)} (${n})`;
+        const value = workspaceProfile.parse({
+          id: incoming.id,
+          name,
+          scopeIds,
+          ...(groups.length && { groups }),
+        });
+        if (JSON.stringify(value) === JSON.stringify(previous)) continue;
+        if (previous) current[index] = value;
+        else current.push(value);
+        changed++;
+      }
+      if (changed) await writeLocalJson(path.join(this.files.dataDir, 'workspaces.json'), current);
+      return changed;
     });
   }
   remove(id: string) {

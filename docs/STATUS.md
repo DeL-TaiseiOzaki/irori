@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Account and environment, 2026-10-06 (**0.1.76**, [ADR 026](decisions/026-github-account-environment.md)):
+the owner asked for account linking like VS Code's, and chose showing the
+account plus carrying the environment to another device, through the GitHub
+CLI's sign-in rather than an irori OAuth App.
+- **設定 → アカウント** shows the account `gh` is signed in to, when the saved
+  environment was written, **環境を保存** and **復元**. The start screen adds
+  **GitHub から環境を復元** for a new device.
+- `src/host/environment.ts` keeps `environment.json` in the account's private
+  `irori-settings` repository (created on the first save, refused when public)
+  through `gh api` contents calls added to `GitHubCli`. It holds GitHub
+  hibachis, workspaces and groups limited to them, six preferences and the
+  irori agent's repository; no paths, notes, conversations or secrets. A save
+  names the blob it read, so a crossing save is refused.
+- Restore clones the chosen hibachis beside the irori agent's folder (or a
+  chosen folder), registers an existing checkout of the same repository as it
+  is, keeps and reports any other folder in the way, clones the irori agent's
+  folder only where it is absent or empty, adopts workspaces by id
+  (`WorkspaceService.adopt`, numbered name on a collision) and applies the
+  preferences.
+- Verified: `npm run build`, `npm run format:check`, `npm test` (428 tests,
+  424 passed, 4 skipped; new `environment` tests against a stand-in gh and
+  bare repositories) and all 29 UI suites under `xvfb-run` (new `account-ui-smoke`: a save
+  from the settings on one device, a restore from the start screen on a
+  second). `links-ui-smoke` failed once on a link count and passed on rerun,
+  as it does intermittently on main. Not verified: a real GitHub account and
+  `gh` (the tests use a stand-in), Windows and macOS.
+
 Published 2026-10-05: **0.1.75** ([#173](https://github.com/DeL-TaiseiOzaki/irori/pull/173),
 routines in the rail) merged at the owner's request as `a49fad2` and is published
 as [v0.1.75-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.75-preview.1)

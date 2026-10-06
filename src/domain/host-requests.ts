@@ -110,6 +110,13 @@ export const hostArguments = {
   gitOpenRepository: z.tuple([target]),
   gitInit: z.tuple([id]),
   githubAccount: z.tuple([]),
+  environment: z.tuple([]),
+  saveEnvironment: z.tuple([]),
+  restoreEnvironment: z.tuple([
+    z
+      .object({ scopeIds: z.array(id).max(500), agent: z.boolean(), parent: path.optional() })
+      .strict(),
+  ]),
   gitPublish: z.tuple([
     id,
     z.object({

@@ -724,6 +724,14 @@ function App() {
     // The brain on show keeps its place but takes its newest declaration.
     setActive((a) => (a && list.find((space) => space.scopeId === a.scopeId)) ?? a ?? list[0]);
   }
+  /** The environment saved on the GitHub account was restored here (ADR 026). */
+  async function environmentRestored() {
+    await refreshSpaces();
+    const profiles = await host.workspaces();
+    setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
+    setHibachiAgent(currentHibachiAgent());
+    setYourChoice(currentYourAi());
+  }
   async function reconcile() {
     const generation = ++reconciliation.current;
     if (organizing.current) return;
@@ -1365,7 +1373,12 @@ function App() {
               });
           }}
           settings={
-            <Settings hibachiAgent={hibachiAgent} onHibachiAgent={chooseHibachi} onError={report} />
+            <Settings
+              hibachiAgent={hibachiAgent}
+              onHibachiAgent={chooseHibachi}
+              onRestored={environmentRestored}
+              onError={report}
+            />
           }
         />
         {(level === 'overview' || level === 'routines' || scene?.leaving === 'overview') &&
