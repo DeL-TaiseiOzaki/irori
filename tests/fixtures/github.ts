@@ -82,7 +82,20 @@ export async function remote(base: string, name: string, files: Record<string, s
     await writeFile(path.join(work, file), text);
   }
   git(work, 'add', '-A');
-  git(work, 'commit', '--quiet', '-m', 'Start');
+  // Its own identity: a CI runner has none, and the caller's Git configuration is not set yet.
+  git(
+    work,
+    '-c',
+    'user.name=Git fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    '-c',
+    'commit.gpgsign=false',
+    'commit',
+    '--quiet',
+    '-m',
+    'Start',
+  );
   git(work, 'push', '--quiet', bare, 'main');
   return { bare, url: `https://github.com/octo/${name}.git` };
 }
