@@ -129,6 +129,12 @@ export interface RoutineRun {
   detail?: string;
 }
 
+/** A routine's `routine.yaml` as the person edits it; `version` names the text read. */
+export interface RoutineSource {
+  text: string;
+  version: string;
+}
+
 export interface Routine {
   ref: RoutineRef;
   owner: 'irori' | 'hibachi';

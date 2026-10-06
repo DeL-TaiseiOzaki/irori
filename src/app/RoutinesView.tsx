@@ -8,6 +8,7 @@ import {
   routineKey,
   stepLabel,
   type Routine,
+  type RoutineRef,
   type RoutineReviewFile,
   type RoutineRun,
   type RoutineRunState,
@@ -415,6 +416,150 @@ function SecretDialog({
   );
 }
 
+/** Names a new routine and where it lives; irori writes a template to finish (ADR 016 stage 4). */
+function NewRoutineDialog({
+  owners,
+  onClose,
+  onCreated,
+}: {
+  owners: { id: string; name: string }[];
+  onClose: () => void;
+  onCreated: (ref: RoutineRef) => void;
+}) {
+  const [name, setName] = useState('');
+  const [owner, setOwner] = useState(owners[0]?.id ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const label = t('新しいルーティン', 'New routine');
+  return createPortal(
+    <Dialog label={label} busy={busy} onClose={onClose}>
+      <form
+        className="modal routine-new"
+        aria-label={label}
+        onSubmit={(event) => {
+          event.preventDefault();
+          setBusy(true);
+          setError('');
+          host
+            .createRoutine(owner, name.trim())
+            .then(onCreated)
+            .catch((reason) => {
+              setError(errorText(reason));
+              setBusy(false);
+            });
+        }}
+      >
+        <h2>{label}</h2>
+        <label>
+          {t('名前', 'Name')}
+          <input
+            autoFocus
+            maxLength={120}
+            value={name}
+            disabled={busy}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label>
+          {t('置き場所', 'Location')}
+          <select value={owner} disabled={busy} onChange={(event) => setOwner(event.target.value)}>
+            {owners.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {error && (
+          <p className="routine-problem" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={onClose}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button type="submit" className="primary" disabled={busy || !name.trim() || !owner}>
+            {t('作成', 'Create')}
+          </button>
+        </div>
+      </form>
+    </Dialog>,
+    document.body,
+  );
+}
+
+/** Edits a routine's `routine.yaml` in place; a save names the version it read. */
+function RoutineEditor({
+  routine,
+  onClose,
+  onSaved,
+}: {
+  routine: { ref: RoutineRef; name: string; path?: string };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const source = useResource(() => host.routineSource(routine.ref), [routineKey(routine.ref)]);
+  const [text, setText] = useState<string>();
+  const [version, setVersion] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+  const shown = text ?? source.data?.text ?? '';
+  const read = version ?? source.data?.version;
+  return createPortal(
+    <Dialog label={routine.name} busy={busy} onClose={onClose}>
+      <form
+        className="modal routine-editor"
+        aria-label={routine.name}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!read) return;
+          setBusy(true);
+          setProblem('');
+          host
+            .saveRoutineSource(routine.ref, shown, read)
+            .then((saved) => {
+              onSaved();
+              if (!saved.problem) return onClose();
+              setVersion(saved.version);
+              setProblem(saved.problem);
+            })
+            .catch((reason) => setProblem(errorText(reason)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <h2>{routine.name}</h2>
+        {routine.path && <p className="routine-path mono">{routine.path}</p>}
+        <textarea
+          className="mono"
+          aria-label="routine.yaml"
+          spellCheck={false}
+          autoFocus
+          rows={18}
+          value={shown}
+          disabled={busy || !source.data}
+          onChange={(event) => setText(event.target.value)}
+        />
+        {(source.error || problem) && (
+          <p className="routine-problem" role="alert">
+            {problem || source.error}
+          </p>
+        )}
+        <div className="actions">
+          <button type="button" disabled={busy} onClick={onClose}>
+            {/* After a save that still cannot run, the file is written: closing keeps it. */}
+            {version ? t('閉じる', 'Close') : t('キャンセル', 'Cancel')}
+          </button>
+          <button type="submit" className="primary" disabled={busy || !read}>
+            {t('保存', 'Save')}
+          </button>
+        </div>
+      </form>
+    </Dialog>,
+    document.body,
+  );
+}
+
 /** The device's secrets by name, to replace or delete; values are never shown. */
 function Secrets({
   revision,
@@ -484,6 +629,7 @@ function RoutineCard({
   onStop,
   onAddRuntime,
   onEnterSecret,
+  onEdit,
   onOpenConversation,
   onError,
 }: {
@@ -496,6 +642,7 @@ function RoutineCard({
   onStop: () => void;
   onAddRuntime: () => void;
   onEnterSecret: (name: string) => void;
+  onEdit: () => void;
   onOpenConversation: (conversation: Conversation) => void;
   onError: (error: unknown) => void;
 }) {
@@ -523,6 +670,15 @@ function RoutineCard({
           </span>
         )}
         <span className="routine-space" />
+        <button
+          className="icon-button"
+          aria-label={t(`${routine.name} を編集`, `Edit ${routine.name}`)}
+          title={t('編集', 'Edit')}
+          disabled={running}
+          onClick={onEdit}
+        >
+          <Icon name="penLine" size={14} />
+        </button>
         {running ? (
           <button className="panel-button" onClick={onStop}>
             <Icon name="close" size={13} />
@@ -578,15 +734,26 @@ function RoutineCard({
   );
 }
 
+/** Where a new routine can live: the irori agent's folder once it is set up, and each hibachi. */
+export function routineOwners(you: YourAi | undefined, spaces: Space[]) {
+  return [
+    ...(you?.state === 'ready' ? [{ id: you.id, name: 'irori agent' }] : []),
+    ...spaces.map((space) => ({ id: space.scopeId, name: space.name })),
+  ];
+}
+
 /**
  * The rail's routines page (ADR 016): the irori agent's routines and each
- * hibachi's, started and stopped only here.
+ * hibachi's, started and stopped only here. The page's header offers a new
+ * routine (`creating`) and asking the irori agent to write one.
  */
 export function RoutinesView({
   workspaceId,
   spaces,
   you,
   revision,
+  creating,
+  onCloseCreate,
   choices,
   onOpenConversation,
   onError,
@@ -595,6 +762,9 @@ export function RoutinesView({
   spaces: Space[];
   you?: YourAi;
   revision: number;
+  /** The header's 新しいルーティン was pressed. */
+  creating: boolean;
+  onCloseCreate: () => void;
   /** The CLI and model chosen in each agent's panel, for steps that name none. */
   choices: () => RunRoutine['agents'];
   onOpenConversation: (conversation: Conversation) => void;
@@ -602,24 +772,6 @@ export function RoutinesView({
 }) {
   const [reads, setReads] = useState(0);
   const reread = () => setReads((value) => value + 1);
-  const [javascript, setJavascript] = useState(() =>
-    currentRoutineRuntimes().includes('javascript'),
-  );
-  const [runtimeBusy, setRuntimeBusy] = useState(false);
-  async function chooseJavascript(on: boolean) {
-    const previous = javascript;
-    setJavascript(on);
-    setRuntimeBusy(true);
-    try {
-      await chooseRoutineRuntimes(on ? ['javascript'] : []);
-      reread();
-    } catch (error) {
-      setJavascript(previous);
-      onError(error);
-    } finally {
-      setRuntimeBusy(false);
-    }
-  }
   // Read again now and then: nothing watches the irori agent's folder, and an agent may edit a routine.
   const list = useResource(() => host.routines(workspaceId), [workspaceId], {
     refresh: revision + reads,
@@ -630,6 +782,7 @@ export function RoutinesView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [reviewing, setReviewing] = useState<Routine>();
   const [entering, setEntering] = useState<string>();
+  const [editing, setEditing] = useState<{ ref: RoutineRef; name: string; path?: string }>();
   useEffect(
     () =>
       host.onEvent((event) => {
@@ -664,19 +817,6 @@ export function RoutinesView({
     .filter((group) => group.routines.length);
   return (
     <section className="routines-view" aria-label={t('ルーティン', 'Routines')}>
-      <section className="routine-settings" aria-label={t('実行環境', 'Runtimes')}>
-        <h2>{t('実行環境', 'Runtimes')}</h2>
-        <label>
-          <input
-            type="checkbox"
-            checked={javascript}
-            disabled={runtimeBusy}
-            onChange={(event) => void chooseJavascript(event.target.checked)}
-          />
-          <Icon name="code" size={15} />
-          <span>{t('この端末で JavaScript を使用', 'Use JavaScript on this device')}</span>
-        </label>
-      </section>
       {list.error && (
         <p className="routine-problem" role="alert">
           {list.error}
@@ -684,19 +824,7 @@ export function RoutinesView({
       )}
       {list.loading && <p className="routines-note">{t('読み込み中…', 'Loading…')}</p>}
       {list.data && !routines.length && (
-        <div className="routines-empty">
-          <p>{t('ルーティンがありません', 'No routines')}</p>
-          <dl>
-            {you && (
-              <>
-                <dt>irori agent</dt>
-                <dd className="mono">{`${you.root}/routines/`}</dd>
-              </>
-            )}
-            <dt>hibachi</dt>
-            <dd className="mono">.irori/routines/</dd>
-          </dl>
-        </div>
+        <p className="routines-empty">{t('ルーティンがありません', 'No routines')}</p>
       )}
       {groups.map((group) => (
         <section
@@ -735,11 +863,13 @@ export function RoutinesView({
                     await chooseRoutineRuntimes([
                       ...new Set([...currentRoutineRuntimes(), 'javascript' as const]),
                     ]);
-                    setJavascript(true);
                     reread();
                   })
                 }
                 onEnterSecret={setEntering}
+                onEdit={() =>
+                  setEditing({ ref: routine.ref, name: routine.name, path: routine.path })
+                }
                 onOpenConversation={onOpenConversation}
                 onError={onError}
               />
@@ -750,6 +880,21 @@ export function RoutinesView({
       <Secrets revision={reads} onEnter={setEntering} onChanged={reread} />
       {entering && (
         <SecretDialog name={entering} onClose={() => setEntering(undefined)} onSaved={reread} />
+      )}
+      {creating && (
+        <NewRoutineDialog
+          owners={routineOwners(you, spaces)}
+          onClose={onCloseCreate}
+          onCreated={(ref) => {
+            onCloseCreate();
+            reread();
+            setOpen(routineKey(ref));
+            setEditing({ ref, name: ref.folder });
+          }}
+        />
+      )}
+      {editing && (
+        <RoutineEditor routine={editing} onClose={() => setEditing(undefined)} onSaved={reread} />
       )}
       {reviewing && (
         <ReviewDialog

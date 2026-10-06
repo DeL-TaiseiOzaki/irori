@@ -9,8 +9,9 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { YourAiService } from '../src/host/you';
 import { SettingsService } from '../src/host/settings';
 
-// Routines from their own rail entry (ADR 016): navigation and device settings,
-// the review before the first run and after a
+// Routines from their own rail entry (ADR 016): navigation, a routine made
+// from the page's template and edited there, the request to the irori agent,
+// JavaScript in the settings, the review before the first run and after a
 // change, JavaScript added from the row, a run's steps, output and changed
 // files, the nothing-to-do gate, 停止, an agent step's request answered in its
 // step, and its conversation. A secret is entered from its row, hidden in the
@@ -184,6 +185,45 @@ try {
   await expect(card('Broken')).toContainText('ステップ 1 の access がありません。');
   await expect(card('Broken').getByRole('button', { name: '実行' })).toBeDisabled();
 
+  // A new routine starts from a template that cannot run until its prompt is written.
+  await page.getByRole('button', { name: '新しいルーティン', exact: true }).click();
+  const create = page.getByRole('dialog', { name: '新しいルーティン' });
+  await expect(create.getByRole('combobox', { name: '置き場所' })).toHaveValue(
+    (await you.load()).id,
+  );
+  await create.getByRole('textbox', { name: '名前' }).fill('Daily mail');
+  await create.getByRole('button', { name: '作成', exact: true }).click();
+  await expect(create).toHaveCount(0);
+  const editor = page.getByRole('dialog', { name: 'Daily mail' });
+  const source = editor.getByRole('textbox', { name: 'routine.yaml' });
+  await expect(source).toHaveValue(/name: "Daily mail"\n[\s\S]*  - agent: irori\n/);
+  await page.screenshot({ path: 'test-results/routines-new.png' });
+  await editor.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  const daily = card('Daily mail');
+  await expect(daily).toContainText('ステップ 1 の prompt が正しくありません。');
+  await expect(daily.getByRole('button', { name: '実行' })).toBeDisabled();
+  // Edited in place: a save that still cannot run says why and stays open.
+  await daily.getByRole('button', { name: 'Daily mail を編集' }).click();
+  await source.fill('name: Daily mail\nsteps:\n  - agent: irori\n    prompt: Sort the mail.\n');
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor.getByRole('alert')).toHaveText('ステップ 1 の access がありません。');
+  await source.fill(
+    'name: Daily mail\nsteps:\n  - agent: irori\n    access: default\n    prompt: Sort the mail.\n',
+  );
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(daily).not.toContainText('無効');
+  await expect(daily).toContainText('未確認');
+  expect(
+    await readFile(path.join(youRoot, 'routines', 'Daily mail', 'routine.yaml'), 'utf8'),
+  ).toContain('access: default');
+  // Or the irori agent is asked, with the words placed for the person to finish.
+  await page.getByRole('button', { name: 'irori agent に頼む', exact: true }).click();
+  const instruction = page.getByRole('textbox', { name: 'irori agent への指示' });
+  await expect(instruction).toHaveValue('ルーティンを作って：');
+  await expect(instruction).toBeFocused();
+  await instruction.fill('');
+
   // JavaScript is added from the row that needs it; nothing is downloaded.
   const collect = card('Collect');
   await expect(collect).toContainText('未確認');
@@ -194,17 +234,26 @@ try {
   expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([
     'javascript',
   ]);
-  // The page's runtime setting follows the row's addition and persists either choice.
-  const javascript = view.getByRole('checkbox', { name: 'この端末で JavaScript を使用' });
+  // The settings' switch follows the row's addition and persists either choice.
+  const settings = rail.getByRole('button', { name: /^設定/ });
+  await settings.click();
+  const javascript = page
+    .getByRole('group', { name: 'ルーティン' })
+    .getByRole('checkbox', { name: 'JavaScript' });
   await expect(javascript).toBeChecked();
   await javascript.uncheck();
-  await expect(collect.getByRole('button', { name: '実行' })).toBeDisabled();
-  expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([]);
+  await expect
+    .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes)
+    .toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(collect).toContainText('JavaScript が必要です。');
+  await settings.click();
   await javascript.check();
+  await expect
+    .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes)
+    .toEqual(['javascript']);
+  await page.keyboard.press('Escape');
   await expect(collect).not.toContainText('JavaScript が必要です。');
-  expect((await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes).toEqual([
-    'javascript',
-  ]);
 
   // The first 実行 shows every file and runs only after the confirmation.
   await collect.getByRole('button', { name: '実行' }).click();
@@ -341,7 +390,7 @@ try {
   await expect(productButton).toHaveAttribute('aria-current', 'true');
   await expect(routinesButton).not.toHaveAttribute('aria-current');
 
-  // An empty workspace still offers the irori agent's routines and device settings.
+  // An empty workspace still offers the irori agent's routines.
   await rail.getByRole('button', { name: 'ワークスペースを選択' }).click();
   await page.locator('.workspace-card').filter({ hasText: 'Empty' }).click();
   await expect(modeButton).toBeDisabled();
@@ -349,11 +398,10 @@ try {
   await routinesButton.click();
   await expect(view.getByRole('region', { name: 'irori agent' })).toContainText('Git version');
   await expect(view.getByRole('region', { name: 'Product', exact: true })).toHaveCount(0);
-  await expect(javascript).toBeChecked();
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Routines UI passed: invalid routine with its reason, JavaScript added from the row, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',
+    'Routines UI passed: invalid routine with its reason, a routine made from the template and edited in place, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',
   );
 } finally {
   // A routine or run left by a failure would hold the window open behind a confirmation.

@@ -40,6 +40,7 @@ export function YourAiPanel({
   onAgent,
   onModel,
   onAccess,
+  seed,
   conversationId,
   onOpenConversation,
   onDeletedConversation,
@@ -62,6 +63,8 @@ export function YourAiPanel({
   onAgent: (agent: AgentId) => void;
   onModel: (model: string) => void;
   onAccess: (access: AgentAccess) => void;
+  /** Words to put in the message box, for the person to finish; each new `key` places them. */
+  seed?: { text: string; key: number };
   /** The conversation on show (ADR 017 D4): the irori agent's own, never a hibachi's. */
   conversationId?: string;
   onOpenConversation: (row: ConversationSummary) => void;
@@ -80,6 +83,18 @@ export function YourAiPanel({
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
   const log = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  // Placed words replace an empty box or follow what is there, with the caret after them.
+  useEffect(() => {
+    if (!seed) return;
+    setText((value) => (value.trim() ? `${value.trimEnd()}\n${seed.text}` : seed.text));
+    requestAnimationFrame(() => {
+      const field = box.current;
+      if (!field) return;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    });
+  }, [seed?.key]);
   // The latest words, hand-offs and reports stay in view.
   useEffect(() => {
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
@@ -218,6 +233,7 @@ export function YourAiPanel({
           </small>
         )}
         <textarea
+          ref={box}
           aria-label={t('irori agent への指示', 'Instruction for the irori agent')}
           placeholder={t('指示…', 'Instruction…')}
           rows={3}

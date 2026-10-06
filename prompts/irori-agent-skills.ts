@@ -1,6 +1,6 @@
 /**
  * The irori agent's standard skills: procedures for setting up the person's
- * irori with the `irori` command.
+ * irori with the `irori` command, and for writing routines.
  *
  * Sent: written into the irori agent's folder as
  * `.agents/skills/<name>/SKILL.md` when the person creates the folder, and,
@@ -85,6 +85,64 @@ person says public), and whose account or organization owns it.
    \`gh repo create <owner>/<name> --private --source <folder> --remote origin --push\`
 
 Report the hibachi's folder and its GitHub repository, if any.
+`,
+  ),
+  'write-routine': skill(
+    'write-routine',
+    "Writes a routine: a job in routine.yaml that runs programs and instructs agents in order when the person presses 実行 (Run) on irori's routines page. Use when the person wants something gathered or done again and again, such as mail or chat brought into hibachis.",
+    `
+# Write a routine
+
+A routine is a folder holding \`routine.yaml\` and the files its steps use.
+Only the person starts it, with 実行 on the routines page; nothing runs on a
+schedule.
+
+1. Find out what it gathers or does, from where, and which hibachis it
+   concerns. Ask once, together, only for what you cannot find out.
+2. Choose the folder. By default it is \`routines/<name>/\` in your own folder:
+   its agent steps are \`agent: irori\`, with the hibachis to hand over in
+   \`hibachis\`. A routine that concerns one hibachi alone may live in that
+   hibachi's \`.irori/routines/<name>/\` with \`agent: hibachi\`; hand writing
+   it to that hibachi's sub-agent.
+3. Write \`routine.yaml\`. Keys are read strictly: an unknown or misspelt key
+   makes the routine invalid.
+
+   \`\`\`yaml
+   name: Mail triage
+   steps:
+     - run: fetch.js # a file in the routine folder
+     - run: [gh, api, notifications] # a command on PATH and its arguments
+       secrets: [GH_TOKEN] # given to this step only, as environment variables
+     - agent: irori
+       hibachis: all # or a list of hibachi names
+       access: default # or full-access; required
+       prompt: |
+         Read the mail in $IRORI_WORK/inbox and put each one into
+         contents/mail of the hibachi it concerns. List any you cannot place.
+   \`\`\`
+
+   Each step has \`run\` or \`agent\`, never both; an agent step may also name
+   \`cli\` and \`model\`. Up to 20 steps; the folder holds at most 100 files,
+   5 MiB in all, and no links.
+4. Programs. \`.js\`, \`.mjs\` and \`.cjs\` run with irori's own Node; prefer
+   them, since nothing needs installing. Any other file needs a \`#!\` line and
+   the executable bit; Python is not available yet. Every step gets
+   \`IRORI_WORK\` (this run's folder, shared by its steps), \`IRORI_STATE\`
+   (kept between runs, for a cursor) and \`IRORI_ROUTINE\` (the routine's
+   folder). A program that finds nothing to do prints \`{"continue": false}\`
+   as its last line, and later steps do not run.
+5. Tokens. Never write a token or password into a file. Name it in the step's
+   \`secrets\` (capitals, digits and \`_\`) and read it from the environment;
+   the person enters its value in irori. Agent steps never receive secrets.
+6. Agent prompts say what to read from \`$IRORI_WORK\` and where results go.
+   irori adds its own preamble to each step.
+7. Run \`irori routines\` and fix the routine until it reports ready, or names
+   only what the person adds on this device (JavaScript, a secret, a command).
+   You may try a program step yourself with \`IRORI_WORK\` set to a scratch
+   folder; do not start the agent steps.
+8. Tell the person the routine's name, what each step does, any secret to
+   enter, and to press 実行 on the routines page. The first run shows its
+   files for them to review.
 `,
   ),
   'connect-folder': skill(

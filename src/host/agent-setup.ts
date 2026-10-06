@@ -6,10 +6,12 @@ import {
   hibachiList,
   hibachiRegistered,
   iroriCommandHelp,
+  routineList,
   type ListedHibachi,
 } from '../../prompts';
 import { parseIroriCommand } from '../domain/irori-command';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
+import type { Routine } from '../domain/routines';
 import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
@@ -26,6 +28,8 @@ export interface AgentSetupHost {
   defaultParent: () => Promise<string>;
   /** Registers through the host's own guards and starts watching the hibachi. */
   register?: (root: string, name: string, category: Category) => Promise<Space>;
+  /** The irori agent's routines and those of the workspace's hibachis, as checked for a run. */
+  routines?: (workspaceId: string | undefined) => Promise<Routine[]>;
   /** Whether a run of the hibachi's own agent is in progress there. */
   running?: (scopeId: string) => boolean;
   /** Tells the window what changed: the hibachis and a workspace, or one hibachi's files. */
@@ -74,6 +78,18 @@ export class AgentSetup {
         return iroriCommandHelp(await this.host.defaultParent());
       case 'list':
         return this.list(context);
+      case 'routines': {
+        if (!this.host.routines) throw Error('Routines are not available here.');
+        const workspace = await this.workspace(context);
+        const spaces = this.host.files.list();
+        return routineList(
+          (await this.host.routines(workspace?.id)).map((routine) => ({
+            ...routine,
+            hibachi: spaces.find((space) => space.scopeId === routine.ref.owner)?.name,
+          })),
+          workspace?.name,
+        );
+      }
       case 'clone':
         return this.clone(command, cwd, context);
       case 'create':

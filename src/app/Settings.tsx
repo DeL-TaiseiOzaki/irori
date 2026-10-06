@@ -6,9 +6,11 @@ import { AccountSection, RestoreEnvironment } from './AccountSync';
 import {
   chooseLanguage,
   chooseMarkdownFont,
+  chooseRoutineRuntimes,
   chooseTheme,
   currentLanguageChoice,
   currentMarkdownFont,
+  currentRoutineRuntimes,
   currentTheme,
 } from './device-settings';
 import { markdownFonts, themes, type MarkdownFont, type Theme } from '../domain/types';
@@ -88,6 +90,37 @@ function Choices<T extends string>({
             <span>{label(option)}</span>
           </label>
         ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * The runtimes routines may use on this device (ADR 016 D3). Read when the
+ * settings open, since a routine's row can add JavaScript too.
+ */
+function RoutineRuntimes({ onError }: { onError: (error: unknown) => void }) {
+  const [javascript, choose] = useChoice(
+    () => currentRoutineRuntimes().includes('javascript'),
+    (on: boolean) => {
+      const others = currentRoutineRuntimes().filter((runtime) => runtime !== 'javascript');
+      return chooseRoutineRuntimes(on ? [...others, 'javascript'] : others);
+    },
+    onError,
+  );
+  return (
+    <fieldset className="settings-choices routine-runtimes">
+      <legend>{t('ルーティン', 'Routines')}</legend>
+      <div>
+        <label className="settings-choice" data-checked={javascript}>
+          <input
+            type="checkbox"
+            checked={javascript}
+            onChange={(event) => choose(event.target.checked)}
+          />
+          <Icon name="code" size={15} />
+          <span>JavaScript</span>
+        </label>
       </div>
     </fieldset>
   );
@@ -197,6 +230,7 @@ export function Settings({
                   </label>
                 </div>
               </fieldset>
+              <RoutineRuntimes onError={onError} />
               <AccountSection
                 onRestore={() => {
                   setOpen(false);

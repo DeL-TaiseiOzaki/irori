@@ -241,6 +241,7 @@ app
       cloud,
       defaultParent,
       register: registerWatched,
+      routines: (workspaceId) => routines.list(workspaceId),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
         emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),
@@ -766,6 +767,9 @@ app
         return agents.startAccepted(input);
       },
       routines: (workspaceId) => routines.list(workspaceId),
+      createRoutine: (owner, name) => routines.create(owner, name),
+      routineSource: (ref) => routines.source(ref),
+      saveRoutineSource: (ref, text, version) => routines.saveSource(ref, text, version),
       reviewRoutine: (ref) => routines.review(ref),
       runRoutine: (ref, input) => routines.run(ref, input),
       stopRoutine: (ref) => routines.stop(ref),

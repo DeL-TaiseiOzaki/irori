@@ -6,11 +6,12 @@ const categories: readonly Category[] = ['personal', 'team', 'organization'];
  * What the irori agent asks of irori through the `irori` command on its run's
  * PATH. Each one only adds: a hibachi registered on this device and joined to
  * the workspace the request came from, or a folder connected to a hibachi's
- * contents. Nothing is removed or replaced.
+ * contents. Nothing is removed or replaced. `list` and `routines` only read.
  */
 export type IroriCommand =
   | { kind: 'help' }
   | { kind: 'list' }
+  | { kind: 'routines' }
   | {
       kind: 'clone';
       url: string;
@@ -26,7 +27,7 @@ export type IroriCommand =
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
 
-const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list'>, string[]> = {
+const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'>, string[]> = {
   clone: ['folder', 'parent', 'name', 'category'],
   create: ['parent', 'name', 'category'],
   add: ['name', 'category'],
@@ -56,9 +57,9 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     throw Error('The arguments could not be read. Run "irori help".');
   const [head, ...rest] = argv as string[];
   if (!head || ['help', '-h', '--help'].includes(head)) return { kind: 'help' };
-  if (head === 'list') {
-    if (rest.length) throw Error('"irori list" takes no arguments.');
-    return { kind: 'list' };
+  if (head === 'list' || head === 'routines') {
+    if (rest.length) throw Error(`"irori ${head}" takes no arguments.`);
+    return { kind: head };
   }
   if (!(head in options)) throw Error(`Unknown command "${head}". Run "irori help".`);
   const kind = head as keyof typeof options;

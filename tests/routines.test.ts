@@ -13,7 +13,14 @@ import { SettingsService } from '../src/host/settings';
 import { GitService } from '../src/git/service';
 import { AgentService } from '../src/agents/service';
 import { conversationMetas } from './fixtures/conversations';
-import { failedReport, nothingToDo, parseRoutine, RoutineService } from '../src/host/routines';
+import {
+  failedReport,
+  nothingToDo,
+  parseRoutine,
+  routineFolderName,
+  RoutineService,
+} from '../src/host/routines';
+import { AgentSetup } from '../src/host/agent-setup';
 import { reversibleStorage, SecretStore } from '../src/host/keystore';
 import { lineDiff, type RoutineRef, type RoutineRun } from '../src/domain/routines';
 import type { AgentEvent } from '../src/domain/types';
@@ -572,6 +579,75 @@ exit 3
     assert.deepEqual((await secrets.list()).names, ['SLACK_TOKEN']);
   },
 );
+
+test('a new routine is a template the person edits until it can run', fixtureOptions, async (t) => {
+  const { routines, listed, start, youId, youRoot, space, root, files, workspace } = await setup(t);
+  assert.equal(routineFolderName(' .Mail: in/out? '), 'Mail- in-out-');
+  assert.equal(routineFolderName('...'), 'routine');
+  assert.equal(routineFolderName('CON'), 'CON-routine');
+  const ref = await routines.create(youId, 'Daily mail');
+  assert.deepEqual(ref, { owner: youId, folder: 'Daily mail' });
+  const yaml = path.join(youRoot, 'routines', 'Daily mail', 'routine.yaml');
+  const template = await readFile(yaml, 'utf8');
+  assert.match(template, /^name: "Daily mail"\n/);
+  assert.match(template, /^ {2}- agent: irori$/m);
+  // The prompt is the person's to write; until then the routine cannot run.
+  const made = await listed(ref);
+  assert.equal(made.problem, 'ステップ 1 の prompt が正しくありません。');
+  await assert.rejects(start(ref), /prompt が正しくありません/);
+  // A second routine of the same name gets a folder of its own; a hibachi's uses agent: hibachi.
+  assert.equal((await routines.create(youId, 'Daily mail')).folder, 'Daily mail 2');
+  const theirs = await routines.create(space.scopeId, 'Triage');
+  assert.match(
+    await readFile(path.join(root, '.irori', 'routines', 'Triage', 'routine.yaml'), 'utf8'),
+    /^ {2}- agent: hibachi$/m,
+  );
+  assert.equal((await listed(theirs)).name, 'Triage');
+  await assert.rejects(routines.create(youId, '   '), /120 文字以内/);
+
+  // A save reports what still stops the routine, and a crossing edit is refused.
+  const read = await routines.source(ref);
+  assert.equal(read.text, template);
+  const missing = await routines.saveSource(
+    ref,
+    'name: Daily mail\nsteps:\n  - agent: irori\n    prompt: Sort.\n',
+    read.version,
+  );
+  assert.equal(missing.problem, 'ステップ 1 の access がありません。');
+  await assert.rejects(
+    routines.saveSource(ref, 'name: X\nsteps: []\n', read.version),
+    /ほかで変更されました/,
+  );
+  const saved = await routines.saveSource(
+    ref,
+    'name: Daily mail\nsteps:\n  - run: [git, --version]\n',
+    missing.version,
+  );
+  assert.equal(saved.problem, undefined);
+  assert.equal((await listed(ref)).review, 'unreviewed');
+  await start(ref);
+
+  // The irori agent checks routines through its command, as irori reads them.
+  const command = new AgentSetup({
+    files,
+    git: {} as never,
+    workspaces: { list: async () => [workspace], save: async () => workspace },
+    cloud: {} as never,
+    defaultParent: async () => root,
+    routines: (id) => routines.list(id),
+  });
+  const report = await command.run(['routines'], youRoot, { workspaceId: workspace.id });
+  assert.match(report, /^- "Daily mail" \(irori agent\) at .*Daily mail": ready$/m);
+  assert.match(
+    report,
+    /^- "Daily mail" \(irori agent\) at .*Daily mail 2": cannot run: ステップ 1/m,
+  );
+  assert.match(report, /^- "Triage" \(hibachi Product\) at .*: cannot run: /m);
+  assert.match(report, /Hibachi routines are those of the workspace "Lab"/);
+  const alone = await command.run(['routines'], youRoot);
+  assert.doesNotMatch(alone, /Triage/);
+  assert.match(alone, /only your own routines/);
+});
 
 test('a device without the OS keychain names it before a run', fixtureOptions, async (t) => {
   const { routine, listed, start } = await setup(t, { keychain: false });

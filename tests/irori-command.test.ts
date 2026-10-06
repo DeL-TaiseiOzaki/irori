@@ -44,6 +44,8 @@ test('the command reads its forms, options and owner/name shorthand', () => {
   assert.deepEqual(parseIroriCommand([]), { kind: 'help' });
   assert.deepEqual(parseIroriCommand(['--help']), { kind: 'help' });
   assert.deepEqual(parseIroriCommand(['list']), { kind: 'list' });
+  assert.deepEqual(parseIroriCommand(['routines']), { kind: 'routines' });
+  assert.throws(() => parseIroriCommand(['routines', 'x']), /"irori routines" takes no arguments/);
   assert.deepEqual(parseIroriCommand(['clone', 'octo/notes', '--name', 'Notes', '--folder=n']), {
     kind: 'clone',
     url: 'https://github.com/octo/notes.git',
@@ -92,14 +94,16 @@ test('every standard skill is a valid package whose name is its folder', () => {
     'connect-folder',
     'irori-setup',
     'new-hibachi',
+    'write-routine',
   ]);
   for (const [name, text] of Object.entries(iroriAgentSkills)) {
     const skill = parseSkill(name, text);
     assert.equal(skill.name, name);
     assert.ok(skill.description.length > 20 && skill.description.length <= 400);
-    assert.match(skill.instructions, /irori (clone|create|add|connect|list)/);
+    assert.match(skill.instructions, /irori (clone|create|add|connect|list|routines)/);
   }
   assert.match(iroriCommandPreamble, /`irori help`/);
+  assert.match(iroriCommandPreamble, /`irori routines`/);
 });
 
 test('a new irori agent folder has the standard skills; an older one gets the missing ones only when asked', async (t) => {

@@ -249,6 +249,9 @@ export const hostArguments = {
   yourAiRead: z.tuple([path]),
   yourAiBrains: z.tuple([z.array(id).max(50)]),
   routines: z.tuple([id]),
+  createRoutine: z.tuple([id, name]),
+  routineSource: z.tuple([routineRef]),
+  saveRoutineSource: z.tuple([routineRef, z.string().max(64 * 1024), version]),
   reviewRoutine: z.tuple([routineRef]),
   runRoutine: z.tuple([
     routineRef,

@@ -593,6 +593,16 @@ export interface HostAPI {
   yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
   /** The irori agent's routines and those of the workspace's hibachis, as this device sees them. */
   routines(workspaceId: string): Promise<import('./routines').Routine[]>;
+  /** Starts a routine in the irori agent's folder or a hibachi, from a template to finish. */
+  createRoutine(owner: string, name: string): Promise<import('./routines').RoutineRef>;
+  /** The routine's `routine.yaml`, for the person to edit. */
+  routineSource(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineSource>;
+  /** Saves `routine.yaml` unless it changed since `version`; says why it cannot run yet, if so. */
+  saveRoutineSource(
+    ref: import('./routines').RoutineRef,
+    text: string,
+    version: string,
+  ): Promise<{ version: string; problem?: string }>;
   /** A routine's files as they are now, and what changed since the person confirmed them. */
   reviewRoutine(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineReview>;
   /** Starts a routine and returns its run's id; nothing else ever starts one. */
