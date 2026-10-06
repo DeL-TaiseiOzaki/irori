@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-06: **0.1.77** ([#179](https://github.com/DeL-TaiseiOzaki/irori/pull/179),
+making routines from the routines page or through the irori agent, [ADR 016](decisions/016-routines.md)
+stage 4) merged at the owner's request as `5bce1c6` and is published as
+[v0.1.77-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.77-preview.1)
+by release run `37420283467` from main's successful CI run `37419304421`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,158,720 bytes,
+  Mac 141,762,918 bytes and `irori-0.1.77-full.nupkg` 175,326,801 bytes.
+  The website manifest now offers 0.1.77.
+- Owner checks remain: a real CLI writing a routine with `write-routine`, and
+  the routines page on the installed Windows and Mac builds.
+
 Making routines, 2026-10-06 (**0.1.77**, [ADR 016](decisions/016-routines.md) stage 4):
 the owner found the routines page hard to use (no way to make a routine, a
 JavaScript switch first, folder paths as the empty state) and chose both a
