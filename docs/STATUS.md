@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-06: **0.1.76** ([#177](https://github.com/DeL-TaiseiOzaki/irori/pull/177),
+the GitHub account carries the environment, [ADR 026](decisions/026-github-account-environment.md))
+merged at the owner's request as `ab8a526` and is published as
+[v0.1.76-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.76-preview.1)
+by release run `37409479015` from main's successful CI run `37408526050`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,153,600 bytes,
+  Mac 141,759,614 bytes and `irori-0.1.76-full.nupkg` 175,323,089 bytes.
+  The website manifest now offers 0.1.76.
+- Owner checks remain: a real `gh` sign-in saving to and restoring from the
+  account's `irori-settings` repository, on the installed Windows and Mac builds.
+
 Account and environment, 2026-10-06 (**0.1.76**, [ADR 026](decisions/026-github-account-environment.md)):
 the owner asked for account linking like VS Code's, and chose showing the
 account plus carrying the environment to another device, through the GitHub
