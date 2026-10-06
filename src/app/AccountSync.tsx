@@ -247,7 +247,7 @@ export function RestoreEnvironment({
           <p role="status">{t('確認しています…', 'Checking…')}</p>
         )}
         {issue && <ErrorMessage text={issue} />}
-        {busy && <p role="status">{t('復元しています…', 'Restoring…')}</p>}
+        {busy && !result && <p role="status">{t('復元しています…', 'Restoring…')}</p>}
         <div className="actions">
           {result ? (
             <ArrowFillButton type="submit">{t('閉じる', 'Close')}</ArrowFillButton>
