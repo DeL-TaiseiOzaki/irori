@@ -96,6 +96,11 @@ export const conversationMeta = z.looseObject({
 });
 export type ConversationMeta = z.infer<typeof conversationMeta>;
 export type ConversationOwner = ConversationMeta['owner'];
+/** Whose conversation it is: the hibachi of that name, or without one the irori agent. */
+export const conversationOwner = (id: string, hibachi?: string): ConversationOwner =>
+  hibachi === undefined
+    ? { kind: 'irori-agent', id, name: 'irori agent' }
+    : { kind: 'hibachi', id, name: hibachi.slice(0, 200) };
 
 /** One row of an owner's history list. */
 export interface ConversationSummary {

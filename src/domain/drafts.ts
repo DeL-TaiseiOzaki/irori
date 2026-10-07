@@ -1,12 +1,8 @@
 import { z } from 'zod';
 import { agentIds, type AgentId } from './types';
 import { t } from './i18n';
+import { relativePath } from './knowledge';
 
-const relativePath = (value: string) =>
-  !value.includes('\\') &&
-  !value.includes('\0') &&
-  !/^[a-z]:/i.test(value) &&
-  value.split('/').every((part) => part && part !== '.' && part !== '..');
 export const draftKey = z.discriminatedUnion('kind', [
   z
     .object({

@@ -19,6 +19,78 @@ export interface BridgeCommand {
   limit: number;
 }
 
+/**
+ * A server on a loopback port for one run, reached through the returned URL and
+ * its random token. `handle` gets each request's body, kept to `limit`
+ * characters, and whether it was a POST to that URL.
+ */
+export async function loopbackServer(
+  limit: number,
+  handle: (body: string, response: http.ServerResponse, found: boolean) => Promise<void>,
+) {
+  const token = randomBytes(24).toString('hex');
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => {
+      body = (body + chunk).slice(0, limit);
+    });
+    request.on('end', () =>
+      handle(body, response, request.method === 'POST' && request.url === `/${token}`),
+    );
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  return {
+    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/${token}`,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+}
+
+/**
+ * The start of a command's client: `fail` reports on standard error under the
+ * command's name, and `post` sends a body to irori, then prints irori's report or
+ * fails with its error, or with `unfinished` when it gives none.
+ */
+export const clientBase = (name: string) => `'use strict';
+const http = require('node:http');
+const fail = (message, code = 1) => {
+  process.stderr.write('${name}: ' + message + '\\n');
+  process.exitCode = code;
+};
+const post = (address, body, unfinished) => {
+  const request = http.request(
+    address,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+    },
+    (response) => {
+      let text = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => (text += chunk));
+      response.on('end', () => {
+        let reply;
+        try {
+          reply = JSON.parse(text);
+        } catch {
+          return fail('irori answered ' + response.statusCode + '.');
+        }
+        if (!reply || !reply.ok) return fail((reply && reply.error) || unfinished);
+        process.stdout.write(reply.report.endsWith('\\n') ? reply.report : reply.report + '\\n');
+      });
+      response.on('error', (error) => fail('the connection to irori ended (' + error.message + ').'));
+    },
+  );
+  request.on('error', (error) => fail('irori is not reachable (' + error.message + ').'));
+  request.end(body);
+};
+`;
+
 /** A POSIX shell word for any path: single quotes, with each quote closed and escaped. */
 const shellWord = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 /** A cmd.exe word: double quotes, with % doubled so a path is never expanded. */
@@ -62,46 +134,31 @@ export async function commandBridge(
   await writeFileAtomic(posix, launchers.posix, { mode: 0o700 });
   await chmod(posix, 0o700);
   await writeFileAtomic(path.join(bin, `${command.name}.cmd`), launchers.windows, { mode: 0o700 });
-  const token = randomBytes(24).toString('hex');
-  const server = http.createServer((request, response) => {
-    let body = '';
-    request.on('data', (chunk) => {
-      body = (body + chunk).slice(0, command.limit);
+  const server = await loopbackServer(command.limit, async (body, response, found) => {
+    if (!found) {
+      response.writeHead(404, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ ok: false, error: 'Not found' }));
+      return;
+    }
+    const gone = new AbortController();
+    response.on('close', () => {
+      if (!response.writableFinished) gone.abort();
     });
-    request.on('end', async () => {
-      if (request.method !== 'POST' || request.url !== `/${token}`) {
-        response.writeHead(404, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ ok: false, error: 'Not found' }));
-        return;
-      }
-      const gone = new AbortController();
-      response.on('close', () => {
-        if (!response.writableFinished) gone.abort();
-      });
-      // The answer may take as long as the work does.
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.flushHeaders();
-      let reply: { ok: true; report: string } | { ok: false; error: string };
-      try {
-        reply = { ok: true, report: await answer(JSON.parse(body), gone.signal) };
-      } catch (error) {
-        reply = { ok: false, error: error instanceof Error ? error.message : String(error) };
-      }
-      if (!response.destroyed) response.end(JSON.stringify(reply));
-    });
+    // The answer may take as long as the work does.
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.flushHeaders();
+    let reply: { ok: true; report: string } | { ok: false; error: string };
+    try {
+      reply = { ok: true, report: await answer(JSON.parse(body), gone.signal) };
+    } catch (error) {
+      reply = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    if (!response.destroyed) response.end(JSON.stringify(reply));
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/${token}`;
   return {
-    env: withPath({ ...env, [command.variable]: url }, bin),
-    url,
+    env: withPath({ ...env, [command.variable]: server.url }, bin),
+    url: server.url,
     bin,
-    close: () => {
-      server.closeAllConnections();
-      server.close();
-    },
+    close: server.close,
   };
 }

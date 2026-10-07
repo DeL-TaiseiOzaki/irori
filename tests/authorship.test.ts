@@ -5,13 +5,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AuthorshipStore,
-  editedPath,
   editedText,
   lineKey,
   personLinesChanged,
   personLinesNotice,
 } from '../src/knowledge/authorship';
 import { personLinesSummary } from '../prompts';
+import { editedPath, toolFile } from '../src/agents/delegation';
 import { FileService, hash } from '../src/host/files';
 
 const ref = { scopeId: '11111111-2222-3333-4444-555555555555', path: 'Knowledge_Base/note.md' };
@@ -184,6 +184,9 @@ test("A file tool's edit is applied as the tool would, and nothing is guessed", 
   assert.equal(editedPath({ filePath: 'b' }), 'b');
   assert.equal(editedPath({ path: 'c' }), 'c');
   assert.equal(editedPath({ path: 1 }), undefined);
+  // The write check reads only the names Claude Code's write tools use.
+  assert.equal(toolFile({ notebook_path: 'n.ipynb' }), 'n.ipynb');
+  assert.equal(toolFile({ path: 'c' }), undefined);
   for (const [tool, input] of [
     ['Edit', { old_string: 'absent', new_string: 'x' }],
     ['Edit', { old_string: '', new_string: 'x' }],

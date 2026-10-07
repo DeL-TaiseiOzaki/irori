@@ -22,8 +22,8 @@ import {
 } from '../domain/skills';
 import { userSkillRoots, type SkillReach } from '../domain/skill-reach';
 import { t } from '../domain/i18n';
+import { matchFrontMatter } from '../domain/schema-settings';
 
-const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
 // The Agent Skills convention keeps metadata values as strings; a list is tolerated.
 const names = z
   .union([z.string(), z.array(z.string())])
@@ -43,7 +43,7 @@ const retiredMetadata = z.looseObject({
 function split(text: string, what: string) {
   if (new TextEncoder().encode(text).byteLength > maxSkillBytes)
     throw Error(`A ${what} is at most ${maxSkillBytes} bytes`);
-  const match = frontMatter.exec(text.replace(/^﻿/, ''));
+  const match = matchFrontMatter(text);
   if (!match) throw Error(`A ${what} must begin with --- front matter`);
   return {
     metadata: parseYaml(match[1], { schema: 'failsafe', logLevel: 'error', stringKeys: true }),

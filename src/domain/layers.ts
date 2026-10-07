@@ -13,15 +13,10 @@ const defaultLabels: Record<Layer, string> = {
   Knowledge_Base: 'Knowledge',
   contents: 'Contents',
 };
+/** The files at the top of a hibachi that belong to Schema: its agents' instructions and settings. */
+export const schemaFiles = ['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode.jsonc'];
 /** Top-level names that already mean Schema, or that tools own. */
-const reserved = [
-  'schema',
-  'agents.md',
-  'claude.md',
-  'opencode.json',
-  'opencode.jsonc',
-  'node_modules',
-];
+const reserved = ['schema', ...schemaFiles.map((name) => name.toLowerCase()), 'node_modules'];
 
 /** What a hibachi says about its layers in `.irori/scope.json`. */
 interface LayerDeclaration {
@@ -70,10 +65,13 @@ export function layerFolderProblem(name: string): string | undefined {
     );
 }
 export const layerFolderName = z.string().refine((name) => !layerFolderProblem(name));
-export const layerLabelText = z.string().trim().min(1).max(40);
-export const layerLabels = z
-  .object({ Knowledge_Base: layerLabelText.optional(), contents: layerLabelText.optional() })
-  .strict();
+const labelLength = 40;
+const namedLayers = <T extends z.ZodType>(label: T) =>
+  z.object({ Knowledge_Base: label, contents: label }).strict();
+export const layerLabelText = z.string().trim().min(1).max(labelLength);
+export const layerLabels = namedLayers(layerLabelText.optional());
+/** A change to the shown names: an empty or `null` one returns to irori's. */
+export const layerLabelChanges = namedLayers(z.string().max(labelLength).nullable().optional());
 
 /** A path moved by a layer folder rename: `from/...` becomes `to/...`, anything else stays. */
 export function renamedPath(p: string, from: string, to: string) {

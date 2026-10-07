@@ -5,6 +5,8 @@ import { z } from 'zod';
 import {
   agentIds,
   agentNames,
+  delegateStates,
+  runOutcomes,
   type AgentEvent,
   type AgentId,
   type StartRun,
@@ -45,11 +47,7 @@ const chunkSize = 256 * 1024;
 /** How many conversations keep the count of the lines before their view window. */
 const countedLimit = 256;
 
-const delegate = z.object({
-  scopeId: z.string(),
-  task: z.string(),
-  state: z.enum(['started', 'working', 'reported', 'failed']),
-});
+const delegate = z.object({ scopeId: z.string(), task: z.string(), state: z.enum(delegateStates) });
 /**
  * One line of `events.jsonl`. Permission and question requests are kept as status
  * text, never as something to answer. Lines of a streamed reply share its id and
@@ -65,7 +63,7 @@ export const storedEvent = z.object({
   details: z.string().optional(),
   /** The bytes `details` had before being kept to their first 1 MiB. */
   cut: z.number().int().positive().optional(),
-  outcome: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  outcome: z.enum(runOutcomes).optional(),
   delegate: delegate.optional(),
   call: z.string().max(400).optional(),
   result: z.literal(true).optional(),
@@ -102,7 +100,42 @@ export const stateFolder = (dataDir: string) => path.join(dataDir, 'conversation
 /** A checkout path as a conversation records it, so no local path enters its folder. */
 export const rootDigest = (root: string) => createHash('sha256').update(root).digest('hex');
 const uuidName = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
+/** What `operation` gives, or undefined when the file it reaches is missing. */
+const ifExists = <T>(operation: Promise<T>) =>
+  operation.catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  });
+
+export const notYours = () =>
+  t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.');
+const noConversation = () => t('この会話はありません。', 'This conversation no longer exists.');
+export const stopBeforeDeleting = () =>
+  t('実行を停止してから削除してください。', 'Stop the run before deleting.');
+/** Said in place of the end of a run an earlier host left unfinished. */
+export const unconfirmedRun = () =>
+  t(
+    '前回の実行結果は未確認です。この指示は再送していません。',
+    'The previous run did not report its result. This instruction was not sent again.',
+  );
+
+/** A new conversation's metadata: none of it pinned, archived, forked, handed on or resumed yet. */
+export const newMeta = (
+  meta: Pick<
+    ConversationMeta,
+    'id' | 'owner' | 'agent' | 'model' | 'title' | 'titleSource' | 'createdAt' | 'linkedNote'
+  > &
+    Partial<ConversationMeta>,
+): ConversationMeta => ({
+  schemaVersion: 1,
+  updatedAt: meta.createdAt,
+  hibachis: [],
+  pinned: false,
+  archived: false,
+  forkedFrom: null,
+  native: {},
+  ...meta,
+});
 
 /** Keeps a value to its first `limit` UTF-8 bytes, on a character boundary. */
 export function cutBytes(value: string, limit: number): { value: string; cut?: number } {
@@ -354,10 +387,7 @@ export class ConversationStore {
   /** Reads this device's queues and recovers runs an earlier host left unfinished. */
   private init() {
     this.loaded ??= (async () => {
-      const names = await fs.readdir(this.stateDir).catch((error) => {
-        if (missing(error)) return [] as string[];
-        throw error;
-      });
+      const names = (await ifExists(fs.readdir(this.stateDir))) ?? [];
       for (const name of names) {
         const id = name.replace(/\.json$/, '');
         if (!name.endsWith('.json') || !uuidName.test(id)) continue;
@@ -413,16 +443,7 @@ export class ConversationStore {
           active.at,
         ),
       );
-    lines.push(
-      storedLine({
-        runId: active.runId,
-        type: 'error',
-        text: t(
-          '前回の実行結果は未確認です。この指示は再送していません。',
-          'The previous run did not report its result. This instruction was not sent again.',
-        ),
-      }),
-    );
+    lines.push(storedLine({ runId: active.runId, type: 'error', text: unconfirmedRun() }));
     await this.append(id, lines);
     await this.writeState({ ...state, active: undefined });
   }
@@ -463,10 +484,7 @@ export class ConversationStore {
   /** Reads every conversation's metadata once; later writes keep the index current. */
   private scan() {
     this.scanned ??= (async () => {
-      const entries = await fs.readdir(this.folder, { withFileTypes: true }).catch((error) => {
-        if (missing(error)) return [];
-        throw error;
-      });
+      const entries = (await ifExists(fs.readdir(this.folder, { withFileTypes: true }))) ?? [];
       for (const entry of entries)
         if (uuidName.test(entry.name)) await this.loadMeta(entry.name).catch(() => {});
     })().catch((error) => {
@@ -479,19 +497,13 @@ export class ConversationStore {
     const cached = this.metas.get(id);
     if (cached) return cached;
     const dir = this.dir(id);
-    const folder = await fs.lstat(dir).catch((error) => {
-      if (missing(error)) return undefined;
-      throw error;
-    });
+    const folder = await ifExists(fs.lstat(dir));
     if (!folder) return undefined;
     let raw: unknown;
     try {
       if (!folder.isDirectory()) throw Error('The conversation folder is not a directory');
       const file = path.join(dir, 'meta.json');
-      const stat = await fs.lstat(file).catch((error) => {
-        if (missing(error)) return undefined;
-        throw error;
-      });
+      const stat = await ifExists(fs.lstat(file));
       if (!stat) {
         // A conversation whose creation stopped before its metadata holds nothing yet.
         const events = await fs.lstat(path.join(dir, 'events.jsonl')).catch(() => undefined);
@@ -519,7 +531,7 @@ export class ConversationStore {
   }
   async meta(id: string) {
     const meta = await this.loadMeta(id);
-    if (!meta) throw Error(t('この会話はありません。', 'This conversation no longer exists.'));
+    if (!meta) throw Error(noConversation());
     return meta;
   }
   private async writeMeta(meta: ConversationMeta) {
@@ -532,10 +544,7 @@ export class ConversationStore {
   private async ensure(id: string, placement: Placement, input: StartRun) {
     const meta = await this.loadMeta(id);
     if (meta) {
-      if (meta.owner.id !== placement.owner.id)
-        throw Error(
-          t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.'),
-        );
+      if (meta.owner.id !== placement.owner.id) throw Error(notYours());
       if (meta.agent !== placement.agent)
         throw Error(
           t(
@@ -550,30 +559,24 @@ export class ConversationStore {
       !placement.create &&
       !(reserved?.owner === placement.owner.id && reserved.agent === placement.agent)
     )
-      throw Error(t('この会話はありません。', 'This conversation no longer exists.'));
+      throw Error(noConversation());
     const dir = this.dir(id);
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
     await writeLocalFile(path.join(dir, 'events.jsonl'), '');
-    const now = this.now();
-    const created = await this.writeMeta({
-      schemaVersion: 1,
-      id,
-      owner: placement.owner,
-      agent: placement.agent,
-      model: input.model ?? null,
-      title: placement.title ?? conversationTitle(input.prompt),
-      titleSource: placement.titleSource ?? 'first-message',
-      createdAt: now,
-      updatedAt: now,
-      linkedNote: input.notePath ?? null,
-      hibachis: [],
-      pinned: false,
-      archived: false,
-      forkedFrom: null,
-      ...(placement.routine && { routine: placement.routine }),
-      ...(placement.handedBy && { handedBy: placement.handedBy }),
-      native: {},
-    });
+    const created = await this.writeMeta(
+      newMeta({
+        id,
+        owner: placement.owner,
+        agent: placement.agent,
+        model: input.model ?? null,
+        title: placement.title ?? conversationTitle(input.prompt),
+        titleSource: placement.titleSource ?? 'first-message',
+        createdAt: this.now(),
+        linkedNote: input.notePath ?? null,
+        ...(placement.routine && { routine: placement.routine }),
+        ...(placement.handedBy && { handedBy: placement.handedBy }),
+      }),
+    );
     this.reserved.delete(id);
     return created;
   }
@@ -584,10 +587,7 @@ export class ConversationStore {
     use: (handle: fs.FileHandle, size: number) => Promise<T>,
   ): Promise<T | undefined> {
     const file = path.join(this.dir(id), 'events.jsonl');
-    const stat = await fs.lstat(file).catch((error) => {
-      if (missing(error)) return undefined;
-      throw error;
-    });
+    const stat = await ifExists(fs.lstat(file));
     if (!stat) return undefined;
     if (!stat.isFile()) throw Error('events.jsonl is not a regular file');
     const handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -658,10 +658,7 @@ export class ConversationStore {
   private async append(id: string, lines: StoredEvent[]) {
     if (!lines.length) return;
     const file = path.join(await this.checkedDir(id), 'events.jsonl');
-    const existing = await fs.lstat(file).catch((error) => {
-      if (missing(error)) return undefined;
-      throw error;
-    });
+    const existing = await ifExists(fs.lstat(file));
     if (existing && !existing.isFile()) throw Error('Conversation files must be regular files');
     let text = lines.map(jsonLine).join('');
     const handle = await fs.open(
@@ -1000,8 +997,7 @@ export class ConversationStore {
     return this.queued(id, async () => {
       await this.init();
       const state = this.states.get(id);
-      if (state?.active)
-        throw Error(t('実行を停止してから削除してください。', 'Stop the run before deleting.'));
+      if (state?.active) throw Error(stopBeforeDeleting());
       if (state?.queued.length)
         throw Error(
           t(
@@ -1010,10 +1006,7 @@ export class ConversationStore {
           ),
         );
       const dir = this.dir(id);
-      const stat = await fs.lstat(dir).catch((error) => {
-        if (missing(error)) return undefined;
-        throw error;
-      });
+      const stat = await ifExists(fs.lstat(dir));
       // A link is removed as a link; what it points to is not irori's to delete.
       if (stat?.isDirectory()) await fs.rm(dir, { recursive: true, force: true });
       else if (stat) await fs.unlink(dir);

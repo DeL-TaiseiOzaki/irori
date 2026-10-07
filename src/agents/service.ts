@@ -1,5 +1,5 @@
 import { KnowledgeStore } from '../knowledge/store';
-import { AuthorshipStore, editedPath, personLinesNotice } from '../knowledge/authorship';
+import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
 import type { RunRecord } from '../domain/knowledge';
 import { createHash, randomUUID } from 'node:crypto';
@@ -25,6 +25,7 @@ import {
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
+import { codexServer, initializeCodex, refuseCodex } from './codex';
 import { ModelCatalog } from './models';
 import { personLinesBridge } from './person-lines';
 import { hibachiBridge } from './hibachi-bridge';
@@ -35,8 +36,16 @@ import { Rpc, type Message } from './rpc';
 import { Tail } from './tail';
 import type { FileService } from '../host/files';
 import type { SessionBinding } from './sessions';
-import { ConversationStore, rootDigest, viewDetails, type Placement } from './conversations';
 import {
+  ConversationStore,
+  notYours,
+  rootDigest,
+  stopBeforeDeleting,
+  viewDetails,
+  type Placement,
+} from './conversations';
+import {
+  conversationOwner,
   conversationTitle,
   promptLimit,
   startInput,
@@ -71,9 +80,11 @@ import { categoryName } from '../domain/brains';
 import {
   brainOfAgent,
   brainOfPath,
+  editedPath,
   hibachiOf,
   toolFile,
   writeDecision,
+  writeToolMatcher,
   type Delegation,
 } from './delegation';
 type Reply = { allow: boolean; answers?: AgentAnswers };
@@ -145,6 +156,29 @@ type Run = {
 };
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
+/** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
+const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
+const alreadyRunning = () =>
+  t(
+    'この会話は実行中です。停止するか、送信待ちに追加してください。',
+    'This conversation is already running. Stop it or add the instruction to its queue.',
+  );
+const historyUnsaved = () =>
+  t(
+    '会話履歴を保存できません。実行を停止します。',
+    'Could not save the conversation history. Stopping the run.',
+  );
+const noReport = () => t('報告がありません。', 'No report.');
+/** The irori agent is handed hibachis; a note, its lines or materials go to a hibachi agent. */
+function refuseYourMaterials(input: StartRun) {
+  if (input.notePath || input.personLines || input.sources?.length)
+    throw Error(
+      t(
+        'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
+        'The irori agent takes hibachis, not notes or materials.',
+      ),
+    );
+}
 /** What a hand-off's or a step's report keeps of the words it collects. */
 const reportLimit = 100000;
 /**
@@ -196,14 +230,7 @@ export class AgentService {
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, this.device, () => {
       for (const run of [...this.runs.values()]) {
-        this.publish(
-          run,
-          'error',
-          t(
-            '会話履歴を保存できません。実行を停止します。',
-            'Could not save the conversation history. Stopping the run.',
-          ),
-        );
+        this.publish(run, 'error', historyUnsaved());
         void this.stop(run);
       }
     });
@@ -243,9 +270,10 @@ export class AgentService {
   }
   /** Whose conversation it is: a hibachi's, or the irori agent's. */
   private owner(scopeId: string): ConversationOwner {
-    return this.isYou(scopeId)
-      ? { kind: 'irori-agent', id: scopeId, name: 'irori agent' }
-      : { kind: 'hibachi', id: scopeId, name: this.files.get(scopeId).name.slice(0, 200) };
+    return conversationOwner(
+      scopeId,
+      this.isYou(scopeId) ? undefined : this.files.get(scopeId).name,
+    );
   }
   get anyBusy() {
     return this.runs.size > 0;
@@ -277,7 +305,7 @@ export class AgentService {
   }
   deleteConversation(id: string) {
     if ([...this.runs.values()].some((run) => run.conversationId === id))
-      throw Error(t('実行を停止してから削除してください。', 'Stop the run before deleting.'));
+      throw Error(stopBeforeDeleting());
     return this.conversations.remove(id);
   }
   /**
@@ -292,10 +320,7 @@ export class AgentService {
     const pending = await this.conversations.pending(scopeId);
     const reserved = id && this.conversations.reservation(id);
     if (!id || reserved) {
-      if (reserved && reserved.owner !== scopeId)
-        throw Error(
-          t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.'),
-        );
+      if (reserved && reserved.owner !== scopeId) throw Error(notYours());
       return {
         id,
         events: [],
@@ -307,10 +332,7 @@ export class AgentService {
       };
     }
     const value = await this.conversations.read(id);
-    if (value.meta.owner.id !== scopeId)
-      throw Error(
-        t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.'),
-      );
+    if (value.meta.owner.id !== scopeId) throw Error(notYours());
     const native = await this.conversations.native(id).catch(() => undefined);
     const requests = [...this.requests.values()]
       .filter(({ run }) => run.conversationId === id && run.id === value.activeRunId)
@@ -339,13 +361,7 @@ export class AgentService {
     input = startInput.parse(input);
     requireAgentAccess(input.agent, input.access);
     this.root(input.scopeId);
-    if (this.isYou(input.scopeId) && (input.notePath || input.personLines || input.sources?.length))
-      throw Error(
-        t(
-          'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
-          'The irori agent takes hibachis, not notes or materials.',
-        ),
-      );
+    if (this.isYou(input.scopeId)) refuseYourMaterials(input);
     const { id, placement } = await this.placement(input);
     return this.conversations.enqueue(id, placement, input);
   }
@@ -421,24 +437,13 @@ export class AgentService {
     if (holder !== undefined && !this.delegated.get(input.scopeId)?.has(holder))
       throw Error('This hibachi is not handed to that run.');
     if (input.conversationId && this.conversationRun(input.conversationId))
-      throw Error(
-        t(
-          'この会話は実行中です。停止するか、送信待ちに追加してください。',
-          'This conversation is already running. Stop it or add the instruction to its queue.',
-        ),
-      );
+      throw Error(alreadyRunning());
     if (!input.prompt.trim() || input.prompt.length > promptLimit)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.root(input.scopeId);
     const brains = [...new Set(input.brains ?? [])];
     if (this.isYou(input.scopeId)) {
-      if (input.notePath || input.personLines || input.sources?.length)
-        throw Error(
-          t(
-            'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
-            'The irori agent takes hibachis, not notes or materials.',
-          ),
-        );
+      refuseYourMaterials(input);
       for (const scopeId of brains) this.files.get(scopeId);
     } else if (brains.length || input.workspace) throw Error('Only the irori agent takes hibachis');
     let close!: () => void;
@@ -512,14 +517,7 @@ export class AgentService {
     try {
       this.conversations.event(run.conversationId, event);
     } catch {
-      this.publish(
-        run,
-        'error',
-        t(
-          '会話履歴を保存できません。実行を停止します。',
-          'Could not save the conversation history. Stopping the run.',
-        ),
-      );
+      this.publish(run, 'error', historyUnsaved());
       void this.stop(run);
     }
   }
@@ -712,12 +710,7 @@ export class AgentService {
       if (
         [...this.runs.values()].some((other) => other !== run && other.conversationId === placed.id)
       )
-        throw Error(
-          t(
-            'この会話は実行中です。停止するか、送信待ちに追加してください。',
-            'This conversation is already running. Stop it or add the instruction to its queue.',
-          ),
-        );
+        throw Error(alreadyRunning());
       run.conversationId = placed.id;
       // The conversation's own queue goes first; `begin` refuses an instruction sent past it.
       const eventId = randomUUID();
@@ -858,7 +851,6 @@ export class AgentService {
       promptParts.push(input.prompt);
       let prompt = promptParts.join('\n\n');
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
-      const binding = this.binding(input.scopeId, input.agent);
       // A native session continues only on the device, checkout and access mode it
       // was made with (ADR 017 D7). Native sessions can retain approvals, so a
       // policy change starts a fresh one in the same conversation (ADR 009). A
@@ -934,7 +926,7 @@ export class AgentService {
         this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
       if (input.agent === 'codex') await this.codex(run, space.root, prompt, saved, input.model);
       else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, binding, saved, input.model);
+        await this.claude(run, space.root, prompt, saved, input.model);
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
@@ -987,9 +979,7 @@ export class AgentService {
           session: saved,
           access: run.access,
           model: input.model,
-          env: run.step
-            ? { ...(command?.env ?? bridge?.env ?? run.env ?? agentEnv()), ...run.step.env }
-            : (command?.env ?? bridge?.env ?? run.env),
+          env: runEnv(run, command?.env ?? bridge?.env ?? run.env),
           args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
@@ -1165,12 +1155,7 @@ export class AgentService {
       const outcome = await done;
       const report = words.toString().trim();
       if (outcome === 'completed') {
-        this.event(
-          holder,
-          'status',
-          report || t('報告がありません。', 'No report.'),
-          delegate('reported'),
-        );
+        this.event(holder, 'status', report || noReport(), delegate('reported'));
         return report || 'The hibachi agent finished without a report.';
       }
       const reason =
@@ -1183,10 +1168,7 @@ export class AgentService {
     }
   }
   private async codex(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
-    const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd, {
-      ...(run.env ?? agentEnv()),
-      ...run.step?.env,
-    });
+    const child = codexServer(cwd, runEnv(run));
     run.child = child;
     let finished = false;
     let failure: Error | undefined;
@@ -1252,11 +1234,7 @@ export class AgentService {
       },
     );
     run.rpc = rpc;
-    await rpc.request('initialize', {
-      clientInfo: { name: 'irori', title: 'irori', version: '0.1.0' },
-      capabilities: { experimentalApi: true },
-    });
-    rpc.send({ method: 'initialized', params: {} });
+    await initializeCodex(rpc);
     const folders = this.localFolders(run);
     const params = {
       cwd,
@@ -1333,22 +1311,12 @@ export class AgentService {
           `Declined an unsupported request: ${m.method}`,
         ),
       );
-      rpc.send({
-        id: m.id,
-        error: { code: -32601, message: 'This request is not supported by irori yet' },
-      });
+      refuseCodex(rpc, m, 'This request is not supported by irori yet');
       return;
     }
     rpc.send({ id: m.id, result });
   }
-  private async claude(
-    run: Run,
-    cwd: string,
-    prompt: string,
-    binding: SessionBinding,
-    session?: string,
-    model?: string,
-  ) {
+  private async claude(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
     const stderr = new Tail(6000);
     let sawResult = false;
@@ -1391,7 +1359,7 @@ export class AgentService {
       options: {
         cwd,
         pathToClaudeCodeExecutable: 'claude',
-        env: { ...(run.env ?? agentEnv()), ...run.step?.env },
+        env: runEnv(run),
         settingSources: ['user', 'project', 'local'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
@@ -1411,7 +1379,7 @@ export class AgentService {
         hooks: {
           PreToolUse: [
             {
-              matcher: 'Edit|MultiEdit|Write|NotebookEdit',
+              matcher: writeToolMatcher,
               hooks: [
                 async (input) => {
                   if (input.hook_event_name !== 'PreToolUse') return {};
@@ -1437,7 +1405,7 @@ export class AgentService {
                   const context = await personLinesNotice(
                     this.files,
                     this.authorship,
-                    brain?.scopeId ?? binding.scopeId,
+                    brain?.scopeId ?? run.binding.scopeId,
                     input.tool_name,
                     input.tool_input,
                   ).catch(() => undefined);
@@ -1569,7 +1537,7 @@ export class AgentService {
           this.event(
             run,
             'status',
-            msg.summary || t('報告がありません。', 'No report.'),
+            msg.summary || noReport(),
             delegate(msg.tool_use_id, msg.status === 'completed' ? 'reported' : 'failed'),
           );
         if (msg.type === 'assistant')

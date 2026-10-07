@@ -13,6 +13,7 @@ import {
 } from '../domain/knowledge';
 import { t } from '../domain/i18n';
 import { personLinesEditNotice } from '../../prompts';
+import { editedPath } from '../agents/delegation';
 
 /**
  * A line with less than this much prose in it says nothing about who wrote it.
@@ -39,12 +40,6 @@ export function lineKey(line: string): string | null {
     .trim();
   if (normalised.replace(decoration, '').length < leastSignificantCharacters) return null;
   return createHash('sha256').update(normalised).digest('hex').slice(0, 16);
-}
-
-/** The file a file tool names: `file_path` for Claude Code, `filePath` for OpenCode, `path` for Pi. */
-export function editedPath(input: unknown): string | undefined {
-  const { file_path, filePath, path: file } = (input ?? {}) as Record<string, unknown>;
-  return [file_path, filePath, file].find((value): value is string => typeof value === 'string');
 }
 
 /**

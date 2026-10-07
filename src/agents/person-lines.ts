@@ -1,10 +1,8 @@
-import http from 'node:http';
 import path from 'node:path';
-import type { AddressInfo } from 'node:net';
-import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import writeFileAtomic from 'write-file-atomic';
 import { personLinesHeld as held } from '../../prompts';
+import { loopbackServer } from './command-bridge';
 
 /** What a file tool call should be told before it runs, or nothing. */
 export type Notice = (tool: string, input: unknown) => Promise<string | undefined>;
@@ -55,36 +53,22 @@ export async function personLinesBridge(
   // Replaced whole: another run's CLI may be loading it at this moment.
   await writeFileAtomic(file, scripts[agent]);
   const heard = new Set<string>();
-  const token = randomBytes(24).toString('hex');
-  const server = http.createServer((request, response) => {
-    let body = '';
-    request.on('data', (chunk) => {
-      body = (body + chunk).slice(0, 1_000_000);
-    });
-    request.on('end', async () => {
-      let text: string | undefined;
-      let status = 200;
-      try {
-        if (request.method !== 'POST' || request.url !== `/${token}`) throw Error('Not found');
-        const { tool, input } = JSON.parse(body);
-        const key = JSON.stringify([tool, input]);
-        if (!heard.has(key)) text = await notice(String(tool), input).catch(() => undefined);
-        if (text) heard.add(key);
-      } catch {
-        status = 404;
-      }
-      response.writeHead(status, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ notice: text ? `${text} ${held}` : null }));
-    });
+  const server = await loopbackServer(1_000_000, async (body, response, found) => {
+    let text: string | undefined;
+    let status = 200;
+    try {
+      if (!found) throw Error('Not found');
+      const { tool, input } = JSON.parse(body);
+      const key = JSON.stringify([tool, input]);
+      if (!heard.has(key)) text = await notice(String(tool), input).catch(() => undefined);
+      if (text) heard.add(key);
+    } catch {
+      status = 404;
+    }
+    response.writeHead(status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ notice: text ? `${text} ${held}` : null }));
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  env = {
-    ...env,
-    IRORI_PERSON_LINES: `http://127.0.0.1:${(server.address() as AddressInfo).port}/${token}`,
-  };
+  env = { ...env, IRORI_PERSON_LINES: server.url };
   if (agent === 'opencode') {
     // OpenCode reads a plugin from an absolute path named in this variable's
     // JSON, merged after its own files; a value already set is kept.
@@ -97,9 +81,6 @@ export async function personLinesBridge(
   return {
     env,
     args: agent === 'pi' ? ['-e', file] : [],
-    close: () => {
-      server.closeAllConnections();
-      server.close();
-    },
+    close: server.close,
   };
 }

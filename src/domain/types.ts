@@ -9,7 +9,8 @@ export const agentNames: Record<AgentId, string> = {
   pi: 'Pi',
   hermes: 'Hermes Agent',
 };
-export type Category = 'personal' | 'team' | 'organization';
+export const categories = ['personal', 'team', 'organization'] as const;
+export type Category = (typeof categories)[number];
 export type Layer = 'schema' | 'Knowledge_Base' | 'contents';
 export interface ScopeDeclaration {
   schemaVersion: 1;
@@ -90,11 +91,14 @@ export type AgentAnswers = Record<string, string | string[]>;
  * Work your AI handed to a brain's sub-agent: which brain, which hand-off (the
  * delegation's tool call), and how far it is.
  */
+export const delegateStates = ['started', 'working', 'reported', 'failed'] as const;
 export interface Delegate {
   scopeId: string;
   task: string;
-  state: 'started' | 'working' | 'reported' | 'failed';
+  state: (typeof delegateStates)[number];
 }
+export const runOutcomes = ['completed', 'failed', 'cancelled'] as const;
+export type RunOutcome = (typeof runOutcomes)[number];
 export interface AgentEvent {
   /** Stable across the view and the saved conversation; a streamed reply keeps one. */
   id?: string;
@@ -109,7 +113,7 @@ export interface AgentEvent {
   requestId?: string;
   questions?: Question[];
   details?: string;
-  outcome?: 'completed' | 'failed' | 'cancelled';
+  outcome?: RunOutcome;
   /** Set on your AI's events that belong to a brain's sub-agent. */
   delegate?: Delegate;
   /** The tool call a `tool` event starts or reports on, as the CLI names it. */

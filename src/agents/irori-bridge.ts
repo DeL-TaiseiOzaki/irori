@@ -1,4 +1,4 @@
-import { commandBridge, type BridgeCommand } from './command-bridge';
+import { clientBase, commandBridge, type BridgeCommand } from './command-bridge';
 import { iroriArgumentLimit } from '../domain/irori-command';
 
 /** Answers one `irori` command: its arguments and the folder it ran in. */
@@ -11,42 +11,15 @@ export type IroriAnswer = (
 // PATH, on every CLI. The client passes its arguments and working folder to
 // irori over a loopback URL that only this run's environment carries, and
 // prints irori's answer.
-const client = `'use strict';
-const http = require('node:http');
-const fail = (message, code = 1) => {
-  process.stderr.write('irori: ' + message + '\\n');
-  process.exitCode = code;
-};
+const client = `${clientBase('irori')}
 const address = process.env.IRORI_COMMAND;
 if (!address) fail('only an irori agent run that irori started can use this command.');
-else {
-  const body = JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() });
-  const request = http.request(
+else
+  post(
     address,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
-    },
-    (response) => {
-      let text = '';
-      response.setEncoding('utf8');
-      response.on('data', (chunk) => (text += chunk));
-      response.on('end', () => {
-        let reply;
-        try {
-          reply = JSON.parse(text);
-        } catch {
-          return fail('irori answered ' + response.statusCode + '.');
-        }
-        if (!reply || !reply.ok) return fail((reply && reply.error) || 'the command did not complete.');
-        process.stdout.write(reply.report.endsWith('\\n') ? reply.report : reply.report + '\\n');
-      });
-      response.on('error', (error) => fail('the connection to irori ended (' + error.message + ').'));
-    },
+    JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }),
+    'the command did not complete.',
   );
-  request.on('error', (error) => fail('irori is not reachable (' + error.message + ').'));
-  request.end(body);
-}
 `;
 
 export const iroriCommand: BridgeCommand = {

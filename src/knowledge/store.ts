@@ -18,9 +18,12 @@ import {
   type KnowledgeHistory,
   type SourceLocation,
 } from '../domain/knowledge';
-import type { StartRun } from '../domain/types';
+import { runOutcomes, type StartRun } from '../domain/types';
 import { t } from '../domain/i18n';
 import { renamedPath } from '../domain/layers';
+
+/** The largest file kept as a material. */
+const materialLimit = 64 * 1024 * 1024;
 
 /** Keeps disk work bounded even when an immutable record directory has years of runs. */
 async function parallel<T, R>(items: T[], read: (item: T) => Promise<R>): Promise<R[]> {
@@ -88,7 +91,7 @@ export class KnowledgeStore {
       sourceRef.parse(ref);
       const filename = await this.resolve(ref);
       const stat = await fs.stat(filename);
-      if (!stat.isFile() || stat.size > 64 * 1024 * 1024)
+      if (!stat.isFile() || stat.size > materialLimit)
         throw Error(
           t(
             '保持できる資料は 64 MiB 以下のファイルです。',
@@ -96,7 +99,7 @@ export class KnowledgeStore {
           ),
         );
       const bytes = await fs.readFile(filename);
-      if (bytes.length > 64 * 1024 * 1024)
+      if (bytes.length > materialLimit)
         throw Error(t('資料のサイズ上限を超えています。', 'The material exceeds the size limit.'));
       const digest = hash(bytes);
       // Re-read to reject a file that changed while being observed (no filesystem snapshot claim).
@@ -143,11 +146,15 @@ export class KnowledgeStore {
     await this.immutable(path.join(this.directory, 'runs', input.scopeId, `${id}.json`), record);
     return record;
   }
+  /** Where a space's runs record their outcomes, one file per run. */
+  private outcomesFolder(scopeId: string) {
+    return path.join(this.directory, 'outcomes', scopeId);
+  }
+  private outcomeFile(scopeId: string, runId: string) {
+    return path.join(this.outcomesFolder(scopeId), `${runId}.json`);
+  }
   async finish(record: RunRecord, outcome: NonNullable<RunRecord['outcome']>) {
-    await this.immutable(
-      path.join(this.directory, 'outcomes', record.scopeId, `${record.id}.json`),
-      { outcome },
-    );
+    await this.immutable(this.outcomeFile(record.scopeId, record.id), { outcome });
   }
   private async immutable(filename: string, record: unknown) {
     try {
@@ -220,7 +227,7 @@ export class KnowledgeStore {
       (run) => run.createdAt,
     );
     const enriched = await parallel(runs, async (run) => {
-      const file = path.join(this.directory, 'outcomes', scopeId, `${run.id}.json`);
+      const file = this.outcomeFile(scopeId, run.id);
       const stat = await fs.stat(file).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
       });
@@ -234,8 +241,7 @@ export class KnowledgeStore {
           size: stat.size,
           mtime: stat.mtimeMs,
           outcome: state
-            ? z.object({ outcome: z.enum(['completed', 'failed', 'cancelled']) }).parse(state)
-                .outcome
+            ? z.object({ outcome: z.enum(runOutcomes) }).parse(state).outcome
             : undefined,
         };
         this.outcomes.set(file, cached);
@@ -245,15 +251,10 @@ export class KnowledgeStore {
         outcome: cached?.outcome,
       };
     });
-    const selected = new Set(
-      runs.map((run) => path.join(this.directory, 'outcomes', scopeId, `${run.id}.json`)),
-    );
+    const selected = new Set(runs.map((run) => this.outcomeFile(scopeId, run.id)));
+    const outcomes = this.outcomesFolder(scopeId);
     for (const file of this.outcomes.keys())
-      if (
-        path.dirname(file) === path.join(this.directory, 'outcomes', scopeId) &&
-        !selected.has(file)
-      )
-        this.outcomes.delete(file);
+      if (path.dirname(file) === outcomes && !selected.has(file)) this.outcomes.delete(file);
     return {
       runs: enriched,
       artifacts: await this.latest(
@@ -326,7 +327,7 @@ export class KnowledgeStore {
         const filename = await this.resolve(current);
         const stat = await fs.stat(filename);
         if (!stat.isFile()) return { state: 'unavailable', current };
-        if (stat.size !== version.size || stat.size > 64 * 1024 * 1024)
+        if (stat.size !== version.size || stat.size > materialLimit)
           return { state: 'changed', current };
         const digest = hash(await fs.readFile(filename));
         return { state: digest === version.hash ? 'matching' : 'changed', current };
@@ -381,7 +382,7 @@ export class KnowledgeStore {
       await this.bytes(previous);
       const filename = await this.resolve(next);
       const stat = await fs.stat(filename);
-      if (!stat.isFile() || stat.size !== previous.size || stat.size > 64 * 1024 * 1024)
+      if (!stat.isFile() || stat.size !== previous.size || stat.size > materialLimit)
         throw Error(
           t('移動先の版が一致しません。', 'The version at the destination does not match.'),
         );

@@ -1,16 +1,12 @@
 import { z } from 'zod';
-import { agentIds } from './types';
-const sourcePath = z
-  .string()
-  .min(1)
-  .max(4096)
-  .refine(
-    (value) =>
-      !/^[a-z]:/i.test(value) &&
-      !value.includes('\\') &&
-      !value.includes('\0') &&
-      value.split('/').every((part) => part && part !== '.' && part !== '..'),
-  );
+import { agentIds, type RunOutcome } from './types';
+/** A path inside a folder, with `/` between plain parts: no drive, `\\`, NUL, `.` or `..`. */
+export const relativePath = (value: string) =>
+  !/^[a-z]:/i.test(value) &&
+  !value.includes('\\') &&
+  !value.includes('\0') &&
+  value.split('/').every((part) => part && part !== '.' && part !== '..');
+const sourcePath = z.string().min(1).max(4096).refine(relativePath);
 export const sourceRef = z.object({ scopeId: z.uuid(), path: z.string().min(1).max(4096) });
 // Restrict new reconnection destinations without changing historical source record schemas.
 export const sourceDestination = sourceRef.extend({ path: sourcePath });
@@ -33,9 +29,7 @@ export const runRecord = z.object({
   createdAt: z.iso.datetime(),
   sources: z.array(sourceVersion).max(21),
 });
-export type RunRecord = z.infer<typeof runRecord> & {
-  outcome?: 'completed' | 'cancelled' | 'failed';
-};
+export type RunRecord = z.infer<typeof runRecord> & { outcome?: RunOutcome };
 export const artifactRecord = z.object({
   id: z.uuid(),
   runId: z.uuid(),

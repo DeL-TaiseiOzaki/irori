@@ -50,14 +50,19 @@ export function writeDecision(
   };
 }
 
-/** The file a file tool's input names, if it names one. */
-export function toolFile(input: unknown) {
-  const value = input as { file_path?: unknown; notebook_path?: unknown; path?: unknown };
-  const file = value?.file_path ?? value?.notebook_path;
-  return typeof file === 'string' ? file : undefined;
+/** The first of `keys` in a tool call's input that holds a string. */
+function fileOf(input: unknown, keys: string[]) {
+  const value = (input ?? {}) as Record<string, unknown>;
+  return keys.map((key) => value[key]).find((file): file is string => typeof file === 'string');
 }
+/** The file a Claude Code write tool names: `file_path`, or NotebookEdit's `notebook_path`. */
+export const toolFile = (input: unknown) => fileOf(input, ['file_path', 'notebook_path']);
+/** The file a file tool names: `file_path` for Claude Code, `filePath` for OpenCode, `path` for Pi. */
+export const editedPath = (input: unknown) => fileOf(input, ['file_path', 'filePath', 'path']);
 
-export const writeTools = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
+/** Claude Code's tools that write a file, as its hook matcher names them. */
+export const writeToolMatcher = 'Write|Edit|MultiEdit|NotebookEdit';
+export const writeTools = new RegExp(`^(${writeToolMatcher})$`);
 
 /**
  * The handed hibachi a `hibachi` command names: by its sub-agent name, or by its
