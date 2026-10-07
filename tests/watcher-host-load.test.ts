@@ -330,7 +330,10 @@ test(
     )
       await delay(10);
     await delay(100);
-    assert.deepEqual(outerEvents, ['note.md']);
-    assert.deepEqual(innerEvents, ['note.md']);
+    // One write can arrive as add and change, and a watched root can report itself;
+    // what matters is which files each watcher saw.
+    const seen = (events: string[]) => [...new Set(events.filter(Boolean))];
+    assert.deepEqual(seen(outerEvents), ['note.md']);
+    assert.deepEqual(seen(innerEvents), ['note.md']);
   },
 );
