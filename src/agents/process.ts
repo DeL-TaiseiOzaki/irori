@@ -54,16 +54,7 @@ function killNow(pid: number | undefined) {
     return;
   }
   // Descendants first: once the group is dead, `ps` no longer ties them to it.
-  let others: number[] = [];
-  try {
-    others = descendantsOf(
-      pid,
-      execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf8', timeout: 1000 }),
-    );
-  } catch {
-    // Without `ps`, the group alone is killed.
-  }
-  for (const target of [-pid, ...others]) signal(target, 'SIGKILL');
+  for (const target of [-pid, ...descendantsOf(pid, listProcessesNow())]) signal(target, 'SIGKILL');
 }
 
 export function launch(command: string, args: string[], cwd: string, env = agentEnv()) {
@@ -84,21 +75,34 @@ export function launch(command: string, args: string[], cwd: string, env = agent
 
 /** How long a SIGTERM'd CLI gets to stop its own servers before what is left is killed. */
 const grace = 2500;
+/** Signals one process or group; one that is gone, or another user's, is left alone. */
 function signal(pid: number, name: 'SIGTERM' | 'SIGKILL') {
   try {
     process.kill(pid, name);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ESRCH') throw e;
+  } catch {
+    // ESRCH: already ended. EPERM: not ours to stop; the others still are.
   }
 }
-/** The pids under `pid` in a `ps -A -o pid=,ppid=` listing, children before grandchildren. */
-export function descendantsOf(pid: number, listing: string) {
-  const children = new Map<number, number[]>();
-  for (const line of listing.split('\n')) {
-    const [child, parent] = line.trim().split(/\s+/).map(Number);
-    if (!child || Number.isNaN(parent)) continue;
-    children.set(parent, [...(children.get(parent) ?? []), child]);
+/** One running process as `ps` lists it: its parent, and when it started. */
+export type Listing = Map<number, { ppid: number; start: string }>;
+/**
+ * A `ps -A -o pid=,ppid=,lstart=` listing. The start time tells a process from a
+ * later one given its pid again; a `ps` that cannot print it leaves it empty.
+ */
+export function parseListing(text: string): Listing {
+  const listing: Listing = new Map();
+  for (const line of text.split('\n')) {
+    const match = /^\s*(\d+)\s+(\d+)\s*(.*)$/.exec(line);
+    if (match) listing.set(Number(match[1]), { ppid: Number(match[2]), start: match[3].trim() });
   }
+  return listing;
+}
+/** The pids under `pid` in a listing, children before grandchildren. */
+export function descendantsOf(pid: number, listing: Listing | string) {
+  if (typeof listing === 'string') listing = parseListing(listing);
+  const children = new Map<number, number[]>();
+  for (const [child, { ppid }] of listing)
+    children.set(ppid, [...(children.get(ppid) ?? []), child]);
   const found: number[] = [];
   for (const queue = [pid]; queue.length;) {
     const next = queue.shift()!;
@@ -110,16 +114,30 @@ export function descendantsOf(pid: number, listing: string) {
   }
   return found;
 }
-async function descendants(pid: number) {
-  try {
-    const { stdout } = await promisify(execFile)('ps', ['-A', '-o', 'pid=,ppid='], {
-      timeout: 2000,
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return descendantsOf(pid, stdout);
-  } catch {
-    return [];
-  }
+const psColumns = ['pid=,ppid=,lstart=', 'pid=,ppid='];
+async function listProcesses(): Promise<Listing> {
+  for (const columns of psColumns)
+    try {
+      const { stdout } = await promisify(execFile)('ps', ['-A', '-o', columns], {
+        timeout: 2000,
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      return parseListing(stdout);
+    } catch {
+      // Tried without the start time next; without `ps`, the group alone is killed.
+    }
+  return new Map();
+}
+function listProcessesNow(): Listing {
+  for (const columns of psColumns)
+    try {
+      return parseListing(
+        execFileSync('ps', ['-A', '-o', columns], { encoding: 'utf8', timeout: 1000 }),
+      );
+    } catch {
+      // As above.
+    }
+  return new Map();
 }
 /** Resolves when the child has exited, or after `ms`. */
 function exited(child: ChildProcess, ms: number) {
@@ -139,7 +157,9 @@ function exited(child: ChildProcess, ms: number) {
  * signalled together with the descendants found first, since a command a CLI
  * detached into its own session (a dev server, an MCP server) is not in the group
  * and is reparented once the CLI dies. SIGTERM comes first, and what is still
- * there when the child has exited, or after the grace period, is killed.
+ * there when the child has exited, or after the grace period, is killed: of the
+ * descendants, only those still running since before the SIGTERM, never a new
+ * process given the same pid meanwhile.
  */
 export async function killTree(child: ChildProcess): Promise<void> {
   if (!child.pid) return;
@@ -152,10 +172,15 @@ export async function killTree(child: ChildProcess): Promise<void> {
     await kill('SIGKILL');
     return;
   }
-  const others = await descendants(pid);
+  const before = await listProcesses();
+  const others = descendantsOf(pid, before);
   for (const target of [-pid, ...others]) signal(target, 'SIGTERM');
   await exited(child, grace);
-  for (const target of [-pid, ...others]) signal(target, 'SIGKILL');
+  signal(-pid, 'SIGKILL');
+  if (!others.length) return;
+  const after = await listProcesses();
+  for (const target of others)
+    if (after.get(target)?.start === before.get(target)!.start) signal(target, 'SIGKILL');
 }
 
 /** A `--version` answer is kept while the executable it came from stays the same, and this long at most. */

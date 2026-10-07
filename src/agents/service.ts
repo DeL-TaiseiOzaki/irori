@@ -111,6 +111,8 @@ type Run = {
   textId?: string;
   /** Streamed text not yet sent to the views or the history, and when it will be. */
   pendingText?: { id: string; text: string; timer: NodeJS.Timeout };
+  /** The run's history is complete: text that still arrives is not part of it. */
+  ended?: boolean;
   /** The agent said or did something in this run: a failure is not the resume's. */
   progressed?: boolean;
   /** The hibachis this run's hand-offs reached. */
@@ -477,6 +479,7 @@ export class AgentService {
     // A reply's deltas go to the views and the history a few at a time, in one
     // piece per window; any other event of the run goes after what came before it.
     if (type === 'text' && !Object.keys(extra).length) {
+      if (run.ended) return;
       if (run.pendingText) {
         run.pendingText.text += text;
         return;
@@ -1002,6 +1005,10 @@ export class AgentService {
       run.bridge?.();
       run.commands?.();
       run.rpc?.fail(Error('Run finished'));
+      // Words the CLI wrote while being stopped arrived after the flush above; with
+      // the process gone and its stream closed, these are the last.
+      this.flushText(run);
+      run.ended = true;
       if (run.cancelled) outcome = 'cancelled';
       if (record)
         await this.knowledge.finish(record, outcome).catch(() => {

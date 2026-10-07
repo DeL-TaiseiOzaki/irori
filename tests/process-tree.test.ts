@@ -5,7 +5,14 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { descendantsOf, killTree, launch, liveChildren, version } from '../src/agents/process';
+import {
+  descendantsOf,
+  killTree,
+  launch,
+  liveChildren,
+  parseListing,
+  version,
+} from '../src/agents/process';
 import { Tail } from '../src/agents/tail';
 
 const posix = { skip: process.platform === 'win32' && 'POSIX process groups and ps' };
@@ -168,3 +175,20 @@ test('A text tail keeps its last characters without copying the whole on every a
   tail.clear();
   assert.equal(tail.toString(), '');
 });
+
+test(
+  'A ps listing with start times tells a process from a later one with its pid',
+  posix,
+  async () => {
+    const listing = parseListing(
+      ' 1 0 Tue Oct  7 05:00:00 2026\n 10 1 Tue Oct  7 05:01:00 2026\n 11 10 Tue Oct  7 05:02:00 2026\n',
+    );
+    assert.deepEqual(listing.get(11), { ppid: 10, start: 'Tue Oct  7 05:02:00 2026' });
+    assert.deepEqual(descendantsOf(1, listing), [10, 11]);
+    assert.deepEqual(parseListing(' 5 1\n').get(5), { ppid: 1, start: '' });
+    // The real ps gives this process a start time.
+    const { stdout } = await promisify(execFile)('ps', ['-A', '-o', 'pid=,ppid=,lstart=']);
+    const me = parseListing(stdout).get(process.pid);
+    assert.ok(me && me.start.length > 0, stdout.slice(0, 200));
+  },
+);

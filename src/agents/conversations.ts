@@ -205,6 +205,7 @@ async function* linesBackward(
 
 /** What a stored line says of itself without being parsed: its id and kind, when it has the shape of one. */
 const lineShape = (line: string) => {
+  line = line.trimEnd();
   if (line[0] !== '{' || !line.endsWith('}')) return undefined;
   const id = /"id":"([0-9a-f-]{36})"/.exec(line);
   const type = /"type":"(status|text|tool|error|done)"/.exec(line);
@@ -302,7 +303,10 @@ export class ConversationStore {
    * the events they hold and the damaged ones among them. The file is append-only
    * and the window only moves on, so a later read counts from there.
    */
-  private counted = new Map<string, { offset: number; events: number; damaged: number }>();
+  private counted = new Map<
+    string,
+    { offset: number; events: number; damaged: number; lastText?: string }
+  >();
   private scanned?: Promise<void>;
   private loaded?: Promise<void>;
   private timer?: NodeJS.Timeout;
@@ -380,14 +384,19 @@ export class ConversationStore {
   }
   private async recover(id: string, state: DeviceState) {
     const active = state.active!;
-    // Its message is among the newest lines; older ones are not read.
+    // Its message is among the newest lines; older ones are not read. A line the
+    // crash cut short is not the message, even if its id survived the cut.
     let found = false;
     await this.withEvents(id, async (handle, size) => {
-      for await (const { line } of linesBackward(handle, 0, size))
-        if (line?.includes(`"id":"${active.eventId}"`)) {
-          found = true;
-          break;
+      for await (const { line } of linesBackward(handle, 0, size)) {
+        if (!line?.includes(`"id":"${active.eventId}"`)) continue;
+        try {
+          found = storedEvent.parse(JSON.parse(line)).id === active.eventId;
+        } catch {
+          continue;
         }
+        if (found) break;
+      }
     });
     const lines: StoredEvent[] = [];
     // The run was claimed and its message not yet written: the message comes back from the claim.
@@ -596,7 +605,7 @@ export class ConversationStore {
    * is damaged, and the lines of one streamed reply are one event. A count made
    * once is kept, so a later read counts only the lines written since.
    */
-  private async readWindow(id: string, window: ViewWindow) {
+  private async readWindow(id: string, window: ViewWindow, newerText?: string) {
     let damaged = 0;
     const result = await this.withEvents(id, async (handle, size) => {
       let start = size;
@@ -614,18 +623,30 @@ export class ConversationStore {
       }
       // A count kept for a file that has since been replaced by a shorter one starts over.
       const cached = this.counted.get(id);
-      const count =
-        cached && cached.offset <= start ? { ...cached } : { offset: 0, events: 0, damaged: 0 };
-      let lastText: string | undefined;
+      const kept = cached && cached.offset <= start ? cached : undefined;
+      const count = kept ? { ...kept } : { offset: 0, events: 0, damaged: 0 };
+      // A reply can straddle the window's edge or the counted part's. The text id
+      // on the newer side (the unwritten lines, when the window has nothing from
+      // the file) joins its lines here; the newest line counted here is kept, so
+      // the lines a later turn adds to its reply join it then.
+      let lastText = start === size ? newerText : undefined;
+      let newest: string | undefined;
+      let oldest: { id: string; type: string } | undefined;
       for await (const { line } of linesBackward(handle, count.offset, start)) {
         const shape = line === undefined ? undefined : lineShape(line);
-        if (!shape) count.damaged++;
-        else if (shape.type === 'text' && shape.id === lastText) continue;
-        else {
-          count.events++;
-          lastText = shape.type === 'text' ? shape.id : undefined;
+        if (!shape) {
+          count.damaged++;
+          continue;
         }
+        oldest = shape;
+        newest ??= shape.type === 'text' && shape.id !== lastText ? shape.id : '';
+        if (shape.type === 'text' && shape.id === lastText) continue;
+        count.events++;
+        lastText = shape.type === 'text' ? shape.id : undefined;
       }
+      // The oldest line here may continue the reply the counted part ends with.
+      if (kept && oldest?.type === 'text' && oldest.id === kept.lastText) count.events--;
+      if (newest !== undefined) count.lastText = newest || undefined;
       count.offset = start;
       this.counted.delete(id);
       this.counted.set(id, count);
@@ -797,7 +818,7 @@ export class ConversationStore {
         skipped++;
         lastText = line.type === 'text' ? line.id : undefined;
       }
-      const { earlier, damaged } = await this.readWindow(id, window);
+      const { earlier, damaged } = await this.readWindow(id, window, lastText);
       const state = this.states.get(id);
       return {
         meta,
