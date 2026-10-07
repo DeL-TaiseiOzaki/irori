@@ -3,7 +3,9 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 
-const version = 1;
+// Older writers do not maintain link_candidates. A distinct version makes
+// either writer rebuild the cache after switching versions instead of reusing it.
+const version = 2;
 // Trigrams narrow a query of three or more characters to candidate files; the
 // line matcher decides the hits, so positions (detail=full) would be paid for
 // and never read. Nothing ranks, so column sizes are not kept either.

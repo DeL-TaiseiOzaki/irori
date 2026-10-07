@@ -1,6 +1,6 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -193,7 +193,7 @@ test('Superseding a scan preserves the validated file it just read and its buffe
   assert.equal(reads, before);
 });
 
-test('Adding backlink candidates to an existing version-one cache preserves its checked texts', async (t) => {
+test("Recreating a missing candidate table preserves the current cache's checked texts", async (t) => {
   const { files, space, write } = await fixture(t);
   await write('note.md', '[link](target.md)');
   const service = new SearchService(files);
@@ -211,6 +211,38 @@ test('Adding backlink candidates to an existing version-one cache preserves its 
   };
   assert.equal((await service.backlinks(space.scopeId, 'target.md')).hits.length, 1);
   assert.equal(reads, 0);
+});
+
+test('Returning from an older index writer rebuilds rows without backlink candidates', async (t) => {
+  const { files, space, write } = await fixture(t);
+  await write('target.md', '# Target');
+  await write('existing.md', '[link](target.md)');
+  const service = new SearchService(files);
+  assert.equal((await service.backlinks(space.scopeId, 'target.md')).hits.length, 1);
+  await write('older-writer.md', '[another link](target.md)');
+  const metadata = await stat(path.join(space.root, 'older-writer.md'));
+  const filename = path.join(files.dataDir, 'search-index', `${space.scopeId}.sqlite`);
+  const db = new DatabaseSync(filename);
+  // An older writer can keep the table yet insert a fully validated notes row
+  // without updating it. Merely checking that the table exists misses this row.
+  db.exec('PRAGMA user_version = 1');
+  const { rowid } = db
+    .prepare('INSERT INTO notes(path, size, mtime, text) VALUES (?, ?, ?, ?) RETURNING rowid')
+    .get('older-writer.md', metadata.size, metadata.mtimeMs, '[another link](target.md)') as {
+    rowid: number;
+  };
+  assert.equal(db.prepare('SELECT id FROM link_candidates WHERE id = ?').get(rowid), undefined);
+  db.close();
+  assert.deepEqual(
+    (await service.backlinks(space.scopeId, 'target.md')).hits.map((hit) => hit.path).sort(),
+    ['existing.md', 'older-writer.md'],
+  );
+  const rebuilt = new DatabaseSync(filename);
+  assert.equal(
+    (rebuilt.prepare('PRAGMA user_version').get() as { user_version: number }).user_version,
+    2,
+  );
+  rebuilt.close();
 });
 
 test('A parallel refresh retains the rows an earlier user search already checked', async (t) => {

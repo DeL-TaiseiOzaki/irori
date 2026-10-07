@@ -6,7 +6,7 @@ import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
-import { FileService, readViewerBytes, watcherIgnored } from './files';
+import { FileService, readViewerBytes, watcherIgnored, watchRegistrationChanges } from './files';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
@@ -202,13 +202,14 @@ app
       }
     }
     const watchTimers = new Map<string, NodeJS.Timeout>();
-    function watch(space: Space) {
-      if (watchers.has(space.scopeId)) return;
+    function watch(space: Space, spaces = files.list()) {
+      const existing = watchers.get(space.scopeId);
+      if (existing) return existing;
       const watcher = chokidar.watch(space.root, {
         ignoreInitial: true,
         depth: 6,
         followSymlinks: false,
-        ignored: watcherIgnored(space, files.list()),
+        ignored: watcherIgnored(space, spaces),
       });
       watcher.on('all', () => {
         if (watchers.get(space.scopeId) !== watcher) return;
@@ -216,6 +217,7 @@ app
         watchTimers.set(
           space.scopeId,
           setTimeout(() => {
+            if (watchers.get(space.scopeId) !== watcher) return;
             watchTimers.delete(space.scopeId);
             if (!closing && files.list().some((item) => item.scopeId === space.scopeId))
               emit({ type: 'files', scopeId: space.scopeId });
@@ -224,20 +226,19 @@ app
       });
       watcher.on('error', (error) => console.warn('Watcher error', String(error)));
       watchers.set(space.scopeId, watcher);
+      return watcher;
     }
-    files.list().forEach(watch);
-    let refreshingWatchers = Promise.resolve();
-    files.onRegistrationsChanged(() => {
-      // Restarting also drops already watched descendants of a newly nested
-      // hibachi and restores them when that registration is removed.
-      refreshingWatchers = refreshingWatchers
-        .then(async () => {
-          const previous = [...watchers.entries()];
-          for (const [scopeId] of previous) watchers.delete(scopeId);
-          await Promise.all(previous.map(([, watcher]) => watcher.close()));
-          if (!closing) files.list().forEach(watch);
-        })
-        .catch((error) => console.warn('Watchers could not be refreshed', String(error)));
+    const initialSpaces = files.list();
+    initialSpaces.forEach((space) => watch(space, initialSpaces));
+    const stopWatchingRegistrations = watchRegistrationChanges(files, {
+      watchers,
+      watch,
+      refreshed: (scopeId) => {
+        if (files.list().some((space) => space.scopeId === scopeId))
+          emit({ type: 'files', scopeId });
+      },
+      closing: () => closing,
+      error: (error) => console.warn('Watchers could not be refreshed', String(error)),
     });
     const defaultParent = async () => path.dirname((await you.load()).root);
     const registerWatched = (root: string, name: string, category: Category) =>
@@ -898,6 +899,7 @@ app
         });
         return false;
       }
+      stopWatchingRegistrations();
       await Promise.all([...watchers.values()].map((w) => w.close()));
       return true;
     }

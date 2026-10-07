@@ -1,13 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { FileService, watcherIgnored } from '../src/host/files';
+import { FileService, watcherIgnored, watchRegistrationChanges } from '../src/host/files';
 import type { Space } from '../src/domain/types';
-import chokidar from 'chokidar';
+import chokidar, { type FSWatcher } from 'chokidar';
 import { setTimeout as delay } from 'node:timers/promises';
+
+function gate() {
+  let release!: () => void;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { wait, release };
+}
 
 test('Watcher boundaries exclude tool caches and nested hibachis, retaining knowledge and metadata events', () => {
   const space: Space = {
@@ -97,6 +106,166 @@ test('Registration changes rebuild cached watcher boundaries, including removal 
   assert.equal(ignored(path.join(root, 'contents/note.md')), false);
   assert.equal(lists, 3);
 });
+
+test('Boundary changes restart only the changed hibachi, its ancestors and descendants', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori-watch-registration-'));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const roots = ['outer', 'outer/inner', 'outer/inner/grandchild', 'outer/sibling', 'unrelated'];
+  const spaces: Space[] = [];
+  for (const root of roots) {
+    await mkdir(path.join(base, root), { recursive: true });
+    spaces.push(await files.register(path.join(base, root), root, 'personal'));
+  }
+  const [outer, inner, grandchild, sibling, unrelated] = spaces;
+  const watchers = new Map<string, FSWatcher>();
+  const opened = new Map<string, number>(),
+    closed = new Map<string, number>();
+  const notifications: string[] = [];
+  const ignored = new Map<string, ReturnType<typeof watcherIgnored>>();
+  const watch = (space: Space, current: Space[]) => {
+    const watcher = Object.assign(new EventEmitter(), {
+      close: async () => {
+        closed.set(space.scopeId, (closed.get(space.scopeId) ?? 0) + 1);
+      },
+    }) as unknown as FSWatcher;
+    watchers.set(space.scopeId, watcher);
+    opened.set(space.scopeId, (opened.get(space.scopeId) ?? 0) + 1);
+    ignored.set(space.scopeId, watcherIgnored(space, current));
+    queueMicrotask(() => watcher.emit('ready'));
+    return watcher;
+  };
+  spaces.forEach((space) => watch(space, spaces));
+  const stop = watchRegistrationChanges(files, {
+    watchers,
+    watch,
+    refreshed: (id) => notifications.push(id),
+    closing: () => false,
+    error: (error) => {
+      throw error;
+    },
+  });
+  t.after(stop);
+  const unchanged = [sibling, unrelated].map((space) => watchers.get(space.scopeId));
+  await files.update(inner.scopeId, { name: 'New name', labels: { contents: 'Sources' } });
+  await delay(0);
+  assert.ok(spaces.every((space) => opened.get(space.scopeId) === 1));
+  assert.equal(closed.size, 0);
+  assert.deepEqual(notifications, []);
+  await files.renameLayerFolder(inner.scopeId, 'contents', 'Materials');
+  await delay(0);
+  for (const space of [outer, inner, grandchild]) {
+    assert.equal(opened.get(space.scopeId), 2);
+    assert.equal(closed.get(space.scopeId), 1);
+  }
+  assert.deepEqual(
+    notifications.sort(),
+    [outer, inner, grandchild].map((space) => space.scopeId).sort(),
+  );
+  assert.equal(ignored.get(inner.scopeId)!(path.join(inner.root, 'Materials/note.md')), true);
+  assert.equal(ignored.get(inner.scopeId)!(path.join(inner.root, 'contents/note.md')), false);
+  notifications.length = 0;
+  await files.unregister(grandchild.scopeId);
+  await delay(0);
+  assert.equal(watchers.has(grandchild.scopeId), false);
+  assert.deepEqual(notifications.sort(), [outer.scopeId, inner.scopeId].sort());
+  assert.equal(ignored.get(inner.scopeId)!(path.join(grandchild.root, 'note.md')), false);
+  notifications.length = 0;
+  await files.register(grandchild.root, 'Grandchild', 'personal');
+  await delay(0);
+  assert.deepEqual(
+    notifications.sort(),
+    [outer, inner, grandchild].map((space) => space.scopeId).sort(),
+  );
+  assert.equal(ignored.get(inner.scopeId)!(path.join(grandchild.root, 'note.md')), true);
+  for (const [index, space] of [sibling, unrelated].entries()) {
+    assert.equal(watchers.get(space.scopeId), unchanged[index]);
+    assert.equal(opened.get(space.scopeId), 1);
+    assert.equal(closed.get(space.scopeId), undefined);
+  }
+});
+
+test(
+  'A restarted real watcher emits one ready refresh covering writes in its observation gap',
+  { timeout: 10000 },
+  async (t) => {
+    const base = await mkdtemp(path.join(tmpdir(), 'irori-watch-ready-'));
+    const files = new FileService(path.join(base, 'device'));
+    const watchers = new Map<string, FSWatcher>();
+    const removed = gate(),
+      resume = gate(),
+      refreshed = gate(),
+      nextWrite = gate();
+    let stop = () => {};
+    t.after(async () => {
+      resume.release();
+      stop();
+      await Promise.all([...watchers.values()].map((watcher) => watcher.close()));
+      await rm(base, { recursive: true, force: true });
+    });
+    await files.init();
+    await mkdir(path.join(base, 'KB'));
+    const space = await files.register(path.join(base, 'KB'), 'Fixture', 'personal');
+    const events: string[] = [],
+      notifications: string[] = [];
+    const watch = (s: Space, spaces: Space[]) => {
+      const watcher = chokidar.watch(s.root, {
+        ignoreInitial: true,
+        depth: 6,
+        followSymlinks: false,
+        ignored: watcherIgnored(s, spaces),
+      });
+      watchers.set(s.scopeId, watcher);
+      watcher.on('all', (_, filename) => {
+        const relative = path.relative(s.root, filename);
+        events.push(relative);
+        if (relative === 'after-ready.md') nextWrite.release();
+      });
+      return watcher;
+    };
+    const initial = watch(space, files.list());
+    await new Promise<void>((resolve, reject) => {
+      initial.once('ready', resolve);
+      initial.once('error', reject);
+    });
+    const close = initial.close.bind(initial);
+    initial.close = async () => {
+      await close();
+      removed.release();
+      await resume.wait;
+    };
+    stop = watchRegistrationChanges(files, {
+      watchers,
+      watch,
+      refreshed: (id) => {
+        notifications.push(id);
+        refreshed.release();
+      },
+      closing: () => false,
+      error: (error) => {
+        throw error;
+      },
+    });
+    await files.renameLayerFolder(space.scopeId, 'contents', 'Materials');
+    await removed.wait;
+    await writeFile(path.join(space.root, 'gap.md'), 'Written while the watcher was closed.');
+    resume.release();
+    await refreshed.wait;
+    assert.deepEqual(notifications, [space.scopeId]);
+    assert.ok(!events.includes('gap.md'), 'ignoreInitial alone hides the gap write');
+    assert.equal(
+      await readFile(path.join(space.root, 'gap.md'), 'utf8'),
+      'Written while the watcher was closed.',
+    );
+    assert.ok(
+      (await readFile(path.join(space.root, '.gitignore'), 'utf8')).includes('/Materials/'),
+    );
+    await writeFile(path.join(space.root, 'after-ready.md'), 'Observed normally.');
+    await nextWrite.wait;
+    assert.deepEqual(notifications, [space.scopeId]);
+  },
+);
 
 test(
   'Real watchers leave cache trees unobserved and route a nested hibachi only to its own scope',
