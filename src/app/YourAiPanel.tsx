@@ -3,7 +3,8 @@ import { agentIds, agentNames, type AgentAccess, type AgentId, type Space } from
 import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
-import { AgentLog, runTasks } from './AgentLog';
+import { AgentLog } from './AgentLog';
+import { runTasks } from '../domain/agent-log';
 import { Icon } from './Icon';
 import type { BrainAi } from './useBrainAi';
 import { ModelPicker } from './ModelPicker';

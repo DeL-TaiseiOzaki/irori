@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, memo, useState, type ReactNode } from 'react';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import type { HibachiGroup, Space } from '../domain/types';
 import {
@@ -16,6 +16,7 @@ import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { shortcut } from './shortcuts';
+import { useLanguage } from './useLanguage';
 
 export type BrainAiState = 'running' | 'waiting' | 'idle';
 
@@ -30,9 +31,10 @@ export function aiStateWords(state: BrainAiState) {
 /**
  * The workspace's brains in their owner's order, some gathered into named
  * groups that open and close, with the way back to the workspace choice, the
- * Overview, routines, adding a brain, search and settings.
+ * Overview, routines, adding a brain, search and settings. Memoised: the window
+ * re-renders it for its own data, not for every keystroke in the editor.
  */
-export function Rail({
+export const Rail = memo(function Rail({
   spaces,
   activeId,
   overview,
@@ -75,6 +77,7 @@ export function Rail({
   onGroups: (groups: HibachiGroup[]) => void;
   settings: ReactNode;
 }) {
+  useLanguage();
   const byId = new Map(spaces.map((space) => [space.scopeId, space]));
   const [naming, setNaming] = useState<{ scopeId?: string; groupId?: string; name: string }>();
   // A hibachi in the rail; its menu gathers it into a named group or takes it out.
@@ -342,4 +345,4 @@ export function Rail({
       )}
     </nav>
   );
-}
+});
