@@ -1,4 +1,9 @@
-import { _electron as electron, expect, type Page } from '@playwright/test';
+import {
+  _electron as electron,
+  expect,
+  type ElectronApplication,
+  type Page,
+} from '@playwright/test';
 import { mkdtemp, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -134,6 +139,23 @@ async function send(page: Page, text: string, label = '送信') {
   await panel(page).getByLabel('エージェントへの指示').fill(text);
   await panel(page).getByRole('button', { name: label, exact: true }).click();
 }
+/**
+ * Quits irori. Quitting during a run asks first, and nobody answers that dialog
+ * here, so a quit that does not finish fails the suite instead of hanging it.
+ */
+async function quit(app: ElectronApplication) {
+  let stuck = false;
+  const timer = setTimeout(() => {
+    stuck = true;
+    app.process().kill('SIGKILL');
+  }, 15000);
+  try {
+    await app.close();
+  } finally {
+    clearTimeout(timer);
+  }
+  if (stuck) throw Error('irori did not quit within 15 s');
+}
 let app = await launch();
 try {
   let page = await app.firstWindow();
@@ -233,6 +255,8 @@ try {
   await send(page, '窓を滑らせる');
   await expect(panel(page).locator('.message.user').last()).toHaveText('窓を滑らせる');
   await expect(panel(page).locator('.message.text').last()).toContainText('の応答');
+  // The reply arrives before the run ends; quitting during a run would ask first.
+  await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   await expect(panel(page).getByText(/以前の \d+ 件を省略/)).toBeVisible();
   await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 2');
   // The window reached into the first group of steps, which kept its later steps.
@@ -246,7 +270,7 @@ try {
   ).toBe(true);
 
   // Restarted, the conversations and their names are kept.
-  await app.close();
+  await quit(app);
   app = await launch();
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -290,5 +314,5 @@ try {
     }),
   );
 } finally {
-  await app.close();
+  await quit(app);
 }
