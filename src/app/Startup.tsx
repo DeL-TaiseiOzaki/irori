@@ -14,6 +14,7 @@ import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import { RestoreEnvironment } from './AccountSync';
+import { RemoveHibachi } from './BrainSettings';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
@@ -472,6 +473,7 @@ export function Startup({
   const [edited, setName] = useState<string>(),
     [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
     [restoring, setRestoring] = useState(false),
+    [removing, setRemoving] = useState<Space>(),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string>();
@@ -634,6 +636,20 @@ export function Startup({
                 />
                 <BrainTile space={space} size={24} radius={7} />
                 <span>{space.name}</span>
+                <button
+                  type="button"
+                  className="start-chip-remove"
+                  disabled={busy}
+                  title={t('hibachi を削除', 'Remove hibachi')}
+                  aria-label={t(`${space.name} を削除`, `Remove ${space.name}`)}
+                  onClick={(event) => {
+                    // The chip is a label: the click must not tick its checkbox.
+                    event.preventDefault();
+                    setRemoving(space);
+                  }}
+                >
+                  <Icon name="trash" size={14} />
+                </button>
               </label>
             ))}
             {!spaces.length && (
@@ -729,6 +745,21 @@ export function Startup({
           onRestored={async () => {
             await refresh();
             setProfiles(await host.workspaces());
+          }}
+        />
+      )}
+      {removing && (
+        <RemoveHibachi
+          space={removing}
+          onClose={() => setRemoving(undefined)}
+          onRemoved={() => {
+            const removed = removing.scopeId;
+            setRemoving(undefined);
+            setSelected((value) => value.filter((id) => id !== removed));
+            void (async () => {
+              await refresh();
+              setProfiles(await host.workspaces());
+            })().catch((e) => setError(errorText(e)));
           }}
         />
       )}

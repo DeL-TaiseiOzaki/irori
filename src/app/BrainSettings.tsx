@@ -90,7 +90,7 @@ function Segments<T extends string>({
 }
 
 /** Removes a hibachi from irori, and its folder too when the person asks for that. */
-function RemoveHibachi({
+export function RemoveHibachi({
   space,
   onRemoved,
   onClose,
