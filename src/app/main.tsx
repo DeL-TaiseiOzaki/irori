@@ -74,6 +74,7 @@ import type {
   WorkspaceProfile,
   CloudRoot,
 } from '../domain/types';
+import { agentIds } from '../domain/types';
 import type { AgentSkill, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
 import { opensInIrori } from '../domain/viewers';
@@ -176,6 +177,27 @@ type LiveRun = { scopeId: string; conversationId?: string };
 type AgentChoice = { last: AgentId; brains: Record<string, AgentId> };
 const agentOf = (choice: AgentChoice, scopeId?: string) =>
   (scopeId && choice.brains[scopeId]) || choice.last;
+/**
+ * The choices survive a reload of the window, so a conversation a reload stopped
+ * is found again with its CLI rather than an empty one with the default CLI.
+ */
+const agentChoiceKey = 'irori.agentChoice';
+function savedAgentChoice(): AgentChoice {
+  const known = (value: unknown): value is AgentId => agentIds.includes(value as AgentId);
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(agentChoiceKey) ?? 'null') as AgentChoice;
+    if (known(saved?.last))
+      return {
+        last: saved.last,
+        brains: Object.fromEntries(
+          Object.entries(saved.brains ?? {}).filter(([, agent]) => known(agent)),
+        ),
+      };
+  } catch {
+    // Storage may be unavailable or hold something else; start with the default.
+  }
+  return { last: 'codex', brains: {} };
+}
 /** Where a column keeps an owner's conversation and tabs: the first under the owner's id. */
 const slot = (columnId: string, scopeId: string) =>
   columnId === 'main' ? scopeId : `${scopeId}#${columnId}`;
@@ -497,7 +519,7 @@ function App() {
     [status, setStatus] = useState(''),
     [panel, setPanel] = useState(false),
     // Each brain keeps the AI chosen for it; a brain not chosen yet starts with the last choice.
-    [agentChoice, setAgentChoice] = useState<AgentChoice>({ last: 'codex', brains: {} }),
+    [agentChoice, setAgentChoice] = useState<AgentChoice>(savedAgentChoice),
     [infos, setInfos] = useState<AgentInfo[]>([]);
   // The workspace's brains in the order its owner chose.
   const workspaceSpaces = useMemo(
@@ -529,6 +551,13 @@ function App() {
   const [shown, setShown] = useState<Record<string, Tab>>({});
   const shownHere = active ? shown[active.scopeId] : undefined;
   const agent = shownHere?.agent ?? agentFor(active?.scopeId);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(agentChoiceKey, JSON.stringify(agentChoice));
+    } catch {
+      // Without storage a reload starts with the default again.
+    }
+  }, [agentChoice]);
   function remember(scopeId: string, next: AgentId) {
     setAgentChoice((choice) => ({ last: next, brains: { ...choice.brains, [scopeId]: next } }));
   }

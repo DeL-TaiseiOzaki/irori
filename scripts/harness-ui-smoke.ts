@@ -187,73 +187,11 @@ try {
       await page.getByLabel('エージェントへの指示').fill('dialog reload');
       await page.getByRole('button', { name: '送信', exact: true }).click();
       await expect(page.locator('.request')).toBeVisible();
-      const consoleErrors: string[] = [];
-      page.on('console', (message) => {
-        if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 1500));
-      });
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
-      for (let i = 0; i < 8; i++) {
-        console.log(
-          'DIAG before select',
-          i,
-          await page.getByLabel('エージェント', { exact: true }).inputValue(),
-          await page.getByLabel('エージェント', { exact: true }).isDisabled(),
-          await page.locator('.message').count(),
-        );
-        await page.waitForTimeout(250);
-      }
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
-      // TEMP diagnostics for a CI-only failure.
-      try {
-        await expect(page.locator('.message.done')).toHaveCount(5);
-      } catch (error) {
-        const started = Date.now();
-        console.log(
-          'DIAG column',
-          await page.locator('main, body').first().innerText().catch(String),
-        );
-        console.log(
-          'DIAG host',
-          JSON.stringify(
-            await page.evaluate(async (id) => {
-              const value = await window.irori.agentConversation(id, 'pi');
-              return {
-                id: value.id,
-                events: value.events.length,
-                done: value.events.filter((e) => e.type === 'done').length,
-                queued: value.queued.length,
-              };
-            }, space.scopeId),
-          ),
-          Date.now() - started,
-        );
-        console.log(
-          'DIAG page',
-          JSON.stringify(
-            await page.evaluate(() => ({
-              href: location.href,
-              visibility: document.visibilityState,
-              hidden: document.hidden,
-              focus: document.hasFocus(),
-              size: [innerWidth, innerHeight],
-              html: document.body.innerHTML.length,
-              columns: document.querySelectorAll('.agent-column, [class*="column"]').length,
-              messages: document.querySelectorAll('.message').length,
-              conversation: document.querySelector('.conversation')?.textContent?.slice(0, 400),
-              select: [...document.querySelectorAll('select')].map(
-                (x) => (x as HTMLSelectElement).value,
-              ),
-              text: document.body.textContent?.slice(0, 1500),
-            })),
-          ),
-        );
-        console.log('DIAG errors', JSON.stringify(errors), JSON.stringify(consoleErrors));
-        await page.waitForTimeout(5000);
-        console.log('DIAG later done', await page.locator('.message.done').count());
-        throw error;
-      }
+      await expect(page.locator('.message.done')).toHaveCount(5);
       await expect(page.locator('.request')).toHaveCount(0);
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
