@@ -191,7 +191,34 @@ try {
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
-      await expect(page.locator('.message.done')).toHaveCount(5);
+      // TEMP diagnostics for a CI-only failure.
+      try {
+        await expect(page.locator('.message.done')).toHaveCount(5);
+      } catch (error) {
+        const started = Date.now();
+        console.log(
+          'DIAG column',
+          await page.locator('main, body').first().innerText().catch(String),
+        );
+        console.log(
+          'DIAG host',
+          JSON.stringify(
+            await page.evaluate(async (id) => {
+              const value = await window.irori.agentConversation(id, 'pi');
+              return {
+                id: value.id,
+                events: value.events.length,
+                done: value.events.filter((e) => e.type === 'done').length,
+                queued: value.queued.length,
+              };
+            }, space.scopeId),
+          ),
+          Date.now() - started,
+        );
+        await page.waitForTimeout(5000);
+        console.log('DIAG later done', await page.locator('.message.done').count());
+        throw error;
+      }
       await expect(page.locator('.request')).toHaveCount(0);
       await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     }
