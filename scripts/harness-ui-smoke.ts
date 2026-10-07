@@ -75,7 +75,8 @@ try {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
     }
     await settings().click();
-    await expect(page.getByText(/fixture/, { exact: false }).first()).toBeVisible();
+    // The CLI's version line; the model list, now quicker to arrive, also says fixture.
+    await expect(page.getByText(/\d fixture$/).first()).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(settings()).toBeFocused();
     await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
