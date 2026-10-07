@@ -144,7 +144,7 @@ import { appIcon } from './branding';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useStableFunctions } from './useStableFunctions';
-import { bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
+import { anyRevision, bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
 import { BrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
@@ -851,7 +851,10 @@ function App() {
   // retired ones among them, win (ADR 027).
   const sharedSkillRead = useResource(() => host.skills(sharedSchemaId), [you?.state], {
     enabled: you?.state === 'ready',
-    refresh: skillRevision + revision,
+    // The shared Schema lives in the irori agent's folder: a change is reported as the
+    // shared Schema's when made from the settings, as the irori agent's otherwise.
+    refresh:
+      skillRevision + scopeRevision(revisions, sharedSchemaId) + scopeRevision(revisions, you?.id),
   });
   const composerSkills = useMemo(
     () => [
@@ -2852,7 +2855,8 @@ function App() {
         <SchemaDialog
           you={you}
           spaces={hibachiAgent ? workspaceSpaces : []}
-          revision={revision + youRevision}
+          // It shows the shared Schema, the irori agent's and every hibachi's: a change in any of them.
+          revision={anyRevision(revisions) + youRevision}
           locked={(scopeId) =>
             connecting ||
             (scopeId === you?.id
