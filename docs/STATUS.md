@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-07: **0.1.85** (copied code that had drifted, merged at the
+owner's request: [#187](https://github.com/DeL-TaiseiOzaki/irori/pull/187) 0.1.82
+fixes, [#190](https://github.com/DeL-TaiseiOzaki/irori/pull/190) host,
+[#189](https://github.com/DeL-TaiseiOzaki/irori/pull/189) agents and domain,
+[#188](https://github.com/DeL-TaiseiOzaki/irori/pull/188) renderer) is published as
+[v0.1.85-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.85-preview.1)
+by release run `37616904194` from main's successful CI run `37615484434` on
+`ce68569` (verify plus Linux, Windows and macOS packages). 0.1.82–0.1.84 were
+merged in sequence and not published on their own; the 0.1.85 notes cover them.
+- Fixes: `within()` copies that refused `..name` children, the hibachi composer
+  accepting 100,000 characters against the host's 32,000, `gh` answers cut at
+  64 KB, doubled "Error: Error:", comment times ignoring the app language, and an
+  untranslated register refusal. The rest consolidates helpers without changing
+  behaviour.
+- The `conversations-ui-smoke` CI hang is explained: the suite quit right after
+  the fixture's reply, before its run ended, and quitting during a run opens a
+  confirmation nobody answers. It now waits for **停止** to go and fails a quit
+  that takes over 15 s (#187).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,170,496 bytes,
+  Mac 141,797,159 bytes and `irori-0.1.85-full.nupkg` 175,339,160 bytes.
+  The website manifest now offers 0.1.85.
+- Left for an owner decision: one relative-path predicate (about 12 sites with
+  different rules for `:`, drive letters and NUL) and the front-matter splitters
+  whose edge cases differ.
+- Owner checks remain: the installed Windows and Mac builds; real CLIs and a real
+  GitHub account were not exercised.
+
 Published 2026-10-07: **0.1.81** ([#182](https://github.com/DeL-TaiseiOzaki/irori/pull/182),
 long agent sessions stay light) merged at the owner's request as `437164e` and
 is published as
