@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Long sessions stay light, 2026-10-07 (**0.1.79**): an audit of what grows with
+Long sessions stay light, 2026-10-07 (**0.1.81**): an audit of what grows with
 long CLI-agent use found the load in three places, and each was fixed and then
 reviewed by another model.
 - Agents (`src/agents`): a conversation is read from the end of
@@ -35,6 +35,35 @@ reviewed by another model.
   (`sessionStorage`): a reload stops the runs it started, and once the stop no
   longer waited a fixed 300 ms the column fell back to the default CLI and an
   empty conversation (seen only in CI's `harness-ui-smoke`).
+
+Shared Schema, 2026-10-07 (**0.1.80**, [ADR 027](decisions/027-shared-schema.md),
+[#183](https://github.com/DeL-TaiseiOzaki/irori/pull/183)): the owner asked for one Schema
+every kind of agent in irori follows, kept in the irori agent's folder, with
+instructions and skills, set from the settings screen like `.obsidian`, and
+every hibachi's own Schema reachable there too.
+- **設定 → Schema** opens `SchemaDialog`: 共通 (the shared Schema), irori agent
+  and each hibachi of the workspace (while hibachi agents are on), edited with
+  the existing Schema forms. The shared Schema is `.irori/shared/` in the irori
+  agent's folder (`YourAiService.sharedFolder`, scope `sharedSchemaId`), with
+  `AGENTS.md` and `.agents/skills/` only; the host refuses rules and hooks there.
+- Every request of every agent starts with it (`prompts/shared-schema.ts`):
+  whole on a native session's first request or after a change, otherwise one
+  line; the session keeps the digest it heard (`native[device].shared`). New
+  sub-agent definitions name it, and the irori agent is told to pass it on.
+  The folder's own Schema wins where the two differ.
+- A hibachi's composer offers the shared skills after its own (共通); its own or
+  retired skill of the same name wins, and a run naming a skill its Schema
+  lacks takes the shared one.
+- Verified: `npm run build`, `npm run format:check`, `npm test` (432 tests,
+  427 passed, 5 skipped; new `shared-schema` tests: the settings folder and its
+  confinement, the words, and a Hermes protocol fixture across a new session,
+  a resumed one, a change and a shared skill) and all 30 UI suites under
+  `xvfb-run` (new `shared-schema-ui-smoke`: writes shared instructions and a
+  skill and a hibachi's instructions from the dialog, checked on disk, and the
+  shared skill in the composer). CI once failed `routines-ui-smoke` where the
+  routines page reflects the JavaScript switch only on its 5 s poll; those two
+  waits now cover a full poll. Not verified: a real CLI following the shared
+  Schema, Windows and macOS.
 
 Published 2026-10-07: **0.1.78** ([#181](https://github.com/DeL-TaiseiOzaki/irori/pull/181),
 removing a hibachi from the start screen) merged at the owner's request as `45417e7`

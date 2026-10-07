@@ -35,6 +35,8 @@ export type AgentSkill = {
   /** Roles and projects the skill is for; empty means everyone. */
   roles: string[];
   projects: string[];
+  /** One of the shared Schema's skills (ADR 027), offered beside the agent's own. */
+  shared?: boolean;
 };
 export type RetiredSkill = {
   name: string;

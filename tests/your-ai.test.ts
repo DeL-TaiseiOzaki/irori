@@ -85,7 +85,7 @@ test('the preamble names each hibachi, its folder and its sub-agent, per CLI', (
 
 test('each CLI gets a definition it can load, with the hibachi and its Schema', () => {
   const brain = { name: 'Product: "Lab"', agent: 'hibachi-product-lab', root: '/kb/product' };
-  const claude = subAgentDefinition('claude', brain);
+  const claude = subAgentDefinition('claude', brain, '/me/.irori/shared');
   assert.match(
     claude,
     /^---\nname: hibachi-product-lab\ndescription: "The Product: \\"Lab\\" hibachi's agent\./,
@@ -93,10 +93,16 @@ test('each CLI gets a definition it can load, with the hibachi and its Schema', 
   assert.match(claude, /\ntools: Read, Write, Edit, Glob, Grep\n---\n/);
   assert.match(claude, /First read \/kb\/product\/AGENTS\.md and follow it/);
   assert.match(claude, /Work only inside \/kb\/product\./);
-  const opencode = subAgentDefinition('opencode', brain);
+  // The shared Schema every agent follows, and which Schema wins (ADR 027).
+  assert.match(
+    claude,
+    /\/me\/\.irori\/shared\/AGENTS\.md and the skills in\s+\/me\/\.irori\/shared\/\.agents\/skills/,
+  );
+  assert.match(claude, /the hibachi's wins/);
+  const opencode = subAgentDefinition('opencode', brain, '/me/.irori/shared');
   assert.match(opencode, /^---\ndescription: ".+"\nmode: subagent\n---\n/);
   // The TOML has the three fields Codex requires, each a basic string.
-  const codex = subAgentDefinition('codex', brain);
+  const codex = subAgentDefinition('codex', brain, '/me/.irori/shared');
   const fields = Object.fromEntries(
     codex
       .trim()
@@ -262,7 +268,7 @@ test('irori writes an absent definition, never over one, and only inside the fol
   ]);
   assert.equal(
     await readFile(path.join(root, '.claude', 'agents', 'hibachi-product.md'), 'utf8'),
-    subAgentDefinition('claude', brains[0]),
+    subAgentDefinition('claude', brains[0], path.join(root, '.irori', 'shared')),
   );
   assert.equal(
     await readFile(path.join(root, '.claude', 'agents', 'hibachi-research.md'), 'utf8'),

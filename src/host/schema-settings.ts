@@ -235,6 +235,7 @@ export class SchemaSettingsService {
     const layer = schema.layer(relative);
     if (
       !kind ||
+      (schema.settings && !schema.settings.includes(kind)) ||
       (kind === 'instructions' && relative !== instructionsFile
         ? layer !== 'Knowledge_Base'
         : layer !== 'schema')

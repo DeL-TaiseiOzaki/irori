@@ -131,6 +131,22 @@ marks the folder as set up. Its skills are listed from its own `.agents/skills`
 by the same reader as a hibachi's (`readFolderSkills`), and changes wait while
 the irori agent runs.
 
+### Shared Schema and Settings → Schema
+
+Since 0.1.80 ([ADR 027](decisions/027-shared-schema.md)) **設定 → Schema**
+opens one dialog with every Schema: the shared Schema (共通), the irori agent's
+and, while hibachi agents are on, each hibachi's of the workspace, edited with
+the same forms (`src/app/SchemaDialog.tsx`). The shared Schema is the folder
+`.irori/shared/` inside the irori agent's folder (`YourAiService.sharedFolder`),
+with `AGENTS.md` and `.agents/skills/` only: the host refuses rules and hooks
+there. The four methods take the fixed `sharedSchemaId` as its scope.
+
+irori puts the shared instructions and each shared skill's name, description
+and file first in every agent's request (`prompts/shared-schema.ts`). A
+hibachi's composer offers the shared skills after its own, marked (共通); its
+own skill wins a name both have, and a run naming a skill its Schema lacks
+takes the shared one.
+
 ## Roles and projects
 
 A skill can say who it is for. The Agent Skills specification reserves

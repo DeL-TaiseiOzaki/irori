@@ -155,6 +155,8 @@ import { NoteComments } from './NoteComments';
 import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
+import { SchemaDialog } from './SchemaDialog';
+import { sharedSchemaId } from '../domain/you';
 import { Overview, type OverviewView } from './Overview';
 import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
@@ -445,6 +447,8 @@ function App() {
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
+  // Every Schema from the settings: the shared one, the irori agent's and each hibachi's.
+  const [schemaOpen, setSchemaOpen] = useState(false);
   const [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   // The brain panel shows its files or, in place of them, its changes.
   const [brainMode, setBrainMode] = useState<BrainMode>('files');
@@ -843,6 +847,21 @@ function App() {
   const youRead = useResource(() => host.yourAi(), [], { refresh: youRevision });
   const you = youRead.data;
   const yourAiRunning = !!you && runningScopes.includes(you.id);
+  // The shared Schema's skills join each hibachi's own in its composer; its own,
+  // retired ones among them, win (ADR 027).
+  const sharedSkillRead = useResource(() => host.skills(sharedSchemaId), [you?.state], {
+    enabled: you?.state === 'ready',
+    refresh: skillRevision + revision,
+  });
+  const composerSkills = useMemo(
+    () => [
+      ...skills,
+      ...(sharedSkillRead.data?.skills ?? [])
+        .filter((skill) => ![...skills, ...skillsRetired].some((own) => own.name === skill.name))
+        .map((skill) => ({ ...skill, shared: true })),
+    ],
+    [skills, skillsRetired, sharedSkillRead.data],
+  );
   // The irori agent's panel shows one of its conversations: the host's pick until one is chosen.
   useEffect(() => {
     if (you?.state !== 'ready' || shown[you.id]) return;
@@ -1748,6 +1767,7 @@ function App() {
         hibachiAgent={hibachiAgent}
         onHibachiAgent={act.chooseHibachi}
         onRestored={act.environmentRestored}
+        onSchema={() => setSchemaOpen(true)}
         onError={act.report}
       />
     ),
@@ -2667,7 +2687,7 @@ function App() {
                           yourAccess={yourAccess}
                           accessChoice={accessChoice}
                           modelChoice={modelChoice}
-                          skills={skills}
+                          skills={composerSkills}
                           skillsRetired={skillsRetired}
                           skillProblems={skillProblems}
                           roots={roots}
@@ -2826,6 +2846,21 @@ function App() {
                   : t('削除しました。', 'Deleted.')),
             );
           }}
+        />
+      )}
+      {schemaOpen && (
+        <SchemaDialog
+          you={you}
+          spaces={hibachiAgent ? workspaceSpaces : []}
+          revision={revision + youRevision}
+          locked={(scopeId) =>
+            connecting ||
+            (scopeId === you?.id
+              ? yourAiRunning
+              : scopeId !== sharedSchemaId &&
+                (gitBusy || runningScopes.includes(scopeId) || heldByYou(scopeId)))
+          }
+          onClose={() => setSchemaOpen(false)}
         />
       )}
       {searchOpen && (

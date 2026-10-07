@@ -246,14 +246,16 @@ try {
     .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes)
     .toEqual([]);
   await page.keyboard.press('Escape');
-  await expect(collect).toContainText('JavaScript が必要です。');
+  // Nothing signals the switch to the page, which reads routines again every 5 s.
+  const poll = { timeout: 12000 };
+  await expect(collect).toContainText('JavaScript が必要です。', poll);
   await settings.click();
   await javascript.check();
   await expect
     .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes)
     .toEqual(['javascript']);
   await page.keyboard.press('Escape');
-  await expect(collect).not.toContainText('JavaScript が必要です。');
+  await expect(collect).not.toContainText('JavaScript が必要です。', poll);
 
   // The first 実行 shows every file and runs only after the confirmation.
   await collect.getByRole('button', { name: '実行' }).click();
