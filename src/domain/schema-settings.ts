@@ -84,6 +84,8 @@ export function settingKind(relative: string): SettingKind | undefined {
 // --- SKILL.md ---------------------------------------------------------------
 
 const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
+/** A skill file's front matter (1) and body (2), past a leading BOM; null without front matter. */
+export const matchFrontMatter = (text: string) => frontMatter.exec(text.replace(/^\uFEFF/, ''));
 const topKey = /^([A-Za-z0-9_-]+)[ \t]*:/;
 
 /** Top-level keys of front matter, each with the lines that belong to it. */
@@ -129,7 +131,7 @@ export type SkillForm = { name: string; description: string; body: string };
 
 /** The form's fields from a SKILL.md, without interpreting its other metadata. */
 export function readSkillText(text: string): SkillForm & { frontMatter: boolean } {
-  const match = frontMatter.exec(text.replace(/^\uFEFF/, ''));
+  const match = matchFrontMatter(text);
   if (!match) return { name: '', description: '', body: text.trim(), frontMatter: false };
   const found = Object.fromEntries(
     blocks(match[1])
@@ -149,7 +151,7 @@ export function readSkillText(text: string): SkillForm & { frontMatter: boolean 
  * front matter line — roles, projects, comments, a licence — stays as written.
  */
 export function writeSkillText(previous: string | undefined, form: SkillForm) {
-  const match = previous ? frontMatter.exec(previous.replace(/^\uFEFF/, '')) : null;
+  const match = previous ? matchFrontMatter(previous) : null;
   const kept = match ? blocks(match[1]) : [];
   const set = {
     name: `name: ${yamlString(form.name)}`,

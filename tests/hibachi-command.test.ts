@@ -5,7 +5,8 @@ import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { hibachiBridge, hibachiLaunchers } from '../src/agents/hibachi-bridge';
+import { hibachiBridge } from '../src/agents/hibachi-bridge';
+import { commandLaunchers } from '../src/agents/command-bridge';
 import { hibachiOf, type Delegation } from '../src/agents/delegation';
 import { brainsCommandPreamble } from '../prompts';
 import { FileService } from '../src/host/files';
@@ -68,7 +69,8 @@ test('the command preamble names each hibachi agent and the command, not their S
 });
 
 test('the launchers run irori’s runtime as Node, quoting any path', () => {
-  const { posix, windows } = hibachiLaunchers(
+  const { posix, windows } = commandLaunchers(
+    'hands a task to a hibachi agent and prints its report.',
     "/Apps/it's irori/irori",
     'C:\\data\\100%\\client.cjs',
   );

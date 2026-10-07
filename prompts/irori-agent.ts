@@ -47,23 +47,26 @@ const commentsNote = (comments: number[]) =>
       ]
     : [];
 
+/** The request: each handed hibachi on a line naming who works in it, then how to hand it work. */
+const handedPreamble = (brains: Handed[], comments: number[], worker: string, handing: string[]) =>
+  [
+    handedHeader,
+    ...brains.map(
+      (brain, index) =>
+        `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, ${worker} "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
+    ),
+    ...handing,
+    ...linkedNote(brains),
+    ...commentsNote(comments),
+  ].join('\n');
+
 /**
  * On a CLI with file-defined sub-agents (Claude Code, Codex, OpenCode): the
  * hibachis handed to it, where they are, and which sub-agent does the work in
  * each. `comments` counts each hibachi's comments, in the same order.
  */
 export function brainsPreamble(brains: Handed[], cli: SubAgentCli, comments: number[] = []) {
-  const lines = brains.map(
-    (brain, index) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, sub-agent "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
-  );
-  return [
-    handedHeader,
-    ...lines,
-    handOff[cli],
-    ...linkedNote(brains),
-    ...commentsNote(comments),
-  ].join('\n');
+  return handedPreamble(brains, comments, 'sub-agent', [handOff[cli]]);
 }
 
 /**
@@ -73,17 +76,9 @@ export function brainsPreamble(brains: Handed[], cli: SubAgentCli, comments: num
  * reads that hibachi's Schema itself. `cli` is the CLI's display name.
  */
 export function brainsCommandPreamble(brains: Handed[], cli: string, comments: number[] = []) {
-  const lines = brains.map(
-    (brain, index) =>
-      `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, hibachi agent "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
-  );
-  return [
-    handedHeader,
-    ...lines,
+  return handedPreamble(brains, comments, 'hibachi agent', [
     `You run on ${cli} for this request, which loads no sub-agents from files. Hand work in a hibachi to that hibachi's agent with the \`hibachi\` command in your shell: hibachi <hibachi agent or hibachi name> "<task>" (or the task on standard input).`,
     'The command runs the hibachi agent inside that hibachi, waits until it finishes, however long that takes, and prints its report. A non-zero exit status means the hand-off did not complete; the reason is on standard error.',
     "Hand one task at a time to a hibachi, and wait for its report before handing it another. Do not change a hibachi's files yourself.",
-    ...linkedNote(brains),
-    ...commentsNote(comments),
-  ].join('\n');
+  ]);
 }

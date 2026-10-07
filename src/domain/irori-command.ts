@@ -1,6 +1,4 @@
-import type { Category } from './types';
-
-const categories: readonly Category[] = ['personal', 'team', 'organization'];
+import { categories, type Category } from './types';
 
 /**
  * What the irori agent asks of irori through the `irori` command on its run's

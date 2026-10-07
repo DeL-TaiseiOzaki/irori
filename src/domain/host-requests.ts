@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, markdownFonts, themes } from './types';
+import { agentIds, categories, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { agentModel, startInput, yourAiChoice } from './conversation';
@@ -11,7 +11,7 @@ import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { brainLook } from './brains';
-import { layerFolderName } from './layers';
+import { layerFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
@@ -167,13 +167,13 @@ export const hostArguments = {
   deleteCloudEntry: z.tuple([id, path]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
-  register: z.tuple([path, name, z.enum(['personal', 'team', 'organization'])]),
+  register: z.tuple([path, name, z.enum(categories)]),
   createSpace: z.tuple([
     z.object({
       parent: path,
       folder: name,
       name,
-      category: z.enum(['personal', 'team', 'organization']),
+      category: z.enum(categories),
     }),
   ]),
   removeSpace: z.tuple([id, z.boolean()]),
@@ -182,16 +182,9 @@ export const hostArguments = {
     z
       .object({
         name: name.optional(),
-        category: z.enum(['personal', 'team', 'organization']).nullable().optional(),
+        category: z.enum(categories).nullable().optional(),
         appearance: brainLook.nullable().optional(),
-        labels: z
-          .object({
-            Knowledge_Base: z.string().max(40).nullable().optional(),
-            contents: z.string().max(40).nullable().optional(),
-          })
-          .strict()
-          .nullable()
-          .optional(),
+        labels: layerLabelChanges.nullable().optional(),
       })
       .strict(),
   ]),

@@ -3,36 +3,32 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { agentIds } from '../domain/types';
-import { conversationMeta, messageInput, queuedMessage } from '../domain/conversation';
+import {
+  conversationMeta,
+  conversationOwner,
+  messageInput,
+  queuedMessage,
+} from '../domain/conversation';
 import { t } from '../domain/i18n';
 import { writeLocalFile, writeLocalJson } from '../host/local-json';
 import {
   conversationsFolder,
   deviceState,
   jsonLine,
+  newMeta,
   rootDigest,
   stateFolder,
+  storedEvent,
   storedLine,
+  unconfirmedRun,
   type StoredEvent,
 } from './conversations';
 import { legacySession, sessionKey } from './sessions';
 
 // The display history irori kept per space, CLI and checkout before ADR 017.
-const legacyEvent = z.object({
-  runId: z.string(),
-  role: z.literal('user').optional(),
-  type: z.enum(['status', 'text', 'tool', 'error', 'done']),
-  text: z.string(),
-  details: z.string().optional(),
-  outcome: z.enum(['completed', 'failed', 'cancelled']).optional(),
-  delegate: z
-    .object({
-      scopeId: z.string(),
-      task: z.string(),
-      state: z.enum(['started', 'working', 'reported', 'failed']),
-    })
-    .optional(),
-});
+const legacyEvent = storedEvent
+  .pick({ type: true, text: true, details: true, outcome: true, delegate: true })
+  .extend({ runId: z.string(), role: z.literal('user').optional() });
 const legacyConversation = z
   .object({
     schemaVersion: z.literal(1),
@@ -175,17 +171,7 @@ async function migrate(
   for (const event of record?.events ?? []) lines.push(storedLine(event, at));
   if (record?.activeRunId)
     lines.push(
-      storedLine(
-        {
-          runId: record.activeRunId,
-          type: 'error',
-          text: t(
-            '前回の実行結果は未確認です。この指示は再送していません。',
-            'The previous run did not report its result. This instruction was not sent again.',
-          ),
-        },
-        at,
-      ),
+      storedLine({ runId: record.activeRunId, type: 'error', text: unconfirmedRun() }, at),
     );
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   const queued = (record?.queued ?? []).map((item, index) =>
@@ -210,37 +196,30 @@ async function migrate(
   const you = binding.scopeId === options.youId;
   await writeLocalJson(
     path.join(dir, 'meta.json'),
-    conversationMeta.parse({
-      schemaVersion: 1,
-      id,
-      owner: {
-        kind: you ? 'irori-agent' : 'hibachi',
-        id: binding.scopeId,
-        name: you
-          ? 'irori agent'
-          : (options.spaceName(binding.scopeId) ?? path.basename(binding.root)).slice(0, 200),
-      },
-      agent: binding.agent,
-      model: null,
-      title: t('以前の会話', 'Earlier conversation'),
-      titleSource: 'migration',
-      createdAt: at,
-      updatedAt: at,
-      linkedNote: null,
-      hibachis: [],
-      pinned: false,
-      archived: false,
-      forkedFrom: null,
-      native: session
-        ? {
-            [deviceId]: {
-              handle: session.handle,
-              access: session.access,
-              root: rootDigest(session.root),
-            },
-          }
-        : {},
-    }),
+    conversationMeta.parse(
+      newMeta({
+        id,
+        owner: conversationOwner(
+          binding.scopeId,
+          you ? undefined : (options.spaceName(binding.scopeId) ?? path.basename(binding.root)),
+        ),
+        agent: binding.agent,
+        model: null,
+        title: t('以前の会話', 'Earlier conversation'),
+        titleSource: 'migration',
+        createdAt: at,
+        linkedNote: null,
+        native: session
+          ? {
+              [deviceId]: {
+                handle: session.handle,
+                access: session.access,
+                root: rootDigest(session.root),
+              },
+            }
+          : {},
+      }),
+    ),
   );
   return true;
 }

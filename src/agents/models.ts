@@ -3,14 +3,16 @@ import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_pr
 import type { AgentId, AgentModel, AgentModels } from '../domain/types';
 import { agentModel } from '../domain/conversation';
 import { t } from '../domain/i18n';
-import { agentEnv, killTree, launch, version } from './process';
+import { agentEnv, killTree, launch, output, version } from './process';
 import { Rpc } from './rpc';
-import { Tail } from './tail';
+import { codexServer, initializeCodex, refuseCodex } from './codex';
 
 // Reading a list asks the CLI what it offers; none of these generates text.
 const deadline = 30000;
 const valid = (id: string) => agentModel.safeParse(id).success;
 const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, '');
+const timedOut = () =>
+  t('モデル一覧の取得がタイムアウトしました。', 'Reading the model list timed out.');
 
 /** `opencode models`: one `provider/model` per line. */
 export function parseOpenCodeModels(output: string): AgentModel[] {
@@ -35,48 +37,25 @@ export function parsePiModels(output: string): AgentModel[] {
   return [...new Set(ids)].map((id) => ({ id, label: id }));
 }
 
-/** What a command prints on success, bounded in size and time. */
-function output(command: string, args: string[]) {
-  return new Promise<string>((resolve, reject) => {
-    const child = launch(command, args, homedir());
-    const text = new Tail(1024 * 1024);
-    const stderr = new Tail(2000);
-    const timer = setTimeout(() => {
-      void killTree(child);
-      reject(
-        Error(t('モデル一覧の取得がタイムアウトしました。', 'Reading the model list timed out.')),
-      );
-    }, deadline);
-    child.stdout!.on('data', (chunk) => text.add(String(chunk)));
-    child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      code === 0
-        ? resolve(text.toString())
-        : reject(Error(stderr.toString().trim() || `${command} exited (${code})`));
-    });
-    child.stdin!.end();
+/** What a listing command prints on success, bounded in size and time. */
+const listing = (command: string, args: string[]) =>
+  output(command, args, {
+    cwd: homedir(),
+    keep: 1024 * 1024,
+    timeout: deadline,
+    timedOut,
+    failed: (code, stderr) => stderr.trim() || `${command} exited (${code})`,
   });
-}
 
 /** Codex's `model/list` through its app server, following each page; hidden models are left out. */
 async function codexModels(): Promise<AgentModel[]> {
-  const child = launch('codex', ['app-server', '--listen', 'stdio://'], homedir());
+  const child = codexServer(homedir());
   const rpc = new Rpc(child, (message) => {
     // Nothing runs, so nothing may be asked; refuse rather than approve.
-    if (message.id !== undefined && message.method)
-      rpc.send({ id: message.id, error: { code: -32601, message: 'Not supported' } });
+    if (message.id !== undefined && message.method) refuseCodex(rpc, message, 'Not supported');
   });
   try {
-    await rpc.request('initialize', {
-      clientInfo: { name: 'irori', title: 'irori', version: '0.1.0' },
-      capabilities: { experimentalApi: true },
-    });
-    rpc.send({ method: 'initialized', params: {} });
+    await initializeCodex(rpc);
     const models: AgentModel[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < 20; page++) {
@@ -151,15 +130,7 @@ async function claudeModels(): Promise<AgentModel[]> {
     const list = await Promise.race([
       session.supportedModels(),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(
-              Error(
-                t('モデル一覧の取得がタイムアウトしました。', 'Reading the model list timed out.'),
-              ),
-            ),
-          deadline,
-        );
+        timer = setTimeout(() => reject(Error(timedOut())), deadline);
       }),
     ]);
     // Its "default" row is the CLI's default, offered separately; the row it resolves to is marked.
@@ -186,8 +157,8 @@ async function claudeModels(): Promise<AgentModel[]> {
 async function list(agent: AgentId): Promise<AgentModel[]> {
   if (agent === 'codex') return codexModels();
   if (agent === 'claude') return claudeModels();
-  if (agent === 'opencode') return parseOpenCodeModels(await output('opencode', ['models']));
-  if (agent === 'pi') return parsePiModels(await output('pi', ['--list-models']));
+  if (agent === 'opencode') return parseOpenCodeModels(await listing('opencode', ['models']));
+  if (agent === 'pi') return parsePiModels(await listing('pi', ['--list-models']));
   return []; // Hermes Agent prints no machine-readable list.
 }
 

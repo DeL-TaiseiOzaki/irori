@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
+import { Tail } from './tail';
 export function agentEnv(source = process.env, platform = process.platform): NodeJS.ProcessEnv {
   // Preserve native provider authentication/configuration. Never inspect tokens.
   const env = { ...source };
@@ -231,24 +232,50 @@ export async function version(command: string): Promise<string> {
   return value;
 }
 function askVersion(command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const p = launch(command, ['--version'], process.cwd());
-    let output = '';
+  return output(command, ['--version'], {
+    cwd: process.cwd(),
+    keep: 1000,
+    timeout: 8000,
+    timedOut: () => 'CLI version check timed out',
+    failed: () => 'CLI unavailable',
+  }).then((text) => text.trim());
+}
+
+/**
+ * The last `keep` characters a command prints when it succeeds within `timeout`
+ * milliseconds; otherwise it is stopped, and the error says `timedOut` or `failed`.
+ */
+export function output(
+  command: string,
+  args: string[],
+  options: {
+    cwd: string;
+    keep: number;
+    timeout: number;
+    timedOut: () => string;
+    failed: (code: number | null, stderr: string) => string;
+  },
+) {
+  return new Promise<string>((resolve, reject) => {
+    const child = launch(command, args, options.cwd);
+    const text = new Tail(options.keep);
+    const stderr = new Tail(2000);
     const timer = setTimeout(() => {
-      void killTree(p);
-      reject(Error('CLI version check timed out'));
-    }, 8000);
-    p.stdout?.on('data', (b) => {
-      output = (output + b).slice(-1000);
-    });
-    p.on('error', (e) => {
+      void killTree(child);
+      reject(Error(options.timedOut()));
+    }, options.timeout);
+    child.stdout!.on('data', (chunk) => text.add(String(chunk)));
+    child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
+    child.on('error', (error) => {
       clearTimeout(timer);
-      reject(e);
+      reject(error);
     });
-    p.on('close', (code) => {
+    child.on('close', (code) => {
       clearTimeout(timer);
-      code === 0 ? resolve(output.trim()) : reject(Error('CLI unavailable'));
+      code === 0
+        ? resolve(text.toString())
+        : reject(Error(options.failed(code, stderr.toString())));
     });
-    p.stdin?.end();
+    child.stdin!.end();
   });
 }
