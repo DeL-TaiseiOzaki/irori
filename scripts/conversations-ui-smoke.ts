@@ -47,7 +47,8 @@ await writeFile(
   }),
 );
 // A conversation of 399 events, one short of the window a column keeps: the next
-// run's events push the oldest out, and the log must keep its nodes meanwhile.
+// run's events push the oldest out, and the log must keep its nodes meanwhile. Its
+// first run took eight steps, so the window reaches into that group of steps.
 const longId = randomUUID();
 const longAt = '2025-01-01T00:00:00.000Z';
 await mkdir(path.join(files.dataDir, 'conversations', longId), { recursive: true });
@@ -73,21 +74,17 @@ await writeFile(
 );
 await writeFile(
   path.join(files.dataDir, 'conversations', longId, 'events.jsonl'),
-  Array.from({ length: 100 }, (_, n) => {
+  Array.from({ length: 98 }, (_, n) => {
     const run = randomUUID();
     const lines = [
       { runId: run, role: 'user' as const, type: 'status' as const, text: `長い会話 ${n + 1}` },
-      ...(n < 99
-        ? [
-            {
-              runId: run,
-              type: 'tool' as const,
-              text: '読む',
-              details: JSON.stringify({ path: 'note.md' }),
-              call: `call-${n}`,
-            },
-          ]
-        : []),
+      ...Array.from({ length: n === 0 ? 8 : 1 }, (_, step) => ({
+        runId: run,
+        type: 'tool' as const,
+        text: '読む',
+        details: JSON.stringify({ path: `note-${step}.md` }),
+        call: `call-${n}-${step}`,
+      })),
       { runId: run, type: 'text' as const, text: `返事 ${n + 1}` },
       { runId: run, type: 'done' as const, text: '完了', outcome: 'completed' as const },
     ];
@@ -224,18 +221,23 @@ try {
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
   await row(page, '長い会話').locator('.history-open').click();
   await expect(history(page)).toHaveCount(0);
-  await expect(panel(page).locator('.message.user')).toHaveCount(100);
+  await expect(panel(page).locator('.message.user')).toHaveCount(98);
   await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 1');
   const steps = panel(page).locator('details.step');
-  await steps.nth(1).locator('summary').click();
-  await expect(steps.nth(1)).toHaveJSProperty('open', true);
+  await expect(steps).toHaveCount(105);
+  // The last step of the first run's group: its first steps leave with the window.
+  await steps.nth(7).locator('summary').click();
+  await expect(steps.nth(7)).toHaveJSProperty('open', true);
   const keptMessage = (await panel(page).locator('.message.user').nth(1).elementHandle())!;
-  const openedStep = (await steps.nth(1).elementHandle())!;
+  const openedStep = (await steps.nth(7).elementHandle())!;
   await send(page, '窓を滑らせる');
   await expect(panel(page).locator('.message.user').last()).toHaveText('窓を滑らせる');
   await expect(panel(page).locator('.message.text').last()).toContainText('の応答');
   await expect(panel(page).getByText(/以前の \d+ 件を省略/)).toBeVisible();
   await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 2');
+  // The window reached into the first group of steps, which kept its later steps.
+  await expect(steps.first()).not.toContainText('note-0.md');
+  await expect(steps.first()).toContainText('note-');
   expect(await keptMessage.evaluate((element) => element.isConnected)).toBe(true);
   expect(
     await openedStep.evaluate(

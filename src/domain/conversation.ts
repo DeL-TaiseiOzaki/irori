@@ -205,6 +205,53 @@ export function appendConversationEvents(events: AgentEvent[], incoming: AgentEv
   return next;
 }
 
+/**
+ * Joins events that arrived while the host's snapshot was being read onto that
+ * snapshot, leaving out what it already holds: an event of the same id, and of a
+ * reply still arriving the fragments the snapshot's text already ends with. The
+ * host reads the history and then its native record before replying, so events
+ * published in between are in neither; nothing is lost and nothing shown twice.
+ */
+export function mergeHeldEvents(snapshot: AgentEvent[], held: AgentEvent[]) {
+  if (!held.length) return snapshot;
+  const known = new Set<string>();
+  for (const event of snapshot) if (event.id) known.add(event.id);
+  const last = snapshot.at(-1);
+  const fresh: AgentEvent[] = [];
+  for (const event of held) {
+    if (!event.id || !known.has(event.id)) {
+      fresh.push(event);
+      continue;
+    }
+    // Fragments continue only the newest reply; a reply another event followed is whole.
+    if (event.type !== 'text' || last?.type !== 'text' || last.id !== event.id) continue;
+    const included = coveredLength(last.text, event.text);
+    if (included < event.text.length) fresh.push({ ...event, text: event.text.slice(included) });
+  }
+  return appendConversationEvents(snapshot, fresh);
+}
+
+/** The longest prefix of `fragments` that `text` ends with: the fragments the text already took. */
+function coveredLength(text: string, fragments: string) {
+  const limit = Math.min(text.length, fragments.length);
+  if (!limit) return 0;
+  // The fragments' border table, run over the text's tail: linear in both, however long.
+  const pattern = fragments.slice(0, limit);
+  const border = new Int32Array(pattern.length);
+  for (let index = 1, length = 0; index < pattern.length; index++) {
+    while (length > 0 && pattern[index] !== pattern[length]) length = border[length - 1];
+    if (pattern[index] === pattern[length]) length++;
+    border[index] = length;
+  }
+  let matched = 0;
+  for (let index = text.length - limit; index < text.length; index++) {
+    while (matched > 0 && (matched === pattern.length || pattern[matched] !== text[index]))
+      matched = border[matched - 1];
+    if (pattern[matched] === text[index]) matched++;
+  }
+  return matched;
+}
+
 /** The events a column keeps on show once a conversation grows; older ones are counted, not shown. */
 export const viewWindow = 400;
 /** The most of the newest reply a column keeps; a longer one keeps its end. */

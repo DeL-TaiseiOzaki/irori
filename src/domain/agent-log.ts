@@ -132,8 +132,18 @@ export type LogItem =
  * hand-offs as a task list. Lookups that used to run per item — a request's
  * end, a run's tasks, a call's result — are made once for the whole list.
  */
-export function logItems(events: AgentEvent[], activeRun?: string): LogItem[] {
+export function logItems(
+  events: AgentEvent[],
+  activeRun?: string,
+  /**
+   * The group each step was shown in last time, by step key. A group keeps its key
+   * while any member it had remains, so losing its first step to the window does not
+   * rebuild it; the map is rewritten for the steps shown now.
+   */
+  groups?: Map<string, string>,
+): LogItem[] {
   const ended = endedRequests(events);
+  const shown = new Map<string, string>();
   const items: LogItem[] = [];
   const listed = new Set<string>();
   const used = new Set<string>();
@@ -155,7 +165,16 @@ export function logItems(events: AgentEvent[], activeRun?: string): LogItem[] {
   let steps: LogStep[] = [];
   const flushSteps = () => {
     if (!steps.length) return;
-    items.push({ kind: 'steps', key: `steps-${steps[0].key}`, steps });
+    let key = `steps-${steps[0].key}`;
+    for (const step of steps) {
+      const before = groups?.get(step.key);
+      if (before) {
+        key = before;
+        break;
+      }
+    }
+    for (const step of steps) shown.set(step.key, key);
+    items.push({ kind: 'steps', key, steps });
     steps = [];
   };
   let labelled = '';
@@ -200,5 +219,9 @@ export function logItems(events: AgentEvent[], activeRun?: string): LogItem[] {
     else items.push({ kind: 'message', key, event });
   });
   flushSteps();
+  if (groups) {
+    groups.clear();
+    for (const [step, key] of shown) groups.set(step, key);
+  }
   return items;
 }

@@ -405,7 +405,9 @@ const noTabs: Tab[] = [];
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
   // the whole tree from here; component state, drafts and the editor are kept.
-  useLanguage();
+  // The memoised islands and the elements memoised below take the language as a
+  // dependency, since nothing else about them changes with it.
+  const language = useLanguage();
   const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
@@ -507,8 +509,6 @@ function App() {
     () => workspaceSpaces.map((space) => space.scopeId),
     [workspaceSpaces],
   );
-  const spacesNow = useRef(spaces);
-  spacesNow.current = spaces;
   const agentFor = (scopeId?: string) => agentOf(agentChoice, scopeId);
   // Each hibachi's own agent and its Schema layer are optional (ADR 021).
   const [hibachiAgent, setHibachiAgent] = useState(currentHibachiAgent);
@@ -1075,12 +1075,10 @@ function App() {
         }
         if (incoming.type !== 'done') return;
         setSkillRevision((value) => value + 1);
-        // A hibachi's run changed that hibachi; the irori agent's may have reached any of them.
-        bump(
-          spacesNow.current.some((space) => space.scopeId === incoming.scopeId)
-            ? incoming.scopeId
-            : undefined,
-        );
+        // A run may have changed any hibachi: the irori agent's hand-offs reach others, and
+        // two hibachis may connect the same folder, whose files no watcher reports. Run ends
+        // are rare, so every view reads again; file events stay with their own hibachi.
+        bump();
         void reconcile();
         // A run's end sends the next queued instruction of its own conversation; a
         // conversation on show in a column sends its own.
@@ -1724,7 +1722,7 @@ function App() {
         onError={act.report}
       />
     ),
-    [hibachiAgent, act],
+    [hibachiAgent, act, language],
   );
   const schemaSelected =
     view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
@@ -1741,7 +1739,7 @@ function App() {
           onOpenFile={act.openSchemaFile}
         />
       ) : undefined,
-    [hibachiAgent, active, revision, schemaSelected, brainLocked, gitBusy, act],
+    [hibachiAgent, active, revision, schemaSelected, brainLocked, gitBusy, act, language],
   );
   const gitPanel = useMemo(
     () =>
@@ -1756,7 +1754,7 @@ function App() {
           onChanged={act.gitChanged}
         />
       ),
-    [active, gitDetailTarget, revision, act],
+    [active, gitDetailTarget, revision, act, language],
   );
   /** Shows a brain, from the rail or the Overview: its note, or its hibachi agent. */
   async function enterBrain(
