@@ -170,13 +170,20 @@ export async function requireSkill(
   scopeId: string,
   name: string,
 ): Promise<AgentSkill> {
-  const found = await readPackage(spaceFolder(files, scopeId), name);
+  const found = await findSkill(spaceFolder(files, scopeId), name);
+  if (!found) throw noSkill(name);
+  return found;
+}
+
+/** The refusal for a request that names a skill no Schema it reads declares. */
+export const noSkill = (name: string) =>
+  Error(t(`このスペースに ${name} スキルがありません。`, `This space has no ${name} skill.`));
+
+/** One skill package of a Schema folder, undefined when absent; a retired one is refused. */
+export async function findSkill(folder: SchemaFolder, name: string) {
+  const found = await readPackage(folder, name);
   if (found?.retired) throw Error(retirementNotice(found.retired));
-  if (!found?.skill)
-    throw Error(
-      t(`このスペースに ${name} スキルがありません。`, `This space has no ${name} skill.`),
-    );
-  return found.skill;
+  return found?.skill;
 }
 
 /**

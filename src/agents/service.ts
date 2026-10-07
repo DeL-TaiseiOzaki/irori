@@ -2,7 +2,7 @@ import { KnowledgeStore } from '../knowledge/store';
 import { AuthorshipStore, editedPath, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
 import type { RunRecord } from '../domain/knowledge';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type {
   AgentEvent,
@@ -56,9 +56,12 @@ import {
   selectedNote,
   connectedFolders,
   selectedSources,
+  sharedSchema,
+  sharedSchemaPointer,
 } from '../../prompts';
 import { commentsCount, readNoteComments } from '../host/comments';
-import { parseSkill, requireSkill } from '../host/skills';
+import { findSkill, noSkill } from '../host/skills';
+import { spaceFolder } from '../host/schema-folder';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
 import { brainAgentNames, hasSubAgents } from '../domain/you';
@@ -114,6 +117,8 @@ type Run = {
   reached: Set<string>;
   /** The digest of the checkout the run works in, kept with its native session. */
   root?: string;
+  /** The digest of the shared Schema this run's request gave in full or pointed at. */
+  shared?: string;
   /** The title a new conversation for this run takes instead of its first line. */
   title?: string;
   accepted: Promise<void>;
@@ -643,6 +648,7 @@ export class AgentService {
       handle,
       access: run.access,
       root: run.root,
+      ...(run.shared && { shared: run.shared }),
     });
   }
   private async execute(run: Run, input: StartRun) {
@@ -766,14 +772,14 @@ export class AgentService {
             );
         if (words) promptParts.push(words);
       }
-      const selectedSkill = !input.skill
-        ? undefined
-        : you
-          ? parseSkill(
-              input.skill,
-              (await this.you!.read(`.agents/skills/${input.skill}/SKILL.md`)).text,
-            )
-          : await requireSkill(this.files, input.scopeId, input.skill);
+      // A skill the agent's own Schema lacks may be one of the shared Schema's (ADR 027).
+      const selectedSkill = input.skill
+        ? ((await findSkill(
+            you ? await this.you!.schemaFolder() : spaceFolder(this.files, input.scopeId),
+            input.skill,
+          )) ?? (await this.you?.sharedSkill(input.skill)))
+        : undefined;
+      if (input.skill && !selectedSkill) throw noSkill(input.skill);
       if (selectedSkill)
         this.event(
           run,
@@ -807,10 +813,13 @@ export class AgentService {
       // routine's step always starts afresh and is never kept.
       run.root = rootDigest(space.root);
       let saved: string | undefined;
+      let heard: string | undefined;
       if (!run.step) {
         const { entry, elsewhere } = await this.conversations.native(run.conversationId!);
-        if (entry && entry.root === run.root && entry.access === run.access) saved = entry.handle;
-        else if (entry || elsewhere)
+        if (entry && entry.root === run.root && entry.access === run.access) {
+          saved = entry.handle;
+          heard = entry.shared;
+        } else if (entry || elsewhere)
           this.event(
             run,
             'status',
@@ -832,6 +841,24 @@ export class AgentService {
       }
       resuming = !!saved;
       if (run.cancelled) return;
+      // The shared Schema leads every request: whole unless this session already
+      // heard it as it is now, then as one line (ADR 027).
+      const shared = await this.you?.shared().catch((error) => {
+        this.event(
+          run,
+          'status',
+          t(
+            `共通 Schema を読めませんでした: ${String(error)}`,
+            `Could not read the shared Schema: ${String(error)}`,
+          ),
+        );
+        return undefined;
+      });
+      if (shared) {
+        const words = sharedSchema(shared, !!run.delegation && hasSubAgents(input.agent));
+        run.shared = createHash('sha256').update(words).digest('hex');
+        prompt = `${saved && heard === run.shared ? sharedSchemaPointer(shared) : words}\n\n${prompt}`;
+      }
       if (saved)
         this.event(
           run,
@@ -924,6 +951,16 @@ export class AgentService {
         if (input.agent === 'pi') await runPi(context);
         else if (input.agent === 'opencode') await runOpenCode(context);
         else await runHermes(context);
+      }
+      // A resumed session's handle is not saved again, so what it heard of the
+      // shared Schema is recorded here, on whatever handle it now has.
+      if (run.shared && run.shared !== heard && !run.step && !run.cancelled) {
+        const { entry } = await this.conversations.native(run.conversationId!);
+        if (entry && entry.shared !== run.shared)
+          await this.conversations.saveNative(run.conversationId!, {
+            ...entry,
+            shared: run.shared,
+          });
       }
     } catch (e) {
       run.reject(e);

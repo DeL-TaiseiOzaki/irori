@@ -84,6 +84,11 @@ export const conversationMeta = z.looseObject({
       handle: z.string().min(1).max(4096),
       access: z.enum(agentAccessModes),
       root: z.string().regex(/^[0-9a-f]{64}$/),
+      /** The digest of the shared Schema the session last heard in full (ADR 027). */
+      shared: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
     }),
   ),
 });

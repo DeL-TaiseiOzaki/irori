@@ -150,6 +150,7 @@ export function Settings({
   hibachiAgent,
   onHibachiAgent,
   onRestored,
+  onSchema,
   onError,
 }: {
   /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
@@ -157,6 +158,8 @@ export function Settings({
   onHibachiAgent: (on: boolean) => void;
   /** The environment saved on the account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
+  /** Opens every Schema: the shared one, the irori agent's and each hibachi's (ADR 027). */
+  onSchema: () => void;
   onError: (error: unknown) => void;
 }) {
   const updates = useUpdateState(host);
@@ -228,6 +231,22 @@ export function Settings({
                     <Icon name="sparkles" size={15} />
                     <span>hibachi agent</span>
                   </label>
+                </div>
+              </fieldset>
+              <fieldset className="settings-choices schema-settings">
+                <legend>Schema</legend>
+                <div>
+                  <button
+                    type="button"
+                    className="settings-choice"
+                    onClick={() => {
+                      setOpen(false);
+                      onSchema();
+                    }}
+                  >
+                    <Icon name="schema" size={15} />
+                    <span>{t('共通・hibachi', 'Shared and hibachis')}</span>
+                  </button>
                 </div>
               </fieldset>
               <RoutineRuntimes onError={onError} />
