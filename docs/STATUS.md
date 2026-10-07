@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Settings on the start screen, 2026-10-08 (**0.1.88**): the owner noted that
+Settings on the start screen, 2026-10-08 (**0.1.88**, [#196](https://github.com/DeL-TaiseiOzaki/irori/pull/196)): the owner noted that
 the settings, and with them **環境を保存** (ADR 026), could only be reached after
 opening a workspace, although the save covers every workspace on the device.
 - `Settings` takes `start`: the start screen's footer shows it as a **設定**
