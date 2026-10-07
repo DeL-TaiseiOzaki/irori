@@ -1,6 +1,14 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, mkdtemp, open as openFile, readFile, rm, stat } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdtemp,
+  open as openFile,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -136,4 +144,65 @@ test('A line over the limit before or inside the window is one damaged line, and
     true,
     'nothing is rewritten',
   );
+});
+
+test('A reply split between the file and the unwritten lines is one earlier event, now and after it is written', async (t) => {
+  const { store, id, runId } = await fixture(t);
+  const reply = randomUUID();
+  store.event(id, { id: reply, runId, type: 'text', text: 'on disk ' });
+  await store.flush();
+  store.event(id, { id: reply, runId, type: 'text', text: 'and buffered' });
+  for (let n = 0; n < 1000; n++) store.event(id, { runId, type: 'tool', text: `tool ${n}` });
+  // Read before the buffer is written: the window is the buffered tools alone.
+  let value = await store.read(id);
+  assert.equal(value.events.length, 1000);
+  assert.equal(value.events[0].text, 'tool 0');
+  assert.equal(value.earlier, 3, 'first, done, the reply');
+  await store.flush();
+  store.event(id, { runId, type: 'tool', text: 'one more' });
+  await store.flush();
+  value = await store.read(id);
+  assert.equal(value.events[0].text, 'tool 1');
+  assert.equal(value.earlier, 4, 'first, done, the reply once, tool 0');
+  assert.equal(value.damaged, 0);
+});
+
+test('Lines ending in CRLF before the window count as events', async (t) => {
+  const { open, id, runId, file } = await fixture(t);
+  const early = Array.from({ length: 3 }, (_, n) =>
+    jsonLine(storedLine({ runId, type: 'tool', text: `crlf ${n}` })).replace(/\n$/, '\r\n'),
+  ).join('');
+  await appendFile(file, early);
+  await appendFile(
+    file,
+    Array.from({ length: 1000 }, (_, n) =>
+      jsonLine(storedLine({ runId, type: 'tool', text: `tool ${n}` })),
+    ).join(''),
+  );
+  const value = await open().read(id);
+  assert.equal(value.earlier, 5);
+  assert.equal(value.damaged, 0);
+});
+
+test('A run cut short by a crash is recovered even when its message line was cut after its id', async (t) => {
+  const { store, open, id, file, placement, input } = await fixture(t);
+  const runId = randomUUID();
+  const eventId = randomUUID();
+  await store.begin(id, placement, { runId, eventId }, input('the instruction that was cut'));
+  // The crash left the message's line without its end, its id intact.
+  const text = await readFile(file, 'utf8');
+  const cut = text.lastIndexOf('"text"');
+  assert.ok(cut > text.lastIndexOf(eventId));
+  await writeFile(file, text.slice(0, cut + 20));
+  const value = await open().read(id);
+  assert.equal(value.activeRunId, undefined, 'the claim is cleared');
+  assert.equal(value.damaged, 1);
+  const user = value.events.filter((event) => event.role === 'user');
+  assert.deepEqual(
+    user.map((event) => event.text),
+    ['first', 'the instruction that was cut'],
+    'the message comes back from the claim',
+  );
+  assert.equal(user[1].id, eventId);
+  assert.equal(value.events.at(-1)?.type, 'error');
 });
