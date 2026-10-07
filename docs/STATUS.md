@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Categories of your own, 2026-10-08 (**0.1.87**, [ADR 029](decisions/029-free-categories.md),
-stacked on #192): the owner asked for categories beyond personal, team and organization.
+[#193](https://github.com/DeL-TaiseiOzaki/irori/pull/193)): the owner asked for categories beyond personal, team and organization.
 - `Category` is a string (`src/domain/types.ts`); `categoryText` in `domain/brains.ts`
   validates it (1–40 characters, one line, no edge spaces) for `scope.json`, the
   HostAPI requests and the `irori` command. `presetCategories` keeps the three with
