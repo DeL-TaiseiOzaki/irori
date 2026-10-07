@@ -177,7 +177,11 @@ export function Settings({
             {t('設定', 'Settings')}
           </Popover.Trigger>
         ) : (
-          <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
+          <Popover.Trigger
+            className="rail-button settings-trigger"
+            aria-label={label}
+            title={label}
+          >
             <Icon name="sliders" size={18} />
             {updateWaiting(updates) && (
               <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
