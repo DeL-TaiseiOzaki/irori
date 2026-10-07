@@ -24,7 +24,9 @@ every hibachi's own Schema reachable there too.
   a resumed one, a change and a shared skill) and all 30 UI suites under
   `xvfb-run` (new `shared-schema-ui-smoke`: writes shared instructions and a
   skill and a hibachi's instructions from the dialog, checked on disk, and the
-  shared skill in the composer). Not verified: a real CLI following the shared
+  shared skill in the composer). CI once failed `routines-ui-smoke` where the
+  routines page reflects the JavaScript switch only on its 5 s poll; those two
+  waits now cover a full poll. Not verified: a real CLI following the shared
   Schema, Windows and macOS.
 
 Published 2026-10-07: **0.1.78** ([#181](https://github.com/DeL-TaiseiOzaki/irori/pull/181),
