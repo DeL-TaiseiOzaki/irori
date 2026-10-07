@@ -219,6 +219,26 @@ try {
           ),
           Date.now() - started,
         );
+        console.log(
+          'DIAG page',
+          JSON.stringify(
+            await page.evaluate(() => ({
+              href: location.href,
+              visibility: document.visibilityState,
+              hidden: document.hidden,
+              focus: document.hasFocus(),
+              size: [innerWidth, innerHeight],
+              html: document.body.innerHTML.length,
+              columns: document.querySelectorAll('.agent-column, [class*="column"]').length,
+              messages: document.querySelectorAll('.message').length,
+              conversation: document.querySelector('.conversation')?.textContent?.slice(0, 400),
+              select: [...document.querySelectorAll('select')].map(
+                (x) => (x as HTMLSelectElement).value,
+              ),
+              text: document.body.textContent?.slice(0, 1500),
+            })),
+          ),
+        );
         console.log('DIAG errors', JSON.stringify(errors), JSON.stringify(consoleErrors));
         await page.waitForTimeout(5000);
         console.log('DIAG later done', await page.locator('.message.done').count());
