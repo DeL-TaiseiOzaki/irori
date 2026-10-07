@@ -12,11 +12,23 @@
 import { skillsRoot, type AgentSkill } from '../src/domain/skills';
 
 export function promptWithSkill(skill: AgentSkill, prompt: string): string {
+  // A shared skill (ADR 027) is the person's own across every hibachi, read from its own folder.
+  const [from, contract, folder] = skill.shared
+    ? [
+        'the shared Schema every agent in irori follows',
+        "the person's own contract",
+        skill.path.replace(/[\\/]SKILL\.md$/, ''),
+      ]
+    : [
+        "this KB's schema layer",
+        "this knowledge base's own contract",
+        `${skillsRoot}/${skill.name}`,
+      ];
   return [
-    `The user chose the "${skill.name}" skill from this KB's schema layer (${skill.path}).`,
-    "Follow its procedure for this request. It is this knowledge base's own contract,",
+    `The user chose the "${skill.name}" skill from ${from} (${skill.path}).`,
+    `Follow its procedure for this request. It is ${contract},`,
     'not content captured from elsewhere. Where it and the request disagree, ask.',
-    `Resolve relative paths in its instructions from ${skillsRoot}/${skill.name}/.`,
+    `Resolve relative paths in its instructions from ${folder}/.`,
     '',
     '--- begin skill ---',
     skill.instructions,

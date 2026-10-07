@@ -1,0 +1,97 @@
+/* Every Schema from the settings (ADR 027): owners, their Schema, the form. */
+.schema-dialog {
+  width: min(1180px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+}
+.schema-dialog-body {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+}
+.schema-owners,
+.schema-dialog-list,
+.schema-dialog-empty {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--shadow);
+}
+.schema-owners {
+  width: 220px;
+}
+.schema-dialog-list,
+.schema-dialog-empty {
+  width: 240px;
+  margin: 0;
+}
+.schema-dialog-empty {
+  color: var(--tx-3);
+  font-size: 12px;
+}
+.schema-owners header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 10px 8px;
+}
+.schema-owners h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.schema-owner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx);
+  font-weight: 400;
+  text-align: left;
+}
+.schema-owner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schema-owner:hover {
+  background: var(--raised);
+}
+.schema-owner[aria-pressed='true'] {
+  background: var(--raised-2);
+}
+.schema-owner-icon {
+  flex: none;
+  color: var(--tx-3);
+}
+.schema-dialog-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--stage);
+  color: var(--ink);
+  box-shadow: var(--stage-shadow);
+}
+@media (max-width: 900px) {
+  .schema-owners {
+    width: 170px;
+  }
+  .schema-dialog-list {
+    width: 190px;
+  }
+}

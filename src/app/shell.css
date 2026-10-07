@@ -645,6 +645,12 @@
     background-color var(--quick) ease,
     color var(--quick) ease;
 }
+/* A choice that opens a view rather than picking a value. */
+button.settings-choice {
+  background: none;
+  box-shadow: none;
+  font-weight: 400;
+}
 .settings-choice:hover {
   background: var(--raised);
   color: var(--tx);

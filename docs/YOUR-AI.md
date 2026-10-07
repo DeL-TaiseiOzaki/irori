@@ -47,6 +47,11 @@ agent's shape. The investigation behind the design is in the
 - Earlier starters also held a `brain-agents` skill for the irori agent to write
   the definitions. New folders no longer get it, and irori never deletes it from
   an existing folder.
+- `.irori/shared/` holds the shared Schema every agent in irori follows
+  ([ADR 027](decisions/027-shared-schema.md)): `AGENTS.md` and
+  `.agents/skills/`, written from **設定 → Schema**. irori makes the folder when
+  the settings first open it. Each request names it first; a new sub-agent
+  definition names it too, and the irori agent is told to pass it on.
 
 ## Sub-agent definitions irori writes
 

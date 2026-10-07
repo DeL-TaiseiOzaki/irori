@@ -74,6 +74,7 @@ const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${f
 export function SchemaList({
   scopeId,
   space,
+  common = false,
   revision,
   selected,
   locked,
@@ -83,6 +84,8 @@ export function SchemaList({
   scopeId: string;
   /** The hibachi, or none for the irori agent's folder. */
   space?: Space;
+  /** The shared Schema (ADR 027): instructions and skills only. */
+  common?: boolean;
   revision: number;
   selected?: SchemaTarget;
   locked: boolean;
@@ -160,65 +163,67 @@ export function SchemaList({
   ];
   return (
     <div className="schema-list">
-      {groups.map((group) => (
-        <div
-          key={group.kind}
-          className="schema-group"
-          role="group"
-          aria-label={t(
-            `Schema の${kinds[group.kind].name()}`,
-            `Schema ${kinds[group.kind].name().toLowerCase()}`,
-          )}
-        >
-          <div className="schema-group-heading">
-            <span>{kinds[group.kind].name()}</span>
-            <button
-              className="section-action"
-              aria-label={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
-              title={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
-              disabled={locked || (group.kind === 'hook' && !!group.error)}
-              onClick={() => onSelect({ kind: group.kind })}
-            >
-              <Icon name="plus" size={13} />
-            </button>
-          </div>
-          {group.error && (
-            <small className="tree-error" role="alert">
-              {group.error}
-            </small>
-          )}
-          {!group.items.length && !group.error && (
-            <small className="tree-empty">{t('まだありません', 'None yet')}</small>
-          )}
-          {group.items.map((item) => {
-            const current = selected?.kind === group.kind && selected.key === item.key;
-            return (
+      {groups
+        .filter((group) => !common || group.kind === 'instructions' || group.kind === 'skill')
+        .map((group) => (
+          <div
+            key={group.kind}
+            className="schema-group"
+            role="group"
+            aria-label={t(
+              `Schema の${kinds[group.kind].name()}`,
+              `Schema ${kinds[group.kind].name().toLowerCase()}`,
+            )}
+          >
+            <div className="schema-group-heading">
+              <span>{kinds[group.kind].name()}</span>
               <button
-                key={`${item.key}-${item.badge ?? ''}`}
-                className={`tree-row ${current ? 'selected' : ''}`}
-                aria-current={current ? 'page' : undefined}
-                title={item.title}
-                onClick={() =>
-                  item.file
-                    ? onOpenFile({
-                        path: item.file,
-                        name: retiredFile,
-                        directory: false,
-                        layer: 'schema',
-                        note: true,
-                      })
-                    : onSelect({ kind: group.kind, key: item.key })
-                }
+                className="section-action"
+                aria-label={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
+                title={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
+                disabled={locked || (group.kind === 'hook' && !!group.error)}
+                onClick={() => onSelect({ kind: group.kind })}
               >
-                <Icon name={kinds[group.kind].icon} size={15} className="tree-icon" />
-                <span className="filename">{item.label}</span>
-                {item.badge && <span className="badge">{item.badge}</span>}
+                <Icon name="plus" size={13} />
               </button>
-            );
-          })}
-          {group.note && <small className="tree-empty">{group.note}</small>}
-        </div>
-      ))}
+            </div>
+            {group.error && (
+              <small className="tree-error" role="alert">
+                {group.error}
+              </small>
+            )}
+            {!group.items.length && !group.error && (
+              <small className="tree-empty">{t('まだありません', 'None yet')}</small>
+            )}
+            {group.items.map((item) => {
+              const current = selected?.kind === group.kind && selected.key === item.key;
+              return (
+                <button
+                  key={`${item.key}-${item.badge ?? ''}`}
+                  className={`tree-row ${current ? 'selected' : ''}`}
+                  aria-current={current ? 'page' : undefined}
+                  title={item.title}
+                  onClick={() =>
+                    item.file
+                      ? onOpenFile({
+                          path: item.file,
+                          name: retiredFile,
+                          directory: false,
+                          layer: 'schema',
+                          note: true,
+                        })
+                      : onSelect({ kind: group.kind, key: item.key })
+                  }
+                >
+                  <Icon name={kinds[group.kind].icon} size={15} className="tree-icon" />
+                  <span className="filename">{item.label}</span>
+                  {item.badge && <span className="badge">{item.badge}</span>}
+                </button>
+              );
+            })}
+            {group.note && <small className="tree-empty">{group.note}</small>}
+          </div>
+        ))}
     </div>
   );
 }
@@ -315,6 +320,7 @@ function TextField({
 export function SchemaEditor({
   scopeId,
   space,
+  common = false,
   target,
   locked,
   revision,
@@ -324,6 +330,8 @@ export function SchemaEditor({
   scopeId: string;
   /** The hibachi, or none for the irori agent's folder. */
   space?: Space;
+  /** The shared Schema (ADR 027), kept in the irori agent's folder. */
+  common?: boolean;
   target: SchemaTarget;
   locked: boolean;
   revision: number;
@@ -371,6 +379,7 @@ export function SchemaEditor({
   const shared = {
     scopeId,
     space,
+    common,
     target,
     data: data.data,
     disabled: locked || busy,
@@ -391,7 +400,11 @@ export function SchemaEditor({
             ...(space
               ? []
               : [{ icon: 'sparkles' as const, label: t('irori agent', 'irori agent') }]),
-            { icon: 'schema', label: 'Schema', className: 'layer schema' },
+            {
+              icon: 'schema',
+              label: common ? t('共通 Schema', 'Shared Schema') : 'Schema',
+              className: 'layer schema',
+            },
             { label: kinds[target.kind].name(), className: 'folder' },
           ]}
           here={title}
@@ -457,6 +470,7 @@ export function SchemaEditor({
 type FormProps = {
   scopeId: string;
   space?: Space;
+  common?: boolean;
   target: SchemaTarget;
   data: SchemaData;
   disabled: boolean;
@@ -514,6 +528,7 @@ function DeleteButton({ disabled, onClick }: { disabled: boolean; onClick: () =>
 function InstructionsForm({
   scopeId,
   space,
+  common,
   target,
   data,
   disabled,
@@ -559,7 +574,9 @@ function InstructionsForm({
                 {choice ||
                   (space
                     ? t('hibachi 全体（AGENTS.md）', 'The whole hibachi (AGENTS.md)')
-                    : t('irori agent（AGENTS.md）', 'The irori agent (AGENTS.md)'))}
+                    : common
+                      ? t('すべてのエージェント（AGENTS.md）', 'Every agent (AGENTS.md)')
+                      : t('irori agent（AGENTS.md）', 'The irori agent (AGENTS.md)'))}
               </option>
             ))}
           </select>

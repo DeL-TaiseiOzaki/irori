@@ -80,7 +80,8 @@ export function SkillPicker({
           <option value="">{t('スキルなし', 'No skill')}</option>
           {visible.map((s) => (
             <option key={s.name} value={s.name} title={s.description}>
-              {s.name} — {s.description}
+              {s.name}
+              {s.shared ? ` (${t('共通', 'shared')})` : ''} — {s.description}
             </option>
           ))}
         </select>

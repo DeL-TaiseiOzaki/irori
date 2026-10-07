@@ -23,7 +23,7 @@ import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
 import { DeviceIdentity } from './device';
 import { migrateConversations } from '../agents/conversation-migration';
-import { brainAgentNames } from '../domain/you';
+import { brainAgentNames, sharedSchemaId } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkspaceService, inspectRepository } from './workspaces';
@@ -125,9 +125,14 @@ app
       youId: (await you.load()).id,
       spaceName: (scopeId) => files.list().find((space) => space.scopeId === scopeId)?.name,
     }).catch((error) => console.warn('Saved conversations could not be migrated', String(error)));
-    // The Schema settings take a hibachi's id or the irori agent's, whose folder is its Schema.
+    // The Schema settings take a hibachi's id, the irori agent's, whose folder is its
+    // Schema, or the shared Schema's, kept inside that folder (ADR 027).
     const schemaFolder = async (scopeId: string) =>
-      you.rootOf(scopeId) ? you.schemaFolder() : spaceFolder(files, scopeId);
+      scopeId === sharedSchemaId
+        ? you.sharedFolder()
+        : you.rootOf(scopeId)
+          ? you.schemaFolder()
+          : spaceFolder(files, scopeId);
     const schemaSettings = new SchemaSettingsService(files, search, schemaFolder);
     const agents = new AgentService(
       files,
@@ -575,7 +580,9 @@ app
           }),
         ),
       skills: async (id) =>
-        you.rootOf(id) ? readFolderSkills(await you.schemaFolder()) : readSkills(files, id),
+        id === sharedSchemaId || you.rootOf(id)
+          ? readFolderSkills(await schemaFolder(id))
+          : readSkills(files, id),
       skillReach: (id) => readSkillReach(files, id),
       schemaSettings: (id) => schemaSettings.list(id),
       readSchemaFile: (...args) => schemaSettings.read(...args),

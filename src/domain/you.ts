@@ -17,6 +17,18 @@ export interface YourAi {
   missingSkills: string[];
 }
 
+/**
+ * The shared Schema (ADR 027): instructions and skills every agent in irori
+ * follows beside its own, kept in this folder inside the irori agent's folder
+ * and written through the settings, as `.obsidian` holds a vault's.
+ */
+export const sharedSchemaFolder = '.irori/shared';
+/**
+ * The id the Schema settings and the skill listing take for the shared Schema: a
+ * fixed UUID, since every host request checks a space id as one.
+ */
+export const sharedSchemaId = '5f3c1e8a-7b2d-4c6e-9a1f-2d8b7e4c0a51';
+
 /** A file or folder in your AI's folder, as the Your AI screen lists it. */
 export interface YourAiEntry {
   path: string;
@@ -82,8 +94,10 @@ export function brainAgentNames(spaces: { scopeId: string; name: string }[]) {
 export function subAgentDefinition(
   cli: SubAgentCli,
   brain: { name: string; agent: string; root: string },
+  /** The shared Schema's folder, which every agent follows beside its own. */
+  shared: string,
 ) {
-  const { description, instructions: prompt } = subAgentPrompt(brain);
+  const { description, instructions: prompt } = subAgentPrompt(brain, shared);
   const q = JSON.stringify;
   if (cli === 'codex')
     return `name = ${q(brain.agent)}\ndescription = ${q(description)}\ndeveloper_instructions = ${q(prompt)}\n`;
