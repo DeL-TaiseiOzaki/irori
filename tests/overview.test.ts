@@ -104,3 +104,21 @@ test('a line joins brains whose AI read another brain’s notes, named by the la
   ]);
   assert.equal(noteLabel(links[0].path), '競合調査');
 });
+
+test('categories of the KBs’ own follow the presets in name order, each its own area', () => {
+  const layout = mapLayout([
+    { scopeId: ids.a, category: '研究室' },
+    { scopeId: ids.b, category: 'personal' },
+    { scopeId: ids.c, category: 'Club' },
+    { scopeId: ids.d },
+  ]);
+  const y = (id: string) => layout.nodes.find((node) => node.scopeId === id)!.y;
+  assert.ok(y(ids.b) < y(ids.c) && y(ids.c) < y(ids.a) && y(ids.a) < y(ids.d));
+  assert.deepEqual(
+    layout.groups.map((group) => group.category),
+    ['personal', 'Club', '研究室'],
+  );
+  // Areas of neighbouring rows do not overlap.
+  for (const [upper, lower] of layout.groups.slice(1).map((group, i) => [layout.groups[i], group]))
+    assert.ok(upper.y + upper.height <= lower.y);
+});

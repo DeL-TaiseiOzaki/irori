@@ -79,9 +79,20 @@ test('the command reads its forms, options and owner/name shorthand', () => {
   assert.throws(() => parseIroriCommand(['add', 'a', 'b']), /takes one folder/);
   assert.throws(() => parseIroriCommand(['connect', 'a']), /a hibachi and a folder/);
   assert.throws(() => parseIroriCommand(['connect', 'a', 'b', '--read-only=yes']), /no value/);
+  // A preset's name in either language is the preset; any other name is the KB's own.
+  assert.deepEqual(parseIroriCommand(['add', 'a', '--category', 'チーム']), {
+    kind: 'add',
+    folder: 'a',
+    category: 'team',
+  });
+  assert.deepEqual(parseIroriCommand(['add', 'a', '--category', ' 研究室  ']), {
+    kind: 'add',
+    folder: 'a',
+    category: '研究室',
+  });
   assert.throws(
-    () => parseIroriCommand(['add', 'a', '--category', 'club']),
-    /--category is one of/,
+    () => parseIroriCommand(['add', 'a', '--category', 'x'.repeat(41)]),
+    /at most 40 characters/,
   );
   assert.throws(() => parseIroriCommand(['add', 'a', '--name', 'x', '--name', 'y']), /twice/);
   assert.throws(() => parseIroriCommand('list'), /could not be read/);

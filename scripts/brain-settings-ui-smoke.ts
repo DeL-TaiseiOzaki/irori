@@ -53,9 +53,10 @@ try {
 
   // Name, no category, a symbol and a colour.
   await open();
-  await expect(sheet.getByRole('radio', { name: 'チーム', exact: true })).toBeChecked();
+  const category = sheet.getByRole('combobox', { name: '分類', exact: true });
+  await expect(category).toHaveValue('チーム');
   await sheet.getByRole('textbox', { name: '名前' }).fill('Product Lab');
-  await sheet.getByRole('radio', { name: 'なし', exact: true }).check();
+  await category.fill('');
   await sheet.getByRole('radio', { name: '記号', exact: true }).check();
   await sheet.getByRole('radio', { name: 'ロケット', exact: true }).check();
   await sheet.getByRole('radio', { name: '藍', exact: true }).check();
@@ -70,6 +71,22 @@ try {
   expect('category' in stored).toBe(false);
   expect(stored.appearance).toEqual({ icon: { kind: 'glyph', glyph: 'rocket' }, color: 'ai' });
   expect(stored.scopeId).toBe(product.scopeId);
+
+  // A category of the KB's own is typed, kept as written and shown beside the name.
+  await open();
+  await category.fill('研究室');
+  await sheet.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('.brain-names')).toHaveText('Product Lab研究室');
+  expect((await scope()).category).toBe('研究室');
+  // A preset typed in either language is stored as the preset.
+  await open();
+  await expect(category).toHaveValue('研究室');
+  await category.fill('Team');
+  await sheet.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('.brain-names')).toHaveText('Product Labチーム');
+  expect((await scope()).category).toBe('team');
 
   // Letters: two at most, and the sheet says so before saving.
   await open();
@@ -178,7 +195,7 @@ try {
   await removal.getByRole('button', { name: '削除', exact: true }).click();
   await expect(removal).toHaveCount(0);
   await expect(railAgain.getByRole('button', { name: /^Research・AI/ })).toHaveCount(0);
-  await expect(page.locator('.brain-names')).toHaveText('Product Lab');
+  await expect(page.locator('.brain-names')).toHaveText('Product Labチーム');
   const bindings = JSON.parse(await readFile(path.join(files.dataDir, 'spaces.json'), 'utf8'));
   expect(bindings.map((item: { scopeId: string }) => item.scopeId)).toEqual([product.scopeId]);
   const profiles = JSON.parse(await readFile(path.join(files.dataDir, 'workspaces.json'), 'utf8'));
@@ -210,7 +227,7 @@ try {
   expect((await scope()).scopeId).toBe(product.scopeId);
   expect(errors).toEqual([]);
   console.log(
-    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal, removal from the start screen.',
+    'Brain settings UI passed: name, no category, a category of its own, a preset typed in English, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal, removal from the start screen.',
   );
 } finally {
   await app.close();

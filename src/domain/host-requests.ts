@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, categories, markdownFonts, themes } from './types';
+import { agentIds, markdownFonts, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { agentModel, startInput, yourAiChoice } from './conversation';
@@ -10,7 +10,7 @@ import { externalUrl } from './links';
 import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
-import { brainLook } from './brains';
+import { brainLook, categoryText } from './brains';
 import { layerFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
@@ -167,13 +167,13 @@ export const hostArguments = {
   deleteCloudEntry: z.tuple([id, path]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
-  register: z.tuple([path, name, z.enum(categories)]),
+  register: z.tuple([path, name, categoryText]),
   createSpace: z.tuple([
     z.object({
       parent: path,
       folder: name,
       name,
-      category: z.enum(categories),
+      category: categoryText,
     }),
   ]),
   removeSpace: z.tuple([id, z.boolean()]),
@@ -182,7 +182,7 @@ export const hostArguments = {
     z
       .object({
         name: name.optional(),
-        category: z.enum(categories).nullable().optional(),
+        category: categoryText.nullable().optional(),
         appearance: brainLook.nullable().optional(),
         labels: layerLabelChanges.nullable().optional(),
       })

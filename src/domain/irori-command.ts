@@ -1,4 +1,5 @@
-import { categories, type Category } from './types';
+import { categoryText, categoryValue } from './brains';
+import type { Category } from './types';
 
 /**
  * What the irori agent asks of irori through the `irori` command on its run's
@@ -90,12 +91,13 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         : `"irori ${kind}" takes one ${kind === 'clone' ? 'repository' : 'folder'}. Run "irori help".`,
     );
   const text = (key: string) => values[key] as string | undefined;
-  const category = text('category');
-  if (category !== undefined && !(categories as readonly string[]).includes(category))
-    throw Error(`--category is one of ${categories.join(', ')}.`);
+  // A preset's name in either language is the preset; any other name is the KB's own.
+  const category = text('category') === undefined ? undefined : categoryValue(text('category')!);
+  if (category !== undefined && !categoryText.safeParse(category).success)
+    throw Error('--category is one line of at most 40 characters.');
   const common = {
     ...(text('name') && { name: text('name')!.trim() }),
-    ...(category && { category: category as Category }),
+    ...(category && { category }),
   };
   switch (kind) {
     case 'clone': {

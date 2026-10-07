@@ -1,4 +1,4 @@
-import type { Category } from './types';
+import { presetCategories, type Category } from './types';
 import type { RunRecord } from './knowledge';
 
 /** Where the Overview map draws a brain, on a board 1000 × 640 units. */
@@ -16,11 +16,11 @@ export interface MapGroup {
   height: number;
 }
 export const board = { width: 1000, height: 640 };
-const order: (Category | undefined)[] = ['organization', 'team', 'personal', undefined];
 
 /**
  * A plain, deterministic map: one row per category (organization, team,
- * personal, then brains without one), the brains of a row spread evenly in the
+ * personal, the KB's own categories in name order, then brains without one),
+ * the brains of a row spread evenly in the
  * workspace's order. The owner will design how the map is built later, so this
  * is the only place that decides positions.
  */
@@ -28,6 +28,16 @@ export function mapLayout(
   spaces: { scopeId: string; category?: Category }[],
   { hearth = false }: { hearth?: boolean } = {},
 ) {
+  const own = spaces
+    .map((space) => space.category)
+    .filter(
+      (category): category is Category =>
+        !!category && !(presetCategories as readonly string[]).includes(category),
+    )
+    .sort((a, b) => a.localeCompare(b));
+  const order = [
+    ...new Set<Category | undefined>(['organization', 'team', 'personal', ...own, undefined]),
+  ];
   const rows = order
     .map((category) => ({
       category,
@@ -39,6 +49,8 @@ export function mapLayout(
   // Rows keep close enough to read as one map, centred on the board.
   const step = rows.length > 1 ? Math.min((board.height - 180) / (rows.length - 1), 210) : 0;
   const top = (board.height - step * (rows.length - 1)) / 2;
+  // Areas shrink with the rows so that many categories do not overlap.
+  const height = Math.min(176, step ? step - 12 : 176);
   rows.forEach((row, index) => {
     const y = top + step * index;
     // Your AI keeps the hearth on the left; the brains take the rest.
@@ -53,9 +65,9 @@ export function mapLayout(
       groups.push({
         category: row.category,
         x: xs[0] - 110,
-        y: y - 88,
+        y: y - height / 2,
         width: xs.at(-1)! - xs[0] + 220,
-        height: 176,
+        height,
       });
   });
   return { nodes, groups, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };

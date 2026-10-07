@@ -1,16 +1,19 @@
-import { useState, type CSSProperties } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import {
   brainAppearance,
   brainColorName,
   brainColors,
   brainGlyphs,
+  categoryChoices,
   categoryName,
+  categoryValue,
   graphemes,
   type BrainColor,
   type BrainGlyph,
   type BrainLook,
 } from '../domain/brains';
 import type { Category, LayerFolderRename, Space } from '../domain/types';
+import { presetCategories } from '../domain/types';
 import {
   defaultLayerLabel,
   layerFolder,
@@ -88,6 +91,47 @@ function Segments<T extends string>({
         </label>
       ))}
     </fieldset>
+  );
+}
+
+/**
+ * A category typed or picked: the presets and the workspace's own categories
+ * are offered, and any other name becomes a new one. `categoryValue` reads it.
+ */
+export function CategoryField({
+  label,
+  value,
+  choices = presetCategories,
+  placeholder,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  choices?: readonly Category[];
+  placeholder?: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const list = useId();
+  return (
+    <>
+      <input
+        className="category-field"
+        aria-label={label}
+        list={list}
+        value={value}
+        maxLength={40}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <datalist id={list}>
+        {choices.map((choice) => (
+          <option key={choice} value={categoryName(choice)} />
+        ))}
+      </datalist>
+    </>
   );
 }
 
@@ -177,7 +221,7 @@ export function BrainSettings({
 }) {
   const current = brainAppearance(space);
   const [name, setName] = useState(space.name);
-  const [category, setCategory] = useState<Category | 'none'>(space.category ?? 'none');
+  const [category, setCategory] = useState(space.category ? categoryName(space.category) : '');
   const [kind, setKind] = useState<IconKind>(current.mark.kind);
   const [glyph, setGlyph] = useState<BrainGlyph>(
     current.mark.kind === 'glyph' ? current.mark.glyph : 'book',
@@ -260,7 +304,7 @@ export function BrainSettings({
       const look = { icon: saved, color };
       let next = await host.updateSpace(space.scopeId, {
         name: name.trim(),
-        category: category === 'none' ? null : category,
+        category: categoryValue(category) ?? null,
         appearance: look,
         labels: {
           Knowledge_Base: labels.Knowledge_Base || null,
@@ -334,17 +378,11 @@ export function BrainSettings({
               </label>
               <div className="brain-sheet-row">
                 <span>{t('分類', 'Category')}</span>
-                <Segments
+                <CategoryField
                   label={t('分類', 'Category')}
-                  name="brain-category"
                   value={category}
-                  options={[
-                    ...(['personal', 'team', 'organization'] as const).map((value) => ({
-                      value,
-                      label: categoryName(value),
-                    })),
-                    { value: 'none' as const, label: t('なし', 'None') },
-                  ]}
+                  choices={categoryChoices(spaces)}
+                  placeholder={t('なし', 'None')}
                   onChange={setCategory}
                 />
                 <span className="brain-sheet-path mono" title={space.root}>

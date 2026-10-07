@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Categories of your own, 2026-10-08 (**0.1.87**, [ADR 029](decisions/029-free-categories.md),
+stacked on #192): the owner asked for categories beyond personal, team and organization.
+- `Category` is a string (`src/domain/types.ts`); `categoryText` in `domain/brains.ts`
+  validates it (1–40 characters, one line, no edge spaces) for `scope.json`, the
+  HostAPI requests and the `irori` command. `presetCategories` keeps the three with
+  their localized names and icons; `categoryValue` maps a preset's Japanese or
+  English name to the preset, `categoryChoices` offers presets then the workspace's
+  own, `categoryIcon` gives others a tag.
+- `CategoryField` (input with a datalist) replaces the registration select and the
+  settings segments. Empty is no category in the settings and `personal` at
+  registration.
+- `mapLayout` orders rows organization, team, personal, own categories by name,
+  none, and shrinks the areas so rows do not overlap.
+- Verified: `npm run build`, `npm test` (510 tests: 505 passed, 5 skipped, 0 failed;
+  new tests in `brains`, `space-settings`, `overview`, `irori-command`), and the UI
+  suites `ui-smoke`, `brain-settings` (types `研究室`, then `Team`), `layers`,
+  `overview` and `rail-groups`. Not verified: Windows and macOS, a real knowledge base.
+- irori-templete [#14](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/14)
+  (ADR 007) gives a category of the scope's own the personal discipline in lint and init.
+
 Published 2026-10-08: **0.1.86** ([#192](https://github.com/DeL-TaiseiOzaki/irori/pull/192),
 generated folder indexes, [ADR 028](decisions/028-generated-indexes.md)) merged at
 the owner's request as `8d131b5` together with irori-templete

@@ -8,7 +8,7 @@ import {
 import { knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
-import { categoryName } from '../domain/brains';
+import { categoryIcon, categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
 import { promptLimit } from '../domain/conversation';
@@ -33,7 +33,6 @@ import './overview.css';
 
 const host = window.irori;
 export type OverviewView = 'map' | 'columns';
-const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 const idle: BrainAi = {
   events: [],
   queued: [],
@@ -445,7 +444,7 @@ function BrainColumn({
             <strong>{space.name}</strong>
             {space.category && (
               <small>
-                <Icon name={categoryIcons[space.category]} size={11} />
+                <Icon name={categoryIcon(space.category)} size={11} />
                 {categoryName(space.category)}
               </small>
             )}

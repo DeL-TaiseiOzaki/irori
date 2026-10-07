@@ -9,7 +9,7 @@ import {
   usePanelRef,
 } from 'react-resizable-panels';
 import type { CloudConnection, Document, Entry, Layer, Space } from '../domain/types';
-import { categoryName } from '../domain/brains';
+import { categoryIcon, categoryName } from '../domain/brains';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { EntryMenu, type EntryAction } from './CloudEntryActions';
@@ -30,7 +30,6 @@ const layerIcons: Record<Layer, IconName> = {
   Knowledge_Base: 'book',
   contents: 'cloud',
 };
-const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 
 /** What a connected folder shows beside its name: a lock when it is read-only. */
 function DriveBadge({ connection }: { connection?: CloudConnection }) {
@@ -424,7 +423,7 @@ export const BrainPanel = memo(function BrainPanel({
               <strong>{space.name}</strong>
               {space.category && (
                 <small>
-                  <Icon name={categoryIcons[space.category]} size={12} />
+                  <Icon name={categoryIcon(space.category)} size={12} />
                   {category}
                 </small>
               )}
