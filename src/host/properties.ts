@@ -1,5 +1,6 @@
 import type { FileService } from './files';
 import type { GitService } from '../git/service';
+import { ifPresent, issueSummary, parseJsonText } from './local-json';
 import {
   actorFromEmail,
   propertyDeclaration,
@@ -21,13 +22,9 @@ export async function readPageProperties(
   scopeId: string,
 ): Promise<PageProperties> {
   const actor = actorFromEmail(await git.userEmail(scopeId).catch(() => ''));
-  let text: string;
-  try {
-    text = (await files.read(scopeId, propertyDeclarationFile)).text;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { declaration: null, actor };
-    throw error;
-  }
+  const doc = await ifPresent(files.read(scopeId, propertyDeclarationFile));
+  if (!doc) return { declaration: null, actor };
+  const { text } = doc;
   if (Buffer.byteLength(text) > propertyDeclarationLimit)
     return {
       declaration: null,
@@ -39,17 +36,16 @@ export async function readPageProperties(
     };
   try {
     return {
-      declaration: propertyDeclaration.parse(JSON.parse(text.replace(/^﻿/, ''))),
+      declaration: propertyDeclaration.parse(parseJsonText(text)),
       actor,
     };
   } catch (error) {
     const detail =
       error instanceof SyntaxError
         ? error.message
-        : ((error as { issues?: { path: PropertyKey[]; message: string }[] }).issues ?? [])
-            .slice(0, 3)
-            .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-            .join('; ');
+        : issueSummary(
+            (error as { issues?: { path: PropertyKey[]; message: string }[] }).issues ?? [],
+          );
     return {
       declaration: null,
       actor,

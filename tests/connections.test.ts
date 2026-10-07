@@ -18,7 +18,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { mountNameError } from '../src/domain/connections';
 import { within } from '../src/domain/scopes';
-import { WorkspaceService, inspectRepository, githubRepository } from '../src/host/workspaces';
+import { WorkspaceService, inspectRepository } from '../src/host/workspaces';
+import { githubRepository } from '../src/domain/git';
 import { FileService, readViewerBytes } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
 import {

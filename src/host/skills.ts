@@ -3,7 +3,8 @@ import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import { parse as parseYaml } from 'yaml';
-import type { FileService } from './files';
+import { reachedAsWritten, type FileService } from './files';
+import { isMissing } from './local-json';
 import { spaceFolder, type SchemaFolder } from './schema-folder';
 import {
   audienceName,
@@ -96,11 +97,11 @@ async function readPackage(
       throw Error('A skill package must stay in the schema layer');
     try {
       const actual = await folder.resolve(relative);
-      if (path.relative(folder.root, actual).split(path.sep).join('/') !== relative)
+      if (!reachedAsWritten(folder.root, actual, relative))
         throw Error('A skill package must not be an alias');
       return await folder.read(relative);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      if (isMissing(error)) return undefined;
       throw error;
     }
   };
@@ -132,8 +133,7 @@ export async function readFolderSkills(folder: SchemaFolder): Promise<SkillListi
       .map((entry) => entry.name)
       .sort((left, right) => left.localeCompare(right));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-      return { skills: [], retired: [], problems: [] };
+    if (isMissing(error)) return { skills: [], retired: [], problems: [] };
     throw error;
   }
   const skills: AgentSkill[] = [];

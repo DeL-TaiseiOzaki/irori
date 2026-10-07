@@ -24,6 +24,7 @@ import { normalizeGroups } from '../domain/hibachi-groups';
 import type { GitHubCli } from '../git/github';
 import type { GitService } from '../git/service';
 import type { FileService } from './files';
+import { ifPresent } from './local-json';
 import { inspectRepository, workspaceProfile, type WorkspaceService } from './workspaces';
 
 const repository = z
@@ -305,10 +306,7 @@ export class EnvironmentService {
   private async restoreAgent(repository: string, result: EnvironmentRestore) {
     const root = await this.host.agentRoot();
     try {
-      const entries = await fs.readdir(root).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined;
-        throw error;
-      });
+      const entries = await ifPresent(fs.readdir(root));
       if (entries?.length) {
         if (same((await inspectRepository(root)).repository, repository)) return 'unchanged';
         throw Error(t(`${root} にはすでにファイルがあります。`, `${root} already holds files.`));

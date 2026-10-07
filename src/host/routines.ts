@@ -1,8 +1,7 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import which from 'which';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { t } from '../domain/i18n';
@@ -34,8 +33,10 @@ import {
 import type { AgentService, StepEnd } from '../agents/service';
 import { agentEnv, killTree, launch } from '../agents/process';
 import { readLocalJson, writeLocalJson } from './local-json';
+import { findExecutable } from './executables';
 import { readWriteBack, Redactor, unavailableText, type SecretStore } from './keystore';
-import type { FileService } from './files';
+// Imported as sha256: several locals here are named `hash`.
+import { hash as sha256, utf8Text, type FileService } from './files';
 import type { YourAiService } from './you';
 import { stepPreamble } from '../../prompts';
 
@@ -307,7 +308,6 @@ function secretsOf(steps: RoutineStep[]) {
   return [...new Set(steps.flatMap((step) => (step.kind === 'run' && step.secrets) || []))];
 }
 
-const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
 const message = (error: unknown) =>
   (error instanceof Error ? error.message : String(error)).replace(/^(?:Error: )+/, '');
@@ -327,13 +327,7 @@ function pause(ms: number, signal: AbortSignal) {
 /** A file's text for the review, or undefined when it is binary or too large. */
 async function readText(file: string, size: number) {
   if (size > textLimit) return undefined;
-  const bytes = await fs.readFile(file);
-  if (bytes.includes(0)) return undefined;
-  try {
-    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-  } catch {
-    return undefined;
-  }
+  return utf8Text(await fs.readFile(file));
 }
 
 const reviewRecord = z.object({
@@ -601,7 +595,6 @@ export class RoutineService {
   /** What the device or workspace lacks before the steps can run (D3). */
   private async needs(steps: RoutineStep[], workspace: Space[], settings: DeviceSettings) {
     const env = agentEnv();
-    const searchPath = Object.entries(env).find(([key]) => key.toLowerCase() === 'path')?.[1];
     const named = secretsOf(steps);
     if (named.length) {
       const stored = await this.host.secrets.list();
@@ -619,7 +612,7 @@ export class RoutineService {
     for (const step of steps) {
       if (step.kind === 'run') {
         if (Array.isArray(step.run)) {
-          if (!(await which(step.run[0], { nothrow: true, path: searchPath })))
+          if (!(await findExecutable(step.run[0], env)))
             return {
               text: t(`${step.run[0]} が見つかりません。`, `${step.run[0]} was not found.`),
             };

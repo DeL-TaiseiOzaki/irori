@@ -147,3 +147,18 @@ export interface AddSubmodule {
 export function repositoryFolder(url: string) {
   return /[/:]([\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] ?? '';
 }
+/** The owner/repository a GitHub remote names, or undefined for any other remote. */
+export function githubRepository(remote: string): string | undefined {
+  // Return only an owner/repository identity; never display embedded credentials or query strings.
+  const scp = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(remote);
+  if (scp) return `${scp[1]}/${scp[2]}`;
+  try {
+    const url = new URL(remote);
+    if (url.hostname.toLowerCase() !== 'github.com' || !['https:', 'ssh:'].includes(url.protocol))
+      return;
+    const parts = /^\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(url.pathname);
+    if (parts) return `${parts[1]}/${parts[2]}`;
+  } catch {
+    /* not a supported GitHub remote */
+  }
+}

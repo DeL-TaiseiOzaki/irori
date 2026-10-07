@@ -18,7 +18,7 @@ import { within } from '../domain/scopes';
 import { instructionsFile } from '../domain/schema-settings';
 import type { AgentSkill } from '../domain/skills';
 import { readTextDocument } from './files';
-import { readLocalJson, writeLocalJson } from './local-json';
+import { ifPresent, isMissing, readLocalJson, writeLocalJson } from './local-json';
 import type { SchemaFolder } from './schema-folder';
 import { findSkill, readFolderSkills } from './skills';
 
@@ -93,8 +93,8 @@ export class YourAiService {
   async create(): Promise<YourAi> {
     const current = await this.status();
     if (current.state === 'ready') return current;
-    const existing = await fs.readdir(current.root).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return [];
+    const existing = await fs.readdir(current.root).catch((error) => {
+      if (isMissing(error)) return [];
       throw error;
     });
     if (existing.length)
@@ -140,8 +140,8 @@ export class YourAiService {
     let dir = root;
     for (const part of rel.split('/').slice(0, -1)) {
       dir = path.join(dir, part);
-      const stat = await fs.lstat(dir).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined;
+      const stat = await fs.lstat(dir).catch((error) => {
+        if (isMissing(error)) return undefined;
         throw error;
       });
       if (!stat) await fs.mkdir(dir);
@@ -247,12 +247,8 @@ export class YourAiService {
   async shared(): Promise<SharedSchemaPrompt | undefined> {
     if ((await this.status()).state !== 'ready') return undefined;
     const folder = await this.sharedSchema();
-    const missing = (error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      return undefined;
-    };
-    const text = (await folder.read(instructionsFile).catch(missing))?.trim();
-    const skills = (await readFolderSkills(folder).catch(missing))?.skills ?? [];
+    const text = (await ifPresent(folder.read(instructionsFile)))?.trim();
+    const skills = (await ifPresent(readFolderSkills(folder)))?.skills ?? [];
     if (!text && !skills.length) return undefined;
     const long = !!text && Buffer.byteLength(text, 'utf8') > sharedInline;
     return {
@@ -271,10 +267,7 @@ export class YourAiService {
   async sharedSkill(name: string): Promise<AgentSkill | undefined> {
     if ((await this.status()).state !== 'ready') return undefined;
     const folder = await this.sharedSchema();
-    const skill = await findSkill(folder, name).catch((error) => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-      throw error;
-    });
+    const skill = await ifPresent(findSkill(folder, name));
     return skill && { ...skill, path: path.join(folder.root, skill.path), shared: true };
   }
   async read(rel: string) {

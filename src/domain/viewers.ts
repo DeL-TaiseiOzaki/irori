@@ -23,4 +23,7 @@ export const viewerByteLimit = 100 * 1024 * 1024;
 /** Text formats the editor opens; kept beside the viewer list so the two never overlap. */
 export const textFilePattern = /\.(md|txt|csv|json|ya?ml|toml|ts|js|css)$/i;
 
+/** The largest text the editor opens, saves, diffs or searches. */
+export const textFileByteLimit = 2 * 1024 * 1024;
+
 export const opensInIrori = (path: string) => textFilePattern.test(path) || !!viewerKind(path);

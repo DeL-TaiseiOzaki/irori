@@ -6,7 +6,8 @@ import { linksTo, samePath } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import { searchQuery, type KnowledgeSearch } from '../domain/search';
 import type { Entry, Space } from '../domain/types';
-import { FileService, hash, textFilePattern } from './files';
+import { FileService, hash, textFilePattern, utf8Text } from './files';
+import { textFileByteLimit } from '../domain/viewers';
 import { foldsCase } from './links';
 import { SearchIndex, trigramQuery } from './search-index';
 import { referencesTo } from './note-references';
@@ -17,7 +18,7 @@ export const searchLimits = {
   files: 50000,
   entries: 100000,
   bytes: 32 * 1024 * 1024,
-  fileBytes: 2 * 1024 * 1024,
+  fileBytes: textFileByteLimit,
   hits: 200,
   milliseconds: 5000,
 };
@@ -427,8 +428,9 @@ export class SearchService {
         (await this.files.resolve(scopeId, relative)) !== filename
       )
         throw Error('File changed during search');
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length));
-      if (text.includes('\0')) throw Error('File is binary');
+      // Unlike the editor's read, a leading BOM is not part of the searched text.
+      const text = utf8Text(buffer.subarray(0, length), false);
+      if (text === undefined) throw Error('File is not UTF-8 text');
       return text;
     } finally {
       await file.close();

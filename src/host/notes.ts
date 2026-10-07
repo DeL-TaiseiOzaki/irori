@@ -1,5 +1,5 @@
-import path from 'node:path';
-import type { FileService } from './files';
+import { reachedAsWritten, type FileService } from './files';
+import { ifPresent, parseJsonText } from './local-json';
 import type { Document } from '../domain/types';
 import { classify } from '../domain/scopes';
 import {
@@ -35,7 +35,7 @@ async function ownFile(files: FileService, scopeId: string, relative: string) {
       ),
     );
   const actual = await files.resolve(scopeId, relative);
-  if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
+  if (!reachedAsWritten(space.root, actual, relative))
     throw Error(
       t(
         'テンプレートに alias / シンボリックリンクは使えません。',
@@ -53,14 +53,9 @@ export async function readNotesDeclaration(
   files: FileService,
   scopeId: string,
 ): Promise<NotesDeclaration | null> {
-  let text: string;
-  try {
-    text = (await files.read(scopeId, notesDeclarationFile)).text;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
-  const declaration = notesDeclaration.parse(JSON.parse(text.replace(/^﻿/, '')));
+  const doc = await ifPresent(files.read(scopeId, notesDeclarationFile));
+  if (!doc) return null;
+  const declaration = notesDeclaration.parse(parseJsonText(doc.text));
   if (declaration.newNoteDirectory)
     await insideKnowledge(files, scopeId, declaration.newNoteDirectory);
   if (declaration.daily) await insideKnowledge(files, scopeId, declaration.daily.path);
@@ -78,14 +73,9 @@ export async function renameInNotesDeclaration(
   from: string,
   to: string,
 ) {
-  let doc: Document;
-  try {
-    doc = await files.read(scopeId, notesDeclarationFile);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
-  }
-  const raw = JSON.parse(doc.text.replace(/^\uFEFF/, '')) as {
+  const doc = await ifPresent(files.read(scopeId, notesDeclarationFile));
+  if (!doc) return false;
+  const raw = parseJsonText(doc.text) as {
     newNoteDirectory?: unknown;
     daily?: { path?: unknown; template?: unknown };
   };
@@ -132,11 +122,8 @@ export async function openDailyNote(
       ),
     );
   const relative = dailyNotePath(declaration, at);
-  try {
-    return await files.read(scopeId, relative);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
+  const existing = await ifPresent(files.read(scopeId, relative));
+  if (existing) return existing;
   const tokens = dateTokens(at);
   let text = `# ${tokens.date}\n\n`;
   if (declaration.daily.template) {
