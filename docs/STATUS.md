@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Removing a hibachi from the start screen, 2026-10-07 (**0.1.78**): the owner
+asked to remove a hibachi from the start screen (workspace selection) rather
+than only from **hibachi の設定**.
+- Each chip under **hibachi を選んで組み合わせる** shows a trash button when
+  pointed at or focused. It opens the existing `RemoveHibachi` dialog (now
+  exported from `BrainSettings.tsx`), which calls `removeSpace` as before; the
+  start screen then reads the hibachis and workspaces again and drops the
+  hibachi from the selection. A workspace left without hibachis stays listed.
+- Verified: see the pull request. `brain-settings-ui-smoke` restarts on the
+  start screen, removes a hibachi there without ticking its chip, and checks
+  that `spaces.json` and the workspace no longer list it while its folder's
+  `scope.json` remains.
+
 Published 2026-10-06: **0.1.77** ([#179](https://github.com/DeL-TaiseiOzaki/irori/pull/179),
 making routines from the routines page or through the irori agent, [ADR 016](decisions/016-routines.md)
 stage 4) merged at the owner's request as `5bce1c6` and is published as
