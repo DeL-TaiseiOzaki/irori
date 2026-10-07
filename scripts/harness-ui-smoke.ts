@@ -194,6 +194,16 @@ try {
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+      for (let i = 0; i < 8; i++) {
+        console.log(
+          'DIAG before select',
+          i,
+          await page.getByLabel('エージェント', { exact: true }).inputValue(),
+          await page.getByLabel('エージェント', { exact: true }).isDisabled(),
+          await page.locator('.message').count(),
+        );
+        await page.waitForTimeout(250);
+      }
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
       // TEMP diagnostics for a CI-only failure.
       try {
