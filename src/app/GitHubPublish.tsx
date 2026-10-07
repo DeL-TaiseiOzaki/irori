@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { suggestRepositoryName, validRepositoryName, type PublishRepository } from '../domain/git';
 import { t } from '../domain/i18n';
 import { Dialog } from './Dialog';
-import { ErrorMessage, errorText } from './ErrorMessage';
+import { ErrorMessage } from './ErrorMessage';
+import { useAction } from './useAction';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useResource } from './useResource';
 const host = window.irori;
@@ -110,19 +111,10 @@ export function PublishDialog({
   publish: (value: PublishRepository) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [value, setValue] = useState(() => initialPublish(suggestion)),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+  const [value, setValue] = useState(() => initialPublish(suggestion));
+  const { busy, error, run } = useAction();
   async function submit() {
-    setBusy(true);
-    setError('');
-    try {
-      await publish(value);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    await run(() => publish(value));
   }
   return (
     <Dialog label={t('GitHub に公開', 'Publish to GitHub')} busy={busy} onClose={onCancel}>

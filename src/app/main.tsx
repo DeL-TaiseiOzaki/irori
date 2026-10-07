@@ -37,6 +37,8 @@ import {
   watchSystemTheme,
 } from './device-settings';
 import { useLanguage } from './useLanguage';
+import { useChoice } from './useChoice';
+import { baseName, parentPath } from '../domain/paths';
 import { t } from '../domain/i18n';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
@@ -215,6 +217,14 @@ const instructionFileOf = (roots: Listing | undefined, agentId: AgentId) =>
   );
 /** The brain's top-level entries as read, or what went wrong reading them. */
 type Listing = { entries: Entry[]; error?: string };
+/** A file as the tree lists it; a Markdown file is a note unless told otherwise. */
+const fileEntry = (path: string, layer: Entry['layer'], note = /\.md$/i.test(path)): Entry => ({
+  path,
+  name: baseName(path),
+  directory: false,
+  note,
+  layer,
+});
 const noEntries: Entry[] = [];
 const noConnections: CloudConnection[] = [];
 const noSkills: AgentSkill[] = [];
@@ -432,8 +442,15 @@ function App() {
   // The memoised islands and the elements memoised below take the language as a
   // dependency, since nothing else about them changes with it.
   const language = useLanguage();
-  const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
+  const [editorAssistance, chooseAssistance] = useChoice(
+    currentEditorAssistance,
+    (next: boolean) => {
+      setSavingAssistance(true);
+      return chooseEditorAssistance(next).finally(() => setSavingAssistance(false));
+    },
+    (error) => report(error),
+  );
   const [creatingNote, setCreatingNote] = useState(false);
   // An editable connected folder the next note goes into, instead of the active KB.
   const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
@@ -537,14 +554,11 @@ function App() {
   );
   const agentFor = (scopeId?: string) => agentOf(agentChoice, scopeId);
   // Each hibachi's own agent and its Schema layer are optional (ADR 021).
-  const [hibachiAgent, setHibachiAgent] = useState(currentHibachiAgent);
-  function chooseHibachi(next: boolean) {
-    setHibachiAgent(next);
-    void chooseHibachiAgent(next).catch((error) => {
-      setHibachiAgent(!next);
-      report(error);
-    });
-  }
+  const [hibachiAgent, chooseHibachi, setHibachiAgent] = useChoice(
+    currentHibachiAgent,
+    chooseHibachiAgent,
+    (error) => report(error),
+  );
   // The agent dock's columns (ADR 021). The first stays while the dock is open; a
   // hibachi column follows the hibachi on show, and shows the irori agent while the
   // hibachi agent is off.
@@ -987,13 +1001,7 @@ function App() {
       const target = await host.resolveLink(space.scopeId, from.path, href);
       if (target.kind === 'external') await host.openUrl(target.url);
       else if (target.kind === 'file')
-        await open(space, {
-          path: target.path,
-          name: target.path.split('/').at(-1)!,
-          directory: false,
-          note: target.note,
-          layer: classify(space, target.path),
-        });
+        await open(space, fileEntry(target.path, classify(space, target.path), target.note));
       // The note stays open, so the answer belongs beside it rather than in the
       // status line the window shows only when nothing is open.
       else if (target.kind === 'missing')
@@ -1830,9 +1838,7 @@ function App() {
     void selectSpace(space).then((selected) => {
       if (selected) {
         setNoteDirectory(
-          doc?.scopeId === space.scopeId
-            ? doc.path.split('/').slice(0, -1).join('/')
-            : defaultNoteDirectory,
+          doc?.scopeId === space.scopeId ? parentPath(doc.path) : defaultNoteDirectory,
         );
         setNewNote(true);
       }
@@ -2122,18 +2128,12 @@ function App() {
                         path={doc.path}
                         revision={docRevision}
                         onOpen={async (hit) => {
-                          const space = spaces.find((item) => item.scopeId === doc.scopeId);
+                          const space = docSpace;
                           const opened =
                             space &&
                             (await open(
                               space,
-                              {
-                                path: hit.path,
-                                name: hit.path.split('/').at(-1)!,
-                                directory: false,
-                                note: true,
-                                layer: 'Knowledge_Base',
-                              },
+                              fileEntry(hit.path, 'Knowledge_Base', true),
                               // No label — an image, a reference definition — still opens the note
                               // and says so, since the line is known but the link is not selectable.
                               {
@@ -2172,7 +2172,7 @@ function App() {
                       )}
                     {onNote && doc && (
                       <NoteInfo label={t('ノートの情報', 'Note details')}>
-                        <h3>{doc.path.split('/').at(-1)}</h3>
+                        <h3>{baseName(doc.path)}</h3>
                         <dl>
                           <dt>{t('場所', 'Location')}</dt>
                           <dd className="mono">{doc.path}</dd>
@@ -2221,14 +2221,7 @@ function App() {
                                 if (space)
                                   setEntryAction({
                                     space,
-                                    entry: {
-                                      path: doc.path,
-                                      name: doc.path.split('/').at(-1)!,
-                                      directory: false,
-                                      note: /\.md$/i.test(doc.path),
-                                      layer: 'contents',
-                                      writable: true,
-                                    },
+                                    entry: { ...fileEntry(doc.path, 'contents'), writable: true },
                                     action,
                                   });
                               }}
@@ -2275,17 +2268,7 @@ function App() {
                           <Menu.CheckboxItem
                             checked={editorAssistance}
                             disabled={savingAssistance}
-                            onCheckedChange={(next) => {
-                              const previous = editorAssistance;
-                              setEditorAssistance(next);
-                              setSavingAssistance(true);
-                              void chooseEditorAssistance(next)
-                                .catch((error) => {
-                                  setEditorAssistance(previous);
-                                  report(error);
-                                })
-                                .finally(() => setSavingAssistance(false));
-                            }}
+                            onCheckedChange={chooseAssistance}
                           >
                             <Icon name="code" size={14} />
                             {t('コード支援', 'Code assistance')}
@@ -2393,13 +2376,7 @@ function App() {
                             item.scopeId === source.scopeId &&
                             workspace?.scopeIds.includes(item.scopeId),
                         );
-                        const entry: Entry = {
-                          path: source.path,
-                          name: source.path.split('/').at(-1)!,
-                          directory: false,
-                          note: /\.md$/i.test(source.path),
-                          layer: 'Knowledge_Base',
-                        };
+                        const entry = fileEntry(source.path, 'Knowledge_Base');
                         if (!target)
                           throw Error(
                             t(
@@ -2462,13 +2439,7 @@ function App() {
                         }
                         onOpen={(relative) => {
                           setView('note');
-                          void open(active, {
-                            path: relative,
-                            name: relative.split('/').at(-1)!,
-                            directory: false,
-                            note: /\.md$/i.test(relative),
-                            layer: 'Knowledge_Base',
-                          });
+                          void open(active, fileEntry(relative, 'Knowledge_Base'));
                         }}
                       />
                     </Suspense>
@@ -2879,17 +2850,11 @@ function App() {
               throw Error(
                 t('この KB はワークスペースにありません。', "This KB isn't in the workspace."),
               );
-            const opened = await open(
-              target,
-              {
-                path: hit.path,
-                name: hit.path.split('/').at(-1)!,
-                directory: false,
-                note: /\.md$/i.test(hit.path),
-                layer: 'Knowledge_Base',
-              },
-              { query, line: hit.line, preview: hit.preview },
-            );
+            const opened = await open(target, fileEntry(hit.path, 'Knowledge_Base'), {
+              query,
+              line: hit.line,
+              preview: hit.preview,
+            });
             if (!opened) throw Error(t('ファイルを開けませんでした。', 'Could not open the file.'));
             setSearchOpen(false);
           }}

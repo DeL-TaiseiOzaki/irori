@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Dialog } from './Dialog';
-import type { CloudWriteRecovery } from '../domain/knowledge';
 import { displayLocale, t } from '../domain/i18n';
-import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
+import { useResource } from './useResource';
 
 const host = window.irori;
+
+/** What is left: changes never sent, and copies once kept for upload. */
+const readLeft = () => Promise.all([host.unsentDriveChanges(), host.recoverableCloudWrites()]);
 
 /**
  * What Google Drive connections left on this device when irori stopped connecting
@@ -12,19 +15,9 @@ const host = window.irori;
  */
 export function CloudRecovery() {
   const [open, setOpen] = useState(false);
-  const [left, setLeft] = useState(0);
   const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    let current = true;
-    void Promise.all([host.unsentDriveChanges(), host.recoverableCloudWrites()])
-      .then(([unsent, prepared]) => {
-        if (current) setLeft(unsent + prepared.entries.length + prepared.unreadable);
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [revision]);
+  const { data } = useResource(readLeft, [], { refresh: revision });
+  const left = data ? data[0] + data[1].entries.length + data[1].unreadable : 0;
   if (!left && !open) return null;
   return (
     <>
@@ -45,37 +38,14 @@ export function CloudRecovery() {
 
 /** Saves changes that never reached Drive, and restores copies once kept for upload. */
 export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
-  const [unsent, setUnsent] = useState<number>();
-  const [prepared, setPrepared] = useState<CloudWriteRecovery>();
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const read = useResource(readLeft, [], { refresh: revision });
+  const [unsent, prepared] = read.data ?? [];
+  const action = useAction();
+  const act = action.run;
+  const busy = action.busy || read.loading;
+  const error = action.error || read.error;
   const [saved, setSaved] = useState('');
-  useEffect(() => {
-    void load();
-  }, []);
-  async function load() {
-    setError('');
-    setBusy(true);
-    try {
-      setUnsent(await host.unsentDriveChanges());
-      setPrepared(await host.recoverableCloudWrites());
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function act(action: () => Promise<void>) {
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <Dialog label={t('Drive の未送信分', 'Not sent to Drive')} busy={busy} onClose={onClose}>
       <div className="modal">
@@ -96,7 +66,7 @@ export function CloudRecoveryDialog({ onClose }: { onClose: () => void }) {
                 void act(async () => {
                   const result = await host.exportUnsentDriveChanges();
                   if (result) setSaved(result.folder);
-                  await load();
+                  setRevision((value) => value + 1);
                 })
               }
             >

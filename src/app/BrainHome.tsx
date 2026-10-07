@@ -6,11 +6,12 @@ import type { AgentSkill } from '../domain/skills';
 import { agentNames } from '../domain/types';
 import { categoryName } from '../domain/brains';
 import { classify } from '../domain/scopes';
-import { displayLocale, t } from '../domain/i18n';
+import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon, type IconName } from './Icon';
 import { SkillReach } from './SkillReach';
 import { useResource } from './useResource';
+import { shortWhen } from './display';
 import type { Listing } from './BrainPanel';
 
 const host = window.irori;
@@ -385,14 +386,7 @@ export function BrainHome({
             <button key={run.id} className="home-row" onClick={onMaterials}>
               <Icon name="sparkles" size={15} className="home-row-icon ember" />
               <span className="home-run-agent">{agentNames[run.agent]}</span>
-              <span className="mono home-run-date">
-                {new Date(run.createdAt).toLocaleString(displayLocale(), {
-                  month: 'numeric',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+              <span className="mono home-run-date">{shortWhen(run.createdAt)}</span>
               <span className="home-card-space" />
               <span className={`home-outcome ${run.outcome ?? ''}`}>
                 <Icon name={run.outcome === 'completed' ? 'checkCircle' : 'clock'} size={13} />

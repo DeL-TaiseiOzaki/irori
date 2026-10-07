@@ -13,13 +13,14 @@ import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview'
 import { t } from '../domain/i18n';
 import { promptLimit } from '../domain/conversation';
 import { AgentRequest } from './AgentLog';
-import { errorText } from './ErrorMessage';
 import { eventTarget } from '../domain/agent-log';
 import { anyRevision, scopeRevision, type ScopeRevisions } from '../domain/revisions';
 import { firstEntries } from './BrainHome';
 import { BrainTile } from './BrainTile';
 import { layoutStorage } from './device-settings';
 import { Icon } from './Icon';
+import { aiStateWords, sendOnEnter, type AiState } from './display';
+import { useAction } from './useAction';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
@@ -32,7 +33,6 @@ import './overview.css';
 
 const host = window.irori;
 export type OverviewView = 'map' | 'columns';
-type AiState = 'running' | 'waiting' | 'queued' | 'idle';
 const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 const idle: BrainAi = {
   events: [],
@@ -58,13 +58,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
       ) : (
         <i />
       )}
-      {state === 'waiting'
-        ? t('許可待ち', 'Needs approval')
-        : state === 'running'
-          ? t('実行中', 'Running')
-          : state === 'queued'
-            ? t(`送信待ち ${ai.pending}`, `${ai.pending} pending`)
-            : t('待機', 'Idle')}
+      {aiStateWords(state, ai.pending)}
     </span>
   );
 }
@@ -123,13 +117,8 @@ function AiCard({
   const request = openRequest(ai);
   const step = currentStep(ai);
   const last = lastRun(ai);
-  const [busy, setBusy] = useState(false);
-  const act = (action: () => Promise<void>) => {
-    setBusy(true);
-    void action()
-      .catch(onError)
-      .finally(() => setBusy(false));
-  };
+  const { busy, run } = useAction({ onError });
+  const act = (action: () => Promise<void>) => void run(action);
   return (
     <section
       className={`ai-card ${aiState(ai)}`}
@@ -608,8 +597,7 @@ function OverviewComposer({
 }) {
   const [target, setTarget] = useState(spaces[0]?.scopeId);
   const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
+  const { busy: sending, error, run } = useAction();
   const space = spaces.find((item) => item.scopeId === target) ?? spaces[0];
   if (!space) return null;
   const ai = ais[space.scopeId] ?? idle;
@@ -617,16 +605,10 @@ function OverviewComposer({
   const behind = ai.running || ai.queued.length > 0;
   async function send() {
     if (!text.trim() || sending) return;
-    setSending(true);
-    setError('');
-    try {
+    await run(async () => {
       await onSend(space.scopeId, text);
       setText('');
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setSending(false);
-    }
+    });
   }
   return (
     <form
@@ -668,17 +650,7 @@ function OverviewComposer({
         maxLength={promptLimit}
         disabled={sending}
         onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          if (
-            event.key === 'Enter' &&
-            !event.shiftKey &&
-            !event.nativeEvent.isComposing &&
-            event.keyCode !== 229
-          ) {
-            event.preventDefault();
-            void send();
-          }
-        }}
+        onKeyDown={sendOnEnter(() => void send())}
       />
       {error && (
         <p className="overview-error" role="alert">

@@ -6,6 +6,8 @@ import { t } from '../domain/i18n';
 import { AgentLog } from './AgentLog';
 import { runTasks } from '../domain/agent-log';
 import { Icon } from './Icon';
+import { sendOnEnter } from './display';
+import { useAction } from './useAction';
 import type { BrainAi } from './useBrainAi';
 import { ModelPicker } from './ModelPicker';
 import { ConversationHistory } from './ConversationHistory';
@@ -81,7 +83,7 @@ export function YourAiPanel({
   onError: (error: unknown) => void;
 }) {
   const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { busy, run: act } = useAction({ onError });
   const [history, setHistory] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -100,18 +102,6 @@ export function YourAiPanel({
   useEffect(() => {
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [ai.events.length, ai.events.at(-1)?.text]);
-  const act = async (action: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await action();
-      return true;
-    } catch (error) {
-      onError(error);
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
   if (!you) return <p className="hint your-ai-loading">{t('読み込み中…', 'Loading…')}</p>;
   if (you.state === 'missing')
     return (
@@ -242,17 +232,7 @@ export function YourAiPanel({
           maxLength={promptLimit}
           disabled={busy}
           onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === 'Enter' &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing &&
-              event.keyCode !== 229
-            ) {
-              event.preventDefault();
-              void send();
-            }
-          }}
+          onKeyDown={sendOnEnter(() => void send())}
         />
         <footer>
           <span className="composer-selects your-ai-selects">

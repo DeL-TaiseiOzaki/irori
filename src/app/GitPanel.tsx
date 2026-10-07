@@ -3,6 +3,7 @@ import { knowledgeFolder } from '../domain/layers';
 import { useEffect, useRef, useState } from 'react';
 import type { Space } from '../domain/types';
 import { classify } from '../domain/scopes';
+import { baseName } from '../domain/paths';
 import { Crumbs } from './NoteBar';
 import type {
   GitCommit,
@@ -1045,7 +1046,7 @@ function RepositoryPanel({
                     ? [{ icon: 'history' as const, label: t('履歴', 'History') }]
                     : []),
                 ]}
-                here={tab === 'history' ? commit?.subject : selection?.path.split('/').at(-1)}
+                here={tab === 'history' ? commit?.subject : selection && baseName(selection.path)}
               />
               <div className="stage-actions git-review-navigation">
                 {tab === 'changes' && selection && (

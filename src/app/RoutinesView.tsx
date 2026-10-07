@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Space } from '../domain/types';
 import { agentNames } from '../domain/types';
 import type { YourAi } from '../domain/you';
-import { displayLocale, t } from '../domain/i18n';
+import { t } from '../domain/i18n';
 import {
   routineKey,
   stepLabel,
@@ -23,7 +23,9 @@ import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
 import { chooseRoutineRuntimes, currentRoutineRuntimes } from './device-settings';
 import { openRequest, useBrainAi } from './useBrainAi';
+import { useAction } from './useAction';
 import { useResource } from './useResource';
+import { shortWhen as when } from './display';
 import './routines.css';
 
 const host = window.irori;
@@ -46,13 +48,6 @@ const stepWords: Record<RoutineStepRun['state'], () => string> = {
   stopped: () => t('停止', 'Stopped'),
   unknown: () => t('不明', 'Unknown'),
 };
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(displayLocale(), {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
 /** An agent step's hibachis, access and CLI, as written in `routine.yaml`. */
 function agentMeta(step: RoutineStep) {
@@ -279,8 +274,7 @@ function ReviewDialog({
   onConfirm: (digest: string) => Promise<void>;
 }) {
   const review = useResource(() => host.reviewRoutine(routine.ref), [routineKey(routine.ref)]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const { busy, error, run } = useAction();
   const data = review.data;
   // Rendered at the document's root, like the other sheets, not inside irori mode's chrome.
   return createPortal(
@@ -331,13 +325,7 @@ function ReviewDialog({
           <button
             className="primary"
             disabled={busy || !data || !!data.problem}
-            onClick={() => {
-              setBusy(true);
-              setError('');
-              onConfirm(data!.digest)
-                .catch((reason) => setError(errorText(reason)))
-                .finally(() => setBusy(false));
-            }}
+            onClick={() => void run(() => onConfirm(data!.digest))}
           >
             {t('確認して実行', 'Confirm and run')}
           </button>
@@ -502,8 +490,7 @@ function RoutineEditor({
   const source = useResource(() => host.routineSource(routine.ref), [routineKey(routine.ref)]);
   const [text, setText] = useState<string>();
   const [version, setVersion] = useState<string>();
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState('');
+  const { busy, error: problem, setError: setProblem, run } = useAction();
   const shown = text ?? source.data?.text ?? '';
   const read = version ?? source.data?.version;
   return createPortal(
@@ -514,18 +501,13 @@ function RoutineEditor({
         onSubmit={(event) => {
           event.preventDefault();
           if (!read) return;
-          setBusy(true);
-          setProblem('');
-          host
-            .saveRoutineSource(routine.ref, shown, read)
-            .then((saved) => {
-              onSaved();
-              if (!saved.problem) return onClose();
-              setVersion(saved.version);
-              setProblem(saved.problem);
-            })
-            .catch((reason) => setProblem(errorText(reason)))
-            .finally(() => setBusy(false));
+          void run(async () => {
+            const saved = await host.saveRoutineSource(routine.ref, shown, read);
+            onSaved();
+            if (!saved.problem) return onClose();
+            setVersion(saved.version);
+            setProblem(saved.problem);
+          });
         }}
       >
         <h2>{routine.name}</h2>

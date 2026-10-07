@@ -19,7 +19,7 @@ import type { GraphIndexStatus } from '../domain/graph-index';
 import { knowledgeFolder, layerLabel } from '../domain/layers';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
-import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
 
 function Graph({
   view,
@@ -353,9 +353,8 @@ export function OntologyPanel({
 }) {
   const [refresh, setRefresh] = useState(0);
   const [table, setTable] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy, error: failure, run } = useAction();
   const [notice, setNotice] = useState('');
-  const [failure, setFailure] = useState('');
   // A file change reads the CSV again behind the graph on show; the graph below
   // is keyed by what it read, so it is rebuilt only when the tables changed.
   const read = useResource(() => window.irori.ontology(space.scopeId), [space.scopeId], {
@@ -374,17 +373,11 @@ export function OntologyPanel({
   // The host's independent declaration check keeps declared CSV pairs protected.
   const repairModule = !!error && !!status.data && !status.data.declared;
   async function generate() {
-    setBusy(true);
-    setFailure('');
-    try {
+    await run(async () => {
       await window.irori.updateGraphIndex(space.scopeId);
       setNotice(t('コミットすると共有されます。', 'Commit it to share.'));
       setRefresh((value) => value + 1);
-    } catch (error) {
-      setFailure(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   const indexed = module || repairModule;
   // The module lives in the hibachi's knowledge folder (ADR 024).

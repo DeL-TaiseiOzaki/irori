@@ -21,6 +21,23 @@ let current: DeviceSettings = {
   routineRuntimes: [],
 };
 
+/**
+ * Writes a choice to the device record. One the window shows is applied at once,
+ * undone if the record refuses it, and applied again as the record keeps it.
+ */
+async function save(patch: Partial<DeviceSettings>, apply?: (shown: DeviceSettings) => void) {
+  const previous = current;
+  apply?.({ ...current, ...patch });
+  try {
+    current = await host.saveDeviceSettings(patch);
+  } catch (error) {
+    apply?.(previous);
+    throw error;
+  }
+  apply?.(current);
+  return current;
+}
+
 export async function loadDeviceSettings() {
   try {
     current = await host.deviceSettings();
@@ -44,17 +61,8 @@ export function applyLanguage(language: DeviceSettings['language'] = current.lan
   setLanguage(language);
 }
 
-export async function chooseLanguage(language: DeviceSettings['language']) {
-  const previous = current.language;
-  applyLanguage(language);
-  try {
-    current = await host.saveDeviceSettings({ language });
-  } catch (error) {
-    applyLanguage(previous);
-    throw error;
-  }
-  applyLanguage();
-  return current;
+export function chooseLanguage(language: DeviceSettings['language']) {
+  return save({ language }, (shown) => applyLanguage(shown.language));
 }
 
 export function currentMarkdownFont() {
@@ -65,9 +73,8 @@ export function currentEditorAssistance() {
   return current.editorAssistance;
 }
 
-export async function chooseEditorAssistance(editorAssistance: boolean) {
-  current = await host.saveDeviceSettings({ editorAssistance });
-  return current;
+export function chooseEditorAssistance(editorAssistance: boolean) {
+  return save({ editorAssistance });
 }
 
 /** Whether each hibachi's own agent and its Schema layer are offered (ADR 021). */
@@ -75,9 +82,8 @@ export function currentHibachiAgent() {
   return current.hibachiAgent;
 }
 
-export async function chooseHibachiAgent(hibachiAgent: boolean) {
-  current = await host.saveDeviceSettings({ hibachiAgent });
-  return current;
+export function chooseHibachiAgent(hibachiAgent: boolean) {
+  return save({ hibachiAgent });
 }
 
 /** The runtimes routines may use on this device (ADR 016 D3). */
@@ -85,9 +91,8 @@ export function currentRoutineRuntimes() {
   return current.routineRuntimes;
 }
 
-export async function chooseRoutineRuntimes(routineRuntimes: DeviceSettings['routineRuntimes']) {
-  current = await host.saveDeviceSettings({ routineRuntimes });
-  return current;
+export function chooseRoutineRuntimes(routineRuntimes: DeviceSettings['routineRuntimes']) {
+  return save({ routineRuntimes });
 }
 
 const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)');
@@ -117,32 +122,14 @@ export function watchSystemTheme() {
   return () => media.removeEventListener('change', update);
 }
 
-export async function chooseTheme(theme: DeviceSettings['theme']) {
-  const previous = current.theme;
-  applyTheme(theme);
-  // The host keeps it for the next launch and tells the operating system, which
-  // owns the window chrome and the native dialogs.
-  try {
-    current = await host.saveDeviceSettings({ theme });
-  } catch (error) {
-    applyTheme(previous);
-    throw error;
-  }
-  applyTheme();
-  return current;
+// The host keeps it for the next launch and tells the operating system, which
+// owns the window chrome and the native dialogs.
+export function chooseTheme(theme: DeviceSettings['theme']) {
+  return save({ theme }, (shown) => applyTheme(shown.theme));
 }
 
-export async function chooseMarkdownFont(markdownFont: DeviceSettings['markdownFont']) {
-  const previous = current.markdownFont;
-  applyMarkdownFont(markdownFont);
-  try {
-    current = await host.saveDeviceSettings({ markdownFont });
-  } catch (error) {
-    applyMarkdownFont(previous);
-    throw error;
-  }
-  applyMarkdownFont();
-  return current;
+export function chooseMarkdownFont(markdownFont: DeviceSettings['markdownFont']) {
+  return save({ markdownFont }, (shown) => applyMarkdownFont(shown.markdownFont));
 }
 
 /** The reader's role and project for one KB; a KB without a choice is not narrowed. */
@@ -150,9 +137,8 @@ export function currentSkillAudience(scopeId: string): SkillAudience {
   return current.skillAudiences[scopeId] ?? {};
 }
 
-export async function chooseSkillAudience(scopeId: string, audience: SkillAudience) {
-  current = await host.saveDeviceSettings({ skillAudiences: { [scopeId]: audience } });
-  return current;
+export function chooseSkillAudience(scopeId: string, audience: SkillAudience) {
+  return save({ skillAudiences: { [scopeId]: audience } });
 }
 
 /** The CLI your AI runs on and the model chosen for each CLI. */
@@ -160,9 +146,8 @@ export function currentYourAi() {
   return current.yourAi;
 }
 
-export async function chooseYourAi(yourAi: DeviceSettings['yourAi']) {
-  current = await host.saveDeviceSettings({ yourAi });
-  return current;
+export function chooseYourAi(yourAi: DeviceSettings['yourAi']) {
+  return save({ yourAi });
 }
 
 const pending: Record<string, string> = {};

@@ -5,7 +5,7 @@ import type { EditorSelection } from '../editor/Editor';
 import { displayLocale, t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
-import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
 
 const host = window.irori;
 
@@ -50,26 +50,17 @@ export function NoteComments({
   const comments = written ?? read.data;
   const [quote, setQuote] = useState<EditorSelection>();
   const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const { busy, error, setError, run } = useAction();
   const [missing, setMissing] = useState<string>();
   const count = comments?.length ?? 0;
   const label = count ? t(`コメント ${count} 件`, `${count} comments`) : t('コメント', 'Comments');
 
   async function change(action: () => Promise<NoteComment[]>) {
     if (busy) return;
-    setBusy(true);
-    setError('');
-    try {
+    return run(async () => {
       setWritten(await action());
       setBump((value) => value + 1);
-      return true;
-    } catch (failure) {
-      setError(errorText(failure));
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   async function add() {
     if (!body.trim()) return;
