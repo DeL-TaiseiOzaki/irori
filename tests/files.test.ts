@@ -65,6 +65,11 @@ test('Ownership precedes classification; nested declared scope and contents alia
   assert(!(await files.entries(parent.scopeId, '')).some((e) => e.path === 'team'));
   await assert.rejects(files.resolve(parent.scopeId, 'team'), /another space/);
   assert.equal(classify(parent, 'AGENTS.md'), 'schema');
+  // A hibachi's front page is Schema like its instructions; a folder's README is knowledge.
+  for (const readme of ['README.md', 'readme.md', 'ReadMe.md'])
+    assert.equal(classify(parent, readme), 'schema');
+  for (const readme of ['Knowledge_Base/README.md', 'notes/readme.md', 'README.md.bak'])
+    assert.equal(classify(parent, readme), 'Knowledge_Base');
   for (const p of [
     'contents/drive/AGENTS.md',
     'contents/drive/notes.md',

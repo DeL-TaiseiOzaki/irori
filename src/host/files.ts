@@ -428,6 +428,57 @@ export class FileService {
       return next;
     });
   }
+  /**
+   * Why a `.irori/scope.json` that a pull brings may not replace this hibachi's,
+   * or undefined when it may (ADR 028): it parses as a declaration, keeps the
+   * same `scopeId`, and passes the checks a local layer rename and registration
+   * apply — ordinary folder names, layers that do not overlap, no layer inside
+   * another hibachi, and no other hibachi inside its contents.
+   */
+  async incomingDeclarationProblem(id: string, text: string): Promise<string | undefined> {
+    const s = this.get(id);
+    let next: Space;
+    try {
+      next = { ...declaration.parse(JSON.parse(text.replace(/^\uFEFF/, ''))), root: s.root };
+    } catch {
+      return 'The incoming declaration does not parse';
+    }
+    if (next.scopeId !== s.scopeId) return 'The incoming declaration changes the identity';
+    const folders = [knowledgeFolder(next), ...next.contents];
+    for (const folder of folders) {
+      if (folder === knowledgeFolder(s) || s.contents.includes(folder)) continue;
+      const problem = folder.split('/').map(layerFolderProblem).find(Boolean);
+      if (problem) return problem;
+    }
+    const overlaps = (a: string, b: string) =>
+      a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+    if (folders.some((a, i) => folders.some((b, j) => i < j && overlaps(a, b))))
+      return 'The incoming declaration overlaps its layers';
+    if (folders.some((folder) => owner(this.spaces, path.join(s.root, folder))?.scopeId !== id))
+      return 'The incoming declaration puts a layer in another hibachi';
+    const others = this.spaces.filter((other) => other.scopeId !== id);
+    const contents = await this.contentsPaths(next);
+    if (others.some((other) => contents.some((c) => within(c, other.root))))
+      return 'The incoming declaration puts another hibachi in contents';
+  }
+  /**
+   * Reads this hibachi's `.irori/scope.json` again after a pull changed it, so
+   * its layers, names and look follow without a restart. The identity must stay.
+   */
+  async reloadDeclaration(id: string): Promise<Space> {
+    return this.queue.run(async () => {
+      const s = this.get(id);
+      const next = await this.inspect(s.root);
+      if (next.scopeId !== s.scopeId) throw Error('Scope identity changed');
+      const others = this.spaces.filter((other) => other.scopeId !== id);
+      const contents = await this.contentsPaths(next);
+      if (others.some((other) => contents.some((c) => within(c, other.root))))
+        throw Error('A space cannot be registered inside contents (including aliases)');
+      this.spaces = this.spaces.map((item) => (item.scopeId === id ? next : item));
+      this.registrationsChanged();
+      return next;
+    });
+  }
   /** Keeps an image as the brain's icon in `.irori/`; the declaration names it on save. */
   async saveIcon(id: string, bytes: Uint8Array, type: string) {
     return this.queue.run(async () => {

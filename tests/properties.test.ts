@@ -196,6 +196,11 @@ test('Required keys combine every page with the type, and pages exclude indexes'
   assert.ok(!isPropertyPage(space, 'Knowledge_Base/wiki/index.md'));
   assert.ok(!isPropertyPage(space, 'Knowledge_Base/data.csv'));
   assert.ok(!isPropertyPage(space, 'AGENTS.md'));
+  // The repository's front page is Schema, not a page (ADR 028); a nested one is a page.
+  for (const readme of ['README.md', 'readme.md', 'Readme.MD'])
+    assert.ok(!isPropertyPage(space, readme), readme);
+  assert.ok(isPropertyPage(space, 'Knowledge_Base/README.md'));
+  assert.ok(isPropertyPage(space, 'notes/readme.md'));
   assert.ok(!isPropertyPage(space, '.agents/skills/a/SKILL.md'));
   assert.ok(!isPropertyPage(space, 'contents/drive/memo.md'));
   assert.equal(actorFromEmail('taisei.ozaki.lab@example.com'), 'human:taisei.ozaki.lab');

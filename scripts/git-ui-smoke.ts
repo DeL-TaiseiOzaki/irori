@@ -28,7 +28,7 @@ async function checkUnrelatedFileEvent(
       fixture;
     ipcMain.removeHandler('irori');
     ipcMain.handle('irori', (event, method, ...args) => {
-      if (method === 'read' && args[0] === scopeId && args[1] === 'README.md') fixture.reads++;
+      if (method === 'read' && args[0] === scopeId && args[1] === 'memo.md') fixture.reads++;
       if (method === 'notesDeclaration' && args[0] === scopeId) fixture.declarations++;
       return original(event, method, ...args);
     });
@@ -104,14 +104,14 @@ async function checkConcurrentReconcile(
     ipcMain.removeHandler('irori');
     ipcMain.handle('irori', async (event, method, ...args) => {
       const result = await original(event, method, ...args);
-      if (method !== 'read' || args[0] !== scopeId || args[1] !== 'README.md' || !fixture.holding)
+      if (method !== 'read' || args[0] !== scopeId || args[1] !== 'memo.md' || !fixture.holding)
         return result;
       return new Promise((resolve) => fixture.pending.push({ value: result, resolve }));
     });
   }, scopeId);
   try {
-    const text = await readFile(path.join(root, 'README.md'), 'utf8');
-    await writeFile(path.join(root, 'README.md'), `${text}\nConcurrent reconcile fixture\n`);
+    const text = await readFile(path.join(root, 'memo.md'), 'utf8');
+    await writeFile(path.join(root, 'memo.md'), `${text}\nConcurrent reconcile fixture\n`);
     await app.evaluate(({ BrowserWindow }, scopeId) => {
       const window = BrowserWindow.getAllWindows()[0];
       window.webContents.send('irori:event', { type: 'files', scopeId });
@@ -161,7 +161,7 @@ async function checkConcurrentReconcile(
     await page.keyboard.insertText('Saved after concurrent refresh\n');
     await page.keyboard.press('ControlOrMeta+s');
     await expect
-      .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
+      .poll(() => readFile(path.join(root, 'memo.md'), 'utf8'))
       .toContain('Saved after concurrent refresh');
   } finally {
     await app.evaluate(({ ipcMain }) => {
@@ -211,7 +211,7 @@ for (const [name, category] of [
   git(root, 'config', 'user.email', 'fixture@example.invalid');
   git(root, 'config', 'commit.gpgsign', 'false');
   spaces.push(await files.register(root, name, category));
-  await writeFile(path.join(root, 'README.md'), `# ${name}\n\nOriginal 日本語\n`);
+  await writeFile(path.join(root, 'memo.md'), `# ${name}\n\nOriginal 日本語\n`);
   git(root, 'add', '.');
   git(root, 'commit', '-m', `${name} initial`);
 }
@@ -222,12 +222,12 @@ git(base, 'init', '--bare', '--initial-branch=main', remote);
 git(root, 'remote', 'add', 'origin', remote);
 git(root, 'push', '-u', 'origin', 'main');
 git(base, 'clone', remote, peer);
-// The repository carries a Git AI Standard note naming README's third line as a collaborator's.
+// The repository carries a Git AI Standard note naming memo.md's third line as a collaborator's.
 const initial = git(root, 'rev-parse', 'HEAD');
 execFileSync('git', ['notes', '--ref=ai', 'add', '-F', '-', initial], {
   cwd: root,
   input:
-    'README.md\n  h_0123456789abcd 3\n---\n' +
+    'memo.md\n  h_0123456789abcd 3\n---\n' +
     JSON.stringify({
       schema_version: 'authorship/3.0.0',
       base_commit_sha: initial,
@@ -244,14 +244,14 @@ git(seed, 'init', '-b', 'main');
 git(seed, 'config', 'user.name', 'UI fixture');
 git(seed, 'config', 'user.email', 'fixture@example.invalid');
 git(seed, 'config', 'commit.gpgsign', 'false');
-await writeFile(path.join(seed, 'README.md'), '# Catalog\n');
+await writeFile(path.join(seed, 'memo.md'), '# Catalog\n');
 git(seed, 'add', '.');
 git(seed, 'commit', '-m', 'Catalog initial');
 const catalogCommit = git(seed, 'rev-parse', 'HEAD');
 execFileSync('git', ['notes', '--ref=ai', 'add', '-F', '-', catalogCommit], {
   cwd: seed,
   input:
-    'README.md\n  h_0123456789abcd 1\n---\n' +
+    'memo.md\n  h_0123456789abcd 1\n---\n' +
     JSON.stringify({
       schema_version: 'authorship/3.0.0',
       base_commit_sha: catalogCommit,
@@ -339,7 +339,7 @@ try {
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page
     .getByRole('region', { name: 'Knowledge', exact: true })
-    .getByRole('button', { name: 'README', exact: true })
+    .getByRole('button', { name: 'memo', exact: true })
     .click();
   await page.getByRole('button', { name: /^ノートの情報/ }).click();
   await expect(page.locator('.note-info')).toContainText('人が書いた行 1');
@@ -365,12 +365,12 @@ try {
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('Editing with source control open\n');
   await expect
-    .poll(() => readFile(path.join(root, 'README.md'), 'utf8'))
+    .poll(() => readFile(path.join(root, 'memo.md'), 'utf8'))
     .toContain('Editing with source control open');
   await checkUnrelatedFileEvent(app, page, spaces[0].scopeId, spaces[1].scopeId);
   await checkConcurrentReconcile(app, page, root, spaces[0].scopeId);
   await panel.getByRole('button', { name: '更新', exact: true }).click();
-  await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
+  await panel.locator('.git-file').filter({ hasText: 'memo.md' }).click();
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('+UI saved 日本語');
   await expect(panel.getByLabel('差分', { exact: true })).toContainText(
     'Editing with source control open',
@@ -378,14 +378,14 @@ try {
   await panel.getByRole('button', { name: 'ノートに戻る' }).click();
   await expect(page.locator('.ProseMirror')).toBeVisible();
   await expect(sidebar).toBeVisible();
-  await panel.getByRole('button', { name: 'README.md をステージする', exact: true }).click();
+  await panel.getByRole('button', { name: 'memo.md をステージする', exact: true }).click();
   await expect(
-    panel.getByRole('button', { name: 'README.md をステージから外す', exact: true }),
+    panel.getByRole('button', { name: 'memo.md をステージから外す', exact: true }),
   ).toBeEnabled();
-  expect(git(root, 'diff', '--cached', '--', 'README.md')).toContain('UI saved 日本語');
-  await panel.getByRole('button', { name: 'README.md をステージから外す', exact: true }).click();
+  expect(git(root, 'diff', '--cached', '--', 'memo.md')).toContain('UI saved 日本語');
+  await panel.getByRole('button', { name: 'memo.md をステージから外す', exact: true }).click();
   await expect(
-    panel.getByRole('button', { name: 'README.md をステージする', exact: true }),
+    panel.getByRole('button', { name: 'memo.md をステージする', exact: true }),
   ).toBeEnabled();
   await page.screenshot({ path: 'test-results/irori-source-control.png' });
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
@@ -413,14 +413,14 @@ try {
   await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('UI note update');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('コミットしました');
-  expect(git(root, 'show', 'HEAD:README.md')).toContain('UI saved 日本語');
+  expect(git(root, 'show', 'HEAD:memo.md')).toContain('UI saved 日本語');
   expect(git(root, 'show', 'HEAD:extra.md')).toBe('# Extra staged note');
   // The line typed here is named as the committer's in the commit's own note.
   expect(git(root, 'notes', '--ref=ai', 'list').split('\n').filter(Boolean)).toHaveLength(2);
-  expect(git(root, 'notes', '--ref=ai', 'show', 'HEAD')).toMatch(/^README\.md\n  h_[0-9a-f]{14} /);
+  expect(git(root, 'notes', '--ref=ai', 'show', 'HEAD')).toMatch(/^memo\.md\n  h_[0-9a-f]{14} /);
   expect(await readFile(path.join(root, 'extra.md'), 'utf8')).toBe('# Extra after staging');
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
-  expect(git(remote, 'show', 'main:README.md')).not.toContain('UI saved 日本語');
+  expect(git(remote, 'show', 'main:memo.md')).not.toContain('UI saved 日本語');
   const changesView = panel.getByRole('button', { name: /^変更 \d+$/ });
   const historyView = panel.getByRole('button', { name: '履歴', exact: true });
   await changesView.focus();
@@ -448,15 +448,15 @@ try {
   await expect(confirmation).toContainText('origin / main');
   await confirmation.getByRole('button', { name: 'Push', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('送信しました');
-  expect(git(remote, 'show', 'main:README.md')).toContain('UI saved 日本語');
+  expect(git(remote, 'show', 'main:memo.md')).toContain('UI saved 日本語');
   expect(git(remote, 'rev-parse', 'refs/notes/ai')).toBe(git(root, 'rev-parse', 'refs/notes/ai'));
 
   git(peer, 'pull', '--ff-only');
-  await writeFile(path.join(peer, 'README.md'), '# Peer 日本語\n');
+  await writeFile(path.join(peer, 'memo.md'), '# Peer 日本語\n');
   git(peer, 'add', '.');
   git(peer, 'commit', '-m', 'Peer competing change');
   git(peer, 'push');
-  await writeFile(path.join(root, 'README.md'), '# Local 日本語\n');
+  await writeFile(path.join(root, 'memo.md'), '# Local 日本語\n');
   git(root, 'add', '.');
   git(root, 'commit', '-m', 'Local competing change');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
@@ -473,7 +473,7 @@ try {
   await panel.getByRole('menuitem', { name: '履歴を統合', exact: true }).click();
   await confirmation.getByRole('button', { name: '統合', exact: true }).click();
   await expect(panel.locator('.git-warning')).toContainText('未解決 1 件');
-  await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
+  await panel.locator('.git-file').filter({ hasText: 'memo.md' }).click();
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toContainText('<<<<<<<');
   await expect(panel.locator('.git-conflict-versions')).toContainText('Local 日本語');
   await expect(panel.locator('.git-conflict-versions')).toContainText('Peer 日本語');
@@ -485,7 +485,7 @@ try {
     .poll(() =>
       page.evaluate(
         async (scopeId) =>
-          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'README.md' }))
+          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'memo.md' }))
             ?.text,
         spaces[0].scopeId,
       ),
@@ -500,7 +500,7 @@ try {
     )
     .toBe('Unfinished merge message');
   await app.close();
-  await writeFile(path.join(root, 'README.md'), 'Native content changed while irori was closed\n');
+  await writeFile(path.join(root, 'memo.md'), 'Native content changed while irori was closed\n');
   app = await launch();
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
@@ -508,7 +508,7 @@ try {
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
   await page
     .getByRole('region', { name: 'Knowledge', exact: true })
-    .getByRole('button', { name: 'README', exact: true })
+    .getByRole('button', { name: 'memo', exact: true })
     .click();
   await page
     .getByRole('group', { name: 'hibachi の表示' })
@@ -519,7 +519,7 @@ try {
   await expect(panel.getByRole('textbox', { name: 'commit メッセージ' })).toHaveValue(
     'Unfinished merge message',
   );
-  await panel.locator('.git-file').filter({ hasText: 'README.md' }).click();
+  await panel.locator('.git-file').filter({ hasText: 'memo.md' }).click();
   await expect(panel.getByRole('region', { name: '統合の下書きの復元' })).toContainText(
     'Git の状態が変わりました',
   );
@@ -530,7 +530,7 @@ try {
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
     '# Combined\n\nLocal 日本語\nPeer 日本語\n',
   );
-  expect(await readFile(path.join(root, 'README.md'), 'utf8')).toBe(
+  expect(await readFile(path.join(root, 'memo.md'), 'utf8')).toBe(
     'Native content changed while irori was closed\n',
   );
   await page.screenshot({ path: 'test-results/irori-git-conflict.png' });
@@ -544,7 +544,7 @@ try {
   ).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(sidebar).toBeVisible();
-  await writeFile(path.join(root, 'README.md'), 'External conflict working copy\n');
+  await writeFile(path.join(root, 'memo.md'), 'External conflict working copy\n');
   // A refused resolution reads the conflict again at once, and again after the status
   // refresh that follows. Hold that second read so it is still in flight when the
   // person resolves: the button stays usable (a click was once lost to it being
@@ -579,7 +579,7 @@ try {
   await expect(panel.getByRole('textbox', { name: '統合する内容' })).toHaveValue(
     '# Combined\n\nLocal 日本語\nPeer 日本語\n',
   );
-  expect(await readFile(path.join(root, 'README.md'), 'utf8')).toBe(
+  expect(await readFile(path.join(root, 'memo.md'), 'utf8')).toBe(
     'External conflict working copy\n',
   );
   const resolve = panel.getByRole('button', { name: '統合内容を保存して解決' });
@@ -606,7 +606,7 @@ try {
     .poll(() =>
       page.evaluate(
         async (scopeId) =>
-          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'README.md' }))
+          (await window.irori.draftRead({ kind: 'git-resolution', scopeId, path: 'memo.md' }))
             ?.text,
         spaces[0].scopeId,
       ),
@@ -624,7 +624,7 @@ try {
           status: await page.getByRole('status').allTextContents(),
           head: git(root, 'log', '-1', '--format=%s'),
           changes: git(root, 'status', '--porcelain'),
-          document: await readFile(path.join(root, 'README.md'), 'utf8'),
+          document: await readFile(path.join(root, 'memo.md'), 'utf8'),
           editor: await page.locator('.document-editor').allTextContents(),
         },
       }),
@@ -673,7 +673,7 @@ try {
   await expect(page.getByRole('textbox', { name: 'KBフォルダ', exact: true })).toHaveValue(
     path.join(base, '取得した KB'),
   );
-  expect(await readFile(path.join(base, '取得した KB/README.md'), 'utf8')).toBe('# Catalog\n');
+  expect(await readFile(path.join(base, '取得した KB/memo.md'), 'utf8')).toBe('# Catalog\n');
   expect(git(path.join(base, '取得した KB'), 'notes', '--ref=ai', 'show', 'HEAD')).toContain(
     'h_0123456789abcd 1',
   );

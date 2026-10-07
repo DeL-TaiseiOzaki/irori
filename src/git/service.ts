@@ -1041,16 +1041,36 @@ export class GitService {
       ...(await this.submodulePaths(s)),
       ...(await this.movedSubmodules(s, base, target)).keys(),
     ]);
+    let declaration = false;
     for (const p of names) {
       await this.safePath(s, p, gitlinks);
-      if (!s.prefix && p === '.irori/scope.json')
-        throw Error(
-          t(
-            '受信内容にスペース定義の変更があります。',
-            'The incoming content changes the space definition.',
-          ),
-        );
+      if (!s.prefix && p === '.irori/scope.json') {
+        await this.checkIncomingDeclaration(s, base, head, target);
+        declaration = true;
+      }
     }
+    return declaration;
+  }
+  /**
+   * An incoming `.irori/scope.json` is taken when it keeps the hibachi's identity
+   * and passes the checks a local rename applies, and this side has not changed
+   * it too (ADR 028). A removed file, another `scopeId` or a broken one is refused.
+   */
+  private async checkIncomingDeclaration(s: Repo, base: string, head: string, target: string) {
+    const refused = () =>
+      Error(
+        t(
+          '受信内容にスペース定義の変更があります。',
+          'The incoming content changes the space definition.',
+        ),
+      );
+    const blob = (commit: string) =>
+      this.optional(s, ['rev-parse', '--verify', '--quiet', `${commit}:.irori/scope.json`]);
+    const [ancestor, ours, theirs] = await Promise.all([blob(base), blob(head), blob(target)]);
+    if (!oidPattern.test(theirs) || (ours !== ancestor && ours !== theirs)) throw refused();
+    if (Number(await this.git(s, ['cat-file', '-s', theirs])) > 64 * 1024) throw refused();
+    const text = await this.git(s, ['cat-file', 'blob', theirs]);
+    if (await this.files.incomingDeclarationProblem(s.space.scopeId, text)) throw refused();
   }
   /**
    * After a pull moved the commits the hibachi records for its submodules, moves
@@ -1186,7 +1206,7 @@ export class GitService {
           )
             throw stale();
           const target = (await this.git(s, ['rev-parse', '--verify', ref])).trim();
-          await this.checkIncoming(s, state.head!, target);
+          const declaration = await this.checkIncoming(s, state.head!, target);
           try {
             await this.git(s, [
               'merge',
@@ -1216,6 +1236,8 @@ export class GitService {
             const left = await this.follow(s, state.head!, target);
             notice = [notice, left].filter(Boolean).join(' ') || undefined;
           }
+          // Renamed layers, their names and the look apply now, without a restart (ADR 028).
+          if (declaration) await this.files.reloadDeclaration(s.space.scopeId);
         }
       }
       const status = await this.snapshot(s);

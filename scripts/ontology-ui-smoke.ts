@@ -138,7 +138,7 @@ try {
   await expect(panel.getByRole('alert')).toContainText('重複');
   await expect(
     panel.getByRole('button', {
-      name: /グラフ索引を更新|ページから再生成|グラフ索引を作成/,
+      name: /索引を更新|ページから再生成|索引を作成/,
     }),
   ).toHaveCount(0);
   await expect(panel.locator('.react-flow__node')).toHaveCount(0);
@@ -158,7 +158,7 @@ try {
   await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
   panel = page.getByRole('region', { name: 'オントロジー', exact: true });
   await expect(panel).toContainText('グラフ索引はまだありません');
-  await panel.getByRole('button', { name: 'グラフ索引を作成', exact: true }).click();
+  await panel.getByRole('button', { name: '索引を作成', exact: true }).click();
   const freshness = panel.getByRole('status').filter({ hasText: 'グラフ索引' });
   await expect(freshness).toContainText('一致しています');
   await expect(freshness).toContainText('除外した関係 1 件');
@@ -186,7 +186,7 @@ try {
   await expect(freshness).toContainText('一致しません');
   await expect(freshness).toContainText('エンティティ +1 / −0、関係 +1 / −1');
   await expect(panel.locator('.react-flow__node')).toHaveCount(3);
-  await panel.getByRole('button', { name: 'グラフ索引を更新', exact: true }).click();
+  await panel.getByRole('button', { name: '索引を更新', exact: true }).click();
   await expect(freshness).toContainText('一致しています');
   await expect(panel.locator('.react-flow__node')).toHaveCount(4);
   await expect(panel.locator('.react-flow__edge')).toHaveCount(3);
@@ -208,6 +208,27 @@ try {
     await expect(panel.locator('.react-flow__node')).toHaveCount(4);
     expect(await readFile(relationsPath, 'utf8')).toBe(correctRelations);
   }
+  // With a property declaration the bundle's folder indexes are offered too (ADR 028):
+  // the panel counts them, and one press writes them with the graph index.
+  await bundlePage(
+    '.property/property.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      types: { concept: { heading: '# Concepts' }, product: { heading: '# Products' } },
+    }),
+  );
+  await panel.getByRole('button', { name: '再読み込み', exact: true }).click();
+  const folderLine = panel.getByRole('status').filter({ hasText: 'フォルダの索引' });
+  await expect(folderLine).toContainText('追加 0・変更 3');
+  await panel.getByRole('button', { name: '索引を更新', exact: true }).click();
+  await expect(folderLine).toContainText('フォルダの索引はページと一致しています');
+  expect(await readFile(path.join(bundleRoot, 'Knowledge_Base/index.md'), 'utf8')).toBe(
+    '---\nokf_version: "0.2"\n---\n\n# Folders\n\n* [entities](entities/)\n* [wiki](wiki/)\n',
+  );
+  expect(await readFile(path.join(bundleRoot, 'Knowledge_Base/wiki/index.md'), 'utf8')).toBe(
+    '# Concepts\n\n* [再試行の予算](再試行の予算.md)\n* [監視](監視.md)\n\n' +
+      '# Other pages\n\n* [障害対応](障害対応.md)\n',
+  );
   // The CSV stays portable NFC; opening uses the actual decomposed name on disk.
   await panel.getByRole('button', { name: 'エンティティとノートの一覧', exact: true }).click();
   await panel
@@ -230,7 +251,7 @@ try {
   );
   await crashed;
   console.log(
-    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, stage view keyboard handling, graph index generation/update/repair, declared-pair protection and decomposed note names. No provider calls.',
+    'Ontology UI passed: CSV no-op/source save, hierarchy/subgraph filters, note links, external invalidation, stage view keyboard handling, graph index generation/update/repair, folder index generation, declared-pair protection and decomposed note names. No provider calls.',
   );
 } finally {
   await app.close();

@@ -516,7 +516,17 @@ app
       gitStage: (...args) => changed(gitScope(args[0]), () => git.stage(...args)),
       gitStageMany: (...args) => changed(gitScope(args[0]), () => git.stageMany(...args)),
       gitCommit: (...args) => changed(gitScope(args[0]), () => git.commit(...args)),
-      gitSync: (...args) => changed(gitScope(args[0]), () => git.sync(...args)),
+      gitSync: (...args) =>
+        changed(gitScope(args[0]), async () => {
+          const before = files.list().find((space) => space.scopeId === gitScope(args[0]));
+          try {
+            return await git.sync(...args);
+          } finally {
+            // A pulled `.irori/scope.json` was taken in (ADR 028): the window reads the hibachis again.
+            const after = files.list().find((space) => space.scopeId === gitScope(args[0]));
+            if (before && after && before !== after) emit({ type: 'hibachis' });
+          }
+        }),
       gitResolve: (...args) => changed(gitScope(args[0]), () => git.resolve(...args)),
       gitSubmodules: (id) => git.submodules(id),
       gitSubmoduleAdd: (...args) => changed(args[0], () => git.addSubmodule(...args)),
@@ -560,8 +570,8 @@ app
         changeHibachi(
           id,
           t(
-            '実行と接続の準備が終わってからグラフ索引を更新してください。',
-            'Wait for runs and connection setup to finish before updating the graph index.',
+            '実行と接続の準備が終わってから索引を更新してください。',
+            'Wait for runs and connection setup to finish before updating the indexes.',
           ),
           () => graphIndex.update(id),
         ),

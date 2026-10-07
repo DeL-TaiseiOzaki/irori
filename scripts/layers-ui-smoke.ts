@@ -28,7 +28,8 @@ for (const [name, category] of [
   await writeFile(path.join(root, 'AGENTS.md'), `# ${name} rules\n\nOnly this repository.\n`);
   await writeFile(path.join(root, 'schema/policy.md'), `# ${name} policy\n`);
   await writeFile(path.join(root, '.codex/config.toml'), '# Native configuration fixture\n');
-  await writeFile(path.join(root, 'README.md'), `# ${name} notes\n`);
+  await writeFile(path.join(root, 'README.md'), `# ${name} front page\n`);
+  await writeFile(path.join(root, 'memo.md'), `# ${name} notes\n`);
   await writeFile(path.join(root, 'Knowledge_Base/notes/topic.md'), `# ${name} topic\n`);
   const contentsRoot = category === 'personal' ? 'schema/raw' : 'contents';
   const { root: _root, ...declaration } = space;
@@ -87,7 +88,9 @@ try {
   await expect(panel.locator('.brain-names')).toContainText('個人');
   await expect(schema.getByRole('button', { name: 'AGENTS.md', exact: true })).toHaveCount(1);
   await expect(schema.getByRole('button', { name: /^README/ })).toHaveCount(0);
-  await expect(knowledge.getByRole('button', { name: 'README', exact: true })).toHaveCount(1);
+  // The front page at the top is Schema, not a knowledge page (ADR 028).
+  await expect(knowledge.getByRole('button', { name: /^README/ })).toHaveCount(0);
+  await expect(knowledge.getByRole('button', { name: 'memo', exact: true })).toHaveCount(1);
   await expect(knowledge.getByRole('button', { name: /AGENTS/ })).toHaveCount(0);
   // An unconfigured Drive alias is visible without a mount, in the brain's Contents only.
   await expect(contents.getByRole('button', { name: /調査 資料/ })).toHaveCount(1);
@@ -96,6 +99,7 @@ try {
   await expect(schema.getByRole('group', { name: 'Schema の指示' })).toContainText('AGENTS.md');
   await expect(schema.getByRole('button', { name: 'schema', exact: true })).toHaveCount(0);
   await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
+  await expect(schema.getByRole('button', { name: 'README.md', exact: true })).toHaveCount(1);
   // A nested contents root under schema/ stays out of the Schema section.
   await schema.getByRole('button', { name: 'schema', exact: true }).click();
   await expect(schema.getByRole('button', { name: 'policy.md', exact: true })).toBeVisible();
@@ -150,21 +154,21 @@ try {
   await schema.getByRole('button', { name: 'AGENTS.md', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('個人KB rules');
   await brain('Engineering').click();
-  await knowledge.getByRole('button', { name: 'README', exact: true }).click();
+  await knowledge.getByRole('button', { name: 'memo', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Engineering notes');
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nEngineering edit\n');
   await brain('Research').click();
   await expect(brain('Research')).toHaveAttribute('aria-current', 'true');
-  await knowledge.getByRole('button', { name: 'README', exact: true }).click();
-  await expect(knowledge.locator('[aria-current="page"]')).toContainText('README');
+  await knowledge.getByRole('button', { name: 'memo', exact: true }).click();
+  await expect(knowledge.locator('[aria-current="page"]')).toContainText('memo');
   await expect(page.locator('.crumbs')).toContainText('Research');
   await expect(page.getByText('保存済み', { exact: true })).toBeVisible();
-  expect(await readFile(path.join(spaces[1].root, 'README.md'), 'utf8')).toContain(
+  expect(await readFile(path.join(spaces[1].root, 'memo.md'), 'utf8')).toContain(
     'Engineering edit',
   );
-  expect(await readFile(path.join(spaces[2].root, 'README.md'), 'utf8')).toBe('# Research notes\n');
+  expect(await readFile(path.join(spaces[2].root, 'memo.md'), 'utf8')).toBe('# Research notes\n');
   await expect(page.locator('.document-editor')).toContainText('Research notes');
   // The hibachi agent belongs to the brain on show and names its Schema.
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();

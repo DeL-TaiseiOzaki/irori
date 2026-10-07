@@ -2,6 +2,8 @@
 
 Date: 2026-09-22. Status: decided by the owner; implemented in 0.1.24.
 Settles the open decision recorded in [STATUS](../STATUS.md) on 2026-09-17.
+Amended by [ADR 028](028-generated-indexes.md): the button is **索引を更新** and
+writes an OKF bundle's folder indexes too.
 
 ## Context
 

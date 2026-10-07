@@ -480,9 +480,9 @@ export interface HostAPI {
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
   ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
-  /** Whether the graph index the KB carries matches its pages now, and what an update would change. Writes nothing. */
+  /** Whether the graph index and an OKF bundle's folder indexes match the pages now, and what an update would change (ADR 008, 028). Writes nothing. */
   graphIndexStatus(scopeId: string): Promise<import('./graph-index').GraphIndexStatus>;
-  /** Generates the graph index from the pages and writes the module files whose bytes change. */
+  /** Generates the graph index (unless declared) and the folder indexes from the pages, and writes the files whose bytes change. */
   updateGraphIndex(scopeId: string): Promise<import('./graph-index').GraphIndexUpdate>;
   /** Who typed each line of this text, resolved against the record on this device. */
   noteAuthorship(

@@ -94,9 +94,9 @@ export function resolveNoteLink(from: string, href: string): LinkTarget {
   }
   if (!segments.length)
     return reject(t('リンク先が KB のルートです。', 'The link points to the root of the KB.'));
-  // A trailing separator is a folder, which the editor has nothing to open.
-  if (/[/]\s*$/.test(target))
-    return reject(t('フォルダーへのリンクは開けません。', 'Links to folders cannot be opened.'));
+  // A trailing separator is a folder: an OKF index lists a subfolder as `name/`,
+  // and what a reader opens there is the folder's own index (ADR 028).
+  if (/[/]\s*$/.test(target)) segments.push('index.md');
   return { kind: 'internal', path: segments.join('/') };
 }
 
