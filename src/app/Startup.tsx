@@ -11,7 +11,7 @@ import { useResource } from './useResource';
 import { useAction } from './useAction';
 import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
-import { LanguageSwitch } from './Settings';
+import { LanguageSwitch, Settings } from './Settings';
 import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
@@ -459,10 +459,17 @@ function Diagram({ spaces, profiles }: { spaces: Space[]; profiles: WorkspacePro
 export function Startup({
   spaces,
   refresh,
+  hibachiAgent,
+  onHibachiAgent,
+  onRestored,
   onOpen,
 }: {
   spaces: Space[];
   refresh: () => Promise<void>;
+  hibachiAgent: boolean;
+  onHibachiAgent: (on: boolean) => void;
+  /** The environment saved on the GitHub account was restored here (ADR 026). */
+  onRestored: () => Promise<void>;
   onOpen: (workspace: WorkspaceProfile) => void;
 }) {
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
@@ -495,6 +502,10 @@ export function Startup({
       if (editing === profile.id) setEditing(undefined);
     });
   }
+  async function restored() {
+    await onRestored();
+    setProfiles(await host.workspaces());
+  }
   const toggle = (id: string, on: boolean) =>
     setSelected((value) => (on ? [...value, id] : value.filter((item) => item !== id)));
   const unavailable = profiles
@@ -518,6 +529,13 @@ export function Startup({
           <UpdateNotice host={host} />
           <CloudRecovery />
           <LanguageSwitch onError={(e) => setError(errorText(e))} />
+          <Settings
+            start
+            hibachiAgent={hibachiAgent}
+            onHibachiAgent={onHibachiAgent}
+            onRestored={restored}
+            onError={(e) => setError(errorText(e))}
+          />
         </footer>
       </section>
       <main className="start-main chrome">
@@ -725,13 +743,7 @@ export function Startup({
         {error && <p role="alert">{error}</p>}
       </main>
       {restoring && (
-        <RestoreEnvironment
-          onClose={() => setRestoring(false)}
-          onRestored={async () => {
-            await refresh();
-            setProfiles(await host.workspaces());
-          }}
-        />
+        <RestoreEnvironment onClose={() => setRestoring(false)} onRestored={restored} />
       )}
       {removing && (
         <RemoveHibachi

@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Icon } from './Icon';
 import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
 import { AccountSection, RestoreEnvironment } from './AccountSync';
 import { useChoice } from './useChoice';
+import { useLanguage } from './useLanguage';
 import {
   chooseLanguage,
   chooseMarkdownFont,
@@ -126,23 +127,28 @@ export function LanguageSwitch({ onError }: { onError: (error: unknown) => void 
 }
 
 /**
- * The rail's settings: display choices shared by every workspace on this device,
- * the GitHub account with the environment saved there, and updates.
+ * The settings: display choices shared by every workspace on this device, the
+ * GitHub account with the environment saved there, and updates. The rail opens
+ * them in a workspace; the start screen opens them before any workspace is, so
+ * the environment can be saved from there too.
  */
 export function Settings({
+  start = false,
   hibachiAgent,
   onHibachiAgent,
   onRestored,
   onSchema,
   onError,
 }: {
+  /** Opened from the start screen, whose footer already offers updates. */
+  start?: boolean;
   /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
   hibachiAgent: boolean;
   onHibachiAgent: (on: boolean) => void;
   /** The environment saved on the account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   /** Opens every Schema: the shared one, the irori agent's and each hibachi's (ADR 027). */
-  onSchema: () => void;
+  onSchema?: () => void;
   onError: (error: unknown) => void;
 }) {
   const updates = useUpdateState(host);
@@ -150,11 +156,14 @@ export function Settings({
     [restoring, setRestoring] = useState(false);
   const [theme, chooseThemeValue] = useChoice(currentTheme, chooseTheme, onError);
   const [font, chooseFont] = useChoice(currentMarkdownFont, chooseMarkdownFont, onError);
-  const [language, chooseLanguageValue] = useChoice<Language>(
+  const [language, chooseLanguageValue, setLanguage] = useChoice<Language>(
     currentLanguageChoice,
     chooseLanguage,
     onError,
   );
+  // The start screen's language switch changes the language beside these settings.
+  const shown = useLanguage();
+  useEffect(() => setLanguage(shown), [shown]);
   const label = t(
     `設定（テーマ：${themeLabels[theme]()}、Markdown：${fontLabels[font]()}、言語：${languageLabels[language]}）`,
     `Settings (theme: ${themeLabels[theme]()}, Markdown: ${fontLabels[font]()}, language: ${languageLabels[language]})`,
@@ -162,14 +171,25 @@ export function Settings({
   return (
     <>
       <Popover.Root open={open} onOpenChange={setOpen}>
-        <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
-          <Icon name="sliders" size={18} />
-          {updateWaiting(updates) && (
-            <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
-          )}
-        </Popover.Trigger>
+        {start ? (
+          <Popover.Trigger className="start-settings" aria-label={label} title={label}>
+            <Icon name="sliders" size={14} />
+            {t('設定', 'Settings')}
+          </Popover.Trigger>
+        ) : (
+          <Popover.Trigger className="rail-button settings-trigger" aria-label={label} title={label}>
+            <Icon name="sliders" size={18} />
+            {updateWaiting(updates) && (
+              <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
+            )}
+          </Popover.Trigger>
+        )}
         <Popover.Portal>
-          <Popover.Positioner side="right" align="end" sideOffset={12}>
+          <Popover.Positioner
+            side={start ? 'top' : 'right'}
+            align={start ? 'start' : 'end'}
+            sideOffset={start ? 8 : 12}
+          >
             <Popover.Popup className="settings-popover">
               <Popover.Title render={<h2 />}>{t('設定', 'Settings')}</Popover.Title>
               <Choices
@@ -216,22 +236,24 @@ export function Settings({
                   </label>
                 </div>
               </fieldset>
-              <fieldset className="settings-choices schema-settings">
-                <legend>Schema</legend>
-                <div>
-                  <button
-                    type="button"
-                    className="settings-choice"
-                    onClick={() => {
-                      setOpen(false);
-                      onSchema();
-                    }}
-                  >
-                    <Icon name="schema" size={15} />
-                    <span>{t('共通・hibachi', 'Shared and hibachis')}</span>
-                  </button>
-                </div>
-              </fieldset>
+              {onSchema && (
+                <fieldset className="settings-choices schema-settings">
+                  <legend>Schema</legend>
+                  <div>
+                    <button
+                      type="button"
+                      className="settings-choice"
+                      onClick={() => {
+                        setOpen(false);
+                        onSchema();
+                      }}
+                    >
+                      <Icon name="schema" size={15} />
+                      <span>{t('共通・hibachi', 'Shared and hibachis')}</span>
+                    </button>
+                  </div>
+                </fieldset>
+              )}
               <RoutineRuntimes onError={onError} />
               <AccountSection
                 onRestore={() => {
@@ -239,10 +261,12 @@ export function Settings({
                   setRestoring(true);
                 }}
               />
-              <section className="settings-updates" aria-label={t('更新', 'Updates')}>
-                <h3>{t('更新', 'Updates')}</h3>
-                <UpdateNotice host={host} />
-              </section>
+              {!start && (
+                <section className="settings-updates" aria-label={t('更新', 'Updates')}>
+                  <h3>{t('更新', 'Updates')}</h3>
+                  <UpdateNotice host={host} />
+                </section>
+              )}
             </Popover.Popup>
           </Popover.Positioner>
         </Popover.Portal>

@@ -128,7 +128,8 @@
 }
 .start-footer .update-notice > button,
 .start-footer .cloud-recovery-trigger,
-.start-footer .language-switch {
+.start-footer .language-switch,
+.start-footer .start-settings {
   height: 30px;
   padding: 0 10px;
   border-radius: 9px;
@@ -139,11 +140,13 @@
 }
 .start-footer .update-notice > button:hover:not(:disabled),
 .start-footer .cloud-recovery-trigger:hover,
-.start-footer .language-switch:hover {
+.start-footer .language-switch:hover,
+.start-footer .start-settings:hover {
   background: var(--raised);
   color: var(--tx);
 }
-.start-footer .language-switch {
+.start-footer .language-switch,
+.start-footer .start-settings {
   display: inline-flex;
   align-items: center;
   gap: 6px;
