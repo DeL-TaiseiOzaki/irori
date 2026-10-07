@@ -1,4 +1,4 @@
-import { constants, createReadStream, promises as fs } from 'node:fs';
+import { constants, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -40,6 +40,10 @@ const queueLimit = MiB;
 /** The newest events a view is sent; the file keeps all of them. */
 const viewEvents = 1000;
 const viewBytes = 8 * MiB;
+/** `events.jsonl` is read from its end this many bytes at a time. */
+const chunkSize = 256 * 1024;
+/** How many conversations keep the count of the lines before their view window. */
+const countedLimit = 256;
 
 const delegate = z.object({
   scopeId: z.string(),
@@ -137,6 +141,108 @@ export function storedLine(event: AgentEvent, at = new Date().toISOString()): St
   });
 }
 
+/**
+ * The lines of `[start, end)` in a file, newest first, each with the byte it starts
+ * at: `start` and `end` lie on line boundaries. A line over `lineLimit` is given
+ * without its text, and a blank line is left out. The file is read from the end
+ * a chunk at a time, so a caller that stops early never reads the rest.
+ */
+async function* linesBackward(
+  handle: fs.FileHandle,
+  start: number,
+  end: number,
+): AsyncGenerator<{ line?: string; offset: number }> {
+  let tail: Buffer[] = [];
+  let tailSize = 0;
+  let skipping = false;
+  const give = (bytes: Buffer, offset: number) => {
+    const line = bytes.toString('utf8');
+    return line.trim() ? { line, offset } : undefined;
+  };
+  while (end > start) {
+    const from = Math.max(start, end - chunkSize);
+    const chunk = Buffer.allocUnsafe(end - from);
+    for (let read = 0; read < chunk.length;) {
+      const { bytesRead } = await handle.read(chunk, read, chunk.length - read, from + read);
+      if (!bytesRead) throw Error('events.jsonl ended before its recorded size');
+      read += bytesRead;
+    }
+    let stop = chunk.length;
+    while (stop > 0) {
+      const newline = chunk.lastIndexOf(10, stop - 1);
+      if (newline < 0) break;
+      const offset = from + newline + 1;
+      if (skipping) {
+        skipping = false;
+        yield { offset };
+      } else {
+        const head = chunk.subarray(newline + 1, stop);
+        const given = give(tail.length ? Buffer.concat([head, ...tail]) : head, offset);
+        if (given) yield given;
+      }
+      tail = [];
+      tailSize = 0;
+      stop = newline;
+    }
+    if (!skipping && stop > 0) {
+      tail.unshift(chunk.subarray(0, stop));
+      tailSize += stop;
+      // A line longer than the limit is counted once and skipped without holding it.
+      if (tailSize > lineLimit) {
+        skipping = true;
+        tail = [];
+        tailSize = 0;
+      }
+    }
+    end = from;
+  }
+  if (skipping) yield { offset: start };
+  else if (tail.length) {
+    const given = give(Buffer.concat(tail), start);
+    if (given) yield given;
+  }
+}
+
+/** What a stored line says of itself without being parsed: its id and kind, when it has the shape of one. */
+const lineShape = (line: string) => {
+  if (line[0] !== '{' || !line.endsWith('}')) return undefined;
+  const id = /"id":"([0-9a-f-]{36})"/.exec(line);
+  const type = /"type":"(status|text|tool|error|done)"/.exec(line);
+  return id && type ? { id: id[1], type: type[1] } : undefined;
+};
+
+/**
+ * The newest events as a view gets them, taken newest first. Lines of one streamed
+ * reply join into its event; an older event is taken while fewer than `viewEvents`
+ * are kept and those kept are within `viewBytes`, so the event crossing the byte
+ * limit stays, as it did when the file was read from its start.
+ */
+class ViewWindow {
+  private kept: StoredEvent[] = [];
+  private bytes = 0;
+  /** False when the window is complete and `line` begins an older event. */
+  take(line: StoredEvent) {
+    const oldest = this.kept.at(-1);
+    if (line.type === 'text' && oldest?.type === 'text' && oldest.id === line.id) {
+      oldest.text = line.text + oldest.text;
+      this.bytes += Buffer.byteLength(line.text);
+      return true;
+    }
+    if (this.kept.length >= viewEvents || this.bytes > viewBytes) return false;
+    // Copy the shortened string: a slice can keep the full tool output alive.
+    const details =
+      line.details && line.details.length > viewDetails
+        ? structuredClone(line.details.slice(0, viewDetails))
+        : line.details;
+    this.kept.push({ ...line, details });
+    this.bytes += Buffer.byteLength(line.text) + (details?.length ?? 0);
+    return true;
+  }
+  get events() {
+    return [...this.kept].reverse();
+  }
+}
+
 function viewEvent(line: StoredEvent, meta: ConversationMeta): AgentEvent {
   const { at: _at, role, details, ...rest } = line;
   return {
@@ -191,6 +297,12 @@ export class ConversationStore {
   private buffers = new Map<string, StoredEvent[]>();
   /** Conversations whose `events.jsonl` is known to end with a newline. */
   private terminated = new Set<string>();
+  /**
+   * What the lines before a conversation's view window add up to, as far as `offset`:
+   * the events they hold and the damaged ones among them. The file is append-only
+   * and the window only moves on, so a later read counts from there.
+   */
+  private counted = new Map<string, { offset: number; events: number; damaged: number }>();
   private scanned?: Promise<void>;
   private loaded?: Promise<void>;
   private timer?: NodeJS.Timeout;
@@ -203,10 +315,16 @@ export class ConversationStore {
     this.folder = conversationsFolder(dataDir);
     this.stateDir = stateFolder(dataDir);
   }
-  private serial(id: string) {
+  /** Runs `operation` after the conversation's earlier ones; a conversation at rest keeps no queue. */
+  private queued<T>(id: string, operation: () => Promise<T>) {
     let queue = this.queues.get(id);
     if (!queue) this.queues.set(id, (queue = new SerialQueue()));
-    return queue;
+    return queue.run(operation).finally(() => {
+      if (queue.busy || this.queues.get(id) !== queue) return;
+      this.queues.delete(id);
+      // Its file's end is checked again before the next write, unless a run is still adding to it.
+      if (!this.states.get(id)?.active && !this.buffers.has(id)) this.terminated.delete(id);
+    });
   }
   /** A time never earlier than the last one given, so queue order and last update are strict. */
   private now() {
@@ -262,9 +380,14 @@ export class ConversationStore {
   }
   private async recover(id: string, state: DeviceState) {
     const active = state.active!;
+    // Its message is among the newest lines; older ones are not read.
     let found = false;
-    await this.readLines(id, (line) => {
-      if (line.id === active.eventId) found = true;
+    await this.withEvents(id, async (handle, size) => {
+      for await (const { line } of linesBackward(handle, 0, size))
+        if (line?.includes(`"id":"${active.eventId}"`)) {
+          found = true;
+          break;
+        }
     });
     const lines: StoredEvent[] = [];
     // The run was claimed and its message not yet written: the message comes back from the claim.
@@ -446,47 +569,70 @@ export class ConversationStore {
     return created;
   }
 
-  /** Reads `events.jsonl` line by line, split at `\n` alone; returns how many lines were damaged. */
-  private async readLines(id: string, visit: (line: StoredEvent) => void) {
+  /** Opens `events.jsonl` for `use`, with its size; a missing file is an empty one. */
+  private async withEvents<T>(
+    id: string,
+    use: (handle: fs.FileHandle, size: number) => Promise<T>,
+  ): Promise<T | undefined> {
     const file = path.join(this.dir(id), 'events.jsonl');
     const stat = await fs.lstat(file).catch((error) => {
       if (missing(error)) return undefined;
       throw error;
     });
-    if (!stat) return 0;
+    if (!stat) return undefined;
     if (!stat.isFile()) throw Error('events.jsonl is not a regular file');
-    let damaged = 0;
-    const take = (text: string) => {
-      if (!text.trim()) return;
-      try {
-        visit(storedEvent.parse(JSON.parse(text)));
-      } catch {
-        damaged++;
-      }
-    };
-    // A line longer than the limit is counted once and skipped without holding it.
-    let rest = '';
-    let skipping = false;
-    for await (const chunk of createReadStream(file, {
-      encoding: 'utf8',
-    }) as AsyncIterable<string>) {
-      let start = 0;
-      for (let end = chunk.indexOf('\n'); end >= 0; end = chunk.indexOf('\n', start)) {
-        if (skipping) skipping = false;
-        else take(rest + chunk.slice(start, end));
-        rest = '';
-        start = end + 1;
-      }
-      if (skipping) continue;
-      rest += chunk.slice(start);
-      if (rest.length > lineLimit) {
-        damaged++;
-        skipping = true;
-        rest = '';
-      }
+    const handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      return await use(handle, stat.size);
+    } finally {
+      await handle.close();
     }
-    if (!skipping) take(rest);
-    return damaged;
+  }
+  /**
+   * The events of `events.jsonl` a view gets, read from the end of the file until
+   * the window is full, with how many events come before them and how many lines
+   * could not be read. The lines before the window are counted by their shape
+   * rather than parsed: a line that is not a JSON object naming an id and a kind
+   * is damaged, and the lines of one streamed reply are one event. A count made
+   * once is kept, so a later read counts only the lines written since.
+   */
+  private async readWindow(id: string, window: ViewWindow) {
+    let damaged = 0;
+    const result = await this.withEvents(id, async (handle, size) => {
+      let start = size;
+      for await (const { line, offset } of linesBackward(handle, 0, size)) {
+        let parsed: StoredEvent | undefined;
+        if (line !== undefined)
+          try {
+            parsed = storedEvent.parse(JSON.parse(line));
+          } catch {
+            // Counted below as damaged, in the window or before it.
+          }
+        if (parsed && !window.take(parsed)) break;
+        if (!parsed) damaged++;
+        start = offset;
+      }
+      // A count kept for a file that has since been replaced by a shorter one starts over.
+      const cached = this.counted.get(id);
+      const count =
+        cached && cached.offset <= start ? { ...cached } : { offset: 0, events: 0, damaged: 0 };
+      let lastText: string | undefined;
+      for await (const { line } of linesBackward(handle, count.offset, start)) {
+        const shape = line === undefined ? undefined : lineShape(line);
+        if (!shape) count.damaged++;
+        else if (shape.type === 'text' && shape.id === lastText) continue;
+        else {
+          count.events++;
+          lastText = shape.type === 'text' ? shape.id : undefined;
+        }
+      }
+      count.offset = start;
+      this.counted.delete(id);
+      this.counted.set(id, count);
+      if (this.counted.size > countedLimit) this.counted.delete(this.counted.keys().next().value!);
+      return count;
+    });
+    return { earlier: result?.events ?? 0, damaged: damaged + (result?.damaged ?? 0) };
   }
   private async append(id: string, lines: StoredEvent[]) {
     if (!lines.length) return;
@@ -635,47 +781,28 @@ export class ConversationStore {
 
   /** The newest events of a conversation for a view, with its queue and run. */
   read(id: string): Promise<OpenConversation> {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       this.usable(id);
       const meta = await this.meta(id);
-      const lines: StoredEvent[] = [];
-      const sizes: number[] = [];
-      let earlier = 0;
-      let bytes = 0;
-      const add = (line: StoredEvent) => {
-        const last = lines.at(-1);
-        if (line.type === 'text' && last?.type === 'text' && last.id === line.id) {
-          last.text += line.text;
-          const size = Buffer.byteLength(last.text) + (last.details?.length ?? 0);
-          bytes += size - sizes[sizes.length - 1];
-          sizes[sizes.length - 1] = size;
-        } else {
-          // Copy the shortened string: a slice can keep the full tool output alive.
-          const details =
-            line.details && line.details.length > viewDetails
-              ? structuredClone(line.details.slice(0, viewDetails))
-              : line.details;
-          lines.push({ ...line, details });
-          const size = Buffer.byteLength(line.text) + (details?.length ?? 0);
-          sizes.push(size);
-          bytes += size;
-        }
-        // Keep the event crossing the byte limit, as the view did before, and
-        // discard older events while reading instead of retaining the whole file.
-        while (lines.length > viewEvents || (lines.length > 1 && bytes - sizes[0] > viewBytes)) {
-          lines.shift();
-          bytes -= sizes.shift()!;
-          earlier++;
-        }
-      };
-      const damaged = await this.readLines(id, add);
-      for (const line of this.buffers.get(id) ?? []) add(line);
+      // The lines not yet written are the newest; the file is read behind them, from its end.
+      const window = new ViewWindow();
+      let full = false;
+      let skipped = 0;
+      let lastText: string | undefined;
+      for (const line of [...(this.buffers.get(id) ?? [])].reverse()) {
+        if (!full && window.take(line)) continue;
+        full = true;
+        if (line.type === 'text' && line.id === lastText) continue;
+        skipped++;
+        lastText = line.type === 'text' ? line.id : undefined;
+      }
+      const { earlier, damaged } = await this.readWindow(id, window);
       const state = this.states.get(id);
       return {
         meta,
-        events: lines.map((line) => viewEvent(line, meta)),
-        earlier,
+        events: window.events.map((line) => viewEvent(line, meta)),
+        earlier: earlier + skipped,
         damaged,
         queued: structuredClone(state?.queued ?? []),
         activeRunId: state?.active?.runId,
@@ -683,7 +810,7 @@ export class ConversationStore {
     });
   }
   enqueue(id: string, placement: Placement, input: StartRun) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       this.usable(id);
       const message = queuedMessage.parse({ ...input, id: randomUUID(), queuedAt: this.now() });
@@ -705,7 +832,7 @@ export class ConversationStore {
     });
   }
   removeQueued(id: string, queuedId: string) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       this.usable(id);
       const state = this.states.get(id);
@@ -730,7 +857,7 @@ export class ConversationStore {
     input: StartRun,
     queuedId?: string,
   ) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       this.usable(id);
       const message = messageInput.parse(input);
@@ -813,12 +940,12 @@ export class ConversationStore {
     clearTimeout(this.timer);
     this.timer = undefined;
     return Promise.all(
-      [...this.buffers.keys()].map((id) => this.serial(id).run(() => this.drain(id))),
+      [...this.buffers.keys()].map((id) => this.queued(id, () => this.drain(id))),
     ).then(() => {});
   }
   /** Writes the run's last events and its end before the end is reported. */
   finish(id: string, event: AgentEvent, hibachis: string[] = []) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.drain(id);
       await this.append(id, [storedLine(event)]);
       const meta = await this.meta(id);
@@ -832,7 +959,7 @@ export class ConversationStore {
     });
   }
   private update(id: string, change: (meta: ConversationMeta) => ConversationMeta) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       return this.summary(await this.writeMeta(change(await this.meta(id))));
     });
@@ -849,7 +976,7 @@ export class ConversationStore {
   }
   /** Removes irori's folder for the conversation; the CLI's own transcript is not touched. */
   remove(id: string) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       await this.init();
       const state = this.states.get(id);
       if (state?.active)
@@ -874,6 +1001,7 @@ export class ConversationStore {
         map.delete(id);
       this.buffers.delete(id);
       this.terminated.delete(id);
+      this.counted.delete(id);
       this.reserved.delete(id);
     });
   }
@@ -889,7 +1017,7 @@ export class ConversationStore {
   }
   /** Records this device's native session; other devices' entries stay as they are. */
   saveNative(id: string, entry: NativeSession | undefined) {
-    return this.serial(id).run(async () => {
+    return this.queued(id, async () => {
       const deviceId = await this.device.id();
       const meta = await this.meta(id);
       const native = { ...meta.native };

@@ -1,10 +1,11 @@
 import { homedir } from 'node:os';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { AgentId, AgentModel, AgentModels } from '../domain/types';
 import { agentModel } from '../domain/conversation';
 import { t } from '../domain/i18n';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc } from './rpc';
+import { Tail } from './tail';
 
 // Reading a list asks the CLI what it offers; none of these generates text.
 const deadline = 30000;
@@ -38,27 +39,25 @@ export function parsePiModels(output: string): AgentModel[] {
 function output(command: string, args: string[]) {
   return new Promise<string>((resolve, reject) => {
     const child = launch(command, args, homedir());
-    let text = '';
-    let stderr = '';
+    const text = new Tail(1024 * 1024);
+    const stderr = new Tail(2000);
     const timer = setTimeout(() => {
       void killTree(child);
       reject(
         Error(t('モデル一覧の取得がタイムアウトしました。', 'Reading the model list timed out.')),
       );
     }, deadline);
-    child.stdout!.on('data', (chunk) => {
-      text = (text + chunk).slice(-1024 * 1024);
-    });
-    child.stderr!.on('data', (chunk) => {
-      stderr = (stderr + chunk).slice(-2000);
-    });
+    child.stdout!.on('data', (chunk) => text.add(String(chunk)));
+    child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
     child.on('error', (error) => {
       clearTimeout(timer);
       reject(error);
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      code === 0 ? resolve(text) : reject(Error(stderr.trim() || `${command} exited (${code})`));
+      code === 0
+        ? resolve(text.toString())
+        : reject(Error(stderr.toString().trim() || `${command} exited (${code})`));
     });
     child.stdin!.end();
   });
@@ -122,6 +121,7 @@ async function claudeModels(): Promise<AgentModel[]> {
     await idle;
   }
   const abort = new AbortController();
+  let child: ChildProcess | undefined;
   const session = query({
     prompt: nothing(),
     options: {
@@ -131,12 +131,12 @@ async function claudeModels(): Promise<AgentModel[]> {
       settingSources: ['user'],
       abortController: abort,
       spawnClaudeCodeProcess: (options) =>
-        launch(
+        (child = launch(
           options.command,
           options.args,
           options.cwd ?? homedir(),
           options.env,
-        ) as ChildProcessWithoutNullStreams,
+        )) as ChildProcessWithoutNullStreams,
     },
   });
   const draining = (async () => {
@@ -178,6 +178,8 @@ async function claudeModels(): Promise<AgentModel[]> {
     abort.abort();
     session.close();
     await draining;
+    // Closed like every other spawn: with whatever the CLI started.
+    if (child) await killTree(child).catch(() => {});
   }
 }
 
