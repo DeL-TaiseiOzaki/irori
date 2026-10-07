@@ -11,7 +11,9 @@ import { agentNames } from '../domain/types';
 import { categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
-import { AgentRequest, eventTarget } from './AgentLog';
+import { AgentRequest } from './AgentLog';
+import { eventTarget } from '../domain/agent-log';
+import { anyRevision, scopeRevision, type ScopeRevisions } from '../domain/revisions';
 import { firstEntries } from './BrainHome';
 import { BrainTile } from './BrainTile';
 import { layoutStorage } from './device-settings';
@@ -399,7 +401,7 @@ function BrainColumn({
   ai,
   agent,
   hibachiAgent,
-  revision,
+  revisions,
   onConnect,
   ...actions
 }: {
@@ -408,9 +410,11 @@ function BrainColumn({
   agent: AgentId;
   /** The AI and Schema rows show only with the hibachi agent (ADR 021). */
   hibachiAgent: boolean;
-  revision: number;
+  revisions: ScopeRevisions;
   onConnect: (space: Space) => void;
 } & Actions) {
+  // This brain's changes alone; another brain's leave its columns as they are.
+  const revision = scopeRevision(revisions, space.scopeId);
   const roots = useResource(() => host.entries(space.scopeId, ''), [space.scopeId], {
     refresh: revision,
   });
@@ -531,7 +535,7 @@ function OverviewColumns({
   ais,
   agentFor,
   hibachiAgent,
-  revision,
+  revisions,
   onConnect,
   ...actions
 }: {
@@ -539,7 +543,7 @@ function OverviewColumns({
   ais: Record<string, BrainAi>;
   agentFor: (scopeId: string) => AgentId;
   hibachiAgent: boolean;
-  revision: number;
+  revisions: ScopeRevisions;
   onConnect: (space: Space) => void;
 } & Actions) {
   return (
@@ -579,7 +583,7 @@ function OverviewColumns({
           ai={ais[space.scopeId] ?? idle}
           agent={agentFor(space.scopeId)}
           hibachiAgent={hibachiAgent}
-          revision={revision}
+          revisions={revisions}
           onConnect={onConnect}
           {...actions}
         />
@@ -708,7 +712,7 @@ export function Overview({
   workspace,
   spaces,
   view,
-  revision,
+  revisions,
   addDisabled,
   agentFor,
   hibachiAgent,
@@ -739,7 +743,8 @@ export function Overview({
   workspace: WorkspaceProfile;
   spaces: Space[];
   view: OverviewView;
-  revision: number;
+  /** The host's file changes, counted per hibachi. */
+  revisions: ScopeRevisions;
   addDisabled: boolean;
   agentFor: (scopeId: string) => AgentId;
   /** Each hibachi's own agent is offered (ADR 021); otherwise the irori agent alone. */
@@ -945,7 +950,7 @@ export function Overview({
               workspaceId={workspace.id}
               spaces={spaces}
               you={you}
-              revision={revision}
+              revision={scopeRevision(revisions, you?.id)}
               creating={creatingRoutine}
               onCloseCreate={() => setCreatingRoutine(false)}
               choices={routineChoices}
@@ -975,7 +980,7 @@ export function Overview({
             <OverviewMap
               spaces={spaces}
               ais={ais}
-              refresh={revision}
+              refresh={anyRevision(revisions)}
               you={you}
               yourAi={yourAi}
               onShowYou={onShowYou}
@@ -987,7 +992,7 @@ export function Overview({
               ais={ais}
               agentFor={agentFor}
               hibachiAgent={hibachiAgent}
-              revision={revision}
+              revisions={revisions}
               onConnect={onConnect}
               {...shared}
             />

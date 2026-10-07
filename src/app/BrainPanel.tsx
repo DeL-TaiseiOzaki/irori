@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
 import { knowledgeFolder, layerLabel } from '../domain/layers';
 import { Menu } from '@base-ui/react/menu';
 import {
@@ -18,6 +18,7 @@ import { MagnetTabs } from './obsidian/MagnetTabs';
 import { layoutStorage } from './device-settings';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
+import { useLanguage } from './useLanguage';
 import './brain-panel.css';
 
 const host = window.irori;
@@ -227,8 +228,11 @@ const editorSections: { layer: Layer; defaultSize: string }[] = [
 // A folded section keeps its heading line.
 const headingHeight = 36;
 
-/** One brain: its Schema, Knowledge and Contents, and its changes. */
-export function BrainPanel({
+/**
+ * One brain: its Schema, Knowledge and Contents, and its changes. Memoised: it
+ * re-renders for its own data, not for every keystroke in the editor.
+ */
+export const BrainPanel = memo(function BrainPanel({
   space,
   roots,
   mode,
@@ -300,6 +304,7 @@ export function BrainPanel({
   /** The Changes view, owned by the caller. */
   children?: ReactNode;
 }) {
+  useLanguage();
   const [folded, setFolded] = useState<Layer[]>([]);
   const [schemaFiles, setSchemaFiles] = useState(false);
   const refs = {
@@ -567,4 +572,4 @@ export function BrainPanel({
       </div>
     </section>
   );
-}
+});

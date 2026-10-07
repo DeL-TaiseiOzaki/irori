@@ -6,6 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { sessionKey } from '../src/agents/sessions';
+import { jsonLine, storedLine } from '../src/agents/conversations';
 import { SettingsService } from '../src/host/settings';
 
 // A hibachi's conversations (ADR 017 stage 1): a record from before is migrated,
@@ -44,6 +45,54 @@ await writeFile(
     queued: [],
     truncated: false,
   }),
+);
+// A conversation of 399 events, one short of the window a column keeps: the next
+// run's events push the oldest out, and the log must keep its nodes meanwhile.
+const longId = randomUUID();
+const longAt = '2025-01-01T00:00:00.000Z';
+await mkdir(path.join(files.dataDir, 'conversations', longId), { recursive: true });
+await writeFile(
+  path.join(files.dataDir, 'conversations', longId, 'meta.json'),
+  JSON.stringify({
+    schemaVersion: 1,
+    id: longId,
+    owner: { kind: 'hibachi', id: space.scopeId, name: '会話検証' },
+    agent: 'pi',
+    model: null,
+    title: '長い会話',
+    titleSource: 'first-message',
+    createdAt: longAt,
+    updatedAt: longAt,
+    linkedNote: null,
+    hibachis: [],
+    pinned: false,
+    archived: false,
+    forkedFrom: null,
+    native: {},
+  }),
+);
+await writeFile(
+  path.join(files.dataDir, 'conversations', longId, 'events.jsonl'),
+  Array.from({ length: 100 }, (_, n) => {
+    const run = randomUUID();
+    const lines = [
+      { runId: run, role: 'user' as const, type: 'status' as const, text: `長い会話 ${n + 1}` },
+      ...(n < 99
+        ? [
+            {
+              runId: run,
+              type: 'tool' as const,
+              text: '読む',
+              details: JSON.stringify({ path: 'note.md' }),
+              call: `call-${n}`,
+            },
+          ]
+        : []),
+      { runId: run, type: 'text' as const, text: `返事 ${n + 1}` },
+      { runId: run, type: 'done' as const, text: '完了', outcome: 'completed' as const },
+    ];
+    return lines.map((line) => jsonLine(storedLine(line, longAt))).join('');
+  }).join(''),
 );
 const bin = path.join(base, 'bin');
 await mkdir(bin);
@@ -139,11 +188,12 @@ try {
   await expect(panel(page).locator('.message.user')).toHaveText(['二つ目の話題']);
 
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
-  await expect(history(page).locator('.history-row')).toHaveCount(3);
+  await expect(history(page).locator('.history-row')).toHaveCount(4);
   await expect(history(page).locator('.history-title')).toHaveText([
     '最初の話題',
     '二つ目の話題',
     '以前の会話',
+    '長い会話',
   ]);
   await expect(row(page, '二つ目の話題')).toHaveAttribute('aria-current', 'true');
   // Rename, pin and archive.
@@ -167,7 +217,31 @@ try {
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
   await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 6']);
   await page.screenshot({ path: 'test-results/irori-conversations.png' });
-  expect((await readdir(path.join(files.dataDir, 'conversations'))).length).toBe(2);
+  expect((await readdir(path.join(files.dataDir, 'conversations'))).length).toBe(3);
+
+  // The long conversation: its log keeps its nodes, and the details the person
+  // opened, while a new run's events push the oldest out of the window.
+  await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
+  await row(page, '長い会話').locator('.history-open').click();
+  await expect(history(page)).toHaveCount(0);
+  await expect(panel(page).locator('.message.user')).toHaveCount(100);
+  await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 1');
+  const steps = panel(page).locator('details.step');
+  await steps.nth(1).locator('summary').click();
+  await expect(steps.nth(1)).toHaveJSProperty('open', true);
+  const keptMessage = (await panel(page).locator('.message.user').nth(1).elementHandle())!;
+  const openedStep = (await steps.nth(1).elementHandle())!;
+  await send(page, '窓を滑らせる');
+  await expect(panel(page).locator('.message.user').last()).toHaveText('窓を滑らせる');
+  await expect(panel(page).locator('.message.text').last()).toContainText('の応答');
+  await expect(panel(page).getByText(/以前の \d+ 件を省略/)).toBeVisible();
+  await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 2');
+  expect(await keptMessage.evaluate((element) => element.isConnected)).toBe(true);
+  expect(
+    await openedStep.evaluate(
+      (element) => element.isConnected && (element as HTMLDetailsElement).open,
+    ),
+  ).toBe(true);
 
   // Restarted, the conversations and their names are kept.
   await app.close();
@@ -179,6 +253,7 @@ try {
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
   await expect(history(page).locator('.history-title')).toHaveText([
+    '長い会話',
     '名前を変えた話題',
     '以前の会話',
   ]);
@@ -208,6 +283,7 @@ try {
         'delete',
       ],
       restart: 'kept',
+      longLog: 'nodes kept while the window slides',
       iroriAgent: 'separate history',
     }),
   );

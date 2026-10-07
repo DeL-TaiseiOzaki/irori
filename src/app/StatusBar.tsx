@@ -1,15 +1,18 @@
+import { memo } from 'react';
 import type { GitStatus } from '../domain/git';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { appVersion } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
+import { useLanguage } from './useLanguage';
 
 /**
  * The workspace, the brain on show with its branch, the AI
  * across brains, the terminal and the version, along the window's foot.
+ * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
-export function StatusBar({
+export const StatusBar = memo(function StatusBar({
   workspace,
   space,
   git,
@@ -37,6 +40,7 @@ export function StatusBar({
   onAi: () => void;
   onTerminal: () => void;
 }) {
+  useLanguage();
   return (
     <footer className="status-bar chrome">
       <button className="status-item" disabled={workspaceDisabled} onClick={onWorkspace}>
@@ -88,4 +92,4 @@ export function StatusBar({
       <span className="status-version">{appVersion}</span>
     </footer>
   );
-}
+});
