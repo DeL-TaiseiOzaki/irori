@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.1.77",
+  "version": "0.1.79",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
