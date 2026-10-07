@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-07: **0.1.78** ([#181](https://github.com/DeL-TaiseiOzaki/irori/pull/181),
+removing a hibachi from the start screen) merged at the owner's request as `45417e7`
+and is published as
+[v0.1.78-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.78-preview.1)
+by release run `37587261904` from main's successful CI run `37585965134`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,159,744 bytes,
+  Mac 141,761,146 bytes and `irori-0.1.78-full.nupkg` 175,327,231 bytes.
+  The website manifest now offers 0.1.78.
+- Owner checks remain: removing a hibachi from the start screen on the
+  installed Windows and Mac builds, including moving its folder to the trash.
+
 Published 2026-10-06: **0.1.77** ([#179](https://github.com/DeL-TaiseiOzaki/irori/pull/179),
 making routines from the routines page or through the irori agent, [ADR 016](decisions/016-routines.md)
 stage 4) merged at the owner's request as `5bce1c6` and is published as

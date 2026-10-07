@@ -31,6 +31,22 @@ reviewed by another model.
   opened step mounted while the 400-event window slides; `git-ui-smoke` checks
   that another hibachi's file event refreshes nothing). Not verified: the effect
   measured on a real long session, real CLIs, Windows and macOS.
+- Each hibachi's CLI choice now survives a reload of the window
+  (`sessionStorage`): a reload stops the runs it started, and once the stop no
+  longer waited a fixed 300 ms the column fell back to the default CLI and an
+  empty conversation (seen only in CI's `harness-ui-smoke`).
+
+Published 2026-10-07: **0.1.78** ([#181](https://github.com/DeL-TaiseiOzaki/irori/pull/181),
+removing a hibachi from the start screen) merged at the owner's request as `45417e7`
+and is published as
+[v0.1.78-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.78-preview.1)
+by release run `37587261904` from main's successful CI run `37585965134`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,159,744 bytes,
+  Mac 141,761,146 bytes and `irori-0.1.78-full.nupkg` 175,327,231 bytes.
+  The website manifest now offers 0.1.78.
+- Owner checks remain: removing a hibachi from the start screen on the
+  installed Windows and Mac builds, including moving its folder to the trash.
 
 Removing a hibachi from the start screen, 2026-10-07 (**0.1.78**): the owner
 asked to remove a hibachi from the start screen (workspace selection) rather
@@ -40,7 +56,8 @@ than only from **hibachi の設定**.
   exported from `BrainSettings.tsx`), which calls `removeSpace` as before; the
   start screen then reads the hibachis and workspaces again and drops the
   hibachi from the selection. A workspace left without hibachis stays listed.
-- Verified: see the pull request. `brain-settings-ui-smoke` restarts on the
+- Verified: `npm run build`, `npm run format:check`, `npm test` (429 tests,
+  424 passed, 5 skipped) and every UI suite under `xvfb-run`. `brain-settings-ui-smoke` restarts on the
   start screen, removes a hibachi there without ticking its chip, and checks
   that `spaces.json` and the workspace no longer list it while its folder's
   `scope.json` remains.
