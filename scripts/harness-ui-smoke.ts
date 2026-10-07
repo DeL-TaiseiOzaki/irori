@@ -187,6 +187,10 @@ try {
       await page.getByLabel('エージェントへの指示').fill('dialog reload');
       await page.getByRole('button', { name: '送信', exact: true }).click();
       await expect(page.locator('.request')).toBeVisible();
+      const consoleErrors: string[] = [];
+      page.on('console', (message) => {
+        if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 1500));
+      });
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
       await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
@@ -215,6 +219,7 @@ try {
           ),
           Date.now() - started,
         );
+        console.log('DIAG errors', JSON.stringify(errors), JSON.stringify(consoleErrors));
         await page.waitForTimeout(5000);
         console.log('DIAG later done', await page.locator('.message.done').count());
         throw error;
