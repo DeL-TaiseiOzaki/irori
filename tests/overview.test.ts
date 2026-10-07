@@ -12,52 +12,51 @@ const ids = {
 
 test('the map places each brain once, the same way every time, inside the board', () => {
   const spaces = [
-    { scopeId: ids.a, category: 'personal' as const },
-    { scopeId: ids.b, category: 'team' as const },
-    { scopeId: ids.c, category: 'team' as const },
+    { scopeId: ids.a, category: 'personal' },
+    { scopeId: ids.b, category: 'team' },
+    { scopeId: ids.c, category: '研究室' },
     { scopeId: ids.d },
   ];
   const layout = mapLayout(spaces);
   assert.deepEqual(layout, mapLayout(spaces.map((space) => ({ ...space }))));
-  assert.deepEqual(layout.nodes.map((node) => node.scopeId).sort(), Object.values(ids).sort());
   for (const node of layout.nodes) {
     assert.ok(node.x > 0 && node.x < board.width);
     assert.ok(node.y > 0 && node.y < board.height);
   }
-  // Team above personal above the brains without a category; the team keeps its order.
-  const at = (id: string) => layout.nodes.find((node) => node.scopeId === id)!;
-  assert.ok(at(ids.b).y < at(ids.a).y && at(ids.a).y < at(ids.d).y);
-  assert.ok(at(ids.b).x < at(ids.c).x);
-  assert.equal(at(ids.b).y, at(ids.c).y);
-  // Categories are soft areas; a brain without one has none.
-  assert.deepEqual(layout.groups.map((group) => group.category).sort(), ['personal', 'team']);
-  const team = layout.groups.find((group) => group.category === 'team')!;
-  for (const id of [ids.b, ids.c]) {
-    assert.ok(at(id).x > team.x && at(id).x < team.x + team.width);
-    assert.ok(at(id).y > team.y && at(id).y < team.y + team.height);
-  }
-});
-
-test('brains with no category at all are one row without areas', () => {
-  const layout = mapLayout([{ scopeId: ids.a }, { scopeId: ids.b }]);
-  assert.equal(layout.groups.length, 0);
-  assert.equal(layout.nodes[0].y, layout.nodes[1].y);
-  assert.deepEqual(mapLayout([]), { nodes: [], groups: [], hearth: undefined });
+  // Categories do not move a hibachi: one row in the workspace's order, without areas.
+  assert.deepEqual(
+    layout.nodes.map((node) => node.scopeId),
+    [ids.a, ids.b, ids.c, ids.d],
+  );
+  assert.ok(layout.nodes.every((node) => node.y === layout.nodes[0].y));
+  assert.ok(layout.nodes.every((node, i) => i === 0 || node.x > layout.nodes[i - 1].x));
+  assert.equal('groups' in layout, false);
+  assert.deepEqual(mapLayout([]), { nodes: [], hearth: undefined });
 });
 
 test('with your AI, the hearth is on the left and the brains keep to its right', () => {
-  const layout = mapLayout(
-    [
-      { scopeId: ids.a, category: 'team' },
-      { scopeId: ids.b, category: 'team' },
-      { scopeId: ids.c },
-    ],
-    { hearth: true },
-  );
+  const layout = mapLayout([{ scopeId: ids.a }, { scopeId: ids.b }, { scopeId: ids.c }], {
+    hearth: true,
+  });
   assert.ok(layout.hearth && layout.hearth.x < 200);
   for (const node of layout.nodes)
     assert.ok(node.x > layout.hearth.x + 150 && node.x < board.width);
-  for (const group of layout.groups) assert.ok(group.x > layout.hearth.x + 60);
+});
+
+test('many hibachis wrap into rows of four in order', () => {
+  const spaces = Array.from({ length: 6 }, (_, i) => ({
+    scopeId: `00000000-0000-4000-8000-00000000010${i}`,
+  }));
+  for (const hearth of [false, true]) {
+    const layout = mapLayout(spaces, { hearth });
+    const ys = [...new Set(layout.nodes.map((node) => node.y))];
+    assert.equal(ys.length, 2);
+    assert.deepEqual(
+      layout.nodes.filter((node) => node.y === ys[0]).map((node) => node.scopeId),
+      spaces.slice(0, 4).map((space) => space.scopeId),
+    );
+    for (const node of layout.nodes) assert.ok(node.y > 0 && node.y < board.height);
+  }
 });
 
 function run(scopeId: string, createdAt: string, sources: [string, string][]): RunRecord {
@@ -103,22 +102,4 @@ test('a line joins brains whose AI read another brain’s notes, named by the la
     },
   ]);
   assert.equal(noteLabel(links[0].path), '競合調査');
-});
-
-test('categories of the KBs’ own follow the presets in name order, each its own area', () => {
-  const layout = mapLayout([
-    { scopeId: ids.a, category: '研究室' },
-    { scopeId: ids.b, category: 'personal' },
-    { scopeId: ids.c, category: 'Club' },
-    { scopeId: ids.d },
-  ]);
-  const y = (id: string) => layout.nodes.find((node) => node.scopeId === id)!.y;
-  assert.ok(y(ids.b) < y(ids.c) && y(ids.c) < y(ids.a) && y(ids.a) < y(ids.d));
-  assert.deepEqual(
-    layout.groups.map((group) => group.category),
-    ['personal', 'Club', '研究室'],
-  );
-  // Areas of neighbouring rows do not overlap.
-  for (const [upper, lower] of layout.groups.slice(1).map((group, i) => [layout.groups[i], group]))
-    assert.ok(upper.y + upper.height <= lower.y);
 });

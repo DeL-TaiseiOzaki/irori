@@ -256,19 +256,6 @@ function OverviewMap({
   return (
     <section className="map-board" aria-label={t('hibachi の地図', 'Map of hibachis')}>
       <div className="map-canvas">
-        {layout.groups.map((group) => (
-          <div
-            key={group.category}
-            className="map-group"
-            style={{
-              ...at(group),
-              width: `${(group.width / board.width) * 100}%`,
-              height: `${(group.height / board.height) * 100}%`,
-            }}
-          >
-            <span>{categoryName(group.category)}</span>
-          </div>
-        ))}
         <svg
           className="map-lines"
           viewBox={`0 0 ${board.width} ${board.height}`}
@@ -376,10 +363,6 @@ function OverviewMap({
         <span>
           <i className="legend-reference" />
           {t('別の hibachi のノートを参照', "Read another hibachi's notes")}
-        </span>
-        <span>
-          <i className="legend-group" />
-          {t('分類ごとのまとまり', 'Grouped by category')}
         </span>
       </footer>
     </section>

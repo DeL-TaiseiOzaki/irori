@@ -2,7 +2,8 @@
 
 Date: 2026-10-08. Status: owner request; implemented for 0.1.87.
 Amends [ADR 014](014-ui-v5.md) D2 and its brain identity section, where the
-category was one of personal, team and organization.
+category was one of personal, team and organization and the Overview map
+grouped brains by it.
 
 ## Context
 
@@ -26,9 +27,11 @@ Overview's rows.
    settings offer the presets and the categories the workspace's hibachis
    already carry, and accept a new name. In the settings an empty field is no
    category; at registration it is `personal`, as before.
-4. **The Overview map** keeps one row per category: organization, team,
-   personal, then the KB's own categories in name order, then hibachis without
-   one. The areas shrink as rows are added so that they do not overlap.
+4. **The irori mode map does not group by category.** On 2026-10-08 the owner
+   said the hibachis there need not be shown by category. The map lays them out
+   in the workspace's order, four to a row, without category areas or their
+   legend entry; the rail's named groups (0.1.69) are how a person arranges
+   hibachis. A hibachi's column still shows its category beside its name.
 5. `irori add|create|clone --category` takes any such name and maps preset names
    the same way.
 

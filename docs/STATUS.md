@@ -11,12 +11,13 @@ Categories of your own, 2026-10-08 (**0.1.87**, [ADR 029](decisions/029-free-cat
 - `CategoryField` (input with a datalist) replaces the registration select and the
   settings segments. Empty is no category in the settings and `personal` at
   registration.
-- `mapLayout` orders rows organization, team, personal, own categories by name,
-  none, and shrinks the areas so rows do not overlap.
-- Verified: `npm run build`, `npm test` (510 tests: 505 passed, 5 skipped, 0 failed;
-  new tests in `brains`, `space-settings`, `overview`, `irori-command`), and the UI
-  suites `ui-smoke`, `brain-settings` (types `研究室`, then `Team`), `layers`,
-  `overview` and `rail-groups`. Not verified: Windows and macOS, a real knowledge base.
+- The irori mode map no longer groups by category (owner, 2026-10-08): `mapLayout`
+  places hibachis in the workspace's order, four to a row, and returns no groups;
+  `.map-group` and the legend's 分類ごとのまとまり are gone.
+- Verified: `npm run build`, `npm test` (509 tests: 504 passed, 5 skipped, 0 failed;
+  new tests in `brains`, `space-settings`, `overview`, `irori-command`), and all 30
+  UI suites (`brain-settings` types `研究室`, then `Team`; `overview` finds no
+  category areas). Not verified: Windows and macOS, a real knowledge base.
 - irori-templete [#14](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/14)
   (ADR 007) gives a category of the scope's own the personal discipline in lint and init.
 
