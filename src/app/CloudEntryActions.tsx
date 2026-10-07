@@ -65,19 +65,6 @@ export function EntryMenu({
   );
 }
 
-/** The same actions for the open document of a connected folder, in the document toolbar. */
-export function CloudDocumentActions({ onAction }: { onAction: (action: EntryAction) => void }) {
-  return (
-    <>
-      {entryActions.map((action) => (
-        <button key={action} onClick={() => onAction(action)}>
-          {actionLabel(action)}
-        </button>
-      ))}
-    </>
-  );
-}
-
 /**
  * Renames, moves or deletes one entry of an editable connected folder. The host
  * checks everything again; the checks here only answer before a round trip.

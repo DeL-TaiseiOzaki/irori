@@ -9,7 +9,7 @@ import { t } from '../domain/i18n';
 import { agentAccessModes, agentIds } from '../domain/types';
 import type { AgentId, DeviceSettings, Space, WorkspaceProfile } from '../domain/types';
 import type { GitStatus } from '../domain/git';
-import { agentModel } from '../domain/conversation';
+import { agentModel, promptLimit } from '../domain/conversation';
 import { requireAgentAccess } from '../domain/agent-access';
 import { within } from '../domain/scopes';
 import {
@@ -92,7 +92,7 @@ const agentStep = z
     model: agentModel.optional(),
     prompt: z
       .string()
-      .max(32000)
+      .max(promptLimit)
       .refine((value) => !!value.trim()),
   })
   .strict();

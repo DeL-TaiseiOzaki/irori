@@ -9,7 +9,7 @@ import { Icon } from './Icon';
 import type { BrainAi } from './useBrainAi';
 import { ModelPicker } from './ModelPicker';
 import { ConversationHistory } from './ConversationHistory';
-import type { ConversationSummary } from '../domain/conversation';
+import { promptLimit, type ConversationSummary } from '../domain/conversation';
 
 /** The latest run of a conversation, and whether it is still going. */
 export function latestRun(ai: BrainAi) {
@@ -239,7 +239,7 @@ export function YourAiPanel({
           placeholder={t('指示…', 'Instruction…')}
           rows={3}
           value={text}
-          maxLength={32000}
+          maxLength={promptLimit}
           disabled={busy}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {

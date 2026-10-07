@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { handToSubAgent, outsideHibachi, outsideIroriAgent } from '../../prompts';
+import { within } from '../domain/scopes';
 
 /**
  * What your AI may reach in one run: its own folder, and the brains handed to
@@ -12,11 +13,6 @@ export interface Delegation {
 }
 
 export type Decision = { allow: true } | { allow: false; reason: string };
-
-function within(root: string, file: string) {
-  const relative = path.relative(root, file);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
 
 /** The brain a sub-agent works for, by the name its definition carries. */
 export function brainOfAgent(delegation: Delegation, agentType?: string) {

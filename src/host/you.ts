@@ -14,6 +14,7 @@ import {
   type YourAiEntry,
 } from '../domain/you';
 import { iroriAgentSkills, yourAiStarter, type SharedSchemaPrompt } from '../../prompts';
+import { within } from '../domain/scopes';
 import { instructionsFile } from '../domain/schema-settings';
 import type { AgentSkill } from '../domain/skills';
 import { readTextDocument } from './files';
@@ -40,11 +41,6 @@ const sharedInline = 32 * 1024;
 
 /** Where a standard skill's package is in the irori agent's folder. */
 const standardSkill = (name: string) => `.agents/skills/${name}`;
-
-function within(root: string, file: string) {
-  const rel = path.relative(root, file);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-}
 
 /**
  * Your AI's folder on this device. Its record (an id and the folder) lives in

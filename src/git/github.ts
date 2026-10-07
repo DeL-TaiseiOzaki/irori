@@ -10,6 +10,8 @@ import {
 import { findGitHubCli, gitDetail } from './process';
 
 const signedOut = /gh auth login|not logged in|authentication required|HTTP 401|bad credentials/i;
+/** More than any answer irori asks for: a base64 file under GitHub's 1 MB contents limit. */
+const outputLimit = 4 * 1024 * 1024;
 
 /**
  * The GitHub CLI, run for the few account and repository calls irori makes on
@@ -45,7 +47,8 @@ export class GitHubCli {
     const child = launch(gh, args, process.cwd(), env);
     this.children.add(child);
     return new Promise<string>((resolve, reject) => {
-      let output = '',
+      const output: Buffer[] = [];
+      let size = 0,
         diagnostic = '',
         failure: Error | undefined;
       let stopping: Promise<void> | undefined;
@@ -56,7 +59,12 @@ export class GitHubCli {
         stopping ??= killTree(child);
       }, timeout);
       child.stdout?.on('data', (bytes: Buffer) => {
-        output = (output + bytes.toString()).slice(-64000);
+        size += bytes.length;
+        if (size <= outputLimit) output.push(bytes);
+        else if (!failure) {
+          failure = Error(t('GitHub の応答が大きすぎます。', 'The GitHub answer is too large.'));
+          stopping ??= killTree(child);
+        }
       });
       child.stderr?.on('data', (bytes: Buffer) => {
         diagnostic = (diagnostic + bytes.toString()).slice(-16000);
@@ -73,8 +81,9 @@ export class GitHubCli {
         void (async () => {
           await stopping?.catch(() => {});
           if (failure) throw failure;
-          if (code !== 0) throw ghError(diagnostic || output, forbidden);
-          return output;
+          const text = Buffer.concat(output).toString('utf8');
+          if (code !== 0) throw ghError(diagnostic || text, forbidden);
+          return text;
         })()
           .finally(() => this.children.delete(child))
           .then(resolve, reject);

@@ -50,6 +50,9 @@ test('your AI writes in its own folder, and a brain changes only through its sub
     ],
   };
   assert.equal(writeDecision(delegation, undefined, 'plans/today.md').allow, true);
+  // A name that only starts with two dots is still inside the folder.
+  assert.equal(writeDecision(delegation, undefined, '..plans/today.md').allow, true);
+  assert.equal(writeDecision(delegation, undefined, '../elsewhere.md').allow, false);
   assert.equal(
     writeDecision(delegation, 'hibachi-product', '/kb/product/Knowledge_Base/a.md').allow,
     true,

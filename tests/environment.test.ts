@@ -277,3 +277,16 @@ test('a public settings repository, a newer file and a concurrent save are refus
   await assert.rejects(f.a.environment.save(), /is public/);
   await assert.rejects(f.b.environment.state(), /is public/);
 });
+
+test('a GitHub answer larger than 64 KB arrives whole, with its multibyte text intact', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori gh answer '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const fake = await fakeGh(base);
+  await mkdir(path.join(fake.github, 'octo', 'irori-settings'), { recursive: true });
+  const text = JSON.stringify({ notes: '日本語のメモ'.repeat(20000) });
+  await writeFile(path.join(fake.github, 'octo', 'irori-settings', 'environment.json'), text);
+  const github = new GitHubCli(async () => fake.gh);
+  t.after(() => github.close());
+  const file = await github.readFile('octo/irori-settings', 'environment.json');
+  assert.equal(file?.text, text);
+});

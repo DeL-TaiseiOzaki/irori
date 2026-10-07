@@ -73,7 +73,6 @@ const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${f
 /** The Schema section as settings: what the agent reads, grouped by what it is. */
 export function SchemaList({
   scopeId,
-  space,
   common = false,
   revision,
   selected,
@@ -82,8 +81,6 @@ export function SchemaList({
   onOpenFile,
 }: {
   scopeId: string;
-  /** The hibachi, or none for the irori agent's folder. */
-  space?: Space;
   /** The shared Schema (ADR 027): instructions and skills only. */
   common?: boolean;
   revision: number;

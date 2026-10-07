@@ -38,6 +38,7 @@ import type { SessionBinding } from './sessions';
 import { ConversationStore, rootDigest, viewDetails, type Placement } from './conversations';
 import {
   conversationTitle,
+  promptLimit,
   startInput,
   type Conversation,
   type ConversationOwner,
@@ -73,7 +74,6 @@ import {
   hibachiOf,
   toolFile,
   writeDecision,
-  writeTools,
   type Delegation,
 } from './delegation';
 type Reply = { allow: boolean; answers?: AgentAnswers };
@@ -427,7 +427,7 @@ export class AgentService {
           'This conversation is already running. Stop it or add the instruction to its queue.',
         ),
       );
-    if (!input.prompt.trim() || input.prompt.length > 32000)
+    if (!input.prompt.trim() || input.prompt.length > promptLimit)
       throw Error('Enter an instruction (up to 32,000 characters)');
     this.root(input.scopeId);
     const brains = [...new Set(input.brains ?? [])];
@@ -932,8 +932,7 @@ export class AgentService {
       );
       if (input.model)
         this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
-      if (input.agent === 'codex')
-        await this.codex(run, space.root, prompt, binding, saved, input.model);
+      if (input.agent === 'codex') await this.codex(run, space.root, prompt, saved, input.model);
       else if (input.agent === 'claude')
         await this.claude(run, space.root, prompt, binding, saved, input.model);
       else {
@@ -1183,14 +1182,7 @@ export class AgentService {
       signal.removeEventListener('abort', stop);
     }
   }
-  private async codex(
-    run: Run,
-    cwd: string,
-    prompt: string,
-    binding: SessionBinding,
-    session?: string,
-    model?: string,
-  ) {
+  private async codex(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
     const child = launch('codex', ['app-server', '--listen', 'stdio://'], cwd, {
       ...(run.env ?? agentEnv()),
       ...run.step?.env,

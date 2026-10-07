@@ -17,6 +17,7 @@ import {
   appendConversationEvents,
   isDamaged,
   mergeHeldEvents,
+  promptLimit,
   trimConversation,
   withRequests,
   type QueuedMessage,
@@ -1058,7 +1059,7 @@ export function AgentColumn({
             value={prompt}
             rows={3}
             disabled={!ready || !composer.ready || sending}
-            maxLength={irori ? 32000 : 100000}
+            maxLength={promptLimit}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
               if (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AgentId, AgentModels } from '../domain/types';
 import { agentModel } from '../domain/conversation';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
 
 const host = window.irori;
@@ -46,7 +47,7 @@ export function ModelPicker({
     setTyping(undefined);
     void readModels(agent)
       .then((next) => live && setList(next))
-      .catch((error) => live && setList({ models: [], custom: true, error: String(error) }));
+      .catch((error) => live && setList({ models: [], custom: true, error: errorText(error) }));
     return () => {
       live = false;
     };
