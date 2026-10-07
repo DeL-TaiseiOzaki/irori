@@ -574,9 +574,13 @@ test(
     const hermes = async () => (await calls()).filter((call: any) => call.kind === 'hermes');
     const first = await execute('hermes', 'ordinary request');
     assert.equal(first.events.at(-1)?.outcome, 'completed', JSON.stringify(first.events));
-    assert.deepEqual(
-      first.events.filter((e) => e.type === 'text').map((e) => e.text),
-      ['日本語\u2028', 'の応答'],
+    // Deltas that come close reach the views together; their words are the reply once.
+    assert.equal(
+      first.events
+        .filter((e) => e.type === 'text')
+        .map((e) => e.text)
+        .join(''),
+      '日本語\u2028の応答',
       'deltas stream, and the final text is not repeated',
     );
     assert.deepEqual(

@@ -1,5 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
 import { launch } from './process';
+import { Tail } from './tail';
 import type { NativeContext } from './adapter';
 import { t } from '../domain/i18n';
 
@@ -48,10 +49,8 @@ export async function runHermes(ctx: NativeContext) {
   };
   let streamed = false;
   let result: Record<string, unknown> | undefined;
-  let stderr = '';
-  child.stderr!.on('data', (chunk) => {
-    stderr = (stderr + chunk).slice(-6000);
-  });
+  const stderr = new Tail(6000);
+  child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
   const receive = (line: string) => {
     let event: Record<string, unknown>;
     try {
@@ -109,8 +108,8 @@ export async function runHermes(ctx: NativeContext) {
   if (!result)
     throw Error(
       t(
-        `Hermes Agent が結果を返さずに終了しました（${exit}）: ${stderr.trim()}`,
-        `Hermes Agent ended without a result (${exit}): ${stderr.trim()}`,
+        `Hermes Agent が結果を返さずに終了しました（${exit}）: ${stderr.toString().trim()}`,
+        `Hermes Agent ended without a result (${exit}): ${stderr.toString().trim()}`,
       ),
     );
   // The final answer is shown when no delta carried it.
