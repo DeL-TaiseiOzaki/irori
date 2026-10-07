@@ -2,7 +2,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { pendingWrite, type CloudWriteRecovery, type PendingWrite } from '../domain/knowledge';
-import { readLocalJson, writeLocalJson } from '../host/local-json';
+import { isMissing, readLocalJson, writeLocalJson } from '../host/local-json';
 import { SerialQueue } from '../host/serial-queue';
 
 // rclone's VFS cache keeps each file's state beside its data: `vfsMeta/<fs>/<path>`
@@ -36,12 +36,10 @@ export class DriveLeftovers {
     );
     const found: { path: string; key: string }[] = [];
     const walk = async (directory: string): Promise<void> => {
-      const items = await fs
-        .readdir(directory, { withFileTypes: true })
-        .catch((error: NodeJS.ErrnoException) => {
-          if (error.code !== 'ENOENT') throw error;
-          return [];
-        });
+      const items = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+        if (!isMissing(error)) throw error;
+        return [];
+      });
       for (const item of items) {
         const filename = path.join(directory, item.name);
         if (item.isDirectory()) await walk(filename);
@@ -83,12 +81,10 @@ export class DriveLeftovers {
   async prepared(): Promise<CloudWriteRecovery> {
     const entries: PendingWrite[] = [];
     let unreadable = 0;
-    const owners = await fs
-      .readdir(this.outbox, { withFileTypes: true })
-      .catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
-        return [];
-      });
+    const owners = await fs.readdir(this.outbox, { withFileTypes: true }).catch((error) => {
+      if (!isMissing(error)) throw error;
+      return [];
+    });
     for (const owner of owners) {
       if (!owner.isDirectory() || !z.uuid().safeParse(owner.name).success) continue;
       try {

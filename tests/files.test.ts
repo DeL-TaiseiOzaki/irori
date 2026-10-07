@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, symlink, rm, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { FileService, textFileByteLimit } from '../src/host/files';
+import { FileService } from '../src/host/files';
+import { textFileByteLimit } from '../src/domain/viewers';
 import { classify, owner } from '../src/domain/scopes';
 import type { Space } from '../src/domain/types';
 async function fixture(t: any) {

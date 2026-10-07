@@ -1,5 +1,5 @@
-import path from 'node:path';
-import type { FileService } from './files';
+import { reachedAsWritten, type FileService } from './files';
+import { ifPresent, isMissing, parseJsonText } from './local-json';
 import { classify } from '../domain/scopes';
 import type { Document, Entry } from '../domain/types';
 import { ontologyDeclaration, ontologyGraph, type OntologyView } from '../domain/ontology';
@@ -13,7 +13,7 @@ export async function knowledgePath(files: FileService, scopeId: string, relativ
   if (classify(space, relative) !== 'Knowledge_Base')
     throw Error('Ontology files and note links must belong to this KB knowledge layer');
   const actual = await files.resolve(scopeId, relative);
-  if (path.relative(space.root, actual).split(path.sep).join('/') !== relative)
+  if (!reachedAsWritten(space.root, actual, relative))
     throw Error('Ontology files must not be aliases');
 }
 
@@ -26,7 +26,7 @@ export async function knowledgeFile(
   try {
     await knowledgePath(files, scopeId, relative);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (isMissing(error)) return undefined;
     throw error;
   }
   return files.read(scopeId, relative);
@@ -34,12 +34,7 @@ export async function knowledgeFile(
 
 /** The text of `.irori/ontology.json`, or null when the KB declares nothing. */
 export async function readDeclaration(files: FileService, scopeId: string) {
-  try {
-    return (await files.read(scopeId, '.irori/ontology.json')).text;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
+  return (await ifPresent(files.read(scopeId, '.irori/ontology.json')))?.text ?? null;
 }
 
 /** Resolve a module's portable NFC note paths to this checkout's actual spelling. */
@@ -95,7 +90,7 @@ export async function readOntology(
   let source: OntologyView['source'];
   let documents: Document[];
   if (declared !== null) {
-    declaration = ontologyDeclaration.parse(JSON.parse(declared.replace(/^\uFEFF/, '')));
+    declaration = ontologyDeclaration.parse(parseJsonText(declared));
     source = 'declared';
     const paths = [
       declaration.entities.path,
@@ -130,7 +125,7 @@ export async function readOntology(
           await knowledgePath(files, scopeId, actual);
           notePaths.set(relative, actual);
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          if (!isMissing(error)) throw error;
         }
       },
     ),

@@ -1,6 +1,4 @@
 import { setImmediate } from 'node:timers/promises';
-import { open } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
 import {
   buildGraphIndex,
@@ -19,7 +17,9 @@ import {
   type GraphIndexUpdate,
   type PageFacts,
 } from '../domain/graph-index';
-import { textFileByteLimit, type FileService } from './files';
+import { utf8Text, type FileService } from './files';
+import { isMissing, stableHash } from './local-json';
+import { textFileByteLimit } from '../domain/viewers';
 import { knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
 import { t } from '../domain/i18n';
@@ -213,49 +213,28 @@ async function moduleFile(files: FileService, scopeId: string, relative: string)
   try {
     await knowledgePath(files, scopeId, relative);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (isMissing(error)) return undefined;
     throw error;
   }
   const filename = await files.resolve(scopeId, relative);
-  const file = await open(filename, 'r');
-  try {
-    const before = await file.stat();
-    if (!before.isFile())
-      throw Error(
-        t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
-      );
-    const digest = createHash('sha256');
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of file.createReadStream({ autoClose: false, end: before.size })) {
-      digest.update(chunk);
-      size += chunk.length;
-      if (size <= textFileByteLimit) chunks.push(chunk);
-      else chunks.length = 0;
-    }
-    const after = await file.stat();
-    if (size !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs)
-      throw Error(
+  const chunks: Buffer[] = [];
+  const { hash, size } = await stableHash(
+    filename,
+    () =>
+      Error(
         t(
           'CONFLICT: グラフ索引の読み取り中にファイルが変更されました。',
           'CONFLICT: A file changed while the graph index was being read.',
         ),
-      );
-    await knowledgePath(files, scopeId, relative);
-    let text: string | undefined;
-    if (size <= textFileByteLimit)
-      try {
-        text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
-          Buffer.concat(chunks),
-        );
-        if (text.includes('\0')) text = undefined;
-      } catch {
-        /* Regeneration can replace invalid UTF-8 too. */
-      }
-    return { hash: digest.digest('hex'), text };
-  } finally {
-    await file.close();
-  }
+      ),
+    (chunk, size) => {
+      if (size <= textFileByteLimit) chunks.push(chunk);
+      else chunks.length = 0;
+    },
+  );
+  await knowledgePath(files, scopeId, relative);
+  // Regeneration can replace invalid UTF-8 too.
+  return { hash, text: size <= textFileByteLimit ? utf8Text(Buffer.concat(chunks)) : undefined };
 }
 
 /** The parsed leading frontmatter, `{}` when the page has none; throws when it cannot be read. */

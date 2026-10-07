@@ -11,8 +11,9 @@ import {
   type DraftRecord,
 } from '../domain/drafts';
 import { FileService, hash } from './files';
+import { textFileByteLimit } from '../domain/viewers';
 import { SerialQueue } from './serial-queue';
-import { writeLocalJson } from './local-json';
+import { isMissing, writeLocalJson } from './local-json';
 import { t } from '../domain/i18n';
 
 const storedDraft = draftValue
@@ -60,7 +61,7 @@ export class DraftService {
       if (!stat.isFile() || stat.size > maxRecordBytes) throw Error('Invalid draft record');
       const record = storedDraft.parse(JSON.parse(await fs.readFile(target.filename, 'utf8')));
       if (record.identity !== target.identity) throw Error('Draft identity mismatch');
-      if (record.text !== null && Buffer.byteLength(record.text) > 2 * 1024 * 1024)
+      if (record.text !== null && Buffer.byteLength(record.text) > textFileByteLimit)
         throw Error('Draft is too large');
       if (target.key.kind === 'git-resolution' && record.text !== null && !record.baseVersion)
         throw Error('Conflict draft has no base version');
@@ -71,7 +72,7 @@ export class DraftService {
         updatedAt: record.updatedAt,
       };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      if (isMissing(error)) return null;
       throw error;
     }
   }
@@ -83,7 +84,7 @@ export class DraftService {
       const target = await this.target(rawKey);
       const value = draftValue.parse(rawValue);
       draftRevision.parse(expectedRevision);
-      if (value.text !== null && Buffer.byteLength(value.text) > 2 * 1024 * 1024)
+      if (value.text !== null && Buffer.byteLength(value.text) > textFileByteLimit)
         throw Error('Draft is too large');
       if (target.key.kind === 'git-resolution' && value.text !== null && !value.baseVersion)
         throw Error('Conflict draft requires its base version');

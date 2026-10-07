@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import writeFileAtomic from 'write-file-atomic';
 import type { FileService } from './files';
+import { isMissing, issueSummary, parseJsonText } from './local-json';
 import type { GitService } from '../git/service';
 import { SerialQueue } from './serial-queue';
 import { actorFromEmail } from '../domain/properties';
@@ -25,10 +26,6 @@ const unreadable = (detail: string) =>
   Error(
     t(`コメントのファイルを読めません: ${detail}`, `The comments file cannot be read: ${detail}`),
   );
-
-function isMissing(error: unknown) {
-  return (error as NodeJS.ErrnoException).code === 'ENOENT';
-}
 
 /**
  * The comments file of a Markdown file in a hibachi, under its `.irori/comments/`.
@@ -80,21 +77,15 @@ async function readFile(filename: string): Promise<{ raw: NoteComments; exists: 
   if (!stat) return { raw: { comments: [] }, exists: false };
   if (!stat.isFile() || stat.isSymbolicLink()) throw unreadable('not an ordinary file');
   if (stat.size > commentsFileLimit) throw unreadable('larger than 1 MiB');
-  const text = (await fs.readFile(filename, 'utf8')).replace(/^﻿/, '');
+  const text = await fs.readFile(filename, 'utf8');
   let value: unknown;
   try {
-    value = JSON.parse(text);
+    value = parseJsonText(text);
   } catch (error) {
     throw unreadable((error as Error).message);
   }
   const parsed = noteComments.safeParse(value);
-  if (!parsed.success)
-    throw unreadable(
-      parsed.error.issues
-        .slice(0, 3)
-        .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-        .join('; '),
-    );
+  if (!parsed.success) throw unreadable(issueSummary(parsed.error.issues));
   return { raw: parsed.data, exists: true };
 }
 

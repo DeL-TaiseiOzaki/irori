@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { FileService, hash } from '../host/files';
-import { replaceFile } from '../host/local-json';
-import { githubRepository } from '../host/workspaces';
+import { FileService, hash, utf8Text } from '../host/files';
+import { textFileByteLimit } from '../domain/viewers';
+import { isMissing, replaceFile } from '../host/local-json';
 import { classify, owner, within } from '../domain/scopes';
 import { lineRanges } from '../domain/knowledge';
 import { lineKey, type AuthorshipStore } from '../knowledge/authorship';
@@ -25,7 +25,7 @@ import type {
   GitSubmodules,
   AddSubmodule,
 } from '../domain/git';
-import { gitRepository, gitScope } from '../domain/git';
+import { githubRepository, gitRepository, gitScope } from '../domain/git';
 import { GitError, GitProcess } from './process';
 import { GitHubCli } from './github';
 import { t } from '../domain/i18n';
@@ -313,7 +313,7 @@ export class GitService {
             ),
           );
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
       }
     }
   }
@@ -585,7 +585,7 @@ export class GitService {
     try {
       return await fs.readFile(path.join(directory, name));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return Buffer.alloc(0);
+      if (isMissing(error)) return Buffer.alloc(0);
       throw error;
     }
   }
@@ -601,7 +601,7 @@ export class GitService {
         await fs.access(path.join(directory, name));
         return 'other';
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
       }
     }
     return (await this.gitFile(directory, 'MERGE_HEAD')).length ? 'merge' : 'none';
@@ -703,7 +703,7 @@ export class GitService {
       await fs.lstat(path.join(this.files.get(id).root, '.git'));
       return false;
     } catch (missing) {
-      return (missing as NodeJS.ErrnoException).code === 'ENOENT';
+      return isMissing(missing);
     }
   }
   private async snapshot(s: Repo): Promise<GitStatus> {
@@ -820,7 +820,7 @@ export class GitService {
     }
     try {
       const filename = path.join(s.root, p);
-      if ((await fs.stat(filename)).size > 2 * 1024 * 1024)
+      if ((await fs.stat(filename)).size > textFileByteLimit)
         throw Error(
           t(
             'このファイルは 2 MiB の差分・編集上限を超えています。',
@@ -829,13 +829,14 @@ export class GitService {
         );
       return await fs.readFile(filename);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      if (isMissing(error)) return;
       throw error;
     }
   }
   private text(bytes: Buffer) {
-    if (bytes.includes(0)) throw Error(t('バイナリファイルです。', 'This is a binary file.'));
-    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    const text = utf8Text(bytes);
+    if (text === undefined) throw Error(t('バイナリファイルです。', 'This is a binary file.'));
+    return text;
   }
   async diff(id: GitTarget, p: string, staged: boolean): Promise<GitDiff> {
     const s = await this.repo(id),
@@ -1253,7 +1254,7 @@ export class GitService {
         blobs.push(undefined);
         continue;
       }
-      if (Number(await this.git(s, ['cat-file', '-s', entry[1]])) > 2 * 1024 * 1024) {
+      if (Number(await this.git(s, ['cat-file', '-s', entry[1]])) > textFileByteLimit) {
         editable = false;
         detail = t(
           '2 MiB を超える競合はここでは編集できません。',
@@ -1304,7 +1305,7 @@ export class GitService {
       if (!conflict.editable) throw Error(conflict.detail);
       if (
         text !== null &&
-        (Buffer.byteLength(text) > 2 * 1024 * 1024 ||
+        (Buffer.byteLength(text) > textFileByteLimit ||
           text.includes('\0') ||
           /^(?:<{7}|={7}|>{7}|\|{7})(?: |$)/m.test(text))
       )
@@ -1413,7 +1414,7 @@ export class GitService {
         await fs.lstat(path.join(s.root, p));
         throw Error(t('同じ名前のフォルダがあります。', 'A folder with this name already exists.'));
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
       }
       await this.git(
         s,

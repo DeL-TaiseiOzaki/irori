@@ -1,10 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { SerialQueue } from './serial-queue';
-import { hash, textFileByteLimit, type FileService } from './files';
+import { editableText, hash, utf8Text, type FileService } from './files';
 import type { SearchService } from './search';
-import { replaceFile } from './local-json';
+import { isMissing, ordinaryFolders, replaceChecked, writeExclusive } from './local-json';
+import { textFileByteLimit } from '../domain/viewers';
 import { spaceFolder, type SchemaFolder } from './schema-folder';
 import { skillName, skillsRoot } from '../domain/skills';
 import {
@@ -29,7 +29,6 @@ const refused = () =>
       'This location cannot be changed as a Schema setting.',
     ),
   );
-const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
 
 /**
  * Writes the files behind the Schema settings: `AGENTS.md` (the brain's and a
@@ -101,13 +100,8 @@ export class SchemaSettingsService {
       throw Error(t('通常のファイルではありません。', 'This is not an ordinary file.'));
     if (stat.size > textFileByteLimit) throw Error('The text editor supports files up to 2 MiB');
     const bytes = await fs.readFile(filename);
-    let text: string;
-    try {
-      text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-    } catch {
-      text = '\0';
-    }
-    if (text.includes('\0'))
+    const text = utf8Text(bytes);
+    if (text === undefined)
       throw Error(
         t('テキストではないファイルは編集できません。', 'Only text files can be edited here.'),
       );
@@ -122,17 +116,13 @@ export class SchemaSettingsService {
    */
   async write(scopeId: string, relative: string, text: string | null, expected: string | null) {
     return this.queue.run(async (): Promise<Document | null> => {
-      if (text !== null) {
-        if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
-          throw Error('The text editor supports files up to 2 MiB');
-        if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
-      }
+      if (text !== null) editableText(text);
       const folder = await this.folderOf(scopeId);
       // The irori agent's AGENTS.md marks its folder as set up; it is edited, never removed.
       if (!folder.knowledge && relative === instructionsFile && text === null) throw refused();
       const filename = await this.target(folder, relative, text !== null && expected === null);
       const existing = await fs.lstat(filename).catch((error) => {
-        if (!missing(error)) throw error;
+        if (!isMissing(error)) throw error;
       });
       if (existing && (!existing.isFile() || existing.isSymbolicLink()))
         throw Error(t('通常のファイルではありません。', 'This is not an ordinary file.'));
@@ -142,13 +132,7 @@ export class SchemaSettingsService {
           throw Error(
             t('同じ名前のファイルが既にあります。', 'A file with the same name already exists.'),
           );
-        const created = await fs.open(filename, 'wx');
-        try {
-          await created.writeFile(text);
-          await created.sync();
-        } finally {
-          await created.close();
-        }
+        await writeExclusive(filename, text);
         return this.read(scopeId, relative);
       }
       const changed = () =>
@@ -159,20 +143,9 @@ export class SchemaSettingsService {
         await this.prune(folder, relative);
         return null;
       }
-      const temp = path.join(path.dirname(filename), `.irori-save-${randomUUID()}.tmp`);
-      try {
-        const pending = await fs.open(temp, 'wx', existing.mode);
-        try {
-          await pending.writeFile(text);
-          await pending.sync();
-        } finally {
-          await pending.close();
-        }
+      await replaceChecked(filename, text, existing.mode, async () => {
         if ((await current()) !== expected) throw changed();
-        await replaceFile(temp, filename);
-      } finally {
-        await fs.rm(temp, { force: true });
-      }
+      });
       return this.read(scopeId, relative);
     });
   }
@@ -193,7 +166,7 @@ export class SchemaSettingsService {
         await fs.lstat(destination).then(
           () => true,
           (error) => {
-            if (!missing(error)) throw error;
+            if (!isMissing(error)) throw error;
             return false;
           },
         )
@@ -207,7 +180,7 @@ export class SchemaSettingsService {
 
   private async optional<T>(read: () => Promise<T[]>) {
     return read().catch((error) => {
-      if (missing(error)) return [] as T[];
+      if (isMissing(error)) return [] as T[];
       throw error;
     });
   }
@@ -224,7 +197,7 @@ export class SchemaSettingsService {
       }
     };
     await visit(directory, 0).catch((error) => {
-      if (!missing(error)) throw error;
+      if (!isMissing(error)) throw error;
     });
     return out.sort((a, b) => a.localeCompare(b));
   }
@@ -248,21 +221,13 @@ export class SchemaSettingsService {
 
   /** A folder inside the brain with no alias on the way, created when asked. */
   private async folder(schema: SchemaFolder, relative: string, create: boolean) {
-    let prefix = '';
-    for (const part of relative.split('/').filter(Boolean)) {
-      prefix = prefix ? `${prefix}/${part}` : part;
-      const filename = path.join(schema.root, prefix);
-      let stat = await fs.lstat(filename).catch((error) => {
-        if (!missing(error) || !create) throw error;
-      });
-      if (!stat) {
-        await fs.mkdir(filename);
-        stat = await fs.lstat(filename);
-      }
-      if (stat.isSymbolicLink() || !stat.isDirectory()) throw refused();
-      // The folder's own check: the same brain, not a nested one or another layer's alias.
-      if ((await schema.resolve(prefix)) !== filename) throw refused();
-    }
+    // Each folder's own check: the same brain, not a nested one or another layer's alias.
+    await ordinaryFolders(relative, create, {
+      location: (prefix) => path.join(schema.root, prefix),
+      resolve: (prefix) => schema.resolve(prefix),
+      notFolder: refused,
+      moved: refused,
+    });
     return path.join(schema.root, relative);
   }
 

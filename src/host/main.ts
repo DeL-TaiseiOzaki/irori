@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } 
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { realpath, open as openFileHandle } from 'node:fs/promises';
+import { realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
@@ -13,6 +13,7 @@ import { resolveLink } from './links';
 import { referringLinks, relink } from './relink';
 import { renameLayerFolder } from './layer-folders';
 import { DraftService } from './drafts';
+import { writeExclusive } from './local-json';
 import { UpdateService } from './updates';
 import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
@@ -317,20 +318,34 @@ app
         emit({ type: 'files', scopeId });
       }
     }
-    /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
-    function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
+    /** A change to a hibachi's files that waits for its runs and for connection setup. */
+    function changeHibachi<T>(scopeId: string, refusal: string, operation: () => Promise<T>) {
       return changeFiles(() =>
         changed(scopeId, async () => {
-          if (agents.busy(scopeId) || cloud.busy)
-            throw Error(
-              t(
-                '実行と接続の準備が終わってから Schema を変更してください。',
-                'Wait for runs and connection setup to finish before changing the Schema.',
-              ),
-            );
+          if (agents.busy(scopeId) || cloud.busy) throw Error(refusal);
           return operation();
         }),
       );
+    }
+    /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
+    function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
+      return changeHibachi(
+        scopeId,
+        t(
+          '実行と接続の準備が終わってから Schema を変更してください。',
+          'Wait for runs and connection setup to finish before changing the Schema.',
+        ),
+        operation,
+      );
+    }
+    const organizing = () =>
+      t(
+        '実行と接続の準備が終わってからノートを整理してください。',
+        'Wait for runs and connection setup to finish before organizing notes.',
+      );
+    /** Refuses a change to the device's registrations while any run, connection or Git operation is under way. */
+    function whenIdle(refusal: string) {
+      if (agents.anyBusy || cloud.busy || git.busy) throw Error(refusal);
     }
     function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (agents.busy(scopeId) || git.busy)
@@ -372,102 +387,71 @@ app
         return true;
       },
       moveNote: (ref, destination, links) =>
-        changeFiles(() =>
-          changed(ref.scopeId, async () => {
-            if (agents.busy(ref.scopeId) || cloud.busy)
-              throw Error(
+        changeHibachi(ref.scopeId, organizing(), async () => {
+          const source = await knowledge.capture(ref);
+          if (source.hash !== ref.hash)
+            throw Error(t('ノートが変更されています。', 'The note has changed.'));
+          const next = await files.moveNote(ref, destination, links);
+          if (next.path === ref.path) return next;
+          // The record is rebound to the bytes as moved, before any link is rewritten.
+          let notice = await knowledge
+            .rebind(source, { scopeId: next.scopeId, path: next.path })
+            .then(
+              () => undefined,
+              () =>
                 t(
-                  '実行と接続の準備が終わってからノートを整理してください。',
-                  'Wait for runs and connection setup to finish before organizing notes.',
+                  'ノートは移動しましたが、資料 ID を再接続できませんでした。',
+                  'The note moved, but its material IDs could not be reconnected.',
                 ),
-              );
-            const source = await knowledge.capture(ref);
-            if (source.hash !== ref.hash)
-              throw Error(t('ノートが変更されています。', 'The note has changed.'));
-            const next = await files.moveNote(ref, destination, links);
-            if (next.path === ref.path) return next;
-            // The record is rebound to the bytes as moved, before any link is rewritten.
-            let notice = await knowledge
-              .rebind(source, { scopeId: next.scopeId, path: next.path })
-              .then(
-                () => undefined,
-                () =>
-                  t(
-                    'ノートは移動しましたが、資料 ID を再接続できませんでした。',
-                    'The note moved, but its material IDs could not be reconnected.',
-                  ),
-              );
+            );
+          const addNotice = (more: string) => {
+            notice = [notice, more].filter(Boolean).join(' ');
+          };
+          try {
+            await moveNoteComments(files, ref.scopeId, ref.path, next.path);
+          } catch {
+            addNotice(
+              t(
+                'ノートは移動しましたが、コメントを移せませんでした。',
+                'The note moved, but its comments could not be moved with it.',
+              ),
+            );
+          }
+          try {
+            await authorship.carry(ref, next, next.text);
+          } catch {
+            addNotice(
+              t(
+                'ノートは移動しましたが、人の行の記録を引き継げませんでした。',
+                'The note moved, but the record of human-written lines could not be carried over.',
+              ),
+            );
+          }
+          if (!links) return { ...next, notice };
+          const update = await relink(files, search, next, ref.path, async (before, after) => {
             try {
-              await moveNoteComments(files, ref.scopeId, ref.path, next.path);
+              await authorship.carry(before, after, before.text, after.text);
             } catch {
-              notice = [
-                notice,
+              addNotice(
                 t(
-                  'ノートは移動しましたが、コメントを移せませんでした。',
-                  'The note moved, but its comments could not be moved with it.',
-                ),
-              ]
-                .filter(Boolean)
-                .join(' ');
-            }
-            try {
-              await authorship.carry(ref, next, next.text);
-            } catch {
-              notice = [
-                notice,
-                t(
-                  'ノートは移動しましたが、人の行の記録を引き継げませんでした。',
-                  'The note moved, but the record of human-written lines could not be carried over.',
-                ),
-              ]
-                .filter(Boolean)
-                .join(' ');
-            }
-            if (!links) return { ...next, notice };
-            const update = await relink(files, search, next, ref.path, async (before, after) => {
-              try {
-                await authorship.carry(before, after, before.text, after.text);
-              } catch {
-                notice = [
-                  notice,
-                  t(
-                    `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
-                    `Links in ${after.path} were updated, but the record of human-written lines could not be carried over.`,
-                  ),
-                ]
-                  .filter(Boolean)
-                  .join(' ');
-              }
-            });
-            return { ...update.doc, notice, links: update.links };
-          }),
-        ),
-      trashNote: (ref) =>
-        changeFiles(() =>
-          changed(ref.scopeId, async () => {
-            if (agents.busy(ref.scopeId) || cloud.busy)
-              throw Error(
-                t(
-                  '実行と接続の準備が終わってからノートを整理してください。',
-                  'Wait for runs and connection setup to finish before organizing notes.',
+                  `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
+                  `Links in ${after.path} were updated, but the record of human-written lines could not be carried over.`,
                 ),
               );
-            return files.trashNote(ref);
-          }),
-        ),
+            }
+          });
+          return { ...update.doc, notice, links: update.links };
+        }),
+      trashNote: (ref) => changeHibachi(ref.scopeId, organizing(), () => files.trashNote(ref)),
       trashedNotes: (id) => files.trashedNotes(id),
       restoreNote: (id, trashId) =>
-        changeFiles(() =>
-          changed(id, async () => {
-            if (agents.busy(id) || cloud.busy)
-              throw Error(
-                t(
-                  '実行と接続の準備が終わってから復元してください。',
-                  'Wait for runs and connection setup to finish before restoring.',
-                ),
-              );
-            return files.restoreNote(id, trashId);
-          }),
+        changeHibachi(
+          id,
+          t(
+            '実行と接続の準備が終わってから復元してください。',
+            'Wait for runs and connection setup to finish before restoring.',
+          ),
+          () => files.restoreNote(id, trashId),
         ),
       search: (...args) => search.search(...args),
       backlinks: (...args) => search.backlinks(...args),
@@ -484,13 +468,7 @@ app
           defaultPath: path.basename(source.path),
         });
         if (choice.canceled || !choice.filePath) return;
-        const file = await openFileHandle(choice.filePath, 'wx', 0o600);
-        try {
-          await file.writeFile(bytes);
-          await file.sync();
-        } finally {
-          await file.close();
-        }
+        await writeExclusive(choice.filePath, bytes, 0o600);
       },
       sourceText: (source) => knowledge.sourceText(source),
       locateSource: (source) => knowledge.locate(source),
@@ -549,13 +527,12 @@ app
       environment: () => environment.state(),
       saveEnvironment: () => environment.save(),
       restoreEnvironment: async (input) => {
-        if (agents.anyBusy || cloud.busy || git.busy)
-          throw Error(
-            t(
-              '実行中の処理が終わってから環境を復元してください。',
-              'Restore the environment after the running operations finish.',
-            ),
-          );
+        whenIdle(
+          t(
+            '実行中の処理が終わってから環境を復元してください。',
+            'Restore the environment after the running operations finish.',
+          ),
+        );
         const result = await environment.restore(input);
         emit({ type: 'hibachis' });
         return result;
@@ -569,29 +546,24 @@ app
       saveWorkspace: (...args) => workspaces.save(...args),
       saveWorkspaceGroups: (...args) => workspaces.saveGroups(...args),
       removeWorkspace: async (id) => {
-        if (cloud.busy || agents.anyBusy || git.busy)
-          throw Error(
-            t(
-              '操作の完了後に登録を削除してください。',
-              'Remove it after the current operation finishes.',
-            ),
-          );
+        whenIdle(
+          t(
+            '操作の完了後に登録を削除してください。',
+            'Remove it after the current operation finishes.',
+          ),
+        );
         await workspaces.remove(id);
       },
       ontology: (id) => readOntology(files, id),
       graphIndexStatus: (id) => graphIndex.status(id),
       updateGraphIndex: (id) =>
-        changeFiles(() =>
-          changed(id, async () => {
-            if (agents.busy(id) || cloud.busy)
-              throw Error(
-                t(
-                  '実行と接続の準備が終わってからグラフ索引を更新してください。',
-                  'Wait for runs and connection setup to finish before updating the graph index.',
-                ),
-              );
-            return graphIndex.update(id);
-          }),
+        changeHibachi(
+          id,
+          t(
+            '実行と接続の準備が終わってからグラフ索引を更新してください。',
+            'Wait for runs and connection setup to finish before updating the graph index.',
+          ),
+          () => graphIndex.update(id),
         ),
       skills: async (id) =>
         id === sharedSchemaId || you.rootOf(id)
@@ -631,22 +603,23 @@ app
         return choice.canceled ? null : choice.filePaths[0];
       },
       register: async (root, name, category) => {
-        if (agents.anyBusy || cloud.busy || git.busy)
-          throw Error('Stop ongoing operations before registering a space');
+        whenIdle(
+          t(
+            '実行中の処理を止めてから登録してください。',
+            'Stop ongoing operations before registering a space.',
+          ),
+        );
         const inspection = await inspectRepository(root);
         if (inspection.kind === 'unavailable') throw Error(inspection.detail);
-        const space = await changeFiles(() => files.register(root, name, category));
-        watch(space);
-        return space;
+        return registerWatched(root, name, category);
       },
       createSpace: async (input) => {
-        if (agents.anyBusy || cloud.busy || git.busy)
-          throw Error(
-            t(
-              '実行中の処理の完了後に作成してください。',
-              'Create it after the operation in progress finishes.',
-            ),
-          );
+        whenIdle(
+          t(
+            '実行中の処理の完了後に作成してください。',
+            'Create it after the operation in progress finishes.',
+          ),
+        );
         const root = await git.create(input);
         let space: Space;
         try {
@@ -700,17 +673,13 @@ app
         );
       },
       renameLayerFolder: (scopeId, layer, name) =>
-        changeFiles(() =>
-          changed(scopeId, async () => {
-            if (agents.busy(scopeId) || cloud.busy)
-              throw Error(
-                t(
-                  '実行と接続の準備が終わってからフォルダ名を変えてください。',
-                  'Wait for runs and connection setup to finish before renaming the folder.',
-                ),
-              );
-            return renameLayerFolder({ files, cloud, knowledge, authorship }, scopeId, layer, name);
-          }),
+        changeHibachi(
+          scopeId,
+          t(
+            '実行と接続の準備が終わってからフォルダ名を変えてください。',
+            'Wait for runs and connection setup to finish before renaming the folder.',
+          ),
+          () => renameLayerFolder({ files, cloud, knowledge, authorship }, scopeId, layer, name),
         ),
       saveSpaceIcon: (scopeId, bytes) =>
         changeFiles(() => files.saveIcon(scopeId, bytes, imageType(bytes))),

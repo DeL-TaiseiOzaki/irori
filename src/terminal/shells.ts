@@ -1,9 +1,9 @@
 import { detectDefaultShell } from 'default-shell';
-import which from 'which';
 import { access, readFile, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import { agentEnv } from '../agents/process';
+import { findExecutable } from '../host/executables';
 import type { TerminalShell } from '../domain/types';
 
 // Detect executables, not terminal windows (Windows Terminal/iTerm are separate frontends).
@@ -46,10 +46,9 @@ export async function detectShells(): Promise<TerminalShell[]> {
         .filter((file) => file && !file.startsWith('#'))
         .map((file) => [file.trim(), path.basename(file.trim())]);
   const env = agentEnv();
-  const searchPath = Object.entries(env).find(([key]) => key.toLowerCase() === 'path')?.[1];
   const found = new Map<string, TerminalShell>();
   for (const [file, name] of candidates) {
-    const executable = await which(file, { nothrow: true, path: searchPath });
+    const executable = await findExecutable(file, env);
     if (!executable) continue;
     try {
       await access(executable, constants.X_OK);

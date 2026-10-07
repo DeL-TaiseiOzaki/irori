@@ -11,8 +11,8 @@ import {
   nameKey,
 } from '../domain/connections';
 import { owner, within } from '../domain/scopes';
-import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
-import { draftFile, hash, readDocument, textFileByteLimit } from '../host/files';
+import { isMissing, readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
+import { draftFile, editableText, hash, readDocument } from '../host/files';
 import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type {
@@ -122,7 +122,7 @@ export class CloudService {
       if ((await fs.lstat(filename)).isSymbolicLink())
         throw Error('Cloud metadata must not be a symlink');
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      if (!isMissing(error)) throw error;
     }
     return filename;
   }
@@ -231,7 +231,7 @@ export class CloudService {
       try {
         stat = await fs.lstat(current);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
         if (!create) return undefined;
         await fs.mkdir(current, { mode: 0o700 });
         stat = await fs.lstat(current);
@@ -443,7 +443,7 @@ export class CloudService {
     try {
       target = await fs.realpath(chosen);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw missing();
+      if (isMissing(error)) throw missing();
       // A sync app's virtual drive may not report a final path; the chosen one is used.
       target = path.resolve(chosen);
     }
@@ -630,8 +630,8 @@ export class CloudService {
       const target = await this.localTarget(binding.path);
       const folder = await fs.lstat(target);
       const entry = path.join((await this.parent(record, true))!, record.name);
-      const existing = await fs.lstat(entry).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
+      const existing = await fs.lstat(entry).catch((error) => {
+        if (!isMissing(error)) throw error;
         return undefined;
       });
       // A link irori left when it last stopped without disconnecting is used again.
@@ -683,8 +683,8 @@ export class CloudService {
   /** Removes irori's link to a local folder; anything that replaced it stays. */
   private async unlink(record: LocalAttachment, target: string) {
     const entry = path.join((await this.parent(record))!, record.name);
-    const info = await fs.lstat(entry).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== 'ENOENT') throw error;
+    const info = await fs.lstat(entry).catch((error) => {
+      if (!isMissing(error)) throw error;
       return undefined;
     });
     if (info?.isSymbolicLink() && (await this.pointsTo(entry, target))) await fs.unlink(entry);
@@ -789,9 +789,7 @@ export class CloudService {
   /** Writes an edited text file in place, keeping the previous version on this device. */
   write(doc: Document) {
     return this.mutate(async () => {
-      if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
-        throw Error('The text editor supports files up to 2 MiB');
-      if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
+      editableText(doc.text);
       const { filename } = await this.locate(doc.scopeId, doc.path);
       await this.assertWritable(doc.scopeId, doc.path);
       const conflict = () =>
@@ -871,7 +869,7 @@ export class CloudService {
       try {
         parent = await this.resolve(scopeId, directory);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
         throw Error(t('移動先のフォルダがありません。', 'The destination folder does not exist.'));
       }
       if (!(await fs.stat(parent)).isDirectory())
@@ -930,11 +928,9 @@ export class CloudService {
     const destination = draftFile(this.files.dataDir, scopeId, to);
     // A draft already under the new path belonged to a file that is gone.
     await fs.rm(destination, { force: true });
-    await fs
-      .rename(draftFile(this.files.dataDir, scopeId, from), destination)
-      .catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
-      });
+    await fs.rename(draftFile(this.files.dataDir, scopeId, from), destination).catch((error) => {
+      if (!isMissing(error)) throw error;
+    });
   }
   /** Moves a file or folder of an editable connection to the system trash. */
   deleteEntry(scopeId: string, target: string): Promise<void> {

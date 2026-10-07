@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { GitProcess } from '../git/process';
-import { readLocalJson, writeLocalJson } from './local-json';
+import { isMissing, readLocalJson, writeLocalJson } from './local-json';
 import type { FileService } from './files';
 import type { HibachiGroup, WorkspaceProfile, RepositoryInfo } from '../domain/types';
 import { normalizeGroups } from '../domain/hibachi-groups';
+import { githubRepository } from '../domain/git';
 import { t } from '../domain/i18n';
 const group = z.object({
   id: z.uuid(),
@@ -149,20 +150,6 @@ export class WorkspaceService {
   }
 }
 
-export function githubRepository(remote: string): string | undefined {
-  // Return only an owner/repository identity; never display embedded credentials or query strings.
-  const scp = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(remote);
-  if (scp) return `${scp[1]}/${scp[2]}`;
-  try {
-    const url = new URL(remote);
-    if (url.hostname.toLowerCase() !== 'github.com' || !['https:', 'ssh:'].includes(url.protocol))
-      return;
-    const parts = /^\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(url.pathname);
-    if (parts) return `${parts[1]}/${parts[2]}`;
-  } catch {
-    /* not a supported GitHub remote */
-  }
-}
 export async function inspectRepository(root: string): Promise<RepositoryInfo> {
   const runner = new GitProcess();
   const git = async (cwd: string, args: string[]) =>
@@ -193,7 +180,7 @@ export async function inspectRepository(root: string): Promise<RepositoryInfo> {
           detail: t('このGitリポジトリを確認できません。', 'Could not check this Git repository.'),
         };
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
       }
       return {
         root,

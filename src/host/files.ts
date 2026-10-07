@@ -6,7 +6,15 @@ import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import writeFileAtomic from 'write-file-atomic';
 import type { FSWatcher } from 'chokidar';
-import { replaceFile, writeLocalFile, writeLocalJson } from './local-json';
+import {
+  isMissing,
+  ordinaryFolders,
+  replaceChecked,
+  stableHash,
+  writeExclusive,
+  writeLocalFile,
+  writeLocalJson,
+} from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
 import { brainLook, iconImagePath } from '../domain/brains';
@@ -30,7 +38,7 @@ import {
   type NamedLayer,
 } from '../domain/layers';
 import { t } from '../domain/i18n';
-import { textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
+import { textFileByteLimit, textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
 const relative = z
   .string()
   .min(1)
@@ -55,7 +63,24 @@ export const hash = (text: string | Buffer) => createHash('sha256').update(text)
 export const draftFile = (dataDir: string, scopeId: string, rel: string) =>
   path.join(dataDir, `draft-${hash(scopeId + '\0' + rel)}.json`);
 export { textFilePattern };
-export const textFileByteLimit = 2 * 1024 * 1024;
+/** Strict UTF-8 without NUL as text, else undefined; `keepBOM` false drops a leading BOM. */
+export function utf8Text(bytes: Uint8Array, keepBOM = true) {
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: keepBOM }).decode(bytes);
+    return text.includes('\0') ? undefined : text;
+  } catch {
+    return undefined;
+  }
+}
+/** Whether a resolved file is `relative` under `root` as written, with no alias on the way. */
+export const reachedAsWritten = (root: string, actual: string, relative: string) =>
+  path.relative(root, actual).split(path.sep).join('/') === relative;
+/** Refuses text the editor would not write: over its limit, or holding NUL. */
+export function editableText(text: string) {
+  if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
+    throw Error('The text editor supports files up to 2 MiB');
+  if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
+}
 export async function readTextDocument(
   filename: string,
   scopeId: string,
@@ -241,7 +266,7 @@ export class FileService {
         }
       }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      if (!isMissing(error)) throw error;
     }
   }
   list() {
@@ -299,7 +324,7 @@ export class FileService {
       try {
         s = await this.inspect(root);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        if (!isMissing(error)) throw error;
         s = {
           ...declaration.parse({
             schemaVersion: 1,
@@ -327,10 +352,10 @@ export class FileService {
           if ((await fs.lstat(ignore)).isSymbolicLink())
             throw Error('.gitignore must not be a symlink');
         } catch (e) {
-          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+          if (!isMissing(e)) throw e;
         }
         const before = await fs.readFile(ignore, 'utf8').catch((e) => {
-          if (e.code === 'ENOENT') return '';
+          if (isMissing(e)) return '';
           throw e;
         });
         if (!before.split(/\r?\n/).includes('/contents/'))
@@ -448,8 +473,8 @@ export class FileService {
       const from = path.join(s.root, previous);
       const to = path.join(s.root, next);
       const stat = (filename: string) =>
-        fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
-          if (error.code !== 'ENOENT') throw error;
+        fs.lstat(filename).catch((error) => {
+          if (!isMissing(error)) throw error;
         });
       const [before, after] = [await stat(from), await stat(to)];
       // On a case-insensitive volume a change of case finds the folder itself.
@@ -530,8 +555,8 @@ export class FileService {
     const out: { filename: string; original: string; next: string }[] = [];
     for (const name of ['local-folders.json', 'cloud-mounts.json']) {
       const filename = path.join(directory, name);
-      const stat = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
+      const stat = await fs.lstat(filename).catch((error) => {
+        if (!isMissing(error)) throw error;
       });
       if (!stat) continue;
       if (stat.isSymbolicLink()) throw Error('Cloud metadata must not be a symlink');
@@ -650,7 +675,7 @@ export class FileService {
         .object({ text: z.string(), baseHash: z.string() })
         .parse(JSON.parse(await fs.readFile(this.draftPath(doc), 'utf8')));
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+      if (!isMissing(e)) throw e;
     }
     return doc;
   }
@@ -667,9 +692,7 @@ export class FileService {
   }
   async save(doc: Document): Promise<Document> {
     return this.queue.run(async () => {
-      if (Buffer.byteLength(doc.text, 'utf8') > textFileByteLimit)
-        throw Error('The text editor supports files up to 2 MiB');
-      if (doc.text.includes('\0')) throw Error('Binary files cannot be edited as text');
+      editableText(doc.text);
       if (classify(this.get(doc.scopeId), doc.path) === 'contents') {
         if (!this.cloud?.write)
           throw Error(
@@ -699,21 +722,10 @@ export class FileService {
           before.toString('utf8'),
         );
         const mode = (await fs.stat(filename)).mode;
-        const temp = path.join(path.dirname(filename), `.irori-save-${randomUUID()}.tmp`);
-        try {
-          const pending = await fs.open(temp, 'wx', mode);
-          try {
-            await pending.writeFile(doc.text);
-            await pending.sync();
-          } finally {
-            await pending.close();
-          }
+        await replaceChecked(filename, doc.text, mode, async () => {
           if (hash(await fs.readFile(filename)) !== doc.hash)
             throw Error('CONFLICT: File changed during save');
-          await replaceFile(temp, filename);
-        } finally {
-          await fs.rm(temp, { force: true });
-        }
+        });
       }
       await fs.rm(this.draftPath(doc), { force: true });
       return this.read(doc.scopeId, doc.path);
@@ -742,27 +754,19 @@ export class FileService {
   }
   private async noteDirectory(id: string, rel: string, create = false) {
     this.noteLocation(id, rel, true);
-    let prefix = '';
-    for (const part of rel.split('/').filter(Boolean)) {
-      prefix = prefix ? `${prefix}/${part}` : part;
-      const filename = this.noteLocation(id, prefix, true);
-      let stat = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT' || !create) throw error;
-      });
-      if (!stat) {
-        await fs.mkdir(filename);
-        stat = await fs.lstat(filename);
-      }
-      if (stat.isSymbolicLink() || !stat.isDirectory())
-        throw Error(
+    await ordinaryFolders(rel, create, {
+      location: (prefix) => this.noteLocation(id, prefix, true),
+      resolve: (prefix) => this.resolve(id, prefix),
+      notFolder: () =>
+        Error(
           t(
             'フォルダの alias / シンボリックリンクは操作できません。',
             'Folder aliases and symbolic links cannot be changed.',
           ),
-        );
-      if ((await this.resolve(id, prefix)) !== filename)
-        throw Error(t('フォルダの alias が変更されています。', 'The folder alias has changed.'));
-    }
+        ),
+      moved: () =>
+        Error(t('フォルダの alias が変更されています。', 'The folder alias has changed.')),
+    });
     return this.resolve(id, rel, true);
   }
   private async existingNote(ref: NoteRef) {
@@ -810,9 +814,7 @@ export class FileService {
    */
   async writeGenerated(id: string, rel: string, text: string, expected: string | null) {
     return this.queue.run(async () => {
-      if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
-        throw Error('The text editor supports files up to 2 MiB');
-      if (text.includes('\0')) throw Error('Binary files cannot be edited as text');
+      editableText(text);
       const space = this.get(id);
       relative.parse(rel);
       if (
@@ -830,45 +832,24 @@ export class FileService {
       const directory = path.posix.dirname(rel);
       const parent = await this.noteDirectory(id, directory === '.' ? '' : directory, true);
       const filename = path.join(parent, path.posix.basename(rel));
-      const existing = await fs.lstat(filename).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
+      const existing = await fs.lstat(filename).catch((error) => {
+        if (!isMissing(error)) throw error;
       });
       if (existing && (!existing.isFile() || existing.isSymbolicLink()))
         throw Error(
           t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
         );
+      const changed = () =>
+        Error(
+          t(
+            'CONFLICT: 生成先のファイルが変更されています。',
+            'CONFLICT: The output file has changed.',
+          ),
+        );
       // A previous version may have generated an oversized file. Hash it without
       // loading its bytes into memory, retaining the ordinary replacement guard.
-      const currentHash = async () => {
-        const digest = createHash('sha256');
-        const file = await fs.open(filename, 'r');
-        try {
-          const before = await file.stat();
-          if (!before.isFile())
-            throw Error(
-              t('生成先が通常のファイルではありません。', 'The output is not an ordinary file.'),
-            );
-          let size = 0;
-          for await (const chunk of file.createReadStream({ autoClose: false, end: before.size })) {
-            digest.update(chunk);
-            size += chunk.length;
-          }
-          const after = await file.stat();
-          if (
-            size !== before.size ||
-            after.size !== before.size ||
-            after.mtimeMs !== before.mtimeMs
-          )
-            throw Error(
-              t(
-                'CONFLICT: 生成先のファイルが変更されています。',
-                'CONFLICT: The output file has changed.',
-              ),
-            );
-        } finally {
-          await file.close();
-        }
-        return digest.digest('hex');
+      const unchanged = async () => {
+        if ((await stableHash(filename, changed)).hash !== expected) throw changed();
       };
       if (expected === null) {
         if (existing)
@@ -878,41 +859,11 @@ export class FileService {
               'CONFLICT: A file was created at the output location.',
             ),
           );
-        const created = await fs.open(filename, 'wx');
-        try {
-          await created.writeFile(text);
-          await created.sync();
-        } finally {
-          await created.close();
-        }
+        await writeExclusive(filename, text);
       } else {
-        if (!existing || (await currentHash()) !== expected)
-          throw Error(
-            t(
-              'CONFLICT: 生成先のファイルが変更されています。',
-              'CONFLICT: The output file has changed.',
-            ),
-          );
-        const temp = path.join(parent, `.irori-save-${randomUUID()}.tmp`);
-        try {
-          const pending = await fs.open(temp, 'wx', existing.mode);
-          try {
-            await pending.writeFile(text);
-            await pending.sync();
-          } finally {
-            await pending.close();
-          }
-          if ((await currentHash()) !== expected)
-            throw Error(
-              t(
-                'CONFLICT: 生成先のファイルが変更されています。',
-                'CONFLICT: The output file has changed.',
-              ),
-            );
-          await replaceFile(temp, filename);
-        } finally {
-          await fs.rm(temp, { force: true });
-        }
+        if (!existing) throw changed();
+        await unchanged();
+        await replaceChecked(filename, text, existing.mode, unchanged);
       }
       return this.read(id, rel);
     });
@@ -953,8 +904,8 @@ export class FileService {
       if (
         await fs.lstat(destination).then(
           () => true,
-          (error: NodeJS.ErrnoException) => {
-            if (error.code !== 'ENOENT') throw error;
+          (error) => {
+            if (!isMissing(error)) throw error;
             return false;
           },
         )
@@ -997,13 +948,7 @@ export class FileService {
       await this.noteDirectory(ref.scopeId, to === '.' ? '' : to);
       // Flush copied bytes before removing the source. Directory-entry durability
       // still depends on the host filesystem; this is not a power-loss transaction.
-      const copied = await fs.open(destination, 'wx', source.stat.mode);
-      try {
-        await copied.writeFile(source.doc.text);
-        await copied.sync();
-      } finally {
-        await copied.close();
-      }
+      await writeExclusive(destination, source.doc.text, source.stat.mode);
       const latest = await this.existingNote(ref);
       if (latest.stat.ino !== source.stat.ino || hash(await fs.readFile(destination)) !== ref.hash)
         throw Error(
@@ -1028,7 +973,7 @@ export class FileService {
     const value = JSON.parse(await fs.readFile(this.trashPath(id), 'utf8'));
     const record = trashedNote
       .extend({
-        text: z.string().max(2 * 1024 * 1024),
+        text: z.string().max(textFileByteLimit),
         restored: z.boolean(),
         checkoutRootHash: z.string().regex(/^[a-f0-9]{64}$/),
       })
@@ -1066,12 +1011,10 @@ export class FileService {
   }
   async trashedNotes(scopeId: string): Promise<TrashedNote[]> {
     this.get(scopeId);
-    const names = await fs
-      .readdir(path.join(this.dataDir, 'note-trash'))
-      .catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'ENOENT') throw error;
-        return [];
-      });
+    const names = await fs.readdir(path.join(this.dataDir, 'note-trash')).catch((error) => {
+      if (!isMissing(error)) throw error;
+      return [];
+    });
     const result: TrashedNote[] = [];
     for (const name of names) {
       if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue;
@@ -1097,13 +1040,7 @@ export class FileService {
       const destination = this.noteLocation(scopeId, record.path);
       const directory = path.posix.dirname(record.path);
       await this.noteDirectory(scopeId, directory === '.' ? '' : directory, true);
-      const restored = await fs.open(destination, 'wx');
-      try {
-        await restored.writeFile(record.text);
-        await restored.sync();
-      } finally {
-        await restored.close();
-      }
+      await writeExclusive(destination, record.text);
       const doc = await this.read(scopeId, record.path);
       try {
         await writeLocalJson(this.trashPath(trashId), { ...record, restored: true });

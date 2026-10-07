@@ -16,7 +16,8 @@ import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
 import type { FileService } from './files';
-import { githubRepository, inspectRepository, type WorkspaceService } from './workspaces';
+import { inspectRepository, type WorkspaceService } from './workspaces';
+import { githubRepository } from '../domain/git';
 
 /** What the `irori` command reaches in the host. */
 export interface AgentSetupHost {

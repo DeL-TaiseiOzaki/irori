@@ -3,7 +3,7 @@ import path from 'node:path';
 import { FileService, hash } from './files';
 import { classify } from '../domain/scopes';
 import { SerialQueue } from './serial-queue';
-import { writeLocalFile } from './local-json';
+import { isMissing, writeLocalFile } from './local-json';
 import { t } from '../domain/i18n';
 
 export const imageLimit = 20 * 1024 * 1024;
@@ -105,7 +105,7 @@ export class ImageService {
           t('保存先の画像が変更されています。', 'The image at the destination has changed.'),
         );
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      if (!isMissing(error)) throw error;
       if (drive)
         // Drive has no atomic rename: replacing a file there deletes and re-creates it.
         // The file is new either way, so an exclusive direct write is enough.

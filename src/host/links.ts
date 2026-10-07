@@ -2,6 +2,7 @@ import { lstat } from 'node:fs/promises';
 import { resolveNoteLink, type ResolvedLink } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import type { FileService } from './files';
+import { isMissing } from './local-json';
 import { t } from '../domain/i18n';
 
 /**
@@ -49,7 +50,7 @@ export async function resolveLink(
   try {
     filename = await files.resolve(scopeId, target.path);
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'ENOENT'
+    return isMissing(error)
       ? { kind: 'missing', path: target.path }
       : {
           kind: 'rejected',
