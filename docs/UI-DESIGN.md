@@ -24,7 +24,7 @@ Everything below this section is the history of the earlier layout.
   the version.
 - **Overview.** The rail's map button shows every brain of the workspace
   instead of one brain's islands, which stay mounted underneath. **地図** lays
-  brains out in rows by category (`src/domain/overview.ts`, replaceable) with
+  brains out in the workspace's order, four to a row (`src/domain/overview.ts`, replaceable; no category areas since 0.1.87) with
   reference lines between brains and a **Brain の AI** island (state, request,
   stop, resume, send); **並列** shows AI / Schema / Knowledge / Contents per
   brain. Each brain's AI runs independently of the one on show.

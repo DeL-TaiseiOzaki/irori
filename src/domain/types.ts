@@ -9,14 +9,17 @@ export const agentNames: Record<AgentId, string> = {
   pi: 'Pi',
   hermes: 'Hermes Agent',
 };
-export const categories = ['personal', 'team', 'organization'] as const;
-export type Category = (typeof categories)[number];
+/** The categories irori offers first, shown in the reader's language; any other name is kept as written. */
+export const presetCategories = ['personal', 'team', 'organization'] as const;
+export type PresetCategory = (typeof presetCategories)[number];
+/** A brain's category: a preset above or any short name the people of the KB choose. */
+export type Category = string;
 export type Layer = 'schema' | 'Knowledge_Base' | 'contents';
 export interface ScopeDeclaration {
   schemaVersion: 1;
   scopeId: string;
   name: string;
-  /** personal / team / organization; a brain may carry none (ADR 014). */
+  /** A preset or a name of the KB's own; a brain may carry none (ADR 014, ADR 029). */
   category?: Category;
   contents: string[];
   /** The knowledge folder when it is not `Knowledge_Base` (ADR 024). */

@@ -39,6 +39,26 @@ test('a brain’s name, category and look are written to scope.json and read bac
   assert.equal(again.get(space.scopeId).name, 'プロダクト');
 });
 
+test('a category of the KB’s own is kept as written and read back', async (t) => {
+  const { base, files, space, meta } = await fixture(t);
+  await files.update(space.scopeId, { category: '研究室' });
+  assert.equal(JSON.parse(await readFile(meta, 'utf8')).category, '研究室');
+  const again = new FileService(path.join(base, 'device'));
+  await again.init();
+  assert.equal(again.get(space.scopeId).category, '研究室');
+  // The request is refused before the host when the name is not one short line.
+  for (const category of ['', ' lab', 'a\nb', 'x'.repeat(41)])
+    assert.equal(
+      hostArguments.updateSpace.safeParse([space.scopeId, { category }]).success,
+      false,
+      JSON.stringify(category),
+    );
+  assert.equal(
+    hostArguments.updateSpace.safeParse([space.scopeId, { category: 'Lab 2026' }]).success,
+    true,
+  );
+});
+
 test('fields irori does not know survive, and null removes a category or a look', async (t) => {
   const { files, space, meta } = await fixture(t);
   const raw = JSON.parse(await readFile(meta, 'utf8'));

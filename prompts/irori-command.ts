@@ -22,10 +22,12 @@ irori list
   The hibachis on this computer: name, folder, GitHub repository, and whether
   they are in this workspace. Also where new hibachis go.
 
-irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <hibachi name>] [--category personal|team|organization]
+irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <hibachi name>] [--category <category>]
   Clones the repository into a new folder and registers it as a hibachi in
   this workspace. A repository already registered here joins the workspace
   instead. The folder is the repository's name unless --folder says otherwise.
+  --category is personal, team, organization or a name of your own, one line
+  of at most 40 characters.
 
 irori create <folder name> [--parent <folder>] [--name <hibachi name>] [--category ...]
   Makes a new hibachi: an empty folder, a Git repository on main, and a first

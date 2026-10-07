@@ -101,7 +101,8 @@ try {
   const map = page.getByRole('region', { name: 'hibachi の地図' });
   await expect(map.getByRole('button', { name: 'Product を開く' })).toContainText('許可待ち');
   await expect(map.getByRole('button', { name: 'Research を開く' })).toContainText('実行中');
-  await expect(map.locator('.map-group')).toHaveCount(2);
+  // The map does not group hibachis by category.
+  await expect(map.locator('.map-group')).toHaveCount(0);
   // Beside the map, your AI comes first; each brain's own AI is the other tab.
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();

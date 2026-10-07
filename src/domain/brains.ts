@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { t } from './i18n';
-import type { Category, Space } from './types';
+import { presetCategories, type Category, type PresetCategory, type Space } from './types';
 
 /**
  * A brain is one registered KB shown with its Schema, Knowledge and Contents
@@ -97,13 +97,61 @@ export function brainColorName(color: BrainColor) {
   }[color];
 }
 
+/** Each preset's name in Japanese and English. */
+const presetNames: Record<PresetCategory, [string, string]> = {
+  personal: ['個人', 'Personal'],
+  team: ['チーム', 'Team'],
+  organization: ['組織', 'Organization'],
+};
+const isPreset = (category: string): category is PresetCategory =>
+  (presetCategories as readonly string[]).includes(category);
+
+/** A category as `.irori/scope.json` keeps it: one line of at most 40 characters, no edge spaces. */
+export const categoryText = z
+  .string()
+  .min(1)
+  .max(40)
+  .refine((value) => value.trim() === value && !/\p{Cc}/u.test(value));
+
 export function categoryName(category?: Category) {
   if (!category) return t('分類なし', 'No category');
-  return {
-    personal: t('個人', 'Personal'),
-    team: t('チーム', 'Team'),
-    organization: t('組織', 'Organization'),
-  }[category];
+  return isPreset(category) ? t(...presetNames[category]) : category;
+}
+
+/** The icon beside a category: a preset's own, a tag for the others. */
+export function categoryIcon(category: Category) {
+  return isPreset(category)
+    ? ({ personal: 'user', team: 'users', organization: 'building' } as const)[category]
+    : ('tag' as const);
+}
+
+/**
+ * What a person typed as a category, as it is stored: a preset's name in either
+ * language becomes the preset, anything else stays as typed, and an empty field
+ * is no category.
+ */
+export function categoryValue(text: string): Category | undefined {
+  const value = text.trim().replace(/\s+/g, ' ');
+  if (!value) return undefined;
+  const lower = value.toLocaleLowerCase();
+  return (
+    presetCategories.find(
+      (preset) =>
+        preset === lower || presetNames[preset].some((name) => name.toLocaleLowerCase() === lower),
+    ) ?? value
+  );
+}
+
+/** The categories to offer: the presets, then the workspace's own in name order. */
+export function categoryChoices(spaces: { category?: Category }[]) {
+  const own = [
+    ...new Set(
+      spaces.flatMap((space) =>
+        space.category && !isPreset(space.category) ? [space.category] : [],
+      ),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  return [...presetCategories, ...own];
 }
 
 /** The first character a reader would pick out of the name, capitalised when it has case. */

@@ -4,7 +4,7 @@ import type { CloudConnection, Entry, Layer, Space } from '../domain/types';
 import type { GitStatus } from '../domain/git';
 import type { AgentSkill } from '../domain/skills';
 import { agentNames } from '../domain/types';
-import { categoryName } from '../domain/brains';
+import { categoryIcon, categoryName } from '../domain/brains';
 import { classify } from '../domain/scopes';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
@@ -20,7 +20,6 @@ const layerIcons: Record<Layer, IconName> = {
   Knowledge_Base: 'book',
   contents: 'cloud',
 };
-const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 // A function so each state name is read in the language of the current render.
 const changeNames = (): Record<string, string> => ({
   M: t('変更', 'Modified'),
@@ -181,7 +180,7 @@ export function BrainHome({
             {space.category && (
               <>
                 <span>
-                  <Icon name={categoryIcons[space.category]} size={14} />
+                  <Icon name={categoryIcon(space.category)} size={14} />
                   {category}
                 </span>
                 <i />

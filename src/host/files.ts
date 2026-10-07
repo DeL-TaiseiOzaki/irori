@@ -17,7 +17,7 @@ import {
 } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
-import { brainLook, iconImagePath } from '../domain/brains';
+import { brainLook, categoryText, iconImagePath } from '../domain/brains';
 import {
   imagesForNoteMove,
   noteFilename,
@@ -52,7 +52,7 @@ const declaration = z.object({
   schemaVersion: z.literal(1),
   scopeId: z.uuid(),
   name: z.string().min(1).max(120),
-  category: z.enum(['personal', 'team', 'organization']).optional(),
+  category: categoryText.optional(),
   contents: z.array(relative).min(1),
   knowledge: layerFolderName.optional(),
   labels: layerLabels.optional(),

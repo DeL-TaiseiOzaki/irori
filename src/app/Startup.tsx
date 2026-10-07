@@ -3,6 +3,7 @@ import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
+import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
 import { appIcon, appVersion } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
@@ -15,21 +16,26 @@ import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import { RestoreEnvironment } from './AccountSync';
-import { RemoveHibachi } from './BrainSettings';
+import { CategoryField, RemoveHibachi } from './BrainSettings';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
   onRegistered,
   onCancel,
   mode = 'folder',
+  categories,
 }: {
   onRegistered: (space: Space) => void;
   onCancel: () => void;
   mode?: 'folder' | 'clone' | 'create';
+  /** The categories to offer; the presets when not given. */
+  categories?: readonly Category[];
 }) {
   const [folder, setFolder] = useState(''),
     [name, setName] = useState(''),
-    [category, setCategory] = useState<Category>('personal');
+    [typed, setTyped] = useState('');
+  // An empty field keeps the first preset, as registration always has.
+  const category = categoryValue(typed) ?? 'personal';
   const [way, setWay] = useState(mode),
     [url, setUrl] = useState(''),
     [parent, setParent] = useState(''),
@@ -298,16 +304,14 @@ export function RegisterSpace({
             <details>
               <summary>{t('分類', 'Category')}</summary>
               <label>
-                <select
-                  aria-label={t('スペースの種類', 'Space type')}
-                  value={category}
+                <CategoryField
+                  label={t('スペースの種類', 'Space type')}
+                  value={typed}
+                  choices={categories}
+                  placeholder={categoryName('personal')}
                   disabled={busy || !!created}
-                  onChange={(e) => setCategory(e.target.value as Category)}
-                >
-                  <option value="personal">{t('個人', 'Personal')}</option>
-                  <option value="team">{t('チーム', 'Team')}</option>
-                  <option value="organization">{t('組織', 'Organization')}</option>
-                </select>
+                  onChange={setTyped}
+                />
               </label>
             </details>
             {creating ? (
@@ -747,6 +751,7 @@ export function Startup({
       {adding && (
         <RegisterSpace
           mode={adding}
+          categories={categoryChoices(spaces)}
           onCancel={() => setAdding(undefined)}
           onRegistered={(space) => {
             setSelected((value) => [...value, space.scopeId]);

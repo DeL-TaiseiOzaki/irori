@@ -1,4 +1,3 @@
-import type { Category } from './types';
 import type { RunRecord } from './knowledge';
 
 /** Where the Overview map draws a brain, on a board 1000 × 640 units. */
@@ -7,35 +6,24 @@ export interface MapNode {
   x: number;
   y: number;
 }
-/** A soft area around the brains that share a category. */
-export interface MapGroup {
-  category: Category;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 export const board = { width: 1000, height: 640 };
-const order: (Category | undefined)[] = ['organization', 'team', 'personal', undefined];
+/** How many hibachis share a row of the map. */
+const rowSize = 4;
 
 /**
- * A plain, deterministic map: one row per category (organization, team,
- * personal, then brains without one), the brains of a row spread evenly in the
- * workspace's order. The owner will design how the map is built later, so this
- * is the only place that decides positions.
+ * A plain, deterministic map: the hibachis in the workspace's order, a few to
+ * a row, spread evenly. Categories are not drawn (ADR 029); the rail's groups
+ * are how a person arranges hibachis. The owner will design how the map is
+ * built later, so this is the only place that decides positions.
  */
 export function mapLayout(
-  spaces: { scopeId: string; category?: Category }[],
+  spaces: { scopeId: string }[],
   { hearth = false }: { hearth?: boolean } = {},
 ) {
-  const rows = order
-    .map((category) => ({
-      category,
-      members: spaces.filter((space) => (space.category ?? undefined) === category),
-    }))
-    .filter((row) => row.members.length);
+  const rows = Array.from({ length: Math.ceil(spaces.length / rowSize) }, (_, index) =>
+    spaces.slice(index * rowSize, (index + 1) * rowSize),
+  );
   const nodes: MapNode[] = [];
-  const groups: MapGroup[] = [];
   // Rows keep close enough to read as one map, centred on the board.
   const step = rows.length > 1 ? Math.min((board.height - 180) / (rows.length - 1), 210) : 0;
   const top = (board.height - step * (rows.length - 1)) / 2;
@@ -43,22 +31,13 @@ export function mapLayout(
     const y = top + step * index;
     // Your AI keeps the hearth on the left; the brains take the rest.
     const area = hearth ? { left: 300, width: board.width - 330 } : { left: 0, width: board.width };
-    const span = Math.min(area.width - 200, 240 * row.members.length);
+    const span = Math.min(area.width - 200, 240 * row.length);
     const left = area.left + (area.width - span) / 2;
-    const xs = row.members.map((_, column) => left + (span / row.members.length) * (column + 0.5));
-    row.members.forEach((space, column) =>
-      nodes.push({ scopeId: space.scopeId, x: xs[column], y }),
+    row.forEach((space, column) =>
+      nodes.push({ scopeId: space.scopeId, x: left + (span / row.length) * (column + 0.5), y }),
     );
-    if (row.category)
-      groups.push({
-        category: row.category,
-        x: xs[0] - 110,
-        y: y - 88,
-        width: xs.at(-1)! - xs[0] + 220,
-        height: 176,
-      });
   });
-  return { nodes, groups, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };
+  return { nodes, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };
 }
 
 /** One brain's hibachi agent read notes of another brain: drawn from the source to the reader. */

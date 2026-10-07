@@ -1375,3 +1375,8 @@ button.home-row:hover {
 .home-edit:focus-visible {
   opacity: 1;
 }
+.brain-sheet-row .category-field {
+  width: 200px;
+  height: 32px;
+  font-size: 13px;
+}

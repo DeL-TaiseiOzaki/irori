@@ -141,7 +141,7 @@ try {
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
   await page.getByText('分類', { exact: true }).click();
-  await page.getByLabel('スペースの種類').selectOption('team');
+  await page.getByLabel('スペースの種類').fill('チーム');
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   // The workspace opens on the first brain's home.

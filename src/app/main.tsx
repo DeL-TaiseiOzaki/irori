@@ -163,6 +163,7 @@ import { Overview, type OverviewView } from './Overview';
 import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
 import { errorText } from './ErrorMessage';
+import { categoryChoices } from '../domain/brains';
 const host = window.irori;
 /** A backlink points at a link on the line, a search hit at matching text; the notice says which. */
 type Navigation = SearchTarget & { link?: boolean };
@@ -2863,6 +2864,7 @@ function App() {
       )}
       {add && (
         <RegisterSpace
+          categories={categoryChoices(spaces)}
           onCancel={() => setAdd(false)}
           onRegistered={(space) => {
             setAdd(false);

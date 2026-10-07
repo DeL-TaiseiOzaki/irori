@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { brainAppearance, brainColors } from '../src/domain/brains';
+import {
+  brainAppearance,
+  brainColors,
+  categoryChoices,
+  categoryIcon,
+  categoryName,
+  categoryValue,
+} from '../src/domain/brains';
 
 test('a brain looks the same wherever it is shown, and never white by default', () => {
   const space = { scopeId: '6f1c2d0e-8b1a-4c33-9d7e-2a4b5c6d7e8f', name: 'プロダクト' };
@@ -26,4 +33,28 @@ test('a Latin name gives its capital, and an emoji stays whole', () => {
     kind: 'text',
     text: '👩‍🔬',
   });
+});
+
+test('a category is a preset or any name, and a preset reads the same in both languages', () => {
+  for (const typed of ['チーム', 'team', 'Team', ' TEAM '])
+    assert.equal(categoryValue(typed), 'team', typed);
+  assert.equal(categoryValue('個人'), 'personal');
+  assert.equal(categoryValue('Organization'), 'organization');
+  assert.equal(categoryValue('  研究室   A '), '研究室 A');
+  assert.equal(categoryValue('   '), undefined);
+  assert.equal(categoryName('team'), 'チーム');
+  assert.equal(categoryName('研究室'), '研究室');
+  assert.equal(categoryIcon('team'), 'users');
+  assert.equal(categoryIcon('研究室'), 'tag');
+  // The presets first, then the workspace's own once each in name order.
+  assert.deepEqual(
+    categoryChoices([
+      { category: '研究室' },
+      { category: 'team' },
+      { category: 'Club' },
+      { category: '研究室' },
+      {},
+    ]),
+    ['personal', 'team', 'organization', 'Club', '研究室'],
+  );
 });

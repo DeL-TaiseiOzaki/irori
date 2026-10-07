@@ -8,7 +8,7 @@ import {
 import { knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
-import { categoryName } from '../domain/brains';
+import { categoryIcon, categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
 import { promptLimit } from '../domain/conversation';
@@ -33,7 +33,6 @@ import './overview.css';
 
 const host = window.irori;
 export type OverviewView = 'map' | 'columns';
-const categoryIcons = { personal: 'user', team: 'users', organization: 'building' } as const;
 const idle: BrainAi = {
   events: [],
   queued: [],
@@ -257,19 +256,6 @@ function OverviewMap({
   return (
     <section className="map-board" aria-label={t('hibachi の地図', 'Map of hibachis')}>
       <div className="map-canvas">
-        {layout.groups.map((group) => (
-          <div
-            key={group.category}
-            className="map-group"
-            style={{
-              ...at(group),
-              width: `${(group.width / board.width) * 100}%`,
-              height: `${(group.height / board.height) * 100}%`,
-            }}
-          >
-            <span>{categoryName(group.category)}</span>
-          </div>
-        ))}
         <svg
           className="map-lines"
           viewBox={`0 0 ${board.width} ${board.height}`}
@@ -378,10 +364,6 @@ function OverviewMap({
           <i className="legend-reference" />
           {t('別の hibachi のノートを参照', "Read another hibachi's notes")}
         </span>
-        <span>
-          <i className="legend-group" />
-          {t('分類ごとのまとまり', 'Grouped by category')}
-        </span>
       </footer>
     </section>
   );
@@ -445,7 +427,7 @@ function BrainColumn({
             <strong>{space.name}</strong>
             {space.category && (
               <small>
-                <Icon name={categoryIcons[space.category]} size={11} />
+                <Icon name={categoryIcon(space.category)} size={11} />
                 {categoryName(space.category)}
               </small>
             )}
