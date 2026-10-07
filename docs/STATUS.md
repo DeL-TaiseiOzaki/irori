@@ -31,6 +31,7 @@ reviewed by another model.
   opened step mounted while the 400-event window slides; `git-ui-smoke` checks
   that another hibachi's file event refreshes nothing). Not verified: the effect
   measured on a real long session, real CLIs, Windows and macOS.
+
 Removing a hibachi from the start screen, 2026-10-07 (**0.1.78**): the owner
 asked to remove a hibachi from the start screen (workspace selection) rather
 than only from **hibachi の設定**.
