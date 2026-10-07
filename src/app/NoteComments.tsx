@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import type { NoteComment } from '../domain/comments';
 import type { EditorSelection } from '../editor/Editor';
-import { t } from '../domain/i18n';
+import { displayLocale, t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { errorText } from './ErrorMessage';
@@ -16,7 +16,7 @@ function when(at: string) {
   const date = new Date(at);
   return Number.isNaN(date.getTime())
     ? ''
-    : date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    : date.toLocaleString(displayLocale(), { dateStyle: 'short', timeStyle: 'short' });
 }
 
 /**

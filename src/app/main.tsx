@@ -1783,7 +1783,6 @@ function App() {
       hibachiAgent && active ? (
         <SchemaList
           scopeId={active.scopeId}
-          space={active}
           revision={revision}
           selected={schemaSelected}
           locked={brainLocked || gitBusy}

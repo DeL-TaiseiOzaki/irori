@@ -56,7 +56,8 @@ if (args[0] === 'api' && match) {
   if (!fs.existsSync(file)) fail('gh: Not Found (HTTP 404)');
   const text = fs.readFileSync(file, 'utf8');
   const content = Buffer.from(text).toString('base64').replace(/(.{60})/g, '$1\\n');
-  console.log(JSON.stringify({ sha: sha(text), encoding: 'base64', content }));
+  // Written synchronously: process.exit would cut a large answer to a pipe short.
+  fs.writeSync(1, JSON.stringify({ sha: sha(text), encoding: 'base64', content }) + '\\n');
   process.exit(0);
 }
 fail('unknown command ' + joined);

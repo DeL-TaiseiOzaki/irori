@@ -11,7 +11,9 @@ import { agentNames } from '../domain/types';
 import { categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
+import { promptLimit } from '../domain/conversation';
 import { AgentRequest } from './AgentLog';
+import { errorText } from './ErrorMessage';
 import { eventTarget } from '../domain/agent-log';
 import { anyRevision, scopeRevision, type ScopeRevisions } from '../domain/revisions';
 import { firstEntries } from './BrainHome';
@@ -621,7 +623,7 @@ function OverviewComposer({
       await onSend(space.scopeId, text);
       setText('');
     } catch (reason) {
-      setError(String(reason));
+      setError(errorText(reason));
     } finally {
       setSending(false);
     }
@@ -663,7 +665,7 @@ function OverviewComposer({
         )}
         rows={3}
         value={text}
-        maxLength={32000}
+        maxLength={promptLimit}
         disabled={sending}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {

@@ -88,7 +88,6 @@ export function SchemaDialog({
             <SchemaList
               key={owner}
               scopeId={owner}
-              space={space}
               common={common}
               revision={revision}
               selected={target}

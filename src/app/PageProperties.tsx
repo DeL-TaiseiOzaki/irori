@@ -1,5 +1,6 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 import {
   isEmptyValue,
   localTimestamp,
@@ -125,7 +126,7 @@ export function PageProperties({
       setProblem('');
       onChange(tidyYaml(next));
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
     }
   }
 

@@ -3,6 +3,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import type { Document } from '../domain/types';
 import type { ViewerKind } from '../domain/viewers';
 import { t } from '../domain/i18n';
+import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
 import type { ViewProps } from './viewers/common';
 import './viewers.css';
@@ -55,7 +56,7 @@ export function FileViewer({
     setInfo('');
     load(doc.scopeId, doc.path).then(
       (loaded) => live && setBytes(loaded),
-      (reason: Error) => live && setError(reason.message),
+      (reason) => live && setError(errorText(reason)),
     );
     return () => {
       live = false;

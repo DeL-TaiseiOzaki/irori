@@ -16,11 +16,13 @@ export const yourAiChoice = z.object({
   agent: z.enum(agentIds),
   models: z.partialRecord(z.enum(agentIds), agentModel),
 });
+/** The longest instruction a person can send to an agent. */
+export const promptLimit = 32000;
 export const messageInput = z.object({
   prompt: z
     .string()
     .min(1)
-    .max(32000)
+    .max(promptLimit)
     .refine((value) => !!value.trim()),
   notePath: z.string().max(4096).optional(),
   access: z.enum(agentAccessModes).optional(),
