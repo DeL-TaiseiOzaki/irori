@@ -14,6 +14,7 @@ import {
   type SourceRef,
   type SourceVersion,
   type RunRecord,
+  type ArtifactRecord,
   type KnowledgeHistory,
   type SourceLocation,
 } from '../domain/knowledge';
@@ -21,10 +22,46 @@ import type { StartRun } from '../domain/types';
 import { t } from '../domain/i18n';
 import { renamedPath } from '../domain/layers';
 
+/** Keeps disk work bounded even when an immutable record directory has years of runs. */
+async function parallel<T, R>(items: T[], read: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  let failure: { error: unknown } | undefined;
+  await Promise.all(
+    Array.from({ length: Math.min(8, items.length) }, async () => {
+      for (;;) {
+        const index = next++;
+        if (index >= items.length || failure) return;
+        try {
+          results[index] = await read(items[index]);
+        } catch (error) {
+          failure ??= { error };
+          return;
+        }
+      }
+    }),
+  );
+  if (failure) throw failure.error;
+  return results;
+}
+
+interface RememberedRecord {
+  size: number;
+  mtime: number;
+  at: string;
+  value?: RunRecord | ArtifactRecord;
+}
+
 /** Private immutable bytes and observations. No transcripts or cross-KB metadata are published. */
 export class KnowledgeStore {
   readonly directory: string;
   private queue = new SerialQueue();
+  private records = new Map<string, RememberedRecord>();
+  private outcomes = new Map<
+    string,
+    { size: number; mtime: number; outcome: RunRecord['outcome'] }
+  >();
+  private histories = new Map<string, Promise<KnowledgeHistory>>();
   constructor(
     dataDir: string,
     private resolve: (ref: SourceRef) => Promise<string>,
@@ -123,38 +160,108 @@ export class KnowledgeStore {
   }
   async history(scopeId: string): Promise<KnowledgeHistory> {
     z.uuid().parse(scopeId);
-    const readRecords = async (kind: string) => {
-      const dir = path.join(this.directory, kind, scopeId);
-      const names = await fs.readdir(dir).catch((e: NodeJS.ErrnoException) => {
-        if (e.code !== 'ENOENT') throw e;
-        return [];
+    const pending = this.histories.get(scopeId);
+    if (pending) return pending.then((history) => structuredClone(history));
+    const next = this.readHistory(scopeId).finally(() => this.histories.delete(scopeId));
+    this.histories.set(scopeId, next);
+    return next.then((history) => structuredClone(history));
+  }
+  private async latest<T extends RunRecord | ArtifactRecord>(
+    scopeId: string,
+    kind: string,
+    parse: (value: unknown) => T,
+    date: (value: T) => string,
+  ): Promise<T[]> {
+    const dir = path.join(this.directory, kind, scopeId);
+    const names = await fs.readdir(dir).catch((e: NodeJS.ErrnoException) => {
+      if (e.code !== 'ENOENT') throw e;
+      return [];
+    });
+    const filenames = names
+      .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
+      .map((name) => path.join(dir, name));
+    const present = new Set(filenames);
+    for (const file of this.records.keys())
+      if (path.dirname(file) === dir && !present.has(file)) this.records.delete(file);
+    const retained: RememberedRecord[] = [];
+    const records = await parallel(filenames, async (file) => {
+      const stat = await fs.stat(file);
+      let record = this.records.get(file);
+      if (!record || record.size !== stat.size || record.mtime !== stat.mtimeMs) {
+        const value = parse(await readLocalJson(file, null));
+        record = { size: stat.size, mtime: stat.mtimeMs, at: date(value), value };
+        this.records.set(file, record);
+      }
+      if (record.value) {
+        retained.push(record);
+        if (retained.length > 100) {
+          let oldest = 0;
+          for (let i = 1; i < retained.length; i++)
+            if (retained[i].at.localeCompare(retained[oldest].at) < 0) oldest = i;
+          retained.splice(oldest, 1)[0].value = undefined;
+        }
+      }
+      return { file, record };
+    });
+    // UUID filenames and mtimes do not order createdAt. The first pass must
+    // validate every record; later passes keep just its date and file stamp.
+    records.sort((a, b) => b.record.at.localeCompare(a.record.at));
+    for (const { record } of records.slice(100)) record.value = undefined;
+    return parallel(records.slice(0, 100), async ({ file, record }) => {
+      record.value ??= parse(await readLocalJson(file, null));
+      return structuredClone(record.value) as T;
+    });
+  }
+  private async readHistory(scopeId: string): Promise<KnowledgeHistory> {
+    const runs = await this.latest(
+      scopeId,
+      'runs',
+      (value) => runRecord.parse(value),
+      (run) => run.createdAt,
+    );
+    const enriched = await parallel(runs, async (run) => {
+      const file = path.join(this.directory, 'outcomes', scopeId, `${run.id}.json`);
+      const stat = await fs.stat(file).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
       });
-      return Promise.all(
-        names
-          .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
-          .map((name) => readLocalJson(path.join(dir, name), null)),
-      );
-    };
-    const runs = (await readRecords('runs')).map((value) => runRecord.parse(value));
-    const enriched: RunRecord[] = [];
-    for (const run of runs) {
-      const state = await readLocalJson(
-        path.join(this.directory, 'outcomes', scopeId, `${run.id}.json`),
-        null,
-      );
-      enriched.push({
+      let cached = this.outcomes.get(file);
+      if (!stat) {
+        this.outcomes.delete(file);
+        cached = undefined;
+      } else if (!cached || cached.size !== stat.size || cached.mtime !== stat.mtimeMs) {
+        const state = await readLocalJson(file, null);
+        cached = {
+          size: stat.size,
+          mtime: stat.mtimeMs,
+          outcome: state
+            ? z.object({ outcome: z.enum(['completed', 'failed', 'cancelled']) }).parse(state)
+                .outcome
+            : undefined,
+        };
+        this.outcomes.set(file, cached);
+      }
+      return {
         ...run,
-        outcome: state
-          ? z.object({ outcome: z.enum(['completed', 'failed', 'cancelled']) }).parse(state).outcome
-          : undefined,
-      });
-    }
+        outcome: cached?.outcome,
+      };
+    });
+    const selected = new Set(
+      runs.map((run) => path.join(this.directory, 'outcomes', scopeId, `${run.id}.json`)),
+    );
+    for (const file of this.outcomes.keys())
+      if (
+        path.dirname(file) === path.join(this.directory, 'outcomes', scopeId) &&
+        !selected.has(file)
+      )
+        this.outcomes.delete(file);
     return {
-      runs: enriched.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100),
-      artifacts: (await readRecords('artifacts'))
-        .map((value) => artifactRecord.parse(value))
-        .sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
-        .slice(0, 100),
+      runs: enriched,
+      artifacts: await this.latest(
+        scopeId,
+        'artifacts',
+        (value) => artifactRecord.parse(value),
+        (record) => record.registeredAt,
+      ),
     };
   }
   async artifact(ref: SourceRef, runId: string) {

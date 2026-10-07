@@ -6,7 +6,7 @@ import { linksTo, samePath } from '../domain/note-links';
 import { classify } from '../domain/scopes';
 import { searchQuery, type KnowledgeSearch } from '../domain/search';
 import type { Entry, Space } from '../domain/types';
-import { FileService, textFilePattern } from './files';
+import { FileService, hash, textFilePattern } from './files';
 import { foldsCase } from './links';
 import { SearchIndex, trigramQuery } from './search-index';
 import { referencesTo } from './note-references';
@@ -31,9 +31,11 @@ function searchable(space: Space, relative: string) {
 
 /** Search saved local text through the same scope boundaries as the explorer. */
 export class SearchService {
-  // A newer scan of a KB replaces an older one of the same KB, which shares its
-  // index; scans of different KBs run side by side.
+  // Only a newer request of the same kind replaces a scan. Identical requests
+  // share the work, including the layer walk, while it is in flight.
   private generations = new Map<string, number>();
+  private pending = new Map<string, { generation: number; result: Promise<KnowledgeSearch> }>();
+  private backlinksCache = new Map<string, { signature: string; result: KnowledgeSearch }>();
   constructor(
     private readonly files: FileService,
     private readonly limits = searchLimits,
@@ -45,26 +47,71 @@ export class SearchService {
     const match = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu');
     // Trigrams need three characters; a shorter query reads every indexed text.
     const narrow = Array.from(query).length >= 3 ? trigramQuery(query) : undefined;
-    return this.scan(scopeId, query, textFilePattern, () => (line) => match.exec(line), narrow);
+    return this.request(scopeId, 'search', query, (generation) =>
+      this.scan(
+        scopeId,
+        'search',
+        generation,
+        query,
+        textFilePattern,
+        () => (line) => match.exec(line),
+        narrow,
+      ),
+    );
   }
 
   /** Lines of the other Markdown notes in this KB whose links resolve to `target`. */
   async backlinks(scopeId: string, target: string): Promise<KnowledgeSearch> {
-    const foldCase = await foldsCase(this.files, scopeId, target);
-    return this.scan(scopeId, target, /\.md$/i, (from) =>
-      samePath(from, target, foldCase) ? () => null : linksTo(from, target, foldCase),
-    );
+    return this.request(scopeId, 'backlinks', target, async (generation) => {
+      const foldCase = await foldsCase(this.files, scopeId, target);
+      return this.scan(
+        scopeId,
+        'backlinks',
+        generation,
+        target,
+        /\.md$/i,
+        (from) => (samePath(from, target, foldCase) ? () => null : linksTo(from, target, foldCase)),
+        undefined,
+        JSON.stringify([scopeId, this.files.get(scopeId).root, target, foldCase]),
+      );
+    });
   }
 
   /** Move previews include the OKF relation and source fields as well as body links. */
   async references(scopeId: string, target: string, foldCase?: boolean): Promise<KnowledgeSearch> {
-    foldCase ??= await foldsCase(this.files, scopeId, target);
-    const roots = layerRoots(this.files.get(scopeId));
-    return this.scan(scopeId, target, /\.md$/i, (from, text) =>
-      samePath(from, target, foldCase)
-        ? () => null
-        : referencesTo(text, from, target, foldCase, roots),
+    return this.request(
+      scopeId,
+      'references',
+      JSON.stringify([target, foldCase]),
+      async (generation) => {
+        foldCase ??= await foldsCase(this.files, scopeId, target);
+        const roots = layerRoots(this.files.get(scopeId));
+        return this.scan(scopeId, 'references', generation, target, /\.md$/i, (from, text) =>
+          samePath(from, target, foldCase)
+            ? () => null
+            : referencesTo(text, from, target, foldCase, roots),
+        );
+      },
     );
+  }
+
+  private request(
+    scopeId: string,
+    kind: string,
+    input: string,
+    scan: (generation: number) => Promise<KnowledgeSearch>,
+  ) {
+    const scope = `${scopeId}:${kind}`;
+    const key = JSON.stringify([scope, input]);
+    const pending = this.pending.get(key);
+    if (pending && pending.generation === this.generations.get(scope)) return pending.result;
+    const generation = (this.generations.get(scope) ?? 0) + 1;
+    this.generations.set(scope, generation);
+    const result = scan(generation).finally(() => {
+      if (this.pending.get(key)?.result === result) this.pending.delete(key);
+    });
+    this.pending.set(key, { generation, result });
+    return result;
   }
 
   /**
@@ -75,14 +122,16 @@ export class SearchService {
    */
   private async scan(
     scopeId: string,
+    kind: string,
+    generation: number,
     query: string,
     include: RegExp,
     matcher: (path: string, text: string) => (line: string) => RegExpExecArray | null,
     narrow?: string,
+    backlinkKey?: string,
   ): Promise<KnowledgeSearch> {
     const space = this.files.get(scopeId);
-    const generation = (this.generations.get(scopeId) ?? 0) + 1;
-    this.generations.set(scopeId, generation);
+    const scope = `${scopeId}:${kind}`;
     let deadline = performance.now() + this.limits.milliseconds;
     const result: KnowledgeSearch = {
       scopeId,
@@ -93,7 +142,7 @@ export class SearchService {
       incomplete: false,
     };
     const current = () => {
-      if (generation !== this.generations.get(scopeId))
+      if (generation !== this.generations.get(scope))
         throw Error(t('新しい検索に切り替わりました。', 'A newer search replaced this one.'));
       if (performance.now() >= deadline) {
         result.incomplete = true;
@@ -102,9 +151,17 @@ export class SearchService {
       return true;
     };
     const index = await SearchIndex.open(this.files.dataDir, scopeId);
+    const retained = new Set<number>();
+    const retain = (id: number) => {
+      if (!retained.has(id)) {
+        retained.add(id);
+        index.retain(id);
+      }
+    };
     try {
       const known = index.files();
-      const seen: { id: number; path: string }[] = [];
+      for (const row of known.values()) retain(row.id);
+      const seen: { id: number; path: string; size: number; mtime: number }[] = [];
       const directories = [''];
       let position = 0;
       let visited = 0;
@@ -183,15 +240,15 @@ export class SearchService {
             bytes += stat.size;
             text = await this.read(space, scopeId, entry.path, stat).catch(() => null);
           }
+          const id = index.put(entry.path, stat.size, stat.mtimeMs, text, row?.id);
+          retain(id);
           if (!current()) break scan;
-          if (row) index.remove(row.id);
-          const id = index.put(entry.path, stat.size, stat.mtimeMs, text);
           if (text === null) {
             result.skippedFiles++;
             result.incomplete = true;
           } else {
             result.scannedFiles++;
-            seen.push({ id, path: entry.path });
+            seen.push({ id, path: entry.path, size: stat.size, mtime: stat.mtimeMs });
           }
         }
         if (!more) break;
@@ -213,7 +270,19 @@ export class SearchService {
 
       // Reading had the budget; matching over the checked text gets its own.
       deadline = performance.now() + this.limits.milliseconds;
-      const candidates = narrow === undefined ? undefined : index.matching(narrow);
+      const signature = hash(
+        JSON.stringify(seen.map(({ id, path, size, mtime }) => ({ id, path, size, mtime }))),
+      );
+      const cached = backlinkKey ? this.backlinksCache.get(backlinkKey) : undefined;
+      if (!result.incomplete && cached?.signature === signature) {
+        current();
+        return structuredClone(cached.result);
+      }
+      const candidates = backlinkKey
+        ? index.linking()
+        : narrow === undefined
+          ? undefined
+          : index.matching(narrow);
       matching: for (const { id, path: file } of seen) {
         if (candidates && !candidates.has(id)) continue;
         await setImmediate();
@@ -248,12 +317,23 @@ export class SearchService {
           }
         }
       }
+      if (backlinkKey && !result.incomplete) {
+        this.backlinksCache.delete(backlinkKey);
+        this.backlinksCache.set(backlinkKey, { signature, result: structuredClone(result) });
+        if (this.backlinksCache.size > 100)
+          this.backlinksCache.delete(this.backlinksCache.keys().next().value!);
+      }
     } catch (error) {
       // A damaged database is a lost cache, not a lost answer: the next request rebuilds it.
       if ((error as { code?: unknown }).code === 'ERR_SQLITE_ERROR') await index.discard();
       throw error;
     } finally {
-      index.close();
+      try {
+        index.release(retained);
+        index.flush();
+      } finally {
+        index.close();
+      }
     }
     return result;
   }

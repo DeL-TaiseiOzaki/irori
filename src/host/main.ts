@@ -6,7 +6,7 @@ import { realpath, open as openFileHandle } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
-import { FileService, readViewerBytes } from './files';
+import { FileService, readViewerBytes, watcherIgnored } from './files';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
@@ -201,31 +201,44 @@ app
         fileMutations--;
       }
     }
+    const watchTimers = new Map<string, NodeJS.Timeout>();
     function watch(space: Space) {
-      let timer: NodeJS.Timeout | undefined;
+      if (watchers.has(space.scopeId)) return;
       const watcher = chokidar.watch(space.root, {
         ignoreInitial: true,
         depth: 6,
         followSymlinks: false,
-        ignored: (p: string) => {
-          const rel = path.relative(space.root, p).replaceAll('\\', '/');
-          return (
-            rel.split('/').some((x) => ['.git', 'node_modules'].includes(x)) ||
-            // The declaration as it is now: its contents folder can be renamed (ADR 024).
-            (files.list().find((item) => item.scopeId === space.scopeId) ?? space).contents.some(
-              (c) => rel === c || rel.startsWith(c + '/'),
-            )
-          );
-        },
+        ignored: watcherIgnored(space, files.list()),
       });
       watcher.on('all', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => emit({ type: 'files', scopeId: space.scopeId }), 150);
+        if (watchers.get(space.scopeId) !== watcher) return;
+        clearTimeout(watchTimers.get(space.scopeId));
+        watchTimers.set(
+          space.scopeId,
+          setTimeout(() => {
+            watchTimers.delete(space.scopeId);
+            if (!closing && files.list().some((item) => item.scopeId === space.scopeId))
+              emit({ type: 'files', scopeId: space.scopeId });
+          }, 150),
+        );
       });
       watcher.on('error', (error) => console.warn('Watcher error', String(error)));
       watchers.set(space.scopeId, watcher);
     }
     files.list().forEach(watch);
+    let refreshingWatchers = Promise.resolve();
+    files.onRegistrationsChanged(() => {
+      // Restarting also drops already watched descendants of a newly nested
+      // hibachi and restores them when that registration is removed.
+      refreshingWatchers = refreshingWatchers
+        .then(async () => {
+          const previous = [...watchers.entries()];
+          for (const [scopeId] of previous) watchers.delete(scopeId);
+          await Promise.all(previous.map(([, watcher]) => watcher.close()));
+          if (!closing) files.list().forEach(watch);
+        })
+        .catch((error) => console.warn('Watchers could not be refreshed', String(error)));
+    });
     const defaultParent = async () => path.dirname((await you.load()).root);
     const registerWatched = (root: string, name: string, category: Category) =>
       changeFiles(async () => {

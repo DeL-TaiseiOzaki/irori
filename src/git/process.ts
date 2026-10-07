@@ -126,6 +126,10 @@ export function githubCredentialConfig(gh: string) {
 type RunOptions = { input?: string; network?: boolean; codes?: number[]; inspection?: boolean };
 
 export class GitProcess {
+  private static running = 0;
+  private static waiting: { owner: GitProcess; resolve: () => void; reject: (e: Error) => void }[] =
+    [];
+  private closed = false;
   private children = new Set<ChildProcess>();
   constructor(
     private command = 'git',
@@ -151,7 +155,28 @@ export class GitProcess {
       }
     }
   }
-  private once(cwd: string, args: string[], options: RunOptions) {
+  private acquire() {
+    if (this.closed) return Promise.reject(Error('Git process is closed'));
+    if (GitProcess.running < 4) {
+      GitProcess.running++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      GitProcess.waiting.push({ owner: this, resolve, reject });
+    });
+  }
+  private async once(cwd: string, args: string[], options: RunOptions) {
+    await this.acquire();
+    try {
+      if (this.closed) throw Error('Git process is closed');
+      return await this.execute(cwd, args, options);
+    } finally {
+      const next = GitProcess.waiting.shift();
+      if (next) next.resolve();
+      else GitProcess.running--;
+    }
+  }
+  private execute(cwd: string, args: string[], options: RunOptions) {
     const env = agentEnv();
     for (const key of Object.keys(env))
       if (
@@ -223,6 +248,12 @@ export class GitProcess {
     });
   }
   async close() {
+    this.closed = true;
+    GitProcess.waiting = GitProcess.waiting.filter((entry) => {
+      if (entry.owner !== this) return true;
+      entry.reject(Error('Git process is closed'));
+      return false;
+    });
     await Promise.all([...this.children].map(killTree));
   }
 }

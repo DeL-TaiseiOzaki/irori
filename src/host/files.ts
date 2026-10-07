@@ -95,6 +95,42 @@ export async function readViewerBytes(filename: string, rel: string) {
   if ((await fs.stat(filename)).size > viewerByteLimit) throw tooLarge();
   return new Uint8Array(await fs.readFile(filename));
 }
+const unwatchedNames = new Set([
+  '.git',
+  'node_modules',
+  '.venv',
+  'venv',
+  '__pycache__',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.tox',
+  '.next',
+  '.turbo',
+  '.cache',
+  '.DS_Store',
+]);
+
+/** One registration's watcher boundaries, computed outside chokidar's path callback. */
+export function watcherIgnored(space: Space, spaces: Space[]) {
+  const excluded = [
+    ...space.contents,
+    ...spaces
+      .filter((other) => other.scopeId !== space.scopeId && within(space.root, other.root))
+      .map((other) => path.relative(space.root, other.root).replaceAll('\\', '/')),
+  ];
+  const knowledge = knowledgeFolder(space);
+  return (filename: string) => {
+    const relative = path.relative(space.root, filename).replaceAll('\\', '/');
+    return (
+      relative
+        .split('/')
+        .some((part, index) => unwatchedNames.has(part) && !(index === 0 && part === knowledge)) ||
+      excluded.some((folder) => relative === folder || relative.startsWith(folder + '/'))
+    );
+  };
+}
+
 export class FileService {
   cloud?: {
     resolve(scopeId: string, rel: string): Promise<string>;
@@ -112,7 +148,16 @@ export class FileService {
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
   private queue = new SerialQueue();
+  private registrationListeners = new Set<() => void>();
   constructor(readonly dataDir: string) {}
+  /** Registration and layer changes require watcher boundaries to be rebuilt. */
+  onRegistrationsChanged(listener: () => void) {
+    this.registrationListeners.add(listener);
+    return () => this.registrationListeners.delete(listener);
+  }
+  private registrationsChanged() {
+    for (const listener of this.registrationListeners) listener();
+  }
   async init() {
     await fs.mkdir(this.dataDir, { recursive: true, mode: 0o700 });
     try {
@@ -235,6 +280,7 @@ export class FileService {
         { root: s.root, scopeId: s.scopeId },
       ];
       await writeLocalJson(path.join(this.dataDir, 'spaces.json'), this.bindings);
+      this.registrationsChanged();
       return s;
     });
   }
@@ -249,6 +295,7 @@ export class FileService {
       await writeLocalJson(path.join(this.dataDir, 'spaces.json'), bindings);
       this.bindings = bindings;
       this.spaces = this.spaces.filter((item) => item.scopeId !== id);
+      this.registrationsChanged();
       return s;
     });
   }
@@ -282,6 +329,7 @@ export class FileService {
       // A file of the KB keeps its own mode; only device records are made private.
       await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
       this.spaces = this.spaces.map((item) => (item.scopeId === id ? next : item));
+      this.registrationsChanged();
       // Only the icon the declaration names stays beside it.
       const icon = next.appearance?.icon?.kind === 'image' ? next.appearance.icon.path : '';
       for (const name of await fs.readdir(path.dirname(meta)))
@@ -380,6 +428,7 @@ export class FileService {
         throw error;
       }
       this.spaces = this.spaces.map((item) => (item.scopeId === id ? space : item));
+      this.registrationsChanged();
       if (layer === 'contents') await this.ignoreContents(s.root, previous, next);
       for (const file of moved) {
         const target = renamedPath(file, previous, next)!;
