@@ -1,5 +1,20 @@
 # irori continuation handoff
 
+Published 2026-10-07: **0.1.81** ([#182](https://github.com/DeL-TaiseiOzaki/irori/pull/182),
+long agent sessions stay light) merged at the owner's request as `437164e` and
+is published as
+[v0.1.81-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.81-preview.1)
+by release run `37605430358` from main's successful CI run `37595849519`
+(verify plus Linux, Windows and macOS packages; its first attempt timed out in
+`conversations-ui-smoke` and the rerun passed — six local runs of that suite
+took 13–14 s each, so the hang is not yet explained).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,171,520 bytes,
+  Mac 141,791,337 bytes and `irori-0.1.81-full.nupkg` 175,339,889 bytes.
+  The website manifest now offers 0.1.81.
+- Owner checks remain: a long session with a real CLI on the installed Windows
+  and Mac builds (smoothness, **停止** ending the CLI's own servers), which was
+  not measured here.
+
 Published 2026-10-07: **0.1.80** ([#183](https://github.com/DeL-TaiseiOzaki/irori/pull/183),
 a shared Schema for every agent, set from the settings, [ADR 027](decisions/027-shared-schema.md))
 merged at the owner's request as `4f011e5` and is published as
