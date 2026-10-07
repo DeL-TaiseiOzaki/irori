@@ -331,7 +331,9 @@ export const AgentLog = memo(function AgentLog({
   onError: (e: unknown) => void;
 }) {
   useLanguage();
-  const items = useMemo(() => logItems(events, activeRun), [events, activeRun]);
+  // Which group each step was shown in, so a group outlives its first step.
+  const groups = useRef(new Map<string, string>());
+  const items = useMemo(() => logItems(events, activeRun, groups.current), [events, activeRun]);
   const last = events.at(-1);
   // The newest event of the run in progress: a step being taken, or a reply still arriving.
   const current = last && activeRun && last.runId === activeRun ? last : undefined;

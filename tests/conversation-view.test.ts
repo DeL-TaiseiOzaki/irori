@@ -4,6 +4,7 @@ import {
   appendConversationEvent,
   appendConversationEvents,
   eventKey,
+  mergeHeldEvents,
   trimConversation,
   viewTextLimit,
   viewWindow,
@@ -91,6 +92,44 @@ test('a list within the limits is returned as it is', () => {
   assert.deepEqual(
     trimConversation(events, 1).events.map((item) => item.id),
     ['t'],
+  );
+});
+
+test('events held while the snapshot was read join it once', () => {
+  const user = event({ id: 'u', role: 'user' });
+  const snapshot = [user, event({ id: 'tool', type: 'tool' }), fragment('t', 'Hello, wor')];
+  // Fragments the snapshot already read, the fragment it did not, and events after its history.
+  const held = [
+    event({ id: 'tool', type: 'tool' }),
+    fragment('t', 'wor'),
+    fragment('t', 'ld'),
+    event({ id: 'done', type: 'done', outcome: 'completed' }),
+  ];
+  const merged = mergeHeldEvents(snapshot, appendConversationEvents([], held));
+  assert.deepEqual(
+    merged.map((item) => item.text),
+    ['u', 'tool', 'Hello, world', 'done'],
+  );
+  assert.equal(merged.length, 4);
+  // Nothing held: the snapshot as it is. Everything held already read: the snapshot's text alone.
+  assert.equal(mergeHeldEvents(snapshot, []), snapshot);
+  assert.deepEqual(
+    mergeHeldEvents(snapshot, [fragment('t', 'Hello, wor')]).map((item) => item.text),
+    ['u', 'tool', 'Hello, wor'],
+  );
+  // A reply the snapshot has not seen at all, and one that ended before the read, are whole/left out.
+  assert.deepEqual(
+    mergeHeldEvents(snapshot, [fragment('v', 'New')]).map((item) => item.text),
+    ['u', 'tool', 'Hello, wor', 'New'],
+  );
+  const closed = [fragment('t', 'Hello'), event({ id: 'done', type: 'done' })];
+  assert.equal(mergeHeldEvents(closed, [fragment('t', 'llo')]).length, 2);
+  // The fragments of the same reply arriving in one batch count as one.
+  assert.deepEqual(
+    mergeHeldEvents([fragment('t', 'ab')], [fragment('t', 'b'), fragment('t', 'c')]).map(
+      (item) => item.text,
+    ),
+    ['abc'],
   );
 });
 

@@ -76,6 +76,23 @@ test('the log keys items by their events, so a sliding window keeps them', () =>
   assert.equal(open.at(-1)!.key, steps.key);
 });
 
+test('a group of steps keeps its key after its first step leaves the window', () => {
+  const steps = Array.from({ length: 4 }, (_, n) =>
+    event({ type: 'tool', text: `step ${n}`, call: `c${n}` }),
+  );
+  const events = [event({ role: 'user' }), ...steps, event({ type: 'text', text: 'Reply' })];
+  const groups = new Map<string, string>();
+  const before = logItems(events, undefined, groups).find((item) => item.kind === 'steps')!;
+  // The window slid past the user message and the first two steps.
+  const after = logItems(events.slice(3), undefined, groups).find((item) => item.kind === 'steps')!;
+  assert.equal(after.key, before.key);
+  assert.ok(after.kind === 'steps' && after.steps.length === 2);
+  // The map names the steps shown now and no others.
+  assert.deepEqual([...groups.keys()].length, 2);
+  // Without a memory, a group is named by its first step.
+  assert.notEqual(logItems(events.slice(3)).find((item) => item.kind === 'steps')!.key, before.key);
+});
+
 test('a resolved event shows nowhere, and a repeated id still gets a key of its own', () => {
   const twin = { id: 'same', runId: 'run', type: 'status' as const, text: 'a' };
   const items = logItems([

@@ -16,6 +16,7 @@ import type { YourAi } from '../domain/you';
 import {
   appendConversationEvents,
   isDamaged,
+  mergeHeldEvents,
   trimConversation,
   withRequests,
   type QueuedMessage,
@@ -24,6 +25,7 @@ import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { useDraft } from './useDraft';
+import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
 import { AgentLog } from './AgentLog';
 import { BrainTile } from './BrainTile';
@@ -169,6 +171,8 @@ export function AgentColumn({
   /** An irori column's run began with these hibachis handed to it. */
   onStarted?: (brains: string[]) => void;
 }) {
+  // The column sits behind a memo boundary, so it follows the language itself.
+  useLanguage();
   const irori = column.owner === 'irori';
   const scopeId = irori ? you?.id : space?.scopeId;
   const ready = irori ? you?.state === 'ready' : !!space;
@@ -339,11 +343,15 @@ export function AgentColumn({
         }
         const value = await host.agentConversation(scopeId, target.agent, target.id);
         if (!current) return;
-        // Events published before the host read are in the snapshot, and reached this
-        // window before its reply did; those held so far are them. Later ones follow it.
+        // Events held while the snapshot was read join it, less what it already holds:
+        // the host reads the history and then its native record before replying, so
+        // some of them are in the snapshot and some arrived after its history was read.
+        const held = pending.current;
         pending.current = [];
         reading = false;
-        const { events: next, dropped } = trimConversation(withRequests(value));
+        const { events: next, dropped } = trimConversation(
+          mergeHeldEvents(withRequests(value), held),
+        );
         view.current = next;
         setEvents(next);
         setQueued(value.queued);
