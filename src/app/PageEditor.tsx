@@ -14,6 +14,7 @@ import {
   type PageProperties as Declared,
 } from '../domain/properties';
 import { PageProperties } from './PageProperties';
+import { baseName } from '../domain/paths';
 
 export interface PageEditorHandle extends EditorHandle {
   /**
@@ -128,7 +129,7 @@ export function PageEditor({
         yaml={yaml}
         declared={properties}
         readOnly={readOnly}
-        fileName={(filename ?? '').split('/').at(-1) ?? ''}
+        fileName={baseName(filename ?? '')}
         onChange={setHeadYaml}
       />
       {editor}

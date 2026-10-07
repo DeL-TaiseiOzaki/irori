@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Document, Entry, Space } from '../domain/types';
 import { t } from '../domain/i18n';
+import { baseName, parentPath } from '../domain/paths';
 import { retiredFile, skillFile, skillName, skillsRoot, type SkillListing } from '../domain/skills';
 import {
   attachmentPath,
@@ -21,6 +22,7 @@ import { errorText } from './ErrorMessage';
 import { Icon, type IconName } from './Icon';
 import { Crumbs } from './NoteBar';
 import { StageView } from './StageView';
+import { useAction } from './useAction';
 import { useResource } from './useResource';
 import './schema-settings.css';
 
@@ -64,8 +66,7 @@ const kinds: Record<SchemaKind, { icon: IconName; name: () => string; one: () =>
   hook: { icon: 'zap', name: () => t('フック', 'Hooks'), one: () => t('フック', 'a hook') },
 };
 
-const folderOf = (file: string) => file.split('/').slice(0, -1).join('/');
-const instructionsLabel = (file: string) => (file === instructionsFile ? file : folderOf(file));
+const instructionsLabel = (file: string) => (file === instructionsFile ? file : parentPath(file));
 const hookLabel = (hook: HookEntry) =>
   hook.matcher ? `${hook.event} · ${hook.matcher}` : hook.event;
 const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${file}`;
@@ -144,7 +145,7 @@ export function SchemaList({
       kind: 'rule',
       items: settings.rules.map((file) => ({
         key: file,
-        label: file.split('/').at(-1)!,
+        label: baseName(file),
         title: file,
       })),
     },
@@ -339,8 +340,8 @@ export function SchemaEditor({
   const data = useResource(() => loadSchema(scopeId), [scopeId], {
     refresh: revision,
   });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const action = useAction();
+  const { busy, error, setError } = action;
   const [notice, setNotice] = useState('');
   const [deleting, setDeleting] = useState<{
     what: string;
@@ -351,18 +352,12 @@ export function SchemaEditor({
     setError('');
     setNotice('');
   }, [target.kind, target.key]);
-  async function run(action: () => Promise<string | void>) {
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const done = await action();
+  async function run(work: () => Promise<string | void>) {
+    await action.run(async () => {
+      setNotice('');
+      const done = await work();
       if (done) setNotice(done);
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   const title = target.key
     ? target.kind === 'hook'
@@ -371,7 +366,7 @@ export function SchemaEditor({
         : kinds.hook.name()
       : target.kind === 'instructions'
         ? instructionsLabel(target.key)
-        : target.key.split('/').at(-1)!
+        : baseName(target.key)
     : t(`${kinds[target.kind].one()}を追加`, `Add ${kinds[target.kind].one()}`);
   const shared = {
     scopeId,
@@ -621,12 +616,12 @@ function InstructionsForm({
 function RuleForm({ scopeId, target, disabled, run, onSelect, onDelete }: FormProps) {
   const { doc, setDoc, error } = useSettingFile(scopeId, target.key);
   const [text, setText] = useState<string>();
-  const [name, setName] = useState(target.key?.split('/').at(-1) ?? '');
+  const [name, setName] = useState(baseName(target.key ?? ''));
   if (doc === undefined) return <Loading error={error} />;
   const value = text ?? doc?.text ?? '';
   const filename = /\.md$/i.test(name.trim()) ? name.trim() : `${name.trim()}.md`;
   const valid = ruleFileName(filename);
-  const renamed = !!target.key && filename !== target.key.split('/').at(-1);
+  const renamed = !!target.key && filename !== baseName(target.key);
   return (
     <form
       className="schema-card"

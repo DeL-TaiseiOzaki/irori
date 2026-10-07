@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../domain/i18n';
+import { baseName } from '../../domain/paths';
 import type { ViewProps } from './common';
 
 const types: [RegExp, string][] = [
@@ -38,7 +39,7 @@ export default function ImageView({
     <div className="image-view">
       <img
         src={url}
-        alt={path.split('/').at(-1)}
+        alt={baseName(path)}
         style={natural ? { width: natural.width * fit * zoom } : undefined}
         onLoad={(event) => {
           const image = event.currentTarget;

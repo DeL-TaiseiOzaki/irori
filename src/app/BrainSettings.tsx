@@ -19,10 +19,12 @@ import {
   type NamedLayer,
 } from '../domain/layers';
 import { t } from '../domain/i18n';
+import { baseName } from '../domain/paths';
 import { BrainTile, glyphs } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
 
 const host = window.irori;
 type IconKind = 'glyph' | 'text' | 'image';
@@ -102,21 +104,14 @@ export function RemoveHibachi({
   beforeRemove?: () => Promise<boolean>;
 }) {
   const [trash, setTrash] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const { busy, error, run } = useAction();
   const label = t(`${space.name} を削除`, `Remove ${space.name}`);
   async function remove() {
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       if (beforeRemove && !(await beforeRemove())) return;
       await host.removeSpace(space.scopeId, trash);
       onRemoved();
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   return (
     <Dialog label={label} busy={busy} onClose={onClose}>
@@ -202,14 +197,13 @@ export function BrainSettings({
   }));
   const [folders, setFolders] = useState(() => ({
     Knowledge_Base: layerFolder(space, 'Knowledge_Base'),
-    contents: layerFolder(space, 'contents').split('/').at(-1)!,
+    contents: baseName(layerFolder(space, 'contents')),
   }));
   const folderProblems = Object.fromEntries(
     namedLayers.map((layer) => [layer, layerFolderProblem(folders[layer].trim()) ?? '']),
   ) as Record<NamedLayer, string>;
   const folderProblem = namedLayers.some((layer) => folderProblems[layer]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const { busy: saving, error, setError, run } = useAction();
   const [removing, setRemoving] = useState(false);
   const textProblem =
     kind === 'text' && (!text.trim() || graphemes(text.trim()) > 2)
@@ -257,9 +251,7 @@ export function BrainSettings({
   }
   async function save() {
     if (saving || textProblem || imageMissing || folderProblem || !name.trim()) return;
-    setSaving(true);
-    setError('');
-    try {
+    await run(async () => {
       const saved =
         kind === 'image' && picked
           ? { kind: 'image' as const, path: await host.saveSpaceIcon(space.scopeId, picked.bytes) }
@@ -278,18 +270,14 @@ export function BrainSettings({
       const renamed: (LayerFolderRename & { layer: NamedLayer })[] = [];
       for (const layer of namedLayers) {
         const folder = folders[layer].trim();
-        if (folder === layerFolder(next, layer).split('/').at(-1)) continue;
+        if (folder === baseName(layerFolder(next, layer))) continue;
         if (beforeRename && !(await beforeRename())) break;
         const result = await host.renameLayerFolder(space.scopeId, layer, folder);
         next = result.space;
         renamed.push({ ...result, layer });
       }
       onSaved(next, renamed);
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setSaving(false);
-    }
+    });
   }
   if (removing && onRemoved)
     return (

@@ -3,6 +3,7 @@ import { Popover } from '@base-ui/react/popover';
 import { Icon } from './Icon';
 import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
 import { AccountSection, RestoreEnvironment } from './AccountSync';
+import { useChoice } from './useChoice';
 import {
   chooseLanguage,
   chooseMarkdownFont,
@@ -37,24 +38,6 @@ const fontLabels: Record<MarkdownFont, () => string> = {
 
 // Each language is named in itself, so it can be found whichever is showing.
 const languageLabels: Record<Language, string> = { ja: '日本語', en: 'English' };
-
-/** One device-wide choice, applied at once and undone if the device record refuses it. */
-function useChoice<T>(
-  read: () => T,
-  save: (value: T) => Promise<unknown>,
-  onError: (e: unknown) => void,
-) {
-  const [value, setValue] = useState<T>(read);
-  function choose(next: T) {
-    const previous = value;
-    setValue(next);
-    void save(next).catch((error) => {
-      setValue(previous);
-      onError(error);
-    });
-  }
-  return [value, choose] as const;
-}
 
 function Choices<T extends string>({
   legend,

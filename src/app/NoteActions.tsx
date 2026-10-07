@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Document } from '../domain/types';
-import { noteFilename, type TrashedNote } from '../domain/note-operations';
+import { noteFilename } from '../domain/note-operations';
 import type { LinkUpdate } from '../domain/note-links';
+import { noteLabel } from '../domain/overview';
+import { parentPath } from '../domain/paths';
 import { Dialog } from './Dialog';
 import { displayLocale, t } from '../domain/i18n';
-import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
+import { useResource } from './useResource';
 
 const host = window.irori;
 
@@ -53,36 +56,19 @@ export function NoteActionDialog({
   onChanged: (doc: Document | null, notice?: string) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
-  const [name, setName] = useState(() => doc.path.split('/').at(-1)!.replace(/\.md$/i, ''));
-  const [directory, setDirectory] = useState(() => doc.path.split('/').slice(0, -1).join('/'));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [name, setName] = useState(() => noteLabel(doc.path));
+  const [directory, setDirectory] = useState(() => parentPath(doc.path));
+  const { busy, error, run } = useAction();
   const [links, setLinks] = useState(true);
-  const [referring, setReferring] = useState<
-    Pick<LinkUpdate, 'notes' | 'links' | 'incomplete'> | { error: string }
-  >();
-  useEffect(() => {
-    if (action !== 'move') return;
-    let current = true;
-    setReferring(undefined);
-    host.referringLinks(doc.scopeId, doc.path).then(
-      (value) => {
-        if (current) setReferring(value);
-      },
-      (error) => {
-        if (current) setReferring({ error: errorText(error) });
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [action, doc.scopeId, doc.path]);
+  const referring = useResource(
+    () => host.referringLinks(doc.scopeId, doc.path),
+    [doc.scopeId, doc.path],
+    { enabled: action === 'move' },
+  );
   const close = onClose;
   async function submit() {
     onBusyChange(true);
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       const saved = await beforeChange();
       if (!saved) throw Error(t('ノートを保存できませんでした。', 'Could not save the note.'));
       if (saved.scopeId !== doc.scopeId || saved.path !== doc.path)
@@ -106,35 +92,31 @@ export function NoteActionDialog({
         );
       }
       close();
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setBusy(false);
-      onBusyChange(false);
-    }
+    });
+    onBusyChange(false);
   }
   const dialogLabel =
     action === 'move' ? t('名前と場所', 'Name and location') : t('ノートを削除', 'Delete note');
   const linksHint = !links
     ? t('参照元リンクは更新しません。', 'Referring links stay as is.')
-    : !referring
-      ? t('参照元リンクを確認中…', 'Checking referring links…')
-      : 'error' in referring
-        ? t(
-            `参照元リンクを確認できません: ${referring.error}`,
-            `Could not check referring links: ${referring.error}`,
-          )
+    : referring.error
+      ? t(
+          `参照元リンクを確認できません: ${referring.error}`,
+          `Could not check referring links: ${referring.error}`,
+        )
+      : !referring.data
+        ? t('参照元リンクを確認中…', 'Checking referring links…')
         : t(
             `${
-              referring.notes
-                ? `参照元 ${referring.notes} 件・リンク ${referring.links} 件を更新`
+              referring.data.notes
+                ? `参照元 ${referring.data.notes} 件・リンク ${referring.data.links} 件を更新`
                 : '参照するリンクなし'
-            }${referring.incomplete ? '・一部未確認' : ''}`,
+            }${referring.data.incomplete ? '・一部未確認' : ''}`,
             `${
-              referring.notes
-                ? `${referring.links} links in ${referring.notes} notes`
+              referring.data.notes
+                ? `${referring.data.links} links in ${referring.data.notes} notes`
                 : 'No referring links'
-            }${referring.incomplete ? ' · Some unchecked' : ''}`,
+            }${referring.data.incomplete ? ' · Some unchecked' : ''}`,
           );
   return (
     <Dialog label={dialogLabel} busy={busy} onClose={close}>
@@ -203,39 +185,20 @@ export function TrashNotes({
   onRestored: (doc: Document, notice?: string) => void;
   onClose: () => void;
 }) {
-  const [notes, setNotes] = useState<TrashedNote[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let current = true;
-    void host
-      .trashedNotes(scopeId)
-      .then((notes) => {
-        if (current) setNotes(notes);
-      })
-      .catch((error) => {
-        if (current) setError(errorText(error));
-      })
-      .finally(() => {
-        if (current) setLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [scopeId]);
+  const list = useResource(() => host.trashedNotes(scopeId), [scopeId]);
+  // Restored notes leave the list without reading it again.
+  const [restored, setRestored] = useState<string[]>([]);
+  const notes = (list.data ?? []).filter((note) => !restored.includes(note.id));
+  const { loading } = list;
+  const action = useAction();
+  const { busy, run } = action;
+  const error = action.error || list.error;
   async function restore(id: string) {
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       const doc = await host.restoreNote(scopeId, id);
-      setNotes((notes) => notes.filter((note) => note.id !== id));
+      setRestored((ids) => [...ids, id]);
       onRestored(doc, doc.notice);
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   return (
     <Dialog label={t('削除済みノート', 'Deleted notes')} busy={busy} onClose={onClose}>

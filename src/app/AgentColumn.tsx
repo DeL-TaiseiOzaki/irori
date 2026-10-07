@@ -25,6 +25,7 @@ import {
 import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill } from '../domain/skills';
 import { t } from '../domain/i18n';
+import { baseName } from '../domain/paths';
 import { useDraft } from './useDraft';
 import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
@@ -35,6 +36,7 @@ import { Icon } from './Icon';
 import { ModelPicker } from './ModelPicker';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
+import { aiStateWords, sendOnEnter } from './display';
 
 const host = window.irori;
 
@@ -611,11 +613,10 @@ export function AgentColumn({
         {(shownRunning || shownWaiting || queued.length > 0) && (
           <span className={`agent-state ${shownWaiting ? 'waiting' : ''}`} role="status">
             <i />
-            {shownWaiting
-              ? t('許可待ち', 'Needs approval')
-              : shownRunning
-                ? t('実行中', 'Running')
-                : t(`送信待ち ${queued.length}`, `${queued.length} pending`)}
+            {aiStateWords(
+              shownWaiting ? 'waiting' : shownRunning ? 'running' : 'queued',
+              queued.length,
+            )}
           </span>
         )}
         <span className="agent-header-space" />
@@ -747,16 +748,7 @@ export function AgentColumn({
                     });
                   }}
                 >
-                  {state && (
-                    <i
-                      role="img"
-                      aria-label={
-                        state === 'waiting'
-                          ? t('許可待ち', 'Needs approval')
-                          : t('実行中', 'Running')
-                      }
-                    />
-                  )}
+                  {state && <i role="img" aria-label={aiStateWords(state)} />}
                   <span>{title}</span>
                 </button>
                 {!state && (
@@ -976,7 +968,7 @@ export function AgentColumn({
                   size={13}
                   className={`layer-icon ${docLayer ?? ''}`}
                 />
-                <span className="context-chip-label">{doc!.path.split('/').at(-1)}</span>
+                <span className="context-chip-label">{baseName(doc!.path)}</span>
                 <button
                   aria-label={t(
                     `${doc!.path} を相談の対象から外す`,
@@ -1000,7 +992,7 @@ export function AgentColumn({
                 onClick={() => setNoteOmitted('')}
               >
                 <Icon name="plus" size={13} />
-                {doc.path.split('/').at(-1)}
+                {baseName(doc.path)}
               </button>
             )}
             {!irori &&
@@ -1061,17 +1053,7 @@ export function AgentColumn({
             disabled={!ready || !composer.ready || sending}
             maxLength={promptLimit}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (
-                e.key === 'Enter' &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing &&
-                e.keyCode !== 229
-              ) {
-                e.preventDefault();
-                void start();
-              }
-            }}
+            onKeyDown={sendOnEnter(() => void start())}
           />
           <div className="composer-actions">
             <div className="composer-selects">

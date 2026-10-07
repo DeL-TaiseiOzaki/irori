@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { repositoryFolder, type AddSubmodule, type GitSubmodule } from '../domain/git';
 import { t } from '../domain/i18n';
 import { Dialog } from './Dialog';
-import { ErrorMessage, errorText } from './ErrorMessage';
+import { ErrorMessage } from './ErrorMessage';
+import { useAction } from './useAction';
 import { Icon } from './Icon';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 
@@ -76,19 +77,12 @@ export function AddSubmoduleDialog({
   onCancel: () => void;
 }) {
   const [value, setValue] = useState<AddSubmodule>({ url: '', path: '' }),
-    [named, setNamed] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [named, setNamed] = useState(false);
+  const { busy, error, run } = useAction();
   async function submit() {
-    setBusy(true);
-    setError('');
-    try {
-      await add({ url: value.url.trim(), path: value.path.trim().replace(/^\/+|\/+$/g, '') });
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    await run(() =>
+      add({ url: value.url.trim(), path: value.path.trim().replace(/^\/+|\/+$/g, '') }),
+    );
   }
   return (
     <Dialog label={t('submodule を追加', 'Add a submodule')} busy={busy} onClose={onCancel}>

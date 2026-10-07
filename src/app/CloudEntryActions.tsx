@@ -5,7 +5,8 @@ import { entryNameError } from '../domain/connections';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { t } from '../domain/i18n';
-import { errorText } from './ErrorMessage';
+import { parentPath } from '../domain/paths';
+import { useAction } from './useAction';
 
 const host = window.irori;
 export const entryActions = ['rename', 'move', 'delete'] as const;
@@ -34,7 +35,6 @@ function connectionOf(contents: string[], entryPath: string) {
   const slash = rest.indexOf('/');
   return slash < 0 ? entryPath : `${root}/${rest.slice(0, slash)}`;
 }
-const parentOf = (entryPath: string) => entryPath.split('/').slice(0, -1).join('/');
 
 /** The row menu of a file or folder in an editable connected folder. */
 export function EntryMenu({
@@ -88,9 +88,8 @@ export function CloudEntryDialog({
   onClose: () => void;
 }) {
   const [name, setName] = useState(entry.name);
-  const [directory, setDirectory] = useState(parentOf(entry.path));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [directory, setDirectory] = useState(parentPath(entry.path));
+  const { busy, error, run } = useAction();
   const connection = connectionOf(space.contents, entry.path);
   const title = actionLabel(action);
   const destination = directory.trim().replace(/\/+$/, '');
@@ -109,14 +108,12 @@ export function CloudEntryDialog({
     action === 'rename'
       ? name === entry.name
       : action === 'move'
-        ? destination === parentOf(entry.path)
+        ? destination === parentPath(entry.path)
         : false;
   async function submit() {
     if (busy || problem || unchanged) return;
     onBusyChange(true);
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       if (!(await beforeChange()))
         throw Error(t('開いているノートを保存してください。', 'Save the open note first.'));
       if (action === 'delete') {
@@ -124,17 +121,15 @@ export function CloudEntryDialog({
         await onDone({ scopeId: space.scopeId, action, from: entry.path });
       } else {
         const to =
-          action === 'rename' ? `${parentOf(entry.path)}/${name}` : `${destination}/${entry.name}`;
+          action === 'rename'
+            ? `${parentPath(entry.path)}/${name}`
+            : `${destination}/${entry.name}`;
         const moved = await host.moveCloudEntry(space.scopeId, entry.path, to);
         await onDone({ scopeId: space.scopeId, action, from: entry.path, to: moved.path });
       }
       onClose();
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setBusy(false);
-      onBusyChange(false);
-    }
+    });
+    onBusyChange(false);
   }
   return (
     <Dialog label={title} busy={busy} onClose={onClose}>

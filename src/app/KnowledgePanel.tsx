@@ -10,6 +10,7 @@ import type {
 } from '../domain/knowledge';
 import { displayLocale, t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
+import { useAction } from './useAction';
 const host = window.irori;
 // Names are functions so that they are read in the language of each render.
 const locationNames: Record<SourceLocation['state'], () => string> = {
@@ -45,9 +46,8 @@ export function KnowledgePanel({
   const [runTarget, setRunTarget] = useState<{ id: string }>();
   const previewElement = useRef<HTMLElement>(null);
   const feedbackElement = useRef<HTMLParagraphElement>(null);
-  const [error, setError] = useState('');
+  const { busy, error, setError, run } = useAction();
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
   async function refresh() {
     setHistory(await host.knowledgeHistory(space.scopeId));
   }
@@ -111,18 +111,12 @@ export function KnowledgePanel({
     );
   }
   async function perform(fn: () => Promise<unknown>, message = '') {
-    setBusy(true);
-    setError('');
-    setNotice('');
-    try {
+    await run(async () => {
+      setNotice('');
       await fn();
       await refresh();
       setNotice(message);
-    } catch (error) {
-      setError(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   return (
     <StageView

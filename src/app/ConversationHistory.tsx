@@ -2,20 +2,14 @@ import { useEffect, useState } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { agentNames } from '../domain/types';
 import { isDamaged, type ConversationRow, type ConversationSummary } from '../domain/conversation';
-import { displayLocale, t } from '../domain/i18n';
+import { t } from '../domain/i18n';
+import { baseName } from '../domain/paths';
+import { shortWhen as when } from './display';
 import { Icon } from './Icon';
+import { useAction } from './useAction';
+import { useResource } from './useResource';
 
 const host = window.irori;
-
-function when(iso: string) {
-  return new Date(iso).toLocaleString(displayLocale(), {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-const noteName = (path: string) => path.split('/').at(-1) ?? path;
 
 /**
  * One owner's conversations (ADR 017 D5): pinned first, then by last update, with
@@ -40,36 +34,22 @@ export function ConversationHistory({
   onDeleted: (id: string) => void;
   onError: (error: unknown) => void;
 }) {
-  const [rows, setRows] = useState<ConversationRow[]>();
   const [reload, setReload] = useState(0);
+  const list = useResource(() => host.agentConversations(scopeId), [scopeId], {
+    refresh: reload,
+  });
+  const rows: ConversationRow[] | undefined = list.data;
+  useEffect(() => {
+    if (list.error) onError(list.error);
+  }, [list.error]);
   const [byNote, setByNote] = useState(false);
   const [onlyNote, setOnlyNote] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; title: string }>();
   const [deleting, setDeleting] = useState<string>();
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let live = true;
-    host
-      .agentConversations(scopeId)
-      .then((value) => live && setRows(value))
-      .catch((error) => live && onError(error));
-    return () => {
-      live = false;
-    };
-  }, [scopeId, reload]);
-  async function act(action: () => Promise<unknown>) {
-    setBusy(true);
-    try {
-      await action();
-      return true;
-    } catch (error) {
-      onError(error);
-      return false;
-    } finally {
-      setBusy(false);
-      setReload((value) => value + 1);
-    }
-  }
+  const { busy, run: act } = useAction({
+    onError,
+    after: () => setReload((value) => value + 1),
+  });
   async function remove(id: string) {
     if (await act(() => host.deleteConversation(id))) {
       setDeleting(undefined);
@@ -153,7 +133,7 @@ export function ConversationHistory({
               {[
                 agentNames[row.agent],
                 when(row.updatedAt),
-                row.linkedNote && noteName(row.linkedNote),
+                row.linkedNote && baseName(row.linkedNote),
                 row.origin === 'routine' && t('ルーティン', 'Routine'),
                 row.origin === 'hand-off' && t('irori agent から', 'From the irori agent'),
                 row.running && t('実行中', 'Running'),
@@ -243,7 +223,7 @@ export function ConversationHistory({
       {byNote ? (
         [...groups].map(([key, group]) => (
           <div key={key || 'none'}>
-            <h3>{key ? noteName(key) : t('ノートなし', 'No note')}</h3>
+            <h3>{key ? baseName(key) : t('ノートなし', 'No note')}</h3>
             <ul>{group.map(item)}</ul>
           </div>
         ))

@@ -17,16 +17,9 @@ import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { shortcut } from './shortcuts';
 import { useLanguage } from './useLanguage';
+import { aiStateWords } from './display';
 
 export type BrainAiState = 'running' | 'waiting' | 'idle';
-
-export function aiStateWords(state: BrainAiState) {
-  return {
-    running: t('実行中', 'Running'),
-    waiting: t('許可待ち', 'Needs approval'),
-    idle: t('待機', 'Idle'),
-  }[state];
-}
 
 /**
  * The workspace's brains in their owner's order, some gathered into named

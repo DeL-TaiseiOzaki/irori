@@ -3,11 +3,11 @@ import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import type { CloudConnection, CloudRoot } from '../domain/types';
 import { mountNameError } from '../domain/connections';
+import { useAction } from './useAction';
 import { useResource } from './useResource';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
-import { errorText } from './ErrorMessage';
 import './connections.css';
 const host = window.irori;
 // States are looked up inside render so they resolve in the current language.
@@ -102,9 +102,8 @@ export function Connections({
   const [name, setName] = useState(''),
     [contentsRoot, setContentsRoot] = useState(space.contents[0]),
     [localPath, setLocalPath] = useState('');
-  const [error, setError] = useState(''),
-    [busy, setBusy] = useState(false),
-    [revision, setRevision] = useState(0);
+  const [revision, setRevision] = useState(0);
+  const { busy, error, run: perform } = useAction({ after: () => setRevision((v) => v + 1) });
   const [editing, setEditing] = useState<string>(),
     [newName, setNewName] = useState('');
   const form = useRef<HTMLFormElement>(null);
@@ -115,18 +114,6 @@ export function Connections({
   );
   const connections = overview.data ?? [];
   const issue = error || overview.error;
-  async function perform(fn: () => Promise<unknown>) {
-    setBusy(true);
-    setError('');
-    try {
-      await fn();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setRevision((v) => v + 1);
-      setBusy(false);
-    }
-  }
   const disabled = busy || running;
   const chosen = localPath && folderName(localPath);
   const invalidName = chosen ? mountNameError(name) : undefined;

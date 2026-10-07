@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog } from './Dialog';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { ErrorMessage, errorText } from './ErrorMessage';
+import { useAction } from './useAction';
 import { Icon } from './Icon';
 import { reloadDeviceSettings } from './device-settings';
 import { displayLocale, t } from '../domain/i18n';
@@ -31,21 +32,14 @@ function useEnvironment() {
  */
 export function AccountSection({ onRestore }: { onRestore: () => void }) {
   const { state, setState, error, load } = useEnvironment();
-  const [busy, setBusy] = useState(false),
-    [issue, setIssue] = useState(''),
-    [saved, setSaved] = useState(false);
+  const { busy, error: issue, run } = useAction();
+  const [saved, setSaved] = useState(false);
   async function save() {
-    setBusy(true);
-    setIssue('');
-    setSaved(false);
-    try {
+    await run(async () => {
+      setSaved(false);
       setState(await host.saveEnvironment());
       setSaved(true);
-    } catch (e) {
-      setIssue(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   const dropped = state?.saved?.hibachis.filter((item) => !item.here).length ?? 0;
   return (
@@ -117,9 +111,8 @@ export function RestoreEnvironment({
   const [selected, setSelected] = useState<string[]>(),
     [agent, setAgent] = useState(true),
     [parent, setParent] = useState<string>(),
-    [busy, setBusy] = useState(false),
-    [issue, setIssue] = useState(''),
     [result, setResult] = useState<EnvironmentRestore>();
+  const { busy, error: issue, run } = useAction();
   const saved = state?.saved;
   // Every hibachi not yet here is chosen until the person says otherwise.
   const chosen =
@@ -130,9 +123,7 @@ export function RestoreEnvironment({
     if (folder) setParent(folder);
   }
   async function restore() {
-    setBusy(true);
-    setIssue('');
-    try {
+    await run(async () => {
       const restored = await host.restoreEnvironment({
         scopeIds: chosen,
         agent: agentMissing && agent,
@@ -141,11 +132,7 @@ export function RestoreEnvironment({
       await reloadDeviceSettings();
       setResult(restored);
       await onRestored();
-    } catch (e) {
-      setIssue(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   const label = t('環境を復元', 'Restore environment');
   return (

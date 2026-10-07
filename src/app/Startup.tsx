@@ -7,6 +7,7 @@ import { appIcon, appVersion } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
+import { useAction } from './useAction';
 import { UpdateNotice } from './UpdateNotice';
 import { CloudRecovery } from './CloudRecovery';
 import { LanguageSwitch } from './Settings';
@@ -33,8 +34,7 @@ export function RegisterSpace({
     [url, setUrl] = useState(''),
     [parent, setParent] = useState(''),
     [cloneName, setCloneName] = useState('');
-  const [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
+  const { busy, error, setError, run } = useAction();
   const [cloneNotice, setCloneNotice] = useState('');
   const [publishing, setPublishing] = useState(false),
     [publish, setPublish] = useState(() => initialPublish('')),
@@ -78,9 +78,7 @@ export function RegisterSpace({
   }
   async function submit() {
     if (created) return onRegistered(created);
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       if (creating) await create();
       else if (cloneMode && !folder) {
         const result = await host.gitClone({ url, parent, name: cloneName });
@@ -88,11 +86,7 @@ export function RegisterSpace({
         setCloneNotice(result.notice ?? '');
         if (!name) setName(cloneName);
       } else onRegistered(await host.register(folder, name, category));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   return (
     <Dialog label={t('スペース登録', 'Register space')} busy={busy} onClose={onCancel}>
@@ -473,9 +467,8 @@ export function Startup({
   const [edited, setName] = useState<string>(),
     [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
     [restoring, setRestoring] = useState(false),
-    [removing, setRemoving] = useState<Space>(),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
+    [removing, setRemoving] = useState<Space>();
+  const { busy, error, setError, run } = useAction();
   const [editing, setEditing] = useState<string>();
   const name = edited ?? t('マイワークスペース', 'My workspace');
   useEffect(() => {
@@ -485,30 +478,18 @@ export function Startup({
       .catch((e) => setError(errorText(e)));
   }, []);
   async function save() {
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       const saved = await host.saveWorkspace(name, selected, editing);
       setProfiles(await host.workspaces());
       onOpen(saved);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   async function remove(profile: WorkspaceProfile) {
-    setBusy(true);
-    setError('');
-    try {
+    await run(async () => {
       await host.removeWorkspace(profile.id);
       setProfiles(await host.workspaces());
       if (editing === profile.id) setEditing(undefined);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   const toggle = (id: string, on: boolean) =>
     setSelected((value) => (on ? [...value, id] : value.filter((item) => item !== id)));
