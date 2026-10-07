@@ -75,13 +75,21 @@ test('Only a relative path inside the knowledge base, or a web address, is follo
     '%E0%A4%A.md',
     '   ',
     '../../../../etc/passwd',
-    'wiki/',
   ])
     assert.equal(
       resolveNoteLink(from, href).kind,
       'rejected',
       `${href} must not resolve to a path`,
     );
+  // A folder link, as an OKF index lists a subfolder, opens that folder's index (ADR 028).
+  assert.deepEqual(resolveNoteLink(from, 'sub/'), {
+    kind: 'internal',
+    path: 'Knowledge_Base/wiki/sub/index.md',
+  });
+  assert.deepEqual(resolveNoteLink(from, '../journal/'), {
+    kind: 'internal',
+    path: 'Knowledge_Base/journal/index.md',
+  });
   // Leaving the knowledge base by one step too many is refused here; a folder inside
   // it resolves, and the host refuses it as something that is not a document.
   assert.equal(resolveNoteLink('top.md', '..').kind, 'rejected');

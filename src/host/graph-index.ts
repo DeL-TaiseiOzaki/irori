@@ -1,3 +1,5 @@
+import { lstat } from 'node:fs/promises';
+import path from 'node:path';
 import { setImmediate } from 'node:timers/promises';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -12,6 +14,7 @@ import {
   relationColumns,
   renderGraphIndex,
   tableDelta,
+  type FolderIndexStatus,
   type GraphIndexStatus,
   type GraphIndexTables,
   type GraphIndexUpdate,
@@ -20,16 +23,37 @@ import {
 import { utf8Text, type FileService } from './files';
 import { isMissing, stableHash } from './local-json';
 import { textFileByteLimit } from '../domain/viewers';
-import { knowledgePath, readDeclaration } from './ontology';
+import { knowledgeFile, knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
 import { t } from '../domain/i18n';
 import { knowledgeFolder } from '../domain/layers';
+import { readPropertyDeclaration } from './properties';
+import { splitPage, type PropertyDeclaration } from '../domain/properties';
+import {
+  planFolderIndexes,
+  type ExistingIndex,
+  type IndexedPage,
+  type PlannedIndex,
+} from '../domain/folder-index';
 
 /** A page's facts at the size and modification time they were read. */
 interface Remembered {
   size: number;
   mtime: number;
   facts?: PageFacts;
+  /** A folder's `index.md` keeps its text instead (ADR 028). */
+  text?: string;
+}
+
+/** What one walk of the knowledge folder read. */
+interface Walked {
+  root: string;
+  pages: PageFacts[];
+  /** Each page's path as on disk, in the order of `pages`. */
+  paths: string[];
+  unreadable: number;
+  /** The folder indexes met, by path as on disk. */
+  indexes: Map<string, { size: number; text?: string }>;
 }
 
 interface Built {
@@ -37,6 +61,12 @@ interface Built {
   texts: ReturnType<typeof renderGraphIndex>;
   pages: number;
   unreadable: number;
+}
+
+/** A knowledge folder that is an OKF bundle: its root index's frontmatter and its property declaration. */
+interface Bundle {
+  frontmatter: string;
+  declaration: PropertyDeclaration;
 }
 
 /**
@@ -52,13 +82,13 @@ interface Built {
 export class GraphIndexService {
   private readonly remembered = new Map<string, Map<string, Remembered>>();
   private readonly statuses = new Map<string, Promise<GraphIndexStatus>>();
-  private readonly building = new Map<string, Promise<Built>>();
+  private readonly building = new Map<string, Promise<Walked>>();
   constructor(
     private readonly files: FileService,
     private readonly search: SearchService,
   ) {}
 
-  /** Whether the module matches the pages now, and what an update would change. Writes nothing. */
+  /** Whether the module and folder indexes match the pages now, and what an update would change. Writes nothing. */
   status(scopeId: string): Promise<GraphIndexStatus> {
     const pending = this.statuses.get(scopeId);
     if (pending) return pending;
@@ -67,34 +97,193 @@ export class GraphIndexService {
     return next;
   }
   private async readStatus(scopeId: string): Promise<GraphIndexStatus> {
-    if ((await readDeclaration(this.files, scopeId)) !== null) return declaredGraphIndex;
-    return this.compare(scopeId, await this.build(scopeId));
+    const declared = (await readDeclaration(this.files, scopeId)) !== null;
+    const bundle = await this.bundle(scopeId);
+    if (declared && !bundle) return declaredGraphIndex;
+    const walked = await this.build(scopeId);
+    const graph = declared ? declaredGraphIndex : await this.compare(scopeId, this.graph(walked));
+    if (!bundle) return graph;
+    return { ...graph, indexes: await this.indexStatus(scopeId, walked, bundle) };
   }
 
-  /** Generates the module and writes the files whose bytes change; refused while a declaration exists. */
+  /**
+   * Generates the module, unless a declaration exists, and the folder indexes of
+   * an OKF bundle, and writes the files whose bytes change. Every output is
+   * checked before the first is written.
+   */
   async update(scopeId: string): Promise<GraphIndexUpdate> {
-    if ((await readDeclaration(this.files, scopeId)) !== null)
+    const declared = (await readDeclaration(this.files, scopeId)) !== null;
+    const bundle = await this.bundle(scopeId);
+    if (declared && !bundle)
       throw Error(
         t(
           'この KB は .irori/ontology.json で表示設定を宣言しているため、グラフ索引は生成しません。',
           'This KB declares its view in .irori/ontology.json, so no graph index is generated.',
         ),
       );
-    const built = await this.build(scopeId, true);
-    const graphIndexFiles = this.at(scopeId).files;
+    const walked = await this.build(scopeId, true);
+    const built = declared ? undefined : this.graph(walked);
+    const planned = bundle ? await this.plan(scopeId, walked, bundle) : [];
     const written: string[] = [];
-    const keys = ['entities', 'relations', 'index'] as const;
-    const previous = await Promise.all(
-      keys.map((key) => moduleFile(this.files, scopeId, graphIndexFiles[key])),
-    );
-    for (const [index, key] of keys.entries()) {
-      const relative = graphIndexFiles[key];
-      const existing = previous[index];
-      if (existing?.text === built.texts[key]) continue;
-      await this.files.writeGenerated(scopeId, relative, built.texts[key], existing?.hash ?? null);
-      written.push(relative);
+    if (built) {
+      const graphIndexFiles = this.at(scopeId).files;
+      const keys = ['entities', 'relations', 'index'] as const;
+      const previous = await Promise.all(
+        keys.map((key) => moduleFile(this.files, scopeId, graphIndexFiles[key])),
+      );
+      for (const [index, key] of keys.entries()) {
+        const relative = graphIndexFiles[key];
+        const existing = previous[index];
+        if (existing?.text === built.texts[key]) continue;
+        await this.files.writeGenerated(
+          scopeId,
+          relative,
+          built.texts[key],
+          existing?.hash ?? null,
+        );
+        written.push(relative);
+      }
     }
-    return { ...(await this.compare(scopeId, built)), written };
+    for (const index of planned) {
+      const existing = await moduleFile(this.files, scopeId, index.path);
+      if (existing?.text === index.text) continue;
+      await this.files.writeGenerated(scopeId, index.path, index.text, existing?.hash ?? null);
+      written.push(index.path);
+    }
+    const graph = built ? await this.compare(scopeId, built) : declaredGraphIndex;
+    return {
+      ...graph,
+      ...(bundle && { indexes: { folders: planned.length, added: 0, changed: 0 } }),
+      written,
+    };
+  }
+
+  /**
+   * The knowledge folder as an OKF bundle: its root `index.md` opens with
+   * frontmatter naming `okf_version`, and `.property/property.json` reads. Folder
+   * indexes are offered only then (ADR 028).
+   */
+  private async bundle(scopeId: string): Promise<Bundle | undefined> {
+    const root = knowledgeFolder(this.files.get(scopeId));
+    let index;
+    try {
+      index = await knowledgeFile(this.files, scopeId, `${root}/index.md`);
+    } catch {
+      return undefined;
+    }
+    if (!index) return undefined;
+    const page = splitPage(index.text);
+    if (page.yaml === undefined) return undefined;
+    let fields: unknown;
+    try {
+      fields = parseYaml(page.yaml, { schema: 'failsafe', logLevel: 'error', stringKeys: true });
+    } catch {
+      return undefined;
+    }
+    if (
+      typeof fields !== 'object' ||
+      fields === null ||
+      !Object.prototype.hasOwnProperty.call(fields, 'okf_version')
+    )
+      return undefined;
+    const { declaration } = await readPropertyDeclaration(this.files, scopeId).catch(() => ({
+      declaration: null,
+    }));
+    if (!declaration) return undefined;
+    return { frontmatter: page.head.slice(page.bom.length), declaration };
+  }
+
+  /** The folder indexes the pages give, with submodules left out. */
+  private async plan(scopeId: string, walked: Walked, bundle: Bundle): Promise<PlannedIndex[]> {
+    const { root } = walked;
+    const folders = new Set<string>();
+    const add = (file: string) => {
+      for (
+        let folder = path.posix.dirname(file);
+        folder === root || folder.startsWith(`${root}/`);
+      ) {
+        if (folders.has(folder)) break;
+        folders.add(folder);
+        folder = path.posix.dirname(folder);
+      }
+    };
+    for (const file of [...walked.paths, ...walked.indexes.keys()]) add(file);
+    // A submodule is another repository's folder: it gets no index, and its pages list nowhere.
+    const space = this.files.get(scopeId);
+    const gitlinks = new Set<string>();
+    const ordered = [...folders];
+    for (let at = 0; at < ordered.length; at += 64) {
+      const batch = ordered.slice(at, at + 64);
+      const found = await Promise.all(
+        batch.map((folder) =>
+          lstat(path.join(space.root, folder, '.git')).then(
+            () => true,
+            () => false,
+          ),
+        ),
+      );
+      batch.forEach((folder, slot) => found[slot] && gitlinks.add(folder));
+      await setImmediate();
+    }
+    const excluded = (file: string) => {
+      for (
+        let folder = path.posix.dirname(file);
+        folder === root || folder.startsWith(`${root}/`);
+      ) {
+        if (gitlinks.has(folder)) return true;
+        folder = path.posix.dirname(folder);
+      }
+      return false;
+    };
+    const pages: IndexedPage[] = [];
+    walked.paths.forEach((file, slot) => {
+      if (excluded(file)) return;
+      const facts = walked.pages[slot];
+      pages.push({
+        path: file,
+        type: facts.type,
+        title: facts.title,
+        description: facts.description,
+      });
+    });
+    const indexes = new Map<string, ExistingIndex>();
+    for (const [file, { text }] of walked.indexes) {
+      if (excluded(file)) continue;
+      const folder = path.posix.dirname(file);
+      // `index.md` itself wins over another spelling in the same folder.
+      if (indexes.has(folder) && !/\/index\.md$/.test(file)) continue;
+      indexes.set(folder, { path: file, text });
+    }
+    const planned = planFolderIndexes({
+      root,
+      pages,
+      indexes,
+      declaration: bundle.declaration,
+      frontmatter: bundle.frontmatter,
+    });
+    for (const index of planned) checkOutput(index.path, index.text);
+    return planned;
+  }
+
+  private async indexStatus(
+    scopeId: string,
+    walked: Walked,
+    bundle: Bundle,
+  ): Promise<FolderIndexStatus> {
+    const planned = await this.plan(scopeId, walked, bundle);
+    let added = 0;
+    let changed = 0;
+    for (const index of planned) {
+      const existing = walked.indexes.get(index.path);
+      if (!existing) added++;
+      // The walk reads text without a BOM; the size tells a file that has one.
+      else if (
+        existing.text !== index.text ||
+        existing.size !== Buffer.byteLength(index.text, 'utf8')
+      )
+        changed++;
+    }
+    return { folders: planned.length, added, changed };
   }
 
   /** The module in this hibachi's knowledge folder. */
@@ -121,7 +310,7 @@ export class GraphIndexService {
     };
   }
 
-  private build(scopeId: string, fresh = false): Promise<Built> {
+  private build(scopeId: string, fresh = false): Promise<Walked> {
     const pending = this.building.get(scopeId);
     if (pending) {
       if (!fresh) return pending;
@@ -132,22 +321,40 @@ export class GraphIndexService {
     this.building.set(scopeId, next);
     return next;
   }
-  private async readPages(scopeId: string): Promise<Built> {
+  private async readPages(scopeId: string): Promise<Walked> {
     const previous = this.remembered.get(scopeId) ?? new Map<string, Remembered>();
     const next = new Map<string, Remembered>();
     const pages: PageFacts[] = [];
+    const paths: string[] = [];
+    const indexes = new Map<string, { size: number; text?: string }>();
     let unreadable = 0;
     const root = knowledgeFolder(this.files.get(scopeId));
-    const { folder, files: graphIndexFiles } = graphIndexAt(root);
+    const { folder } = graphIndexAt(root);
+    const folderIndex = (path: string) =>
+      path.startsWith(`${root}/`) &&
+      /(^|\/)index\.md$/i.test(path) &&
+      !path.startsWith(`${folder}/`);
     const walk = await this.search.walk(
       scopeId,
-      (path) => bundlePage(path, root),
+      (path) => bundlePage(path, root) || folderIndex(path),
       (directory) =>
         (directory === root || directory.startsWith(`${root}/`)) && directory !== folder,
       async ({ path, stat, read }) => {
         const known = previous.get(path);
+        const same = known && known.size === stat.size && known.mtime === stat.mtimeMs;
+        if (folderIndex(path)) {
+          let entry: Remembered;
+          if (same && known.text !== undefined) entry = known;
+          else {
+            entry = { size: stat.size, mtime: stat.mtimeMs };
+            entry.text = await read().catch(() => undefined);
+          }
+          next.set(path, entry);
+          indexes.set(path, { size: stat.size, text: entry.text });
+          return;
+        }
         let entry: Remembered;
-        if (known?.facts && known.size === stat.size && known.mtime === stat.mtimeMs) entry = known;
+        if (same && known.facts) entry = known;
         else {
           entry = { size: stat.size, mtime: stat.mtimeMs };
           try {
@@ -158,6 +365,7 @@ export class GraphIndexService {
         }
         next.set(path, entry);
         pages.push(entry.facts ?? pageFacts(path, undefined));
+        paths.push(path);
         if (!entry.facts) unreadable++;
         if (pages.length % 64 === 0) await setImmediate();
       },
@@ -170,6 +378,12 @@ export class GraphIndexService {
           'The Knowledge layer could not be read completely, so the graph index cannot be checked.',
         ),
       );
+    return { root, pages, paths, unreadable, indexes };
+  }
+
+  /** The module the walked pages give; refused when the reader could not load it. */
+  private graph({ root, pages, unreadable }: Walked): Built {
+    const graphIndexFiles = graphIndexAt(root).files;
     const tables = buildGraphIndex(pages, root);
     if (
       tables.entities.length > graphIndexLimits.entities ||
@@ -184,24 +398,28 @@ export class GraphIndexService {
     const texts = renderGraphIndex(tables, root);
     // Validate every output before publishing the first: long paths repeated in
     // edge rows can exceed the byte limit even when both row counts fit.
-    for (const [key, text] of Object.entries(texts)) {
-      if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
-        throw Error(
-          t(
-            `${graphIndexFiles[key as keyof typeof texts]} が 2 MiB を超えるため、グラフ索引は書き込まれませんでした。`,
-            `${graphIndexFiles[key as keyof typeof texts]} exceeds 2 MiB, so the graph index was not written.`,
-          ),
-        );
-      if (text.includes('\0'))
-        throw Error(
-          t(
-            '生成するグラフ索引に NUL があるため、書き込まれませんでした。',
-            'The generated graph index contains NUL, so it was not written.',
-          ),
-        );
-    }
+    for (const [key, text] of Object.entries(texts))
+      checkOutput(graphIndexFiles[key as keyof typeof texts], text);
     return { tables, texts, pages: pages.length, unreadable };
   }
+}
+
+/** Refuses generated bytes the editor could not hold: over 2 MiB, or with NUL. */
+function checkOutput(relative: string, text: string) {
+  if (Buffer.byteLength(text, 'utf8') > textFileByteLimit)
+    throw Error(
+      t(
+        `${relative} が 2 MiB を超えるため、索引は書き込まれませんでした。`,
+        `${relative} exceeds 2 MiB, so the indexes were not written.`,
+      ),
+    );
+  if (text.includes('\0'))
+    throw Error(
+      t(
+        '生成する索引に NUL があるため、書き込まれませんでした。',
+        'The generated index contains NUL, so it was not written.',
+      ),
+    );
 }
 
 /**

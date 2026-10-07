@@ -15,7 +15,7 @@ import { Crumbs } from './NoteBar';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { selectSubgraph, type OntologyView } from '../domain/ontology';
-import type { GraphIndexStatus } from '../domain/graph-index';
+import type { FolderIndexStatus, GraphIndexStatus } from '../domain/graph-index';
 import { knowledgeFolder, layerLabel } from '../domain/layers';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -337,6 +337,16 @@ function describeGraphIndex(status: GraphIndexStatus, folder: string) {
   );
 }
 
+/** The freshness of the folder indexes of an OKF bundle (ADR 028). */
+function describeFolderIndexes(indexes: FolderIndexStatus) {
+  if (!indexes.added && !indexes.changed)
+    return t('フォルダの索引はページと一致しています。', 'The folder indexes match the pages.');
+  return t(
+    `フォルダの索引: 追加 ${indexes.added}・変更 ${indexes.changed}。`,
+    `Folder indexes: ${indexes.added} to add, ${indexes.changed} to change.`,
+  );
+}
+
 export function OntologyPanel({
   space,
   revision,
@@ -365,13 +375,14 @@ export function OntologyPanel({
   const data = error ? undefined : read.data;
   const module = data?.source === 'module';
   // The graph shows first; the freshness check walks every page and arrives when it does.
+  // A declared graph still asks: an OKF bundle's folder indexes are generated either way (ADR 028).
   const status = useResource(() => window.irori.graphIndexStatus(space.scopeId), [space.scopeId], {
-    enabled: module || !!error,
     refresh: revision + refresh,
   });
   // An unreadable generated table must still be replaceable from its pages.
   // The host's independent declaration check keeps declared CSV pairs protected.
   const repairModule = !!error && !!status.data && !status.data.declared;
+  const indexes = status.data?.indexes;
   async function generate() {
     await run(async () => {
       await window.irori.updateGraphIndex(space.scopeId);
@@ -380,6 +391,11 @@ export function OntologyPanel({
     });
   }
   const indexed = module || repairModule;
+  // Nothing the button writes is there yet: no graph module, and no folder index.
+  const fresh = !module && (!indexes || indexes.added === indexes.folders);
+  const updateLabel = fresh ? t('索引を作成', 'Create indexes') : t('索引を更新', 'Update indexes');
+  const matches =
+    (!indexed || !!status.data?.current) && (!indexes || !(indexes.added || indexes.changed));
   // The module lives in the hibachi's knowledge folder (ADR 024).
   const indexFolder = `${knowledgeFolder(space)}/ontology/`;
   return (
@@ -403,23 +419,26 @@ export function OntologyPanel({
       }
       actions={
         <>
-          {indexed && status.data && (
+          {(indexed || (data && indexes)) && status.data && (
             <span
-              className={`index-state ${status.data.current ? 'current' : ''}`}
-              title={describeGraphIndex(status.data, indexFolder)}
+              className={`index-state ${matches ? 'current' : ''}`}
+              title={[
+                indexed ? describeGraphIndex(status.data, indexFolder) : '',
+                indexes ? describeFolderIndexes(indexes) : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
-              <Icon name={status.data.current ? 'checkCircle' : 'refresh'} size={13} />
-              {status.data.current
+              <Icon name={matches ? 'checkCircle' : 'refresh'} size={13} />
+              {matches
                 ? t('ページと一致', 'Matches the pages')
                 : t('ページと不一致', 'Differs from the pages')}
             </span>
           )}
-          {indexed && (
+          {(indexed || (data && indexes)) && (
             <button className="stage-text-button framed" disabled={busy} onClick={generate}>
               <Icon name="refresh" size={14} />
-              {repairModule
-                ? t('ページから再生成', 'Regenerate from pages')
-                : t('グラフ索引を更新', 'Update graph index')}
+              {repairModule ? t('ページから再生成', 'Regenerate from pages') : updateLabel}
             </button>
           )}
           {data && (
@@ -465,6 +484,11 @@ export function OntologyPanel({
               : status.data && describeGraphIndex(status.data, indexFolder)}
         </p>
       )}
+      {indexes && (
+        <p className="graph-index-line muted" role="status">
+          {describeFolderIndexes(indexes)}
+        </p>
+      )}
       {notice && <p className="hint">{notice}</p>}
       {failure && (
         <p role="alert" className="error">
@@ -491,7 +515,7 @@ export function OntologyPanel({
             <Icon name="graph" size={32} />
             <p>{t('グラフ索引はまだありません。', 'No graph index yet.')}</p>
             <button className="solid-button" disabled={busy} onClick={generate}>
-              {t('グラフ索引を作成', 'Create graph index')}
+              {updateLabel}
             </button>
           </div>
         )

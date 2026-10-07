@@ -100,6 +100,8 @@ export interface PageFacts {
   path: string;
   type?: string;
   title?: string;
+  /** What the page's line in its folder index says (ADR 028); not part of the graph. */
+  description?: string;
   relations: { rel: string; target: string }[];
 }
 
@@ -119,6 +121,7 @@ export function pageFacts(path: string, frontmatter: unknown): PageFacts {
     path: path.normalize('NFC'),
     type: text(fields.type),
     title: text(fields.title),
+    description: text(fields.description),
     relations: relations.map((entry) => ({
       rel: (record(entry) && text(entry.rel)) || '',
       target: (record(entry) && text(entry.target)) || '',
@@ -208,7 +211,7 @@ export const graphIndexReadmeFor = (root: string) => `# ontology
 
 The files in this folder are the graph index irori generates from the pages of
 this bundle — each page's \`type\`, \`title\` and \`relations\` in its
-frontmatter. Regenerate them in irori (オントロジー → グラフ索引を更新) rather
+frontmatter. Regenerate them in irori (オントロジー → 索引を更新) rather
 than editing them.
 
 - \`entities.csv\`: one row per page that takes part in a relation — \`id\` (the page's path inside \`${root}/\` without \`.md\`), \`label\` (its title), \`note\` (its path from the repository root), \`parentId\` (empty) and \`group\` (its type).
@@ -272,7 +275,7 @@ export function tableDelta(
 }
 
 export interface GraphIndexStatus {
-  /** `.irori/ontology.json` declares the graph: the module is neither read nor generated, and the rest is empty. */
+  /** `.irori/ontology.json` declares the graph: the module is neither read nor generated, and the graph counts are empty. */
   declared: boolean;
   /** `entities.csv` exists in the module. */
   present: boolean;
@@ -285,10 +288,24 @@ export interface GraphIndexStatus {
   excluded: number;
   entities: RowDelta;
   relations: RowDelta;
+  /**
+   * The folder indexes of an OKF bundle (ADR 028), generated with the graph
+   * index and independent of a declaration; absent when the knowledge folder is
+   * not a bundle with a readable `.property/property.json`.
+   */
+  indexes?: FolderIndexStatus;
+}
+
+export interface FolderIndexStatus {
+  /** The `index.md` files the pages give. */
+  folders: number;
+  /** Of those, the files an update would create, and those it would rewrite. */
+  added: number;
+  changed: number;
 }
 
 export interface GraphIndexUpdate extends GraphIndexStatus {
-  /** The module files whose bytes changed, and so were written. */
+  /** The module files and folder indexes whose bytes changed, and so were written. */
   written: string[];
 }
 

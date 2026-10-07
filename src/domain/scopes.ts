@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Layer, Space } from './types';
-import { schemaFiles } from './layers';
+import { isRootReadme, schemaFiles } from './layers';
 export function within(root: string, target: string): boolean {
   const rel = path.relative(root, target);
   return rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel));
@@ -20,7 +20,7 @@ export function classify(space: Space, relative: string): Layer {
   // directory instead left them displayed as notes. Search and note operations already
   // skip hidden path components, so this agrees with the rest of the host.
   if (top.startsWith('.') || top === 'schema') return 'schema';
-  if (schemaFiles.includes(p)) return 'schema';
+  if (schemaFiles.includes(p) || isRootReadme(p)) return 'schema';
   return 'Knowledge_Base';
 }
 

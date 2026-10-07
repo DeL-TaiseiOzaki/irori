@@ -268,6 +268,69 @@ test('receive refuses dirty work and incoming changes to cloud contents or scope
   assert.equal(git(root, 'rev-parse', 'HEAD'), before);
 });
 
+test('a pulled scope declaration that keeps the identity is taken in; any other is refused', async (t) => {
+  const { service, space, root, peer, files } = await remoteFixture(t);
+  const peerMeta = path.join(peer, '.irori/scope.json');
+  const original = JSON.parse(await readFile(peerMeta, 'utf8'));
+  const publish = async (declaration: unknown, message: string) => {
+    if (declaration === undefined) git(peer, 'rm', '-q', '.irori/scope.json');
+    else {
+      await writeFile(peerMeta, JSON.stringify(declaration, null, 2) + '\n');
+      git(peer, 'add', '.irori/scope.json');
+    }
+    git(peer, 'commit', '-m', message);
+    git(peer, 'push', '-f', 'origin', 'main');
+  };
+  const head = git(root, 'rev-parse', 'HEAD');
+  const refuse = async (declaration: unknown, message: string) => {
+    await publish(declaration, message);
+    await assert.rejects(
+      service.sync(space.scopeId, 'pull', (await service.status(space.scopeId)).version),
+      /スペース定義/,
+      message,
+    );
+    assert.equal(git(root, 'rev-parse', 'HEAD'), head, message);
+    assert.equal(files.get(space.scopeId).knowledge, undefined, message);
+    git(peer, 'reset', '-q', '--hard', 'HEAD~1');
+    git(peer, 'push', '-f', 'origin', 'main');
+  };
+  await refuse({ ...original, scopeId: '6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d' }, 'New identity');
+  await refuse(undefined, 'Removed declaration');
+  await refuse({ ...original, knowledge: 'schema' }, 'Reserved folder name');
+  await refuse({ ...original, knowledge: 'contents' }, 'Overlapping layers');
+  await refuse({ ...original, contents: ['.hidden'] }, 'Hidden contents folder');
+  await refuse({ ...original, schemaVersion: 2 }, 'Unknown schema');
+
+  // A rename and new names from another device arrive with the pull and apply at once.
+  const renamed = { ...original, knowledge: '知識', labels: { Knowledge_Base: 'ナレッジ' } };
+  await publish(renamed, 'Rename the knowledge folder');
+  const status = await service.sync(
+    space.scopeId,
+    'pull',
+    (await service.status(space.scopeId)).version,
+  );
+  assert.equal(status.behind, 0);
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(root, '.irori/scope.json'), 'utf8')),
+    renamed,
+  );
+  assert.equal(files.get(space.scopeId).knowledge, '知識');
+  assert.deepEqual(files.get(space.scopeId).labels, { Knowledge_Base: 'ナレッジ' });
+
+  // Both sides changed it: refused, whatever the incoming file says.
+  await files.update(space.scopeId, { name: 'Local name' });
+  git(root, 'add', '.irori/scope.json');
+  git(root, 'commit', '-m', 'Local name');
+  const local = git(root, 'rev-parse', 'HEAD');
+  await publish({ ...renamed, name: 'Peer name' }, 'Peer name');
+  await assert.rejects(
+    service.sync(space.scopeId, 'merge', (await service.status(space.scopeId)).version),
+    /スペース定義/,
+  );
+  assert.equal(git(root, 'rev-parse', 'HEAD'), local);
+  assert.equal(files.get(space.scopeId).name, 'Local name');
+});
+
 test('clone validates URLs, reserved destinations and credentials without network side effects', async (t) => {
   const { service, base, root } = await fixture(t);
   for (const url of [

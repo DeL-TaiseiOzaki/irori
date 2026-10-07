@@ -15,8 +15,20 @@ const defaultLabels: Record<Layer, string> = {
 };
 /** The files at the top of a hibachi that belong to Schema: its agents' instructions and settings. */
 export const schemaFiles = ['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode.jsonc'];
+/**
+ * The repository's front page at the top of a hibachi is Schema too (ADR 028):
+ * it introduces the checkout, it is not a knowledge page. Matched in any case,
+ * as GitHub finds `readme.md` or `Readme.md` and a default Mac or Windows volume
+ * reaches the same file through either spelling. A nested README stays knowledge.
+ */
+export const isRootReadme = (relative: string) => /^readme\.md$/i.test(relative);
 /** Top-level names that already mean Schema, or that tools own. */
-const reserved = ['schema', ...schemaFiles.map((name) => name.toLowerCase()), 'node_modules'];
+const reserved = [
+  'schema',
+  ...schemaFiles.map((name) => name.toLowerCase()),
+  'readme.md',
+  'node_modules',
+];
 
 /** What a hibachi says about its layers in `.irori/scope.json`. */
 interface LayerDeclaration {

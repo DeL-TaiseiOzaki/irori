@@ -121,7 +121,7 @@ test('A layer folder name must be free, ordinary and not another layer’s', asy
   const { files, id, write, meta } = await fixture(t);
   await write('Knowledge_Base/a.md', '# A\n');
   await write('taken/b.md', '# B\n');
-  for (const name of ['schema', '.hidden', 'a/b', 'AGENTS.md', 'trailing.', ''])
+  for (const name of ['schema', '.hidden', 'a/b', 'AGENTS.md', 'README.md', 'trailing.', ''])
     assert(layerFolderProblem(name), name);
   await assert.rejects(files.renameLayerFolder(id, 'Knowledge_Base', 'schema'));
   await assert.rejects(

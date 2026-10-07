@@ -3,7 +3,8 @@
 Date: 2026-09-29. Status: owner request accepted; stage 1 implemented for 0.1.54,
 stages 2 and 3 open.
 Addresses the "properties" item that [ACCEPTANCE](../ACCEPTANCE.md) leaves open
-under R03 and R08.
+under R03 and R08. Amended by [ADR 028](028-generated-indexes.md): the hibachi's
+root `README.md` is Schema, so it has no properties block.
 
 ## Context
 
