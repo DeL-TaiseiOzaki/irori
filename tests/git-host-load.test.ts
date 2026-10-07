@@ -22,9 +22,16 @@ class CountingGit extends GitProcess {
   calls: string[][] = [];
   pause?: { started: ReturnType<typeof gate>; resume: ReturnType<typeof gate> };
   pauseLog?: { started: ReturnType<typeof gate>; resume: ReturnType<typeof gate> };
+  pauseFetch?: { started: ReturnType<typeof gate>; resume: ReturnType<typeof gate> };
   failStatus = false;
   override async run(cwd: string, args: string[], options?: Parameters<GitProcess['run']>[2]) {
     this.calls.push(args);
+    if (args[0] === 'fetch' && options?.network && this.pauseFetch) {
+      const pause = this.pauseFetch;
+      this.pauseFetch = undefined;
+      pause.started.release();
+      await pause.resume.wait;
+    }
     if (args[0] === 'status' && this.failStatus) {
       this.failStatus = false;
       throw Error('Temporary status failure');
@@ -140,8 +147,8 @@ test('Refreshes arriving during a status read get only one follow-up and see the
   assert.ok(results.every((result) => result.changes.some((change) => change.path === 'note.md')));
 });
 
-test('Requests arriving during the follow-up pass do not create further status reads', async (t) => {
-  const { space, process, service } = await fixture(t);
+test('An edit and a burst during the follow-up queue one more fresh status pass', async (t) => {
+  const { root, space, process, service } = await fixture(t);
   const firstPause = { started: gate(), resume: gate() };
   const secondPause = { started: gate(), resume: gate() };
   t.after(firstPause.resume.release);
@@ -153,10 +160,14 @@ test('Requests arriving during the follow-up pass do not create further status r
   process.pause = secondPause;
   firstPause.resume.release();
   await secondPause.started.wait;
+  await writeFile(path.join(root, 'last-write.md'), 'The agent finished writing.\n');
   const burst = Array.from({ length: 20 }, () => service.status(space.scopeId));
   secondPause.resume.release();
-  await Promise.all([first, joined, ...burst]);
-  assert.equal(process.count('status'), 2);
+  const results = await Promise.all([first, joined, ...burst]);
+  assert.equal(process.count('status'), 3);
+  assert.ok(
+    results.every((result) => result.changes.some((change) => change.path === 'last-write.md')),
+  );
 });
 
 test('A status read overlapping a mutation never returns its pre-mutation index', async (t) => {
@@ -169,7 +180,8 @@ test('A status read overlapping a mutation never returns its pre-mutation index'
   process.pause = pause;
   const pending = service.status(space.scopeId);
   await pause.started.wait;
-  await service.stage(space.scopeId, 'note.md', true, diff.version);
+  const staged = await service.stage(space.scopeId, 'note.md', true, diff.version);
+  assert.equal(staged.changes.find((change) => change.path === 'note.md')!.index, 'M');
   const after = service.status(space.scopeId);
   pause.resume.release();
   for (const status of await Promise.all([pending, after])) {
@@ -179,6 +191,61 @@ test('A status read overlapping a mutation never returns its pre-mutation index'
     assert.notEqual(status.version, before.version);
   }
 });
+
+test(
+  'Status reads stay responsive through chained network mutations and refresh after the queue drains',
+  { timeout: 15000 },
+  async (t) => {
+    const firstPause = { started: gate(), resume: gate() };
+    const secondPause = { started: gate(), resume: gate() };
+    t.after(firstPause.resume.release);
+    t.after(secondPause.resume.release);
+    const { root, space, process, service } = await fixture(t);
+    const remote = path.join(path.dirname(root), 'origin.git');
+    git(root, 'clone', '--bare', root, remote);
+    git(root, 'remote', 'add', 'origin', remote);
+    git(root, 'fetch', 'origin');
+    git(root, 'branch', '--set-upstream-to=origin/main');
+    const before = await service.status(space.scopeId);
+    process.pauseFetch = firstPause;
+    const first = service.sync(space.scopeId, 'fetch', before.version);
+    await firstPause.started.wait;
+    process.pauseFetch = secondPause;
+    const second = service.sync(space.scopeId, 'fetch', before.version);
+    const read = async () => {
+      const timeout = AbortSignal.timeout(3000);
+      return Promise.race([
+        Promise.all(Array.from({ length: 20 }, () => service.status(space.scopeId))),
+        new Promise<never>((_, reject) => {
+          timeout.addEventListener('abort', () => reject(Error('Status waited for the mutation')));
+        }),
+      ]);
+    };
+    const duringFirst = await read();
+    assert.ok(
+      duringFirst.every((status) => status.version === before.version && !status.fetchedAt),
+    );
+    const count = process.count('status');
+    await delay(50);
+    assert.equal(process.count('status'), count, 'A pending mutation must not spin status reads');
+    firstPause.resume.release();
+    await secondPause.started.wait;
+    const duringSecond = await read();
+    assert.ok(duringSecond.every((status) => status.available && status.fetchedAt));
+    const secondCount = process.count('status');
+    await delay(50);
+    assert.equal(process.count('status'), secondCount);
+    secondPause.resume.release();
+    const mutations = await Promise.all([first, second]);
+    assert.ok(mutations.every((status) => status.fetchedAt));
+    for (let i = 0; i < 300 && process.count('status') < secondCount + 2; i++) await delay(10);
+    assert.equal(
+      process.count('status'),
+      secondCount + 2,
+      'The final mutation snapshot and one deferred read',
+    );
+  },
+);
 
 test('Authorship history is coalesced and cached by HEAD, notes ref and path', async (t) => {
   const { root, space, process, service } = await fixture(t);
@@ -285,6 +352,64 @@ setInterval(() => {
     assert.ok(results.slice(0, 8).every((result) => result.status === 'rejected'));
     assert.ok(
       results.slice(8).every((result) => result.status === 'fulfilled' && result.value === 'done'),
+    );
+  },
+);
+
+test(
+  'Queued network operations leave local Git reads runnable and close cancels their lane',
+  { skip: process.platform === 'win32', timeout: 15000 },
+  async (t) => {
+    const base = await mkdtemp(path.join(tmpdir(), 'irori-git-network-slots-'));
+    const command = path.join(base, 'git-fixture');
+    await writeFile(
+      command,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const label = process.argv.at(-1);
+fs.writeFileSync('started-' + label, '');
+if (label.startsWith('network')) setInterval(() => {}, 1000);
+else { process.stdout.write('local'); process.exit(0); }
+`,
+    );
+    await chmod(command, 0o700);
+    const network = new GitProcess(command),
+      local = new GitProcess(command);
+    t.after(async () => {
+      await network.close();
+      await local.close();
+      await rm(base, { recursive: true, force: true });
+    });
+    const calls = Array.from({ length: 4 }, (_, index) =>
+      network.run(base, [`network${index}`], { network: true }),
+    );
+    const settled = Promise.allSettled(calls);
+    for (
+      let i = 0;
+      i < 300 &&
+      (await readdir(base)).filter((name) => name.startsWith('started-network')).length < 2;
+      i++
+    )
+      await delay(10);
+    assert.equal(
+      (await readdir(base)).filter((name) => name.startsWith('started-network')).length,
+      2,
+    );
+    assert.equal(await local.run(base, ['status']), 'local');
+    assert.equal(await local.run(base, ['inspectRepository'], { inspection: true }), 'local');
+    assert.equal(
+      (await readdir(base)).filter((name) => name.startsWith('started-network')).length,
+      2,
+    );
+    await network.close();
+    assert.ok((await settled).every((result) => result.status === 'rejected'));
+    assert.deepEqual(
+      await Promise.all(
+        Array.from({ length: 4 }, (_, index) =>
+          local.run(base, [`after-close-${index}`], { network: true }),
+        ),
+      ),
+      ['local', 'local', 'local', 'local'],
     );
   },
 );

@@ -124,11 +124,17 @@ export function githubCredentialConfig(gh: string) {
 }
 
 type RunOptions = { input?: string; network?: boolean; codes?: number[]; inspection?: boolean };
+type ProcessSlots = {
+  limit: number;
+  running: number;
+  waiting: { owner: GitProcess; resolve: () => void; reject: (e: Error) => void }[];
+};
 
 export class GitProcess {
-  private static running = 0;
-  private static waiting: { owner: GitProcess; resolve: () => void; reject: (e: Error) => void }[] =
-    [];
+  // Network operations can wait for 90 seconds. Separate global limits leave
+  // local status and repository inspection runnable throughout those waits.
+  private static local: ProcessSlots = { limit: 4, running: 0, waiting: [] };
+  private static network: ProcessSlots = { limit: 2, running: 0, waiting: [] };
   private closed = false;
   private children = new Set<ChildProcess>();
   constructor(
@@ -155,25 +161,26 @@ export class GitProcess {
       }
     }
   }
-  private acquire() {
+  private acquire(slots: ProcessSlots) {
     if (this.closed) return Promise.reject(Error('Git process is closed'));
-    if (GitProcess.running < 4) {
-      GitProcess.running++;
+    if (slots.running < slots.limit) {
+      slots.running++;
       return Promise.resolve();
     }
     return new Promise<void>((resolve, reject) => {
-      GitProcess.waiting.push({ owner: this, resolve, reject });
+      slots.waiting.push({ owner: this, resolve, reject });
     });
   }
   private async once(cwd: string, args: string[], options: RunOptions) {
-    await this.acquire();
+    const slots = options.network ? GitProcess.network : GitProcess.local;
+    await this.acquire(slots);
     try {
       if (this.closed) throw Error('Git process is closed');
       return await this.execute(cwd, args, options);
     } finally {
-      const next = GitProcess.waiting.shift();
+      const next = slots.waiting.shift();
       if (next) next.resolve();
-      else GitProcess.running--;
+      else slots.running--;
     }
   }
   private execute(cwd: string, args: string[], options: RunOptions) {
@@ -249,11 +256,12 @@ export class GitProcess {
   }
   async close() {
     this.closed = true;
-    GitProcess.waiting = GitProcess.waiting.filter((entry) => {
-      if (entry.owner !== this) return true;
-      entry.reject(Error('Git process is closed'));
-      return false;
-    });
+    for (const slots of [GitProcess.local, GitProcess.network])
+      slots.waiting = slots.waiting.filter((entry) => {
+        if (entry.owner !== this) return true;
+        entry.reject(Error('Git process is closed'));
+        return false;
+      });
     await Promise.all([...this.children].map(killTree));
   }
 }

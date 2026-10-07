@@ -83,6 +83,8 @@ export class GitService {
     string,
     { result: Promise<GitStatus>; started: boolean; followup: boolean }
   >();
+  private mutationRefreshes = new Map<string, { root: string; target: GitTarget }>();
+  private closing = false;
   private revisions = new Map<string, number>();
   private noting = new Map<string, Promise<Set<string>>>();
   private notedCache = new Map<string, { revision: string; keys: Set<string> }>();
@@ -254,7 +256,14 @@ export class GitService {
     return next.finally(() => {
       this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
       this.pending--;
-      if (this.queues.get(key) === next) this.queues.delete(key);
+      if (this.queues.get(key) === next) {
+        this.queues.delete(key);
+        for (const [statusKey, refresh] of this.mutationRefreshes) {
+          if (refresh.root !== key) continue;
+          this.mutationRefreshes.delete(statusKey);
+          if (!this.closing) void this.status(refresh.target).catch(() => {});
+        }
+      }
     });
   }
   private validateName(p: string) {
@@ -634,29 +643,32 @@ export class GitService {
     const key = JSON.stringify([root, gitRepository(id)]);
     const pending = this.statuses.get(key);
     if (pending) {
-      // Requests after the read started may follow a worktree edit. One extra
-      // pass covers the whole burst; arrivals during that pass share it too.
+      // Each pass coalesces its arrivals into one queued follow-up. An edit
+      // arriving during a follow-up still needs a subsequent fresh snapshot.
       if (pending.started) pending.followup = true;
       return pending.result;
     }
     const state = { result: undefined! as Promise<GitStatus>, started: false, followup: false };
     const next = (async () => {
       await Promise.resolve();
-      let pass = 0;
       for (;;) {
-        // A read overlapping a mutation is repeated once after the queued writes,
-        // however many refresh requests joined it. Mutation checks use snapshot directly.
-        let queued;
-        while ((queued = this.queues.get(root))) await queued.catch(() => {});
+        state.followup = false;
         const revision = this.revisions.get(root);
+        if (this.queues.has(root)) this.mutationRefreshes.set(key, { root, target: id });
         state.started = true;
+        const repeat = () => {
+          const mutating = this.queues.has(root);
+          // Keep reads responsive during network writes. Their completion queues
+          // one refresh after the last mutation; mutation results use snapshot directly.
+          if (mutating) this.mutationRefreshes.set(key, { root, target: id });
+          return state.followup || (!mutating && revision !== this.revisions.get(root));
+        };
         try {
           const result = await this.readStatus(id);
-          if (revision === this.revisions.get(root) && (pass > 0 || !state.followup)) return result;
+          if (!repeat()) return result;
         } catch (error) {
-          if (revision === this.revisions.get(root) && (pass > 0 || !state.followup)) throw error;
+          if (!repeat()) throw error;
         }
-        pass++;
       }
     })().finally(() => this.statuses.delete(key));
     state.result = next;
@@ -1787,6 +1799,7 @@ export class GitService {
     });
   }
   async close() {
+    this.closing = true;
     await Promise.allSettled(this.queues.values());
     await this.process.close();
     await this.github.close();
