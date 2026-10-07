@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-07: **0.1.80** ([#183](https://github.com/DeL-TaiseiOzaki/irori/pull/183),
+a shared Schema for every agent, set from the settings, [ADR 027](decisions/027-shared-schema.md))
+merged at the owner's request as `4f011e5` and is published as
+[v0.1.80-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.80-preview.1)
+by release run `37591763672` from main's successful CI run `37590465209`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,161,792 bytes,
+  Mac 141,758,324 bytes and `irori-0.1.80-full.nupkg` 175,330,177 bytes.
+  The website manifest now offers 0.1.80.
+- Owner checks remain: a real CLI following the shared Schema, and
+  **設定 → Schema** on the installed Windows and Mac builds.
+
 Published 2026-10-07: **0.1.78** ([#181](https://github.com/DeL-TaiseiOzaki/irori/pull/181),
 removing a hibachi from the start screen) merged at the owner's request as `45417e7`
 and is published as
