@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { Popover } from '@base-ui/react/popover';
 import {
@@ -14,8 +14,10 @@ import {
 import type { SourceRef } from '../domain/knowledge';
 import type { YourAi } from '../domain/you';
 import {
-  appendConversationEvent,
+  appendConversationEvents,
   isDamaged,
+  mergeHeldEvents,
+  trimConversation,
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
@@ -23,6 +25,7 @@ import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { useDraft } from './useDraft';
+import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
 import { AgentLog } from './AgentLog';
 import { BrainTile } from './BrainTile';
@@ -76,8 +79,10 @@ export interface DockShared {
   reload: number;
   /** A queue changed outside the column; `resume` also lets a paused one go on. */
   queueSignal: { n: number; scopeId?: string; resume: boolean };
-  /** The owners' conversation lists changed: a run began or ended. */
-  tabRevision: number;
+  /** An owner's conversation list changed (a run began or ended), counted per owner. */
+  tabRevisions: Record<string, number>;
+  /** The brain's islands are off show (the Overview, routines or the irori agent's Schema is). */
+  hidden: boolean;
 }
 
 /**
@@ -166,6 +171,8 @@ export function AgentColumn({
   /** An irori column's run began with these hibachis handed to it. */
   onStarted?: (brains: string[]) => void;
 }) {
+  // The column sits behind a memo boundary, so it follows the language itself.
+  useLanguage();
   const irori = column.owner === 'irori';
   const scopeId = irori ? you?.id : space?.scopeId;
   const ready = irori ? you?.state === 'ready' : !!space;
@@ -225,7 +232,13 @@ export function AgentColumn({
   const [omitted, setOmitted] = useState({ earlier: 0, damaged: 0 });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [retry, setRetry] = useState(0);
-  const eventRevision = useRef(0);
+  // The events on show, as the effect below alone changes them, and those that
+  // arrived since they were last shown. The log takes a batch per frame.
+  const view = useRef<AgentEvent[]>([]);
+  const pending = useRef<AgentEvent[]>([]);
+  const flushPending = useRef<() => void>(() => {});
+  const hiddenNow = useRef(shared.hidden);
+  hiddenNow.current = shared.hidden;
   const [skill, setSkill] = useState('');
   const [personLines, setPersonLines] = useState(false);
   // The open note the person took out of this column's context, as `scopeId:path`.
@@ -240,7 +253,7 @@ export function AgentColumn({
   const shownBlank = conversationReady && !events.length && !queued.length && !shownRunning;
   const rows = useResource(() => host.agentConversations(scopeId!), [scopeId], {
     enabled: !!scopeId && ready,
-    refresh: shared.tabRevision,
+    refresh: scopeId ? (shared.tabRevisions[scopeId] ?? 0) : 0,
   });
   const agentInfo = infos.find((info) => info.id === agent);
   const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
@@ -270,10 +283,48 @@ export function AgentColumn({
   useEffect(() => {
     if (target) return shared.display(target.id);
   }, [target?.id]);
+  // Back on show, the column takes in what arrived while the islands were hidden.
+  useEffect(() => {
+    if (!shared.hidden) flushPending.current();
+  }, [shared.hidden]);
 
   // The conversation on show: read it, and follow its events.
   useEffect(() => {
     let current = true;
+    // The snapshot is on its way: events are held until it lands.
+    let reading = true;
+    let frame: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const show = (next: AgentEvent[], dropped: number) => {
+      view.current = next;
+      setEvents(next);
+      if (dropped) setOmitted((value) => ({ ...value, earlier: value.earlier + dropped }));
+    };
+    const flush = () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      frame = timer = undefined;
+      if (!current || reading || !pending.current.length) return;
+      const batch = pending.current;
+      pending.current = [];
+      const { events: next, dropped } = trimConversation(
+        appendConversationEvents(view.current, batch),
+      );
+      show(next, dropped);
+    };
+    // One state update per frame while the log is on show; nothing while the islands or
+    // the window are hidden, where the batch waits to be taken in on return. A window
+    // without frames (throttled in the background) still shows the batch within a moment.
+    const schedule = () => {
+      if (frame !== undefined || reading || hiddenNow.current || document.hidden) return;
+      frame = requestAnimationFrame(flush);
+      timer = setTimeout(flush, 250);
+    };
+    const shown = () => {
+      if (!document.hidden) flush();
+    };
+    view.current = [];
+    pending.current = [];
     setEvents([]);
     setQueued([]);
     setQueuePaused(true);
@@ -290,46 +341,55 @@ export function AgentColumn({
           if (current) onPick({ id, agent: value?.summary?.agent ?? agent });
           return;
         }
-        // A renderer reload stops native work. If its final events race the read, reread
-        // the host snapshot instead of overwriting newer events with an older result.
-        while (current) {
-          const revision = eventRevision.current;
-          const value = await host.agentConversation(scopeId, target.agent, target.id);
-          if (!current) return;
-          if (revision !== eventRevision.current) continue;
-          setEvents(withRequests(value));
-          setQueued(value.queued);
-          // Only the conversation holding the run knows the requests it waits on.
-          if (value.activeRunId) {
-            shared.addRun(value.activeRunId, scopeId, target.id);
-            shared.resetRequests(scopeId, value.activeRunId, value.requests);
-          }
-          // Work queued behind the conversation's run goes on when it ends; a queue left
-          // without one (after a failure or a restart) waits for the person to resume it.
-          setQueuePaused(!value.activeRunId && !runningNow.current.has(target.id));
-          setOmitted({ earlier: value.earlier, damaged: value.damaged });
-          setConversationReady(true);
-          return;
+        const value = await host.agentConversation(scopeId, target.agent, target.id);
+        if (!current) return;
+        // Events held while the snapshot was read join it, less what it already holds:
+        // the host reads the history and then its native record before replying, so
+        // some of them are in the snapshot and some arrived after its history was read.
+        const held = pending.current;
+        pending.current = [];
+        reading = false;
+        const { events: next, dropped } = trimConversation(
+          mergeHeldEvents(withRequests(value), held),
+        );
+        view.current = next;
+        setEvents(next);
+        setQueued(value.queued);
+        // Only the conversation holding the run knows the requests it waits on.
+        if (value.activeRunId) {
+          shared.addRun(value.activeRunId, scopeId, target.id);
+          shared.resetRequests(scopeId, value.activeRunId, value.requests);
         }
+        // Work queued behind the conversation's run goes on when it ends; a queue left
+        // without one (after a failure or a restart) waits for the person to resume it.
+        setQueuePaused(!value.activeRunId && !runningNow.current.has(target.id));
+        setOmitted({ earlier: value.earlier + dropped, damaged: value.damaged });
+        setConversationReady(true);
       })().catch((error) => {
         if (current) setConversationError(errorText(error));
       });
     if (!target) return;
     const id = target.id;
+    flushPending.current = flush;
+    document.addEventListener('visibilitychange', shown);
     const stop = host.onEvent((event) => {
       if (event.type !== 'agent' || event.event.conversationId !== id) return;
       const incoming = event.event;
-      eventRevision.current++;
-      setEvents((all) => {
-        const next = appendConversationEvent(all, incoming).slice(-400);
-        const last = next.at(-1)!;
-        return [...next.slice(0, -1), { ...last, text: last.text.slice(-200000) }];
-      });
+      // Fragments join in the batch, which stays within the window however long it waits.
+      pending.current = trimConversation(
+        appendConversationEvents(pending.current, [incoming]),
+      ).events;
+      schedule();
+      // A run that failed or was stopped pauses the queue at once, hidden or not.
       if (incoming.type === 'done' && incoming.outcome !== 'completed') setQueuePaused(true);
     });
     return () => {
       current = false;
       stop();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', shown);
+      flushPending.current = () => {};
     };
   }, [scopeId, ready, target?.id, shared.reload, retry]);
 
@@ -454,6 +514,11 @@ export function AgentColumn({
     gitBusy,
   ]);
 
+  // The hibachis an irori column's log names; the same list across renders keeps the log as it is.
+  const handedSpaces = useMemo(
+    () => (irori ? spaces.filter((item) => brains.includes(item.scopeId)) : undefined),
+    [irori, spaces, brains],
+  );
   const kind = irori ? 'irori agent' : 'hibachi agent';
   const ownerName = irori
     ? 'irori agent'
@@ -838,7 +903,7 @@ export function AgentColumn({
         <AgentLog
           events={events}
           activeRun={shownRunning ? events.at(-1)?.runId : undefined}
-          brains={irori ? spaces.filter((item) => brains.includes(item.scopeId)) : undefined}
+          brains={handedSpaces}
           onError={report}
         />
       </div>

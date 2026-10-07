@@ -1,9 +1,17 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentAnswers, AgentEvent, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
+import {
+  eventTarget,
+  logItems,
+  taskStateWords,
+  type LogStep,
+  type RunTask,
+} from '../domain/agent-log';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { BrainTile } from './BrainTile';
+import { useLanguage } from './useLanguage';
 
 const host = window.irori;
 // A reply is Markdown, but its renderer is the heaviest thing a session that
@@ -20,28 +28,27 @@ function AgentMarkdown({ text }: { text: string }) {
   );
 }
 
-/** The file or command a tool or a request is about, read from its JSON details. */
-export function eventTarget(details?: string) {
-  if (!details) return '';
-  try {
-    const value = JSON.parse(details) as Record<string, unknown>;
-    const input = (value.input ?? value) as Record<string, unknown>;
-    for (const key of [
-      'file_path',
-      'path',
-      'filePath',
-      'notebook_path',
-      'command',
-      'pattern',
-      'url',
-    ])
-      if (typeof input[key] === 'string') return input[key] as string;
-    if (Array.isArray(input.changes) && typeof input.changes[0]?.path === 'string')
-      return input.changes[0].path as string;
-  } catch {
-    // Details that are not JSON name nothing more than the event's own text.
-  }
-  return '';
+/** How long a reply still arriving may show its last parsed text before it is parsed again. */
+const streamingParseInterval = 150;
+
+/**
+ * A reply still being streamed is parsed a few times a second rather than at
+ * every fragment; once it has settled, its text renders exactly as it stands.
+ */
+function StreamingMarkdown({ text, live }: { text: string; live: boolean }) {
+  const [shown, setShown] = useState(text);
+  const latest = useRef(text);
+  latest.current = text;
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    if (!live || timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = undefined;
+      setShown(latest.current);
+    }, streamingParseInterval);
+  }, [text, live]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return <AgentMarkdown text={live ? shown : text} />;
 }
 
 /** A permission or a question from a run, answered here or wherever else it shows. */
@@ -159,24 +166,10 @@ export function AgentRequest({
   );
 }
 
-/**
- * A request is over once it was answered — here or in another view — or
- * declined, or its run ended. Other events of the run say nothing: a sub-agent
- * of another brain works on meanwhile, and the message announcing a tool call
- * can arrive after the request it raised.
- */
-export function requestEnded(events: AgentEvent[], index: number) {
-  const { runId, requestId } = events[index];
-  return events
-    .slice(index + 1)
-    .some(
-      (event) =>
-        event.runId === runId &&
-        (event.type === 'done' || (!!requestId && event.resolved === requestId)),
-    );
-}
-
-function Step({
+// The log's parts are memoised: a fragment of the reply still arriving changes
+// one message, and the hundreds before it keep their rendered form. Each reads
+// the language itself, since a language change reaches it through no prop.
+const Step = memo(function Step({
   event,
   result,
   running,
@@ -189,7 +182,8 @@ function Step({
   /** The brain a sub-agent's step works in. */
   brain?: Space;
 }) {
-  const target = eventTarget(event.details);
+  useLanguage();
+  const target = useMemo(() => eventTarget(event.details), [event.details]);
   return (
     <details className="step">
       <summary>
@@ -218,47 +212,35 @@ function Step({
       )}
     </details>
   );
-}
+});
 
-export type TaskState = 'working' | 'waiting' | 'reported' | 'failed' | 'stopped';
+const Steps = memo(function Steps({
+  steps,
+  running,
+  brains,
+}: {
+  steps: LogStep[];
+  /** The step among these being taken now, if any. */
+  running?: AgentEvent;
+  brains: Space[];
+}) {
+  return (
+    <div className="steps">
+      {steps.map(({ key, event, result }) => (
+        <Step
+          key={key}
+          event={event}
+          result={result}
+          brain={brainOf(brains, event)}
+          running={event === running}
+        />
+      ))}
+    </div>
+  );
+});
 
-/**
- * The hand-offs of one run of your AI, each with its brain, what it was asked
- * and how far it is: a request it waits on, a report, or still working.
- */
-export function runTasks(events: AgentEvent[], runId: string, active: boolean) {
-  const tasks = new Map<string, { scopeId: string; label: string; state: TaskState }>();
-  events.forEach((event, index) => {
-    const delegate = event.delegate;
-    if (event.runId !== runId || !delegate) return;
-    const task = tasks.get(delegate.task);
-    if (delegate.state === 'started')
-      tasks.set(delegate.task, { scopeId: delegate.scopeId, label: event.text, state: 'working' });
-    else if (task && (delegate.state === 'reported' || delegate.state === 'failed'))
-      task.state = delegate.state;
-    else if (
-      task &&
-      (event.type === 'permission' || event.type === 'question') &&
-      !requestEnded(events, index)
-    )
-      task.state = 'waiting';
-  });
-  for (const task of tasks.values())
-    if (!active && (task.state === 'working' || task.state === 'waiting')) task.state = 'stopped';
-  return [...tasks.entries()].map(([id, task]) => ({ id, ...task }));
-}
-
-export function taskStateWords(state: TaskState) {
-  return {
-    working: t('作業中', 'Working'),
-    waiting: t('許可待ち', 'Needs approval'),
-    reported: t('完了', 'Done'),
-    failed: t('失敗', 'Failed'),
-    stopped: t('中断', 'Stopped'),
-  }[state];
-}
-
-function TaskList({ tasks, brains }: { tasks: ReturnType<typeof runTasks>; brains: Space[] }) {
+const TaskList = memo(function TaskList({ tasks, brains }: { tasks: RunTask[]; brains: Space[] }) {
+  useLanguage();
   return (
     <ul className="task-list" aria-label={t('hibachi への依頼', 'Hand-offs to hibachis')}>
       {tasks.map((task) => {
@@ -289,18 +271,56 @@ function TaskList({ tasks, brains }: { tasks: ReturnType<typeof runTasks>; brain
       })}
     </ul>
   );
+});
+
+const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain?: Space }) {
+  useLanguage();
+  return (
+    <div className={`message report ${event.delegate?.state ?? ''}`}>
+      <span className="report-from">
+        {brain && <BrainTile space={brain} size={16} radius={5} />}
+        {brain
+          ? t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)
+          : t('報告', 'Report')}
+      </span>
+      <AgentMarkdown text={event.text} />
+    </div>
+  );
+});
+
+const Message = memo(function Message({ event, live }: { event: AgentEvent; live: boolean }) {
+  return (
+    <div className={`message ${event.type}`}>
+      {event.type === 'done' && (
+        <Icon name={event.outcome === 'completed' ? 'checkCircle' : 'close'} size={13} />
+      )}
+      {event.type === 'text' ? (
+        <StreamingMarkdown text={event.text} live={live} />
+      ) : (
+        <span>{event.text}</span>
+      )}
+    </div>
+  );
+});
+
+const none: Space[] = [];
+function brainOf(brains: Space[], event: AgentEvent) {
+  return event.delegate
+    ? brains.find((space) => space.scopeId === event.delegate!.scopeId)
+    : undefined;
 }
 
 /**
  * One brain's conversation: the person's messages, and for each run the agent's
  * words, its steps as a timeline, its requests and how it ended. Your AI's
  * conversation also shows each run's hand-offs as a task list, and the brains'
- * reports.
+ * reports. Items are keyed by their events, so the log keeps its nodes — and the
+ * details the person opened — as new events arrive and the oldest leave.
  */
-export function AgentLog({
+export const AgentLog = memo(function AgentLog({
   events,
   activeRun,
-  brains = [],
+  brains = none,
   onError,
 }: {
   events: AgentEvent[];
@@ -310,119 +330,67 @@ export function AgentLog({
   brains?: Space[];
   onError: (e: unknown) => void;
 }) {
-  const brainOf = (event: AgentEvent) =>
-    event.delegate ? brains.find((space) => space.scopeId === event.delegate!.scopeId) : undefined;
-  const listed = new Set<string>();
-  const items: ReactNode[] = [];
-  let steps: AgentEvent[] = [];
-  // A tool call's later reports (its result, or a CLI's progress updates) join its step.
-  const calls = new Map<string, AgentEvent>();
-  const results = new Map<AgentEvent, AgentEvent>();
-  const joined = new Set<AgentEvent>();
-  for (const event of events) {
-    if (event.type !== 'tool' || !event.call) continue;
-    const key = `${event.runId}:${event.call}`;
-    const call = calls.get(key);
-    if (!call) {
-      if (!event.result) calls.set(key, event);
-      continue;
-    }
-    joined.add(event);
-    if (event.result) results.set(call, event);
-  }
-  let labelled = '';
-  const flushSteps = (key: string) => {
-    if (!steps.length) return;
-    const group = steps;
-    steps = [];
-    items.push(
-      <div className="steps" key={`steps-${key}`}>
-        {group.map((event, i) => (
-          <Step
-            key={i}
-            event={event}
-            result={results.get(event)}
-            brain={brainOf(event)}
-            running={event.runId === activeRun && event === events.at(-1)}
-          />
-        ))}
-      </div>,
-    );
-  };
-  events.forEach((event, i) => {
-    if (event.resolved) return;
-    const key = `${event.runId}-${i}`;
-    if (event.type !== 'tool') flushSteps(key);
-    if (event.role === 'user') {
-      labelled = '';
-      items.push(
-        <div className="message user" key={key}>
-          <span>{event.text}</span>
-        </div>,
-      );
-      return;
-    }
-    // The agent names itself once at the start of each reply.
-    if (labelled !== event.runId && event.type !== 'status' && event.type !== 'done') {
-      labelled = event.runId;
-      items.push(
-        <div className="agent-label" key={`label-${key}`}>
-          <Icon name="sparkles" size={12} />
-          {event.agent ? agentNames[event.agent] : 'AI'}
-        </div>,
-      );
-    }
-    if (event.delegate?.state === 'started') {
-      // A run's hand-offs show once, as a list that follows their progress.
-      if (!listed.has(event.runId)) {
-        listed.add(event.runId);
-        items.push(
-          <TaskList
-            key={`tasks-${key}`}
-            tasks={runTasks(events, event.runId, event.runId === activeRun)}
-            brains={brains}
-          />,
-        );
-      }
-      return;
-    }
-    if (event.delegate && event.type === 'status') {
-      const brain = brainOf(event);
-      items.push(
-        <div className={`message report ${event.delegate.state}`} key={key}>
-          <span className="report-from">
-            {brain && <BrainTile space={brain} size={16} radius={5} />}
-            {brain
-              ? t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)
-              : t('報告', 'Report')}
-          </span>
-          <AgentMarkdown text={event.text} />
-        </div>,
-      );
-      return;
-    }
-    if (event.type === 'tool') {
-      if (!joined.has(event)) steps.push(event);
-    } else if (event.type === 'permission' || event.type === 'question')
-      items.push(
-        <AgentRequest
-          key={key}
-          event={event}
-          ended={requestEnded(events, i)}
-          brain={brainOf(event)}
-          onError={onError}
-        />,
-      );
-    else
-      items.push(
-        <div className={`message ${event.type}`} key={key}>
-          {event.type === 'done' && (
-            <Icon name={event.outcome === 'completed' ? 'checkCircle' : 'close'} size={13} />
-          )}
-          {event.type === 'text' ? <AgentMarkdown text={event.text} /> : <span>{event.text}</span>}
-        </div>,
-      );
-  });
-  flushSteps('end');
-  return <>{items}</>;
-}
+  useLanguage();
+  // Which group each step was shown in, so a group outlives its first step.
+  const groups = useRef(new Map<string, string>());
+  const items = useMemo(() => logItems(events, activeRun, groups.current), [events, activeRun]);
+  const last = events.at(-1);
+  // The newest event of the run in progress: a step being taken, or a reply still arriving.
+  const current = last && activeRun && last.runId === activeRun ? last : undefined;
+  return (
+    <>
+      {items.map((item) => {
+        switch (item.kind) {
+          case 'user':
+            return (
+              <div className="message user" key={item.key}>
+                <span>{item.event.text}</span>
+              </div>
+            );
+          case 'label':
+            return (
+              <div className="agent-label" key={item.key}>
+                <Icon name="sparkles" size={12} />
+                {item.event.agent ? agentNames[item.event.agent] : 'AI'}
+              </div>
+            );
+          case 'tasks':
+            return <TaskList key={item.key} tasks={item.tasks} brains={brains} />;
+          case 'report':
+            return <Report key={item.key} event={item.event} brain={brainOf(brains, item.event)} />;
+          case 'steps':
+            return (
+              <Steps
+                key={item.key}
+                steps={item.steps}
+                running={
+                  current?.type === 'tool' && item.steps.some((step) => step.event === current)
+                    ? current
+                    : undefined
+                }
+                brains={brains}
+              />
+            );
+          case 'request':
+            return (
+              <AgentRequest
+                key={item.key}
+                event={item.event}
+                ended={item.ended}
+                brain={brainOf(brains, item.event)}
+                onError={onError}
+              />
+            );
+          case 'message':
+            return (
+              <Message
+                key={item.key}
+                event={item.event}
+                live={item.event.type === 'text' && item.event === current}
+              />
+            );
+        }
+      })}
+    </>
+  );
+});

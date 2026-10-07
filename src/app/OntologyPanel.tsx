@@ -356,17 +356,20 @@ export function OntologyPanel({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [failure, setFailure] = useState('');
-  const { data, error, loading } = useResource(
-    () => window.irori.ontology(space.scopeId),
-    [space.scopeId, revision, refresh],
-  );
+  // A file change reads the CSV again behind the graph on show; the graph below
+  // is keyed by what it read, so it is rebuilt only when the tables changed.
+  const read = useResource(() => window.irori.ontology(space.scopeId), [space.scopeId], {
+    refresh: revision + refresh,
+  });
+  const { error, loading } = read;
+  // A reread that fails hides the graph it replaces rather than showing tables that no longer hold.
+  const data = error ? undefined : read.data;
   const module = data?.source === 'module';
   // The graph shows first; the freshness check walks every page and arrives when it does.
-  const status = useResource(
-    () => window.irori.graphIndexStatus(space.scopeId),
-    [space.scopeId, revision, refresh],
-    { enabled: module || !!error },
-  );
+  const status = useResource(() => window.irori.graphIndexStatus(space.scopeId), [space.scopeId], {
+    enabled: module || !!error,
+    refresh: revision + refresh,
+  });
   // An unreadable generated table must still be replaceable from its pages.
   // The host's independent declaration check keeps declared CSV pairs protected.
   const repairModule = !!error && !!status.data && !status.data.declared;

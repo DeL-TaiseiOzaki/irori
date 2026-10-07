@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import writeFileAtomic from 'write-file-atomic';
+import type { FSWatcher } from 'chokidar';
 import { replaceFile, writeLocalFile, writeLocalJson } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
@@ -95,6 +96,106 @@ export async function readViewerBytes(filename: string, rel: string) {
   if ((await fs.stat(filename)).size > viewerByteLimit) throw tooLarge();
   return new Uint8Array(await fs.readFile(filename));
 }
+const unwatchedNames = new Set([
+  '.git',
+  'node_modules',
+  '.venv',
+  'venv',
+  '__pycache__',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.tox',
+  '.next',
+  '.turbo',
+  '.cache',
+  '.DS_Store',
+]);
+
+/** One registration's watcher boundaries, computed outside chokidar's path callback. */
+export function watcherIgnored(space: Space, spaces: Space[]) {
+  const excluded = [
+    ...space.contents,
+    ...spaces
+      .filter((other) => other.scopeId !== space.scopeId && within(space.root, other.root))
+      .map((other) => path.relative(space.root, other.root).replaceAll('\\', '/')),
+  ];
+  const knowledge = knowledgeFolder(space);
+  return (filename: string) => {
+    const relative = path.relative(space.root, filename).replaceAll('\\', '/');
+    return (
+      relative
+        .split('/')
+        .some((part, index) => unwatchedNames.has(part) && !(index === 0 && part === knowledge)) ||
+      excluded.some((folder) => relative === folder || relative.startsWith(folder + '/'))
+    );
+  };
+}
+
+/** Reconcile only watchers whose registration boundaries changed. */
+export function watchRegistrationChanges(
+  files: FileService,
+  handlers: {
+    watchers: Map<string, FSWatcher>;
+    watch(space: Space, spaces: Space[]): FSWatcher;
+    refreshed(scopeId: string): void;
+    closing(): boolean;
+    error(error: unknown): void;
+  },
+) {
+  let previous = files.list();
+  let refreshing = Promise.resolve();
+  let stopped = false;
+  const boundary = (space: Space) =>
+    JSON.stringify([space.root, [...space.contents].sort(), knowledgeFolder(space)]);
+  const unsubscribe = files.onRegistrationsChanged(() => {
+    const spaces = files.list();
+    const before = new Map(previous.map((space) => [space.scopeId, boundary(space)]));
+    const after = new Map(spaces.map((space) => [space.scopeId, boundary(space)]));
+    const changed = [...previous, ...spaces].filter(
+      (space) => before.get(space.scopeId) !== after.get(space.scopeId),
+    );
+    const affected = new Set(
+      [...previous, ...spaces]
+        .filter((space) =>
+          changed.some((other) => within(space.root, other.root) || within(other.root, space.root)),
+        )
+        .map((space) => space.scopeId),
+    );
+    previous = spaces;
+    if (!affected.size) return;
+    refreshing = refreshing
+      .then(async () => {
+        if (stopped || handlers.closing()) return;
+        const removed: FSWatcher[] = [];
+        for (const id of affected) {
+          const watcher = handlers.watchers.get(id);
+          if (!watcher) continue;
+          handlers.watchers.delete(id);
+          removed.push(watcher);
+        }
+        await Promise.all(removed.map((watcher) => watcher.close()));
+        if (stopped || handlers.closing()) return;
+        const current = files.list();
+        for (const space of current) {
+          if (!affected.has(space.scopeId)) continue;
+          const watcher = handlers.watch(space, current);
+          // ignoreInitial hides writes between closing the old watcher and the
+          // new one's initial scan. One ready notification covers that gap.
+          watcher.once('ready', () => {
+            if (!stopped && !handlers.closing() && handlers.watchers.get(space.scopeId) === watcher)
+              handlers.refreshed(space.scopeId);
+          });
+        }
+      })
+      .catch(handlers.error);
+  });
+  return () => {
+    stopped = true;
+    unsubscribe();
+  };
+}
+
 export class FileService {
   cloud?: {
     resolve(scopeId: string, rel: string): Promise<string>;
@@ -112,7 +213,16 @@ export class FileService {
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
   private queue = new SerialQueue();
+  private registrationListeners = new Set<() => void>();
   constructor(readonly dataDir: string) {}
+  /** Registration and layer changes require watcher boundaries to be rebuilt. */
+  onRegistrationsChanged(listener: () => void) {
+    this.registrationListeners.add(listener);
+    return () => this.registrationListeners.delete(listener);
+  }
+  private registrationsChanged() {
+    for (const listener of this.registrationListeners) listener();
+  }
   async init() {
     await fs.mkdir(this.dataDir, { recursive: true, mode: 0o700 });
     try {
@@ -235,6 +345,7 @@ export class FileService {
         { root: s.root, scopeId: s.scopeId },
       ];
       await writeLocalJson(path.join(this.dataDir, 'spaces.json'), this.bindings);
+      this.registrationsChanged();
       return s;
     });
   }
@@ -249,6 +360,7 @@ export class FileService {
       await writeLocalJson(path.join(this.dataDir, 'spaces.json'), bindings);
       this.bindings = bindings;
       this.spaces = this.spaces.filter((item) => item.scopeId !== id);
+      this.registrationsChanged();
       return s;
     });
   }
@@ -282,6 +394,7 @@ export class FileService {
       // A file of the KB keeps its own mode; only device records are made private.
       await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
       this.spaces = this.spaces.map((item) => (item.scopeId === id ? next : item));
+      this.registrationsChanged();
       // Only the icon the declaration names stays beside it.
       const icon = next.appearance?.icon?.kind === 'image' ? next.appearance.icon.path : '';
       for (const name of await fs.readdir(path.dirname(meta)))
@@ -380,6 +493,7 @@ export class FileService {
         throw error;
       }
       this.spaces = this.spaces.map((item) => (item.scopeId === id ? space : item));
+      this.registrationsChanged();
       if (layer === 'contents') await this.ignoreContents(s.root, previous, next);
       for (const file of moved) {
         const target = renamedPath(file, previous, next)!;

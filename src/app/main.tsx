@@ -47,19 +47,36 @@ import {
   useDefaultLayout,
   usePanelRef,
 } from 'react-resizable-panels';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AgentEvent,
   AgentAccess,
   AgentId,
   AgentInfo,
+  CloudConnection,
   Document,
   Entry,
+  HibachiGroup,
   Space,
   WorkspaceProfile,
   CloudRoot,
 } from '../domain/types';
+import { agentIds } from '../domain/types';
+import type { AgentSkill, retirementNotice } from '../domain/skills';
+import type { YourAi } from '../domain/you';
 import { opensInIrori } from '../domain/viewers';
 const PageEditor = lazy(() =>
   import('./PageEditor').then((module) => ({ default: module.PageEditor })),
@@ -126,6 +143,8 @@ import { Startup, RegisterSpace } from './Startup';
 import { appIcon } from './branding';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
+import { useStableFunctions } from './useStableFunctions';
+import { anyRevision, bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
 import { BrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
@@ -156,10 +175,263 @@ function navigationNotice(target: Navigation, found: boolean) {
 }
 /** A run in progress: its space, and its conversation once the host has placed it. */
 type LiveRun = { scopeId: string; conversationId?: string };
+/** The AI chosen for each brain; a brain not chosen yet starts with the last choice. */
+type AgentChoice = { last: AgentId; brains: Record<string, AgentId> };
+const agentOf = (choice: AgentChoice, scopeId?: string) =>
+  (scopeId && choice.brains[scopeId]) || choice.last;
+/**
+ * The choices survive a reload of the window, so a conversation a reload stopped
+ * is found again with its CLI rather than an empty one with the default CLI.
+ */
+const agentChoiceKey = 'irori.agentChoice';
+function savedAgentChoice(): AgentChoice {
+  const known = (value: unknown): value is AgentId => agentIds.includes(value as AgentId);
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(agentChoiceKey) ?? 'null') as AgentChoice;
+    if (known(saved?.last))
+      return {
+        last: saved.last,
+        brains: Object.fromEntries(
+          Object.entries(saved.brains ?? {}).filter(([, agent]) => known(agent)),
+        ),
+      };
+  } catch {
+    // Storage may be unavailable or hold something else; start with the default.
+  }
+  return { last: 'codex', brains: {} };
+}
+/** Where a column keeps an owner's conversation and tabs: the first under the owner's id. */
+const slot = (columnId: string, scopeId: string) =>
+  columnId === 'main' ? scopeId : `${scopeId}#${columnId}`;
+/** A column's open tabs; the conversation on show is always among them. */
+function openTabs(tabs: Record<string, Tab[]>, shown: Record<string, Tab>, key: string) {
+  const open = tabs[key] ?? [];
+  const on = shown[key];
+  return on && !open.some((tab) => tab.id === on.id) ? [...open, on] : open;
+}
+const instructionFileOf = (roots: Listing | undefined, agentId: AgentId) =>
+  (agentId === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find((name) =>
+    roots?.entries.some((entry) => entry.path === name),
+  );
+/** The brain's top-level entries as read, or what went wrong reading them. */
+type Listing = { entries: Entry[]; error?: string };
+const noEntries: Entry[] = [];
+const noConnections: CloudConnection[] = [];
+const noSkills: AgentSkill[] = [];
+const noRetired: Parameters<typeof retirementNotice>[0][] = [];
+const noProblems: { directory: string; message?: string }[] = [];
+const noSources: SourceRef[] = [];
+const noGroups: HibachiGroup[] = [];
+
+/** What a dock column asks of the window; each identity stays the same across renders. */
+interface DockActions {
+  report: (error: unknown) => void;
+  toggleStage: () => void;
+  chooseYour: (choice: ReturnType<typeof currentYourAi>) => void;
+  remember: (scopeId: string, agent: AgentId) => void;
+  newConversation: (
+    scopeId: string,
+    key: string,
+    agent: AgentId,
+    replace?: boolean,
+  ) => Promise<void>;
+  showConversation: (key: string, id: string, agent: AgentId, replace?: boolean) => void;
+  closeTab: (key: string, id: string, onNeighbour: (agent: AgentId) => void) => void;
+  splitColumn: (after: DockColumn) => void;
+  closeColumn: (column: DockColumn) => void;
+  createYou: () => Promise<void>;
+  setShown: Dispatch<SetStateAction<Record<string, Tab>>>;
+  setTabs: Dispatch<SetStateAction<Record<string, Tab[]>>>;
+  setSources: Dispatch<SetStateAction<Record<string, SourceRef[]>>>;
+  setColumns: Dispatch<SetStateAction<DockColumn[]>>;
+  setModelChoice: Dispatch<SetStateAction<Record<string, string>>>;
+  setAccessChoice: Dispatch<SetStateAction<Record<string, { agent: AgentId; value: AgentAccess }>>>;
+  setYourAccessSelection: Dispatch<
+    SetStateAction<{ agent: AgentId; value: AgentAccess } | undefined>
+  >;
+  setColumnStatus: Dispatch<SetStateAction<Record<string, { sending: boolean; queued: number }>>>;
+  setHanded: Dispatch<SetStateAction<string[] | undefined>>;
+}
+
+/**
+ * One column of the dock with what the window knows about it. Memoised on that
+ * data, so the editor's keystrokes (which change none of it) leave the column,
+ * its log and its composer as they are.
+ */
+const DockColumnView = memo(function DockColumnView({
+  column,
+  owner,
+  first,
+  shared,
+  active,
+  you,
+  shown,
+  tabs,
+  agentChoice,
+  yourChoice,
+  yourAccess,
+  accessChoice,
+  modelChoice,
+  skills,
+  skillsRetired,
+  skillProblems,
+  roots,
+  sources,
+  hibachiAgent,
+  stageHidden,
+  workspaceScopeIds,
+  act,
+}: {
+  column: DockColumn;
+  owner: ColumnOwner;
+  /** The first column hides and shows the stage beside the dock. */
+  first: boolean;
+  shared: DockShared;
+  active?: Space;
+  you?: YourAi;
+  shown: Record<string, Tab>;
+  tabs: Record<string, Tab[]>;
+  agentChoice: AgentChoice;
+  yourChoice: ReturnType<typeof currentYourAi>;
+  yourAccess: AgentAccess;
+  accessChoice: Record<string, { agent: AgentId; value: AgentAccess }>;
+  modelChoice: Record<string, string>;
+  skills: AgentSkill[];
+  skillsRetired: Parameters<typeof retirementNotice>[0][];
+  skillProblems: { directory: string }[];
+  roots?: Listing;
+  sources: SourceRef[];
+  hibachiAgent: boolean;
+  stageHidden: boolean;
+  workspaceScopeIds: string[];
+  act: DockActions;
+}) {
+  const irori = owner === 'irori';
+  const scopeId = irori ? you?.id : active?.scopeId;
+  const key = scopeId ? slot(column.id, scopeId) : '';
+  const target = key ? shown[key] : undefined;
+  const columnAgent =
+    target?.agent ?? (irori ? yourChoice.agent : agentOf(agentChoice, active?.scopeId));
+  const access = irori
+    ? yourAccess
+    : accessChoice[key]?.agent === columnAgent
+      ? accessChoice[key].value
+      : defaultAgentAccess(columnAgent);
+  const rememberAgent = (next: AgentId) => {
+    if (irori) act.chooseYour({ ...yourChoice, agent: next });
+    else if (active) act.remember(active.scopeId, next);
+  };
+  const stage = useMemo(
+    () => (first ? { hidden: stageHidden, onToggle: act.toggleStage } : undefined),
+    [first, stageHidden, act],
+  );
+  const dockColumn = useMemo(() => ({ ...column, owner }), [column, owner]);
+  return (
+    <AgentColumn
+      column={dockColumn}
+      number={column.id === 'main' ? 1 : Number(column.id)}
+      shared={shared}
+      space={irori ? undefined : active}
+      you={you}
+      brains={workspaceScopeIds}
+      target={target}
+      tabs={key ? openTabs(tabs, shown, key) : noTabs}
+      agent={columnAgent}
+      model={
+        irori
+          ? yourChoice.models[columnAgent] || undefined
+          : active && (modelChoice[`${active.scopeId}:${columnAgent}`] || undefined)
+      }
+      access={access}
+      skills={irori ? noSkills : skills}
+      skillsRetired={irori ? noRetired : skillsRetired}
+      skillProblems={irori ? noProblems : skillProblems}
+      instructionFile={irori ? undefined : instructionFileOf(roots, columnAgent)}
+      sources={sources}
+      ownerChoice={hibachiAgent}
+      stage={stage}
+      onModel={(next) => {
+        if (irori) {
+          const models = { ...yourChoice.models };
+          if (next) models[columnAgent] = next;
+          else delete models[columnAgent];
+          act.chooseYour({ ...yourChoice, models });
+        } else if (active)
+          act.setModelChoice((all) => ({
+            ...all,
+            [`${active.scopeId}:${columnAgent}`]: next,
+          }));
+      }}
+      onAccess={(value) => {
+        if (irori) act.setYourAccessSelection({ agent: columnAgent, value });
+        else
+          act.setAccessChoice((all) => ({
+            ...all,
+            [key]: { agent: columnAgent, value },
+          }));
+      }}
+      onAgent={(next, replace) => {
+        if (!scopeId) return;
+        rememberAgent(next);
+        // Another CLI is another conversation (ADR 017 D2).
+        void act.newConversation(scopeId, key, next, replace).catch(act.report);
+      }}
+      onPick={(tab) => {
+        if (!key) return;
+        if (irori && column.id === 'main' && tab.agent !== yourChoice.agent)
+          act.chooseYour({ ...yourChoice, agent: tab.agent });
+        act.setShown((all) => (all[key] ? all : { ...all, [key]: tab }));
+      }}
+      onShow={(tab, replace) => {
+        if (!key) return;
+        rememberAgent(tab.agent);
+        act.showConversation(key, tab.id, tab.agent, replace);
+      }}
+      onCloseTab={(id) => key && act.closeTab(key, id, rememberAgent)}
+      onNew={async (replace) => {
+        if (scopeId) await act.newConversation(scopeId, key, columnAgent, replace);
+      }}
+      onDeleted={(id) => {
+        if (!key) return;
+        act.setTabs((all) => ({
+          ...all,
+          [key]: (all[key] ?? []).filter((tab) => tab.id !== id),
+        }));
+        // The column shows the owner's next conversation, or a new one.
+        if (shown[key]?.id === id) act.setShown(({ [key]: _, ...rest }) => rest);
+      }}
+      onSources={(update) =>
+        act.setSources((all) => ({
+          ...all,
+          [column.id]: update(all[column.id] ?? []),
+        }))
+      }
+      onOwner={(next) =>
+        act.setColumns((all) =>
+          all.map((item) => (item.id === column.id ? { ...item, owner: next } : item)),
+        )
+      }
+      onSplit={() => act.splitColumn({ ...column, owner })}
+      onClose={() => act.closeColumn(column)}
+      onStatus={(status) =>
+        act.setColumnStatus((all) =>
+          all[column.id]?.sending === status.sending && all[column.id]?.queued === status.queued
+            ? all
+            : { ...all, [column.id]: status },
+        )
+      }
+      onCreateYou={act.createYou}
+      onStarted={act.setHanded}
+    />
+  );
+});
+const noTabs: Tab[] = [];
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
   // the whole tree from here; component state, drafts and the editor are kept.
-  useLanguage();
+  // The memoised islands and the elements memoised below take the language as a
+  // dependency, since nothing else about them changes with it.
+  const language = useLanguage();
   const [editorAssistance, setEditorAssistance] = useState(currentEditorAssistance);
   const [savingAssistance, setSavingAssistance] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
@@ -239,25 +511,31 @@ function App() {
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
     [buffer, setBuffer] = useState('');
-  const [revision, setRevision] = useState(0),
+  // The host's file changes, counted per hibachi: a change in one leaves the others' views as they are.
+  const [revisions, setRevisions] = useState(noRevisions),
     [editorKey, setEditorKey] = useState(0),
     [mode, setMode] = useState<'rich' | 'source' | 'table'>('rich'),
     [external, setExternal] = useState<Document>();
+  // What the views of the hibachi on show, and of the open note's hibachi, follow.
+  const revision = scopeRevision(revisions, active?.scopeId);
+  const docRevision = scopeRevision(revisions, doc?.scopeId);
   const [error, setError] = useState(''),
     [status, setStatus] = useState(''),
     [panel, setPanel] = useState(false),
     // Each brain keeps the AI chosen for it; a brain not chosen yet starts with the last choice.
-    [agentChoice, setAgentChoice] = useState<{
-      last: AgentId;
-      brains: Record<string, AgentId>;
-    }>({ last: 'codex', brains: {} }),
+    [agentChoice, setAgentChoice] = useState<AgentChoice>(savedAgentChoice),
     [infos, setInfos] = useState<AgentInfo[]>([]);
   // The workspace's brains in the order its owner chose.
-  const workspaceSpaces = (workspace?.scopeIds ?? []).flatMap((id) =>
-    spaces.filter((space) => space.scopeId === id),
+  const workspaceSpaces = useMemo(
+    () =>
+      (workspace?.scopeIds ?? []).flatMap((id) => spaces.filter((space) => space.scopeId === id)),
+    [workspace?.scopeIds, spaces],
   );
-  const agentFor = (scopeId?: string) =>
-    (scopeId && agentChoice.brains[scopeId]) || agentChoice.last;
+  const workspaceScopeIds = useMemo(
+    () => workspaceSpaces.map((space) => space.scopeId),
+    [workspaceSpaces],
+  );
+  const agentFor = (scopeId?: string) => agentOf(agentChoice, scopeId);
   // Each hibachi's own agent and its Schema layer are optional (ADR 021).
   const [hibachiAgent, setHibachiAgent] = useState(currentHibachiAgent);
   function chooseHibachi(next: boolean) {
@@ -272,25 +550,25 @@ function App() {
   // hibachi agent is off.
   const [columns, setColumns] = useState<DockColumn[]>([{ id: 'main', owner: 'hibachi' }]);
   const ownerOf = (column: DockColumn): ColumnOwner => (hibachiAgent ? column.owner : 'irori');
-  /** Where a column keeps an owner's conversation and tabs: the first under the owner's id. */
-  const slot = (columnId: string, scopeId: string) =>
-    columnId === 'main' ? scopeId : `${scopeId}#${columnId}`;
   // The conversation each column shows per owner, with its CLI (ADR 017 D4). An owner
   // not in it shows the host's pick: the one running, queued longest, or its latest.
   const [shown, setShown] = useState<Record<string, Tab>>({});
   const shownHere = active ? shown[active.scopeId] : undefined;
   const agent = shownHere?.agent ?? agentFor(active?.scopeId);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(agentChoiceKey, JSON.stringify(agentChoice));
+    } catch {
+      // Without storage a reload starts with the default again.
+    }
+  }, [agentChoice]);
   function remember(scopeId: string, next: AgentId) {
     setAgentChoice((choice) => ({ last: next, brains: { ...choice.brains, [scopeId]: next } }));
   }
   // The conversations a column keeps open as tabs, as Claudian does (ADR 020): the
   // one on show is always among them, and the others may run meanwhile.
   const [tabs, setTabs] = useState<Record<string, Tab[]>>({});
-  function tabsOf(key: string) {
-    const open = tabs[key] ?? [];
-    const on = shown[key];
-    return on && !open.some((tab) => tab.id === on.id) ? [...open, on] : open;
-  }
+  const tabsOf = (key: string) => openTabs(tabs, shown, key);
   /**
    * Shows a conversation in a column's tabs: in its own tab when it has one, else
    * in a new tab, or with `replace` in place of the conversation on show.
@@ -394,11 +672,15 @@ function App() {
     enabled: !!active,
     refresh: skillRevision,
   });
-  const skills = skillRead.data?.skills ?? [];
-  const skillsRetired = skillRead.data?.retired ?? [];
-  const skillProblems = skillRead.error
-    ? [{ directory: '.agents/skills', message: skillRead.error }]
-    : (skillRead.data?.problems ?? []);
+  const skills = skillRead.data?.skills ?? noSkills;
+  const skillsRetired = skillRead.data?.retired ?? noRetired;
+  const skillProblems = useMemo(
+    () =>
+      skillRead.error
+        ? [{ directory: '.agents/skills', message: skillRead.error }]
+        : (skillRead.data?.problems ?? noProblems),
+    [skillRead.error, skillRead.data],
+  );
   const notesRead = useResource(() => host.notesDeclaration(active!.scopeId), [active?.scopeId], {
     enabled: !!active,
     refresh: revision,
@@ -415,10 +697,13 @@ function App() {
     enabled: !!active,
     refresh: revision,
   });
-  const roots =
-    rootsRead.data || rootsRead.error
-      ? { entries: rootsRead.data ?? [], error: rootsRead.error }
-      : undefined;
+  const roots = useMemo<Listing | undefined>(
+    () =>
+      rootsRead.data || rootsRead.error
+        ? { entries: rootsRead.data ?? noEntries, error: rootsRead.error }
+        : undefined,
+    [rootsRead.data, rootsRead.error],
+  );
   // The branch and changes shown beside the brain; Git itself reads without locking.
   const gitRead = useResource(() => host.gitStatus(active!.scopeId), [active?.scopeId], {
     enabled: !!active,
@@ -430,7 +715,7 @@ function App() {
     [active?.scopeId],
     { enabled: !!active && !startup, refresh: revision, interval: 5000 },
   );
-  const connections = connectionsRead.data ?? [];
+  const connections = connectionsRead.data ?? noConnections;
   const defaultNoteDirectory =
     notesDeclared?.newNoteDirectory ?? `${knowledgeFolder(active ?? {})}/Notes`;
   const composer = useDraft(
@@ -566,14 +851,20 @@ function App() {
   // retired ones among them, win (ADR 027).
   const sharedSkillRead = useResource(() => host.skills(sharedSchemaId), [you?.state], {
     enabled: you?.state === 'ready',
-    refresh: skillRevision + revision,
+    // The shared Schema lives in the irori agent's folder: a change is reported as the
+    // shared Schema's when made from the settings, as the irori agent's otherwise.
+    refresh:
+      skillRevision + scopeRevision(revisions, sharedSchemaId) + scopeRevision(revisions, you?.id),
   });
-  const composerSkills = [
-    ...skills,
-    ...(sharedSkillRead.data?.skills ?? [])
-      .filter((skill) => ![...skills, ...skillsRetired].some((own) => own.name === skill.name))
-      .map((skill) => ({ ...skill, shared: true })),
-  ];
+  const composerSkills = useMemo(
+    () => [
+      ...skills,
+      ...(sharedSkillRead.data?.skills ?? [])
+        .filter((skill) => ![...skills, ...skillsRetired].some((own) => own.name === skill.name))
+        .map((skill) => ({ ...skill, shared: true })),
+    ],
+    [skills, skillsRetired, sharedSkillRead.data],
+  );
   // The irori agent's panel shows one of its conversations: the host's pick until one is chosen.
   useEffect(() => {
     if (you?.state !== 'ready' || shown[you.id]) return;
@@ -600,27 +891,22 @@ function App() {
   function heldByYou(scopeId: string) {
     return yourAiRunning && (handed ?? workspace?.scopeIds ?? []).includes(scopeId);
   }
-  function aiState(scopeId: string): BrainAiState {
-    return waitingScopes.includes(scopeId)
-      ? 'waiting'
-      : runningScopes.includes(scopeId) || heldByYou(scopeId)
-        ? 'running'
-        : 'idle';
-  }
   // Any run in the hibachi on show holds what irori itself would change there.
   const running = !!active && runningScopes.includes(active.scopeId);
   /** Whether a conversation's run waits for the person's answer. */
-  function conversationWaiting(id: string) {
-    return Object.entries(liveRuns).some(
-      ([runId, run]) => run.conversationId === id && waitingRuns.includes(runId),
-    );
-  }
+  const conversationWaiting = useCallback(
+    (id: string) =>
+      Object.entries(liveRuns).some(
+        ([runId, run]) => run.conversationId === id && waitingRuns.includes(runId),
+      ),
+    [liveRuns, waitingRuns],
+  );
   // The hibachi's conversations, read again when one begins or a run ends, name the
   // tabs; one running without a tab, after a reload or from the Overview, gets one.
-  const [tabRevision, setTabRevision] = useState(0);
+  const [tabRevisions, setTabRevisions] = useState<Record<string, number>>({});
   const tabRows = useResource(() => host.agentConversations(active!.scopeId), [active?.scopeId], {
     enabled: !!active && !startup,
-    refresh: tabRevision,
+    refresh: active ? (tabRevisions[active.scopeId] ?? 0) : 0,
   });
   useEffect(() => {
     if (!active || !tabRows.data) return;
@@ -641,16 +927,29 @@ function App() {
   }, [active?.scopeId, hibachiAgent]);
   // Who typed which line of the open note. A connected folder's file is outside the KB's
   // Git history and has no record; a failure here leaves the note unmarked rather than unopenable.
+  // A note just opened is asked about at once; one being saved again and again (an agent
+  // editing it) is asked about once it has stood for half a second.
+  const authorshipOf = useRef('');
   useEffect(() => {
-    if (!doc || doc.cloud || doc.viewer) return setAuthorship(undefined);
+    if (!doc || doc.cloud || doc.viewer) {
+      authorshipOf.current = '';
+      return setAuthorship(undefined);
+    }
     let current = true;
     const { scopeId, path, text } = doc;
-    void host
-      .noteAuthorship(scopeId, path, text)
-      .then((value) => current && setAuthorship(value))
-      .catch(() => current && setAuthorship(undefined));
+    const note = `${scopeId}:${path}`;
+    const settled = authorshipOf.current === note;
+    authorshipOf.current = note;
+    const ask = () =>
+      void host
+        .noteAuthorship(scopeId, path, text)
+        .then((value) => current && setAuthorship(value))
+        .catch(() => current && setAuthorship(undefined));
+    const timer = settled ? setTimeout(ask, 500) : undefined;
+    if (!settled) ask();
     return () => {
       current = false;
+      clearTimeout(timer);
     };
   }, [doc?.scopeId, doc?.path, doc?.hash]);
   const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
@@ -661,7 +960,13 @@ function App() {
   const organizing = useRef(false);
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
-  const report = (e: unknown) => setError(errorText(e));
+  const report = useCallback((e: unknown) => setError(errorText(e)), []);
+  /** Counts a change in one hibachi, or in every one of them when none is named. */
+  const bump = useCallback(
+    (scopeId?: string) => setRevisions((all) => bumpRevision(all, scopeId)),
+    [],
+  );
+
   function openDaily() {
     if (!active) return;
     const scopeId = active.scopeId;
@@ -669,7 +974,7 @@ function App() {
       .then(async (saved) => {
         if (!saved) return;
         show(await host.dailyNote(scopeId));
-        setRevision((value) => value + 1);
+        bump(scopeId);
       })
       .catch(report);
   }
@@ -790,7 +1095,7 @@ function App() {
     void host.agents().then(setInfos).catch(report);
     return host.onEvent((event) => {
       if (event.type === 'files') {
-        setRevision((r) => r + 1);
+        bump(event.scopeId);
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();
       } else if (event.type === 'hibachis') {
         // The irori agent registered a hibachi; the workspace on show takes it in.
@@ -808,7 +1113,7 @@ function App() {
           trackRun(incoming);
           trackRequests(incoming);
           if (incoming.type === 'done' || incoming.role === 'user')
-            setTabRevision((value) => value + 1);
+            setTabRevisions((all) => ({ ...all, [scopeId]: (all[scopeId] ?? 0) + 1 }));
           // The AI that runs in a brain is that brain's hibachi agent from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
@@ -821,7 +1126,10 @@ function App() {
         }
         if (incoming.type !== 'done') return;
         setSkillRevision((value) => value + 1);
-        setRevision((r) => r + 1);
+        // A run may have changed any hibachi: the irori agent's hand-offs reach others, and
+        // two hibachis may connect the same folder, whose files no watcher reports. Run ends
+        // are rare, so every view reads again; file events stay with their own hibachi.
+        bump();
         void reconcile();
         // A run's end sends the next queued instruction of its own conversation; a
         // conversation on show in a column sends its own.
@@ -910,30 +1218,33 @@ function App() {
     }, 25000);
     return () => clearInterval(timer);
   }, [doc, dirty]);
+  // The shortcuts read the latest render's state; the listener itself is added once.
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {});
+  onKey.current = (e: KeyboardEvent) => {
+    // Ctrl+` opens and closes the terminal, from inside it too.
+    if (e.ctrlKey && e.key === '`' && !startup) {
+      e.preventDefault();
+      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
+      return;
+    }
+    if ((e.target as HTMLElement).closest('.terminal-panel')) return;
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      void save();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !startup && !searchOpen) {
+      e.preventDefault();
+      if (workspaceSpaces.length && !connecting) {
+        setSearchAll(level === 'overview' || level === 'routines');
+        setSearchOpen(true);
+      }
+    }
+  };
   useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      // Ctrl+` opens and closes the terminal, from inside it too.
-      if (e.ctrlKey && e.key === '`' && !startup) {
-        e.preventDefault();
-        if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
-        return;
-      }
-      if ((e.target as HTMLElement).closest('.terminal-panel')) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        void save();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !startup && !searchOpen) {
-        e.preventDefault();
-        if (workspaceSpaces.length && !connecting) {
-          setSearchAll(level === 'overview' || level === 'routines');
-          setSearchOpen(true);
-        }
-      }
-    };
+    const key = (e: KeyboardEvent) => onKey.current(e);
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
+  }, []);
   async function selectSpace(space: Space) {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
@@ -1119,7 +1430,7 @@ function App() {
       report(error);
     } finally {
       setConnecting(false);
-      setRevision((v) => v + 1);
+      bump();
     }
   }
   function showConnections(target: CloudRoot) {
@@ -1160,7 +1471,7 @@ function App() {
         return moved ? [moved] : [];
       }),
     );
-    setRevision((value) => value + 1);
+    bump(change.scopeId);
     setStatus(
       change.action === 'delete'
         ? t('ゴミ箱に移動', 'Moved to trash')
@@ -1206,14 +1517,6 @@ function App() {
   const stagePanel = usePanelRef();
   const dockPanel = usePanelRef();
   const [stageHidden, setStageHidden] = useState(false);
-  if (startup)
-    return (
-      <Startup
-        spaces={spaces}
-        refresh={refreshSpaces}
-        onOpen={(profile) => void openWorkspace(profile)}
-      />
-    );
   // A run, a send, queued work or a connection holds what changes the brain on show.
   // Your AI's run holds the brains handed to it as a brain's own run holds it.
   const heldHere = !!active && heldByYou(active.scopeId);
@@ -1235,10 +1538,6 @@ function App() {
       : undefined;
   // The note's own controls show while the note is what the stage shows.
   const onNote = !!doc && view === 'note';
-  const instructionFile = (agentId: AgentId) =>
-    (agentId === 'claude' ? ['CLAUDE.md', 'AGENTS.md'] : ['AGENTS.md']).find((name) =>
-      roots?.entries.some((entry) => entry.path === name),
-    );
   /** Opens the dock; with an owner, its first column shows that agent. */
   function openDock(owner?: ColumnOwner) {
     setPanel(true);
@@ -1279,34 +1578,236 @@ function App() {
     setSources(({ [column.id]: _, ...rest }) => rest);
     setColumnStatus(({ [column.id]: _, ...rest }) => rest);
   }
-  const dockShared: DockShared = {
-    infos,
-    spaces,
-    doc,
-    docLayer,
-    personLineCount,
-    gitBusy,
-    connecting,
-    external: !!external,
-    runningConversations,
-    conversationWaiting,
-    draining,
-    save,
-    launch,
-    addRun,
-    resetRequests,
-    display,
-    report,
-    reload,
-    queueSignal,
-    tabRevision,
-  };
   // Another brain's hibachi agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
     if (!workspaceSpaces.length) return;
     goToLevel('overview');
   }
+  // The rail, the brain panel, the status bar and the dock's columns are memoised, so
+  // a keystroke in the editor re-renders none of them. They take their actions under
+  // identities that never change; each still does what the latest render's would.
+  const act = useStableFunctions({
+    report,
+    save,
+    launch,
+    addRun,
+    resetRequests,
+    display,
+    leaveWorkspace,
+    showOverview,
+    showRoutines: () => goToLevel('routines'),
+    enterBrain: (space: Space) => void enterBrain(space),
+    openAdd: () => setAdd(true),
+    searchFromRail: () => {
+      setSearchAll(level === 'overview' || level === 'routines');
+      setSearchOpen(true);
+    },
+    searchHere: () => {
+      setSearchAll(false);
+      setSearchOpen(true);
+    },
+    saveGroups: (groups: HibachiGroup[]) => {
+      if (!workspace) return;
+      const before = workspace;
+      setWorkspace({ ...workspace, groups });
+      void host
+        .saveWorkspaceGroups(workspace.id, groups)
+        .then(setWorkspace)
+        .catch((error) => {
+          setWorkspace(before);
+          report(error);
+        });
+    },
+    changeBrainMode: (next: BrainMode) => {
+      if (next === 'files') {
+        setBrainMode('files');
+        setGitReview(false);
+      } else
+        void save().then((saved) => {
+          if (saved) setBrainMode('changes');
+        });
+    },
+    openEntry: (space: Space, entry: Entry) => void open(space, entry),
+    refreshBrain: () => bump(active?.scopeId),
+    showHome: () => setView('home'),
+    openDaily,
+    newNoteHere: () => {
+      if (active) newNoteIn(active);
+    },
+    showGraph: () => setView('graph'),
+    connectHere: () => {
+      if (active) showConnections(active);
+    },
+    openTrash: () => {
+      void save().then((saved) => {
+        if (saved) setTrashOpen(true);
+      });
+    },
+    openMaterials,
+    openBrainSettings: () => setBrainSettings(true),
+    createIn: (space: Space, entry: Entry) => {
+      setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
+      setNewNote(true);
+    },
+    entryAction: (space: Space, entry: Entry, action: EntryAction) =>
+      setEntryAction({ space, entry, action }),
+    selectSchema: (target: SchemaTarget) => {
+      if (!active) return;
+      const scopeId = active.scopeId;
+      // The note being edited is saved first, as before the graph or materials.
+      void save().then((saved) => {
+        if (!saved) return;
+        setSchemaTarget({ ...target, scopeId });
+        setView('schema');
+      });
+    },
+    openSchemaFile: (entry: Entry) => {
+      if (active) void open(active, entry);
+    },
+    gitBeforeAction: async () => {
+      if (brainLocked) {
+        report(t('実行中は Git を操作できません。', "Can't operate Git while running."));
+        return false;
+      }
+      return save();
+    },
+    gitChanged: () => {
+      bump(active?.scopeId);
+      void reconcile();
+    },
+    setGitReview,
+    setGitBusy,
+    showAi: () => {
+      if (othersActive) showOverview();
+      else {
+        goToLevel('brain');
+        openDock();
+      }
+    },
+    toggleTerminal: () => setTerminalSpace((value) => (value ? undefined : active)),
+    toggleStage,
+    chooseHibachi,
+    environmentRestored,
+    chooseYour,
+    remember,
+    newConversation,
+    showConversation,
+    closeTab,
+    splitColumn,
+    closeColumn,
+    createYou: async () => {
+      await host.createYourAi();
+      setYouRevision((value) => value + 1);
+    },
+    setShown,
+    setTabs,
+    setSources,
+    setColumns,
+    setModelChoice,
+    setAccessChoice,
+    setYourAccessSelection,
+    setColumnStatus,
+    setHanded,
+  });
+  const hidden = level !== 'brain';
+  const dockShared = useMemo<DockShared>(
+    () => ({
+      infos,
+      spaces,
+      doc,
+      docLayer,
+      personLineCount,
+      gitBusy,
+      connecting,
+      external: !!external,
+      runningConversations,
+      conversationWaiting,
+      draining,
+      save: act.save,
+      launch: act.launch,
+      addRun: act.addRun,
+      resetRequests: act.resetRequests,
+      display: act.display,
+      report: act.report,
+      reload,
+      queueSignal,
+      tabRevisions,
+      hidden,
+    }),
+    [
+      infos,
+      spaces,
+      doc,
+      docLayer,
+      personLineCount,
+      gitBusy,
+      connecting,
+      external,
+      runningConversations,
+      conversationWaiting,
+      act,
+      reload,
+      queueSignal,
+      tabRevisions,
+      hidden,
+    ],
+  );
+  // What the rail shows of each brain's AI; the same function while nothing changed.
+  const aiState = useMemo(
+    () =>
+      (scopeId: string): BrainAiState =>
+        waitingScopes.includes(scopeId)
+          ? 'waiting'
+          : runningScopes.includes(scopeId) || heldByYou(scopeId)
+            ? 'running'
+            : 'idle',
+    [waitingScopes, runningScopes, yourAiRunning, handed, workspace?.scopeIds],
+  );
+  const settings = useMemo(
+    () => (
+      <Settings
+        hibachiAgent={hibachiAgent}
+        onHibachiAgent={act.chooseHibachi}
+        onRestored={act.environmentRestored}
+        onSchema={() => setSchemaOpen(true)}
+        onError={act.report}
+      />
+    ),
+    [hibachiAgent, act, language],
+  );
+  const schemaSelected =
+    view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
+  const schemaList = useMemo(
+    () =>
+      hibachiAgent && active ? (
+        <SchemaList
+          scopeId={active.scopeId}
+          space={active}
+          revision={revision}
+          selected={schemaSelected}
+          locked={brainLocked || gitBusy}
+          onSelect={act.selectSchema}
+          onOpenFile={act.openSchemaFile}
+        />
+      ) : undefined,
+    [hibachiAgent, active, revision, schemaSelected, brainLocked, gitBusy, act, language],
+  );
+  const gitPanel = useMemo(
+    () =>
+      active && (
+        <GitPanel
+          space={active}
+          detailTarget={gitDetailTarget}
+          onReviewChange={act.setGitReview}
+          onBusyChange={act.setGitBusy}
+          revision={revision}
+          beforeAction={act.gitBeforeAction}
+          onChanged={act.gitChanged}
+        />
+      ),
+    [active, gitDetailTarget, revision, act, language],
+  );
   /** Shows a brain, from the rail or the Overview: its note, or its hibachi agent. */
   async function enterBrain(
     space: Space,
@@ -1348,6 +1849,14 @@ function App() {
       if (saved) setView('records');
     });
   }
+  if (startup)
+    return (
+      <Startup
+        spaces={spaces}
+        refresh={refreshSpaces}
+        onOpen={(profile) => void openWorkspace(profile)}
+      />
+    );
   return (
     <div
       className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}
@@ -1366,37 +1875,15 @@ function App() {
           homeDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
           addDisabled={anyRunning || dirty || connecting}
           searchDisabled={!workspaceSpaces.length || connecting}
-          onHome={leaveWorkspace}
-          onOverview={showOverview}
-          onRoutines={() => goToLevel('routines')}
-          onSelect={(space) => void enterBrain(space)}
-          onAdd={() => setAdd(true)}
-          onSearch={() => {
-            setSearchAll(level === 'overview' || level === 'routines');
-            setSearchOpen(true);
-          }}
-          groups={workspace?.groups ?? []}
-          onGroups={(groups) => {
-            if (!workspace) return;
-            const before = workspace;
-            setWorkspace({ ...workspace, groups });
-            void host
-              .saveWorkspaceGroups(workspace.id, groups)
-              .then(setWorkspace)
-              .catch((error) => {
-                setWorkspace(before);
-                report(error);
-              });
-          }}
-          settings={
-            <Settings
-              hibachiAgent={hibachiAgent}
-              onHibachiAgent={chooseHibachi}
-              onRestored={environmentRestored}
-              onSchema={() => setSchemaOpen(true)}
-              onError={report}
-            />
-          }
+          onHome={act.leaveWorkspace}
+          onOverview={act.showOverview}
+          onRoutines={act.showRoutines}
+          onSelect={act.enterBrain}
+          onAdd={act.openAdd}
+          onSearch={act.searchFromRail}
+          groups={workspace?.groups ?? noGroups}
+          onGroups={act.saveGroups}
+          settings={settings}
         />
         {(level === 'overview' || level === 'routines' || scene?.leaving === 'overview') &&
           workspace && (
@@ -1412,7 +1899,7 @@ function App() {
               workspace={workspace}
               spaces={workspaceSpaces}
               view={overviewView}
-              revision={revision}
+              revisions={revisions}
               addDisabled={anyRunning || dirty || connecting}
               agentFor={agentFor}
               hibachiAgent={hibachiAgent}
@@ -1491,7 +1978,7 @@ function App() {
             agent={yourChoice.agent}
             spaces={workspaceSpaces}
             running={yourAiRunning}
-            revision={revision}
+            revision={scopeRevision(revisions, you.id)}
             onBack={() => goToLevel('overview')}
             onAddSkills={async () => {
               try {
@@ -1516,15 +2003,7 @@ function App() {
                 space={active}
                 roots={roots}
                 mode={brainMode}
-                onModeChange={(next) => {
-                  if (next === 'files') {
-                    setBrainMode('files');
-                    setGitReview(false);
-                  } else
-                    void save().then((saved) => {
-                      if (saved) setBrainMode('changes');
-                    });
-                }}
+                onModeChange={act.changeBrainMode}
                 filesDisabled={gitBusy}
                 changesDisabled={brainLocked || gitBusy}
                 changes={gitRead.data?.available ? gitRead.data.changes.length : undefined}
@@ -1534,74 +2013,22 @@ function App() {
                 daily={!!notesDeclared?.daily}
                 dirty={dirty}
                 connections={connections}
-                onOpen={(space, entry) => void open(space, entry)}
-                onRefresh={() => setRevision((value) => value + 1)}
-                onHome={() => setView('home')}
-                onDaily={openDaily}
-                onNewNote={() => newNoteIn(active)}
-                onGraph={() => setView('graph')}
-                onConnect={() => showConnections(active)}
-                onTrash={() => {
-                  void save().then((saved) => {
-                    if (saved) setTrashOpen(true);
-                  });
-                }}
-                onMaterials={openMaterials}
-                onSettings={() => setBrainSettings(true)}
-                onSearch={() => {
-                  setSearchAll(false);
-                  setSearchOpen(true);
-                }}
-                onCreateIn={(space, entry) => {
-                  setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
-                  setNewNote(true);
-                }}
-                onEntryAction={(space, entry, action) => setEntryAction({ space, entry, action })}
-                schema={
-                  hibachiAgent ? (
-                    <SchemaList
-                      scopeId={active.scopeId}
-                      space={active}
-                      revision={revision}
-                      selected={
-                        view === 'schema' && schemaTarget?.scopeId === active.scopeId
-                          ? schemaTarget
-                          : undefined
-                      }
-                      locked={brainLocked || gitBusy}
-                      onSelect={(target) => {
-                        // The note being edited is saved first, as before the graph or materials.
-                        void save().then((saved) => {
-                          if (!saved) return;
-                          setSchemaTarget({ ...target, scopeId: active.scopeId });
-                          setView('schema');
-                        });
-                      }}
-                      onOpenFile={(entry) => void open(active, entry)}
-                    />
-                  ) : undefined
-                }
+                onOpen={act.openEntry}
+                onRefresh={act.refreshBrain}
+                onHome={act.showHome}
+                onDaily={act.openDaily}
+                onNewNote={act.newNoteHere}
+                onGraph={act.showGraph}
+                onConnect={act.connectHere}
+                onTrash={act.openTrash}
+                onMaterials={act.openMaterials}
+                onSettings={act.openBrainSettings}
+                onSearch={act.searchHere}
+                onCreateIn={act.createIn}
+                onEntryAction={act.entryAction}
+                schema={schemaList}
               >
-                <GitPanel
-                  space={active}
-                  detailTarget={gitDetailTarget}
-                  onReviewChange={setGitReview}
-                  onBusyChange={setGitBusy}
-                  revision={revision}
-                  beforeAction={async () => {
-                    if (brainLocked) {
-                      report(
-                        t('実行中は Git を操作できません。', "Can't operate Git while running."),
-                      );
-                      return false;
-                    }
-                    return save();
-                  }}
-                  onChanged={() => {
-                    setRevision((r) => r + 1);
-                    void reconcile();
-                  }}
-                />
+                {gitPanel}
               </BrainPanel>
             ) : (
               <section className="brain-panel brain-empty chrome">
@@ -1694,7 +2121,7 @@ function App() {
                         key={`${doc.scopeId}:${doc.path}`}
                         scopeId={doc.scopeId}
                         path={doc.path}
-                        revision={revision}
+                        revision={docRevision}
                         onOpen={async (hit) => {
                           const space = spaces.find((item) => item.scopeId === doc.scopeId);
                           const opened =
@@ -1735,7 +2162,7 @@ function App() {
                           key={`comments:${doc.scopeId}:${doc.path}`}
                           scopeId={doc.scopeId}
                           path={doc.path}
-                          revision={revision}
+                          revision={docRevision}
                           selection={() => editor.current?.selection()}
                           onReveal={(comment) =>
                             !!comment.quote &&
@@ -2130,7 +2557,7 @@ function App() {
                         onDaily={openDaily}
                         onNewNote={() => newNoteIn(active)}
                         onTerminal={() => setTerminalSpace((value) => value ?? active)}
-                        onRefresh={() => setRevision((value) => value + 1)}
+                        onRefresh={act.refreshBrain}
                         onGraph={() => setView('graph')}
                         onConnect={() => showConnections(active)}
                         onChanges={() => {
@@ -2234,21 +2661,6 @@ function App() {
                 >
                   {columns.map((column, index) => {
                     const owner = ownerOf(column);
-                    const irori = owner === 'irori';
-                    const scopeId = irori ? you?.id : active?.scopeId;
-                    const key = scopeId ? slot(column.id, scopeId) : '';
-                    const target = key ? shown[key] : undefined;
-                    const columnAgent =
-                      target?.agent ?? (irori ? yourChoice.agent : agentFor(active?.scopeId));
-                    const access = irori
-                      ? yourAccess
-                      : accessChoice[key]?.agent === columnAgent
-                        ? accessChoice[key].value
-                        : defaultAgentAccess(columnAgent);
-                    const rememberAgent = (next: AgentId) => {
-                      if (irori) chooseYour({ ...yourChoice, agent: next });
-                      else if (active) remember(active.scopeId, next);
-                    };
                     return [
                       index > 0 && (
                         <PaneSeparator
@@ -2263,110 +2675,30 @@ function App() {
                         className="dock-column-pane"
                         minSize={280}
                       >
-                        <AgentColumn
+                        <DockColumnView
                           key={`${column.id}:${owner}`}
-                          column={{ ...column, owner }}
-                          number={column.id === 'main' ? 1 : Number(column.id)}
+                          column={column}
+                          owner={owner}
+                          first={index === 0}
                           shared={dockShared}
-                          space={irori ? undefined : active}
+                          active={active}
                           you={you}
-                          brains={workspaceSpaces.map((space) => space.scopeId)}
-                          target={target}
-                          tabs={key ? tabsOf(key) : []}
-                          agent={columnAgent}
-                          model={
-                            irori
-                              ? yourChoice.models[columnAgent] || undefined
-                              : active && modelFor(active.scopeId, columnAgent)
-                          }
-                          access={access}
-                          skills={irori ? [] : composerSkills}
-                          skillsRetired={irori ? [] : skillsRetired}
-                          skillProblems={irori ? [] : skillProblems}
-                          instructionFile={irori ? undefined : instructionFile(columnAgent)}
-                          sources={sources[column.id] ?? []}
-                          ownerChoice={hibachiAgent}
-                          stage={
-                            index === 0 ? { hidden: stageHidden, onToggle: toggleStage } : undefined
-                          }
-                          onModel={(next) => {
-                            if (irori) {
-                              const models = { ...yourChoice.models };
-                              if (next) models[columnAgent] = next;
-                              else delete models[columnAgent];
-                              chooseYour({ ...yourChoice, models });
-                            } else if (active)
-                              setModelChoice((all) => ({
-                                ...all,
-                                [`${active.scopeId}:${columnAgent}`]: next,
-                              }));
-                          }}
-                          onAccess={(value) => {
-                            if (irori) setYourAccessSelection({ agent: columnAgent, value });
-                            else
-                              setAccessChoice((all) => ({
-                                ...all,
-                                [key]: { agent: columnAgent, value },
-                              }));
-                          }}
-                          onAgent={(next, replace) => {
-                            if (!scopeId) return;
-                            rememberAgent(next);
-                            // Another CLI is another conversation (ADR 017 D2).
-                            void newConversation(scopeId, key, next, replace).catch(report);
-                          }}
-                          onPick={(tab) => {
-                            if (!key) return;
-                            if (irori && column.id === 'main' && tab.agent !== yourChoice.agent)
-                              chooseYour({ ...yourChoice, agent: tab.agent });
-                            setShown((all) => (all[key] ? all : { ...all, [key]: tab }));
-                          }}
-                          onShow={(tab, replace) => {
-                            if (!key) return;
-                            rememberAgent(tab.agent);
-                            showConversation(key, tab.id, tab.agent, replace);
-                          }}
-                          onCloseTab={(id) => key && closeTab(key, id, rememberAgent)}
-                          onNew={async (replace) => {
-                            if (scopeId) await newConversation(scopeId, key, columnAgent, replace);
-                          }}
-                          onDeleted={(id) => {
-                            if (!key) return;
-                            setTabs((all) => ({
-                              ...all,
-                              [key]: (all[key] ?? []).filter((tab) => tab.id !== id),
-                            }));
-                            // The column shows the owner's next conversation, or a new one.
-                            if (shown[key]?.id === id) setShown(({ [key]: _, ...rest }) => rest);
-                          }}
-                          onSources={(update) =>
-                            setSources((all) => ({
-                              ...all,
-                              [column.id]: update(all[column.id] ?? []),
-                            }))
-                          }
-                          onOwner={(next) =>
-                            setColumns((all) =>
-                              all.map((item) =>
-                                item.id === column.id ? { ...item, owner: next } : item,
-                              ),
-                            )
-                          }
-                          onSplit={() => splitColumn({ ...column, owner })}
-                          onClose={() => closeColumn(column)}
-                          onStatus={(status) =>
-                            setColumnStatus((all) =>
-                              all[column.id]?.sending === status.sending &&
-                              all[column.id]?.queued === status.queued
-                                ? all
-                                : { ...all, [column.id]: status },
-                            )
-                          }
-                          onCreateYou={async () => {
-                            await host.createYourAi();
-                            setYouRevision((value) => value + 1);
-                          }}
-                          onStarted={setHanded}
+                          shown={shown}
+                          tabs={tabs}
+                          agentChoice={agentChoice}
+                          yourChoice={yourChoice}
+                          yourAccess={yourAccess}
+                          accessChoice={accessChoice}
+                          modelChoice={modelChoice}
+                          skills={composerSkills}
+                          skillsRetired={skillsRetired}
+                          skillProblems={skillProblems}
+                          roots={roots}
+                          sources={sources[column.id] ?? noSources}
+                          hibachiAgent={hibachiAgent}
+                          stageHidden={stageHidden}
+                          workspaceScopeIds={workspaceScopeIds}
+                          act={act}
                         />
                       </Pane>,
                     ];
@@ -2387,15 +2719,9 @@ function App() {
         workspaceDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
         terminalOpen={!!terminalSpace}
         terminalDisabled={!active && !terminalSpace}
-        onWorkspace={leaveWorkspace}
-        onAi={() => {
-          if (othersActive) showOverview();
-          else {
-            goToLevel('brain');
-            openDock();
-          }
-        }}
-        onTerminal={() => setTerminalSpace((value) => (value ? undefined : active))}
+        onWorkspace={act.leaveWorkspace}
+        onAi={act.showAi}
+        onTerminal={act.toggleTerminal}
       />
       {connectionsOpen && connectionTarget && (
         <Connections
@@ -2404,7 +2730,7 @@ function App() {
           running={running}
           onClose={() => {
             setConnectionsOpen(false);
-            setRevision((v) => v + 1);
+            bump(connectionTarget.scopeId);
           }}
         />
       )}
@@ -2437,7 +2763,7 @@ function App() {
               }
               updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
               setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
-              setRevision((value) => value + 1);
+              bump();
               setStatus(t('hibachi を削除しました。', 'Removed the hibachi.'));
             })().catch(report);
           }}
@@ -2471,7 +2797,7 @@ function App() {
                   .then((doc) => show(doc))
                   .catch(report);
             }
-            if (renamed.length) setRevision((v) => v + 1);
+            if (renamed.length) bump(next.scopeId);
           }}
         />
       )}
@@ -2514,7 +2840,8 @@ function App() {
                 all.filter((ref) => ref.scopeId !== previous.scopeId || ref.path !== previous.path),
               );
             }
-            setRevision((value) => value + 1);
+            bump(previous.scopeId);
+            if (next && next.scopeId !== previous.scopeId) bump(next.scopeId);
             setStatus(
               notice ??
                 (next
@@ -2528,7 +2855,8 @@ function App() {
         <SchemaDialog
           you={you}
           spaces={hibachiAgent ? workspaceSpaces : []}
-          revision={revision + youRevision}
+          // It shows the shared Schema, the irori agent's and every hibachi's: a change in any of them.
+          revision={anyRevision(revisions) + youRevision}
           locked={(scopeId) =>
             connecting ||
             (scopeId === you?.id
@@ -2614,7 +2942,7 @@ function App() {
                     show(d);
                     closeNewNote();
                     setNoteName('');
-                    setRevision((r) => r + 1);
+                    bump(d.scopeId);
                   })
                   .catch(report)
                   .finally(() => setCreatingNote(false));
@@ -2686,7 +3014,7 @@ function App() {
             setTrashOpen(false);
             show(next);
             setStatus(notice ?? t('復元しました。', 'Restored.'));
-            setRevision((value) => value + 1);
+            bump(next.scopeId);
           }}
         />
       )}

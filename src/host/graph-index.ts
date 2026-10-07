@@ -51,13 +51,22 @@ interface Built {
  */
 export class GraphIndexService {
   private readonly remembered = new Map<string, Map<string, Remembered>>();
+  private readonly statuses = new Map<string, Promise<GraphIndexStatus>>();
+  private readonly building = new Map<string, Promise<Built>>();
   constructor(
     private readonly files: FileService,
     private readonly search: SearchService,
   ) {}
 
   /** Whether the module matches the pages now, and what an update would change. Writes nothing. */
-  async status(scopeId: string): Promise<GraphIndexStatus> {
+  status(scopeId: string): Promise<GraphIndexStatus> {
+    const pending = this.statuses.get(scopeId);
+    if (pending) return pending;
+    const next = this.readStatus(scopeId).finally(() => this.statuses.delete(scopeId));
+    this.statuses.set(scopeId, next);
+    return next;
+  }
+  private async readStatus(scopeId: string): Promise<GraphIndexStatus> {
     if ((await readDeclaration(this.files, scopeId)) !== null) return declaredGraphIndex;
     return this.compare(scopeId, await this.build(scopeId));
   }
@@ -71,7 +80,7 @@ export class GraphIndexService {
           'This KB declares its view in .irori/ontology.json, so no graph index is generated.',
         ),
       );
-    const built = await this.build(scopeId);
+    const built = await this.build(scopeId, true);
     const graphIndexFiles = this.at(scopeId).files;
     const written: string[] = [];
     const keys = ['entities', 'relations', 'index'] as const;
@@ -112,7 +121,18 @@ export class GraphIndexService {
     };
   }
 
-  private async build(scopeId: string): Promise<Built> {
+  private build(scopeId: string, fresh = false): Promise<Built> {
+    const pending = this.building.get(scopeId);
+    if (pending) {
+      if (!fresh) return pending;
+      // An explicit update must include edits made since the older walk began.
+      return pending.catch(() => {}).then(() => this.build(scopeId, true));
+    }
+    const next = this.readPages(scopeId).finally(() => this.building.delete(scopeId));
+    this.building.set(scopeId, next);
+    return next;
+  }
+  private async readPages(scopeId: string): Promise<Built> {
     const previous = this.remembered.get(scopeId) ?? new Map<string, Remembered>();
     const next = new Map<string, Remembered>();
     const pages: PageFacts[] = [];

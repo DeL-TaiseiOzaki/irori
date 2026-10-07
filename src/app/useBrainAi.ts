@@ -6,7 +6,7 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
-import { requestEnded } from './AgentLog';
+import { requestEnded } from '../domain/agent-log';
 import { errorText } from './ErrorMessage';
 
 const host = window.irori;

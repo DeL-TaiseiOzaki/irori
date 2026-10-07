@@ -79,6 +79,15 @@ export class GitService {
   private queues = new Map<string, Promise<unknown>>();
   private pending = 0;
   private fetched = new Map<string, string>();
+  private statuses = new Map<
+    string,
+    { result: Promise<GitStatus>; started: boolean; followup: boolean }
+  >();
+  private mutationRefreshes = new Map<string, { root: string; target: GitTarget }>();
+  private closing = false;
+  private revisions = new Map<string, number>();
+  private noting = new Map<string, Promise<Set<string>>>();
+  private notedCache = new Map<string, { revision: string; keys: Set<string> }>();
   constructor(
     private files: FileService,
     private canMutate: () => boolean = () => true,
@@ -234,6 +243,7 @@ export class GitService {
       );
     // A hibachi's submodules queue with it: committing one moves what the hibachi records.
     const key = this.files.get(gitScope(id)).root;
+    this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
     this.pending++;
     const next = (this.queues.get(key) ?? Promise.resolve())
       .catch(() => {})
@@ -244,8 +254,16 @@ export class GitService {
       });
     this.queues.set(key, next);
     return next.finally(() => {
+      this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
       this.pending--;
-      if (this.queues.get(key) === next) this.queues.delete(key);
+      if (this.queues.get(key) === next) {
+        this.queues.delete(key);
+        for (const [statusKey, refresh] of this.mutationRefreshes) {
+          if (refresh.root !== key) continue;
+          this.mutationRefreshes.delete(statusKey);
+          if (!this.closing) void this.status(refresh.target).catch(() => {});
+        }
+      }
     });
   }
   private validateName(p: string) {
@@ -344,6 +362,17 @@ export class GitService {
    * the file as that commit had it, so each noted commit's version is read.
    */
   async noted(id: string, notePath: string): Promise<Set<string>> {
+    const root = this.files.get(id).root;
+    const key = JSON.stringify([root, notePath]);
+    const pending = this.noting.get(key);
+    if (pending) return pending.then((keys) => new Set(keys));
+    // Attestation calls back here from inside commit; it cannot wait on the
+    // mutation queue. readNoted checks the history refs before publishing.
+    const next = this.readNoted(id, notePath, key).finally(() => this.noting.delete(key));
+    this.noting.set(key, next);
+    return next.then((keys) => new Set(keys));
+  }
+  private async readNoted(id: string, notePath: string, key: string): Promise<Set<string>> {
     this.validateName(notePath);
     // A note inside a submodule has its history, and its notes, in that repository.
     const hibachi = main(this.files.get(id));
@@ -352,6 +381,22 @@ export class GitService {
     );
     const s = await this.repo(repository ? { scopeId: id, repository } : id);
     const p = notePath.slice(s.prefix.length);
+    for (;;) {
+      // Authorship notes can move without HEAD moving, including a notes-only fetch.
+      const [head, notes] = await Promise.all([this.ref(s, 'HEAD'), this.ref(s, notesRef)]);
+      const revision = JSON.stringify([s.root, p, head, notes]);
+      const cached = this.notedCache.get(key);
+      if (cached?.revision === revision) return cached.keys;
+      const keys = await this.notedAt(s, p, head);
+      const after = await Promise.all([this.ref(s, 'HEAD'), this.ref(s, notesRef)]);
+      if (head !== after[0] || notes !== after[1]) continue;
+      this.notedCache.delete(key);
+      this.notedCache.set(key, { revision, keys });
+      if (this.notedCache.size > 200) this.notedCache.delete(this.notedCache.keys().next().value!);
+      return keys;
+    }
+  }
+  private async notedAt(s: Repo, p: string, head: string): Promise<Set<string>> {
     const found = new Set<string>();
     const records = (
       await this.optional(s, [
@@ -366,7 +411,7 @@ export class GitService {
         `--notes=${notesRef}`,
         '--format=%H%x00%N',
         '--max-count=50',
-        'HEAD',
+        head || 'HEAD',
         '--',
         literal(p),
       ])
@@ -594,7 +639,43 @@ export class GitService {
     return { value, identity: JSON.stringify([value, url, pushes]) };
   }
   async status(id: GitTarget): Promise<GitStatus> {
-    this.files.get(gitScope(id));
+    const root = this.files.get(gitScope(id)).root;
+    const key = JSON.stringify([root, gitRepository(id)]);
+    const pending = this.statuses.get(key);
+    if (pending) {
+      // Each pass coalesces its arrivals into one queued follow-up. An edit
+      // arriving during a follow-up still needs a subsequent fresh snapshot.
+      if (pending.started) pending.followup = true;
+      return pending.result;
+    }
+    const state = { result: undefined! as Promise<GitStatus>, started: false, followup: false };
+    const next = (async () => {
+      await Promise.resolve();
+      for (;;) {
+        state.followup = false;
+        const revision = this.revisions.get(root);
+        if (this.queues.has(root)) this.mutationRefreshes.set(key, { root, target: id });
+        state.started = true;
+        const repeat = () => {
+          const mutating = this.queues.has(root);
+          // Keep reads responsive during network writes. Their completion queues
+          // one refresh after the last mutation; mutation results use snapshot directly.
+          if (mutating) this.mutationRefreshes.set(key, { root, target: id });
+          return state.followup || (!mutating && revision !== this.revisions.get(root));
+        };
+        try {
+          const result = await this.readStatus(id);
+          if (!repeat()) return result;
+        } catch (error) {
+          if (!repeat()) throw error;
+        }
+      }
+    })().finally(() => this.statuses.delete(key));
+    state.result = next;
+    this.statuses.set(key, state);
+    return next;
+  }
+  private async readStatus(id: GitTarget): Promise<GitStatus> {
     let s: Repo;
     try {
       s = await this.repo(id);
@@ -1650,7 +1731,7 @@ export class GitService {
       async (s) => s,
       async () => {
         const s = main(this.files.get(id));
-        const status = await this.status(id);
+        const status = await this.readStatus(id);
         if (!status.initializable)
           throw Error(
             t(
@@ -1718,6 +1799,7 @@ export class GitService {
     });
   }
   async close() {
+    this.closing = true;
     await Promise.allSettled(this.queues.values());
     await this.process.close();
     await this.github.close();

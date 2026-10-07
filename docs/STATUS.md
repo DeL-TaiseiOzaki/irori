@@ -1,5 +1,41 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Long sessions stay light, 2026-10-07 (**0.1.81**): an audit of what grows with
+long CLI-agent use found the load in three places, and each was fixed and then
+reviewed by another model.
+- Agents (`src/agents`): a conversation is read from the end of
+  `events.jsonl`, with lines before the window counted by shape and cached;
+  streamed text is coalesced for 32 ms in the main process and flushed before
+  any other event and a run's end; Codex `item/started` details omit output and
+  diffs; `killTree` signals the group and the descendants listed first, waits up
+  to 2.5 s and SIGKILLs only processes whose start time is unchanged; launched
+  children are killed on `process.on('exit')`; `--version` answers are cached
+  per executable. History is still never trimmed, and the first open of a long
+  conversation scans its bytes once per session.
+- Host (`src/host`, `src/git`, `src/knowledge`): Git status and authorship
+  reads are coalesced per repository (status no longer waits for mutations and
+  rereads after them); at most four local and two network Git commands run at
+  once; backlinks read only candidate notes from the search index (index
+  version 2 rebuilds older caches) and reuse an unchanged result; search,
+  backlinks and references no longer cancel each other; graph index checks are
+  coalesced; knowledge history caches its records. The watcher ignores tool and
+  cache folders and nested hibachis, and restarts only the affected watchers.
+- Renderer: log items are keyed by event identity, streamed events apply once
+  per frame and a reply still arriving re-parses its Markdown at most every
+  150 ms; typing no longer re-renders the dock, rail, status bar or brain
+  panel; hidden islands and windows defer work; polls skip unchanged data and
+  pause while hidden; file events refresh only their hibachi (a run's end still
+  refreshes all); events arriving during a snapshot read are merged into it.
+- Verified: `npm run build`, `npm run format:check`, `npm test` and all 29 UI
+  suites under `xvfb-run`, each run alone (`conversations-ui-smoke` keeps an
+  opened step mounted while the 400-event window slides; `git-ui-smoke` checks
+  that another hibachi's file event refreshes nothing). Not verified: the effect
+  measured on a real long session, real CLIs, Windows and macOS.
+- Each hibachi's CLI choice now survives a reload of the window
+  (`sessionStorage`): a reload stops the runs it started, and once the stop no
+  longer waited a fixed 300 ms the column fell back to the default CLI and an
+  empty conversation (seen only in CI's `harness-ui-smoke`).
+
 Published 2026-10-07: **0.1.80** ([#183](https://github.com/DeL-TaiseiOzaki/irori/pull/183),
 a shared Schema for every agent, set from the settings, [ADR 027](decisions/027-shared-schema.md))
 merged at the owner's request as `4f011e5` and is published as

@@ -32,6 +32,7 @@ import { iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
+import { Tail } from './tail';
 import type { FileService } from '../host/files';
 import type { SessionBinding } from './sessions';
 import { ConversationStore, rootDigest, viewDetails, type Placement } from './conversations';
@@ -111,6 +112,10 @@ type Run = {
   recorded?: boolean;
   /** The id streamed text keeps until another kind of event comes. */
   textId?: string;
+  /** Streamed text not yet sent to the views or the history, and when it will be. */
+  pendingText?: { id: string; text: string; timer: NodeJS.Timeout };
+  /** The run's history is complete: text that still arrives is not part of it. */
+  ended?: boolean;
   /** The agent said or did something in this run: a failure is not the resume's. */
   progressed?: boolean;
   /** The hibachis this run's hand-offs reached. */
@@ -138,6 +143,25 @@ type Run = {
   closed: Promise<void>;
   close: () => void;
 };
+/** Deltas of a streamed reply are sent together after at most this long, not one by one. */
+const textWindow = 32;
+/** What a hand-off's or a step's report keeps of the words it collects. */
+const reportLimit = 100000;
+/**
+ * What `item/started` keeps of a Codex item: the call without any output, which
+ * `item/completed` brings in full, so a diff or a command's output is stored once.
+ */
+export function itemStart(item: Record<string, unknown>) {
+  const outputs = ['aggregatedOutput', 'formattedOutput', 'output', 'result', 'error'];
+  const without = (value: Record<string, unknown>, keys: string[]) =>
+    Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
+  const rest = without(item, outputs);
+  if (Array.isArray(rest.changes))
+    rest.changes = rest.changes.map((change) =>
+      change && typeof change === 'object' ? without(change, ['diff']) : change,
+    );
+  return rest;
+}
 export class AgentService {
   // Runs by id: one per conversation, and an owner's conversations run side by
   // side in its checkout, as Claudian's tabs do in one vault (ADR 020).
@@ -353,7 +377,9 @@ export class AgentService {
     await this.runs.get(id)!.accepted;
     return id;
   }
+  /** Sends and writes what every run has streamed so far, then writes the histories. */
   flush() {
+    for (const run of this.runs.values()) this.flushText(run);
     return this.conversations.flush();
   }
   /** The models the installed CLI offers, read once per CLI version. */
@@ -455,9 +481,30 @@ export class AgentService {
   }
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
     if (type === 'text' || type === 'tool') run.progressed = true;
-    const event = this.publish(run, type, text, extra);
-    this.record(run, event);
-    return event;
+    // A reply's deltas go to the views and the history a few at a time, in one
+    // piece per window; any other event of the run goes after what came before it.
+    if (type === 'text' && !Object.keys(extra).length) {
+      if (run.ended) return;
+      if (run.pendingText) {
+        run.pendingText.text += text;
+        return;
+      }
+      run.pendingText = {
+        id: (run.textId ??= randomUUID()),
+        text,
+        timer: setTimeout(() => this.flushText(run), textWindow),
+      };
+      return;
+    }
+    this.record(run, this.publish(run, type, text, extra));
+  }
+  /** Sends and records the text a run has streamed since its last event. */
+  private flushText(run: Run) {
+    const pending = run.pendingText;
+    if (!pending) return;
+    run.pendingText = undefined;
+    clearTimeout(pending.timer);
+    this.record(run, this.publish(run, 'text', pending.text, { id: pending.id }));
   }
   private record(run: Run, event: AgentEvent) {
     if (!run.recorded || !run.conversationId) return;
@@ -487,6 +534,7 @@ export class AgentService {
     text: string,
     extra: Partial<AgentEvent> = {},
   ) {
+    if (type !== 'text') this.flushText(run);
     const id = extra.id ?? (type === 'text' ? (run.textId ??= randomUUID()) : randomUUID());
     if (type !== 'text') run.textId = undefined;
     const event: AgentEvent = {
@@ -588,23 +636,27 @@ export class AgentService {
   ): { runId: string; conversationId: string; done: Promise<StepEnd> } {
     const runId = this.start(input, undefined, undefined, step);
     const conversationId = this.runs.get(runId)!.conversationId!;
-    let report = '';
+    const report = new Tail(reportLimit);
     let after = true;
     const errors: string[] = [];
     const done = new Promise<StepEnd>((resolve) => {
       // Registered before the run's first event, which waits for the next tick.
       this.watchers.set(runId, (event) => {
         if (event.type === 'text') {
-          if (after) report = '';
+          if (after) report.clear();
           after = false;
-          report = (report + event.text).slice(-100000);
+          report.add(event.text);
           return;
         }
         after = true;
         if (event.type === 'error') errors.push(event.text);
         if (event.type !== 'done') return;
         this.watchers.delete(runId);
-        resolve({ outcome: event.outcome ?? 'failed', report, error: errors.at(-1) });
+        resolve({
+          outcome: event.outcome ?? 'failed',
+          report: report.toString(),
+          error: errors.at(-1),
+        });
       });
     });
     return { runId, conversationId, done };
@@ -982,12 +1034,18 @@ export class AgentService {
         }
       }
     } finally {
+      // The reply's last words go before the run's end, in the views and the history alike.
+      this.flushText(run);
       this.denyRequests(run);
       await this.cancelHeld(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();
       run.commands?.();
       run.rpc?.fail(Error('Run finished'));
+      // Words the CLI wrote while being stopped arrived after the flush above; with
+      // the process gone and its stream closed, these are the last.
+      this.flushText(run);
+      run.ended = true;
       if (run.cancelled) outcome = 'cancelled';
       if (record)
         await this.knowledge.finish(record, outcome).catch(() => {
@@ -1067,7 +1125,7 @@ export class AgentService {
     const delegate = (state: Delegate['state']) => ({
       delegate: { scopeId: brain.scopeId, task: id, state },
     });
-    let words = '';
+    const words = new Tail(reportLimit);
     const errors: string[] = [];
     let finished!: (outcome: AgentEvent['outcome']) => void;
     const done = new Promise<AgentEvent['outcome']>((resolve) => {
@@ -1088,7 +1146,7 @@ export class AgentService {
     );
     // Registered before the run's first event, which waits for the next tick.
     this.watchers.set(runId, (event) => {
-      if (event.type === 'text') words = (words + event.text).slice(-100000);
+      if (event.type === 'text') words.add(event.text);
       else if (event.type === 'error') errors.push(event.text);
       else if (event.type === 'tool')
         this.event(holder, 'tool', event.text, {
@@ -1106,7 +1164,7 @@ export class AgentService {
     signal.addEventListener('abort', stop);
     try {
       const outcome = await done;
-      const report = words.trim();
+      const report = words.toString().trim();
       if (outcome === 'completed') {
         this.event(
           holder,
@@ -1146,10 +1204,8 @@ export class AgentService {
         resolve();
       };
     });
-    let stderr = '';
-    child.stderr!.on('data', (b) => {
-      stderr = (stderr + b).slice(-6000);
-    });
+    const stderr = new Tail(6000);
+    child.stderr!.on('data', (b) => stderr.add(String(b)));
     child.on('close', (code) => {
       if (!finished && !run.cancelled) failure = Error(`Codex exited (${code}): ${stderr}`);
       run.finish?.();
@@ -1172,7 +1228,9 @@ export class AgentService {
           p.item?.type !== 'userMessage'
         )
           this.event(run, 'tool', p.item?.type ?? 'tool', {
-            details: JSON.stringify(p.item),
+            details: JSON.stringify(
+              p.item && typeof p.item === 'object' ? itemStart(p.item) : p.item,
+            ),
             call: p.item?.id,
           });
         // A finished item carries its output: a command's, a tool's, the files changed.
@@ -1300,7 +1358,7 @@ export class AgentService {
     model?: string,
   ) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
-    let stderr = '';
+    const stderr = new Tail(6000);
     let sawResult = false;
     let streamed = false;
     const delegation = run.delegation;
@@ -1323,8 +1381,11 @@ export class AgentService {
       const task =
         agentTasks.get(agentId) ??
         (await new Promise<string | undefined>((resolve) => {
-          taskWaiters.set(agentId, resolve);
-          setTimeout(() => resolve(agentTasks.get(agentId)), 3000);
+          const timer = setTimeout(() => resolve(agentTasks.get(agentId)), 3000);
+          taskWaiters.set(agentId, (task) => {
+            clearTimeout(timer);
+            resolve(task);
+          });
         }));
       taskWaiters.delete(agentId);
       if (task && tasks.has(task)) return delegate(task, 'working');
@@ -1440,9 +1501,7 @@ export class AgentService {
         spawnClaudeCodeProcess: (options) => {
           const child = launch(options.command, options.args, options.cwd ?? cwd, options.env);
           run.child = child;
-          child.stderr!.on('data', (b) => {
-            stderr = (stderr + b).slice(-6000);
-          });
+          child.stderr!.on('data', (b) => stderr.add(String(b)));
           return child as ChildProcessWithoutNullStreams;
         },
         canUseTool: async (tool, input, options) => {

@@ -189,11 +189,101 @@ export function withRequests(conversation: Conversation) {
 
 /** Streamed text joins the reply it continues: the same event id, or the same run for older records. */
 export function appendConversationEvent(events: AgentEvent[], event: AgentEvent) {
-  const last = events.at(-1);
-  return event.type === 'text' &&
-    last?.type === 'text' &&
-    last.runId === event.runId &&
-    last.id === event.id
-    ? [...events.slice(0, -1), { ...last, text: last.text + event.text }]
-    : [...events, event];
+  return appendConversationEvents(events, [event]);
+}
+
+/** Appends a batch of events as `appendConversationEvent` would one by one, copying the list once. */
+export function appendConversationEvents(events: AgentEvent[], incoming: AgentEvent[]) {
+  if (!incoming.length) return events;
+  const next = events.slice();
+  for (const event of incoming) {
+    const last = next.at(-1);
+    if (
+      event.type === 'text' &&
+      last?.type === 'text' &&
+      last.runId === event.runId &&
+      last.id === event.id
+    )
+      next[next.length - 1] = { ...last, text: last.text + event.text };
+    else next.push(event);
+  }
+  return next;
+}
+
+/**
+ * Joins events that arrived while the host's snapshot was being read onto that
+ * snapshot, leaving out what it already holds: an event of the same id, and of a
+ * reply still arriving the fragments the snapshot's text already ends with. The
+ * host reads the history and then its native record before replying, so events
+ * published in between are in neither; nothing is lost and nothing shown twice.
+ */
+export function mergeHeldEvents(snapshot: AgentEvent[], held: AgentEvent[]) {
+  if (!held.length) return snapshot;
+  const known = new Set<string>();
+  for (const event of snapshot) if (event.id) known.add(event.id);
+  const last = snapshot.at(-1);
+  const fresh: AgentEvent[] = [];
+  for (const event of held) {
+    if (!event.id || !known.has(event.id)) {
+      fresh.push(event);
+      continue;
+    }
+    // Fragments continue only the newest reply; a reply another event followed is whole.
+    if (event.type !== 'text' || last?.type !== 'text' || last.id !== event.id) continue;
+    const included = coveredLength(last.text, event.text);
+    if (included < event.text.length) fresh.push({ ...event, text: event.text.slice(included) });
+  }
+  return appendConversationEvents(snapshot, fresh);
+}
+
+/** The longest prefix of `fragments` that `text` ends with: the fragments the text already took. */
+function coveredLength(text: string, fragments: string) {
+  const limit = Math.min(text.length, fragments.length);
+  if (!limit) return 0;
+  // The fragments' border table, run over the text's tail: linear in both, however long.
+  const pattern = fragments.slice(0, limit);
+  const border = new Int32Array(pattern.length);
+  for (let index = 1, length = 0; index < pattern.length; index++) {
+    while (length > 0 && pattern[index] !== pattern[length]) length = border[length - 1];
+    if (pattern[index] === pattern[length]) length++;
+    border[index] = length;
+  }
+  let matched = 0;
+  for (let index = text.length - limit; index < text.length; index++) {
+    while (matched > 0 && (matched === pattern.length || pattern[matched] !== text[index]))
+      matched = border[matched - 1];
+    if (pattern[matched] === text[index]) matched++;
+  }
+  return matched;
+}
+
+/** The events a column keeps on show once a conversation grows; older ones are counted, not shown. */
+export const viewWindow = 400;
+/** The most of the newest reply a column keeps; a longer one keeps its end. */
+export const viewTextLimit = 200000;
+
+/**
+ * Keeps the newest events and the end of the newest reply. A list within both
+ * limits is returned as it is, so nothing re-renders for a trim that did nothing.
+ */
+export function trimConversation(
+  events: AgentEvent[],
+  limit = viewWindow,
+  textLimit = viewTextLimit,
+): { events: AgentEvent[]; dropped: number } {
+  const dropped = Math.max(0, events.length - limit);
+  let next = dropped ? events.slice(dropped) : events;
+  const last = next.at(-1);
+  if (last && last.text.length > textLimit)
+    next = [...next.slice(0, -1), { ...last, text: last.text.slice(-textLimit) }];
+  return { events: next, dropped };
+}
+
+/**
+ * What identifies an event in a view while the window slides: its id, which a
+ * streamed reply keeps across its fragments. A record without one is named by
+ * its place, which an older record alone lacks.
+ */
+export function eventKey(event: AgentEvent, index: number) {
+  return event.id ? `${event.runId}:${event.id}` : `${event.runId}-${index}`;
 }

@@ -124,8 +124,18 @@ export function githubCredentialConfig(gh: string) {
 }
 
 type RunOptions = { input?: string; network?: boolean; codes?: number[]; inspection?: boolean };
+type ProcessSlots = {
+  limit: number;
+  running: number;
+  waiting: { owner: GitProcess; resolve: () => void; reject: (e: Error) => void }[];
+};
 
 export class GitProcess {
+  // Network operations can wait for 90 seconds. Separate global limits leave
+  // local status and repository inspection runnable throughout those waits.
+  private static local: ProcessSlots = { limit: 4, running: 0, waiting: [] };
+  private static network: ProcessSlots = { limit: 2, running: 0, waiting: [] };
+  private closed = false;
   private children = new Set<ChildProcess>();
   constructor(
     private command = 'git',
@@ -151,7 +161,29 @@ export class GitProcess {
       }
     }
   }
-  private once(cwd: string, args: string[], options: RunOptions) {
+  private acquire(slots: ProcessSlots) {
+    if (this.closed) return Promise.reject(Error('Git process is closed'));
+    if (slots.running < slots.limit) {
+      slots.running++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      slots.waiting.push({ owner: this, resolve, reject });
+    });
+  }
+  private async once(cwd: string, args: string[], options: RunOptions) {
+    const slots = options.network ? GitProcess.network : GitProcess.local;
+    await this.acquire(slots);
+    try {
+      if (this.closed) throw Error('Git process is closed');
+      return await this.execute(cwd, args, options);
+    } finally {
+      const next = slots.waiting.shift();
+      if (next) next.resolve();
+      else slots.running--;
+    }
+  }
+  private execute(cwd: string, args: string[], options: RunOptions) {
     const env = agentEnv();
     for (const key of Object.keys(env))
       if (
@@ -223,6 +255,13 @@ export class GitProcess {
     });
   }
   async close() {
+    this.closed = true;
+    for (const slots of [GitProcess.local, GitProcess.network])
+      slots.waiting = slots.waiting.filter((entry) => {
+        if (entry.owner !== this) return true;
+        entry.reject(Error('Git process is closed'));
+        return false;
+      });
     await Promise.all([...this.children].map(killTree));
   }
 }

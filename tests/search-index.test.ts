@@ -184,7 +184,7 @@ test('A file that is not a database, or from another schema version, is rebuilt'
   const rebuilt = new DatabaseSync(indexFile);
   assert.equal(
     (rebuilt.prepare('PRAGMA user_version').get() as { user_version: number }).user_version,
-    1,
+    2,
   );
   rebuilt.close();
   // Damage in a page only a query reads — the trigram index's own b-tree —
