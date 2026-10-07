@@ -40,18 +40,35 @@ async function checkUnrelatedFileEvent(
       ).unrelatedReadFixture;
       return { reads, declarations };
     });
-  try {
-    await app.evaluate(({ BrowserWindow }, scopeId) => {
-      BrowserWindow.getAllWindows()[0].webContents.send('irori:event', { type: 'files', scopeId });
-    }, otherScopeId);
-    // Declaration refresh proves the renderer received the file event. A file
-    // in another hibachi must not reread the whole document open in this one.
-    await expect.poll(async () => (await counts()).declarations).toBeGreaterThan(0);
-    expect((await counts()).reads).toBe(0);
-    await app.evaluate(({ BrowserWindow }, scopeId) => {
+  const send = (scopeId: string) =>
+    app.evaluate(({ BrowserWindow }, scopeId) => {
       BrowserWindow.getAllWindows()[0].webContents.send('irori:event', { type: 'files', scopeId });
     }, scopeId);
+  // The reads one event starts land at different times; wait until none arrive.
+  const settled = async () => {
+    let last = JSON.stringify(await counts());
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(500);
+      const now = JSON.stringify(await counts());
+      if (now === last) return JSON.parse(now) as { reads: number; declarations: number };
+      last = now;
+    }
+    throw Error(`File event reads did not settle: ${last}`);
+  };
+  try {
+    // What one event of this hibachi refreshes here.
+    await send(scopeId);
     await expect.poll(async () => (await counts()).reads).toBe(1);
+    const own = await settled();
+    expect(own.declarations).toBeGreaterThan(0);
+    // Events reach the renderer in the order they are sent, so the other
+    // hibachi's event has been handled once this hibachi's next event is.
+    await send(otherScopeId);
+    await send(scopeId);
+    await expect.poll(async () => (await counts()).reads).toBe(2);
+    // A file in another hibachi refreshes nothing here: neither the document
+    // open in this one nor its notes declaration.
+    expect((await settled()).declarations).toBe(own.declarations * 2);
   } finally {
     await app.evaluate(({ ipcMain }) => {
       const fixture = (
