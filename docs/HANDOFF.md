@@ -1,5 +1,20 @@
 # irori continuation handoff
 
+Published 2026-10-08: **0.1.87** ([#193](https://github.com/DeL-TaiseiOzaki/irori/pull/193),
+categories of your own and no category areas on the irori mode map,
+[ADR 029](decisions/029-free-categories.md)) merged at the owner's request as
+`f2af45e` together with irori-templete
+[#14](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/14) (ADR 007, `23ca9c4`),
+and is published as
+[v0.1.87-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.87-preview.1)
+by release run `37661573075` from main's successful CI run `37659921133`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,177,664 bytes,
+  Mac 141,801,562 bytes and `irori-0.1.87-full.nupkg` 175,345,006 bytes.
+  The website manifest now offers 0.1.87.
+- Owner checks remain: the installed Windows and Mac builds, and a real knowledge
+  base with a category of its own (0.1.86 and earlier cannot open it).
+
 Published 2026-10-08: **0.1.86** ([#192](https://github.com/DeL-TaiseiOzaki/irori/pull/192),
 generated folder indexes, [ADR 028](decisions/028-generated-indexes.md)) merged at
 the owner's request as `8d131b5` together with irori-templete
