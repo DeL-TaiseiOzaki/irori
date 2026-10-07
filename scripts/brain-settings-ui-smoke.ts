@@ -186,9 +186,31 @@ try {
   expect(
     JSON.parse(await readFile(path.join(roots[1], '.irori', 'scope.json'), 'utf8')).scopeId,
   ).toBe(research.scopeId);
+
+  // The start screen removes a hibachi without opening a workspace; its folder stays.
+  await app.close();
+  app = await launch();
+  page = await app.firstWindow();
+  page.on('pageerror', (error) => errors.push(String(error)));
+  const chip = page.locator('.start-chip').filter({ hasText: 'Product Lab' });
+  await chip.hover();
+  await chip.getByRole('button', { name: 'Product Lab を削除', exact: true }).click();
+  const startRemoval = page.getByRole('dialog', { name: 'Product Lab を削除' });
+  await expect(startRemoval).toBeVisible();
+  await expect(chip.getByRole('checkbox')).not.toBeChecked();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/irori-start-remove-hibachi.png' });
+  await startRemoval.getByRole('button', { name: '削除', exact: true }).click();
+  await expect(startRemoval).toHaveCount(0);
+  await expect(page.locator('.start-chip')).toHaveCount(0);
+  expect(JSON.parse(await readFile(path.join(files.dataDir, 'spaces.json'), 'utf8'))).toEqual([]);
+  expect(
+    JSON.parse(await readFile(path.join(files.dataDir, 'workspaces.json'), 'utf8'))[0].scopeIds,
+  ).toEqual([]);
+  expect((await scope()).scopeId).toBe(product.scopeId);
   expect(errors).toEqual([]);
   console.log(
-    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal.',
+    'Brain settings UI passed: name, no category, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal, removal from the start screen.',
   );
 } finally {
   await app.close();

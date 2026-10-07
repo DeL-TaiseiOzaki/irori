@@ -318,9 +318,33 @@
   color: var(--tx);
   box-shadow: inset 0 0 0 1.5px var(--solid);
 }
-.start-chip > span:last-child {
+.start-chip > span:last-of-type {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* Removing a hibachi from the library, shown on the chip being pointed at. */
+.start .start-chip-remove {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-right: -6px;
+  padding: 0;
+  border-radius: 7px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+.start-chip:hover .start-chip-remove,
+.start .start-chip-remove:focus-visible {
+  opacity: 1;
+}
+.start .start-chip-remove:hover:not(:disabled) {
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .start-chip small {
   display: block;
