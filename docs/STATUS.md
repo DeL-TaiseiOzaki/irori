@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-08: **0.1.86** ([#192](https://github.com/DeL-TaiseiOzaki/irori/pull/192),
+generated folder indexes, [ADR 028](decisions/028-generated-indexes.md)) merged at
+the owner's request as `8d131b5` together with irori-templete
+[#13](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/13) (one layout,
+ADR 006, `1b17e19`), and is published as
+[v0.1.86-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.86-preview.1)
+by release run `37647491306` from main's successful CI run `37645927734`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,174,080 bytes,
+  Mac 141,797,048 bytes and `irori-0.1.86-full.nupkg` 175,342,100 bytes.
+  The website manifest now offers 0.1.86.
+- The template's index rule and irori's generator were checked against each
+  other: a disposable knowledge base made from irori-templete `feat/one-layout`
+  gave byte-identical indexes from irori and from an independent implementation
+  of the rule, and a second update wrote nothing.
+- Owner checks remain: the installed Windows and Mac builds, a real knowledge
+  base from the template, and pulling a renamed layer on a second device.
+
 Generated folder indexes, 2026-10-07 (**0.1.86**, [ADR 028](decisions/028-generated-indexes.md),
 [#192](https://github.com/DeL-TaiseiOzaki/irori/pull/192)):
 the owner approved irori-templete's one layout (`journal/`, `wiki/`, `ontology/`)
