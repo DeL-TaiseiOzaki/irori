@@ -1860,6 +1860,9 @@ function App() {
       <Startup
         spaces={spaces}
         refresh={refreshSpaces}
+        hibachiAgent={hibachiAgent}
+        onHibachiAgent={act.chooseHibachi}
+        onRestored={act.environmentRestored}
         onOpen={(profile) => void openWorkspace(profile)}
       />
     );

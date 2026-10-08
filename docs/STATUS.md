@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Settings on the start screen, 2026-10-08 (**0.1.88**, [#196](https://github.com/DeL-TaiseiOzaki/irori/pull/196)): the owner noted that
+the settings, and with them **環境を保存** (ADR 026), could only be reached after
+opening a workspace, although the save covers every workspace on the device.
+- `Settings` takes `start`: the start screen's footer shows it as a **設定**
+  button beside the language switch, opening upward. There it leaves out Schema
+  (`onSchema` is optional and needs a workspace) and updates (the footer already
+  shows them).
+- `Startup` receives `hibachiAgent`, `onHibachiAgent` and `onRestored` from
+  `main.tsx`. Both the start screen's restore button and the settings' restore
+  call the window's `environmentRestored`, so a restored hibachi agent choice
+  reaches the window, then reload the workspace list.
+- `Settings` follows `useLanguage()`: the start screen's switch changes the
+  language beside the open settings, and their label had kept the old one.
+- `account-ui-smoke` saves from the start screen before opening a workspace and
+  finds the saved state in the rail's settings afterwards.
+
 Published 2026-10-08: **0.1.87** ([#193](https://github.com/DeL-TaiseiOzaki/irori/pull/193),
 categories of your own and no category areas on the irori mode map,
 [ADR 029](decisions/029-free-categories.md)) merged at the owner's request as

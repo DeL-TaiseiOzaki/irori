@@ -8,8 +8,9 @@ import { SettingsService } from '../src/host/settings';
 import { fakeGh, git, remote } from '../tests/fixtures/github';
 
 // The environment kept on the GitHub account (ADR 026): one device saves its
-// hibachis, workspaces and preferences from the settings, and a new device
-// restores them from the start screen. gh is a stand-in answering from a folder.
+// hibachis, workspaces and preferences from the start screen's settings, before
+// opening any workspace, and a new device restores them from the start screen.
+// gh is a stand-in answering from a folder.
 const base = await mkdtemp(path.join(tmpdir(), 'irori account UI '));
 const scope = {
   schemaVersion: 1,
@@ -69,9 +70,11 @@ let app = await launch(filesA.dataDir, homeA);
 try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
-  await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await page.getByRole('button', { name: /^設定/ }).click();
   const account = page.getByRole('region', { name: 'アカウント' });
+  // The start screen's settings leave out what needs a workspace or is already there.
+  await expect(page.locator('.settings-popover')).not.toContainText('Schema');
+  await expect(page.getByRole('region', { name: '更新' })).toHaveCount(0);
   await expect(account).toContainText('GitHub: octo');
   await expect(account).toContainText('環境は保存されていません');
   await expect(account.getByRole('button', { name: '復元' })).toHaveCount(0);
@@ -79,6 +82,11 @@ try {
   await expect(account.getByRole('status')).toHaveText('保存しました。');
   await expect(account).toContainText('環境を保存：');
   await page.screenshot({ path: 'test-results/irori-account-settings.png' });
+  await page.keyboard.press('Escape');
+  await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
+  await page.getByRole('button', { name: /^設定/ }).click();
+  await expect(account).toContainText('環境を保存：');
+  await expect(page.locator('.settings-popover')).toContainText('Schema');
   const saved = JSON.parse(await fake.stored());
   if (saved.hibachis[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
     throw Error(`Unexpected saved environment: ${JSON.stringify(saved)}`);
