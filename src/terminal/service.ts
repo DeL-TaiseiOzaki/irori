@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
 import treeKill from 'tree-kill';
 import type { IPty } from 'node-pty';
 import type { FileService } from '../host/files';
@@ -19,6 +20,8 @@ export class TerminalService {
   constructor(
     private files: FileService,
     private emit: (event: TerminalEvent) => void,
+    /** The irori agent's folder when `scopeId` is its id; a hibachi's id resolves through the files. */
+    private agentRoot: (scopeId: string) => string | undefined = () => undefined,
   ) {}
   get busy() {
     return this.running.size > 0 || this.queue.busy;
@@ -34,8 +37,17 @@ export class TerminalService {
         );
       const shell = (await this.available()).find((item) => item.id === shellId);
       if (!shell) throw Error(t('シェルが見つかりません。', 'Shell not found.'));
-      const space = await this.files.get(scopeId);
-      const cwd = await this.files.resolve(scopeId, '', true);
+      const own = this.agentRoot(scopeId);
+      const cwd = own
+        ? await fs.realpath(own).catch(() => {
+            throw Error(
+              t(
+                'irori agent のフォルダがまだありません。',
+                "The irori agent's folder doesn't exist yet.",
+              ),
+            );
+          })
+        : await this.files.resolve(scopeId, '', true);
       const env = agentEnv();
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.NODE_OPTIONS;
@@ -47,7 +59,7 @@ export class TerminalService {
         name: 'xterm-256color',
         env: env as Record<string, string>,
       });
-      const info = { id: randomUUID(), scopeId: space.scopeId, shell, cwd };
+      const info = { id: randomUUID(), scopeId, shell, cwd };
       const session: Running = { info, pty, pending: 0 };
       this.running.set(info.id, session);
       pty.onData((data) => {

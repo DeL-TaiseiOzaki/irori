@@ -4,9 +4,9 @@ The owner requested an embedded terminal with automatic detection of installed s
 
 ## User flow
 
-Open a KB and choose **ターミナル** in the bottom bar. It starts the first detected shell in that KB's root. Windows discovery includes PowerShell 7, Windows PowerShell, Command Prompt and Git Bash; macOS/Linux discovery starts with the user's default and reads `/etc/shells`. Only executables actually found are offered. Windows Terminal and iTerm are separate terminal frontends; their underlying shells are used inside irori.
+Open a KB and choose **ターミナル** in the bottom bar. It starts the first detected shell in that KB's root. In irori mode (and on the routines and irori agent screens) the same button opens irori mode's own terminal, a drawer under the screen that starts in the irori agent's folder; it stays running, hidden, while a hibachi is on show. Windows discovery includes PowerShell 7, Windows PowerShell, Command Prompt and Git Bash; macOS/Linux discovery starts with the user's default and reads `/etc/shells`. Only executables actually found are offered. Windows Terminal and iTerm are separate terminal frontends; their underlying shells are used inside irori.
 
-The pane retains its original KB when a different note/KB is selected. Its header names that KB; it never silently changes cwd. Stop the process, choose another detected shell and press **開く** to restart. Closing the pane terminates its shell and descendants. Workspace switching is disabled while the pane is open. Normal app closure confirms stopping live terminals/agents; renderer reload/crash stops old terminal sessions. Note/agent workflows do not require opening this pane.
+The pane retains its original KB when a different note/KB is selected. Its header names that KB; it never silently changes cwd. Stop the process, choose another detected shell and press **開く** to restart. Closing the pane terminates its shell and descendants. Going home (choosing another workspace) while a terminal is open asks first, then closes it. Normal app closure confirms stopping live terminals/agents; renderer reload/crash stops old terminal sessions. Note/agent workflows do not require opening this pane.
 
 ## Boundary and lifecycle
 

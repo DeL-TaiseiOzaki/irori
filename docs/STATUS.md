@@ -12,6 +12,19 @@ by release run `37710982525` from main's successful CI run `37709804336`
 - Owner checks remain: the installed Windows and Mac builds, and saving the
   environment from the start screen with a real GitHub account.
 
+irori mode terminal and home, 2026-10-08 (**0.1.89**): the owner reported that the
+terminal could not be used in irori mode and that home could not be reached from it.
+- Cause: the terminal drawer lives in the hibachi's stage, which is `inert` and
+  hidden under irori mode; **ターミナル** started a shell in the last hibachi out of
+  sight, and that open terminal (like any run or unsaved note) disabled home.
+- irori mode, routines and the irori agent screen have their own `TerminalDrawer`
+  in the app body's second grid row. `TerminalService` takes the irori agent's id
+  (owner's choice: its folder, not the last hibachi's) and refuses it until the
+  folder exists. The drawer stays mounted, hidden, while a hibachi is on show.
+- Home is disabled only while connecting or during Git work. `leaveWorkspace`
+  saves the note, and with agents running or a terminal open asks first, then
+  cancels those runs and closes the terminals (owner's choice: confirm and stop).
+
 Settings on the start screen, 2026-10-08 (**0.1.88**, [#196](https://github.com/DeL-TaiseiOzaki/irori/pull/196)): the owner noted that
 the settings, and with them **環境を保存** (ADR 026), could only be reached after
 opening a workspace, although the save covers every workspace on the device.

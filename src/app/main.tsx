@@ -162,6 +162,7 @@ import { sharedSchemaId } from '../domain/you';
 import { Overview, type OverviewView } from './Overview';
 import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
+import { TerminalDrawer } from './TerminalDrawer';
 import { errorText } from './ErrorMessage';
 import { categoryChoices } from '../domain/brains';
 const host = window.irori;
@@ -525,6 +526,11 @@ function App() {
     );
   }
   const [terminalSpace, setTerminalSpace] = useState<Space>();
+  // irori mode's own terminal, in the irori agent's folder; a hibachi's opens in its stage.
+  const [iroriTerminal, setIroriTerminal] = useState(false);
+  // Going home asks first while agents or terminals still run.
+  const [askHome, setAskHome] = useState(false),
+    [goingHome, setGoingHome] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
@@ -1227,13 +1233,20 @@ function App() {
     }, 25000);
     return () => clearInterval(timer);
   }, [doc, dirty]);
+  // The terminal of what is on show: a hibachi's in its stage, or irori mode's own.
+  const iroriShown = level !== 'brain';
+  function toggleTerminal() {
+    if (!iroriShown) {
+      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
+    } else if (iroriTerminal || you?.state === 'ready') setIroriTerminal((value) => !value);
+  }
   // The shortcuts read the latest render's state; the listener itself is added once.
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onKey.current = (e: KeyboardEvent) => {
     // Ctrl+` opens and closes the terminal, from inside it too.
     if (e.ctrlKey && e.key === '`' && !startup) {
       e.preventDefault();
-      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
+      toggleTerminal();
       return;
     }
     if ((e.target as HTMLElement).closest('.terminal-panel')) return;
@@ -1694,7 +1707,7 @@ function App() {
         openDock();
       }
     },
-    toggleTerminal: () => setTerminalSpace((value) => (value ? undefined : active)),
+    toggleTerminal,
     toggleStage,
     chooseHibachi,
     environmentRestored,
@@ -1826,14 +1839,31 @@ function App() {
     goToLevel('brain', options.origin);
     if (options.ai) openDock(hibachiAgent ? 'hibachi' : 'irori');
   }
+  // Home is reachable from anywhere: what still runs is stopped once the person agrees.
   function leaveWorkspace() {
-    if (doc && (editor.current?.getText() ?? buffer) !== doc.text) {
-      report(t('ノートが未保存です。', 'The note is unsaved.'));
-      return;
+    if (gitBusy || connecting || goingHome) return;
+    if (anyRunning || terminalSpace || iroriTerminal) setAskHome(true);
+    else void goHome();
+  }
+  async function goHome() {
+    setGoingHome(true);
+    try {
+      if (!(await save())) {
+        setAskHome(false);
+        report(t('ノートが未保存です。', 'The note is unsaved.'));
+        return;
+      }
+      await Promise.all(runningScopes.map((scopeId) => host.cancel(scopeId)));
+      setTerminalSpace(undefined);
+      setIroriTerminal(false);
+      await flushDrafts();
+      setAskHome(false);
+      setStartup(true);
+    } catch (error) {
+      report(error);
+    } finally {
+      setGoingHome(false);
     }
-    void flushDrafts()
-      .then(() => setStartup(true))
-      .catch(report);
   }
   function newNoteIn(space: Space) {
     void selectSpace(space).then((selected) => {
@@ -1868,7 +1898,7 @@ function App() {
     );
   return (
     <div
-      className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace ? 'terminal-open' : ''}`}
+      className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace || iroriTerminal ? 'terminal-open' : ''}`}
     >
       <a className="skip-to-editor" href="#editor-main">
         {t('編集領域へ移動', 'Skip to editor')}
@@ -1881,7 +1911,7 @@ function App() {
           routines={level === 'routines'}
           aiState={aiState}
           locked={switchLocked || gitBusy}
-          homeDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
+          homeDisabled={connecting || gitBusy}
           addDisabled={anyRunning || dirty || connecting}
           searchDisabled={!workspaceSpaces.length || connecting}
           onHome={act.leaveWorkspace}
@@ -2682,6 +2712,20 @@ function App() {
             </>
           )}
         </PaneGroup>
+        {iroriTerminal && you && (
+          <TerminalDrawer hidden={!iroriShown}>
+            <Suspense
+              fallback={
+                <p className="hint">{t('ターミナルを開いています…', 'Opening the terminal…')}</p>
+              }
+            >
+              <TerminalPanel
+                space={{ scopeId: you.id, name: 'irori agent' }}
+                onClose={() => setIroriTerminal(false)}
+              />
+            </Suspense>
+          </TerminalDrawer>
+        )}
       </div>
       <StatusBar
         workspace={workspace?.name ?? t('ワークスペース', 'Workspace')}
@@ -2690,13 +2734,50 @@ function App() {
         running={runningScopes.length}
         waiting={openRequestCount}
         status={status}
-        workspaceDisabled={dirty || anyRunning || connecting || !!terminalSpace || gitBusy}
-        terminalOpen={!!terminalSpace}
-        terminalDisabled={!active && !terminalSpace}
+        workspaceDisabled={connecting || gitBusy}
+        terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
+        terminalDisabled={
+          iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
+        }
         onWorkspace={act.leaveWorkspace}
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}
       />
+      {askHome && (
+        <Dialog
+          label={t('ホームに戻る', 'Go home')}
+          busy={goingHome}
+          onClose={() => setAskHome(false)}
+        >
+          <form
+            className="modal"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void goHome();
+            }}
+          >
+            <h2>{t('ホームに戻る', 'Go home')}</h2>
+            <p>
+              {anyRunning && (terminalSpace || iroriTerminal)
+                ? t(
+                    '実行中のエージェントを停止し、ターミナルを閉じます。',
+                    'The running agents stop and the terminals close.',
+                  )
+                : anyRunning
+                  ? t('実行中のエージェントを停止します。', 'The running agents stop.')
+                  : t('ターミナルを閉じます。', 'The terminals close.')}
+            </p>
+            <div className="actions">
+              <button type="button" disabled={goingHome} onClick={() => setAskHome(false)}>
+                {t('キャンセル', 'Cancel')}
+              </button>
+              <button className="primary" disabled={goingHome}>
+                {t('停止して戻る', 'Stop and go home')}
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
       {connectionsOpen && connectionTarget && (
         <Connections
           key={connectionTarget.scopeId}

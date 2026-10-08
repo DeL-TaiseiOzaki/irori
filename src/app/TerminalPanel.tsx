@@ -23,7 +23,14 @@ function terminalTheme() {
   };
 }
 
-export default function TerminalPanel({ space, onClose }: { space: Space; onClose: () => void }) {
+export default function TerminalPanel({
+  space,
+  onClose,
+}: {
+  /** The hibachi, or the irori agent, whose folder the shell starts in. */
+  space: Pick<Space, 'scopeId' | 'name'>;
+  onClose: () => void;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const session = useRef<TerminalSession | undefined>(undefined);
   const [shells, setShells] = useState<TerminalShell[]>([]);

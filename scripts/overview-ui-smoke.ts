@@ -85,8 +85,13 @@ try {
   await expect(rail.getByRole('button', { name: 'Product・AI 許可待ち' })).toBeVisible();
   await expect(page.locator('.status-bar')).toContainText('実行中 2');
   await expect(page.locator('.status-bar')).toContainText('許可待ち 1');
-  // The workspace cannot be left while an AI runs in any brain.
-  await expect(page.getByRole('button', { name: 'ワークスペースを選択' })).toBeDisabled();
+  // Home stays reachable while an AI runs in any brain; it asks before stopping them.
+  await page.getByRole('button', { name: 'ワークスペースを選択' }).click();
+  const goHome = page.getByRole('dialog', { name: 'ホームに戻る' });
+  await expect(goHome).toContainText('実行中のエージェントを停止します。');
+  await goHome.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await expect(goHome).toHaveCount(0);
+  await expect(rail.getByRole('button', { name: 'Research・AI 実行中' })).toBeVisible();
 
   // Back in Product, the request is still answerable after the switch.
   await rail.getByRole('button', { name: /^Product・AI/ }).click();
