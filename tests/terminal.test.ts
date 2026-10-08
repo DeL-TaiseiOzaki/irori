@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { TerminalService } from '../src/terminal/service';
@@ -117,3 +117,33 @@ test(
     assert.fail('Terminal child survived close');
   },
 );
+
+test("irori mode's terminal opens in the irori agent's folder, never another", async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori terminal agent 日本語 '));
+  const files = new FileService(path.join(base, 'device'));
+  await files.init();
+  const folder = path.join(base, 'irori', 'you');
+  let root = path.join(base, 'not yet');
+  const terminals = new TerminalService(
+    files,
+    (event) => {
+      if (event.type === 'data') terminals.acknowledge(event.id, event.data.length);
+    },
+    (scopeId) => (scopeId === 'irori-agent' ? root : undefined),
+  );
+  t.after(async () => {
+    await terminals.closeAll();
+    await rm(base, { recursive: true, force: true });
+  });
+  const shells = await terminals.available();
+  await assert.rejects(
+    terminals.open('irori-agent', shells[0].id, 80, 24),
+    /irori agent のフォルダがまだありません/,
+  );
+  await mkdir(folder, { recursive: true });
+  root = folder;
+  const session = await terminals.open('irori-agent', shells[0].id, 80, 24);
+  assert.equal(session.cwd, await realpath(folder));
+  assert.equal(session.scopeId, 'irori-agent');
+  await assert.rejects(terminals.open('another-id', shells[0].id, 80, 24));
+});

@@ -14,7 +14,26 @@
   min-height: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.app-body > .rail {
+  grid-row: 1 / -1;
+}
+/* irori mode's terminal: a drawer under the Overview, the way a hibachi's sits
+   at its stage's foot. */
+.app-body > .terminal-drawer {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 8px 8px 0 0;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+  background: var(--term);
+}
+.app-body > .terminal-drawer[hidden] {
+  display: none;
 }
 /* The Overview and the brain on show share one place beside the rail; the
    brain's islands stay mounted under the Overview so the note, the terminal and

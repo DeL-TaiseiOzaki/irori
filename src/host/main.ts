@@ -101,7 +101,6 @@ app
     });
     // This process is the version an earlier update switched to, or one that never finished.
     void updates.cleanup().catch((error) => console.warn('Update cleanup failed', String(error)));
-    const terminals = new TerminalService(files, (event) => emit({ type: 'terminal', event }));
     const workspaces = new WorkspaceService(files);
     // Folders on this device in contents (ADR 019); Drive is reached through its own app (ADR 023).
     const cloud = new CloudService(files, (filename) => shell.trashItem(filename));
@@ -118,6 +117,11 @@ app
     // Your AI's folder is the device's, not a KB's: its record is read before any run.
     const you = new YourAiService(files.dataDir);
     await you.load();
+    const terminals = new TerminalService(
+      files,
+      (event) => emit({ type: 'terminal', event }),
+      (scopeId) => you.rootOf(scopeId),
+    );
     // Conversations kept per space, CLI and checkout become conversations (ADR 017 D8),
     // once and before any run; a failure leaves the old records to try again next start.
     const identity = new DeviceIdentity(files.dataDir);
