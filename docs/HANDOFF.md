@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-08: **0.1.88** ([#196](https://github.com/DeL-TaiseiOzaki/irori/pull/196),
+settings on the start screen, so the environment can be saved before opening a
+workspace) merged at the owner's request as `88dca0b`, and is published as
+[v0.1.88-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.88-preview.1)
+by release run `37710982525` from main's successful CI run `37709804336`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,176,640 bytes,
+  Mac 141,799,439 bytes and `irori-0.1.88-full.nupkg` 175,344,703 bytes.
+  The website manifest now offers 0.1.88.
+- Owner checks remain: the installed Windows and Mac builds, and saving the
+  environment from the start screen with a real GitHub account.
+
 Published 2026-10-08: **0.1.87** ([#193](https://github.com/DeL-TaiseiOzaki/irori/pull/193),
 categories of your own and no category areas on the irori mode map,
 [ADR 029](decisions/029-free-categories.md)) merged at the owner's request as
