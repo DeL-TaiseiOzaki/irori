@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Published 2026-10-08: **0.1.89** ([#198](https://github.com/DeL-TaiseiOzaki/irori/pull/198),
+irori mode's own terminal in the irori agent's folder, and home reachable from
+anywhere) merged at the owner's request as `cff50b3`, and is published as
+[v0.1.89-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.89-preview.1)
+by release run `37749666965` from main's successful CI run `37748514168`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,177,664 bytes,
+  Mac 141,804,900 bytes and `irori-0.1.89-full.nupkg` 175,345,694 bytes.
+  The website manifest now offers 0.1.89.
+- The PR's first CI run failed in `routines-ui-smoke` (line 287, **変更あり**), the
+  same failure main's run `37713027054` had before this change; a rerun passed.
+- Owner checks remain: the installed Windows and Mac builds, and irori mode's
+  terminal with the shells there.
+
 Published 2026-10-08: **0.1.88** ([#196](https://github.com/DeL-TaiseiOzaki/irori/pull/196),
 settings on the start screen, so the environment can be saved before opening a
 workspace) merged at the owner's request as `88dca0b`, and is published as
