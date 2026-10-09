@@ -100,6 +100,7 @@ export function AgentColumn({
   space,
   you,
   brains,
+  workspaceId,
   target,
   tabs,
   agent,
@@ -138,6 +139,8 @@ export function AgentColumn({
   you?: YourAi;
   /** The hibachis an irori column hands to its agent: the workspace's. */
   brains: string[];
+  /** The workspace open: an irori column's conversations are those kept for it. */
+  workspaceId?: string;
   /** The conversation on show, once picked. */
   target?: Tab;
   tabs: Tab[];
@@ -254,10 +257,14 @@ export function AgentColumn({
   const shownWaiting = !!target && shared.conversationWaiting(target.id);
   // Nothing has been said in the conversation on show: a new one can take its place.
   const shownBlank = conversationReady && !events.length && !queued.length && !shownRunning;
-  const rows = useResource(() => host.agentConversations(scopeId!), [scopeId], {
-    enabled: !!scopeId && ready,
-    refresh: scopeId ? (shared.tabRevisions[scopeId] ?? 0) : 0,
-  });
+  const rows = useResource(
+    () => host.agentConversations(scopeId!, workspaceId),
+    [scopeId, workspaceId],
+    {
+      enabled: !!scopeId && ready,
+      refresh: scopeId ? (shared.tabRevisions[scopeId] ?? 0) : 0,
+    },
+  );
   const agentInfo = infos.find((info) => info.id === agent);
   const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
   // The open note of this hibachi goes with each instruction unless the person removed it.
@@ -339,8 +346,10 @@ export function AgentColumn({
         if (!target) {
           // The first column shows the host's pick; a later one starts a conversation of its own.
           const value =
-            column.id === 'main' ? await host.agentConversation(scopeId, agent) : undefined;
-          const id = value?.id ?? (await host.createConversation(scopeId, agent));
+            column.id === 'main'
+              ? await host.agentConversation(scopeId, agent, undefined, workspaceId)
+              : undefined;
+          const id = value?.id ?? (await host.createConversation(scopeId, agent, workspaceId));
           if (current) onPick({ id, agent: value?.summary?.agent ?? agent });
           return;
         }
@@ -423,7 +432,7 @@ export function AgentColumn({
       model,
       prompt: message,
     };
-    if (irori) return { ...common, brains };
+    if (irori) return { ...common, brains, workspace: workspaceId };
     return {
       ...common,
       notePath: noteInContext ? doc!.path : undefined,
@@ -839,6 +848,7 @@ export function AgentColumn({
         <ConversationHistory
           key={scopeId}
           scopeId={scopeId}
+          workspaceId={workspaceId}
           current={target?.id}
           note={!irori && doc?.scopeId === scopeId ? doc.path : undefined}
           onOpen={(row) => {

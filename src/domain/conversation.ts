@@ -77,6 +77,11 @@ export const conversationMeta = z.looseObject({
   forkedFrom: z.object({ conversationId: z.uuid(), eventId: z.uuid() }).nullable(),
   /** A routine's agent step (ADR 016): the routine's run and the step's index. */
   routine: z.object({ runId: z.uuid(), step: z.number().int().min(0) }).optional(),
+  /**
+   * For the irori agent: the workspace the conversation began in. Its history is
+   * kept per workspace (ADR 017 D4); one begun in no workspace has none.
+   */
+  workspace: z.uuid().optional(),
   /** Work the irori agent handed to this hibachi from one of its conversations. */
   handedBy: z.object({ conversationId: z.uuid() }).optional(),
   /** The native session per device: a handle, its access mode and the checkout's digest. */

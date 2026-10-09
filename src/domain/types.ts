@@ -549,8 +549,15 @@ export interface HostAPI {
   agents(): Promise<AgentInfo[]>;
   /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */
   agentModels(agent: AgentId): Promise<AgentModels>;
-  /** The owner's conversations (a hibachi's or the irori agent's), pinned first, then by last update. */
-  agentConversations(scopeId: string): Promise<import('./conversation').ConversationRow[]>;
+  /**
+   * The owner's conversations (a hibachi's or the irori agent's), pinned first, then
+   * by last update. `workspaceId` picks the irori agent's history of that workspace;
+   * a hibachi's is one history wherever it is opened.
+   */
+  agentConversations(
+    scopeId: string,
+    workspaceId?: string,
+  ): Promise<import('./conversation').ConversationRow[]>;
   /**
    * One conversation with its queue and the requests its run waits on. Without an
    * id: the one running, else the one whose queue is oldest, else the latest for this CLI.
@@ -559,9 +566,10 @@ export interface HostAPI {
     scopeId: string,
     agent: AgentId,
     conversationId?: string,
+    workspaceId?: string,
   ): Promise<import('./conversation').Conversation>;
   /** An id for a new conversation; nothing is written before its first instruction. */
-  createConversation(scopeId: string, agent: AgentId): Promise<string>;
+  createConversation(scopeId: string, agent: AgentId, workspaceId?: string): Promise<string>;
   renameConversation(
     conversationId: string,
     title: string,
@@ -586,7 +594,11 @@ export interface HostAPI {
    * is not running, or of the named conversation alone. Each conversation's queue
    * waits only for its own run; null when nothing could start.
    */
-  startNextQueued(scopeId: string, conversationId?: string): Promise<string | null>;
+  startNextQueued(
+    scopeId: string,
+    conversationId?: string,
+    workspaceId?: string,
+  ): Promise<string | null>;
   start(input: StartRun): Promise<string>;
   /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
   yourAi(): Promise<import('./you').YourAi>;

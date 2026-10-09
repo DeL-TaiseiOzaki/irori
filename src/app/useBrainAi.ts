@@ -37,6 +37,8 @@ export function useBrainAi(
   agent: AgentId,
   refresh = 0,
   conversationId?: string,
+  /** The workspace whose irori agent conversation is on show when none is named. */
+  workspaceId?: string,
 ): BrainAi {
   const [state, setState] = useState<BrainAi>({
     events: [],
@@ -54,7 +56,7 @@ export function useBrainAi(
     void (async () => {
       while (current) {
         const before = controlRevision;
-        const value = await host.agentConversation(scopeId, agent, conversationId);
+        const value = await host.agentConversation(scopeId, agent, conversationId, workspaceId);
         if (!current) return;
         // Request/run controls can race the host snapshot. Reread for them;
         // ordinary fragments must not restart a full-history read indefinitely.
@@ -99,7 +101,7 @@ export function useBrainAi(
       current = false;
       stop();
     };
-  }, [scopeId, agent, refresh, reread, conversationId]);
+  }, [scopeId, agent, refresh, reread, conversationId, workspaceId]);
   return state;
 }
 

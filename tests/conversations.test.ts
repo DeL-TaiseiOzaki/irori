@@ -515,3 +515,51 @@ test('Large tool histories open within a bounded heap while their full details s
   assert.equal(value.damaged, 0);
   assert.deepEqual(value.details, Array(400).fill(viewDetails));
 });
+
+test('The irori agent keeps a history per workspace; a hibachi keeps one wherever it is opened', async (t) => {
+  const { open, store, owner: hibachi, input } = await fixture(t);
+  const you = { kind: 'irori-agent' as const, id: randomUUID(), name: 'irori agent' };
+  const [a, b] = [randomUUID(), randomUUID()];
+  const yours = (prompt: string, workspace?: string) => ({
+    ...input(prompt, { scopeId: you.id, workspace }),
+  });
+  const inA = { owner: you, agent: 'pi' as const, workspace: a };
+  const inB = { ...inA, workspace: b };
+  // Conversations made in each workspace, and one from before workspaces were kept.
+  const first = store.reserve(you.id, 'pi', a);
+  await store.enqueue(first, inA, yours('in a', a));
+  const second = randomUUID();
+  await store.enqueue(second, { ...inB, create: true }, yours('in b', b));
+  const older = randomUUID();
+  await store.enqueue(older, { owner: you, agent: 'pi', create: true }, yours('before'));
+  const theirs = randomUUID();
+  await store.enqueue(theirs, { owner: hibachi, agent: 'pi', create: true }, input('hibachi'));
+
+  const restarted = open();
+  const ids = async (workspace?: string) =>
+    (await restarted.list(you.id, workspace)).map((row) => row.id);
+  assert.deepEqual(await ids(a), [first]);
+  assert.deepEqual(await ids(b), [second]);
+  assert.deepEqual(await ids(), [older], 'one begun in no workspace stays out of every workspace');
+  assert.equal(
+    JSON.parse(await readFile(path.join(restarted.folder, first, 'meta.json'), 'utf8')).workspace,
+    a,
+  );
+  assert.equal(await restarted.latest(you.id, 'pi', a), first);
+  assert.equal(await restarted.current(you.id, 'pi', b), second);
+  assert.equal(await restarted.pending(you.id, a), 1);
+  assert.equal((await restarted.nextQueued(you.id, undefined, b))?.conversationId, second);
+  assert.equal(restarted.workspaceOf(first), a);
+  // A conversation continues only in its own workspace.
+  await assert.rejects(restarted.enqueue(first, inB, yours('moved', b)), /別のワークスペース/);
+  await assert.rejects(restarted.enqueue(older, inA, yours('moved', a)), /別のワークスペース/);
+  // An id reserved in one workspace is not made in another.
+  const reserved = restarted.reserve(you.id, 'pi', a);
+  await assert.rejects(restarted.enqueue(reserved, inB, yours('x', b)), /ありません/);
+  // A hibachi's history is the same whatever workspace is asked for.
+  assert.deepEqual(
+    (await restarted.list(hibachi.id, a)).map((row) => row.id),
+    [theirs],
+  );
+  assert.equal(await restarted.pending(hibachi.id, b), 1);
+});

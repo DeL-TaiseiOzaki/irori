@@ -18,6 +18,7 @@ const host = window.irori;
  */
 export function ConversationHistory({
   scopeId,
+  workspaceId,
   current,
   note,
   onOpen,
@@ -26,6 +27,8 @@ export function ConversationHistory({
 }: {
   /** The owner: a hibachi's scope or the irori agent's id. */
   scopeId: string;
+  /** For the irori agent: the workspace whose history is listed (ADR 017 D4). */
+  workspaceId?: string;
   /** The conversation on show. */
   current?: string;
   /** The note open beside the panel, whose conversations can be listed alone. */
@@ -35,9 +38,13 @@ export function ConversationHistory({
   onError: (error: unknown) => void;
 }) {
   const [reload, setReload] = useState(0);
-  const list = useResource(() => host.agentConversations(scopeId), [scopeId], {
-    refresh: reload,
-  });
+  const list = useResource(
+    () => host.agentConversations(scopeId, workspaceId),
+    [scopeId, workspaceId],
+    {
+      refresh: reload,
+    },
+  );
   const rows: ConversationRow[] | undefined = list.data;
   useEffect(() => {
     if (list.error) onError(list.error);

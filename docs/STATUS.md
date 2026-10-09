@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+irori agent history per workspace, 2026-10-09 (**0.1.94**): the owner asked that the
+irori agent's conversations be kept per workspace and the hibachi agent's per hibachi.
+- Hibachis already had one history each; the owner kept it in the one conversations
+  folder rather than a folder inside each hibachi.
+- `conversationMeta.workspace` records the workspace an irori agent conversation began
+  in (from `StartRun.workspace`, and the routine's workspace for an agent step).
+  `ConversationStore` list, latest, current, queue and pending take a workspace and
+  keep the irori agent's to it; `ensure` refuses continuing one elsewhere.
+- `agentConversations`, `agentConversation`, `createConversation` and
+  `startNextQueued` take an optional workspace id; the renderer passes the open one,
+  and an irori column's requests now carry `workspace` too (before, hibachis the
+  irori agent registered from a dock column joined no workspace). Opening another
+  workspace drops the irori agent's tabs on show. A named conversation is still read
+  wherever it is kept, so a routine record opens its step's conversation.
+- Conversations from before have no workspace and show in no workspace (owner: not
+  carried over); they stay on disk.
+
 The irori agent runs routines, 2026-10-09 (**0.1.93**): the owner asked that the
 person can tell an agent "run this routine", with the keys kept from the agent.
 - `irori run <routine> [--hibachi <hibachi>]` on the irori agent's command calls

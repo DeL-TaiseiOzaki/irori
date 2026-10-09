@@ -140,6 +140,14 @@ the default instead of a constraint.
 > an owner's conversations now run side by side, one run per conversation.
 
 - A hibachi and the irori agent each have any number of conversations.
+- The irori agent's conversations are kept per workspace (owner, 2026-10-09):
+  `meta.json` records the workspace a conversation began in, and its history
+  list, the conversation shown, its queue and new conversations are those of the
+  workspace open. A conversation continues only in its own workspace.
+  Conversations begun before this have no workspace and are shown in none (the
+  owner chose not to carry them over); their folders are kept. A hibachi's
+  history stays one per hibachi wherever it is opened, in the one conversations
+  folder (the owner kept D3; a folder per hibachi remains under Later).
 - The panel shows one conversation at a time with a **履歴** list for its own
   owner. A hibachi's list never shows the irori agent's conversations, and the
   reverse. The irori agent's hand-offs remain visible in the hibachi's panel as

@@ -775,7 +775,7 @@ app
         changeFiles(() => removeNoteComment(files, id, p, commentId)),
       agents: () => agents.available(),
       agentModels: (agent) => agents.models(agent),
-      agentConversations: (scopeId) => agents.conversationList(scopeId),
+      agentConversations: (scopeId, workspaceId) => agents.conversationList(scopeId, workspaceId),
       agentConversation: (...args) => agents.conversation(...args),
       createConversation: (...args) => agents.createConversation(...args),
       renameConversation: (...args) => agents.renameConversation(...args),
@@ -784,8 +784,8 @@ app
       deleteConversation: (id) => agents.deleteConversation(id),
       queueAgentMessage: (input) => agents.queueMessage(input),
       removeQueuedMessage: (...args) => agents.removeQueued(...args),
-      startNextQueued: (scopeId, conversationId) =>
-        agents.startNextQueued(scopeId, conversationId, canStartAgent),
+      startNextQueued: (scopeId, conversationId, workspaceId) =>
+        agents.startNextQueued(scopeId, conversationId, canStartAgent, workspaceId),
       yourAi: () => you.status(),
       createYourAi: () => you.create(),
       addYourAiSkills: () => you.addStandardSkills(),

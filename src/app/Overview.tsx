@@ -67,6 +67,7 @@ function AiWatch({
   scopeId,
   agent,
   conversationId,
+  workspaceId,
   refresh,
   onChange,
 }: {
@@ -74,10 +75,12 @@ function AiWatch({
   agent: AgentId;
   /** The conversation to follow; the owner's on show when absent. */
   conversationId?: string;
+  /** For the irori agent: the workspace whose conversations it keeps. */
+  workspaceId?: string;
   refresh: number;
   onChange: (scopeId: string, ai: BrainAi) => void;
 }) {
-  const ai = useBrainAi(scopeId, agent, refresh, conversationId);
+  const ai = useBrainAi(scopeId, agent, refresh, conversationId, workspaceId);
   useEffect(() => onChange(scopeId, ai), [scopeId, ai]);
   return null;
 }
@@ -799,10 +802,11 @@ export function Overview({
       ))}
       {you?.state === 'ready' && (
         <AiWatch
-          key={`you:${you.id}:${yourAgent}:${yourConversation ?? ''}`}
+          key={`you:${you.id}:${yourAgent}:${yourConversation ?? ''}:${workspace.id}`}
           scopeId={you.id}
           agent={yourAgent}
           conversationId={yourConversation}
+          workspaceId={workspace.id}
           refresh={acted}
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
@@ -988,6 +992,7 @@ export function Overview({
                 {island === 'you' ? (
                   <YourAiPanel
                     you={you}
+                    workspaceId={workspace.id}
                     brains={spaces}
                     ai={yourAi}
                     agent={yourAgent}
