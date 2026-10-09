@@ -142,8 +142,9 @@ are links agents cannot read.
 
 ## Routines
 A routine (\`routine.yaml\` with program and agent steps) runs when the person
-presses 実行; nothing runs on a schedule. Secrets are entered in irori. Follow
-write-routine; check with \`irori routines\`.
+presses 実行, or when they ask you to and have reviewed it: \`irori run
+<routine>\`. Nothing runs on a schedule. Secrets are entered in irori and never
+reach you. Follow write-routine; check with \`irori routines\`.
 
 ## Settings the person changes
 Theme, language and fonts; turning the hibachi agent on; the shared Schema;
@@ -285,8 +286,8 @@ Report the hibachi's folder and its GitHub repository, if any.
 # Write a routine
 
 A routine is a folder holding \`routine.yaml\` and the files its steps use.
-Only the person starts it, with 実行 on the routines page; nothing runs on a
-schedule.
+The person starts it with 実行 on the routines page, or asks you to start it
+with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
 
 1. Find out what it gathers or does, from where, and which hibachis it
    concerns. Ask once, together, only for what you cannot find out.

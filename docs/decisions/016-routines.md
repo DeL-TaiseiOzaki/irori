@@ -159,8 +159,17 @@ agent can write routines. So:
 ### D6 — Starting and stopping
 
 - A routine starts only when the person presses **実行** in the routines view
-  (owner, 2026-09-30). There is no schedule, no file-change trigger and nothing
-  that runs while irori is closed.
+  (owner, 2026-09-30), or asks the irori agent to run it (owner, 2026-10-09).
+  There is no schedule, no file-change trigger and nothing that runs while
+  irori is closed.
+- The irori agent starts one with `irori run <routine>`, only when the routine
+  is ready and its files are as the person reviewed them on this device (D4);
+  otherwise the command names what the person does on the routines page. The
+  command does not wait for the run, so the routine's agent steps wait for the
+  request that started it to end. An agent step of a routine starts none, and
+  hibachi agents have no `irori` command. The routine's secrets go only to its
+  programs inside the host (D5); the agent gets back only that it started, and
+  `irori routines` reports how the last run ended, without its output.
 - A routine that is running cannot be started again; its **停止** ends the
   step in progress, and later steps do not run.
 - Different routines may run at the same time. An agent step in a hibachi

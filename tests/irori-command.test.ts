@@ -46,6 +46,16 @@ test('the command reads its forms, options and owner/name shorthand', () => {
   assert.deepEqual(parseIroriCommand(['list']), { kind: 'list' });
   assert.deepEqual(parseIroriCommand(['routines']), { kind: 'routines' });
   assert.throws(() => parseIroriCommand(['routines', 'x']), /"irori routines" takes no arguments/);
+  assert.deepEqual(parseIroriCommand(['run', 'Daily mail']), {
+    kind: 'run',
+    routine: 'Daily mail',
+  });
+  assert.deepEqual(parseIroriCommand(['run', 'post', '--hibachi=Product']), {
+    kind: 'run',
+    routine: 'post',
+    hibachi: 'Product',
+  });
+  assert.throws(() => parseIroriCommand(['run']), /"irori run" takes one routine/);
   assert.deepEqual(parseIroriCommand(['clone', 'octo/notes', '--name', 'Notes', '--folder=n']), {
     kind: 'clone',
     url: 'https://github.com/octo/notes.git',

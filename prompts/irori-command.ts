@@ -10,8 +10,9 @@
 
 /** Said on every irori agent request that has the command. */
 export const iroriCommandPreamble = [
-  "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set hibachis up: `irori list` shows the hibachis, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register hibachis in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a hibachi's contents and take it out; `irori set` names a hibachi, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a hibachi off this computer. `irori routines` checks the routines as irori reads them. Run `irori help` for the options.",
+  "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set hibachis up: `irori list` shows the hibachis, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register hibachis in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a hibachi's contents and take it out; `irori set` names a hibachi, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a hibachi off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
   "Use it when the person asks you to set up, move in from another tool, or reorganize their hibachis, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A hibachi you register is handed to you from the next request.",
+  "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
 
 /** `irori help`: every form of the command, with where new hibachis go by default. */
@@ -42,7 +43,15 @@ irori add <folder> [--name <hibachi name>] [--category ...]
 irori routines
   The routines of your folder (routines/) and of this workspace's hibachis
   (.irori/routines/), as irori reads them: whether each can run, and if not,
-  why. Run it after writing or changing a routine.
+  why, and how its last run ended. Run it after writing or changing a routine.
+
+irori run <routine> [--hibachi <hibachi>]
+  Starts a routine, named as in \`irori routines\` or by its folder, when the
+  person asks you to. It runs in irori; this command does not wait for it.
+  Only a routine the person has reviewed on the routines page runs, and a
+  change to its files needs their review again. Its secrets go only to its
+  programs and never to you. Your own routine of that name comes first;
+  --hibachi names a hibachi's. A routine's agent steps cannot start routines.
 
 irori connect <hibachi> <folder> [--name <name in contents>] [--read-only]
   Connects a folder on this computer, such as one Google Drive for desktop,
@@ -231,7 +240,17 @@ export interface ListedRoutine {
   problem?: string;
   needs?: { text: string };
   review: 'unreviewed' | 'changed' | 'reviewed';
+  /** A run in progress. */
+  running?: string;
+  last?: { state: string; endedAt?: string };
 }
+
+const lastRun = (routine: ListedRoutine) =>
+  routine.running
+    ? '; running now'
+    : routine.last?.endedAt
+      ? `; last run ${routine.last.state === 'nothing' ? 'found nothing to do' : routine.last.state} at ${routine.last.endedAt}`
+      : '';
 
 /** `irori routines`: each routine, whether it can run, and what the person does next. */
 export function routineList(routines: ListedRoutine[], workspace: string | undefined) {
@@ -243,7 +262,7 @@ export function routineList(routines: ListedRoutine[], workspace: string | undef
         : routine.review === 'reviewed'
           ? 'ready'
           : 'ready; the person reviews its files before the next run';
-    return `- ${JSON.stringify(routine.name)} (${routine.owner === 'irori' ? 'irori agent' : `hibachi ${routine.hibachi}`}) at ${JSON.stringify(routine.path)}: ${state}`;
+    return `- ${JSON.stringify(routine.name)} (${routine.owner === 'irori' ? 'irori agent' : `hibachi ${routine.hibachi}`}) at ${JSON.stringify(routine.path)}: ${state}${lastRun(routine)}`;
   });
   return [
     routines.length ? 'Routines:' : 'No routines yet.',
@@ -251,6 +270,36 @@ export function routineList(routines: ListedRoutine[], workspace: string | undef
     workspace
       ? `Hibachi routines are those of the workspace "${workspace}".`
       : 'This request came from no workspace: only your own routines are listed.',
-    'Only the person starts a routine, with 実行 (Run) on the routines page.',
+    'The person starts a routine with 実行 (Run) on the routines page. When they ask you to, `irori run <routine>` starts one that is ready and reviewed.',
   ].join('\n');
 }
+
+/** `irori run`: the routine started; nothing of what it handles comes back. */
+export function routineStarted(name: string, agentSteps: boolean) {
+  return [
+    `Started the routine ${JSON.stringify(name)}. It runs in irori; the person follows it on the routines page.`,
+    ...(agentSteps
+      ? ['Its agent steps wait while an agent they need, such as you in this request, is running.']
+      : []),
+    'Run `irori routines` later to see how it ended.',
+  ].join('\n');
+}
+
+/** Why `irori run` did not start a routine, and what the person does instead. */
+export const routineRunRefused = {
+  inRoutine: 'A routine step cannot start routines.',
+  noWorkspace:
+    'This request came from no workspace, so no routine can run from it. The person starts routines on the routines page of a workspace.',
+  notFound: (name: string) =>
+    `No routine is named ${JSON.stringify(name)}. Run "irori routines" for their names.`,
+  ambiguous: (name: string, routines: { folder: string; hibachi?: string }[]) =>
+    `More than one routine is named ${JSON.stringify(name)}: ${routines.map((routine) => `folder ${JSON.stringify(routine.folder)} (${routine.hibachi ? `hibachi ${routine.hibachi}` : 'yours'})`).join(', ')}. Name it by its folder, with --hibachi for a hibachi's.`,
+  problem: (problem: string) => `The routine cannot run: ${problem}`,
+  needs: (text: string) =>
+    `The routine needs something on this device first: ${text} The person adds it on the routines page; a secret's value is entered only there.`,
+  review: (review: 'unreviewed' | 'changed') =>
+    review === 'changed'
+      ? 'The routine changed since the person reviewed it. They review it again and press 実行 (Run) on the routines page; after that you can start it.'
+      : 'The person has not reviewed this routine on this device. They review it and press 実行 (Run) on the routines page; after that you can start it.',
+  running: 'The routine is already running.',
+};

@@ -22,7 +22,12 @@ import {
 } from '../src/host/routines';
 import { AgentSetup } from '../src/host/agent-setup';
 import { reversibleStorage, SecretStore } from '../src/host/keystore';
-import { lineDiff, type RoutineRef, type RoutineRun } from '../src/domain/routines';
+import {
+  lineDiff,
+  type RoutineRef,
+  type RoutineRun,
+  type RunRoutine,
+} from '../src/domain/routines';
 import type { AgentEvent } from '../src/domain/types';
 
 const fixtureOptions = {
@@ -637,7 +642,10 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
     routines: (id) => routines.list(id),
   });
   const report = await command.run(['routines'], youRoot, { workspaceId: workspace.id });
-  assert.match(report, /^- "Daily mail" \(irori agent\) at .*Daily mail": ready$/m);
+  assert.match(
+    report,
+    /^- "Daily mail" \(irori agent\) at .*Daily mail": ready; (running now|last run)/m,
+  );
   assert.match(
     report,
     /^- "Daily mail" \(irori agent\) at .*Daily mail 2": cannot run: ステップ 1/m,
@@ -648,6 +656,87 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
   assert.doesNotMatch(alone, /Triage/);
   assert.match(alone, /only your own routines/);
 });
+
+test(
+  'the irori agent starts a reviewed routine on request and never sees its secrets',
+  fixtureOptions,
+  async (t) => {
+    const { routine, routines, start, ended, secrets, workspace, youRoot, root, youId, files } =
+      await setup(t);
+    const ref = await routine(
+      'post',
+      {
+        'routine.yaml': 'name: Post\nsteps:\n  - run: post.sh\n    secrets: [SLACK_TOKEN]\n',
+        'post.sh':
+          '#!/bin/sh\n[ "$SLACK_TOKEN" = xoxb-kept-in-irori ] && echo "sent $SLACK_TOKEN"\n',
+      },
+      'irori',
+    );
+    const theirs = await routine('post', {
+      'routine.yaml': 'name: Post\nsteps: [{run: [echo, theirs]}]\n',
+    });
+    let started: RunRoutine | undefined;
+    const command = new AgentSetup({
+      files,
+      git: {} as never,
+      workspaces: { list: async () => [workspace], save: async () => workspace },
+      cloud: {} as never,
+      defaultParent: async () => root,
+      routines: (id) => routines.list(id),
+      runRoutine: (ref, input) => ((started = input), routines.run(ref, input)),
+    });
+    const context = { workspaceId: workspace.id, agent: { agent: 'pi' as const, model: 'm1' } };
+    const run = (...argv: string[]) => command.run(['run', ...argv], youRoot, context);
+
+    // A secret is entered by the person, and a routine runs first as they reviewed it.
+    await assert.rejects(
+      run('Post'),
+      /needs something on this device first: シークレット SLACK_TOKEN/,
+    );
+    await secrets.set('SLACK_TOKEN', 'xoxb-kept-in-irori');
+    await assert.rejects(run('Post'), /has not reviewed this routine/);
+    await ended(ref, await start(ref));
+
+    const report = await run('Post');
+    assert.match(report, /^Started the routine "Post"\./);
+    assert.doesNotMatch(report, /xoxb-kept-in-irori/);
+    assert.deepEqual(started, { workspaceId: workspace.id, agents: { [youId]: context.agent } });
+    const last = (await routines.runs(ref))[0];
+    const done = await ended(ref, last.id);
+    assert.equal(done.state, 'succeeded', JSON.stringify(done));
+    // The program got the value; the record and the agent's view hold none of it.
+    assert.equal(done.steps[0].output, 'sent ***\n');
+    const listed = await command.run(['routines'], youRoot, context);
+    assert.match(listed, /"Post" \(irori agent\).*: ready; last run succeeded at /);
+    assert.doesNotMatch(listed, /xoxb-kept-in-irori/);
+
+    // --hibachi names a hibachi's routine; it too waits for the person's review.
+    await assert.rejects(run('post', '--hibachi', 'Product'), /has not reviewed this routine/);
+    await ended(theirs, await start(theirs));
+    assert.match(await run('post', '--hibachi', 'Product'), /^Started the routine "Post"/);
+    await until(async () => !routines.busy, 'the hibachi routine to end');
+
+    // A change brings the review back; a step, or a request from no workspace, starts none.
+    await writeFile(path.join(youRoot, 'routines', 'post', 'post.sh'), '#!/bin/sh\necho changed\n');
+    await assert.rejects(run('Post'), /changed since the person reviewed it/);
+    await assert.rejects(
+      command.run(['run', 'Post'], youRoot, { ...context, inRoutine: true }),
+      /A routine step cannot start routines/,
+    );
+    await assert.rejects(command.run(['run', 'Post'], youRoot), /came from no workspace/);
+    await assert.rejects(run('Missing'), /No routine is named "Missing"/);
+    // Two of the irori agent's routines share a name; each is named by its folder.
+    await routine(
+      'post 2',
+      { 'routine.yaml': 'name: Post\nsteps: [{run: [echo, two]}]\n' },
+      'irori',
+    );
+    await assert.rejects(
+      run('Post'),
+      /More than one routine is named "Post": folder "post" \(yours\), folder "post 2" \(yours\)/,
+    );
+  },
+);
 
 test('a device without the OS keychain names it before a run', fixtureOptions, async (t) => {
   const { routine, listed, start } = await setup(t, { keychain: false });

@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The irori agent runs routines, 2026-10-09 (**0.1.93**): the owner asked that the
+person can tell an agent "run this routine", with the keys kept from the agent.
+- `irori run <routine> [--hibachi <hibachi>]` on the irori agent's command calls
+  `RoutineService.run` without a digest, so only a routine reviewed on this device
+  and unchanged since starts; otherwise it names the missing secret, the review
+  or the problem for the person to handle on the routines page (ADR 016 D6).
+- It returns at once. Agent steps that need the irori agent wait for the request
+  that started the run to end, so they cannot deadlock on it.
+- Secrets still go only to `run` steps inside the host. The command reports that
+  the run started; `irori routines` now adds "running now" or the last run's
+  state and end time, never output. A routine's own agent steps and requests
+  from no workspace are refused.
+- Steps naming no CLI use the CLI and model of the irori agent's request.
+- Hibachi agents have no `irori` command and cannot start routines; the person
+  asks the irori agent.
+
 Keychain prompt on routines, 2026-10-09 (**0.1.92**): the owner reported that opening
 routines on macOS asked for the login password for "irori Safe Storage".
 - Cause: listing secrets called `safeStorage.isEncryptionAvailable()`, which on macOS

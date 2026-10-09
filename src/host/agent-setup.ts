@@ -12,10 +12,13 @@ import {
   layerChosen,
   routineList,
   workspaceSaved,
+  routineRunRefused,
+  routineStarted,
   type ListedHibachi,
 } from '../../prompts';
 import { parseIroriCommand } from '../domain/irori-command';
 import type {
+  AgentId,
   Category,
   LayerFolderRename,
   Space,
@@ -24,7 +27,7 @@ import type {
 } from '../domain/types';
 import { knowledgeFolder, layerFolder, layerLabel, type NamedLayer } from '../domain/layers';
 import { categoryName } from '../domain/brains';
-import type { Routine } from '../domain/routines';
+import type { Routine, RoutineRef, RunRoutine } from '../domain/routines';
 import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
@@ -56,6 +59,8 @@ export interface AgentSetupHost {
   remove?: (scopeId: string, trash: boolean) => Promise<void>;
   /** The irori agent's routines and those of the workspace's hibachis, as checked for a run. */
   routines?: (workspaceId: string | undefined) => Promise<Routine[]>;
+  /** Starts a routine as 実行 does, without a review: only reviewed files run (ADR 016 D4). */
+  runRoutine?: (ref: RoutineRef, input: RunRoutine) => Promise<string>;
   /** Whether a run of the hibachi's own agent is in progress there. */
   running?: (scopeId: string) => boolean;
   /** Tells the window what changed: the hibachis and a workspace, or one hibachi's files. */
@@ -67,6 +72,10 @@ export interface AgentSetupHost {
 export interface SetupContext {
   /** The workspace the request was sent in, which new hibachis join. */
   workspaceId?: string;
+  /** The CLI and model the request runs on, for the agent steps of a routine it starts. */
+  agent?: { agent: AgentId; model?: string };
+  /** The request is an agent step of a routine, which starts none (D6). */
+  inRoutine?: boolean;
 }
 
 type Joined = 'joined' | 'member' | 'no workspace';
@@ -134,6 +143,8 @@ export class AgentSetup {
         return this.saveWorkspace(command, cwd, context);
       case 'remove':
         return this.remove(command, cwd, context);
+      case 'run':
+        return this.startRoutine(command, cwd, context);
     }
   }
   private async workspace(context: SetupContext) {
@@ -291,6 +302,58 @@ export class AgentSetup {
     return hibachiRegistered(
       { name: space.name, root: space.root, repository: inspection.repository },
       { already: false, joined: await this.join(space.scopeId, context) },
+    );
+  }
+  /**
+   * Starts a routine the person asked the irori agent to run (ADR 016 D6). It
+   * runs only as reviewed on this device, so the agent cannot run files the
+   * person has not seen. The routine's secrets go to its programs inside the
+   * host; the agent gets back only that it started.
+   */
+  private async startRoutine(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'run' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.routines || !this.host.runRoutine)
+      throw Error('Routines are not available here.');
+    if (context.inRoutine) throw Error(routineRunRefused.inRoutine);
+    const workspace = await this.workspace(context);
+    if (!workspace) throw Error(routineRunRefused.noWorkspace);
+    const owner = command.hibachi ? this.hibachi(command.hibachi, cwd).scopeId : undefined;
+    let found = (await this.host.routines(workspace.id)).filter(
+      (routine) =>
+        (routine.name === command.routine || routine.ref.folder === command.routine) &&
+        (!owner || routine.ref.owner === owner),
+    );
+    // Without --hibachi, the irori agent's own routine of that name comes first.
+    if (!owner && found.some((routine) => routine.owner === 'irori'))
+      found = found.filter((routine) => routine.owner === 'irori');
+    if (!found.length) throw Error(routineRunRefused.notFound(command.routine));
+    if (found.length > 1) {
+      const spaces = this.host.files.list();
+      throw Error(
+        routineRunRefused.ambiguous(
+          command.routine,
+          found.map((routine) => ({
+            folder: routine.ref.folder,
+            hibachi: spaces.find((space) => space.scopeId === routine.ref.owner)?.name,
+          })),
+        ),
+      );
+    }
+    const routine = found[0];
+    if (routine.problem) throw Error(routineRunRefused.problem(routine.problem));
+    if (routine.needs) throw Error(routineRunRefused.needs(routine.needs.text));
+    if (routine.review !== 'reviewed') throw Error(routineRunRefused.review(routine.review));
+    if (routine.running) throw Error(routineRunRefused.running);
+    await this.host.runRoutine(routine.ref, {
+      workspaceId: workspace.id,
+      agents: context.agent ? { [routine.ref.owner]: context.agent } : {},
+    });
+    return routineStarted(
+      routine.name,
+      routine.steps.some((step) => step.kind === 'agent'),
     );
   }
   /** The registered hibachi a command names: by name, sub-agent name or folder. */
