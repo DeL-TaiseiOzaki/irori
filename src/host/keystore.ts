@@ -16,8 +16,12 @@ export interface SecureStorage {
  * falls back to `basic_text`, a key every copy of Chromium knows; its
  * asynchronous API even reports that as available, so only the synchronous
  * check is trusted (docs/research/spike-external-tool-credentials.md).
+ * On macOS that check reads the key from the Keychain, and an ad-hoc signed app
+ * is asked for the login password, so merely listing secrets would ask. The
+ * Keychain is always there; only sealing or opening a value touches it.
  */
 export function secureStorageAvailable(storage?: SecureStorage, platform = process.platform) {
+  if (platform === 'darwin') return !!storage;
   try {
     return !!(
       storage?.isEncryptionAvailable() &&
@@ -96,7 +100,12 @@ export class SecretStore {
       throw Error(
         t('値は 8〜8192 文字の 1 行です。', 'A value is one line of 8 to 8192 characters.'),
       );
-    return this.storage!.encryptString(value).toString('base64');
+    try {
+      return this.storage!.encryptString(value).toString('base64');
+    } catch {
+      // On macOS this is where the Keychain asks, and a refusal lands here.
+      throw Error(unavailableText());
+    }
   }
   async list(): Promise<SecretList> {
     return { available: this.available, names: Object.keys(await this.read()).sort() };

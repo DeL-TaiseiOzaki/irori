@@ -262,7 +262,9 @@ line) and no saved session. Document content cannot start a routine.
   the live output until the step ends; the kept record hides it.
 - Secrets were checked with a stand-in store only. Electron's `safeStorage`
   was measured refusing a Linux display without a keychain; the Keychain,
-  DPAPI and a Linux secret service have not been tried.
+  DPAPI and a Linux secret service have not been tried. On macOS only saving a
+  secret or running a step that names one touches the Keychain; an ad-hoc
+  signed build is asked for the login password there, once per build.
 - Changes under a hibachi's contents folders and in hibachis that are not Git
   repositories are not in the change record.
 - Agent steps ran on real Claude Code 2.1.280 and Codex 0.156.1 only

@@ -35,7 +35,37 @@ test('only a key the OS keeps counts as secure storage', () => {
       throw Error('not ready');
     },
   };
-  assert.equal(secureStorageAvailable(throwing, 'darwin'), false);
+  assert.equal(secureStorageAvailable(throwing, 'win32'), false);
+});
+
+test('listing secrets on macOS does not touch the Keychain', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori keystore '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  let touched = 0;
+  const keychain: SecureStorage = {
+    isEncryptionAvailable: () => (touched++, true),
+    encryptString: (value) => (touched++, reversibleStorage.encryptString(value)),
+    decryptString: (value) => (touched++, reversibleStorage.decryptString(value)),
+  };
+  const store = new SecretStore(path.join(base, 'secrets.json'), keychain, 'darwin');
+  assert.deepEqual(await store.list(), { available: true, names: [] });
+  assert.equal(touched, 0);
+  await store.set('SLACK_TOKEN', 'xoxb-first-value');
+  assert.equal(touched, 1);
+  assert.deepEqual((await store.list()).names, ['SLACK_TOKEN']);
+  assert.equal(touched, 1);
+  // A refused Keychain is reported as one, not as Electron's encryption error.
+  const refused = new SecretStore(
+    path.join(base, 'secrets.json'),
+    {
+      ...keychain,
+      encryptString: () => {
+        throw Error('Error while encrypting the text provided to safeStorage.encryptString.');
+      },
+    },
+    'darwin',
+  );
+  await assert.rejects(refused.set('GH_TOKEN', 'ghp_value_12345'), /キーチェーンが必要です/);
 });
 
 test('names and values are bounded', () => {
