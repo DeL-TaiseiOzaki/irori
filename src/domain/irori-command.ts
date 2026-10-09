@@ -1,11 +1,14 @@
 import { categoryText, categoryValue } from './brains';
 import type { Category } from './types';
+import type { NamedLayer } from './layers';
 
 /**
  * What the irori agent asks of irori through the `irori` command on its run's
- * PATH. Each one only adds: a hibachi registered on this device and joined to
- * the workspace the request came from, or a folder connected to a hibachi's
- * contents. Nothing is removed or replaced. `list` and `routines` only read.
+ * PATH: what the person does in irori's own dialogs to set hibachis up
+ * (ADR 025, ADR 030). Registering, cloning, creating and connecting add;
+ * `set`, `layer`, `workspace`, `disconnect` and `remove` change or take back
+ * what irori holds, and only `remove --trash` moves a folder, to the system
+ * trash. `list` and `routines` only read.
  */
 export type IroriCommand =
   | { kind: 'help' }
@@ -21,7 +24,18 @@ export type IroriCommand =
     }
   | { kind: 'create'; folder: string; parent?: string; name?: string; category?: Category }
   | { kind: 'add'; folder: string; name?: string; category?: Category }
-  | { kind: 'connect'; hibachi: string; folder: string; name?: string; readOnly: boolean };
+  | { kind: 'connect'; hibachi: string; folder: string; name?: string; readOnly: boolean }
+  | { kind: 'disconnect'; hibachi: string; name: string }
+  | {
+      kind: 'set';
+      hibachi: string;
+      name?: string;
+      category?: Category;
+      labels?: Partial<Record<NamedLayer, string>>;
+    }
+  | { kind: 'layer'; hibachi: string; layer: NamedLayer; folder: string; also: boolean }
+  | { kind: 'workspace'; name: string; hibachis: string[]; leave: boolean }
+  | { kind: 'remove'; hibachi: string; trash: boolean };
 
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
@@ -31,9 +45,25 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   create: ['parent', 'name', 'category'],
   add: ['name', 'category'],
   connect: ['name', 'read-only'],
+  disconnect: [],
+  set: ['name', 'category', 'knowledge-label', 'contents-label'],
+  layer: ['also'],
+  workspace: ['leave'],
+  remove: ['trash'],
 };
-const flags = new Set(['read-only']);
-const positional = { clone: 1, create: 1, add: 1, connect: 2 } as const;
+const flags = new Set(['read-only', 'also', 'leave', 'trash']);
+/** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
+const positional: Record<keyof typeof options, [count: number, words: string]> = {
+  clone: [1, 'one repository'],
+  create: [1, 'one folder'],
+  add: [1, 'one folder'],
+  connect: [2, 'a hibachi and a folder'],
+  disconnect: [2, 'a hibachi and the name of a connected folder'],
+  set: [1, 'one hibachi'],
+  layer: [3, 'a hibachi, knowledge or contents, and a folder'],
+  workspace: [1, 'a workspace name and then hibachis'],
+  remove: [1, 'one hibachi'],
+};
 
 /**
  * A GitHub repository as the person may write it: `owner/name` becomes its
@@ -84,12 +114,9 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       throw Error(`--${key} needs a value.`);
     values[key] = value;
   }
-  if (words.length !== positional[kind])
-    throw Error(
-      positional[kind] === 2
-        ? `"irori ${kind}" takes a hibachi and a folder. Run "irori help".`
-        : `"irori ${kind}" takes one ${kind === 'clone' ? 'repository' : 'folder'}. Run "irori help".`,
-    );
+  const [count, wanted] = positional[kind];
+  if (kind === 'workspace' ? !words.length : words.length !== count)
+    throw Error(`"irori ${kind}" takes ${wanted}. Run "irori help".`);
   const text = (key: string) => values[key] as string | undefined;
   // A preset's name in either language is the preset; any other name is the KB's own.
   const category = text('category') === undefined ? undefined : categoryValue(text('category')!);
@@ -126,5 +153,48 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         ...(text('name') && { name: text('name')!.trim() }),
         readOnly: values['read-only'] === true,
       };
+    case 'disconnect':
+      return { kind, hibachi: words[0], name: words[1] };
+    case 'set': {
+      const labels: Partial<Record<NamedLayer, string>> = {};
+      for (const [key, layer] of [
+        ['knowledge-label', 'Knowledge_Base'],
+        ['contents-label', 'contents'],
+      ] as const) {
+        const label = text(key)?.trim();
+        if (label === undefined) continue;
+        if (label.length > 40 || /[\r\n]/.test(label))
+          throw Error(`--${key} is one line of at most 40 characters.`);
+        labels[layer] = label;
+      }
+      if (!common.name && !common.category && !Object.keys(labels).length)
+        throw Error('"irori set" needs --name, --category, --knowledge-label or --contents-label.');
+      return {
+        kind,
+        hibachi: words[0],
+        ...common,
+        ...(Object.keys(labels).length ? { labels } : {}),
+      };
+    }
+    case 'layer': {
+      const layers: Record<string, NamedLayer> = {
+        knowledge: 'Knowledge_Base',
+        contents: 'contents',
+      };
+      const layer = Object.hasOwn(layers, words[1]) ? layers[words[1]] : undefined;
+      if (!layer) throw Error('"irori layer" names knowledge or contents. Run "irori help".');
+      const also = values.also === true;
+      if (also && layer !== 'contents') throw Error('--also is for contents only.');
+      return { kind, hibachi: words[0], layer, folder: words[2], also };
+    }
+    case 'workspace':
+      return {
+        kind,
+        name: words[0].trim(),
+        hibachis: words.slice(1),
+        leave: values.leave === true,
+      };
+    case 'remove':
+      return { kind, hibachi: words[0], trash: values.trash === true };
   }
 }
