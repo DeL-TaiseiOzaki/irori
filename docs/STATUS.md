@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Keychain prompt on routines, 2026-10-09 (**0.1.92**): the owner reported that opening
+routines on macOS asked for the login password for "irori Safe Storage".
+- Cause: listing secrets called `safeStorage.isEncryptionAvailable()`, which on macOS
+  reads the key from the Keychain. The app is ad-hoc signed, so the Keychain does not
+  recognise each build as the item's owner and asks for the password.
+- On macOS `secureStorageAvailable` no longer calls it; the Keychain is only touched
+  when a secret is saved or handed to a step. A refused Keychain on saving reports the
+  device as lacking one instead of Electron's encryption error.
+- Saving or using a secret still asks once per build until Developer ID signing.
+
 Moving in with the irori agent, 2026-10-09 (**0.1.91**, [ADR 030](decisions/030-moving-in-with-the-irori-agent.md)):
 the owner asked for people coming from Obsidian, orca or other tools to move in
 agentically from irori mode, with the agent asking the person rather than
