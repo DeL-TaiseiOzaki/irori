@@ -285,15 +285,22 @@ export class AgentService {
   private binding(scopeId: string, agent: AgentId): SessionBinding {
     return { scopeId, agent, root: this.root(scopeId) };
   }
+  /**
+   * The workspace whose conversations an owner's view takes: the irori agent keeps
+   * a history per workspace, a hibachi one history wherever it is opened (ADR 017 D4).
+   */
+  private historyOf(scopeId: string, workspace?: string) {
+    return this.isYou(scopeId) ? workspace : undefined;
+  }
   /** The owner's conversations for its history list. */
-  async conversationList(scopeId: string) {
+  async conversationList(scopeId: string, workspace?: string) {
     this.root(scopeId);
-    return this.conversations.list(scopeId);
+    return this.conversations.list(scopeId, this.historyOf(scopeId, workspace));
   }
   /** An id for the owner's next conversation; it is written with its first instruction. */
-  createConversation(scopeId: string, agent: AgentId) {
+  createConversation(scopeId: string, agent: AgentId, workspace?: string) {
     this.root(scopeId);
-    return this.conversations.reserve(scopeId, agent);
+    return this.conversations.reserve(scopeId, agent, this.historyOf(scopeId, workspace));
   }
   renameConversation(id: string, title: string) {
     return this.conversations.rename(id, title);
@@ -315,10 +322,16 @@ export class AgentService {
    * live one from here. Without an id, the owner's conversation on show: the one
    * running, the one queued longest, or its latest with this CLI.
    */
-  async conversation(scopeId: string, agent: AgentId, id?: string): Promise<Conversation> {
+  async conversation(
+    scopeId: string,
+    agent: AgentId,
+    id?: string,
+    workspace?: string,
+  ): Promise<Conversation> {
     this.root(scopeId);
-    id ??= await this.conversations.current(scopeId, agent);
-    const pending = await this.conversations.pending(scopeId);
+    const history = this.historyOf(scopeId, workspace);
+    id ??= await this.conversations.current(scopeId, agent, history);
+    const pending = await this.conversations.pending(scopeId, history);
     const reserved = id && this.conversations.reservation(id);
     if (!id || reserved) {
       if (reserved && reserved.owner !== scopeId) throw Error(notYours());
@@ -353,9 +366,13 @@ export class AgentService {
   }
   /** Where an instruction that names no conversation goes: the owner's latest with this CLI, or a new one. */
   private async placement(input: StartRun) {
-    const placement: Placement = { owner: this.owner(input.scopeId), agent: input.agent };
+    const placement: Placement = {
+      owner: this.owner(input.scopeId),
+      agent: input.agent,
+      workspace: this.historyOf(input.scopeId, input.workspace),
+    };
     if (input.conversationId) return { id: input.conversationId, placement };
-    const latest = await this.conversations.latest(input.scopeId, input.agent);
+    const latest = await this.conversations.latest(input.scopeId, input.agent, placement.workspace);
     return { id: latest ?? randomUUID(), placement: { ...placement, create: !latest } };
   }
   async queueMessage(input: StartRun) {
@@ -369,18 +386,27 @@ export class AgentService {
   removeQueued(conversationId: string, id: string) {
     return this.conversations.removeQueued(conversationId, id);
   }
-  /** Instructions waiting across the owner's conversations. */
-  pending(scopeId: string) {
-    return this.conversations.pending(scopeId);
+  /** Instructions waiting across the owner's conversations (the irori agent's in `workspace`). */
+  pending(scopeId: string, workspace?: string) {
+    return this.conversations.pending(scopeId, this.historyOf(scopeId, workspace));
   }
   /**
    * Starts the oldest queued instruction of one of the owner's conversations
    * that is not running: of `conversationId` alone when it is given.
    */
-  async startNextQueued(scopeId: string, conversationId?: string, canStart = () => {}) {
+  async startNextQueued(
+    scopeId: string,
+    conversationId?: string,
+    canStart = () => {},
+    workspace?: string,
+  ) {
     const next = await this.conversations.nextQueued(
       scopeId,
       (id) => (!conversationId || id === conversationId) && !this.conversationRun(id),
+      // A named conversation's queue is its own, in whichever workspace it is kept.
+      conversationId
+        ? this.conversations.workspaceOf(conversationId)
+        : this.historyOf(scopeId, workspace),
     );
     if (!next) return null;
     canStart();
@@ -665,6 +691,7 @@ export class AgentService {
     const placement: Placement = {
       owner: this.owner(input.scopeId),
       agent: input.agent,
+      workspace: this.historyOf(input.scopeId, input.workspace),
       title: run.title,
     };
     if (run.step)

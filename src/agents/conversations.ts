@@ -107,6 +107,11 @@ const ifExists = <T>(operation: Promise<T>) =>
     throw error;
   });
 
+export const otherWorkspace = () =>
+  t(
+    'この会話は別のワークスペースの irori agent の会話です。',
+    "This conversation is the irori agent's in another workspace.",
+  );
 export const notYours = () =>
   t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.');
 const noConversation = () => t('この会話はありません。', 'This conversation no longer exists.');
@@ -295,6 +300,8 @@ function viewEvent(line: StoredEvent, meta: ConversationMeta): AgentEvent {
 export interface Placement {
   owner: ConversationOwner;
   agent: AgentId;
+  /** The irori agent's workspace for this request; none for a hibachi's. */
+  workspace?: string;
   /** A new conversation may be made under this id: one the host chose, not one a view named. */
   create?: boolean;
   title?: string;
@@ -327,7 +334,7 @@ export class ConversationStore {
   private states = new Map<string, DeviceState>();
   private damagedStates = new Map<string, Error>();
   /** Ids given to new conversations that have not had an instruction yet. */
-  private reserved = new Map<string, { owner: string; agent: AgentId }>();
+  private reserved = new Map<string, { owner: string; agent: AgentId; workspace?: string }>();
   private buffers = new Map<string, StoredEvent[]>();
   /** Conversations whose `events.jsonl` is known to end with a newline. */
   private terminated = new Set<string>();
@@ -540,11 +547,23 @@ export class ConversationStore {
     this.metas.set(value.id, value);
     return value;
   }
+  /**
+   * Whether a conversation belongs to the workspace asked for. A hibachi's
+   * history is the hibachi's wherever it is opened; the irori agent's is kept per
+   * workspace (ADR 017 D4).
+   */
+  private inWorkspace(id: string, workspace: string | undefined) {
+    const meta = this.metas.get(id);
+    if (meta) return meta.owner.kind === 'hibachi' || meta.workspace === workspace;
+    const reserved = this.reserved.get(id);
+    return !reserved || reserved.workspace === workspace;
+  }
   /** The conversation a run or a queued instruction goes to, made on its first instruction. */
   private async ensure(id: string, placement: Placement, input: StartRun) {
     const meta = await this.loadMeta(id);
     if (meta) {
       if (meta.owner.id !== placement.owner.id) throw Error(notYours());
+      if (!this.inWorkspace(id, placement.workspace)) throw Error(otherWorkspace());
       if (meta.agent !== placement.agent)
         throw Error(
           t(
@@ -557,7 +576,11 @@ export class ConversationStore {
     const reserved = this.reserved.get(id);
     if (
       !placement.create &&
-      !(reserved?.owner === placement.owner.id && reserved.agent === placement.agent)
+      !(
+        reserved?.owner === placement.owner.id &&
+        reserved.agent === placement.agent &&
+        reserved.workspace === placement.workspace
+      )
     )
       throw Error(noConversation());
     const dir = this.dir(id);
@@ -574,6 +597,8 @@ export class ConversationStore {
         createdAt: this.now(),
         linkedNote: input.notePath ?? null,
         ...(placement.routine && { routine: placement.routine }),
+        ...(placement.workspace &&
+          placement.owner.kind === 'irori-agent' && { workspace: placement.workspace }),
         ...(placement.handedBy && { handedBy: placement.handedBy }),
       }),
     );
@@ -708,12 +733,15 @@ export class ConversationStore {
       queued: state?.queued.length ?? 0,
     };
   }
-  /** The owner's conversations, pinned first and then by last update; damaged ones last. */
-  async list(owner: string): Promise<ConversationRow[]> {
+  /**
+   * The owner's conversations, pinned first and then by last update; damaged ones
+   * last. The irori agent's are those of `workspace`.
+   */
+  async list(owner: string, workspace?: string): Promise<ConversationRow[]> {
     await this.init();
     await this.scan();
     const rows = [...this.metas.values()]
-      .filter((meta) => meta.owner.id === owner)
+      .filter((meta) => meta.owner.id === owner && this.inWorkspace(meta.id, workspace))
       .map((meta) => this.summary(meta))
       .sort(
         (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt),
@@ -725,12 +753,13 @@ export class ConversationStore {
     return [...rows, ...damaged];
   }
   /** The owner's latest conversation of its own with this CLI: not a routine's or a hand-off's. */
-  async latest(owner: string, agent: AgentId) {
+  async latest(owner: string, agent: AgentId, workspace?: string) {
     await this.scan();
     return [...this.metas.values()]
       .filter(
         (meta) =>
           meta.owner.id === owner &&
+          this.inWorkspace(meta.id, workspace) &&
           meta.agent === agent &&
           !meta.archived &&
           !meta.routine &&
@@ -739,13 +768,21 @@ export class ConversationStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id;
   }
   /** The conversation to show for an owner: the one running, the one queued longest, or the latest. */
-  async current(owner: string, agent: AgentId) {
+  async current(owner: string, agent: AgentId, workspace?: string) {
     await this.init();
     await this.scan();
     for (const state of this.states.values())
-      if (state.owner === owner && state.active && this.metas.has(state.conversationId))
+      if (
+        state.owner === owner &&
+        state.active &&
+        this.metas.has(state.conversationId) &&
+        this.inWorkspace(state.conversationId, workspace)
+      )
         return state.conversationId;
-    return this.next(owner)?.conversationId ?? (await this.latest(owner, agent));
+    return (
+      this.next(owner, undefined, workspace)?.conversationId ??
+      (await this.latest(owner, agent, workspace))
+    );
   }
   /** The hibachi conversation that work from one of the irori agent's conversations went to. */
   async handed(owner: string, agent: AgentId, from: string) {
@@ -755,20 +792,29 @@ export class ConversationStore {
         meta.owner.id === owner && meta.agent === agent && meta.handedBy?.conversationId === from,
     )?.id;
   }
-  reserve(owner: string, agent: AgentId) {
+  reserve(owner: string, agent: AgentId, workspace?: string) {
     const id = randomUUID();
-    this.reserved.set(id, { owner, agent });
+    this.reserved.set(id, { owner, agent, ...(workspace && { workspace }) });
     return id;
+  }
+  /** The workspace a conversation, made or reserved, is kept in. */
+  workspaceOf(id: string) {
+    return (this.metas.get(id) ?? this.reserved.get(id))?.workspace;
   }
   reservation(id: string) {
     return this.metas.has(id) ? undefined : this.reserved.get(id);
   }
-  private next(owner: string, accept: (conversationId: string) => boolean = () => true) {
+  private next(
+    owner: string,
+    accept: (conversationId: string) => boolean = () => true,
+    workspace?: string,
+  ) {
     let best: { conversationId: string; agent: AgentId; item: QueuedMessage } | undefined;
     for (const state of this.states.values()) {
       const item = state.queued[0];
       if (
         state.owner === owner &&
+        this.inWorkspace(state.conversationId, workspace) &&
         item &&
         !state.active &&
         accept(state.conversationId) &&
@@ -783,17 +829,24 @@ export class ConversationStore {
    * The owner's oldest queued instruction in a conversation not running now, of
    * those `accept` allows. Each conversation's queue waits only for its own run.
    */
-  async nextQueued(owner: string, accept?: (conversationId: string) => boolean) {
+  async nextQueued(
+    owner: string,
+    accept?: (conversationId: string) => boolean,
+    workspace?: string,
+  ) {
     await this.init();
-    const next = this.next(owner, accept);
+    await this.scan();
+    const next = this.next(owner, accept, workspace);
     return next && structuredClone(next);
   }
-  /** Instructions waiting across the owner's conversations. */
-  async pending(owner: string) {
+  /** Instructions waiting across the owner's conversations (the irori agent's in `workspace`). */
+  async pending(owner: string, workspace?: string) {
     await this.init();
+    await this.scan();
     let count = 0;
     for (const state of this.states.values())
-      if (state.owner === owner) count += state.queued.length;
+      if (state.owner === owner && this.inWorkspace(state.conversationId, workspace))
+        count += state.queued.length;
     return count;
   }
 

@@ -1148,7 +1148,7 @@ export class RoutineService {
     });
   }
   /** Why an agent step waits now (D6), or undefined when it can start. */
-  private async blocked(scopeIds: string[], agent: AgentId) {
+  private async blocked(scopeIds: string[], agent: AgentId, workspace: string) {
     try {
       this.host.canStart();
     } catch {
@@ -1157,7 +1157,8 @@ export class RoutineService {
     for (const scopeId of scopeIds)
       if (this.host.agents.busy(scopeId))
         return t(`${this.nameOf(scopeId)} の実行待ち`, `Waiting for ${this.nameOf(scopeId)}`);
-    if (await this.host.agents.pending(scopeIds[0]))
+    // The irori agent's queue is the one of the routine's workspace (ADR 017 D4).
+    if (await this.host.agents.pending(scopeIds[0], workspace))
       return t('送信待ちの指示の後', 'After the queued instructions');
     return undefined;
   }
@@ -1189,7 +1190,7 @@ export class RoutineService {
         record.state = 'stopped';
         return;
       }
-      let reason = await this.blocked(scopeIds, agent);
+      let reason = await this.blocked(scopeIds, agent, active.input.workspaceId);
       if (!reason)
         try {
           started = this.host.agents.startStep(
@@ -1217,7 +1218,7 @@ export class RoutineService {
           break;
         } catch (error) {
           // Another run took the space between the check and the start.
-          reason = await this.blocked(scopeIds, agent);
+          reason = await this.blocked(scopeIds, agent, active.input.workspaceId);
           if (!reason) throw error;
         }
       if (record.state !== 'waiting' || record.detail !== reason) {

@@ -35,6 +35,7 @@ export function openTasks(ai: BrainAi) {
  */
 export function YourAiPanel({
   you,
+  workspaceId,
   brains,
   ai,
   agent,
@@ -55,6 +56,8 @@ export function YourAiPanel({
   onError,
 }: {
   you?: YourAi;
+  /** The workspace whose irori agent history the panel lists. */
+  workspaceId?: string;
   brains: Space[];
   ai: BrainAi;
   /** The CLI your AI runs on; each hands a brain's work to its hibachi agent. */
@@ -177,6 +180,7 @@ export function YourAiPanel({
       {history && (
         <ConversationHistory
           scopeId={you.id}
+          workspaceId={workspaceId}
           current={conversationId}
           onOpen={(row) => {
             setHistory(false);

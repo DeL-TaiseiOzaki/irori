@@ -292,6 +292,7 @@ const DockColumnView = memo(function DockColumnView({
   hibachiAgent,
   stageHidden,
   workspaceScopeIds,
+  workspaceId,
   act,
 }: {
   column: DockColumn;
@@ -316,6 +317,7 @@ const DockColumnView = memo(function DockColumnView({
   hibachiAgent: boolean;
   stageHidden: boolean;
   workspaceScopeIds: string[];
+  workspaceId?: string;
   act: DockActions;
 }) {
   const irori = owner === 'irori';
@@ -346,6 +348,7 @@ const DockColumnView = memo(function DockColumnView({
       space={irori ? undefined : active}
       you={you}
       brains={workspaceScopeIds}
+      workspaceId={workspaceId}
       target={target}
       tabs={key ? openTabs(tabs, shown, key) : noTabs}
       agent={columnAgent}
@@ -631,7 +634,12 @@ function App() {
    * instruction. With `replace` it takes the place of the conversation on show.
    */
   async function newConversation(scopeId: string, key: string, next: AgentId, replace = false) {
-    showConversation(key, await host.createConversation(scopeId, next), next, replace);
+    showConversation(
+      key,
+      await host.createConversation(scopeId, next, workspace?.id),
+      next,
+      replace,
+    );
   }
   // Each brain keeps the model chosen for each CLI; '' is the CLI's own default.
   const [modelChoice, setModelChoice] = useState<Record<string, string>>({});
@@ -892,8 +900,8 @@ function App() {
     let live = true;
     const choice = yourChoice.agent;
     void (async () => {
-      const value = await host.agentConversation(you.id, choice);
-      const id = value.id ?? (await host.createConversation(you.id, choice));
+      const value = await host.agentConversation(you.id, choice, undefined, workspace?.id);
+      const id = value.id ?? (await host.createConversation(you.id, choice, workspace?.id));
       const next = value.summary?.agent ?? choice;
       if (!live) return;
       if (next !== choice) chooseYour({ ...yourChoice, agent: next });
@@ -902,7 +910,7 @@ function App() {
     return () => {
       live = false;
     };
-  }, [you?.id, you?.state, !!(you && shown[you.id])]);
+  }, [you?.id, you?.state, !!(you && shown[you.id]), workspace?.id]);
   // The brains handed to your AI's run in progress; unknown after a reload, when
   // the workspace's brains count as handed.
   const [handed, setHanded] = useState<string[]>();
@@ -1326,7 +1334,7 @@ function App() {
       if (open.doc?.scopeId === scopeId && open.external) return null;
       if (!(await save())) return null;
       return await launch(scopeId, conversationId, () =>
-        host.startNextQueued(scopeId, conversationId),
+        host.startNextQueued(scopeId, conversationId, workspace?.id),
       );
     } catch (error) {
       report(error);
@@ -1392,7 +1400,7 @@ function App() {
       brains,
       workspace: workspace?.id,
     };
-    const value = await host.agentConversation(you.id, agentId, target?.id);
+    const value = await host.agentConversation(you.id, agentId, target?.id, workspace?.id);
     if (behind(input.conversationId, value)) {
       await host.queueAgentMessage(input);
       setQueueSignal((signal) => ({ n: signal.n + 1, scopeId: you.id, resume: false }));
@@ -1412,6 +1420,12 @@ function App() {
     setGitReview(false);
     setSources({});
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+    // The irori agent keeps a history per workspace: its conversations on show belong to the last one.
+    if (you && profile.id !== workspace?.id) {
+      const yours = (key: string) => key === you.id || key.startsWith(`${you.id}#`);
+      setShown((all) => Object.fromEntries(Object.entries(all).filter(([key]) => !yours(key))));
+      setTabs((all) => Object.fromEntries(Object.entries(all).filter(([key]) => !yours(key))));
+    }
     setWorkspace(profile);
     setScene(undefined);
     setLevel('brain');
@@ -2702,6 +2716,7 @@ function App() {
                           hibachiAgent={hibachiAgent}
                           stageHidden={stageHidden}
                           workspaceScopeIds={workspaceScopeIds}
+                          workspaceId={workspace?.id}
                           act={act}
                         />
                       </Pane>,

@@ -14,6 +14,13 @@ is described in the history of this file.
   the irori agent's panel shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
   is written until its first instruction. **履歴** lists the owner's own
   conversations: a hibachi's list never holds the irori agent's, and the reverse.
+- The irori agent keeps a history per workspace (0.1.94). Its 履歴, the
+  conversation a panel opens on, its queue and a new conversation are those of
+  the workspace open; opening another workspace shows that one's. A conversation
+  continues only in the workspace it began in. Conversations from before 0.1.94
+  have no workspace and appear in none; their folders stay. A hibachi keeps one
+  history wherever it is opened, and a routine's irori agent step is kept in the
+  routine's workspace.
 - Choosing another CLI in the panel starts a new conversation: a conversation's
   CLI is fixed. Opening a conversation from 履歴 switches the panel to its CLI.
 - Opening a panel shows the owner's conversation that is running, else the one
@@ -44,7 +51,8 @@ is described in the history of this file.
   (`hibachi` or `irori-agent`, its id and its name then), CLI, model, title and
   where it came from, times, linked note, the hibachis the irori agent's
   hand-offs reached, pin and archive, `forkedFrom` (null until stage 3), a
-  routine step's `routine` or a hand-off's `handedBy`, and `native`. Keys a later
+  routine step's `routine` or a hand-off's `handedBy`, the irori agent's
+  `workspace` (the id of the workspace it began in), and `native`. Keys a later
   version adds are read and kept.
 - **events.jsonl** (`storedEvent` in `src/agents/conversations.ts`): each line
   has an id, the run's id, a time, a role (`user` or `agent`), a type and the
