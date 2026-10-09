@@ -312,6 +312,7 @@ app
         );
       },
       routines: (workspaceId) => routines.list(workspaceId),
+      runRoutine: (ref, input) => routines.run(ref, input),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
         emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),

@@ -35,6 +35,7 @@ import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import { Tail } from './tail';
 import type { FileService } from '../host/files';
+import type { SetupContext } from '../host/agent-setup';
 import type { SessionBinding } from './sessions';
 import {
   ConversationStore,
@@ -208,9 +209,9 @@ export class AgentService {
   private delegated = new Map<string, Set<string>>();
   /**
    * Carries out the irori agent's `irori` command (its arguments, the folder it
-   * ran in, and the request's workspace). Without it the command is not offered.
+   * ran in, and where the request came from). Without it the command is not offered.
    */
-  setup?: (argv: string[], cwd: string, context: { workspaceId?: string }) => Promise<string>;
+  setup?: (argv: string[], cwd: string, context: SetupContext) => Promise<string>;
   private requests = new Map<
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
@@ -739,7 +740,12 @@ export class AgentService {
         const setup = this.setup;
         const commands = await iroriBridge(
           this.files.dataDir,
-          ({ argv, cwd }) => setup(argv, cwd, { workspaceId: input.workspace }),
+          ({ argv, cwd }) =>
+            setup(argv, cwd, {
+              workspaceId: input.workspace,
+              agent: { agent: input.agent, model: input.model },
+              inRoutine: !!run.step,
+            }),
           agentEnv(),
         );
         run.env = commands.env;

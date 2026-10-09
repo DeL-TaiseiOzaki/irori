@@ -8,7 +8,8 @@ import type { NamedLayer } from './layers';
  * (ADR 025, ADR 030). Registering, cloning, creating and connecting add;
  * `set`, `layer`, `workspace`, `disconnect` and `remove` change or take back
  * what irori holds, and only `remove --trash` moves a folder, to the system
- * trash. `list` and `routines` only read.
+ * trash. `list` and `routines` only read; `run` starts a routine the
+ * person has reviewed, when they ask for it.
  */
 export type IroriCommand =
   | { kind: 'help' }
@@ -35,7 +36,8 @@ export type IroriCommand =
     }
   | { kind: 'layer'; hibachi: string; layer: NamedLayer; folder: string; also: boolean }
   | { kind: 'workspace'; name: string; hibachis: string[]; leave: boolean }
-  | { kind: 'remove'; hibachi: string; trash: boolean };
+  | { kind: 'remove'; hibachi: string; trash: boolean }
+  | { kind: 'run'; routine: string; hibachi?: string };
 
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
@@ -50,6 +52,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   layer: ['also'],
   workspace: ['leave'],
   remove: ['trash'],
+  run: ['hibachi'],
 };
 const flags = new Set(['read-only', 'also', 'leave', 'trash']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
@@ -63,6 +66,7 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   layer: [3, 'a hibachi, knowledge or contents, and a folder'],
   workspace: [1, 'a workspace name and then hibachis'],
   remove: [1, 'one hibachi'],
+  run: [1, 'one routine'],
 };
 
 /**
@@ -196,5 +200,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       };
     case 'remove':
       return { kind, hibachi: words[0], trash: values.trash === true };
+    case 'run':
+      return { kind, routine: words[0], ...(text('hibachi') && { hibachi: text('hibachi') }) };
   }
 }

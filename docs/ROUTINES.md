@@ -75,8 +75,11 @@ a workspace without hibachis. The agent panel stays beside it, so a
 routine's agent steps can be followed in their conversations. The list is read
 again every five seconds and whenever a hibachi's files change.
 
-- **実行** starts a routine; nothing else does. There is no schedule and nothing
-  runs while irori is closed. A running routine shows **停止** instead, which
+- **実行** starts a routine, and so does the irori agent when the person asks
+  it to (`irori run <routine>`, for a routine already reviewed on this device
+  and unchanged since). There is no schedule and nothing runs while irori is
+  closed. The agent never receives the routine's secrets or its output; it
+  learns only that the run started, and from `irori routines` how it ended. A running routine shows **停止** instead, which
   ends the step in progress; later steps do not run. Different routines run at
   the same time; the same one cannot start twice.
 - **Review.** The first **実行** on a device opens **ルーティンの確認** with
@@ -201,7 +204,8 @@ Discovery, review, execution and records are `src/host/routines.ts`
 `saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
 `runRoutine(ref, { workspaceId, digest, agents })`, `stopRoutine(ref)`,
 `routineRuns(ref)`, and `routine` events carrying a run. The irori agent's
-`irori routines` reads the same list (`src/host/agent-setup.ts`). JavaScript is the device setting `routineRuntimes`.
+`irori routines` reads the same list and `irori run` calls the same
+`run` without a digest (`src/host/agent-setup.ts`). JavaScript is the device setting `routineRuntimes`.
 Secrets are `src/host/keystore.ts` (`SecretStore`, the hiding of values, the
 write-back reader), reached through `secrets()`, `setSecret(name, value)` and
 `deleteSecret(name)`; no method returns a value.
@@ -228,8 +232,11 @@ line) and no saved session. Document content cannot start a routine.
   an agent step; an irori agent routine handing a named hibachi; an
   unfinished run marked unknown and not repeated; a new routine's folder
   name and template, an edit refused after a crossing change, and
-  `irori routines` with and without a workspace.
-- `tests/irori-command.test.ts`: `irori routines` parsed, and the
+  `irori routines` with and without a workspace; `irori run` refusing a missing
+  secret, an unreviewed or changed routine, a routine step and a request from
+  no workspace, preferring the irori agent's own routine over `--hibachi`, and
+  starting a reviewed one whose secret reaches its program but not the report.
+- `tests/irori-command.test.ts`: `irori routines` and `irori run` parsed, and the
   `write-routine` skill a valid package.
 - `tests/settings.test.ts`: `routineRuntimes` kept and bounded.
 - `tests/keystore.test.ts`: the secure-storage check (Linux `basic_text`
