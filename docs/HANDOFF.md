@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+Published 2026-10-09: **0.1.91** ([#202](https://github.com/DeL-TaiseiOzaki/irori/pull/202),
+moving in from other tools with the irori agent, [ADR 030](decisions/030-moving-in-with-the-irori-agent.md))
+merged at the owner's request as `789f45b`, and is published as
+[v0.1.91-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.91-preview.1)
+by release run `37909583554` from main's successful CI run `37908295105`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,189,952 bytes,
+  Mac 141,818,859 bytes and `irori-0.1.91-full.nupkg` 175,357,685 bytes.
+  The website manifest now offers 0.1.91.
+- 0.1.90 was never published: #200 was renumbered to 0.1.92 (and #201 to
+  0.1.93, #203 to 0.1.94) after #202 merged first.
+- Owner checks remain: the installed Windows and Mac builds, and a real move
+  from an Obsidian vault or orca with a real CLI.
+
 Published 2026-10-08: **0.1.89** ([#198](https://github.com/DeL-TaiseiOzaki/irori/pull/198),
 irori mode's own terminal in the irori agent's folder, and home reachable from
 anywhere) merged at the owner's request as `cff50b3`, and is published as
