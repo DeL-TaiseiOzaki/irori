@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-09: **0.1.94** ([#200](https://github.com/DeL-TaiseiOzaki/irori/pull/200)
+0.1.92, routines open without a Keychain prompt on macOS;
+[#201](https://github.com/DeL-TaiseiOzaki/irori/pull/201) 0.1.93, the irori agent
+starts a reviewed routine with `irori run`, never seeing its secrets;
+[#203](https://github.com/DeL-TaiseiOzaki/irori/pull/203) 0.1.94, the irori agent's
+conversations kept per workspace) merged at the owner's request as `545577d`,
+`27ee3ac` and `85ef2f2`, and published together as
+[v0.1.94-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.94-preview.1)
+by release run `37913998823` from main's successful CI run `37912840734`
+(verify plus Linux, Windows and macOS packages). 0.1.92 and 0.1.93 were not
+published on their own; their notes are in `docs/releases/`.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,191,488 bytes,
+  Mac 141,832,016 bytes and `irori-0.1.94-full.nupkg` 175,358,858 bytes.
+  The website manifest now offers 0.1.94.
+- Owner checks remain: the installed Mac build opening routines without the
+  Keychain prompt, asking the irori agent to run a routine with a real CLI, and
+  switching workspaces with irori agent history.
+
 Published 2026-10-09: **0.1.91** ([#202](https://github.com/DeL-TaiseiOzaki/irori/pull/202),
 moving in from other tools with the irori agent, [ADR 030](decisions/030-moving-in-with-the-irori-agent.md))
 merged at the owner's request as `789f45b`, and is published as
