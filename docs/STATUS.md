@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Moving in with the irori agent, 2026-10-09 (**0.1.91**, [ADR 030](decisions/030-moving-in-with-the-irori-agent.md)):
+the owner asked for people coming from Obsidian, orca or other tools to move in
+agentically from irori mode, with the agent asking the person rather than
+following rules, and knowing everything irori can do.
+- Standard skills `irori-guide` (each capability, and whether the agent uses
+  the command, writes a file, or the person acts in irori) and `move-to-irori`
+  (look read-only, ask in rounds, write `moves/<date>.md`, wait for a yes,
+  carry out, report). `irori-setup` points at both.
+- `irori` command: `layer` (ADR 024's rename; `--also` declares an existing
+  folder as contents in place, `FileService.declareContents`), `set`,
+  `workspace`, `disconnect`, `remove [--trash]`; `list` shows layers,
+  connections and workspaces. They wait for the hibachi's own agent only, and
+  refuse during Git work or connection setup (`remove` also during a routine).
+- Open: not tried with a real CLI, vault or orca data; taking back an `--also`
+  contents folder has no command.
+
 Published 2026-10-08: **0.1.89** ([#198](https://github.com/DeL-TaiseiOzaki/irori/pull/198),
 irori mode's own terminal in the irori agent's folder, and home reachable from
 anywhere) merged at the owner's request as `cff50b3`, and is published as

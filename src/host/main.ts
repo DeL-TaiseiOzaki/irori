@@ -257,6 +257,21 @@ app
         watch(space);
         return space;
       });
+    /** Lets go of a hibachi's folder before it is removed, and says how to take it up again. */
+    const releaseSpace = async (space: Space) => {
+      await terminals.closeScope(space.scopeId);
+      const connected = await cloud.suspend(space.scopeId);
+      await watchers.get(space.scopeId)?.close();
+      watchers.delete(space.scopeId);
+      return async () => {
+        watch(space);
+        await cloud.resume(space.scopeId, connected);
+      };
+    };
+    const setupWait = t(
+      'Git 操作・接続・ルーティンが終わってからもう一度実行してください。',
+      'Run it again after the Git operation, connection or routine finishes.',
+    );
     // The irori agent's `irori` command: hibachis it registers join the request's workspace.
     const setup = new AgentSetup({
       files,
@@ -265,6 +280,37 @@ app
       cloud,
       defaultParent,
       register: registerWatched,
+      // As the settings and explorer do, but the irori agent's own hold on a hibachi does not count.
+      update: (scopeId, change) => {
+        if (cloud.busy || git.busy) throw Error(setupWait);
+        return changeFiles(() => files.update(scopeId, change));
+      },
+      renameLayer: (scopeId, layer, name) => {
+        if (cloud.busy || git.busy) throw Error(setupWait);
+        return changeFiles(() =>
+          renameLayerFolder({ files, cloud, knowledge, authorship }, scopeId, layer, name),
+        );
+      },
+      declareContents: (scopeId, folder) => {
+        if (cloud.busy || git.busy) throw Error(setupWait);
+        return changeFiles(() => files.declareContents(scopeId, folder));
+      },
+      remove: (scopeId, trash) => {
+        if (cloud.busy || git.busy || routines.busy) throw Error(setupWait);
+        return changeFiles(() =>
+          removeSpace(
+            {
+              files,
+              workspaces,
+              keep: async () => [(await you.load()).root, files.dataDir],
+              release: releaseSpace,
+              trash: (folder) => shell.trashItem(folder),
+            },
+            scopeId,
+            trash,
+          ),
+        );
+      },
       routines: (workspaceId) => routines.list(workspaceId),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
@@ -669,16 +715,7 @@ app
               files,
               workspaces,
               keep: async () => [(await you.load()).root, files.dataDir],
-              release: async (space) => {
-                await terminals.closeScope(space.scopeId);
-                const connected = await cloud.suspend(space.scopeId);
-                await watchers.get(space.scopeId)?.close();
-                watchers.delete(space.scopeId);
-                return async () => {
-                  watch(space);
-                  await cloud.resume(space.scopeId, connected);
-                };
-              },
+              release: releaseSpace,
               trash: (folder) => shell.trashItem(folder),
             },
             scopeId,

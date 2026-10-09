@@ -580,6 +580,59 @@ export class FileService {
       return { space, previous, files: moved };
     });
   }
+  /**
+   * Declares a folder the hibachi already has as contents beside its contents
+   * folder (ADR 030), as a person moving an Obsidian vault or a project in may
+   * want for its attachments or code. The folder stays where it is and Git
+   * keeps tracking it; it is checked as an incoming declaration's would be.
+   */
+  async declareContents(id: string, folder: string): Promise<Space> {
+    return this.queue.run(async () => {
+      const s = this.get(id);
+      const next = folder.replace(/\\/g, '/').replace(/^\.\/|\/+$/g, '');
+      const problem = next.split('/').map(layerFolderProblem).find(Boolean);
+      if (problem) throw Error(problem);
+      if (s.contents.includes(next)) return s;
+      const overlaps = (a: string, b: string) =>
+        a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+      if ([knowledgeFolder(s), ...s.contents].some((other) => overlaps(other, next)))
+        throw Error(
+          t(
+            'そのフォルダは別の層と重なっています。',
+            "That folder is another layer's or overlaps one.",
+          ),
+        );
+      const absolute = path.join(s.root, next);
+      const stat = await fs.lstat(absolute).catch((error) => {
+        if (!isMissing(error)) throw error;
+      });
+      if (!stat?.isDirectory())
+        throw Error(
+          t(
+            `${next} は hibachi の中のフォルダではありません。`,
+            `${next} is not a folder in the hibachi.`,
+          ),
+        );
+      if (owner(this.spaces, absolute)?.scopeId !== id)
+        throw Error(t('そのフォルダは別の hibachi です。', "That folder is another hibachi's."));
+      const meta = await this.metadata(s.root);
+      const raw = JSON.parse(await fs.readFile(meta, 'utf8')) as Record<string, unknown>;
+      if (raw.scopeId !== s.scopeId) throw Error('Scope identity changed');
+      raw.contents = [...s.contents, next];
+      const space: Space = { ...declaration.parse(raw), root: s.root };
+      const contents = await this.contentsPaths(space);
+      if (
+        this.spaces.some(
+          (other) => other.scopeId !== id && contents.some((c) => within(c, other.root)),
+        )
+      )
+        throw Error('A space cannot be registered inside contents (including aliases)');
+      await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
+      this.spaces = this.spaces.map((item) => (item.scopeId === id ? space : item));
+      this.registrationsChanged();
+      return space;
+    });
+  }
   /** The files under a folder, by their paths in the hibachi; links are not followed. */
   private async walk(directory: string, rel: string) {
     const out: string[] = [];

@@ -69,7 +69,60 @@ test('the command reads its forms, options and owner/name shorthand', () => {
     folder: '~/Drive',
     readOnly: true,
   });
-  assert.throws(() => parseIroriCommand(['remove', 'x']), /Unknown command "remove"/);
+  assert.throws(() => parseIroriCommand(['delete', 'x']), /Unknown command "delete"/);
+  assert.deepEqual(parseIroriCommand(['remove', 'Notes', '--trash']), {
+    kind: 'remove',
+    hibachi: 'Notes',
+    trash: true,
+  });
+  assert.deepEqual(parseIroriCommand(['disconnect', 'Notes', 'drive']), {
+    kind: 'disconnect',
+    hibachi: 'Notes',
+    name: 'drive',
+  });
+  assert.deepEqual(
+    parseIroriCommand(['set', 'Notes', '--category', '研究室', '--knowledge-label', '知識']),
+    { kind: 'set', hibachi: 'Notes', category: '研究室', labels: { Knowledge_Base: '知識' } },
+  );
+  assert.throws(() => parseIroriCommand(['set', 'Notes']), /needs --name, --category/);
+  assert.throws(
+    () => parseIroriCommand(['set', 'Notes', '--contents-label', 'x'.repeat(41)]),
+    /--contents-label is one line/,
+  );
+  assert.deepEqual(parseIroriCommand(['layer', 'Notes', 'contents', 'attachments', '--also']), {
+    kind: 'layer',
+    hibachi: 'Notes',
+    layer: 'contents',
+    folder: 'attachments',
+    also: true,
+  });
+  assert.equal(
+    (parseIroriCommand(['layer', 'Notes', 'knowledge', 'wiki']) as { layer: string }).layer,
+    'Knowledge_Base',
+  );
+  assert.throws(
+    () => parseIroriCommand(['layer', 'Notes', 'schema', 'x']),
+    /knowledge or contents/,
+  );
+  assert.throws(
+    () => parseIroriCommand(['layer', 'Notes', 'toString', 'x']),
+    /knowledge or contents/,
+  );
+  assert.throws(
+    () => parseIroriCommand(['layer', 'Notes', 'knowledge', 'x', '--also']),
+    /contents only/,
+  );
+  assert.throws(
+    () => parseIroriCommand(['layer', 'Notes', 'x']),
+    /a hibachi, knowledge or contents/,
+  );
+  assert.deepEqual(parseIroriCommand(['workspace', 'Lab', 'Notes', 'Thesis']), {
+    kind: 'workspace',
+    name: 'Lab',
+    hibachis: ['Notes', 'Thesis'],
+    leave: false,
+  });
+  assert.throws(() => parseIroriCommand(['workspace']), /a workspace name/);
   assert.throws(() => parseIroriCommand(['add', 'a', '--parent', 'b']), /has no --parent/);
   assert.throws(() => parseIroriCommand(['clone', 'octo/a', '--name']), /--name needs a value/);
   assert.throws(
@@ -103,7 +156,9 @@ test('every standard skill is a valid package whose name is its folder', () => {
   assert.deepEqual(Object.keys(iroriAgentSkills).sort(), [
     'add-hibachis',
     'connect-folder',
+    'irori-guide',
     'irori-setup',
+    'move-to-irori',
     'new-hibachi',
     'write-routine',
   ]);
@@ -115,6 +170,20 @@ test('every standard skill is a valid package whose name is its folder', () => {
   }
   assert.match(iroriCommandPreamble, /`irori help`/);
   assert.match(iroriCommandPreamble, /`irori routines`/);
+  // Every form the command takes is in the guide, so the agent knows what it can do.
+  for (const form of [
+    'add',
+    'clone',
+    'create',
+    'connect',
+    'disconnect',
+    'set',
+    'layer',
+    'workspace',
+    'remove',
+  ])
+    assert.match(iroriAgentSkills['irori-guide'], new RegExp(`irori ${form}\\b`), form);
+  assert.match(iroriAgentSkills['irori-setup'], /move-to-irori/);
 });
 
 test('a new irori agent folder has the standard skills; an older one gets the missing ones only when asked', async (t) => {
@@ -291,6 +360,124 @@ test('connect links a folder into the named hibachi’s contents', async (t) => 
   await assert.rejects(setup.run(['connect', 'Research', drive], base), /No hibachi is named/);
   const busy = new AgentSetup({ ...deps, running: () => true });
   await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
+});
+
+test('set, layer, workspace, disconnect and remove change what irori holds, never the files', async (t) => {
+  const { base, files, workspaces, setup, deps, announced } = await device(t);
+  // An Obsidian-like vault: notes in wiki/, attachments beside them, code apart.
+  const vault = path.join(base, 'Vault');
+  for (const folder of ['.obsidian', 'wiki', 'attachments', 'code'])
+    await mkdir(path.join(vault, folder), { recursive: true });
+  await writeFile(path.join(vault, 'wiki', 'a.md'), '# A\n');
+  const work = await workspaces.save('Work', []);
+  const context = { workspaceId: work.id };
+  await setup.run(['add', vault, '--name', 'Vault'], base, context);
+  const id = files.list().find((space) => space.name === 'Vault')!.scopeId;
+
+  // A folder the vault has becomes knowledge as it is; nothing moves.
+  const knowledge = await setup.run(['layer', 'Vault', 'knowledge', 'wiki'], base, context);
+  assert.match(
+    knowledge,
+    /knowledge folder of the hibachi "Vault" is now "wiki"; nothing was moved/,
+  );
+  assert.equal(files.get(id).knowledge, 'wiki');
+  assert.equal(await readFile(path.join(vault, 'wiki', 'a.md'), 'utf8'), '# A\n');
+  // Contents beside the contents folder stays in place.
+  assert.match(
+    await setup.run(['layer', 'Vault', 'contents', 'attachments', '--also'], base, context),
+    /"attachments" is contents of the hibachi "Vault" too/,
+  );
+  assert.deepEqual(files.get(id).contents, ['contents', 'attachments']);
+  await assert.rejects(
+    setup.run(['layer', 'Vault', 'contents', 'wiki', '--also'], base),
+    /別の層と重なって|another layer's/,
+  );
+  await assert.rejects(
+    setup.run(['layer', 'Vault', 'contents', 'missing', '--also'], base),
+    /hibachi の中のフォルダではありません|is not a folder in the hibachi/,
+  );
+  await assert.rejects(
+    setup.run(['layer', 'Vault', 'contents', '.obsidian', '--also'], base),
+    /先頭に \. を|cannot start with a dot/,
+  );
+  // The contents folder renamed: it did not exist, so only the declaration changes.
+  assert.match(
+    await setup.run(['layer', 'Vault', 'contents', 'materials'], base),
+    /contents folder of the hibachi "Vault" is now "materials"/,
+  );
+  assert.deepEqual(files.get(id).contents, ['materials', 'attachments']);
+  const declared = JSON.parse(await readFile(path.join(vault, '.irori', 'scope.json'), 'utf8'));
+  assert.equal(declared.knowledge, 'wiki');
+  assert.deepEqual(declared.contents, ['materials', 'attachments']);
+
+  assert.match(
+    await setup.run(
+      ['set', 'Vault', '--name', 'Research', '--category', '研究室', '--contents-label', '資料'],
+      base,
+    ),
+    /^The hibachi is now "Research", category 研究室, with its layers shown as "Knowledge" and "資料"\./,
+  );
+  assert.equal(files.get(id).labels?.contents, '資料');
+
+  // Workspaces by name: made, added to, left.
+  const notes = path.join(base, 'Notes');
+  await mkdir(notes);
+  await setup.run(['add', notes], base);
+  const made = await setup.run(['workspace', 'Lab', 'Research', 'Notes'], base, context);
+  assert.match(made, /^Made the workspace "Lab" holds Research, Notes\./);
+  assert.match(made, /from the start screen/);
+  assert.match(
+    await setup.run(['workspace', 'Lab', 'Notes', '--leave'], base),
+    /^The workspace "Lab" holds Research\./,
+  );
+  assert.match(
+    await setup.run(['workspace', 'Work', 'Notes'], base, context),
+    /holds Research, Notes\.\nIt is the workspace this request came from/,
+  );
+  await assert.rejects(
+    setup.run(['workspace', 'Nowhere', 'Notes', '--leave'], base),
+    /no workspace/,
+  );
+
+  // A connected folder taken out; the folder itself stays.
+  const drive = path.join(base, 'Drive');
+  await mkdir(drive);
+  await writeFile(path.join(drive, 'x.txt'), 'x');
+  await setup.run(['connect', 'Research', drive, '--name', 'drive'], base);
+  const listed = await setup.run(['list'], base, context);
+  assert.match(
+    listed,
+    /- Research: folder .*, in this workspace; category 研究室; knowledge "wiki"; contents "materials", "attachments"; connected materials\/drive \(mounted\)/,
+  );
+  assert.match(listed, /^Workspaces:$/m);
+  assert.match(listed, /^- Work: Research, Notes$/m);
+  assert.match(listed, /^- Lab: Research$/m);
+  assert.match(
+    await setup.run(['disconnect', 'Research', 'materials/drive'], base),
+    /^Took materials\/drive out of the hibachi "Research"/,
+  );
+  await assert.rejects(lstat(path.join(vault, 'materials', 'drive')));
+  assert.equal(await readFile(path.join(drive, 'x.txt'), 'utf8'), 'x');
+  await assert.rejects(setup.run(['disconnect', 'Research', 'drive'], base), /no connected folder/);
+
+  // A hibachi whose own agent works waits.
+  const busy = new AgentSetup({ ...deps, running: () => true });
+  await assert.rejects(busy.run(['set', 'Research', '--name', 'X'], base), /own agent running/);
+  await assert.rejects(busy.run(['remove', 'Research'], base), /own agent running/);
+
+  // Removing keeps the folder and leaves every workspace; adding brings it back.
+  const removed = await setup.run(['remove', 'Notes'], base, context);
+  assert.match(removed, /^Removed the hibachi "Notes" from this computer/);
+  assert.ok((await stat(notes)).isDirectory());
+  assert.equal(files.list().length, 1);
+  assert.deepEqual((await workspaces.list()).find((item) => item.id === work.id)?.scopeIds, [id]);
+  assert.deepEqual(announced.at(-1)?.workspace?.scopeIds, [id]);
+  await assert.rejects(
+    setup.run(['remove', 'Research', '--trash'], base),
+    /trash is not available/,
+  );
+  assert.equal(files.list().length, 1);
+  assert.match(await setup.run(['add', notes], base), /^Registered the hibachi "Notes"/);
 });
 
 /** Runs the `irori` command as a CLI's shell would: by name, from the run's PATH. */

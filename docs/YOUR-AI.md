@@ -165,18 +165,30 @@ agent sets up the person's hibachis.
   `--parent`, `--folder`, `--name`, `--category` and `--read-only` where they
   apply (`parseIroriCommand`, `irori help`). The host carries them out in
   `AgentSetup` (`src/host/agent-setup.ts`).
-- Only additions: a hibachi registered on this device and added to the
-  workspace the request came from (`StartRun.workspace`), or a folder linked
-  into a hibachi's first contents folder. A repository or folder already
-  registered just joins the workspace. New hibachis go beside the irori agent's
-  folder unless `--parent` names another.
+- Since 0.1.91 ([ADR 030](decisions/030-moving-in-with-the-irori-agent.md)) also
+  what the person does in a hibachi's settings and the start screen:
+  `irori disconnect <hibachi> <name>`, `irori set <hibachi>` (`--name`,
+  `--category`, `--knowledge-label`, `--contents-label`), `irori layer <hibachi>
+  knowledge|contents <folder> [--also]`, `irori workspace <name> [<hibachi>...]
+  [--leave]` and `irori remove <hibachi> [--trash]`. `irori list` also shows each
+  hibachi's category, layer folders and connected folders, and the workspaces.
+- A hibachi is registered on this device and added to the workspace the
+  request came from (`StartRun.workspace`); a folder is linked into a hibachi's
+  first contents folder. A repository or folder already registered just joins
+  the workspace. New hibachis go beside the irori agent's folder unless
+  `--parent` names another. No form deletes a file: `remove --trash` moves the
+  folder to the system trash, as the settings' removal does.
 - Clones, new hibachis and their first commit go ahead while runs are in
-  progress, since their folders are new. `connect` waits only for the
-  hibachi's own agent.
+  progress, since their folders are new. `connect`, `disconnect`, `set`,
+  `layer` and `remove` wait only for the hibachi's own agent, not for the
+  irori agent's hold on it, and refuse while a Git operation, connection setup
+  or (for `remove`) a routine is in progress.
 - The window refreshes its hibachis and takes in the saved workspace when the
   host announces a registration (`hibachis` event).
-- Standard skills (`prompts/irori-agent-skills.ts`): `irori-setup`,
-  `add-hibachis`, `new-hibachi`, `connect-folder`. Written with the starter;
+- Standard skills (`prompts/irori-agent-skills.ts`): `irori-guide` (what irori
+  can do and who does each part), `irori-setup`, `move-to-irori` (moving in
+  from another tool by asking first), `add-hibachis`, `new-hibachi`,
+  `connect-folder` and `write-routine`. Written with the starter;
   for a folder set up earlier, the + beside Schema on the irori agent's screen
   (**標準スキルを追加**, shown only while one is missing) writes the missing
   ones. A present skill folder is never replaced.

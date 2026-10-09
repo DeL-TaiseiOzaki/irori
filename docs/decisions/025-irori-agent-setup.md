@@ -1,6 +1,8 @@
 # 025 — The irori agent sets up hibachis, with standard skills
 
-Date: 2026-10-05. Status: owner request; implemented for 0.1.71.
+Date: 2026-10-05. Status: owner request; implemented for 0.1.71. Decision 2
+is widened by [ADR 030](030-moving-in-with-the-irori-agent.md): the command
+also changes and takes back what irori holds.
 
 ## Context
 
