@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { AgentService, itemStart } from '../src/agents/service';
+import { AgentService, itemStart, ownCodexNotice } from '../src/agents/service';
 import { FileService } from '../src/host/files';
 import type { AgentEvent } from '../src/domain/types';
 
@@ -203,3 +203,85 @@ test(
     assert.equal(saved.events.at(-2)?.text, words);
   },
 );
+
+// A stand-in whose turn spawns a sub-agent: the child's thread streams its own reply
+// and finishes its turn on the same connection while the parent's turn goes on.
+const subAgentFixture = `#!/usr/bin/env node
+require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+  const m = JSON.parse(line);
+  if (!m.method || m.id === undefined) return;
+  const send = value => process.stdout.write(JSON.stringify(value) + '\\n');
+  const result = m.method.startsWith('thread/') ? {thread:{id:'parent-thread'}}
+    : m.method === 'turn/start' ? {turn:{id:'parent-turn'}} : {};
+  send({id:m.id,result});
+  if (m.method !== 'turn/start') return;
+  const parent = {threadId:'parent-thread',turnId:'parent-turn'};
+  const child = {threadId:'child-thread',turnId:'child-turn'};
+  send({method:'item/agentMessage/delta',params:{...parent,itemId:'a',delta:'before '}});
+  const spawn = {type:'collabAgentToolCall',id:'spawn-1',tool:'spawnAgent',status:'inProgress'};
+  send({method:'item/started',params:{...parent,item:spawn}});
+  send({method:'turn/started',params:{threadId:'child-thread',turn:{id:'child-turn',status:'inProgress'}}});
+  send({method:'item/agentMessage/delta',params:{...child,itemId:'c',delta:'child '}});
+  send({method:'item/started',params:{...child,item:{type:'commandExecution',id:'child-command'}}});
+  send({method:'turn/completed',params:{threadId:'child-thread',turn:{id:'child-turn',status:'completed'}}});
+  setTimeout(() => {
+    send({method:'item/completed',params:{...parent,item:{...spawn,status:'completed'}}});
+    send({method:'item/agentMessage/delta',params:{...parent,itemId:'b',delta:'after'}});
+    send({method:'turn/completed',params:{threadId:'parent-thread',turn:{id:'parent-turn',status:'completed'}}});
+  }, 300);
+});
+`;
+
+test(
+  'A sub-agent finishing its turn does not end the run, and its words stay out of the reply',
+  { skip: process.platform === 'win32' && 'POSIX protocol fixture executable', timeout: 30000 },
+  async (t) => {
+    const base = await mkdtemp(path.join(tmpdir(), 'irori agent sub-agent '));
+    const previous = process.env.PATH;
+    t.after(async () => {
+      process.env.PATH = previous;
+      await rm(base, { recursive: true, force: true });
+    });
+    const bin = path.join(base, 'bin');
+    const root = path.join(base, 'KB');
+    await mkdir(bin);
+    await mkdir(root);
+    await writeFile(path.join(bin, 'codex'), subAgentFixture, { mode: 0o700 });
+    process.env.PATH = bin + path.delimiter + previous;
+    const files = new FileService(path.join(base, 'device'));
+    await files.init();
+    const space = await files.register(root, 'KB', 'personal');
+    const events: AgentEvent[] = [];
+    let done!: () => void;
+    const completed = new Promise<void>((resolve) => {
+      done = resolve;
+    });
+    const service = new AgentService(files, (event) => {
+      events.push(event);
+      if (event.type === 'done') done();
+    });
+    t.after(() => service.cancel());
+    service.start({ scopeId: space.scopeId, agent: 'codex', prompt: 'Sub-agent fixture' });
+    await completed;
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events.slice(-3)));
+    const words = events
+      .filter((event) => event.type === 'text')
+      .map((event) => event.text)
+      .join('');
+    assert.equal(words, 'before after');
+    const calls = events.filter((event) => event.type === 'tool').map((event) => event.call);
+    assert.deepEqual(calls, ['spawn-1', 'spawn-1']);
+  },
+);
+
+test('A Codex notice is the run’s when it names the run’s thread and turn, or neither', () => {
+  const run = { threadId: 'parent', turnId: 'turn' };
+  assert.equal(ownCodexNotice(run, {}), true);
+  assert.equal(ownCodexNotice(run, { threadId: 'parent', turnId: 'turn' }), true);
+  assert.equal(ownCodexNotice(run, { threadId: 'parent', turn: { id: 'turn' } }), true);
+  assert.equal(ownCodexNotice(run, { threadId: 'child', turn: { id: 'turn' } }), false);
+  assert.equal(ownCodexNotice(run, { threadId: 'parent', turn: { id: 'earlier' } }), false);
+  // Before the turn's id is known, the thread decides.
+  assert.equal(ownCodexNotice({ threadId: 'parent' }, { threadId: 'parent', turnId: 'x' }), true);
+  assert.equal(ownCodexNotice({ threadId: 'parent' }, { threadId: 'child', turnId: 'x' }), false);
+});
