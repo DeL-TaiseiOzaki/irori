@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-12: **0.1.99** ([#214](https://github.com/DeL-TaiseiOzaki/irori/pull/214),
+irori agent threads side by side in irori mode and kept per workspace, a
+stopped thread takes the next instruction, [ADR 034](decisions/034-irori-mode-threads.md))
+merged at the owner's request as `31b9903`, and is published as
+[v0.1.99-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.99-preview.1)
+by release run `38158919978` from main's successful CI run `38158080226`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,205,312 bytes,
+  Mac 141,829,942 bytes and `irori-0.1.99-full.nupkg` 175,373,694 bytes.
+  The website manifest now offers 0.1.99.
+- Owner checks remain: real Claude Code and Codex threads at once in irori
+  mode, and whether one conversation still shows in every workspace.
+
 Threads in irori mode, 2026-10-12 (**0.1.99**, [ADR 034](decisions/034-irori-mode-threads.md)):
 irori mode shows the irori agent in up to four columns of the dock's kind, so
 its threads run side by side. A closed column's running thread comes back as a
