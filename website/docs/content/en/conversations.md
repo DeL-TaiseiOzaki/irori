@@ -17,8 +17,8 @@ Deleting a conversation removes irori's saved copy. The CLI's own history stays.
 
 ## Queues and resuming
 
-One run proceeds at a time in a vault. Instructions sent during a run are queued. Queues run oldest first across conversations belonging to the same owner.
+Each conversation runs one instruction at a time, and several conversations can run at once. Instructions sent during a run wait in that conversation's queue.
 
-A failed or stopped run pauses the queue. Instructions survive a restart; use **Resume sending** to continue. A run whose completion could not be confirmed is never automatically repeated.
+A failed or stopped run pauses the queue. Sending another instruction continues it, oldest first; **Resume sending** does the same. Instructions survive a restart. A run whose completion could not be confirmed is never automatically repeated.
 
 A native CLI session resumes only on the same computer, folder, and access mode. A change starts a new CLI session. Previous conversation context is not automatically supplied to it yet; include the material it needs in your next request.

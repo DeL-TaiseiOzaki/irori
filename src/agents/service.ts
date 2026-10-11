@@ -41,6 +41,7 @@ import type { SessionBinding } from './sessions';
 import {
   ConversationStore,
   notYours,
+  otherWorkspace,
   rootDigest,
   stopBeforeDeleting,
   viewDetails,
@@ -376,6 +377,14 @@ export class AgentService {
   ): Promise<Conversation> {
     this.root(scopeId);
     const history = this.historyOf(scopeId, workspace);
+    // A named irori agent conversation opens only in its own workspace (ADR 017 D4).
+    if (
+      id &&
+      workspace !== undefined &&
+      this.isYou(scopeId) &&
+      !(await this.conversations.belongs(id, history))
+    )
+      throw Error(otherWorkspace());
     id ??= await this.conversations.current(scopeId, agent, history);
     const pending = await this.conversations.pending(scopeId, history);
     const reserved = id && this.conversations.reservation(id);

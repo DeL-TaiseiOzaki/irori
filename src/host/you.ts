@@ -144,8 +144,15 @@ export class YourAiService {
         if (isMissing(error)) return undefined;
         throw error;
       });
-      if (!stat) await fs.mkdir(dir);
-      else if (!stat.isDirectory())
+      if (!stat)
+        try {
+          await fs.mkdir(dir);
+          continue;
+        } catch (error) {
+          // Another run of the irori agent made it a moment ago.
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        }
+      if (!(stat ?? (await fs.lstat(dir))).isDirectory())
         throw Error(`${dir} is not a folder inside the irori agent’s folder`);
     }
   }

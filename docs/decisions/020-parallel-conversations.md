@@ -51,6 +51,9 @@ space, and `cancel()` every run, for shutdown.
 
 ### D4 — Tabs in the hibachi agent's panel
 
+> For irori mode, the irori agent's single panel was replaced on 2026-10-12 by
+> columns with tabs ([ADR 034](034-irori-mode-threads.md)).
+
 - The panel keeps the hibachi's open conversations as tabs, shown once there are
   two. **新しい会話**, choosing another CLI and opening a conversation from
   **履歴** add a tab; an empty conversation on show gives way instead of keeping a

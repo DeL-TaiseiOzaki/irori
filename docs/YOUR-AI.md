@@ -81,12 +81,12 @@ agent's shape. The investigation behind the design is in the
 
 ## A request
 
-- The irori agent runs on the CLI chosen in its panel (Claude Code unless the
+- The irori agent runs on the CLI chosen in its column (Claude Code unless the
   person chose another), with the model chosen for that CLI. Both are kept on
   the device (`yourAi` in the device settings).
 - It starts in **full access** wherever the CLI offers it, on every CLI
-  including Claude Code (`defaultAgentAccess`, as for a vault agent). The
-  panel has the same access pill as a vault agent's composer; a choice holds
+  including Claude Code (`defaultAgentAccess`, as for a vault agent). Each
+  column has the same access pill as a vault agent's composer; a choice holds
   for the chosen CLI until the CLI changes, like the composer's. Pi offers only
   its own settings. The owner accepts that the irori agent may read any vault.
 - irori mode sends each request with the workspace's vaults, busy or not
@@ -229,15 +229,18 @@ agent sets up the person's vaults.
 ## Where it shows
 
 - **irori mode, beside the map:** **irori agent** (the default) or **vault
-  agent**. The irori agent's log shows each run's hand-offs as a task list
+  agent**. The irori agent shows in up to four columns, each a thread with its
+  own tabs, 履歴 and composer, kept per workspace
+  ([ADR 034](decisions/034-irori-mode-threads.md)). Its log shows each run's hand-offs as a task list
   (vault, what it was asked, working / needs approval / done), each vault's
   report, and sub-agent requests labelled with their vault.
 - **Map:** the irori agent's orb at the hearth. A line runs to each vault with
-  a hand-off under way, with a spark moving along it unless less motion is asked
+  a hand-off under way from any thread on show or running, with a spark moving along it unless less motion is asked
   for. The vault glows.
-- **The irori agent's panel:** the access pill (full access by default) beside
-  the CLI select and the model pill.
-- **The irori agent's screen** (the orb, or "<CLI> · あなたの Schema"): its
+- **The irori agent's columns:** the access pill (full access by default) beside
+  the model pill, and the CLI select in the header.
+- **The irori agent's screen** (the orb, or the mark at the start of an irori
+  mode column): its
   Schema as the same settings a vault has ([SKILLS](SKILLS.md#schema-settings)):
   指示 (its root `AGENTS.md` only; the irori agent's folder has no knowledge
   folders, and its `AGENTS.md` cannot be deleted, since it marks the folder as

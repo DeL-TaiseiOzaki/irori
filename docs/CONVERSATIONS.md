@@ -9,15 +9,19 @@ is described in the history of this file.
 ## What the person sees
 
 - A vault and the irori agent each have any number of conversations, and they
-  run side by side ([ADR 020](decisions/020-parallel-conversations.md)). The
-  vault agent's panel keeps the open ones as tabs, shown once there are two;
-  the irori agent's panel shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
+  run side by side ([ADR 020](decisions/020-parallel-conversations.md)). Each
+  column keeps the open ones as tabs, shown once there are two. irori mode shows
+  the irori agent in up to four columns of its own, and a conversation running
+  without a tab gets one in the first column
+  ([ADR 034](decisions/034-irori-mode-threads.md)). **新しい会話** starts an empty one on the same CLI; nothing
   is written until its first instruction. **履歴** lists the owner's own
   conversations: a vault's list never holds the irori agent's, and the reverse.
 - The irori agent keeps a history per workspace (0.1.94). Its 履歴, the
   conversation a panel opens on, its queue and a new conversation are those of
   the workspace open; opening another workspace shows that one's. A conversation
-  continues only in the workspace it began in. Conversations from before 0.1.94
+  continues only in the workspace it began in. Since 0.1.99 the columns, tabs and
+  conversations on show are also kept per workspace, and the host refuses to
+  show a named irori agent conversation in another workspace (ADR 034 D2). Conversations from before 0.1.94
   have no workspace and appear in none; their folders stay. A vault keeps one
   history wherever it is opened, and a routine's irori agent step is kept in the
   routine's workspace.
@@ -105,7 +109,9 @@ is described in the history of this file.
 - A send to a conversation whose run is in progress, or whose queue is not
   empty, is queued in that conversation, and waits for that conversation alone.
   A completed run sends its conversation's next; a failed or stopped run pauses
-  that queue; after a restart queues are paused until **送信を再開**. A run never
+  that queue (**一時停止中**); after a restart queues are paused until
+  **送信を再開**, or until the next send to that conversation, which joins the
+  queue and lets it go on, oldest first (ADR 034 D3). A run never
   passes its conversation's waiting queue. `startNextQueued(scopeId,
   conversationId?)` starts the named conversation's next, or the oldest among
   conversations not running.

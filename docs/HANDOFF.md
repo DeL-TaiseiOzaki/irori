@@ -1,5 +1,20 @@
 # irori continuation handoff
 
+Threads in irori mode, 2026-10-12 (**0.1.99**, [ADR 034](decisions/034-irori-mode-threads.md)):
+irori mode shows the irori agent in up to four columns of the dock's kind, so
+its threads run side by side. A closed column's running thread comes back as a
+tab. Its columns, tabs and conversations on show are kept per workspace, and the
+host refuses to show a named irori agent conversation of another workspace.
+Sending to a thread whose queue 停止 paused lets the queue go on, in a vault
+column and from irori mode's vault list too. `YourAiPanel` is gone. Host fixes:
+`YourAiService.folders()` tolerates a folder another run just made, and
+`WorkspaceService.update` reads and saves a workspace in one step for `irori`.
+The owner's report of one conversation in every workspace (Claude Code and
+Codex) was not reproduced with protocol fixtures through the home screen, a
+restart, the dock or a CLI change. Owner checks remain: real CLIs, and whether
+the report still occurs. Routine steps of the irori agent still wait for any of
+its runs (owner undecided).
+
 Published 2026-10-12: **0.1.98** ([#212](https://github.com/DeL-TaiseiOzaki/irori/pull/212),
 hibachis are vaults and a vault's agent is named after it, hand-off on Pi and
 Hermes Agent through `irori call`, [ADR 033](decisions/033-vaults.md)) merged at

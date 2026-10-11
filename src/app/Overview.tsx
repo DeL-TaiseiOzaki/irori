@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import type { AttachmentRef } from '../domain/attachments';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   Group as PaneGroup,
   Panel as Pane,
   Separator as PaneSeparator,
   useDefaultLayout,
+  usePanelRef,
 } from 'react-resizable-panels';
 import { knowledgeFolder } from '../domain/layers';
-import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
+import type { AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
 import { categoryIcon, categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
@@ -25,9 +25,15 @@ import { useAction } from './useAction';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
-import { currentStep, lastRun, openRequest, useBrainAi, type BrainAi } from './useBrainAi';
+import {
+  currentStep,
+  lastRun,
+  openRequest,
+  openTasks,
+  useBrainAi,
+  type BrainAi,
+} from './useBrainAi';
 import type { YourAi } from '../domain/you';
-import { openTasks, YourAiPanel } from './YourAiPanel';
 import { routineOwners, RoutinesView } from './RoutinesView';
 import type { RunRoutine } from '../domain/routines';
 import './overview.css';
@@ -217,7 +223,7 @@ function OverviewMap({
   ais,
   refresh,
   you,
-  yourAi,
+  yourAis,
   onShowYou,
   onEnter,
 }: {
@@ -225,13 +231,16 @@ function OverviewMap({
   ais: Record<string, BrainAi>;
   refresh: number;
   you?: YourAi;
-  yourAi: BrainAi;
+  /** The irori agent's conversations followed here: those on show and those running. */
+  yourAis: BrainAi[];
   onShowYou: () => void;
   onEnter: Actions['onEnter'];
 }) {
   const layout = useMemo(() => mapLayout(spaces, { hearth: !!you }), [spaces, !!you]);
-  // Your AI's hand-offs still under way: a line from the hearth to each brain.
-  const tasks = openTasks(yourAi);
+  // The irori agent's hand-offs still under way, from any of its conversations: a line
+  // from the hearth to each vault.
+  const tasks = yourAis.flatMap(openTasks);
+  const working = yourAis.some((ai) => ai.running);
   const ids = spaces.map((space) => space.scopeId);
   const histories = useResource(
     async () =>
@@ -294,7 +303,7 @@ function OverviewMap({
           ))}
         {layout.hearth && you && (
           <button
-            className={`map-hearth ${yourAi.running ? 'working' : ''}`}
+            className={`map-hearth ${working ? 'working' : ''}`}
             style={at(layout.hearth)}
             aria-label={t('irori agent の Schema を開く', "Open the irori agent's Schema")}
             onClick={onShowYou}
@@ -668,19 +677,12 @@ export function Overview({
   onConnect,
   onSend,
   you,
-  onCreateYou,
   onShowYou,
-  onSendYou,
-  onStopYou,
-  yourAgent,
-  yourModel,
-  yourAccess,
-  onYourAgent,
-  onYourModel,
-  onYourAccess,
-  yourConversation,
+  yourDock,
+  yourColumnCount,
+  yourWatched,
+  onAskYou,
   onShowConversation,
-  onYourNew,
   routineChoices,
   ...actions
 }: {
@@ -704,23 +706,16 @@ export function Overview({
   you?: YourAi;
   /** The zoom into a brain (from `origin`), or back from one. */
   scene?: { kind: 'leave' | 'return'; origin?: { x: number; y: number } };
-  onCreateYou: () => Promise<void>;
   onShowYou: () => void;
-  onSendYou: (prompt: string, attachments?: AttachmentRef[]) => Promise<void>;
-  onStopYou: (conversationId?: string) => Promise<void>;
-  /** The CLI your AI runs on, and the model chosen for it ('' for the CLI's default). */
-  yourAgent: AgentId;
-  yourModel: string;
-  /** Your AI's access, full access by default where the CLI offers it. */
-  yourAccess: AgentAccess;
-  onYourAgent: (agent: AgentId) => void;
-  onYourModel: (model: string) => void;
-  onYourAccess: (access: AgentAccess) => void;
-  /** The irori agent's conversation on show. */
-  yourConversation?: string;
+  /** The irori agent's columns in this workspace (ADR 034). */
+  yourDock: ReactNode;
+  yourColumnCount: number;
+  /** The irori agent's conversations the map follows: those on show and those running. */
+  yourWatched: string[];
+  /** Puts words in the irori agent's first column, for the person to finish. */
+  onAskYou: (text: string) => void;
   /** Shows one of an owner's conversations in its panel; `null` lets the host pick. */
   onShowConversation: (scopeId: string, id: string | null, agent: AgentId) => void;
-  onYourNew: () => Promise<void>;
   /** The CLI and model chosen in each agent's panel, for routine steps that name none. */
   routineChoices: () => RunRoutine['agents'];
 } & Actions) {
@@ -728,10 +723,19 @@ export function Overview({
   // Beside the map: your AI, or each brain's own AI.
   const [islandChoice, setIsland] = useState<'you' | 'brains'>('you');
   const [creatingRoutine, setCreatingRoutine] = useState(false);
-  // Words put in the irori agent's message box by 「irori agent に頼む」; `key` places them again.
-  const [yourSeed, setYourSeed] = useState<{ text: string; key: number }>();
   const island = vaultAgent ? islandChoice : 'you';
-  const yourAi = (you && ais[you.id]) ?? idle;
+  // The irori agent's conversations as the map follows them.
+  const [yourAis, setYourAis] = useState<Record<string, BrainAi>>({});
+  const followed = yourWatched.flatMap((id) => yourAis[id] ?? []);
+  // A column added in irori mode widens the island for it, as in the dock.
+  const aiPane = usePanelRef();
+  const shownColumns = useRef(yourColumnCount);
+  useEffect(() => {
+    const added = yourColumnCount - shownColumns.current;
+    shownColumns.current = yourColumnCount;
+    const width = aiPane.current?.getSize().inPixels;
+    if (added > 0 && width) aiPane.current?.resize(width + 340 * added);
+  }, [yourColumnCount]);
   // What the Overview itself did (a send, a resume) is read back at once.
   const [acted, setActed] = useState(0);
   const reread =
@@ -787,17 +791,19 @@ export function Overview({
           onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
         />
       ))}
-      {you?.state === 'ready' && (
-        <AiWatch
-          key={`you:${you.id}:${yourAgent}:${yourConversation ?? ''}:${workspace.id}`}
-          scopeId={you.id}
-          agent={yourAgent}
-          conversationId={yourConversation}
-          workspaceId={workspace.id}
-          refresh={acted}
-          onChange={(id, ai) => setAis((all) => ({ ...all, [id]: ai }))}
-        />
-      )}
+      {you?.state === 'ready' &&
+        yourWatched.map((id) => (
+          <AiWatch
+            key={`you:${id}`}
+            scopeId={you.id}
+            // A named conversation is read with its own CLI.
+            agent="claude"
+            conversationId={id}
+            workspaceId={workspace.id}
+            refresh={acted}
+            onChange={(_, ai) => setYourAis((all) => ({ ...all, [id]: ai }))}
+          />
+        ))}
       <PaneGroup
         className="overview-panes"
         orientation="horizontal"
@@ -849,10 +855,7 @@ export function Overview({
                   className="panel-button"
                   onClick={() => {
                     setIsland('you');
-                    setYourSeed((seed) => ({
-                      text: t('ルーティンを作って：', 'Write a routine: '),
-                      key: (seed?.key ?? 0) + 1,
-                    }));
+                    onAskYou(t('ルーティンを作って：', 'Write a routine: '));
                   }}
                 >
                   <Icon name="sparkles" size={14} />
@@ -930,7 +933,7 @@ export function Overview({
               ais={ais}
               refresh={anyRevision(revisions)}
               you={you}
-              yourAi={yourAi}
+              yourAis={followed}
               onShowYou={onShowYou}
               onEnter={actions.onEnter}
             />
@@ -952,57 +955,52 @@ export function Overview({
               className="island-handle"
               aria-label={t('エージェントの幅', 'Agents width')}
             />
-            <Pane id="overview-ai" className="overview-ai-pane" defaultSize={360} minSize={300}>
-              <aside
-                className="overview-ai chrome"
-                aria-label={
-                  island === 'you'
-                    ? t('irori agent', 'irori agent')
-                    : t('vault agent', 'vault agents')
-                }
-              >
-                {vaultAgent && (
-                  <MagnetTabs
-                    className="overview-island-tabs"
-                    label={
-                      routines
-                        ? t('ルーティンの AI', 'Routine agents')
-                        : t('irori mode の AI', 'AIs in irori mode')
-                    }
-                    value={island}
-                    onValueChange={setIsland}
-                    options={[
-                      { value: 'you', label: t('irori agent', 'irori agent') },
-                      { value: 'brains', label: t('vault agent', 'vault agents') },
-                    ]}
-                  />
-                )}
-                {island === 'you' ? (
-                  <YourAiPanel
-                    you={you}
-                    workspaceId={workspace.id}
-                    brains={spaces}
-                    ai={yourAi}
-                    agent={yourAgent}
-                    model={yourModel}
-                    access={yourAccess}
-                    onAgent={onYourAgent}
-                    onModel={onYourModel}
-                    onAccess={onYourAccess}
-                    seed={yourSeed}
-                    conversationId={yourConversation}
-                    onOpenConversation={(row) => onShowConversation(you!.id, row.id, row.agent)}
-                    onDeletedConversation={(id) => {
-                      if (id === yourConversation) onShowConversation(you!.id, null, yourAgent);
-                    }}
-                    onNew={onYourNew}
-                    onCreate={onCreateYou}
-                    onShow={onShowYou}
-                    onSend={reread(onSendYou)}
-                    onStop={reread(onStopYou)}
-                    onError={actions.onError}
-                  />
-                ) : (
+            <Pane
+              id="overview-ai"
+              className="overview-ai-pane"
+              panelRef={aiPane}
+              defaultSize={360}
+              minSize={300}
+            >
+              {island === 'you' ? (
+                // Each column is the irori agent's own landmark; this one holds them.
+                <div className="overview-ai your-columns chrome">
+                  {vaultAgent && (
+                    <MagnetTabs
+                      className="overview-island-tabs"
+                      label={
+                        routines
+                          ? t('ルーティンの AI', 'Routine agents')
+                          : t('irori mode の AI', 'AIs in irori mode')
+                      }
+                      value={island}
+                      onValueChange={setIsland}
+                      options={[
+                        { value: 'you', label: t('irori agent', 'irori agent') },
+                        { value: 'brains', label: t('vault agent', 'vault agents') },
+                      ]}
+                    />
+                  )}
+                  {yourDock}
+                </div>
+              ) : (
+                <aside className="overview-ai chrome" aria-label={t('vault agent', 'vault agents')}>
+                  {vaultAgent && (
+                    <MagnetTabs
+                      className="overview-island-tabs"
+                      label={
+                        routines
+                          ? t('ルーティンの AI', 'Routine agents')
+                          : t('irori mode の AI', 'AIs in irori mode')
+                      }
+                      value={island}
+                      onValueChange={setIsland}
+                      options={[
+                        { value: 'you', label: t('irori agent', 'irori agent') },
+                        { value: 'brains', label: t('vault agent', 'vault agents') },
+                      ]}
+                    />
+                  )}
                   <>
                     <header className="overview-ai-head">
                       <span className="overview-orb" aria-hidden="true">
@@ -1041,8 +1039,8 @@ export function Overview({
                       onSend={reread(onSend)}
                     />
                   </>
-                )}
-              </aside>
+                </aside>
+              )}
             </Pane>
           </>
         )}

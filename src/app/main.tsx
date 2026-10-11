@@ -1,5 +1,4 @@
 import { classify, isPropertyPage } from '../domain/scopes';
-import type { AttachmentRef } from '../domain/attachments';
 import { knowledgeFolder, layerFolder, renamedPath } from '../domain/layers';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
@@ -205,9 +204,24 @@ function savedAgentChoice(): AgentChoice {
   }
   return { last: 'codex', brains: {} };
 }
-/** Where a column keeps an owner's conversation and tabs: the first under the owner's id. */
-const slot = (columnId: string, scopeId: string) =>
-  columnId === 'main' ? scopeId : `${scopeId}#${columnId}`;
+/**
+ * irori mode's own columns (ADR 034): `you` first, then `you-2` to `you-4`. Its first
+ * column and the dock's first column show the same irori agent conversation.
+ */
+const yourFirst = 'you';
+const yourColumnLimit = 4;
+const isYourColumn = (columnId: string) =>
+  columnId === yourFirst || columnId.startsWith(`${yourFirst}-`);
+/** A column's number: 1 for the first, the dock's or irori mode's. */
+const columnNumber = (columnId: string) =>
+  columnId === 'main' || columnId === yourFirst ? 1 : Number(columnId.replace(/^you-/, ''));
+/**
+ * Where a column keeps an owner's conversation and tabs: the first under the
+ * owner's key. The irori agent's key names the workspace, so each workspace keeps
+ * its own (ADR 017 D4, ADR 034).
+ */
+const slot = (columnId: string, ownerKey: string) =>
+  columnNumber(columnId) === 1 ? ownerKey : `${ownerKey}#${columnId}`;
 /** A column's open tabs; the conversation on show is always among them. */
 function openTabs(tabs: Record<string, Tab[]>, shown: Record<string, Tab>, key: string) {
   const open = tabs[key] ?? [];
@@ -253,6 +267,8 @@ interface DockActions {
   splitColumn: (after: DockColumn) => void;
   closeColumn: (column: DockColumn) => void;
   createYou: () => Promise<void>;
+  /** Opens the irori agent's screen: its folder, Schema and the vaults' sub-agents. */
+  showYou: () => void;
   setShown: Dispatch<SetStateAction<Record<string, Tab>>>;
   setTabs: Dispatch<SetStateAction<Record<string, Tab[]>>>;
   setSources: Dispatch<SetStateAction<Record<string, SourceRef[]>>>;
@@ -294,6 +310,9 @@ const DockColumnView = memo(function DockColumnView({
   stageHidden,
   workspaceScopeIds,
   workspaceId,
+  yourKey,
+  canSplit = true,
+  seed,
   act,
 }: {
   column: DockColumn;
@@ -319,11 +338,18 @@ const DockColumnView = memo(function DockColumnView({
   stageHidden: boolean;
   workspaceScopeIds: string[];
   workspaceId?: string;
+  /** The irori agent's key in this workspace: its id and the workspace's. */
+  yourKey?: string;
+  /** Another column fits beside this one. */
+  canSplit?: boolean;
+  /** Words for the composer, placed again with each new `key`. */
+  seed?: { text: string; key: number };
   act: DockActions;
 }) {
   const irori = owner === 'irori';
   const scopeId = irori ? you?.id : active?.scopeId;
-  const key = scopeId ? slot(column.id, scopeId) : '';
+  const ownerKey = irori ? yourKey : active?.scopeId;
+  const key = scopeId && ownerKey ? slot(column.id, ownerKey) : '';
   const target = key ? shown[key] : undefined;
   const columnAgent =
     target?.agent ?? (irori ? yourChoice.agent : agentOf(agentChoice, active?.scopeId));
@@ -344,7 +370,7 @@ const DockColumnView = memo(function DockColumnView({
   return (
     <AgentColumn
       column={dockColumn}
-      number={column.id === 'main' ? 1 : Number(column.id)}
+      number={columnNumber(column.id)}
       shared={shared}
       space={irori ? undefined : active}
       you={you}
@@ -364,8 +390,12 @@ const DockColumnView = memo(function DockColumnView({
       skillProblems={irori ? noProblems : skillProblems}
       instructionFile={irori ? undefined : instructionFileOf(roots, columnAgent)}
       sources={sources}
-      ownerChoice={vaultAgent}
+      ownerChoice={vaultAgent && !isYourColumn(column.id)}
       stage={stage}
+      closable={column.id !== yourFirst}
+      canSplit={canSplit}
+      seed={seed}
+      onShowSchema={isYourColumn(column.id) ? act.showYou : undefined}
       onModel={(next) => {
         if (irori) {
           const models = { ...yourChoice.models };
@@ -394,7 +424,7 @@ const DockColumnView = memo(function DockColumnView({
       }}
       onPick={(tab) => {
         if (!key) return;
-        if (irori && column.id === 'main' && tab.agent !== yourChoice.agent)
+        if (irori && columnNumber(column.id) === 1 && tab.agent !== yourChoice.agent)
           act.chooseYour({ ...yourChoice, agent: tab.agent });
         act.setShown((all) => (all[key] ? all : { ...all, [key]: tab }));
       }}
@@ -442,6 +472,7 @@ const DockColumnView = memo(function DockColumnView({
   );
 });
 const noTabs: Tab[] = [];
+const firstYourColumns: DockColumn[] = [{ id: yourFirst, owner: 'irori' }];
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
   // the whole tree from here; component state, drafts and the editor are kept.
@@ -895,23 +926,38 @@ function App() {
     ],
     [skills, skillsRetired, sharedSkillRead.data],
   );
-  // The irori agent's panel shows one of its conversations: the host's pick until one is chosen.
-  useEffect(() => {
-    if (you?.state !== 'ready' || shown[you.id]) return;
-    let live = true;
-    const choice = yourChoice.agent;
-    void (async () => {
-      const value = await host.agentConversation(you.id, choice, undefined, workspace?.id);
-      const id = value.id ?? (await host.createConversation(you.id, choice, workspace?.id));
-      const next = value.summary?.agent ?? choice;
-      if (!live) return;
-      if (next !== choice) chooseYour({ ...yourChoice, agent: next });
-      setShown((all) => (all[you.id] ? all : { ...all, [you.id]: { id, agent: next } }));
-    })().catch(report);
-    return () => {
-      live = false;
-    };
-  }, [you?.id, you?.state, !!(you && shown[you.id]), workspace?.id]);
+  // The irori agent keeps its conversations per workspace (ADR 017 D4), and so does
+  // every view of them: its columns' conversations and tabs are kept under this key.
+  const yourKey = you && workspace ? `${you.id}@${workspace.id}` : undefined;
+  // irori mode's columns, kept per workspace while irori runs (ADR 034).
+  const [yourColumnSets, setYourColumnSets] = useState<Record<string, DockColumn[]>>({});
+  const yourColumns = (workspace && yourColumnSets[workspace.id]) ?? firstYourColumns;
+  /** Adds a column beside `after` with a new conversation, up to the limit. */
+  function splitYourColumn(after: DockColumn) {
+    if (!workspace || yourColumns.length >= yourColumnLimit) return;
+    const used = yourColumns.map((column) => columnNumber(column.id));
+    const id = `${yourFirst}-${Math.max(1, ...used) + 1}`;
+    const at = yourColumns.findIndex((column) => column.id === after.id);
+    setYourColumnSets((all) => ({
+      ...all,
+      [workspace.id]: [
+        ...yourColumns.slice(0, at + 1),
+        { id, owner: 'irori' },
+        ...yourColumns.slice(at + 1),
+      ],
+    }));
+  }
+  /** Closes a later column; its conversation's run goes on, and comes back as a tab. */
+  function closeYourColumn(column: DockColumn) {
+    if (!workspace || column.id === yourFirst) return;
+    setYourColumnSets((all) => ({
+      ...all,
+      [workspace.id]: yourColumns.filter((item) => item.id !== column.id),
+    }));
+    setColumnStatus(({ [column.id]: _, ...rest }) => rest);
+  }
+  // Words for irori mode's first column, from the routines page's request.
+  const [yourSeed, setYourSeed] = useState<{ text: string; key: number }>();
   // The brains handed to your AI's run in progress; unknown after a reload, when
   // the workspace's brains count as handed.
   const [handed, setHanded] = useState<string[]>();
@@ -949,6 +995,28 @@ function App() {
     );
     if (missing.length) setTabs((all) => ({ ...all, [active.scopeId]: [...open, ...missing] }));
   }, [tabRows.data]);
+  // The same for the irori agent in this workspace: a conversation running without a
+  // tab, from a closed column, a routine or before a reload, gets one in the first column.
+  const yourRows = useResource(
+    () => host.agentConversations(you!.id, workspace!.id),
+    [you?.id, workspace?.id],
+    {
+      enabled: you?.state === 'ready' && !!workspace && !startup,
+      refresh: you ? (tabRevisions[you.id] ?? 0) : 0,
+    },
+  );
+  useEffect(() => {
+    if (!yourKey || !yourRows.data) return;
+    const anywhere = [...yourColumns, ...columns].flatMap((column) =>
+      tabsOf(slot(column.id, yourKey)),
+    );
+    const missing = yourRows.data.flatMap((row) =>
+      !isDamaged(row) && row.running && !anywhere.some((tab) => tab.id === row.id)
+        ? [{ id: row.id, agent: row.agent }]
+        : [],
+    );
+    if (missing.length) setTabs((all) => ({ ...all, [yourKey]: [...tabsOf(yourKey), ...missing] }));
+  }, [yourRows.data, yourColumns]);
   // A Schema setting belongs to its brain; another brain shows its note instead, and
   // without the vault agent there is no Schema to show (ADR 021).
   useEffect(() => {
@@ -1362,52 +1430,44 @@ function App() {
     };
     if (behind(input.conversationId, value)) {
       await host.queueAgentMessage(input);
-      setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: false }));
+      // Behind its queue alone, after a stop or a failure: this send lets the queue go
+      // on, oldest first (ADR 034).
+      const stopped = !!input.conversationId && !runs(input.conversationId, value);
+      setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: stopped }));
+      if (stopped) await sendNextQueued(scopeId, input.conversationId);
       return;
     }
     await launch(scopeId, input.conversationId, () => host.start(input));
   }
-  /** Whether a send to this conversation waits behind its own run or queue. */
-  function behind(conversationId: string | undefined, value: Conversation) {
+  /** Whether this conversation's run is under way or on its way. */
+  function runs(conversationId: string | undefined, value: Conversation) {
     return (
       !!value.activeRunId ||
-      value.queued.length > 0 ||
       (!!conversationId &&
         (runningNow.current.has(conversationId) || draining.current.has(conversationId)))
     );
   }
+  /** Whether a send to this conversation waits behind its own run or queue. */
+  function behind(conversationId: string | undefined, value: Conversation) {
+    return runs(conversationId, value) || value.queued.length > 0;
+  }
   /**
-   * Sends to your AI with the workspace's brains, or queues behind its
-   * conversation's run, on the CLI and model chosen for it on this device.
+   * Shows an owner's conversation from the Overview or the routines page: a vault's
+   * in its first column, the irori agent's in irori mode's first column, and only
+   * when it is this workspace's (ADR 017 D4).
    */
-  async function sendToYou(message: string, attachments?: AttachmentRef[]) {
-    if (!you) return;
-    if (!(await save()))
-      throw Error(
-        t('編集中のノートを保存できませんでした。', 'Could not save the note being edited.'),
-      );
-    const brains = workspaceSpaces.map((space) => space.scopeId);
-    const target = shown[you.id];
-    const agentId = target?.agent ?? yourChoice.agent;
-    const input = {
-      scopeId: you.id,
-      agent: agentId,
-      conversationId: target?.id,
-      access: yourAccess,
-      model: yourChoice.models[agentId] || undefined,
-      prompt: message,
-      brains,
-      workspace: workspace?.id,
-      ...(attachments?.length && { attachments }),
-    };
-    const value = await host.agentConversation(you.id, agentId, target?.id, workspace?.id);
-    if (behind(input.conversationId, value)) {
-      await host.queueAgentMessage(input);
-      setQueueSignal((signal) => ({ n: signal.n + 1, scopeId: you.id, resume: false }));
+  async function showOwnerConversation(scopeId: string, id: string | null, next: AgentId) {
+    if (scopeId !== you?.id) {
+      remember(scopeId, next);
+      if (id) showConversation(scopeId, id, next);
+      else setShown(({ [scopeId]: _, ...rest }) => rest);
       return;
     }
-    setHanded(brains);
-    await launch(you.id, input.conversationId, () => host.start(input));
+    if (!id || !yourKey || !workspace) return;
+    // The host refuses a conversation kept for another workspace.
+    await host.agentConversation(you.id, next, id, workspace.id);
+    chooseYour({ ...yourChoice, agent: next });
+    showConversation(yourKey, id, next);
   }
   /** Resumes a brain's queues from the Overview: each conversation's, behind its own run. */
   async function resumeQueue(scopeId: string) {
@@ -1420,12 +1480,6 @@ function App() {
     setGitReview(false);
     setSources({});
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
-    // The irori agent keeps a history per workspace: its conversations on show belong to the last one.
-    if (you && profile.id !== workspace?.id) {
-      const yours = (key: string) => key === you.id || key.startsWith(`${you.id}#`);
-      setShown((all) => Object.fromEntries(Object.entries(all).filter(([key]) => !yours(key))));
-      setTabs((all) => Object.fromEntries(Object.entries(all).filter(([key]) => !yours(key))));
-    }
     setWorkspace(profile);
     setScene(undefined);
     setLevel('brain');
@@ -1549,6 +1603,13 @@ function App() {
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
+  const yourPanes = useMemo(() => yourColumns.map((column) => column.id), [yourColumns]);
+  const yourLayout = useDefaultLayout({
+    id: 'irori-your-columns',
+    panelIds: yourPanes,
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
   // The stage folds away beside the dock, so only the agents show (ADR 021).
   const stagePanel = usePanelRef();
   const dockPanel = usePanelRef();
@@ -1598,6 +1659,7 @@ function App() {
   }
   /** Adds a column beside `after`, showing the same agent, and widens the dock for it. */
   function splitColumn(after: DockColumn) {
+    if (isYourColumn(after.id)) return splitYourColumn(after);
     const used = columns.map((column) => Number(column.id)).filter(Number.isFinite);
     const id = String(Math.max(1, ...used) + 1);
     if (Number(id) > 64) return;
@@ -1609,6 +1671,7 @@ function App() {
     requestAnimationFrame(() => dockPanel.current?.resize(width + 340));
   }
   function closeColumn(column: DockColumn) {
+    if (isYourColumn(column.id)) return closeYourColumn(column);
     if (column.id === 'main') return closeDock();
     setColumns((all) => all.filter((item) => item.id !== column.id));
     setSources(({ [column.id]: _, ...rest }) => rest);
@@ -1736,6 +1799,9 @@ function App() {
       await host.createYourAi();
       setYouRevision((value) => value + 1);
     },
+    showYou: () => {
+      if (you?.state === 'ready') goToLevel('you');
+    },
     setShown,
     setTabs,
     setSources,
@@ -1788,6 +1854,71 @@ function App() {
       tabRevisions,
       hidden,
     ],
+  );
+  // irori mode's columns are on show where the Overview and the routines page are.
+  const yourShared = useMemo<DockShared>(
+    () => ({ ...dockShared, hidden: level !== 'overview' && level !== 'routines' }),
+    [dockShared, level],
+  );
+  // The irori agent's conversations the map follows for hand-off lines: those on show
+  // in irori mode's columns, and those running in this workspace.
+  const yourWatched = useMemo(
+    () => [
+      ...new Set([
+        ...(yourKey
+          ? yourColumns.flatMap((column) => shown[slot(column.id, yourKey)]?.id ?? [])
+          : []),
+        ...(yourRows.data ?? []).flatMap((row) => (!isDamaged(row) && row.running ? [row.id] : [])),
+      ]),
+    ],
+    [yourKey, yourColumns, shown, yourRows.data],
+  );
+  const yourDock = (
+    <PaneGroup
+      className="agent-dock your-dock"
+      orientation="horizontal"
+      defaultLayout={yourLayout.defaultLayout}
+      onLayoutChanged={yourLayout.onLayoutChanged}
+    >
+      {yourColumns.map((column, index) => [
+        index > 0 && (
+          <PaneSeparator
+            key={`${column.id}-handle`}
+            className="island-handle dock-handle"
+            aria-label={t('列の幅', 'Column width')}
+          />
+        ),
+        <Pane key={column.id} id={column.id} className="dock-column-pane" minSize={280}>
+          <DockColumnView
+            column={column}
+            owner="irori"
+            first={false}
+            shared={yourShared}
+            active={active}
+            you={you}
+            shown={shown}
+            tabs={tabs}
+            agentChoice={agentChoice}
+            yourChoice={yourChoice}
+            yourAccess={yourAccess}
+            accessChoice={accessChoice}
+            modelChoice={modelChoice}
+            skills={noSkills}
+            skillsRetired={noRetired}
+            skillProblems={noProblems}
+            sources={noSources}
+            vaultAgent={vaultAgent}
+            stageHidden={false}
+            workspaceScopeIds={workspaceScopeIds}
+            workspaceId={workspace?.id}
+            yourKey={yourKey}
+            canSplit={yourColumns.length < yourColumnLimit}
+            seed={column.id === yourFirst ? yourSeed : undefined}
+            act={act}
+          />
+        </Pane>,
+      ])}
+    </PaneGroup>
   );
   // What the rail shows of each brain's AI; the same function while nothing changed.
   const aiState = useMemo(
@@ -1967,43 +2098,14 @@ function App() {
               onResume={resumeQueue}
               onStop={(scopeId, conversationId) => host.cancel(scopeId, conversationId)}
               you={you}
-              onCreateYou={async () => {
-                await host.createYourAi();
-                setYouRevision((value) => value + 1);
-              }}
-              onShowYou={() => {
-                if (you?.state === 'ready') goToLevel('you');
-              }}
-              onSendYou={(prompt, attachments) => sendToYou(prompt, attachments)}
-              yourAgent={yourChoice.agent}
-              yourModel={yourChoice.models[yourChoice.agent] ?? ''}
-              yourAccess={yourAccess}
-              onYourAccess={(value) => setYourAccessSelection({ agent: yourChoice.agent, value })}
-              onYourAgent={(next) => {
-                if (next === yourChoice.agent) return;
-                chooseYour({ ...yourChoice, agent: next });
-                // Another CLI is another conversation (ADR 017 D2).
-                if (you) void newConversation(you.id, you.id, next).catch(report);
-              }}
-              yourConversation={you ? shown[you.id]?.id : undefined}
-              onShowConversation={(scopeId, id, next) => {
-                if (scopeId === you?.id) chooseYour({ ...yourChoice, agent: next });
-                else remember(scopeId, next);
-                if (id) showConversation(scopeId, id, next);
-                else setShown(({ [scopeId]: _, ...rest }) => rest);
-              }}
-              onYourNew={async () => {
-                if (you) await newConversation(you.id, you.id, yourChoice.agent);
-              }}
-              onYourModel={(next) => {
-                const models = { ...yourChoice.models };
-                if (next) models[yourChoice.agent] = next;
-                else delete models[yourChoice.agent];
-                chooseYour({ ...yourChoice, models });
-              }}
-              onStopYou={async (conversationId) => {
-                if (you) await host.cancel(you.id, conversationId);
-              }}
+              onShowYou={act.showYou}
+              yourDock={yourDock}
+              yourColumnCount={yourColumns.length}
+              yourWatched={yourWatched}
+              onAskYou={(text) => setYourSeed((seed) => ({ text, key: (seed?.key ?? 0) + 1 }))}
+              onShowConversation={(scopeId, id, next) =>
+                void showOwnerConversation(scopeId, id, next).catch(report)
+              }
               routineChoices={() => ({
                 ...Object.fromEntries(
                   workspaceSpaces.map((space) => {
@@ -2717,6 +2819,7 @@ function App() {
                           stageHidden={stageHidden}
                           workspaceScopeIds={workspaceScopeIds}
                           workspaceId={workspace?.id}
+                          yourKey={yourKey}
                           act={act}
                         />
                       </Pane>,

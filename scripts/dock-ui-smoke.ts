@@ -82,7 +82,7 @@ try {
     .getByRole('button', { name: /^表示するエージェント/ })
     .click();
   await page.getByRole('menuitemradio', { name: 'irori agent' }).click();
-  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'irori agent');
+  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'irori agent 2');
   await expect(columns.first()).toHaveAttribute('aria-label', 'Research agent');
 
   // The page folds away so only the agents show, and a file brings it back.

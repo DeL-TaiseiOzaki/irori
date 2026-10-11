@@ -228,7 +228,9 @@ for (const run of runs) {
       await page.getByRole('button', { name: L('地図', 'Map'), exact: true }).click();
     });
     await step('you', async () => {
+      // The map's hearth; each irori mode column's mark opens the same screen.
       await page
+        .getByRole('region', { name: L('vault map', 'Vault map') })
         .getByRole('button', {
           name: L('irori agent の Schema を開く', "Open the irori agent's Schema"),
         })

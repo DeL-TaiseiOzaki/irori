@@ -120,6 +120,10 @@ export function AgentColumn({
   sources,
   ownerChoice,
   stage,
+  closable = true,
+  canSplit = true,
+  seed,
+  onShowSchema,
   onModel,
   onAccess,
   onAgent,
@@ -164,6 +168,14 @@ export function AgentColumn({
   ownerChoice: boolean;
   /** The first column hides and shows the stage beside the dock. */
   stage?: { hidden: boolean; onToggle: () => void };
+  /** The column can be closed: irori mode's first column stays. */
+  closable?: boolean;
+  /** Another column fits beside this one. */
+  canSplit?: boolean;
+  /** Words for the composer, for the person to finish; each new `key` places them. */
+  seed?: { text: string; key: number };
+  /** Opens the irori agent's screen from its mark. */
+  onShowSchema?: () => void;
   onModel: (model: string) => void;
   onAccess: (access: AgentAccess) => void;
   /** Another CLI is another conversation; `replace` lets an empty one on show give way. */
@@ -239,6 +251,9 @@ export function AgentColumn({
   // The conversation's own queue: it waits for that conversation's run alone.
   const [queued, setQueued] = useState<QueuedMessage[]>([]);
   const [queuePaused, setQueuePaused] = useState(false);
+  // A send to a paused queue, after 停止 or a failure, lets it go on once no run is
+  // under way, even when the stopped run is still ending (ADR 034).
+  const [resumeWanted, setResumeWanted] = useState(false);
   const [conversationReady, setConversationReady] = useState(false);
   const [conversationError, setConversationError] = useState('');
   // Events kept in the conversation but not sent to the view, and lines that could not be read.
@@ -303,6 +318,18 @@ export function AgentColumn({
   useEffect(() => {
     if (target) return shared.display(target.id);
   }, [target?.id]);
+  // Placed words replace an empty box or follow what is there, with the caret after them.
+  useEffect(() => {
+    if (!seed) return;
+    const text = composer.snapshot().text;
+    setPrompt(text.trim() ? `${text.trimEnd()}\n${seed.text}` : seed.text);
+    requestAnimationFrame(() => {
+      const field = textarea.current;
+      if (!field) return;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    });
+  }, [seed?.key]);
   // Back on show, the column takes in what arrived while the islands were hidden.
   useEffect(() => {
     if (!shared.hidden) flushPending.current();
@@ -348,6 +375,7 @@ export function AgentColumn({
     setEvents([]);
     setQueued([]);
     setQueuePaused(true);
+    setResumeWanted(false);
     setConversationReady(false);
     setConversationError('');
     setOmitted({ earlier: 0, damaged: 0 });
@@ -356,14 +384,14 @@ export function AgentColumn({
         if (!target) {
           // The first column shows the host's pick; a later one starts a conversation of its own.
           const value =
-            column.id === 'main'
+            number === 1
               ? await host.agentConversation(scopeId, agent, undefined, workspaceId)
               : undefined;
           const id = value?.id ?? (await host.createConversation(scopeId, agent, workspaceId));
           if (current) onPick({ id, agent: value?.summary?.agent ?? agent });
           return;
         }
-        const value = await host.agentConversation(scopeId, target.agent, target.id);
+        const value = await host.agentConversation(scopeId, target.agent, target.id, workspaceId);
         if (!current) return;
         // Events held while the snapshot was read join it, less what it already holds:
         // the host reads the history and then its native record before replying, so
@@ -413,13 +441,13 @@ export function AgentColumn({
       document.removeEventListener('visibilitychange', shown);
       flushPending.current = () => {};
     };
-  }, [scopeId, ready, target?.id, shared.reload, retry]);
+  }, [scopeId, ready, target?.id, workspaceId, shared.reload, retry]);
 
   /** Reads the queue again after a queued instruction started, leaving the log as it is. */
   async function refreshQueue() {
     if (!scopeId || !target) return;
     const id = target.id;
-    const value = await host.agentConversation(scopeId, target.agent, id);
+    const value = await host.agentConversation(scopeId, target.agent, id, workspaceId);
     if (targetNow.current?.id === id) setQueued(value.queued);
   }
   // The Overview resumed or added to this owner's queues.
@@ -472,9 +500,12 @@ export function AgentColumn({
       const draftRevision = composer.snapshot().record?.revision;
       if (!(await shared.save())) return;
       const input = request(message);
-      // Behind this conversation's run or its queue; its other conversations run beside it (ADR 020).
-      if (shownRunning || queued.length) setQueued(await host.queueAgentMessage(input));
-      else {
+      // Behind this conversation's run or its queue; its other conversations run beside it
+      // (ADR 020). A queue left by a stop or a failure goes on with this send (ADR 034).
+      if (shownRunning || queued.length) {
+        setQueued(await host.queueAgentMessage(input));
+        if (queuePaused || !shownRunning) setResumeWanted(true);
+      } else {
         setQueuePaused(false);
         followConversation.current = true;
         if (irori) onStarted?.(brains);
@@ -490,6 +521,11 @@ export function AgentColumn({
       setSending(false);
     }
   }
+  useEffect(() => {
+    if (!resumeWanted || shownRunning || !conversationReady) return;
+    setResumeWanted(false);
+    setQueuePaused(false);
+  }, [resumeWanted, shownRunning, conversationReady]);
   useEffect(() => {
     if (
       !scopeId ||
@@ -545,7 +581,14 @@ export function AgentColumn({
     [irori, spaces, brains],
   );
   const kind = irori ? 'irori agent' : 'vault agent';
-  const ownerName = irori ? 'irori agent' : space ? `${space.name} agent` : 'vault agent';
+  // Each irori agent column is named apart, so its landmark is its own.
+  const ownerName = irori
+    ? number > 1
+      ? `irori agent ${number}`
+      : 'irori agent'
+    : space
+      ? `${space.name} agent`
+      : 'vault agent';
   const mark = irori ? (
     <span className="agent-mark irori">
       <span className="overview-orb" aria-hidden="true">
@@ -604,6 +647,16 @@ export function AgentColumn({
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
+        ) : onShowSchema && irori ? (
+          <button
+            className="agent-owner"
+            aria-label={t('irori agent の Schema を開く', "Open the irori agent's Schema")}
+            title={t('irori agent の Schema を開く', "Open the irori agent's Schema")}
+            disabled={you?.state !== 'ready'}
+            onClick={onShowSchema}
+          >
+            {mark}
+          </button>
         ) : (
           mark
         )}
@@ -699,6 +752,7 @@ export function AgentColumn({
           className="icon-button"
           aria-label={t('列を追加', 'Add a column')}
           title={t('列を追加', 'Add a column')}
+          disabled={!canSplit}
           onClick={onSplit}
         >
           <Icon name="split" size={16} />
@@ -714,21 +768,23 @@ export function AgentColumn({
             <Icon name={stage.hidden ? 'stageShow' : 'stageHide'} size={16} />
           </button>
         )}
-        <button
-          className="icon-button"
-          aria-label={
-            column.id === 'main'
-              ? t(`${kind} を閉じる`, `Close ${kind}`)
-              : t('この列を閉じる', 'Close this column')
-          }
-          onClick={() => {
-            void composer.flush().then((saved) => {
-              if (saved) onClose();
-            });
-          }}
-        >
-          <Icon name="close" size={16} />
-        </button>
+        {closable && (
+          <button
+            className="icon-button"
+            aria-label={
+              number === 1
+                ? t(`${kind} を閉じる`, `Close ${kind}`)
+                : t('この列を閉じる', 'Close this column')
+            }
+            onClick={() => {
+              void composer.flush().then((saved) => {
+                if (saved) onClose();
+              });
+            }}
+          >
+            <Icon name="close" size={16} />
+          </button>
+        )}
         {shownRunning && (
           <span className="agent-progress" aria-hidden="true">
             <span />
@@ -926,7 +982,7 @@ export function AgentColumn({
               <Icon name="clock" size={13} />
               {t(`送信待ち ${queued.length} 件`, `${queued.length} pending`)}
             </strong>
-            {queuePaused && <p>{t('送信待ちを保存しています。', 'Pending sends saved.')}</p>}
+            {queuePaused && <p>{t('一時停止中', 'Paused')}</p>}
             {queued.map((item) => (
               <div key={item.id}>
                 <span>{item.prompt}</span>

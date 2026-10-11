@@ -636,7 +636,7 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
   const command = new AgentSetup({
     files,
     git: {} as never,
-    workspaces: { list: async () => [workspace], save: async () => workspace },
+    workspaces: { list: async () => [workspace], update: async () => ({ saved: workspace }) },
     cloud: {} as never,
     defaultParent: async () => root,
     routines: (id) => routines.list(id),
@@ -679,7 +679,7 @@ test(
     const command = new AgentSetup({
       files,
       git: {} as never,
-      workspaces: { list: async () => [workspace], save: async () => workspace },
+      workspaces: { list: async () => [workspace], update: async () => ({ saved: workspace }) },
       cloud: {} as never,
       defaultParent: async () => root,
       routines: (id) => routines.list(id),
