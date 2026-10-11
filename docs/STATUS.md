@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-12: **0.1.98** ([#212](https://github.com/DeL-TaiseiOzaki/irori/pull/212),
+hibachis are vaults and a vault's agent is named after it, hand-off on Pi and
+Hermes Agent through `irori call`, [ADR 033](decisions/033-vaults.md)) merged at
+the owner's request as `a2e94b1`, and is published as
+[v0.1.98-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.98-preview.1)
+by release run `38156867675` from main's successful CI run `38156102890`
+(verify plus Linux, Windows and macOS packages). irori-templete #15 renamed
+its README to match.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,208,384 bytes,
+  Mac 141,837,605 bytes and `irori-0.1.98-full.nupkg` 175,375,790 bytes.
+  The website manifest now offers 0.1.98.
+- Owner checks remain: a device with data from an earlier version renamed on
+  first start, and real Pi or Hermes Agent handing work over with `irori call`.
+
 Hibachis are vaults, 2026-10-11 (**0.1.98**, [ADR 033](decisions/033-vaults.md)):
 the owner renamed a hibachi to a vault, and a vault's agent to
 `<vault name> agent`. The rename covers the app, website, prompts, `irori` command and code
