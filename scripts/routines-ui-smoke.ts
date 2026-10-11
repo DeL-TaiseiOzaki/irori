@@ -284,7 +284,8 @@ try {
     path.join(routines, 'collect', 'fetch.js'),
     fetchJs.replace('fetched 2', 'fetched two'),
   );
-  await expect(collect).toContainText('変更あり');
+  // The view reads the routines again every 5 s; the edit shows on the next read.
+  await expect(collect).toContainText('変更あり', poll);
   await collect.getByRole('button', { name: '実行' }).click();
   const diff = review.getByRole('region', { name: 'fetch.js' });
   await expect(diff).toContainText('変更');
