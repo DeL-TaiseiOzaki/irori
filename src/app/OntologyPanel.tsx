@@ -358,7 +358,7 @@ export function OntologyPanel({
   revision: number;
   onClose: () => void;
   onOpen: (path: string) => void;
-  /** Asks the hibachi agent to set the ontology up; absent while it is off. */
+  /** Asks the vault agent to set the ontology up; absent while it is off. */
   onConfigure?: () => void;
 }) {
   const [refresh, setRefresh] = useState(0);
@@ -396,7 +396,7 @@ export function OntologyPanel({
   const updateLabel = fresh ? t('索引を作成', 'Create indexes') : t('索引を更新', 'Update indexes');
   const matches =
     (!indexed || !!status.data?.current) && (!indexes || !(indexes.added || indexes.changed));
-  // The module lives in the hibachi's knowledge folder (ADR 024).
+  // The module lives in the vault's knowledge folder (ADR 024).
   const indexFolder = `${knowledgeFolder(space)}/ontology/`;
   return (
     <StageView
@@ -463,7 +463,7 @@ export function OntologyPanel({
           {onConfigure && (
             <button className="stage-text-button ask-ai" onClick={onConfigure}>
               <Icon name="sparkles" size={14} />
-              {t('hibachi agent', 'hibachi agent')}
+              {t('vault agent', 'vault agent')}
             </button>
           )}
         </>

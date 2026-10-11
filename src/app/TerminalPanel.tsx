@@ -27,7 +27,7 @@ export default function TerminalPanel({
   space,
   onClose,
 }: {
-  /** The hibachi, or the irori agent, whose folder the shell starts in. */
+  /** The vault, or the irori agent, whose folder the shell starts in. */
   space: Pick<Space, 'scopeId' | 'name'>;
   onClose: () => void;
 }) {

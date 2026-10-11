@@ -30,8 +30,7 @@ import { runHermes } from './hermes';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
 import { ModelCatalog } from './models';
 import { personLinesBridge } from './person-lines';
-import { hibachiBridge } from './hibachi-bridge';
-import { iroriBridge } from './irori-bridge';
+import { handOffTaskLimit, iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
 import { agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
@@ -59,7 +58,7 @@ import { DeviceIdentity } from '../host/device';
 import {
   brainsCommandPreamble,
   iroriCommandPreamble,
-  hibachiCommandPreamble,
+  vaultCommandPreamble,
   brainsPreamble,
   commentsPointer,
   commentsSummary,
@@ -86,7 +85,7 @@ import {
   brainOfAgent,
   brainOfPath,
   editedPath,
-  hibachiOf,
+  vaultOf,
   toolFile,
   writeDecision,
   writeToolMatcher,
@@ -129,7 +128,7 @@ type Run = {
   conversationId?: string;
   /** For your AI: its folder and the brains handed to it in this run. */
   delegation?: Delegation;
-  /** For a hibachi agent's run started by your AI's `hibachi` command: that run's id. */
+  /** For a vault agent's run started by your AI's `irori call`: that run's id. */
   holder?: string;
   /** A routine's agent step: a new native session that is never kept. */
   step?: StepRun;
@@ -144,7 +143,7 @@ type Run = {
   ended?: boolean;
   /** The agent said or did something in this run: a failure is not the resume's. */
   progressed?: boolean;
-  /** The hibachis this run's hand-offs reached. */
+  /** The vaults this run's hand-offs reached. */
   reached: Set<string>;
   /** The digest of the checkout the run works in, kept with its native session. */
   root?: string;
@@ -186,13 +185,13 @@ const historyUnsaved = () =>
     'Could not save the conversation history. Stopping the run.',
   );
 const noReport = () => t('報告がありません。', 'No report.');
-/** The irori agent is handed hibachis; a note, its lines or materials go to a hibachi agent. */
+/** The irori agent is handed vaults; a note, its lines or materials go to a vault agent. */
 function refuseYourMaterials(input: StartRun) {
   if (input.notePath || input.personLines || input.sources?.length)
     throw Error(
       t(
-        'irori agent にはノートや資料を直接渡せません。hibachi を渡してください。',
-        'The irori agent takes hibachis, not notes or materials.',
+        'irori agent にはノートや資料を直接渡せません。vault を渡してください。',
+        'The irori agent takes vaults, not notes or materials.',
       ),
     );
 }
@@ -298,8 +297,8 @@ export class AgentService {
     return [...this.runs.values()].find((run) => run.conversationId === id);
   }
   /**
-   * The folders on this device that the run's hibachis show in contents through
-   * links: a hibachi agent's own, or those of the hibachis handed to the irori agent.
+   * The folders on this device that the run's vaults show in contents through
+   * links: a vault agent's own, or those of the vaults handed to the irori agent.
    */
   private localFolders(run: Run) {
     const scopes = run.delegation
@@ -315,7 +314,7 @@ export class AgentService {
   private root(scopeId: string) {
     return this.you?.rootOf(scopeId) ?? this.files.get(scopeId).root;
   }
-  /** Whose conversation it is: a hibachi's, or the irori agent's. */
+  /** Whose conversation it is: a vault's, or the irori agent's. */
   private owner(scopeId: string): ConversationOwner {
     return conversationOwner(
       scopeId,
@@ -333,7 +332,7 @@ export class AgentService {
   }
   /**
    * The workspace whose conversations an owner's view takes: the irori agent keeps
-   * a history per workspace, a hibachi one history wherever it is opened (ADR 017 D4).
+   * a history per workspace, a vault one history wherever it is opened (ADR 017 D4).
    */
   private historyOf(scopeId: string, workspace?: string) {
     return this.isYou(scopeId) ? workspace : undefined;
@@ -510,7 +509,7 @@ export class AgentService {
     input = startInput.parse(input);
     const access = requireAgentAccess(input.agent, input.access);
     if (holder !== undefined && !this.delegated.get(input.scopeId)?.has(holder))
-      throw Error('This hibachi is not handed to that run.');
+      throw Error('This vault is not handed to that run.');
     if (input.conversationId && this.conversationRun(input.conversationId))
       throw Error(alreadyRunning());
     if (!input.prompt.trim() || input.prompt.length > promptLimit)
@@ -520,7 +519,7 @@ export class AgentService {
     if (this.isYou(input.scopeId)) {
       refuseYourMaterials(input);
       for (const scopeId of brains) this.files.get(scopeId);
-    } else if (brains.length || input.workspace) throw Error('Only the irori agent takes hibachis');
+    } else if (brains.length || input.workspace) throw Error('Only the irori agent takes vaults');
     let close!: () => void;
     let accept!: () => void;
     let reject!: (error: unknown) => void;
@@ -756,7 +755,7 @@ export class AgentService {
     const holder = run.holder && this.runs.get(run.holder);
     if (holder && holder.conversationId) {
       // Work handed from one of the irori agent's conversations continues in one
-      // conversation of the hibachi, apart from the person's own.
+      // conversation of the vault, apart from the person's own.
       const from = holder.conversationId;
       const found = await this.conversations.handed(input.scopeId, input.agent, from);
       return {
@@ -816,30 +815,37 @@ export class AgentService {
         : this.files.get(input.scopeId);
       const promptParts: string[] = [];
       // Every CLI the irori agent runs on gets the `irori` command for setup work.
-      if (you && this.setup) {
+      // Pi and Hermes Agent load no sub-agents from files, so on them it also
+      // hands a vault's work to its vault agent with `irori call`.
+      const calls = you && !!input.brains?.length && !hasSubAgents(input.agent);
+      if (you && (this.setup || calls)) {
         const setup = this.setup;
         const commands = await iroriBridge(
           this.files.dataDir,
-          ({ argv, cwd }) =>
-            setup(argv, cwd, {
-              workspaceId: input.workspace,
-              agent: { agent: input.agent, model: input.model },
-              inRoutine: !!run.step,
-              by: `${agentNames[input.agent]} (irori agent)`,
-            }),
+          ({ argv, cwd }, signal) =>
+            argv[0] === 'call' && calls
+              ? this.call(run, input, argv.slice(1), signal)
+              : !setup
+                ? Promise.reject(Error('Only "irori call" is available here.'))
+                : setup(argv, cwd, {
+                    workspaceId: input.workspace,
+                    agent: { agent: input.agent, model: input.model },
+                    inRoutine: !!run.step,
+                    by: `${agentNames[input.agent]} (irori agent)`,
+                  }),
           agentEnv(),
         );
         run.env = commands.env;
         run.commands = commands.close;
       } else if (this.setup) {
-        // A hibachi agent's command reaches its own hibachi alone (ADR 031).
+        // A vault agent's command reaches its own vault alone (ADR 031).
         const setup = this.setup;
         const commands = await iroriBridge(
           this.files.dataDir,
           ({ argv, cwd }) =>
             setup(argv, cwd, {
-              hibachi: input.scopeId,
-              by: `${agentNames[input.agent]} (hibachi agent)`,
+              vault: input.scopeId,
+              by: `${agentNames[input.agent]} (vault agent)`,
             }),
           agentEnv(),
         );
@@ -870,7 +876,7 @@ export class AgentService {
         run.delegation = { you: space.root, brains };
         const cli = input.agent;
         if (hasSubAgents(cli)) {
-          // Each hibachi's sub-agent is defined by irori, only where no file is:
+          // Each vault's sub-agent is defined by irori, only where no file is:
           // the person may have edited one.
           const written = await this.you!.writeDefinitions(cli, brains);
           if (written.length)
@@ -878,16 +884,16 @@ export class AgentService {
               run,
               'status',
               t(
-                `hibachi agent の定義を書きました: ${written.join(', ')}`,
-                `Wrote the hibachi agent definitions: ${written.join(', ')}`,
+                `vault agent の定義を書きました: ${written.join(', ')}`,
+                `Wrote the vault agent definitions: ${written.join(', ')}`,
               ),
             );
           promptParts.push(brainsPreamble(brains, cli, comments));
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
-      if (run.commands)
-        promptParts.push(you ? iroriCommandPreamble : hibachiCommandPreamble(space.name));
-      // Searches that walk the hibachi skip the links its connected folders appear through.
+      if (run.commands && this.setup)
+        promptParts.push(you ? iroriCommandPreamble : vaultCommandPreamble(space.name));
+      // Searches that walk the vault skip the links its connected folders appear through.
       const linked = you ? [] : (this.files.cloud?.linkedPaths?.(input.scopeId) ?? []);
       if (linked.length) promptParts.push(connectedFolders(linked));
       if (input.notePath) {
@@ -907,7 +913,7 @@ export class AgentService {
       }
       if (!you) {
         // The comments on the note in hand go with the instruction; without one,
-        // a line says where this hibachi keeps the comments it has.
+        // a line says where this vault keeps the comments it has.
         const onNote = input.notePath
           ? await readNoteComments(this.files, input.scopeId, input.notePath).catch(() => [])
           : [];
@@ -1072,21 +1078,6 @@ export class AgentService {
                 run.env ?? agentEnv(),
               );
         run.bridge = bridge?.close;
-        // Pi and Hermes Agent load no sub-agents from files: your AI hands a
-        // brain's work to its hibachi agent with the `hibachi` command instead.
-        const command =
-          delegation && !hasSubAgents(input.agent)
-            ? await hibachiBridge(
-                this.files.dataDir,
-                (name, task, signal) => this.handOff(run, input, name, task, signal),
-                bridge?.env ?? run.env ?? agentEnv(),
-              )
-            : undefined;
-        if (command)
-          run.bridge = () => {
-            bridge?.close();
-            command.close();
-          };
         const context: NativeContext = {
           cwd: space.root,
           prompt,
@@ -1094,7 +1085,7 @@ export class AgentService {
           access: run.access,
           model: input.model,
           attached: run.attached,
-          env: runEnv(run, command?.env ?? bridge?.env ?? run.env),
+          env: runEnv(run, bridge?.env ?? run.env),
           args: bridge?.args,
           signal: run.abort.signal,
           child: (child) => {
@@ -1192,7 +1183,7 @@ export class AgentService {
       run.close();
     }
   }
-  /** Stops the hibachi agents' runs your AI's run handed work to. */
+  /** Stops the vault agents' runs your AI's run handed work to. */
   private async cancelHeld(run: Run) {
     await Promise.all(
       [...this.runs.values()]
@@ -1201,11 +1192,21 @@ export class AgentService {
     );
   }
   /**
-   * One hand-off through the `hibachi` command: a run of the named brain's
-   * hibachi agent in that brain, on your AI's CLI and model in the hibachi
+   * One hand-off through `irori call`: a run of the named brain's
+   * vault agent in that brain, on your AI's CLI and model in the vault
    * agent's default access, shown in that brain's own log. Your AI's log follows
    * it as a task, and the command gets the run's words as its report.
    */
+  /** `irori call <vault> <task>`: one hand-off from the irori agent's run, answered with its report. */
+  private call(holder: Run, input: StartRun, words: string[], signal: AbortSignal) {
+    const [name, ...rest] = words;
+    const task = rest.join(' ');
+    if (!name?.trim()) throw Error('Name a vault and a task: irori call <vault> "<task>".');
+    if (!task.trim()) throw Error('The task is empty.');
+    if (task.length > handOffTaskLimit)
+      throw Error(`A task is at most ${handOffTaskLimit} characters.`);
+    return this.handOff(holder, input, name.trim(), task, signal);
+  }
   private async handOff(
     holder: Run,
     input: StartRun,
@@ -1213,17 +1214,17 @@ export class AgentService {
     task: string,
     signal: AbortSignal,
   ) {
-    const brain = hibachiOf(holder.delegation!, name);
+    const brain = vaultOf(holder.delegation!, name);
     if (holder.cancelled || signal.aborted) throw Error('The irori agent’s run has stopped.');
     if (!this.delegated.get(brain.scopeId)?.has(holder.id))
-      throw Error(`The ${brain.name} hibachi is not handed to this request.`);
+      throw Error(`The ${brain.name} vault is not handed to this request.`);
     if (
       [...this.runs.values()].some(
         (run) => run.holder === holder.id && run.binding.scopeId === brain.scopeId,
       )
     )
       throw Error(
-        `The ${brain.name} hibachi's agent is already working on a hand-off. Wait for its report before handing it another.`,
+        `The ${brain.name} agent is already working on a hand-off. Wait for its report before handing it another.`,
       );
     const id = randomUUID();
     const delegate = (state: Delegate['state']) => ({
@@ -1263,7 +1264,7 @@ export class AgentService {
     });
     const label = task.trim().split('\n')[0].slice(0, 120);
     this.event(holder, 'status', label, delegate('started'));
-    // Only the hand-off stops: the person's own runs in that hibachi go on.
+    // Only the hand-off stops: the person's own runs in that vault go on.
     const stop = () => void this.cancelRun(runId);
     signal.addEventListener('abort', stop);
     try {
@@ -1271,12 +1272,12 @@ export class AgentService {
       const report = words.toString().trim();
       if (outcome === 'completed') {
         this.event(holder, 'status', report || noReport(), delegate('reported'));
-        return report || 'The hibachi agent finished without a report.';
+        return report || 'The vault agent finished without a report.';
       }
       const reason =
         errors.at(-1) ?? (outcome === 'cancelled' ? 'The run was stopped.' : 'The run failed.');
       this.event(holder, 'status', reason, delegate('failed'));
-      throw Error(`The ${brain.name} hibachi's agent did not finish: ${reason}`);
+      throw Error(`The ${brain.name} agent did not finish: ${reason}`);
     } finally {
       this.watchers.delete(runId);
       signal.removeEventListener('abort', stop);

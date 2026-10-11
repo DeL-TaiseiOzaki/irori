@@ -12,7 +12,7 @@ import type { NamedLayer } from './layers';
 
 /**
  * What the irori agent asks of irori through the `irori` command on its run's
- * PATH: what the person does in irori's own dialogs to set hibachis up
+ * PATH: what the person does in irori's own dialogs to set vaults up
  * (ADR 025, ADR 030). Registering, cloning, creating and connecting add;
  * `set`, `layer`, `workspace`, `disconnect` and `remove` change or take back
  * what irori holds, and only `remove --trash` moves a folder, to the system
@@ -33,25 +33,25 @@ export type IroriCommand =
     }
   | { kind: 'create'; folder: string; parent?: string; name?: string; category?: Category }
   | { kind: 'add'; folder: string; name?: string; category?: Category }
-  | { kind: 'connect'; hibachi: string; folder: string; name?: string; readOnly: boolean }
-  | { kind: 'disconnect'; hibachi: string; name: string }
+  | { kind: 'connect'; vault: string; folder: string; name?: string; readOnly: boolean }
+  | { kind: 'disconnect'; vault: string; name: string }
   | {
       kind: 'set';
-      hibachi: string;
+      vault: string;
       name?: string;
       category?: Category;
       labels?: Partial<Record<NamedLayer, string>>;
       look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
     }
-  | { kind: 'layer'; hibachi: string; layer: NamedLayer; folder: string; also: boolean }
-  | { kind: 'workspace'; name: string; hibachis: string[]; leave: boolean }
-  | { kind: 'remove'; hibachi: string; trash: boolean }
-  | { kind: 'run'; routine: string; hibachi?: string }
+  | { kind: 'layer'; vault: string; layer: NamedLayer; folder: string; also: boolean }
+  | { kind: 'workspace'; name: string; vaults: string[]; leave: boolean }
+  | { kind: 'remove'; vault: string; trash: boolean }
+  | { kind: 'run'; routine: string; vault?: string }
   | { kind: 'move'; note: string; destination: string }
   | { kind: 'trash'; note: string }
   | { kind: 'comment'; file: string; body: string; quote?: string; line?: number }
   | { kind: 'resolve'; file: string; id: string }
-  | { kind: 'index'; hibachi?: string };
+  | { kind: 'index'; vault?: string };
 
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
@@ -66,7 +66,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   layer: ['also'],
   workspace: ['leave'],
   remove: ['trash'],
-  run: ['hibachi'],
+  run: ['vault'],
   move: [],
   trash: [],
   comment: ['quote', 'line'],
@@ -79,18 +79,18 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   clone: [1, 'one repository'],
   create: [1, 'one folder'],
   add: [1, 'one folder'],
-  connect: [2, 'a hibachi and a folder'],
-  disconnect: [2, 'a hibachi and the name of a connected folder'],
-  set: [1, 'one hibachi'],
-  layer: [3, 'a hibachi, knowledge or contents, and a folder'],
-  workspace: [1, 'a workspace name and then hibachis'],
-  remove: [1, 'one hibachi'],
+  connect: [2, 'a vault and a folder'],
+  disconnect: [2, 'a vault and the name of a connected folder'],
+  set: [1, 'one vault'],
+  layer: [3, 'a vault, knowledge or contents, and a folder'],
+  workspace: [1, 'a workspace name and then vaults'],
+  remove: [1, 'one vault'],
   run: [1, 'one routine'],
   move: [2, 'a note and where it goes'],
   trash: [1, 'one note'],
   comment: [2, 'a file and the comment'],
   resolve: [2, "a file and the comment's id"],
-  index: [1, 'at most one hibachi'],
+  index: [1, 'at most one vault'],
 };
 
 /**
@@ -182,13 +182,13 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     case 'connect':
       return {
         kind,
-        hibachi: words[0],
+        vault: words[0],
         folder: words[1],
         ...(text('name') && { name: text('name')!.trim() }),
         readOnly: values['read-only'] === true,
       };
     case 'disconnect':
-      return { kind, hibachi: words[0], name: words[1] };
+      return { kind, vault: words[0], name: words[1] };
     case 'set': {
       const labels: Partial<Record<NamedLayer, string>> = {};
       for (const [key, layer] of [
@@ -231,7 +231,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         );
       return {
         kind,
-        hibachi: words[0],
+        vault: words[0],
         ...common,
         ...(Object.keys(labels).length ? { labels } : {}),
         ...(Object.keys(look).length ? { look } : {}),
@@ -246,19 +246,19 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       if (!layer) throw Error('"irori layer" names knowledge or contents. Run "irori help".');
       const also = values.also === true;
       if (also && layer !== 'contents') throw Error('--also is for contents only.');
-      return { kind, hibachi: words[0], layer, folder: words[2], also };
+      return { kind, vault: words[0], layer, folder: words[2], also };
     }
     case 'workspace':
       return {
         kind,
         name: words[0].trim(),
-        hibachis: words.slice(1),
+        vaults: words.slice(1),
         leave: values.leave === true,
       };
     case 'remove':
-      return { kind, hibachi: words[0], trash: values.trash === true };
+      return { kind, vault: words[0], trash: values.trash === true };
     case 'run':
-      return { kind, routine: words[0], ...(text('hibachi') && { hibachi: text('hibachi') }) };
+      return { kind, routine: words[0], ...(text('vault') && { vault: text('vault') }) };
     case 'move':
       return { kind, note: words[0], destination: words[1] };
     case 'trash':
@@ -285,6 +285,6 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     case 'resolve':
       return { kind, file: words[0], id: words[1].trim() };
     case 'index':
-      return { kind, ...(words[0] && { hibachi: words[0] }) };
+      return { kind, ...(words[0] && { vault: words[0] }) };
   }
 }

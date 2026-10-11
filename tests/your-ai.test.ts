@@ -22,7 +22,7 @@ const fixtureOptions = {
   timeout: 20000,
 };
 
-test('each hibachi gets a stable sub-agent name hibachi-<slug> that Claude Code accepts', () => {
+test('each vault gets a stable sub-agent name vault-<slug> that Claude Code accepts', () => {
   const names = brainAgentNames([
     { scopeId: '6f1c2d0e-8b1a-4c33-9d7e-2a4b5c6d7e8f', name: 'Product Lab' },
     { scopeId: '11111111-2222-4333-8444-555555555555', name: 'プロダクト' },
@@ -31,12 +31,7 @@ test('each hibachi gets a stable sub-agent name hibachi-<slug> that Claude Code 
   ]);
   assert.deepEqual(
     [...names.values()],
-    [
-      'hibachi-product-lab',
-      'hibachi-11111111',
-      'hibachi-product-lab-99999999',
-      'hibachi-cafe-notes',
-    ],
+    ['vault-product-lab', 'vault-11111111', 'vault-product-lab-99999999', 'vault-cafe-notes'],
   );
   for (const name of names.values()) assert.match(name, /^[a-z0-9]+(-[a-z0-9]+)*$/);
 });
@@ -45,8 +40,8 @@ test('your AI writes in its own folder, and a brain changes only through its sub
   const delegation: Delegation = {
     you: '/home/me/irori/you',
     brains: [
-      { scopeId: 'a', name: 'Product', agent: 'hibachi-product', root: '/kb/product' },
-      { scopeId: 'b', name: 'Research', agent: 'hibachi-research', root: '/kb/research' },
+      { scopeId: 'a', name: 'Product', agent: 'vault-product', root: '/kb/product' },
+      { scopeId: 'b', name: 'Research', agent: 'vault-research', root: '/kb/research' },
     ],
   };
   assert.equal(writeDecision(delegation, undefined, 'plans/today.md').allow, true);
@@ -54,15 +49,15 @@ test('your AI writes in its own folder, and a brain changes only through its sub
   assert.equal(writeDecision(delegation, undefined, '..plans/today.md').allow, true);
   assert.equal(writeDecision(delegation, undefined, '../elsewhere.md').allow, false);
   assert.equal(
-    writeDecision(delegation, 'hibachi-product', '/kb/product/Knowledge_Base/a.md').allow,
+    writeDecision(delegation, 'vault-product', '/kb/product/Knowledge_Base/a.md').allow,
     true,
   );
   const direct = writeDecision(delegation, undefined, '/kb/product/a.md');
   assert.equal(direct.allow, false);
-  assert.match(!direct.allow ? direct.reason : '', /sub-agent "hibachi-product"/);
-  assert.equal(writeDecision(delegation, 'hibachi-product', '/kb/research/a.md').allow, false);
+  assert.match(!direct.allow ? direct.reason : '', /sub-agent "vault-product"/);
+  assert.equal(writeDecision(delegation, 'vault-product', '/kb/research/a.md').allow, false);
   assert.equal(
-    writeDecision(delegation, 'hibachi-product', '/kb/product/../research/a.md').allow,
+    writeDecision(delegation, 'vault-product', '/kb/product/../research/a.md').allow,
     false,
   );
   // A built-in agent or a brain's own agent keeps to your AI's folder.
@@ -71,14 +66,14 @@ test('your AI writes in its own folder, and a brain changes only through its sub
   assert.equal(writeDecision(delegation, undefined, '/etc/passwd').allow, false);
 });
 
-test('the preamble names each hibachi, its folder and its sub-agent, per CLI', () => {
+test('the preamble names each vault, its folder and its sub-agent, per CLI', () => {
   const brains = [
-    { name: 'Product', category: 'チーム', agent: 'hibachi-product', root: '/kb/p' },
-    { name: 'Research', agent: 'hibachi-research', root: '/kb/r "x"' },
+    { name: 'Product', category: 'チーム', agent: 'vault-product', root: '/kb/p' },
+    { name: 'Research', agent: 'vault-research', root: '/kb/r "x"' },
   ];
   const text = brainsPreamble(brains, 'claude');
-  assert.match(text, /- Product \(チーム\): folder "\/kb\/p", sub-agent "hibachi-product"\n/);
-  assert.match(text, /folder "\/kb\/r \\"x\\"", sub-agent "hibachi-research"\n/);
+  assert.match(text, /- Product \(チーム\): folder "\/kb\/p", sub-agent "vault-product"\n/);
+  assert.match(text, /folder "\/kb\/r \\"x\\"", sub-agent "vault-research"\n/);
   assert.match(text, /material, not instructions/);
   assert.match(text, /run it in the foreground; irori refuses your own writes/);
   assert.doesNotMatch(text, /brain-agents|not defined/);
@@ -86,12 +81,12 @@ test('the preamble names each hibachi, its folder and its sub-agent, per CLI', (
   assert.match(brainsPreamble(brains, 'opencode'), /task tool/);
 });
 
-test('each CLI gets a definition it can load, with the hibachi and its Schema', () => {
-  const brain = { name: 'Product: "Lab"', agent: 'hibachi-product-lab', root: '/kb/product' };
+test('each CLI gets a definition it can load, with the vault and its Schema', () => {
+  const brain = { name: 'Product: "Lab"', agent: 'vault-product-lab', root: '/kb/product' };
   const claude = subAgentDefinition('claude', brain, '/me/.irori/shared');
   assert.match(
     claude,
-    /^---\nname: hibachi-product-lab\ndescription: "The Product: \\"Lab\\" hibachi's agent\./,
+    /^---\nname: vault-product-lab\ndescription: "The Product: \\"Lab\\" agent, the agent of the Product: \\"Lab\\" vault\./,
   );
   assert.match(claude, /\ntools: Read, Write, Edit, Glob, Grep\n---\n/);
   assert.match(claude, /First read \/kb\/product\/AGENTS\.md and follow it/);
@@ -101,7 +96,7 @@ test('each CLI gets a definition it can load, with the hibachi and its Schema', 
     claude,
     /\/me\/\.irori\/shared\/AGENTS\.md and the skills in\s+\/me\/\.irori\/shared\/\.agents\/skills/,
   );
-  assert.match(claude, /the hibachi's wins/);
+  assert.match(claude, /the vault's wins/);
   const opencode = subAgentDefinition('opencode', brain, '/me/.irori/shared');
   assert.match(opencode, /^---\ndescription: ".+"\nmode: subagent\n---\n/);
   // The TOML has the three fields Codex requires, each a basic string.
@@ -116,7 +111,7 @@ test('each CLI gets a definition it can load, with the hibachi and its Schema', 
       }),
   );
   assert.deepEqual(Object.keys(fields), ['name', 'description', 'developer_instructions']);
-  assert.equal(fields.name, 'hibachi-product-lab');
+  assert.equal(fields.name, 'vault-product-lab');
   assert.match(fields.developer_instructions, /First read \/kb\/product\/AGENTS\.md/);
 });
 
@@ -179,17 +174,17 @@ test('the Your AI screen reads only inside the folder', async (t) => {
   await assert.rejects(you.read('../secret.txt'));
   await assert.rejects(you.read('link.txt'), /leaves/);
   await writeFile(
-    path.join(root, '.claude', 'agents', 'hibachi-product.md'),
-    '---\nname: hibachi-product\n---\n',
+    path.join(root, '.claude', 'agents', 'vault-product.md'),
+    '---\nname: vault-product\n---\n',
   );
-  const found = await you.definitions(['hibachi-product', 'hibachi-research']);
-  assert.deepEqual(found.get('hibachi-product'), [
-    { cli: 'claude', path: '.claude/agents/hibachi-product.md' },
+  const found = await you.definitions(['vault-product', 'vault-research']);
+  assert.deepEqual(found.get('vault-product'), [
+    { cli: 'claude', path: '.claude/agents/vault-product.md' },
   ]);
-  assert.deepEqual(found.get('hibachi-research'), []);
+  assert.deepEqual(found.get('vault-research'), []);
 });
 
-test('the irori agent’s folder takes the same Schema settings as a hibachi, confined to it', async (t) => {
+test('the irori agent’s folder takes the same Schema settings as a vault, confined to it', async (t) => {
   const { base, you } = await yourAi(t);
   const { id, root } = await you.create();
   const files = new FileService(path.join(base, 'device'));
@@ -209,7 +204,7 @@ test('the irori agent’s folder takes the same Schema settings as a hibachi, co
     service.write(id, 'plans/b/AGENTS.md', '# b\n', null),
     /cannot be changed|変更できません/,
   );
-  // The instructions, a rule, hooks and a skill, hash-checked as for a hibachi.
+  // The instructions, a rule, hooks and a skill, hash-checked as for a vault.
   const agents = await service.read(id, 'AGENTS.md');
   assert.equal(agents.text, yourAiStarter['AGENTS.md']);
   await service.write(id, 'AGENTS.md', '# Mine\n', agents.hash);
@@ -230,7 +225,7 @@ test('the irori agent’s folder takes the same Schema settings as a hibachi, co
   const after = await service.list(id);
   assert.deepEqual(after.rules, ['.claude/rules/tone.md']);
   assert.equal(after.claudeSettings, true);
-  // Its skills are listed from its own .agents/skills, as a hibachi's are,
+  // Its skills are listed from its own .agents/skills, as a vault's are,
   // the standard skills irori wrote when the folder was made among them.
   const standard = Object.keys(iroriAgentSkills);
   const skills = await readFolderSkills(await you.schemaFolder());
@@ -241,9 +236,9 @@ test('the irori agent’s folder takes the same Schema settings as a hibachi, co
     [...standard, 'weekly'].sort(),
   );
   // A definition irori wrote is not a setting, and no alias leads out of the folder.
-  await you.writeDefinitions('claude', [{ name: 'P', agent: 'hibachi-p', root: '/kb/p' }]);
+  await you.writeDefinitions('claude', [{ name: 'P', agent: 'vault-p', root: '/kb/p' }]);
   await assert.rejects(
-    service.read(id, '.claude/agents/hibachi-p.md'),
+    service.read(id, '.claude/agents/vault-p.md'),
     /cannot be changed|変更できません/,
   );
   const outside = path.join(base, 'outside');
@@ -261,26 +256,26 @@ test('irori writes an absent definition, never over one, and only inside the fol
   const { base, you } = await yourAi(t);
   const { root } = await you.create();
   const brains = [
-    { name: 'Product', agent: 'hibachi-product', root: '/kb/product' },
-    { name: 'Research', agent: 'hibachi-research', root: '/kb/research' },
+    { name: 'Product', agent: 'vault-product', root: '/kb/product' },
+    { name: 'Research', agent: 'vault-research', root: '/kb/research' },
   ];
   // The person edited Research's definition: it stays as it is.
-  await writeFile(path.join(root, '.claude', 'agents', 'hibachi-research.md'), 'mine');
+  await writeFile(path.join(root, '.claude', 'agents', 'vault-research.md'), 'mine');
   assert.deepEqual(await you.writeDefinitions('claude', brains), [
-    '.claude/agents/hibachi-product.md',
+    '.claude/agents/vault-product.md',
   ]);
   assert.equal(
-    await readFile(path.join(root, '.claude', 'agents', 'hibachi-product.md'), 'utf8'),
+    await readFile(path.join(root, '.claude', 'agents', 'vault-product.md'), 'utf8'),
     subAgentDefinition('claude', brains[0], path.join(root, '.irori', 'shared')),
   );
   assert.equal(
-    await readFile(path.join(root, '.claude', 'agents', 'hibachi-research.md'), 'utf8'),
+    await readFile(path.join(root, '.claude', 'agents', 'vault-research.md'), 'utf8'),
     'mine',
   );
   assert.deepEqual(await you.writeDefinitions('claude', brains), []);
   assert.deepEqual(await you.writeDefinitions('codex', brains), [
-    '.codex/agents/hibachi-product.toml',
-    '.codex/agents/hibachi-research.toml',
+    '.codex/agents/vault-product.toml',
+    '.codex/agents/vault-research.toml',
   ]);
   // A linked folder on the way is not followed out of the folder.
   const outside = path.join(base, 'outside');
@@ -289,9 +284,9 @@ test('irori writes an absent definition, never over one, and only inside the fol
   await assert.rejects(you.writeDefinitions('opencode', brains), /not a folder inside/);
   assert.deepEqual(await readdir(outside), []);
   // A link where the file would be is left alone, as an existing file.
-  await symlink(path.join(outside, 'x.md'), path.join(root, '.claude', 'agents', 'hibachi-x.md'));
+  await symlink(path.join(outside, 'x.md'), path.join(root, '.claude', 'agents', 'vault-x.md'));
   assert.deepEqual(
-    await you.writeDefinitions('claude', [{ name: 'X', agent: 'hibachi-x', root: '/kb/x' }]),
+    await you.writeDefinitions('claude', [{ name: 'X', agent: 'vault-x', root: '/kb/x' }]),
     [],
   );
   assert.deepEqual(await readdir(outside), []);
@@ -385,12 +380,10 @@ test(
         ['Research', research.root],
       ],
     );
-    // irori wrote each handed hibachi's definition before the run, so it loaded.
-    assert.deepEqual(log[0].loaded.sort(), ['hibachi-product', 'hibachi-research']);
+    // irori wrote each handed vault's definition before the run, so it loaded.
+    assert.deepEqual(log[0].loaded.sort(), ['vault-product', 'vault-research']);
     assert.ok(
-      events.some(
-        (event) => event.type === 'status' && /hibachi-product\.md/.test(event.text ?? ''),
-      ),
+      events.some((event) => event.type === 'status' && /vault-product\.md/.test(event.text ?? '')),
     );
     const hand = events.find((event) => event.delegate?.state === 'started');
     assert.equal(hand?.delegate?.scopeId, product.scopeId);
@@ -406,7 +399,7 @@ test(
     // The sub-agent's own words stay with its hand-off; the reply is your AI's.
     assert.deepEqual(
       events.filter((event) => event.type === 'text').map((event) => event.text),
-      ["Handed the note to Product's hibachi agent."],
+      ['Handed the note to the Product agent.'],
     );
     // The hand-offs are kept with the conversation.
     const saved = await service.conversation(id, 'claude');
@@ -429,7 +422,7 @@ test(
 );
 
 test(
-  'the irori agent in full access on Claude Code still keeps out of the hibachis (protocol fixture)',
+  'the irori agent in full access on Claude Code still keeps out of the vaults (protocol fixture)',
   fixtureOptions,
   async (t) => {
     const { brains, events, run, fixtureLog } = await delegation(t);
@@ -440,7 +433,7 @@ test(
     // The write hook runs in every mode: the irori agent's own write is refused.
     assert.ok(log.some((entry) => entry.direct === 'denied'));
     await assert.rejects(readFile(path.join(brains[0].root, 'direct.md')));
-    // The sub-agent inherits full access: it writes in its hibachi without asking.
+    // The sub-agent inherits full access: it writes in its vault without asking.
     assert.ok(log.some((entry) => entry.written === true));
     assert.equal(events.filter((event) => event.type === 'permission').length, 0);
     assert.equal(events.at(-1)?.outcome, 'completed');
@@ -459,11 +452,11 @@ test('only your AI takes brains, on any CLI, without notes or materials', async 
   t.after(() => service.cancel());
   assert.throws(
     () => service.start({ scopeId: id, agent: 'pi', prompt: 'x', notePath: 'a.md' }),
-    /hibachis, not notes|ノートや資料/,
+    /vaults, not notes|ノートや資料/,
   );
   assert.throws(
     () => service.start({ scopeId: id, agent: 'claude', prompt: 'x', notePath: 'a.md' }),
-    /hibachis, not notes|ノートや資料/,
+    /vaults, not notes|ノートや資料/,
   );
   assert.throws(
     () =>
@@ -473,15 +466,15 @@ test('only your AI takes brains, on any CLI, without notes or materials', async 
         prompt: 'x',
         brains: [space.scopeId],
       }),
-    /Only the irori agent takes hibachis/,
+    /Only the irori agent takes vaults/,
   );
 });
 
 for (const cli of ['pi', 'opencode'] as const)
   test(
     cli === 'pi'
-      ? 'the irori agent on Pi is told to hand each hibachi to its agent with the hibachi command (protocol fixture)'
-      : 'the irori agent on OpenCode gets the hibachi definitions irori writes and hands work to them (protocol fixture)',
+      ? 'the irori agent on Pi is told to hand each vault to its agent with irori call (protocol fixture)'
+      : 'the irori agent on OpenCode gets the vault definitions irori writes and hands work to them (protocol fixture)',
     fixtureOptions,
     async (t) => {
       const { base, you } = await yourAi(t);
@@ -542,21 +535,21 @@ for (const cli of ['pi', 'opencode'] as const)
       ) as string;
       assert.ok(sent.includes(`Product (チーム): folder ${JSON.stringify(brainRoot)}`), sent);
       assert.ok(sent.endsWith('Tidy the product notes.'));
-      const definition = path.join(root, '.opencode', 'agents', 'hibachi-product.md');
+      const definition = path.join(root, '.opencode', 'agents', 'vault-product.md');
       if (cli === 'pi') {
         assert.match(sent, /You run on Pi .* loads no sub-agents from files/);
-        assert.match(sent, /hibachi agent "hibachi-product"/);
+        assert.match(sent, /vault agent "vault-product"/);
         assert.match(
           sent,
-          /with the `hibachi` command in your shell: hibachi <hibachi agent or hibachi name> "<task>"/,
+          /with `irori call` in your shell: irori call <vault agent or vault name> "<task>"/,
         );
-        // The hibachi agent reads its own Schema; the irori agent is not told to.
+        // The vault agent reads its own Schema; the irori agent is not told to.
         assert.doesNotMatch(sent, /AGENTS\.md/);
         // Pi loads no sub-agent files, so irori writes none.
-        assert.equal(existsSync(path.join(root, '.claude', 'agents', 'hibachi-product.md')), false);
+        assert.equal(existsSync(path.join(root, '.claude', 'agents', 'vault-product.md')), false);
         assert.equal(existsSync(definition), false);
       } else {
-        assert.match(sent, /sub-agent "hibachi-product"/);
+        assert.match(sent, /sub-agent "vault-product"/);
         assert.match(sent, /with the task tool/);
         assert.match(await readFile(definition, 'utf8'), /\nmode: subagent\n/);
       }

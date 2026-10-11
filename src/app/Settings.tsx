@@ -134,20 +134,20 @@ export function LanguageSwitch({ onError }: { onError: (error: unknown) => void 
  */
 export function Settings({
   start = false,
-  hibachiAgent,
-  onHibachiAgent,
+  vaultAgent,
+  onVaultAgent,
   onRestored,
   onSchema,
   onError,
 }: {
   /** Opened from the start screen, whose footer already offers updates. */
   start?: boolean;
-  /** Each hibachi's own agent and its Schema layer are offered (ADR 021). */
-  hibachiAgent: boolean;
-  onHibachiAgent: (on: boolean) => void;
+  /** Each vault's own agent and its Schema layer are offered (ADR 021). */
+  vaultAgent: boolean;
+  onVaultAgent: (on: boolean) => void;
   /** The environment saved on the account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
-  /** Opens every Schema: the shared one, the irori agent's and each hibachi's (ADR 027). */
+  /** Opens every Schema: the shared one, the irori agent's and each vault's (ADR 027). */
   onSchema?: () => void;
   onError: (error: unknown) => void;
 }) {
@@ -226,17 +226,17 @@ export function Settings({
                 label={(option) => languageLabels[option]}
                 onChange={chooseLanguageValue}
               />
-              <fieldset className="settings-choices hibachi-agent">
+              <fieldset className="settings-choices vault-agent">
                 <legend>{t('エージェント', 'Agents')}</legend>
                 <div>
-                  <label className="settings-choice" data-checked={hibachiAgent}>
+                  <label className="settings-choice" data-checked={vaultAgent}>
                     <input
                       type="checkbox"
-                      checked={hibachiAgent}
-                      onChange={(event) => onHibachiAgent(event.target.checked)}
+                      checked={vaultAgent}
+                      onChange={(event) => onVaultAgent(event.target.checked)}
                     />
                     <Icon name="sparkles" size={15} />
-                    <span>hibachi agent</span>
+                    <span>vault agent</span>
                   </label>
                 </div>
               </fieldset>
@@ -253,7 +253,7 @@ export function Settings({
                       }}
                     >
                       <Icon name="schema" size={15} />
-                      <span>{t('共通・hibachi', 'Shared and hibachis')}</span>
+                      <span>{t('共通・vault', 'Shared and vaults')}</span>
                     </button>
                   </div>
                 </fieldset>

@@ -26,8 +26,8 @@ const onePixel =
 const base = await mkdtemp(path.join(tmpdir(), 'irori harness UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const root = path.join(base, 'KB');
 await mkdir(root);
 const space = await files.register(root, 'ハーネス検証', 'personal');
@@ -63,7 +63,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   const settings = () => page.getByRole('button', { name: '会話と接続', exact: true });
   await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
@@ -161,7 +161,7 @@ try {
         page = await app.firstWindow();
         page.on('pageerror', (error) => errors.push(String(error)));
         await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-        await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+        await page.getByRole('button', { name: 'vault agent', exact: true }).click();
         await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
         await expect(page.getByLabel('送信待ち', { exact: true })).toContainText(
           'after cancellation',
@@ -197,7 +197,7 @@ try {
       await expect(page.locator('.request')).toBeVisible();
       await page.reload();
       await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-      await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+      await page.getByRole('button', { name: 'vault agent', exact: true }).click();
       await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
       await expect(page.locator('.message.done')).toHaveCount(5);
       await expect(page.locator('.request')).toHaveCount(0);
@@ -227,7 +227,7 @@ try {
   // offers to hand them to the agent, off until the person asks.
   await page.getByRole('button', { name: 'note', exact: true }).click();
   await expect.poll(() => authorship(page)).toContain('人が書いた行 2');
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(page.getByLabel('人の行を伝える', { exact: true })).not.toBeChecked();
   // An assistant reply is Markdown: it reaches the conversation as structure, not
   // as the characters the model wrote.
@@ -289,7 +289,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-attachments-sent.png' });
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
-  // A brain's hibachi agent starts in full access.
+  // A brain's vault agent starts in full access.
   await expect(access).toHaveValue('full-access');
   await page.getByLabel('エージェントへの指示').fill('access fixture');
   // Count only once OpenCode's saved conversation has loaded.
@@ -376,7 +376,7 @@ try {
     (await page.evaluate((id) => window.irori.agentConversation(id, 'hermes'), space.scopeId))
       .session.state,
   ).toBe('saved');
-  // Each CLI's conversations are in the hibachi's history; opening one shows its log.
+  // Each CLI's conversations are in the vault's history; opening one shows its log.
   await page.getByRole('button', { name: '履歴', exact: true }).click();
   const history = page.getByRole('region', { name: '履歴' });
   await expect(history.locator('.history-row').filter({ hasText: 'Hermes Agent' })).toHaveCount(1);

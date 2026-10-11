@@ -129,7 +129,7 @@ test('the shared Schema says which Schema wins, and tells the irori agent to pas
   assert.match(text, /<shared-instructions>\nWrite dates as YYYY-MM-DD\.\n<\/shared-instructions>/);
   assert.match(text, /- weekly: Weekly review\. \(\/me\/s\/weekly\/SKILL\.md\)/);
   assert.doesNotMatch(text, /sub-agent/);
-  assert.match(sharedSchema(shared, true), /hand work to a hibachi's sub-agent, tell it to follow/);
+  assert.match(sharedSchema(shared, true), /hand work to a vault's sub-agent, tell it to follow/);
   assert.match(
     sharedSchemaPointer(shared),
     /still applies, unchanged\. Its folder is \/me\/\.irori\/shared\./,
@@ -212,20 +212,20 @@ test(
     await settings.write(sharedSchemaId, 'AGENTS.md', 'Write times in UTC.\n', agents.hash);
     await execute('fourth words');
     assert.match((await prompts()).at(-1)!, /<shared-instructions>\nWrite times in UTC\.\n/);
-    // A skill the hibachi lacks is found in the shared Schema, and says so.
+    // A skill the vault lacks is found in the shared Schema, and says so.
     const events = await execute('fifth words', { skill: 'weekly' });
     assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
     const fifth = (await prompts()).at(-1)!;
     assert.match(fifth, /chose the "weekly" skill from the shared Schema/);
     assert.match(fifth, /--- begin skill ---\nCollect the week\.\n--- end skill ---/);
-    // The hibachi's own skill of the same name wins.
+    // The vault's own skill of the same name wins.
     await mkdir(path.join(kb, '.agents', 'skills', 'weekly'), { recursive: true });
     await writeFile(
       path.join(kb, '.agents', 'skills', 'weekly', 'SKILL.md'),
-      skill('weekly', 'The hibachi’s own.', 'Use the hibachi’s template.'),
+      skill('weekly', 'The vault’s own.', 'Use the vault’s template.'),
     );
     await execute('sixth words', { skill: 'weekly' });
-    assert.match((await prompts()).at(-1)!, /from this KB's schema layer[\s\S]*hibachi’s template/);
+    assert.match((await prompts()).at(-1)!, /from this KB's schema layer[\s\S]*vault’s template/);
     // A skill neither has is refused before any CLI starts.
     const missing = await execute('seventh words', { skill: 'absent' });
     assert.equal(missing.at(-1)?.outcome, 'failed');

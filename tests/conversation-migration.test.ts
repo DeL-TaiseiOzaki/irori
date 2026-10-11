@@ -17,12 +17,12 @@ test('Conversations kept before ADR 017 become conversations once, with their ev
   const sessions = path.join(dataDir, 'agent-sessions');
   await mkdir(conversations);
   await mkdir(sessions);
-  const hibachi = { scopeId: randomUUID(), agent: 'pi' as const, root: '/work/研究' };
+  const vault = { scopeId: randomUUID(), agent: 'pi' as const, root: '/work/研究' };
   const you = { scopeId: randomUUID(), agent: 'claude' as const, root: '/home/me/irori/you' };
   const gone = { scopeId: randomUUID(), agent: 'codex' as const, root: '/old/place/archive' };
   const runId = randomUUID();
   const activeRunId = randomUUID();
-  const record = (binding: typeof hibachi | typeof you, extra: object = {}) => ({
+  const record = (binding: typeof vault | typeof you, extra: object = {}) => ({
     schemaVersion: 1,
     ...binding,
     events: [
@@ -37,14 +37,14 @@ test('Conversations kept before ADR 017 become conversations once, with their ev
   });
   const write = (dir: string, binding: object, value: unknown) =>
     writeFile(
-      path.join(dir, `${sessionKey(binding as typeof hibachi)}.json`),
+      path.join(dir, `${sessionKey(binding as typeof vault)}.json`),
       typeof value === 'string' ? value : JSON.stringify(value),
     );
   const queuedId = randomUUID();
   await write(
     conversations,
-    hibachi,
-    record(hibachi, {
+    vault,
+    record(vault, {
       truncated: true,
       activeRunId,
       queued: [
@@ -60,16 +60,16 @@ test('Conversations kept before ADR 017 become conversations once, with their ev
     access: 'full-access',
     updatedAt: new Date().toISOString(),
   });
-  await write(sessions, hibachi, session(hibachi, 'pi-handle'));
+  await write(sessions, vault, session(vault, 'pi-handle'));
   await write(conversations, you, record(you));
   // A handle alone, from a checkout no longer registered.
   await write(sessions, gone, session(gone, 'codex-handle'));
   // A damaged record and one filed under another binding's name.
-  const damaged = { ...hibachi, agent: 'hermes' as const };
+  const damaged = { ...vault, agent: 'hermes' as const };
   await write(conversations, damaged, '{broken');
   await writeFile(
     path.join(conversations, `${createHash('sha256').update('elsewhere').digest('hex')}.json`),
-    JSON.stringify(record(hibachi)),
+    JSON.stringify(record(vault)),
   );
   const before = await Promise.all(
     [conversations, sessions].flatMap(async (dir) =>
@@ -85,27 +85,27 @@ test('Conversations kept before ADR 017 become conversations once, with their ev
   const options = {
     deviceId: () => device.id(),
     youId: you.scopeId,
-    spaceName: (scopeId: string) => (scopeId === hibachi.scopeId ? '研究' : undefined),
+    spaceName: (scopeId: string) => (scopeId === vault.scopeId ? '研究' : undefined),
   };
   const result = await migrateConversations(dataDir, options);
   assert.equal(result?.migrated, 3);
   assert.equal(result?.skipped.length, 2);
   const metas = await conversationMetas(dataDir);
   const deviceId = await device.id();
-  const own = metas.find((meta) => meta.owner.id === hibachi.scopeId)!;
-  assert.equal(own.id, migratedId(sessionKey(hibachi)));
-  assert.deepEqual(own.owner, { kind: 'hibachi', id: hibachi.scopeId, name: '研究' });
+  const own = metas.find((meta) => meta.owner.id === vault.scopeId)!;
+  assert.equal(own.id, migratedId(sessionKey(vault)));
+  assert.deepEqual(own.owner, { kind: 'vault', id: vault.scopeId, name: '研究' });
   assert.equal(own.title, '以前の会話');
   assert.equal(own.titleSource, 'migration');
   assert.equal(own.agent, 'pi');
   assert.equal(own.native[deviceId].handle, 'pi-handle');
   assert.equal(own.native[deviceId].access, 'full-access');
-  assert.equal(own.native[deviceId].root, createHash('sha256').update(hibachi.root).digest('hex'));
+  assert.equal(own.native[deviceId].root, createHash('sha256').update(vault.root).digest('hex'));
   const yours = metas.find((meta) => meta.owner.id === you.scopeId)!;
   assert.deepEqual(yours.owner, { kind: 'irori-agent', id: you.scopeId, name: 'irori agent' });
   assert.deepEqual(yours.native, {});
   const old = metas.find((meta) => meta.owner.id === gone.scopeId)!;
-  assert.equal(old.owner.name, 'archive', 'a hibachi no longer registered keeps its folder name');
+  assert.equal(old.owner.name, 'archive', 'a vault no longer registered keeps its folder name');
   assert.equal(old.native[deviceId].handle, 'codex-handle');
   for (const meta of metas) assert.ok(!JSON.stringify(meta).includes('/work/'), 'no local path');
 
@@ -131,9 +131,9 @@ test('Conversations kept before ADR 017 become conversations once, with their ev
     ],
   );
   assert.equal(read.activeRunId, undefined, 'a run of the old version is never sent again');
-  assert.equal((await store.nextQueued(hibachi.scopeId))?.item.id, queuedId);
+  assert.equal((await store.nextQueued(vault.scopeId))?.item.id, queuedId);
   assert.deepEqual(
-    (await store.list(hibachi.scopeId)).map((row) => row.id),
+    (await store.list(vault.scopeId)).map((row) => row.id),
     [own.id],
   );
   assert.equal((await store.read(old.id)).events.length, 0);

@@ -19,7 +19,7 @@
 .app-body > .rail {
   grid-row: 1 / -1;
 }
-/* irori mode's terminal: a drawer under the Overview, the way a hibachi's sits
+/* irori mode's terminal: a drawer under the Overview, the way a vault's sits
    at its stage's foot. */
 .app-body > .terminal-drawer {
   grid-column: 2;

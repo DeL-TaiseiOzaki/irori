@@ -1,4 +1,4 @@
-// Shared fixtures for the cloud service: a hibachi with a folder outside it, standing
+// Shared fixtures for the cloud service: a vault with a folder outside it, standing
 // for one a sync app keeps on this device, connected the way irori connects it, through
 // a real link at `contents/<name>` (ADR 019). A Google Drive declaration from before
 // 0.1.67 can be written beside it to stand for a retired connection (ADR 023).
@@ -13,7 +13,7 @@ import type { CloudAttachment, Space } from '../../src/domain/types';
 export const connectionName = 'Connected fixture';
 export const connectionRoot = `contents/${connectionName}`;
 
-/** A hibachi and a cloud service whose trash records each entry and removes it. */
+/** A vault and a cloud service whose trash records each entry and removes it. */
 export async function fixture(t: any) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori cloud 日本語 '));
   t.after(() => rm(base, { recursive: true, force: true }));
@@ -32,7 +32,7 @@ export async function fixture(t: any) {
   return { base, files, space, cloud, trash, trashed };
 }
 
-/** A folder outside the hibachi, as a sync app keeps one, by its real path. */
+/** A folder outside the vault, as a sync app keeps one, by its real path. */
 export async function syncedFolder(base: string, name = 'Shared folder') {
   const folder = path.join(base, 'Sync 同期', name);
   await mkdir(folder, { recursive: true });
@@ -79,7 +79,7 @@ export function retiredDeclaration(
   };
 }
 
-/** Adds retired declarations to a hibachi's `.irori/cloud-mounts.json`. */
+/** Adds retired declarations to a vault's `.irori/cloud-mounts.json`. */
 export async function writeRetired(space: Pick<Space, 'root'>, ...records: CloudAttachment[]) {
   const filename = path.join(space.root, '.irori', 'cloud-mounts.json');
   const existing = JSON.parse(await readFile(filename, 'utf8').catch(() => '[]'));

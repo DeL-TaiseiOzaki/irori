@@ -1,6 +1,6 @@
 import { Fragment, memo, useState, type ReactNode } from 'react';
 import { ContextMenu } from '@base-ui/react/context-menu';
-import type { HibachiGroup, Space } from '../domain/types';
+import type { VaultGroup, Space } from '../domain/types';
 import {
   joinGroup,
   leaveGroup,
@@ -9,7 +9,7 @@ import {
   startGroup,
   toggleGroup,
   ungroup,
-} from '../domain/hibachi-groups';
+} from '../domain/vault-groups';
 import { t } from '../domain/i18n';
 import { appIcon, iroriModeIcon, routinesIcon } from './branding';
 import { BrainTile } from './BrainTile';
@@ -65,15 +65,15 @@ export const Rail = memo(function Rail({
   onSelect: (space: Space) => void;
   onAdd: () => void;
   onSearch: () => void;
-  /** The workspace's named groups of hibachis, each opened or closed in the rail. */
-  groups: HibachiGroup[];
-  onGroups: (groups: HibachiGroup[]) => void;
+  /** The workspace's named groups of vaults, each opened or closed in the rail. */
+  groups: VaultGroup[];
+  onGroups: (groups: VaultGroup[]) => void;
   settings: ReactNode;
 }) {
   useLanguage();
   const byId = new Map(spaces.map((space) => [space.scopeId, space]));
   const [naming, setNaming] = useState<{ scopeId?: string; groupId?: string; name: string }>();
-  // A hibachi in the rail; its menu gathers it into a named group or takes it out.
+  // A vault in the rail; its menu gathers it into a named group or takes it out.
   const slot = (space: Space, groupId?: string) => {
     const active = !overview && space.scopeId === activeId;
     const state = aiState(space.scopeId);
@@ -141,7 +141,7 @@ export const Rail = memo(function Rail({
     );
   };
   return (
-    <nav className="rail chrome" aria-label={t('hibachi', 'hibachis')}>
+    <nav className="rail chrome" aria-label={t('vault', 'vaults')}>
       <button
         className="rail-home"
         aria-label={t('ワークスペースを選択', 'Choose a workspace')}
@@ -185,7 +185,7 @@ export const Rail = memo(function Rail({
         spaces.map((space) => space.scopeId),
         groups,
       ).map((item) => {
-        if (item.kind === 'hibachi') return slot(byId.get(item.scopeId)!);
+        if (item.kind === 'vault') return slot(byId.get(item.scopeId)!);
         const members = item.group.scopeIds.map((scopeId) => byId.get(scopeId)!);
         const states = members.map((space) => aiState(space.scopeId));
         const state: BrainAiState = states.includes('waiting')
@@ -270,8 +270,8 @@ export const Rail = memo(function Rail({
       })}
       <button
         className="rail-add"
-        aria-label={t('hibachi を追加', 'Add a hibachi')}
-        title={t('hibachi を追加', 'Add a hibachi')}
+        aria-label={t('vault を追加', 'Add a vault')}
+        title={t('vault を追加', 'Add a vault')}
         disabled={addDisabled}
         onClick={onAdd}
       >

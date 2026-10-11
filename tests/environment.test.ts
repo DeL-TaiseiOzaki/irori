@@ -83,7 +83,7 @@ async function fixture(t: any) {
   return { base, kb, you, kbScope, fake, a, b };
 }
 
-/** Device A: a GitHub hibachi, a plain folder, a workspace and group, a dark theme, an agent repository. */
+/** Device A: a GitHub vault, a plain folder, a workspace and group, a dark theme, an agent repository. */
 async function deviceA(f: Awaited<ReturnType<typeof fixture>>) {
   const checkout = path.join(f.a.dir, 'irori', 'kb');
   await mkdir(path.dirname(checkout), { recursive: true });
@@ -106,7 +106,7 @@ async function deviceA(f: Awaited<ReturnType<typeof fixture>>) {
   return { research, plain, lab };
 }
 
-test('a device saves its GitHub hibachis, workspaces and preferences to a private repository', async (t) => {
+test('a device saves its GitHub vaults, workspaces and preferences to a private repository', async (t) => {
   const f = await fixture(t);
   const { research, plain, lab } = await deviceA(f);
   assert.equal(research.scopeId, f.kbScope.scopeId);
@@ -114,7 +114,7 @@ test('a device saves its GitHub hibachis, workspaces and preferences to a privat
   const before = await f.a.environment.state();
   assert.equal(before.account, 'octo');
   assert.equal(before.saved, undefined);
-  assert.deepEqual(before.local, { hibachis: 1, left: ['Local notes'], agent: 'octo/you' });
+  assert.deepEqual(before.local, { vaults: 1, left: ['Local notes'], agent: 'octo/you' });
   // Looking creates nothing on the account.
   assert.ok(!(await f.fake.calls()).some((call) => call.includes('POST')));
 
@@ -124,7 +124,7 @@ test('a device saves its GitHub hibachis, workspaces and preferences to a privat
     'true',
   );
   const saved = JSON.parse(await f.fake.stored());
-  assert.deepEqual(saved.hibachis, [
+  assert.deepEqual(saved.vaults, [
     { scopeId: research.scopeId, name: 'Research', repository: 'octo/kb' },
   ]);
   // The plain folder cannot be restored elsewhere, so it leaves the workspace and its group.
@@ -152,7 +152,7 @@ test('a device saves its GitHub hibachis, workspaces and preferences to a privat
   assert.ok(!JSON.stringify(saved).includes(f.base));
   assert.equal(after.saved?.savedAt, '2026-10-06T00:00:00.000Z');
   assert.deepEqual(
-    after.saved?.hibachis.map((item) => item.here),
+    after.saved?.vaults.map((item) => item.here),
     [true],
   );
   assert.deepEqual(after.saved?.workspaces, ['Lab']);
@@ -164,7 +164,7 @@ test('a device saves its GitHub hibachis, workspaces and preferences to a privat
   assert.equal((await f.fake.calls()).filter((call) => call.includes('POST')).length, 1);
 });
 
-test('another device restores the hibachis, workspaces, preferences and irori agent', async (t) => {
+test('another device restores the vaults, workspaces, preferences and irori agent', async (t) => {
   const f = await fixture(t);
   const { research, lab } = await deviceA(f);
   await f.a.environment.save();
@@ -176,7 +176,7 @@ test('another device restores the hibachis, workspaces, preferences and irori ag
   const ownLab = await f.b.workspaces.save('Lab', [own.scopeId]);
 
   const state = await f.b.environment.state();
-  assert.deepEqual(state.saved?.hibachis, [
+  assert.deepEqual(state.saved?.vaults, [
     { scopeId: research.scopeId, name: 'Research', repository: 'octo/kb', here: false },
   ]);
   assert.deepEqual(state.saved?.agent, { repository: 'octo/you', here: false });
@@ -209,7 +209,7 @@ test('another device restores the hibachis, workspaces, preferences and irori ag
   const again = await f.b.environment.restore({ scopeIds: [research.scopeId], agent: true });
   assert.deepEqual(again, { restored: [], failed: [], workspaces: 0, agent: 'unchanged' });
   assert.deepEqual(
-    (await f.b.environment.state()).saved?.hibachis.map((item) => item.here),
+    (await f.b.environment.state()).saved?.vaults.map((item) => item.here),
     [true],
   );
 });
@@ -234,7 +234,7 @@ test('restoring keeps what is in the way and reports it', async (t) => {
   assert.equal(await readFile(path.join(f.b.dir, 'irori', 'kb', 'mine.md'), 'utf8'), 'mine\n');
   assert.equal(await readFile(path.join(f.b.agentRoot, 'notes.md'), 'utf8'), 'mine\n');
 
-  // An unselected hibachi is not cloned; the workspace still comes, its hibachi unavailable.
+  // An unselected vault is not cloned; the workspace still comes, its vault unavailable.
   const other = await device(f.base, 'c', f.fake.gh);
   t.after(() => other.service.close());
   const skipped = await other.environment.restore({ scopeIds: [], agent: false });

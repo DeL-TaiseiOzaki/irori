@@ -15,7 +15,7 @@ import path from 'node:path';
 import { CloudService } from '../src/cloud/service';
 import { fixture, retiredDeclaration, writeRetired } from './fixtures/cloud';
 
-/** A hibachi with a folder outside it, standing for one a sync app keeps on this device. */
+/** A vault with a folder outside it, standing for one a sync app keeps on this device. */
 async function local(t: any) {
   const value = await fixture(t);
   const folder = path.join(value.base, 'Sync 同期', 'Research');
@@ -35,7 +35,7 @@ test('A local folder appears in contents through a link and is edited in place',
   assert.equal(connection.provider, 'local');
   assert.equal(connection.state, 'disconnected');
   assert.equal(connection.folderName, 'Research');
-  // The hibachi's record names the connection, never the device's path.
+  // The vault's record names the connection, never the device's path.
   const record = await readFile(path.join(space.root, '.irori', 'local-folders.json'), 'utf8');
   assert(!record.includes(folder));
   await cloud.connect(space.scopeId, connection.mountId);
@@ -43,7 +43,7 @@ test('A local folder appears in contents through a link and is edited in place',
   assert((await lstat(entry)).isSymbolicLink());
   assert.equal(await readlink(entry), folder);
   assert.deepEqual(cloud.localFolders(space.scopeId), [folder]);
-  // Agents are told where it appears: searches that walk the hibachi skip the link.
+  // Agents are told where it appears: searches that walk the vault skip the link.
   assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/調査']);
   const [listed] = await files.entries(space.scopeId, 'contents');
   assert.equal(listed.blocked, undefined);
@@ -85,7 +85,7 @@ test('A read-only local folder refuses changes, and access changes reconnect it'
   assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).readOnly, false);
 });
 
-test('Folders overlapping a hibachi or irori data, and taken names, are refused', async (t) => {
+test('Folders overlapping a vault or irori data, and taken names, are refused', async (t) => {
   const { base, files, space, cloud, folder } = await local(t);
   const add = (chosen: string, name = 'Other') =>
     cloud.addLocal({ scopeId: space.scopeId, path: chosen, contentsRoot: 'contents', name });

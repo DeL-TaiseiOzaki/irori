@@ -108,7 +108,7 @@ test('Moves refuse occupied, foreign and impossible destinations and leave every
   // The connection folder itself belongs to the connection dialog.
   await rejects('contents/Renamed', /接続フォルダ自体/, root);
   await assert.rejects(cloud.deleteEntry(space.scopeId, root), /接続フォルダ自体/);
-  // Another connection of the same hibachi is a different folder.
+  // Another connection of the same vault is a different folder.
   const otherTarget = await syncedFolder(base, 'Other');
   const other = await cloud.addLocal({
     scopeId: space.scopeId,

@@ -179,7 +179,7 @@ test('Renaming contents keeps its connected folders, their records and the ignor
   );
 });
 
-test('The graph index lives in the knowledge folder the hibachi names', async (t) => {
+test('The graph index lives in the knowledge folder the vault names', async (t) => {
   const { files, id, write, read } = await fixture(t);
   await write(
     'Knowledge_Base/a.md',

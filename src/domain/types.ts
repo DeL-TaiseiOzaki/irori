@@ -186,8 +186,8 @@ export interface RepositoryInfo {
   changed?: boolean;
   detail?: string;
 }
-/** Hibachis gathered under a name in the rail; a closed group shows as one folder. */
-export interface HibachiGroup {
+/** Vaults gathered under a name in the rail; a closed group shows as one folder. */
+export interface VaultGroup {
   id: string;
   name: string;
   scopeIds: string[];
@@ -197,7 +197,7 @@ export interface WorkspaceProfile {
   id: string;
   name: string;
   scopeIds: string[];
-  groups?: HibachiGroup[];
+  groups?: VaultGroup[];
 }
 export interface CloudRoot {
   scopeId: string;
@@ -206,7 +206,7 @@ export interface CloudRoot {
   contents: string[];
 }
 /**
- * A Google Drive folder irori connected itself before 0.1.67. Kept in a hibachi's
+ * A Google Drive folder irori connected itself before 0.1.67. Kept in a vault's
  * `.irori/cloud-mounts.json`, it is listed as retired until it is switched to a
  * folder on this computer or unregistered (ADR 023).
  */
@@ -274,8 +274,8 @@ export type HostEvent =
   | { type: 'terminal'; event: TerminalEvent }
   | { type: 'update'; state: import('./updates').UpdateState }
   | { type: 'routine'; run: import('./routines').RoutineRun }
-  /** The irori agent registered a hibachi; `workspace` is the one it joined, as saved. */
-  | { type: 'hibachis'; workspace?: WorkspaceProfile };
+  /** The irori agent registered a vault; `workspace` is the one it joined, as saved. */
+  | { type: 'vaults'; workspace?: WorkspaceProfile };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -294,7 +294,7 @@ export interface StartRun {
   personLines?: boolean;
   /** Brains handed to your AI for this request; only your AI's runs take them. */
   brains?: string[];
-  /** The workspace an irori agent request was sent in: hibachis it registers join it. */
+  /** The workspace an irori agent request was sent in: vaults it registers join it. */
   workspace?: string;
   /** Files the person attached, by the references `stageAttachment` returned. */
   attachments?: import('./attachments').AttachmentRef[];
@@ -315,8 +315,8 @@ export interface DeviceSettings {
   markdownFont: MarkdownFont;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
-  /** Offer each hibachi's own agent and its Schema layer; off, irori is an editor with the irori agent. */
-  hibachiAgent: boolean;
+  /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */
+  vaultAgent: boolean;
   /** The CLI your AI runs on and the model chosen for each CLI ('' or absent: the CLI's default). */
   yourAi: { agent: AgentId; models: Partial<Record<AgentId, string>> };
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
@@ -419,9 +419,9 @@ export interface HostAPI {
     text: string | null,
     version: string,
   ): Promise<GitStatus>;
-  /** The repositories the hibachi holds as submodules (ADR 022). */
+  /** The repositories the vault holds as submodules (ADR 022). */
   gitSubmodules(scopeId: string): Promise<import('./git').GitSubmodules>;
-  /** Clones a GitHub repository into a new folder of the hibachi as a submodule. */
+  /** Clones a GitHub repository into a new folder of the vault as a submodule. */
   gitSubmoduleAdd(
     scopeId: string,
     input: import('./git').AddSubmodule,
@@ -429,11 +429,11 @@ export interface HostAPI {
   /** Fetches the files of one submodule not yet here, or of every such submodule. */
   gitSubmoduleInit(scopeId: string, path?: string): Promise<import('./git').GitSubmodules>;
   gitClone(input: CloneRepository): Promise<import('./git').CloneResult>;
-  /** Makes a hibachi that is an ordinary folder a Git repository on `main`. */
+  /** Makes a vault that is an ordinary folder a Git repository on `main`. */
   gitInit(scopeId: string): Promise<GitStatus>;
   /** The account the GitHub CLI is signed in to and its organizations. */
   githubAccount(): Promise<import('./git').GitHubAccount>;
-  /** Creates a GitHub repository for a hibachi without a remote and pushes to it. */
+  /** Creates a GitHub repository for a vault without a remote and pushes to it. */
   gitPublish(
     scopeId: string,
     input: import('./git').PublishRepository,
@@ -453,7 +453,7 @@ export interface HostAPI {
   saveWorkspace(name: string, scopeIds: string[], id?: string): Promise<WorkspaceProfile>;
   removeWorkspace(id: string): Promise<void>;
   /** Replaces the workspace's groups; members it does not hold are dropped. */
-  saveWorkspaceGroups(id: string, groups: HibachiGroup[]): Promise<WorkspaceProfile>;
+  saveWorkspaceGroups(id: string, groups: VaultGroup[]): Promise<WorkspaceProfile>;
   cloudConnections(scopeId: string): Promise<CloudConnection[]>;
   connectCloud(scopeId: string, mountId: string): Promise<void>;
   disconnectCloud(scopeId: string, mountId: string): Promise<void>;
@@ -481,17 +481,17 @@ export interface HostAPI {
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;
-  /** Makes a new folder a Git repository and registers it as a hibachi. */
+  /** Makes a new folder a Git repository and registers it as a vault. */
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
   /**
-   * Removes a hibachi from this device and from every workspace. With `trash`,
+   * Removes a vault from this device and from every workspace. With `trash`,
    * its folder goes to the system trash; otherwise the folder stays as it is.
    */
   removeSpace(scopeId: string, trash: boolean): Promise<void>;
   /** Changes a brain's name, category or look in its `.irori/scope.json`. */
   updateSpace(scopeId: string, change: SpaceChange): Promise<Space>;
   /**
-   * Renames the hibachi's knowledge or contents folder on disk and in its
+   * Renames the vault's knowledge or contents folder on disk and in its
    * declaration, carrying the links, comments and records that name its paths.
    */
   renameLayerFolder(
@@ -571,9 +571,9 @@ export interface HostAPI {
   /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */
   agentModels(agent: AgentId): Promise<AgentModels>;
   /**
-   * The owner's conversations (a hibachi's or the irori agent's), pinned first, then
+   * The owner's conversations (a vault's or the irori agent's), pinned first, then
    * by last update. `workspaceId` picks the irori agent's history of that workspace;
-   * a hibachi's is one history wherever it is opened.
+   * a vault's is one history wherever it is opened.
    */
   agentConversations(
     scopeId: string,
@@ -631,9 +631,9 @@ export interface HostAPI {
   yourAiRead(path: string): Promise<{ path: string; text: string }>;
   /** The sub-agent each brain gets from your AI, and whether its definition exists. */
   yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
-  /** The irori agent's routines and those of the workspace's hibachis, as this device sees them. */
+  /** The irori agent's routines and those of the workspace's vaults, as this device sees them. */
   routines(workspaceId: string): Promise<import('./routines').Routine[]>;
-  /** Starts a routine in the irori agent's folder or a hibachi, from a template to finish. */
+  /** Starts a routine in the irori agent's folder or a vault, from a template to finish. */
   createRoutine(owner: string, name: string): Promise<import('./routines').RoutineRef>;
   /** The routine's `routine.yaml`, for the person to edit. */
   routineSource(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineSource>;

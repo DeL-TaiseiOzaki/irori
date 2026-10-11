@@ -12,7 +12,7 @@
 import { skillsRoot, type AgentSkill } from '../src/domain/skills';
 
 export function promptWithSkill(skill: AgentSkill, prompt: string): string {
-  // A shared skill (ADR 027) is the person's own across every hibachi, read from its own folder.
+  // A shared skill (ADR 027) is the person's own across every vault, read from its own folder.
   const [from, contract, folder] = skill.shared
     ? [
         'the shared Schema every agent in irori follows',

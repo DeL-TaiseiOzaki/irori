@@ -19,6 +19,6 @@ Choose **Resolve** when the work is done. This removes the comment; there is cur
 
 ## Share with AI or your team
 
-Comments live in the hibachi's `.irori/comments/` and can be shared through Git. The hibachi agent receives comments on the selected note; the irori agent can see each hibachi's comment count.
+Comments live in the vault's `.irori/comments/` and can be shared through Git. The vault agent receives comments on the selected note; the irori agent can see each vault's comment count.
 
-Ask [AI](agents.md) to “Read the comments and revise this note.” Comments currently cover Markdown files inside hibachis. Drive files and the irori agent's own folder are not supported yet.
+Ask [AI](agents.md) to “Read the comments and revise this note.” Comments currently cover Markdown files inside vaults. Drive files and the irori agent's own folder are not supported yet.

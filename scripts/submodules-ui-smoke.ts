@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 
-// A hibachi holding another repository as a submodule (ADR 022): it is added from
+// A vault holding another repository as a submodule (ADR 022): it is added from
 // Source control, edited, committed and pushed in its own repository, recorded
-// in the hibachi, and fetched again from the picker after its files are gone.
+// in the vault, and fetched again from the picker after its files are gone.
 const base = await mkdtemp(path.join(tmpdir(), 'irori submodules ui '));
 function git(root: string, ...args: string[]) {
   return execFileSync(
@@ -43,7 +43,7 @@ git(root, 'init', '-b', 'main');
 await files.register(root, 'サブモジュールのKB', 'personal');
 await writeFile(path.join(root, 'README.md'), '# Main\n');
 git(root, 'add', '.');
-git(root, 'commit', '-m', 'Main hibachi');
+git(root, 'commit', '-m', 'Main vault');
 // The GitHub URL reaches the disposable bare repository only through this test's config.
 const globalConfig = path.join(base, 'gitconfig');
 for (const [key, value] of [
@@ -76,7 +76,7 @@ try {
   await page.getByRole('checkbox', { name: /サブモジュールのKB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
   await page
-    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('group', { name: 'vault の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
   const panel = page.getByRole('region', { name: 'ソース管理' });
@@ -102,7 +102,7 @@ try {
   await expect(panel.getByRole('status')).toContainText('コミットしました');
   expect(git(root, 'ls-tree', 'HEAD', 'projects/library')).toMatch(/^160000 commit /);
 
-  // Edit inside the submodule: the hibachi lists nothing, the submodule lists the file.
+  // Edit inside the submodule: the vault lists nothing, the submodule lists the file.
   await writeFile(path.join(root, 'projects/library/doc.md'), '# Library\n\nEdited in irori\n');
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await expect(panel.locator('.git-file')).toHaveCount(0);
@@ -125,7 +125,7 @@ try {
   );
   await page.screenshot({ path: 'test-results/irori-submodule.png' });
 
-  // Back in the hibachi, the submodule's new commit is a change to record.
+  // Back in the vault, the submodule's new commit is a change to record.
   await picker.selectOption('');
   const moved = panel.locator('.git-file').filter({ hasText: 'library' });
   await expect(moved).toBeVisible();
@@ -157,9 +157,9 @@ try {
       {
         checks: [
           'Source control adds a GitHub repository as a submodule in a chosen folder, staged with .gitmodules',
-          "an edit inside the submodule is listed in the submodule's repository, not the hibachi's",
+          "an edit inside the submodule is listed in the submodule's repository, not the vault's",
           'the submodule commits on its branch and pushes to its own remote',
-          "the hibachi lists the submodule's new commit, shows its log as the diff and records it",
+          "the vault lists the submodule's new commit, shows its log as the diff and records it",
           'a submodule whose files are gone is fetched again from the picker and put on its branch',
         ],
         errors,

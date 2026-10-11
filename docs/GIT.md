@@ -80,46 +80,46 @@ the merge commits of a plain merge or in irori's own device records. `git notes
 merge` can also refuse when another tool left a notes merge unfinished in the
 repository; the result names it and the branch operation is unaffected.
 
-**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, fetches the hibachi's submodules (see below), and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
+**スペースを追加 → GitHub から取得** accepts a GitHub HTTPS/SSH repository URL, a chosen parent directory and a new folder name. Native clone runs without recursive submodule initialization, imports the authorship notes, fetches the vault's submodules (see below), and then returns to the existing inspected registration flow. A notes-only failure still permits registration of the completed checkout and displays a notice. Existing directories are never overwritten. Failed-clone leftovers are not removed by irori; retries can use another name. A duplicate portable scope identity still follows the existing registration policy.
 
 ### Submodules
 
-Since 0.1.66 a hibachi can hold other repositories as submodules
+Since 0.1.66 a vault can hold other repositories as submodules
 ([ADR 022](decisions/022-submodules.md)). **その他 → submodule を追加…** clones a
 GitHub repository into a new Knowledge folder with `git submodule add`; Git
-stages it with `.gitmodules`. Once a hibachi has submodules, a picker above the
-repository bar chooses the repository the view acts on: the hibachi or one of its
+stages it with `.gitmodules`. Once a vault has submodules, a picker above the
+repository bar chooses the repository the view acts on: the vault or one of its
 submodules. A submodule's edits, commits, pushes, pulls and history are its own.
-The hibachi lists a submodule only when it is on a different commit from the one
+The vault lists a submodule only when it is on a different commit from the one
 recorded, and committing that records the new commit (the diff lists the commits
-moved over). A pull of the hibachi moves a clean submodule to the newly recorded
+moved over). A pull of the vault moves a clean submodule to the newly recorded
 commit by fast-forward, fetching it if needed, and otherwise says to pull the
 submodule. Submodules not fetched yet show as 未取得 with **取得**; cloning a
-hibachi fetches them. A fetched submodule is put on its branch at the recorded
+vault fetches them. A fetched submodule is put on its branch at the recorded
 commit when that commit is on it. Only GitHub HTTPS/SSH remotes are fetched,
 with every other Git transport turned off for the command.
 
-### Making a hibachi here and publishing it
+### Making a vault here and publishing it
 
-Since 0.1.53 the direction also runs the other way: a hibachi can start in irori
+Since 0.1.53 the direction also runs the other way: a vault can start in irori
 and become a GitHub repository.
 
-**hibachi を追加 → 新しく作成** takes a parent folder, a new folder name and the
-hibachi's name. The host (`GitService.create`) applies the clone's destination
+**vault を追加 → 新しく作成** takes a parent folder, a new folder name and the
+vault's name. The host (`GitService.create`) applies the clone's destination
 rules — never an existing folder, never inside a registered space or cloud
 materials — makes the folder, runs `git init` and points `HEAD` at `main`
 whatever `init.defaultBranch` says. Registration then writes `.irori/scope.json`
 and the `.gitignore` excluding `/contents/`, and `firstCommit` commits exactly
 those two paths with the person's own Git identity, hooks and signing. A commit
-that fails leaves the hibachi registered and returns the reason as a notice. A
+that fails leaves the vault registered and returns the reason as a notice. A
 folder whose registration fails is removed only while it holds nothing beyond
 `.git`, `.irori` and `.gitignore`.
 
-A registered hibachi that is an ordinary folder reports `initializable` in its
+A registered vault that is an ordinary folder reports `initializable` in its
 status, and the 変更 view offers **Git を始める** (`gitInit`); a folder inside
 another repository or with a `.git` entry Git cannot read is not offered it.
 
-A hibachi with a commit and no remote shows **GitHub に公開…** (`gitPublish`),
+A vault with a commit and no remote shows **GitHub に公開…** (`gitPublish`),
 also offered by the creation form's **GitHub にもリポジトリを作成する**. irori runs
 the GitHub CLI with `GH_HOST=github.com` and prompts disabled:
 `gh api user` and `gh api user/orgs` list where the repository may go (without

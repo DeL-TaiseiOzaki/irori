@@ -26,8 +26,8 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const root = path.join(base, 'Product');
 await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(path.join(root, 'Knowledge_Base', 'Product note.md'), '# Product\n');
@@ -71,10 +71,10 @@ await routine(path.join(routines, 'long'), {
 });
 await routine(path.join(routines, 'ask'), {
   'routine.yaml':
-    'name: Ask\nsteps:\n  - agent: hibachi\n    cli: pi\n    access: default\n    prompt: dialog\n',
+    'name: Ask\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: dialog\n',
 });
 await routine(path.join(routines, 'broken'), {
-  'routine.yaml': 'name: Broken\nsteps:\n  - agent: hibachi\n    prompt: go\n',
+  'routine.yaml': 'name: Broken\nsteps:\n  - agent: vault\n    prompt: go\n',
 });
 await routine(path.join(routines, 'token'), {
   'routine.yaml': 'name: Token\nsteps:\n  - run: use.sh\n    secrets: [SLACK_TOKEN]\n',
@@ -114,11 +114,11 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   page.setDefaultTimeout(20000);
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
   const modeButton = rail.getByRole('button', { name: 'irori mode', exact: true });
   const routinesButton = rail.getByRole('button', { name: 'ルーティン', exact: true });
   const productButton = rail.getByRole('button', { name: /^Product・AI/ });
-  // Home, irori mode, routines, then the hibachis; the new icon loads at its bundled size.
+  // Home, irori mode, routines, then the vaults; the new icon loads at its bundled size.
   expect(
     await rail
       .locator('.rail-home, .rail-overview, .rail-routines, .rail-brain')
@@ -127,7 +127,7 @@ try {
   await expect
     .poll(() => routinesButton.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBe(256);
-  // The routines page opens directly from a hibachi, with its own heading and selection.
+  // The routines page opens directly from a vault, with its own heading and selection.
   await routinesButton.click();
   await expect(page.getByRole('heading', { name: 'ルーティン', exact: true })).toBeVisible();
   await expect(routinesButton).toHaveAttribute('aria-current', 'page');
@@ -176,7 +176,7 @@ try {
     .toBeGreaterThan(narrow + 120);
   // Rail search from routines covers the workspace, as irori mode's does.
   await rail.getByRole('button', { name: /^検索/ }).click();
-  await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'すべての vault', exact: true })).toBeChecked();
   await page.getByRole('button', { name: '閉じる', exact: true }).click();
   await page.screenshot({ path: 'test-results/routines-navigation.png' });
 
@@ -367,7 +367,7 @@ try {
   await question.getByLabel('Fixture answer').fill('Choice');
   await question.getByRole('button', { name: '回答する' }).click();
   await last('Ask', 'succeeded');
-  await expect(ask.locator('.routine-step')).toContainText('hibachi agent');
+  await expect(ask.locator('.routine-step')).toContainText('vault agent');
   await ask.getByText('報告', { exact: true }).click();
   await expect(ask.locator('.routine-output pre')).toHaveText('日本語 の応答');
   const run = (
@@ -405,7 +405,7 @@ try {
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Routines UI passed: invalid routine with its reason, a routine made from the template and edited in place, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its hibachi, and an irori agent routine. Protocol fixture only.',
+    'Routines UI passed: invalid routine with its reason, a routine made from the template and edited in place, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its vault, and an irori agent routine. Protocol fixture only.',
   );
 } finally {
   // A routine or run left by a failure would hold the window open behind a confirmation.

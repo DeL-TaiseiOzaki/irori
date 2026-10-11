@@ -12,7 +12,7 @@ const defaults = {
   language: 'ja',
   markdownFont: 'sans',
   editorAssistance: true,
-  hibachiAgent: false,
+  vaultAgent: false,
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
@@ -90,16 +90,16 @@ test('editor assistance survives restart and unrelated preference writes, with c
   assert.equal((await new SettingsService(dir).read()).editorAssistance, true);
 });
 
-test('the hibachi agent is off until the person turns it on, and stays as chosen', async () => {
+test('the vault agent is off until the person turns it on, and stays as chosen', async () => {
   const { dir, settings } = await service();
   await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ theme: 'dark' }));
-  assert.equal((await settings.read()).hibachiAgent, false);
-  await settings.save({ hibachiAgent: true });
+  assert.equal((await settings.read()).vaultAgent, false);
+  await settings.save({ vaultAgent: true });
   await settings.save({ markdownFont: 'mono' });
-  assert.equal((await new SettingsService(dir).read()).hibachiAgent, true);
-  await settings.save({ hibachiAgent: false });
-  assert.equal((await new SettingsService(dir).read()).hibachiAgent, false);
-  assert.equal(hostArguments.saveDeviceSettings.safeParse([{ hibachiAgent: 'on' }]).success, false);
+  assert.equal((await new SettingsService(dir).read()).vaultAgent, true);
+  await settings.save({ vaultAgent: false });
+  assert.equal((await new SettingsService(dir).read()).vaultAgent, false);
+  assert.equal(hostArguments.saveDeviceSettings.safeParse([{ vaultAgent: 'on' }]).success, false);
 });
 
 test("the reader's role and project are kept per KB on the device, not in the KB", async () => {

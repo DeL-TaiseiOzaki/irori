@@ -20,7 +20,7 @@ async function fixture(t: TestContext) {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'irori conversation window '));
   const open = () => new ConversationStore(dataDir, new DeviceIdentity(dataDir));
   const store = open();
-  const owner = { kind: 'hibachi' as const, id: randomUUID(), name: 'KB' };
+  const owner = { kind: 'vault' as const, id: randomUUID(), name: 'KB' };
   const placement = { owner, agent: 'pi' as const, create: true };
   const input = (prompt: string): StartRun => ({ scopeId: owner.id, agent: 'pi', prompt });
   const id = randomUUID();

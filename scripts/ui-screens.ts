@@ -117,7 +117,7 @@ for (const run of runs) {
   const { files, home } = await fixture(base);
   await writeFile(
     path.join(files.dataDir, 'device-settings.json'),
-    JSON.stringify({ theme: run.theme, language: run.language, hibachiAgent: true }),
+    JSON.stringify({ theme: run.theme, language: run.language, vaultAgent: true }),
   );
   const env = { ...process.env, HOME: home, IRORI_DATA_DIR: files.dataDir } as Record<
     string,
@@ -153,7 +153,7 @@ for (const run of runs) {
       await page.getByRole('button', { name: 'notes', exact: true }).click();
       await page.getByRole('button', { name: 'decision-001', exact: true }).click();
       await page
-        .getByRole('button', { name: L('hibachi agent', 'hibachi agent'), exact: true })
+        .getByRole('button', { name: L('vault agent', 'vault agent'), exact: true })
         .click();
       await shot(page, 'Main', run);
     });
@@ -167,10 +167,10 @@ for (const run of runs) {
     });
     await step('settings', async () => {
       await page
-        .getByRole('button', { name: L('hibachi のメニュー', 'hibachi menu'), exact: true })
+        .getByRole('button', { name: L('vault のメニュー', 'vault menu'), exact: true })
         .click();
       await page
-        .getByRole('menuitem', { name: L('hibachi の設定', 'hibachi settings'), exact: true })
+        .getByRole('menuitem', { name: L('vault の設定', 'vault settings'), exact: true })
         .click();
       await shot(page, 'Settings', run);
       await page.keyboard.press('Escape');
@@ -178,7 +178,7 @@ for (const run of runs) {
     });
     await step('changes', async () => {
       await page
-        .getByRole('group', { name: L('hibachi の表示', 'hibachi view') })
+        .getByRole('group', { name: L('vault の表示', 'vault view') })
         .getByRole('button', { name: new RegExp(`^${L('変更', 'Changes')}`) })
         .click();
       await page
@@ -187,7 +187,7 @@ for (const run of runs) {
         .click();
       await shot(page, 'Changes', run);
       await page
-        .getByRole('group', { name: L('hibachi の表示', 'hibachi view') })
+        .getByRole('group', { name: L('vault の表示', 'vault view') })
         .getByRole('button', { name: L('ファイル', 'Files'), exact: true })
         .click();
     });
@@ -217,7 +217,7 @@ for (const run of runs) {
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'detached' });
     });
-    const rail = page.getByRole('navigation', { name: L('hibachi', 'hibachis') });
+    const rail = page.getByRole('navigation', { name: L('vault', 'vaults') });
     await step('overview', async () => {
       await rail.getByRole('button', { name: L('irori mode', 'irori mode'), exact: true }).click();
       await shot(page, 'Atlas', run);

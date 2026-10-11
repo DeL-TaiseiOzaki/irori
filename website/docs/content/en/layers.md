@@ -11,18 +11,18 @@ description: Keep AI instructions, accumulated knowledge, and source materials d
 | Knowledge | Notes you write and maintain   | Markdown, ontology CSV files      |
 | Contents  | Materials your notes draw on   | PDFs, Office files, Google Drive  |
 
-Read source materials and write your understanding in Knowledge. Schema appears only when the hibachi agent is on in **Settings → Agents**.
+Read source materials and write your understanding in Knowledge. Schema appears only when the vault agent is on in **Settings → Agents**.
 
 ## How folders relate
 
-The layers describe roles and presentation. They do not require every hibachi to have the same folder names. You can open existing notes without moving them.
+The layers describe roles and presentation. They do not require every vault to have the same folder names. You can open existing notes without moving them.
 
-Top-level hidden files and folders, and files such as `AGENTS.md`, belong to Schema. Contents locations follow the hibachi's declarations. Other knowledge files appear in Knowledge.
+Top-level hidden files and folders, and files such as `AGENTS.md`, belong to Schema. Contents locations follow the vault's declarations. Other knowledge files appear in Knowledge.
 
-See [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete) for a recommended structure. Creating a new hibachi does not automatically copy the entire template.
+See [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete) for a recommended structure. Creating a new vault does not automatically copy the entire template.
 
 ## What agents use
 
-The optional hibachi agent works with that hibachi's Schema and notes. It can also use connected Contents within its access to the folder.
+The optional vault agent works with that vault's Schema and notes. It can also use connected Contents within its access to the folder.
 
-Give cross-hibachi work to the [irori agent](irori-mode.md). See [Schema settings](schema.md) for configuration and [Google Drive](drive.md) for connecting materials.
+Give cross-vault work to the [irori agent](irori-mode.md). See [Schema settings](schema.md) for configuration and [Google Drive](drive.md) for connecting materials.

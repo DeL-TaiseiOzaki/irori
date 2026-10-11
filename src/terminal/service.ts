@@ -20,7 +20,7 @@ export class TerminalService {
   constructor(
     private files: FileService,
     private emit: (event: TerminalEvent) => void,
-    /** The irori agent's folder when `scopeId` is its id; a hibachi's id resolves through the files. */
+    /** The irori agent's folder when `scopeId` is its id; a vault's id resolves through the files. */
     private agentRoot: (scopeId: string) => string | undefined = () => undefined,
   ) {}
   get busy() {
@@ -102,7 +102,7 @@ export class TerminalService {
       /* The process may already have exited. */
     }
   }
-  /** Closes the terminals open in a hibachi, before it is removed. */
+  /** Closes the terminals open in a vault, before it is removed. */
   async closeScope(scopeId: string) {
     await this.queue.run(async () => {
       const ids = [...this.running.values()]

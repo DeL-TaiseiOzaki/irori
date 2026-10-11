@@ -43,7 +43,7 @@
   width: 26px;
   height: 26px;
 }
-/* With the hibachi agent on, the mark chooses which agent the column shows. */
+/* With the vault agent on, the mark chooses which agent the column shows. */
 .agent-owner {
   display: flex;
   flex: none;
@@ -146,7 +146,7 @@
   background: linear-gradient(90deg, transparent, var(--ember), transparent);
   animation: irori-slide 1.9s ease-in-out infinite;
 }
-/* The hibachi's open conversations, each running beside the others (ADR 020). */
+/* The vault's open conversations, each running beside the others (ADR 020). */
 .conversation-tabs {
   flex: none;
   display: flex;

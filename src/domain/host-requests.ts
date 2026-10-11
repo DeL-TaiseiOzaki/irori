@@ -23,7 +23,7 @@ const id = z.uuid(),
 const name = z.string().min(1).max(120),
   version = z.string().regex(/^[a-f0-9]{64}$/);
 const document = z.object({ scopeId: id, path, text, hash: version });
-// A submodule's folder from the hibachi's root; the host checks it is one.
+// A submodule's folder from the vault's root; the host checks it is one.
 const repository = z
   .string()
   .min(1)
@@ -59,7 +59,7 @@ export const hostArguments = {
       language: z.enum(languages).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
       editorAssistance: z.boolean().optional(),
-      hibachiAgent: z.boolean().optional(),
+      vaultAgent: z.boolean().optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),

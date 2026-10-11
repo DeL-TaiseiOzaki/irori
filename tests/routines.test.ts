@@ -50,11 +50,11 @@ steps:
   - run: [gh, api, user]
     secrets: [GH_TOKEN]
   - agent: irori
-    hibachis: all
+    vaults: all
     access: full-access
     cli: claude
     prompt: |
-      Put each mail in $IRORI_WORK into the hibachi it concerns.
+      Put each mail in $IRORI_WORK into the vault it concerns.
 `,
     'irori',
   );
@@ -66,8 +66,8 @@ steps:
     run: ['gh', 'api', 'user'],
     secrets: ['GH_TOKEN'],
   });
-  assert.equal(good.steps[2].kind === 'agent' && good.steps[2].hibachis, 'all');
-  const problem = (text: string, owner: 'irori' | 'hibachi' = 'hibachi') => {
+  assert.equal(good.steps[2].kind === 'agent' && good.steps[2].vaults, 'all');
+  const problem = (text: string, owner: 'irori' | 'vault' = 'vault') => {
     const result = parseRoutine(text, owner);
     assert.ok('problem' in result, `accepted: ${text}`);
     return result.problem;
@@ -78,19 +78,19 @@ steps:
   assert.match(problem('steps: [{run: a.js}]\n'), /name がありません/);
   assert.match(problem('name: A\nsteps: []\n'), /steps が正しくありません/);
   assert.match(
-    problem('name: A\nsteps: [{run: a.js, agent: hibachi}]\n'),
+    problem('name: A\nsteps: [{run: a.js, agent: vault}]\n'),
     /ステップ 1 には run か agent/,
   );
   assert.match(
-    problem('name: A\nsteps: [{run: a.js}, {agent: hibachi, prompt: go}]\n'),
+    problem('name: A\nsteps: [{run: a.js}, {agent: vault, prompt: go}]\n'),
     /ステップ 2 の access がありません/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, access: everything, prompt: go}]\n'),
+    problem('name: A\nsteps: [{agent: vault, access: everything, prompt: go}]\n'),
     /access は default \/ full-access のどれか/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, access: default, promt: go}]\n'),
+    problem('name: A\nsteps: [{agent: vault, access: default, promt: go}]\n'),
     /ステップ 1 に不明なキー.*promt/,
   );
   for (const run of [
@@ -107,22 +107,22 @@ steps:
     );
   assert.match(
     problem('name: A\nsteps: [{agent: irori, access: default, prompt: go}]\n'),
-    /hibachi のルーティンでは agent: hibachi/,
+    /vault のルーティンでは agent: vault/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, access: default, prompt: go}]\n', 'irori'),
+    problem('name: A\nsteps: [{agent: vault, access: default, prompt: go}]\n', 'irori'),
     /irori agent のルーティンでは agent: irori/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, hibachis: all, access: default, prompt: go}]\n'),
-    /hibachis は agent: irori/,
+    problem('name: A\nsteps: [{agent: vault, vaults: all, access: default, prompt: go}]\n'),
+    /vaults は agent: irori/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, cli: pi, access: full-access, prompt: go}]\n'),
+    problem('name: A\nsteps: [{agent: vault, cli: pi, access: full-access, prompt: go}]\n'),
     /Pi はこのアクセス設定に対応していません/,
   );
   assert.match(
-    problem('name: A\nsteps: [{agent: hibachi, access: default, prompt: "  "}]\n'),
+    problem('name: A\nsteps: [{agent: vault, access: default, prompt: "  "}]\n'),
     /prompt が正しくありません/,
   );
 });
@@ -134,8 +134,8 @@ test('the gate, the failure marker and the review difference are read exactly', 
   assert.equal(nothingToDo('{"continue": true}'), false);
   assert.equal(nothingToDo('{"continue": "false"}'), false);
   assert.equal(
-    failedReport('[FAILED] Two mails had no hibachi.\nDetails…'),
-    'Two mails had no hibachi.',
+    failedReport('[FAILED] Two mails had no vault.\nDetails…'),
+    'Two mails had no vault.',
   );
   assert.equal(failedReport('Done. [FAILED] appears later'), undefined);
   assert.deepEqual(lineDiff('a\nb\nc\nd\ne\nf\ng\nh\ni\n', 'a\nb\nc\nd\nE\nf\ng\nh\ni\n', 1), [
@@ -218,21 +218,21 @@ async function setup(t: TestContext, { javascript = true, keychain = true } = {}
     process.env.PATH = oldPath;
     await rm(base, { recursive: true, force: true });
   });
-  /** Writes a routine folder in the hibachi or the irori agent's folder. */
+  /** Writes a routine folder in the vault or the irori agent's folder. */
   const routine = async (
     folder: string,
     contents: Record<string, string>,
-    owner: 'hibachi' | 'irori' = 'hibachi',
+    owner: 'vault' | 'irori' = 'vault',
   ): Promise<RoutineRef> => {
     const dir =
-      owner === 'hibachi'
+      owner === 'vault'
         ? path.join(root, '.irori', 'routines', folder)
         : path.join(youRoot, 'routines', folder);
     for (const [rel, text] of Object.entries(contents)) {
       await mkdir(path.dirname(path.join(dir, rel)), { recursive: true });
       await writeFile(path.join(dir, rel), text, { mode: rel.endsWith('.sh') ? 0o700 : 0o600 });
     }
-    return { owner: owner === 'hibachi' ? space.scopeId : youId, folder };
+    return { owner: owner === 'vault' ? space.scopeId : youId, folder };
   };
   const listed = async (ref: RoutineRef) =>
     (await routines.list(workspace.id)).find(
@@ -308,7 +308,7 @@ test(
     });
     const first = await listed(ref);
     assert.equal(first.name, 'Collect');
-    assert.equal(first.owner, 'hibachi');
+    assert.equal(first.owner, 'vault');
     assert.equal(first.review, 'unreviewed');
     assert.equal(first.problem, undefined);
     assert.equal(first.needs, undefined);
@@ -600,12 +600,12 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
   const made = await listed(ref);
   assert.equal(made.problem, 'ステップ 1 の prompt が正しくありません。');
   await assert.rejects(start(ref), /prompt が正しくありません/);
-  // A second routine of the same name gets a folder of its own; a hibachi's uses agent: hibachi.
+  // A second routine of the same name gets a folder of its own; a vault's uses agent: vault.
   assert.equal((await routines.create(youId, 'Daily mail')).folder, 'Daily mail 2');
   const theirs = await routines.create(space.scopeId, 'Triage');
   assert.match(
     await readFile(path.join(root, '.irori', 'routines', 'Triage', 'routine.yaml'), 'utf8'),
-    /^ {2}- agent: hibachi$/m,
+    /^ {2}- agent: vault$/m,
   );
   assert.equal((await listed(theirs)).name, 'Triage');
   await assert.rejects(routines.create(youId, '   '), /120 文字以内/);
@@ -650,8 +650,8 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
     report,
     /^- "Daily mail" \(irori agent\) at .*Daily mail 2": cannot run: ステップ 1/m,
   );
-  assert.match(report, /^- "Triage" \(hibachi Product\) at .*: cannot run: /m);
-  assert.match(report, /Hibachi routines are those of the workspace "Lab"/);
+  assert.match(report, /^- "Triage" \(vault Product\) at .*: cannot run: /m);
+  assert.match(report, /Vault routines are those of the workspace "Lab"/);
   const alone = await command.run(['routines'], youRoot);
   assert.doesNotMatch(alone, /Triage/);
   assert.match(alone, /only your own routines/);
@@ -710,11 +710,11 @@ test(
     assert.match(listed, /"Post" \(irori agent\).*: ready; last run succeeded at /);
     assert.doesNotMatch(listed, /xoxb-kept-in-irori/);
 
-    // --hibachi names a hibachi's routine; it too waits for the person's review.
-    await assert.rejects(run('post', '--hibachi', 'Product'), /has not reviewed this routine/);
+    // --vault names a vault's routine; it too waits for the person's review.
+    await assert.rejects(run('post', '--vault', 'Product'), /has not reviewed this routine/);
     await ended(theirs, await start(theirs));
-    assert.match(await run('post', '--hibachi', 'Product'), /^Started the routine "Post"/);
-    await until(async () => !routines.busy, 'the hibachi routine to end');
+    assert.match(await run('post', '--vault', 'Product'), /^Started the routine "Post"/);
+    await until(async () => !routines.busy, 'the vault routine to end');
 
     // A change brings the review back; a step, or a request from no workspace, starts none.
     await writeFile(path.join(youRoot, 'routines', 'post', 'post.sh'), '#!/bin/sh\necho changed\n');
@@ -749,7 +749,7 @@ test('a device without the OS keychain names it before a run', fixtureOptions, a
   await assert.rejects(start(ref), /OS のキーチェーンが必要です/);
 });
 
-test('a run records the files each hibachi Git status shows changed', fixtureOptions, async (t) => {
+test('a run records the files each vault Git status shows changed', fixtureOptions, async (t) => {
   const { routine, start, ended, root, space } = await setup(t);
   await writeFile(path.join(root, 'note.md'), '# Product\nEdited before the run.\n');
   await writeFile(path.join(root, 'draft.md'), 'Untouched.\n');
@@ -771,13 +771,13 @@ test(
     const { routine, start, ended, root, space, agents, files } = await setup(t);
     const ref = await routine('ask', {
       'routine.yaml':
-        'name: Ask\nsteps:\n  - agent: hibachi\n    access: default\n    prompt: Summarize the inbox.\n',
+        'name: Ask\nsteps:\n  - agent: vault\n    access: default\n    prompt: Summarize the inbox.\n',
     });
-    // Without `cli` the step uses the CLI chosen in the hibachi agent's panel.
+    // Without `cli` the step uses the CLI chosen in the vault agent's panel.
     const run = await ended(ref, await start(ref, { [space.scopeId]: { agent: 'pi' } }));
     assert.equal(run.state, 'succeeded', JSON.stringify(run));
     const step = run.steps[0];
-    assert.equal(step.label, 'hibachi agent');
+    assert.equal(step.label, 'vault agent');
     assert.equal(step.output, '日本語 の応答');
     assert.equal(step.conversation?.scopeId, space.scopeId);
     assert.equal(step.conversation?.agent, 'pi');
@@ -816,66 +816,62 @@ test(
     // A report beginning with [FAILED] fails the step although the CLI ended normally.
     const failing = await routine('fails', {
       'routine.yaml':
-        'name: Fails\nsteps:\n  - agent: hibachi\n    cli: pi\n    access: default\n    prompt: |\n      run: echo "[FAILED] Two mails had no hibachi."\n  - run: [git, status]\n',
+        'name: Fails\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: |\n      run: echo "[FAILED] Two mails had no vault."\n  - run: [git, status]\n',
     });
     const failed = await ended(failing, await start(failing));
     assert.equal(failed.state, 'failed');
     assert.equal(failed.steps[0].state, 'failed');
-    assert.equal(failed.steps[0].detail, 'Two mails had no hibachi.');
+    assert.equal(failed.steps[0].detail, 'Two mails had no vault.');
     assert.equal(failed.steps[1].state, 'pending');
     // The variables are in the CLI's environment too.
     const variables = await routine('variables', {
       'routine.yaml':
-        'name: Variables\nsteps:\n  - agent: hibachi\n    cli: pi\n    access: default\n    prompt: |\n      run: printf "%s" "$IRORI_ROUTINE"\n',
+        'name: Variables\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: |\n      run: printf "%s" "$IRORI_ROUTINE"\n',
     });
     const read = await ended(variables, await start(variables));
     assert.equal(read.steps[0].output, path.join(root, '.irori', 'routines', 'variables'));
   },
 );
 
-test(
-  'an agent step waits while its hibachi is held, and 停止 ends it',
-  fixtureOptions,
-  async (t) => {
-    const { routine, start, ended, routines, space, agents } = await setup(t);
-    // The person's own run holds the hibachi.
-    agents.start({ scopeId: space.scopeId, agent: 'pi', prompt: 'hold' });
-    const ref = await routine('after', {
-      'routine.yaml':
-        'name: After\nsteps:\n  - agent: hibachi\n    cli: pi\n    access: default\n    prompt: Summarize.\n',
-    });
-    const id = await start(ref);
-    await until(
-      async () => (await routines.runs(ref))[0]?.steps[0].state === 'waiting',
-      'the step to wait',
-    );
-    assert.equal((await routines.runs(ref))[0].steps[0].detail, 'Product の実行待ち');
-    await agents.cancel(space.scopeId);
-    assert.equal((await ended(ref, id)).state, 'succeeded');
+test('an agent step waits while its vault is held, and 停止 ends it', fixtureOptions, async (t) => {
+  const { routine, start, ended, routines, space, agents } = await setup(t);
+  // The person's own run holds the vault.
+  agents.start({ scopeId: space.scopeId, agent: 'pi', prompt: 'hold' });
+  const ref = await routine('after', {
+    'routine.yaml':
+      'name: After\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: Summarize.\n',
+  });
+  const id = await start(ref);
+  await until(
+    async () => (await routines.runs(ref))[0]?.steps[0].state === 'waiting',
+    'the step to wait',
+  );
+  assert.equal((await routines.runs(ref))[0].steps[0].detail, 'Product の実行待ち');
+  await agents.cancel(space.scopeId);
+  assert.equal((await ended(ref, id)).state, 'succeeded');
 
-    const hold = await routine('hold', {
-      'routine.yaml':
-        'name: Holding\nsteps:\n  - agent: hibachi\n    cli: pi\n    access: default\n    prompt: hold\n  - run: [git, status]\n',
-    });
-    const second = await start(hold);
-    await until(
-      async () =>
-        (await routines.runs(hold))[0]?.steps[0].state === 'running' && agents.busy(space.scopeId),
-      'the agent to start',
-    );
-    await routines.stop(hold);
-    const stopped = await ended(hold, second);
-    assert.equal(stopped.state, 'stopped');
-    assert.deepEqual(
-      stopped.steps.map((step) => step.state),
-      ['stopped', 'pending'],
-    );
-    assert.equal(agents.busy(space.scopeId), false);
-  },
-);
+  const hold = await routine('hold', {
+    'routine.yaml':
+      'name: Holding\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: hold\n  - run: [git, status]\n',
+  });
+  const second = await start(hold);
+  await until(
+    async () =>
+      (await routines.runs(hold))[0]?.steps[0].state === 'running' && agents.busy(space.scopeId),
+    'the agent to start',
+  );
+  await routines.stop(hold);
+  const stopped = await ended(hold, second);
+  assert.equal(stopped.state, 'stopped');
+  assert.deepEqual(
+    stopped.steps.map((step) => step.state),
+    ['stopped', 'pending'],
+  );
+  assert.equal(agents.busy(space.scopeId), false);
+});
 
 test(
-  'an irori agent routine hands the named hibachis of the workspace to the irori agent',
+  'an irori agent routine hands the named vaults of the workspace to the irori agent',
   fixtureOptions,
   async (t) => {
     const { routine, listed, start, ended, youId, youRoot } = await setup(t);
@@ -883,19 +879,19 @@ test(
       'elsewhere',
       {
         'routine.yaml':
-          'name: Elsewhere\nsteps:\n  - agent: irori\n    hibachis: [Research]\n    access: default\n    prompt: Sort.\n',
+          'name: Elsewhere\nsteps:\n  - agent: irori\n    vaults: [Research]\n    access: default\n    prompt: Sort.\n',
       },
       'irori',
     );
     assert.equal(
       (await listed(elsewhere)).needs?.text,
-      'hibachi「Research」はこのワークスペースにありません。',
+      'vault「Research」はこのワークスペースにありません。',
     );
     const ref = await routine(
       'sort',
       {
         'routine.yaml':
-          'name: Sort\nsteps:\n  - agent: irori\n    hibachis: [Product]\n    cli: pi\n    access: default\n    prompt: Sort the mail.\n',
+          'name: Sort\nsteps:\n  - agent: irori\n    vaults: [Product]\n    cli: pi\n    access: default\n    prompt: Sort the mail.\n',
       },
       'irori',
     );
@@ -911,10 +907,10 @@ test(
       .split('\n')
       .map((line) => JSON.parse(line));
     const prompt: string = requests.find((request) => request.type === 'prompt').message;
-    // The hibachis handed to it come first, then the routine's words, then the step.
+    // The vaults handed to it come first, then the routine's words, then the step.
     assert.match(
       prompt,
-      /- Product \(.+\): folder .+, hibachi agent "hibachi-product"[\s\S]*step of the routine "Sort"[\s\S]*Sort the mail\.$/,
+      /- Product \(.+\): folder .+, vault agent "vault-product"[\s\S]*step of the routine "Sort"[\s\S]*Sort the mail\.$/,
     );
   },
 );

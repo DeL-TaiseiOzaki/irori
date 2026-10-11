@@ -1,13 +1,13 @@
 ---
 title: Google Drive
-description: Use a folder that Google Drive for desktop keeps in sync as hibachi materials.
+description: Use a folder that Google Drive for desktop keeps in sync as vault materials.
 ---
 
 ## Connect
 
 1. Install [Google Drive for desktop](https://www.google.com/drive/download/) and sign in.
 2. Set the folder you use to **Mirror** or **Available offline**.
-3. In the hibachi's **Connect**, use **Choose folder** to pick that folder.
+3. In the vault's **Connect**, use **Choose folder** to pick that folder.
 
 See [synced folders](sync-folders.md) for the details. irori does not sign in to Google itself.
 

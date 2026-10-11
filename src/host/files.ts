@@ -230,9 +230,9 @@ export class FileService {
     /** Writes an edited file of a connected folder in place, hash checked. */
     write?(doc: Document): Promise<void>;
     writable?(scopeId: string, rel: string): boolean;
-    /** The connected folders on this device that a hibachi's contents shows through links. */
+    /** The connected folders on this device that a vault's contents shows through links. */
     localFolders?(scopeId: string): string[];
-    /** Where those folders appear, as paths inside the hibachi. */
+    /** Where those folders appear, as paths inside the vault. */
     linkedPaths?(scopeId: string): string[];
   };
   private spaces: Space[] = [];
@@ -375,8 +375,8 @@ export class FileService {
     });
   }
   /**
-   * Takes a hibachi off this device's list. Its folder and `.irori/scope.json`
-   * stay as they are, so registering the folder again brings the same hibachi back.
+   * Takes a vault off this device's list. Its folder and `.irori/scope.json`
+   * stay as they are, so registering the folder again brings the same vault back.
    */
   async unregister(id: string): Promise<Space> {
     return this.queue.run(async () => {
@@ -429,11 +429,11 @@ export class FileService {
     });
   }
   /**
-   * Why a `.irori/scope.json` that a pull brings may not replace this hibachi's,
+   * Why a `.irori/scope.json` that a pull brings may not replace this vault's,
    * or undefined when it may (ADR 028): it parses as a declaration, keeps the
    * same `scopeId`, and passes the checks a local layer rename and registration
    * apply — ordinary folder names, layers that do not overlap, no layer inside
-   * another hibachi, and no other hibachi inside its contents.
+   * another vault, and no other vault inside its contents.
    */
   async incomingDeclarationProblem(id: string, text: string): Promise<string | undefined> {
     const s = this.get(id);
@@ -455,14 +455,14 @@ export class FileService {
     if (folders.some((a, i) => folders.some((b, j) => i < j && overlaps(a, b))))
       return 'The incoming declaration overlaps its layers';
     if (folders.some((folder) => owner(this.spaces, path.join(s.root, folder))?.scopeId !== id))
-      return 'The incoming declaration puts a layer in another hibachi';
+      return 'The incoming declaration puts a layer in another vault';
     const others = this.spaces.filter((other) => other.scopeId !== id);
     const contents = await this.contentsPaths(next);
     if (others.some((other) => contents.some((c) => within(c, other.root))))
-      return 'The incoming declaration puts another hibachi in contents';
+      return 'The incoming declaration puts another vault in contents';
   }
   /**
-   * Reads this hibachi's `.irori/scope.json` again after a pull changed it, so
+   * Reads this vault's `.irori/scope.json` again after a pull changed it, so
    * its layers, names and look follow without a restart. The identity must stay.
    */
   async reloadDeclaration(id: string): Promise<Space> {
@@ -517,8 +517,8 @@ export class FileService {
       )
         throw Error(
           t(
-            'その名前は別の層か別の hibachi のフォルダです。',
-            "That name is another layer's or another hibachi's folder.",
+            'その名前は別の層か別の vault のフォルダです。',
+            "That name is another layer's or another vault's folder.",
           ),
         );
       const from = path.join(s.root, previous);
@@ -581,7 +581,7 @@ export class FileService {
     });
   }
   /**
-   * Declares a folder the hibachi already has as contents beside its contents
+   * Declares a folder the vault already has as contents beside its contents
    * folder (ADR 030), as a person moving an Obsidian vault or a project in may
    * want for its attachments or code. The folder stays where it is and Git
    * keeps tracking it; it is checked as an incoming declaration's would be.
@@ -609,12 +609,12 @@ export class FileService {
       if (!stat?.isDirectory())
         throw Error(
           t(
-            `${next} は hibachi の中のフォルダではありません。`,
-            `${next} is not a folder in the hibachi.`,
+            `${next} は vault の中のフォルダではありません。`,
+            `${next} is not a folder in the vault.`,
           ),
         );
       if (owner(this.spaces, absolute)?.scopeId !== id)
-        throw Error(t('そのフォルダは別の hibachi です。', "That folder is another hibachi's."));
+        throw Error(t('そのフォルダは別の vault です。', "That folder is another vault's."));
       const meta = await this.metadata(s.root);
       const raw = JSON.parse(await fs.readFile(meta, 'utf8')) as Record<string, unknown>;
       if (raw.scopeId !== s.scopeId) throw Error('Scope identity changed');
@@ -633,7 +633,7 @@ export class FileService {
       return space;
     });
   }
-  /** The files under a folder, by their paths in the hibachi; links are not followed. */
+  /** The files under a folder, by their paths in the vault; links are not followed. */
   private async walk(directory: string, rel: string) {
     const out: string[] = [];
     const visit = async (dir: string, prefix: string) => {

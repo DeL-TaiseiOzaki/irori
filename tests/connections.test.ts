@@ -252,7 +252,7 @@ test('Mount names support Japanese and spaces, and reject traversal and incompat
     assert.ok(mountNameError(name), name);
 });
 
-test('Folder records keep their names across restart and hibachis, without device paths', async (t) => {
+test('Folder records keep their names across restart and vaults, without device paths', async (t) => {
   const { base, files, space, cloud } = await fixture(t);
   const first = await cloud.addLocal({
     scopeId: space.scopeId,
@@ -412,7 +412,7 @@ test('Unreadable connection records are reported in words a person can act on', 
     }
     await rm(filename);
   }
-  // A record of another hibachi is refused rather than shown here.
+  // A record of another vault is refused rather than shown here.
   await writeRetired(space, retiredDeclaration({ scopeId: randomUUID() }));
   await assert.rejects(cloud.connections(space.scopeId), /重複・不一致/);
 });

@@ -1,5 +1,5 @@
 /**
- * The note open beside the hibachi agent.
+ * The note open beside the vault agent.
  *
  * Sent: before the person's words, when the instruction goes with the open
  * note (the person has not removed it from the composer).

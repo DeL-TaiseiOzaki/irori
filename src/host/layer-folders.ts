@@ -10,7 +10,7 @@ import { renameInNotesDeclaration } from './notes';
 import { relinkFolder } from './relink';
 
 /**
- * Renames a hibachi's knowledge or contents folder and carries over what names
+ * Renames a vault's knowledge or contents folder and carries over what names
  * its paths (ADR 024): the connected folders are linked again under the new
  * name, then the device's material IDs and person-line records, the notes
  * declaration, the comments and every link that led into the folder follow.

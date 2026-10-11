@@ -3,8 +3,8 @@ import { subAgentPrompt } from '../../prompts';
 
 /**
  * The irori agent (formerly "your AI"): the person's own agent, run from its own
- * folder (its Schema), which hands work in each hibachi (a brain) to that
- * hibachi's agent, a sub-agent irori defines for it.
+ * folder (its Schema), which hands work in each vault (a brain) to that
+ * vault's agent, a sub-agent irori defines for it.
  */
 export interface YourAi {
   /** The id its runs, conversations and sessions are kept under. */
@@ -41,7 +41,7 @@ export interface BrainAgent {
   scopeId: string;
   name: string;
   category?: string;
-  /** The sub-agent name its definitions carry, `hibachi-<slug>`. */
+  /** The sub-agent name its definitions carry, `vault-<slug>`. */
   agent: string;
   root: string;
   /** The definition files of that sub-agent in your AI's folder, one per CLI that has one. */
@@ -63,7 +63,7 @@ export function hasSubAgents(agent: AgentId): agent is SubAgentCli {
 }
 
 /**
- * A stable sub-agent name for a brain: `hibachi-` and lowercase letters, digits
+ * A stable sub-agent name for a brain: `vault-` and lowercase letters, digits
  * and hyphens as Claude Code asks, from the brain's name when it has Latin
  * letters, otherwise from its id. Names already taken get the id's first
  * characters.
@@ -79,7 +79,7 @@ export function brainAgentNames(spaces: { scopeId: string; name: string }[]) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40);
     const short = space.scopeId.replace(/-/g, '').slice(0, 8);
-    let name = `hibachi-${slug || short}`;
+    let name = `vault-${slug || short}`;
     if (taken.has(name)) name = `${name}-${short}`;
     taken.add(name);
     names.set(space.scopeId, name);

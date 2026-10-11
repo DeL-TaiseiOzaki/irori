@@ -60,7 +60,7 @@ export const conversationMeta = z.looseObject({
   schemaVersion: z.literal(1),
   id: z.uuid(),
   owner: z.object({
-    kind: z.enum(['hibachi', 'irori-agent']),
+    kind: z.enum(['vault', 'irori-agent']),
     id: z.uuid(),
     /** The owner's name when the conversation began. */
     name: z.string().max(200),
@@ -73,8 +73,8 @@ export const conversationMeta = z.looseObject({
   updatedAt: z.iso.datetime(),
   /** The note selected when the conversation began, relative to the owner's root. */
   linkedNote: z.string().max(4096).nullable(),
-  /** For the irori agent: the hibachis its hand-offs reached. */
-  hibachis: z.array(z.uuid()).max(1000),
+  /** For the irori agent: the vaults its hand-offs reached. */
+  vaults: z.array(z.uuid()).max(1000),
   pinned: z.boolean(),
   archived: z.boolean(),
   forkedFrom: z.object({ conversationId: z.uuid(), eventId: z.uuid() }).nullable(),
@@ -85,7 +85,7 @@ export const conversationMeta = z.looseObject({
    * kept per workspace (ADR 017 D4); one begun in no workspace has none.
    */
   workspace: z.uuid().optional(),
-  /** Work the irori agent handed to this hibachi from one of its conversations. */
+  /** Work the irori agent handed to this vault from one of its conversations. */
   handedBy: z.object({ conversationId: z.uuid() }).optional(),
   /** The native session per device: a handle, its access mode and the checkout's digest. */
   native: z.record(
@@ -104,11 +104,11 @@ export const conversationMeta = z.looseObject({
 });
 export type ConversationMeta = z.infer<typeof conversationMeta>;
 export type ConversationOwner = ConversationMeta['owner'];
-/** Whose conversation it is: the hibachi of that name, or without one the irori agent. */
-export const conversationOwner = (id: string, hibachi?: string): ConversationOwner =>
-  hibachi === undefined
+/** Whose conversation it is: the vault of that name, or without one the irori agent. */
+export const conversationOwner = (id: string, vault?: string): ConversationOwner =>
+  vault === undefined
     ? { kind: 'irori-agent', id, name: 'irori agent' }
-    : { kind: 'hibachi', id, name: hibachi.slice(0, 200) };
+    : { kind: 'vault', id, name: vault.slice(0, 200) };
 
 /** One row of an owner's history list. */
 export interface ConversationSummary {

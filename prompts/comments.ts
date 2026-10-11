@@ -1,5 +1,5 @@
 /**
- * People's comments on a hibachi's Markdown files (ADR 018). They are notes on
+ * People's comments on a vault's Markdown files (ADR 018). They are notes on
  * the text: the agent acts on them when the instruction asks it to, and finds
  * all of them in the file named.
  */
@@ -10,7 +10,7 @@ const clip = (text: string, limit: number) =>
 const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 /**
- * The comments on the note the hibachi agent was given.
+ * The comments on the note the vault agent was given.
  *
  * Sent: after the selected note, whenever that note has comments.
  * Channel: the request text.
@@ -36,13 +36,13 @@ export function commentsSummary(notePath: string, comments: NoteComment[], limit
 }
 
 /**
- * Where the hibachi keeps its comments.
+ * Where the vault keeps its comments.
  *
- * Sent: to a hibachi agent whose request has no note, or a note without
- * comments, while the hibachi has comments; a hand-off from the irori agent
+ * Sent: to a vault agent whose request has no note, or a note without
+ * comments, while the vault has comments; a hand-off from the irori agent
  * included.
  * Channel: the request text.
  */
 export function commentsPointer(count: number, files: number) {
-  return `This hibachi has ${count} comment${count === 1 ? '' : 's'} from people on ${files} file${files === 1 ? '' : 's'}, kept in ${commentsDirectory}/<file path>.json. Read them when the instruction concerns comments.`;
+  return `This vault has ${count} comment${count === 1 ? '' : 's'} from people on ${files} file${files === 1 ? '' : 's'}, kept in ${commentsDirectory}/<file path>.json. Read them when the instruction concerns comments.`;
 }

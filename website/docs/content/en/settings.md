@@ -17,7 +17,7 @@ This documentation site also has an **English / 日本語** switch at the top ri
 
 ## Agents
 
-Turn on the hibachi agent under **Agents**. It is off by default.
+Turn on the vault agent under **Agents**. It is off by default.
 
 ## Updates and routines
 

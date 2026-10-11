@@ -14,7 +14,7 @@ import { defaultKnowledgeFolder } from './layers';
  * module while one exists.
  */
 export const bundleRoot = defaultKnowledgeFolder;
-/** The module's folder and files in a bundle rooted at a hibachi's knowledge folder (ADR 024). */
+/** The module's folder and files in a bundle rooted at a vault's knowledge folder (ADR 024). */
 export function graphIndexAt(root: string = bundleRoot) {
   const folder = `${root}/ontology`;
   return {

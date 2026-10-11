@@ -28,10 +28,10 @@ import {
   applyMarkdownFont,
   applyTheme,
   chooseEditorAssistance,
-  chooseHibachiAgent,
+  chooseVaultAgent,
   chooseYourAi,
   currentEditorAssistance,
-  currentHibachiAgent,
+  currentVaultAgent,
   currentYourAi,
   layoutStorage,
   loadDeviceSettings,
@@ -72,7 +72,7 @@ import type {
   CloudConnection,
   Document,
   Entry,
-  HibachiGroup,
+  VaultGroup,
   Space,
   WorkspaceProfile,
   CloudRoot,
@@ -234,7 +234,7 @@ const noSkills: AgentSkill[] = [];
 const noRetired: Parameters<typeof retirementNotice>[0][] = [];
 const noProblems: { directory: string; message?: string }[] = [];
 const noSources: SourceRef[] = [];
-const noGroups: HibachiGroup[] = [];
+const noGroups: VaultGroup[] = [];
 
 /** What a dock column asks of the window; each identity stays the same across renders. */
 interface DockActions {
@@ -290,7 +290,7 @@ const DockColumnView = memo(function DockColumnView({
   skillProblems,
   roots,
   sources,
-  hibachiAgent,
+  vaultAgent,
   stageHidden,
   workspaceScopeIds,
   workspaceId,
@@ -315,7 +315,7 @@ const DockColumnView = memo(function DockColumnView({
   skillProblems: { directory: string }[];
   roots?: Listing;
   sources: SourceRef[];
-  hibachiAgent: boolean;
+  vaultAgent: boolean;
   stageHidden: boolean;
   workspaceScopeIds: string[];
   workspaceId?: string;
@@ -364,7 +364,7 @@ const DockColumnView = memo(function DockColumnView({
       skillProblems={irori ? noProblems : skillProblems}
       instructionFile={irori ? undefined : instructionFileOf(roots, columnAgent)}
       sources={sources}
-      ownerChoice={hibachiAgent}
+      ownerChoice={vaultAgent}
       stage={stage}
       onModel={(next) => {
         if (irori) {
@@ -470,7 +470,7 @@ function App() {
     [startup, setStartup] = useState(true);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
-  // Every Schema from the settings: the shared one, the irori agent's and each hibachi's.
+  // Every Schema from the settings: the shared one, the irori agent's and each vault's.
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   // The brain panel shows its files or, in place of them, its changes.
@@ -487,7 +487,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   // The palette opened from the Overview searches every brain.
   const [searchAll, setSearchAll] = useState(false);
-  // The workspace's map, routines, one hibachi, or the irori agent's Schema.
+  // The workspace's map, routines, one vault, or the irori agent's Schema.
   const [level, setLevel] = useState<'overview' | 'routines' | 'brain' | 'you'>('brain');
   const levelNow = useRef(level);
   levelNow.current = level;
@@ -530,7 +530,7 @@ function App() {
     );
   }
   const [terminalSpace, setTerminalSpace] = useState<Space>();
-  // irori mode's own terminal, in the irori agent's folder; a hibachi's opens in its stage.
+  // irori mode's own terminal, in the irori agent's folder; a vault's opens in its stage.
   const [iroriTerminal, setIroriTerminal] = useState(false);
   // Going home asks first while agents or terminals still run.
   const [askHome, setAskHome] = useState(false),
@@ -539,12 +539,12 @@ function App() {
     [active, setActive] = useState<Space>(),
     [doc, setDoc] = useState<Document>(),
     [buffer, setBuffer] = useState('');
-  // The host's file changes, counted per hibachi: a change in one leaves the others' views as they are.
+  // The host's file changes, counted per vault: a change in one leaves the others' views as they are.
   const [revisions, setRevisions] = useState(noRevisions),
     [editorKey, setEditorKey] = useState(0),
     [mode, setMode] = useState<'rich' | 'source' | 'table'>('rich'),
     [external, setExternal] = useState<Document>();
-  // What the views of the hibachi on show, and of the open note's hibachi, follow.
+  // What the views of the vault on show, and of the open note's vault, follow.
   const revision = scopeRevision(revisions, active?.scopeId);
   const docRevision = scopeRevision(revisions, doc?.scopeId);
   const [error, setError] = useState(''),
@@ -564,17 +564,17 @@ function App() {
     [workspaceSpaces],
   );
   const agentFor = (scopeId?: string) => agentOf(agentChoice, scopeId);
-  // Each hibachi's own agent and its Schema layer are optional (ADR 021).
-  const [hibachiAgent, chooseHibachi, setHibachiAgent] = useChoice(
-    currentHibachiAgent,
-    chooseHibachiAgent,
+  // Each vault's own agent and its Schema layer are optional (ADR 021).
+  const [vaultAgent, chooseVault, setVaultAgent] = useChoice(
+    currentVaultAgent,
+    chooseVaultAgent,
     (error) => report(error),
   );
   // The agent dock's columns (ADR 021). The first stays while the dock is open; a
-  // hibachi column follows the hibachi on show, and shows the irori agent while the
-  // hibachi agent is off.
-  const [columns, setColumns] = useState<DockColumn[]>([{ id: 'main', owner: 'hibachi' }]);
-  const ownerOf = (column: DockColumn): ColumnOwner => (hibachiAgent ? column.owner : 'irori');
+  // vault column follows the vault on show, and shows the irori agent while the
+  // vault agent is off.
+  const [columns, setColumns] = useState<DockColumn[]>([{ id: 'main', owner: 'vault' }]);
+  const ownerOf = (column: DockColumn): ColumnOwner => (vaultAgent ? column.owner : 'irori');
   // The conversation each column shows per owner, with its CLI (ADR 017 D4). An owner
   // not in it shows the host's pick: the one running, queued longest, or its latest.
   const [shown, setShown] = useState<Record<string, Tab>>({});
@@ -661,7 +661,7 @@ function App() {
     yourAccessSelection?.agent === yourChoice.agent
       ? yourAccessSelection.value
       : defaultAgentAccess(yourChoice.agent);
-  // A hibachi column's access, by where it shows: for its CLI, until that changes.
+  // A vault column's access, by where it shows: for its CLI, until that changes.
   const [accessChoice, setAccessChoice] = useState<
     Record<string, { agent: AgentId; value: AgentAccess }>
   >({});
@@ -722,7 +722,7 @@ function App() {
     enabled: !!doc && !doc.cloud,
     refresh: editorKey,
   });
-  // The brain's top level, shared by its three sections and the hibachi agent's Schema line.
+  // The brain's top level, shared by its three sections and the vault agent's Schema line.
   const rootsRead = useResource(() => host.entries(active!.scopeId, ''), [active?.scopeId], {
     enabled: !!active,
     refresh: revision,
@@ -877,7 +877,7 @@ function App() {
   const youRead = useResource(() => host.yourAi(), [], { refresh: youRevision });
   const you = youRead.data;
   const yourAiRunning = !!you && runningScopes.includes(you.id);
-  // The shared Schema's skills join each hibachi's own in its composer; its own,
+  // The shared Schema's skills join each vault's own in its composer; its own,
   // retired ones among them, win (ADR 027).
   const sharedSkillRead = useResource(() => host.skills(sharedSchemaId), [you?.state], {
     enabled: you?.state === 'ready',
@@ -921,7 +921,7 @@ function App() {
   function heldByYou(scopeId: string) {
     return yourAiRunning && (handed ?? workspace?.scopeIds ?? []).includes(scopeId);
   }
-  // Any run in the hibachi on show holds what irori itself would change there.
+  // Any run in the vault on show holds what irori itself would change there.
   const running = !!active && runningScopes.includes(active.scopeId);
   /** Whether a conversation's run waits for the person's answer. */
   const conversationWaiting = useCallback(
@@ -931,7 +931,7 @@ function App() {
       ),
     [liveRuns, waitingRuns],
   );
-  // The hibachi's conversations, read again when one begins or a run ends, name the
+  // The vault's conversations, read again when one begins or a run ends, name the
   // tabs; one running without a tab, after a reload or from the Overview, gets one.
   const [tabRevisions, setTabRevisions] = useState<Record<string, number>>({});
   const tabRows = useResource(() => host.agentConversations(active!.scopeId), [active?.scopeId], {
@@ -950,11 +950,11 @@ function App() {
     if (missing.length) setTabs((all) => ({ ...all, [active.scopeId]: [...open, ...missing] }));
   }, [tabRows.data]);
   // A Schema setting belongs to its brain; another brain shows its note instead, and
-  // without the hibachi agent there is no Schema to show (ADR 021).
+  // without the vault agent there is no Schema to show (ADR 021).
   useEffect(() => {
-    if (view === 'schema' && (!hibachiAgent || schemaTarget?.scopeId !== active?.scopeId))
+    if (view === 'schema' && (!vaultAgent || schemaTarget?.scopeId !== active?.scopeId))
       setView('note');
-  }, [active?.scopeId, hibachiAgent]);
+  }, [active?.scopeId, vaultAgent]);
   // Who typed which line of the open note. A connected folder's file is outside the KB's
   // Git history and has no record; a failure here leaves the note unmarked rather than unopenable.
   // A note just opened is asked about at once; one being saved again and again (an agent
@@ -991,7 +991,7 @@ function App() {
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
   const report = useCallback((e: unknown) => setError(errorText(e)), []);
-  /** Counts a change in one hibachi, or in every one of them when none is named. */
+  /** Counts a change in one vault, or in every one of them when none is named. */
   const bump = useCallback(
     (scopeId?: string) => setRevisions((all) => bumpRevision(all, scopeId)),
     [],
@@ -1074,7 +1074,7 @@ function App() {
     await refreshSpaces();
     const profiles = await host.workspaces();
     setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
-    setHibachiAgent(currentHibachiAgent());
+    setVaultAgent(currentVaultAgent());
     setYourChoice(currentYourAi());
   }
   async function reconcile() {
@@ -1121,8 +1121,8 @@ function App() {
       if (event.type === 'files') {
         bump(event.scopeId);
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();
-      } else if (event.type === 'hibachis') {
-        // The irori agent registered a hibachi; the workspace on show takes it in.
+      } else if (event.type === 'vaults') {
+        // The irori agent registered a vault; the workspace on show takes it in.
         const joined = event.workspace;
         void refreshSpaces()
           .then(() => {
@@ -1138,7 +1138,7 @@ function App() {
           trackRequests(incoming);
           if (incoming.type === 'done' || incoming.role === 'user')
             setTabRevisions((all) => ({ ...all, [scopeId]: (all[scopeId] ?? 0) + 1 }));
-          // The AI that runs in a brain is that brain's hibachi agent from now on.
+          // The AI that runs in a brain is that brain's vault agent from now on.
           if (incoming.agent) {
             const agentId = incoming.agent;
             setAgentChoice((choice) =>
@@ -1150,9 +1150,9 @@ function App() {
         }
         if (incoming.type !== 'done') return;
         setSkillRevision((value) => value + 1);
-        // A run may have changed any hibachi: the irori agent's hand-offs reach others, and
-        // two hibachis may connect the same folder, whose files no watcher reports. Run ends
-        // are rare, so every view reads again; file events stay with their own hibachi.
+        // A run may have changed any vault: the irori agent's hand-offs reach others, and
+        // two vaults may connect the same folder, whose files no watcher reports. Run ends
+        // are rare, so every view reads again; file events stay with their own vault.
         bump();
         void reconcile();
         // A run's end sends the next queued instruction of its own conversation; a
@@ -1231,7 +1231,7 @@ function App() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [dirty, buffer, doc, external, gitBusy]);
-  // A connected folder lies outside the hibachi's watched files, and a sync app
+  // A connected folder lies outside the vault's watched files, and a sync app
   // changes it at any time, so its document at rest is read again now and then; the
   // change would otherwise show only when a save ran into it. A failed check ends the checks until the document
   // changes, so an unreachable folder is reported once rather than every tick.
@@ -1242,7 +1242,7 @@ function App() {
     }, 25000);
     return () => clearInterval(timer);
   }, [doc, dirty]);
-  // The terminal of what is on show: a hibachi's in its stage, or irori mode's own.
+  // The terminal of what is on show: a vault's in its stage, or irori mode's own.
   const iroriShown = level !== 'brain';
   function toggleTerminal() {
     if (!iroriShown) {
@@ -1280,7 +1280,7 @@ function App() {
     if (gitBusy) return false;
     if (!(await composer.flush())) return false;
     if (!(await save())) return false;
-    // Another brain's hibachi agent keeps running and its queue keeps going; only a send
+    // Another brain's vault agent keeps running and its queue keeps going; only a send
     // in flight or a connection being prepared holds the brain on show.
     if (sending || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
@@ -1302,9 +1302,7 @@ function App() {
       }
       if (!(await save())) return false;
       if (sending && space.scopeId !== active?.scopeId) {
-        setError(
-          t('送信中は hibachi を切り替えられません。', "Can't switch hibachis while sending."),
-        );
+        setError(t('送信中は vault を切り替えられません。', "Can't switch vaults while sending."));
         return false;
       }
       if (opensInIrori(entry.path)) {
@@ -1344,7 +1342,7 @@ function App() {
       draining.current.delete(key);
     }
   }
-  /** Sends to a brain's hibachi agent from the Overview, or queues behind its run or its waiting queue. */
+  /** Sends to a brain's vault agent from the Overview, or queues behind its run or its waiting queue. */
   async function sendToBrain(scopeId: string, message: string) {
     if (!(await save()))
       throw Error(
@@ -1438,7 +1436,7 @@ function App() {
     setStartup(false);
     setConnecting(true);
     try {
-      // The folders of hibachis this workspace leaves are disconnected; its own are connected.
+      // The folders of vaults this workspace leaves are disconnected; its own are connected.
       const nextIds = available.map((space) => space.scopeId);
       for (const previousId of workspace?.scopeIds ?? []) {
         if (!nextIds.includes(previousId) && spaces.some((space) => space.scopeId === previousId))
@@ -1558,10 +1556,10 @@ function App() {
   // A run, a send, queued work or a connection holds what changes the brain on show.
   // Your AI's run holds the brains handed to it as a brain's own run holds it.
   const heldHere = !!active && heldByYou(active.scopeId);
-  // The queues of the hibachi columns' conversations, which follow the hibachi on show.
+  // The queues of the vault columns' conversations, which follow the vault on show.
   const queuedHere = columns.reduce(
     (sum, column) =>
-      ownerOf(column) === 'hibachi' ? sum + (columnStatus[column.id]?.queued ?? 0) : sum,
+      ownerOf(column) === 'vault' ? sum + (columnStatus[column.id]?.queued ?? 0) : sum,
     0,
   );
   const brainLocked = running || sending || queuedHere > 0 || connecting || heldHere;
@@ -1616,7 +1614,7 @@ function App() {
     setSources(({ [column.id]: _, ...rest }) => rest);
     setColumnStatus(({ [column.id]: _, ...rest }) => rest);
   }
-  // Another brain's hibachi agent is running or waiting: the AI summary leads to the Overview.
+  // Another brain's vault agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
   function showOverview() {
     if (!workspaceSpaces.length) return;
@@ -1645,7 +1643,7 @@ function App() {
       setSearchAll(false);
       setSearchOpen(true);
     },
-    saveGroups: (groups: HibachiGroup[]) => {
+    saveGroups: (groups: VaultGroup[]) => {
       if (!workspace) return;
       const before = workspace;
       setWorkspace({ ...workspace, groups });
@@ -1725,7 +1723,7 @@ function App() {
     },
     toggleTerminal,
     toggleStage,
-    chooseHibachi,
+    chooseVault,
     environmentRestored,
     chooseYour,
     remember,
@@ -1805,20 +1803,20 @@ function App() {
   const settings = useMemo(
     () => (
       <Settings
-        hibachiAgent={hibachiAgent}
-        onHibachiAgent={act.chooseHibachi}
+        vaultAgent={vaultAgent}
+        onVaultAgent={act.chooseVault}
         onRestored={act.environmentRestored}
         onSchema={() => setSchemaOpen(true)}
         onError={act.report}
       />
     ),
-    [hibachiAgent, act, language],
+    [vaultAgent, act, language],
   );
   const schemaSelected =
     view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
   const schemaList = useMemo(
     () =>
-      hibachiAgent && active ? (
+      vaultAgent && active ? (
         <SchemaList
           scopeId={active.scopeId}
           revision={revision}
@@ -1828,7 +1826,7 @@ function App() {
           onOpenFile={act.openSchemaFile}
         />
       ) : undefined,
-    [hibachiAgent, active, revision, schemaSelected, brainLocked, gitBusy, act, language],
+    [vaultAgent, active, revision, schemaSelected, brainLocked, gitBusy, act, language],
   );
   const gitPanel = useMemo(
     () =>
@@ -1845,7 +1843,7 @@ function App() {
       ),
     [active, gitDetailTarget, revision, act, language],
   );
-  /** Shows a brain, from the rail or the Overview: its note, or its hibachi agent. */
+  /** Shows a brain, from the rail or the Overview: its note, or its vault agent. */
   async function enterBrain(
     space: Space,
     options: { ai?: boolean; entry?: Entry; origin?: { x: number; y: number } } = {},
@@ -1853,7 +1851,7 @@ function App() {
     const selected = options.entry ? await open(space, options.entry) : await selectSpace(space);
     if (!selected) return;
     goToLevel('brain', options.origin);
-    if (options.ai) openDock(hibachiAgent ? 'hibachi' : 'irori');
+    if (options.ai) openDock(vaultAgent ? 'vault' : 'irori');
   }
   // Home is reachable from anywhere: what still runs is stopped once the person agrees.
   function leaveWorkspace() {
@@ -1906,8 +1904,8 @@ function App() {
       <Startup
         spaces={spaces}
         refresh={refreshSpaces}
-        hibachiAgent={hibachiAgent}
-        onHibachiAgent={act.chooseHibachi}
+        vaultAgent={vaultAgent}
+        onVaultAgent={act.chooseVault}
         onRestored={act.environmentRestored}
         onOpen={(profile) => void openWorkspace(profile)}
       />
@@ -1957,7 +1955,7 @@ function App() {
               revisions={revisions}
               addDisabled={anyRunning || dirty || connecting}
               agentFor={agentFor}
-              hibachiAgent={hibachiAgent}
+              vaultAgent={vaultAgent}
               onView={setOverviewView}
               onSearch={() => {
                 setSearchAll(true);
@@ -2089,20 +2087,20 @@ function App() {
               <section className="brain-panel brain-empty chrome">
                 <p>
                   {t(
-                    'このワークスペースに hibachi がありません。',
-                    'This workspace has no hibachi yet.',
+                    'このワークスペースに vault がありません。',
+                    'This workspace has no vault yet.',
                   )}
                 </p>
                 <button className="solid-button" onClick={() => setAdd(true)}>
                   <Icon name="plus" size={14} />
-                  {t('hibachi を追加', 'Add a hibachi')}
+                  {t('vault を追加', 'Add a vault')}
                 </button>
               </section>
             )}
           </Pane>
           <PaneSeparator
             className="island-handle"
-            aria-label={t('hibachi パネルの幅', 'hibachi panel width')}
+            aria-label={t('vault パネルの幅', 'vault panel width')}
           />
           <Pane
             id="stage"
@@ -2341,7 +2339,7 @@ function App() {
                     {onNote && <span className="stage-divider" aria-hidden="true" />}
                     <AiToggle
                       open={panel}
-                      name={ownerOf(columns[0]) === 'irori' ? 'irori agent' : 'hibachi agent'}
+                      name={ownerOf(columns[0]) === 'irori' ? 'irori agent' : 'vault agent'}
                       onToggle={() => (panel ? closeDock() : openDock())}
                     />
                   </div>
@@ -2475,10 +2473,10 @@ function App() {
                         revision={revision}
                         onClose={() => setView('note')}
                         onConfigure={
-                          hibachiAgent
+                          vaultAgent
                             ? () => {
                                 setView('note');
-                                openDock('hibachi');
+                                openDock('vault');
                                 const request =
                                   'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
                                 setPrompt((previous) =>
@@ -2569,7 +2567,7 @@ function App() {
                         git={gitRead.data}
                         connections={connections}
                         skills={skills}
-                        schemaLayer={hibachiAgent}
+                        schemaLayer={vaultAgent}
                         daily={!!notesDeclared?.daily}
                         locked={brainLocked || gitBusy}
                         revision={revision}
@@ -2715,7 +2713,7 @@ function App() {
                           skillProblems={skillProblems}
                           roots={roots}
                           sources={sources[column.id] ?? noSources}
-                          hibachiAgent={hibachiAgent}
+                          vaultAgent={vaultAgent}
                           stageHidden={stageHidden}
                           workspaceScopeIds={workspaceScopeIds}
                           workspaceId={workspace?.id}
@@ -2821,7 +2819,7 @@ function App() {
               const next = profiles.find((profile) => profile.id === workspace?.id);
               setSpaces(list);
               if (next) setWorkspace(next);
-              // The next hibachi of the workspace comes on show.
+              // The next vault of the workspace comes on show.
               setActive(
                 (next?.scopeIds ?? []).flatMap((id) =>
                   list.filter((space) => space.scopeId === id),
@@ -2836,7 +2834,7 @@ function App() {
               updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
               setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
               bump();
-              setStatus(t('hibachi を削除しました。', 'Removed the hibachi.'));
+              setStatus(t('vault を削除しました。', 'Removed the vault.'));
             })().catch(report);
           }}
           onSaved={(next, renamed) => {
@@ -2855,7 +2853,7 @@ function App() {
                 : []),
             ]);
             if (notices.length) setError(notices.join(' '));
-            else setStatus(t('hibachi の設定を保存しました。', "Saved the hibachi's settings."));
+            else setStatus(t('vault の設定を保存しました。', "Saved the vault's settings."));
             // The note on show follows its folder to the new name.
             const open = current.current.doc;
             for (const item of renamed) {
@@ -2926,8 +2924,8 @@ function App() {
       {schemaOpen && (
         <SchemaDialog
           you={you}
-          spaces={hibachiAgent ? workspaceSpaces : []}
-          // It shows the shared Schema, the irori agent's and every hibachi's: a change in any of them.
+          spaces={vaultAgent ? workspaceSpaces : []}
+          // It shows the shared Schema, the irori agent's and every vault's: a change in any of them.
           revision={anyRevision(revisions) + youRevision}
           locked={(scopeId) =>
             connecting ||

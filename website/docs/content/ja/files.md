@@ -18,7 +18,7 @@ Office・PDF・画像のビューアは100 MiBまでのファイルを対象と�
 
 ## 資料を開く
 
-hibachi の Contents からファイルを選ぶと、中央に表示されます。[Google Drive](drive.md)の資料も、接続できている場合に開けます。
+vault の Contents からファイルを選ぶと、中央に表示されます。[Google Drive](drive.md)の資料も、接続できている場合に開けます。
 
 PDF や Office 文書の閲覧は表示専用です。編集する場合は元のアプリを使ってください。Markdown の資料は、書き込みできる接続であれば irori で編集できます。
 

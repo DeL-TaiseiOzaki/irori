@@ -1,6 +1,6 @@
 # Conversations
 
-What irori keeps of the conversations with hibachi agents and the irori agent,
+What irori keeps of the conversations with vault agents and the irori agent,
 as of **0.1.60** ([ADR 017](decisions/017-conversation-history.md) stage 1). Stage 2
 adds the choice of folder and search; stage 3 adds rewind, clone and rebuilt
 context. Earlier behavior (a bounded display window per space, CLI and checkout)
@@ -8,17 +8,17 @@ is described in the history of this file.
 
 ## What the person sees
 
-- A hibachi and the irori agent each have any number of conversations, and they
+- A vault and the irori agent each have any number of conversations, and they
   run side by side ([ADR 020](decisions/020-parallel-conversations.md)). The
-  hibachi agent's panel keeps the open ones as tabs, shown once there are two;
+  vault agent's panel keeps the open ones as tabs, shown once there are two;
   the irori agent's panel shows one at a time. **新しい会話** starts an empty one on the same CLI; nothing
   is written until its first instruction. **履歴** lists the owner's own
-  conversations: a hibachi's list never holds the irori agent's, and the reverse.
+  conversations: a vault's list never holds the irori agent's, and the reverse.
 - The irori agent keeps a history per workspace (0.1.94). Its 履歴, the
   conversation a panel opens on, its queue and a new conversation are those of
   the workspace open; opening another workspace shows that one's. A conversation
   continues only in the workspace it began in. Conversations from before 0.1.94
-  have no workspace and appear in none; their folders stay. A hibachi keeps one
+  have no workspace and appear in none; their folders stay. A vault keeps one
   history wherever it is opened, and a routine's irori agent step is kept in the
   routine's workspace.
 - Choosing another CLI in the panel starts a new conversation: a conversation's
@@ -48,8 +48,8 @@ is described in the history of this file.
 ```
 
 - **meta.json** (`conversationMeta` in `src/domain/conversation.ts`): owner
-  (`hibachi` or `irori-agent`, its id and its name then), CLI, model, title and
-  where it came from, times, linked note, the hibachis the irori agent's
+  (`vault` or `irori-agent`, its id and its name then), CLI, model, title and
+  where it came from, times, linked note, the vaults the irori agent's
   hand-offs reached, pin and archive, `forkedFrom` (null until stage 3), a
   routine step's `routine` or a hand-off's `handedBy`, the irori agent's
   `workspace` (the id of the workspace it began in), and `native`. Keys a later
@@ -100,7 +100,7 @@ is described in the history of this file.
 ## Runs and the queue
 
 - One run at a time per conversation; an owner's conversations run at once in
-  the same checkout, and different hibachis run in parallel. The run map is keyed
+  the same checkout, and different vaults run in parallel. The run map is keyed
   by run id. irori does not coordinate edits between runs in one checkout.
 - A send to a conversation whose run is in progress, or whose queue is not
   empty, is queued in that conversation, and waits for that conversation alone.
@@ -113,8 +113,8 @@ is described in the history of this file.
 - A run the host could not see finish is shown as unconfirmed on the next start
   and never sent again. If the host stopped between claiming a queued
   instruction and writing it, the message is written from the claim.
-- The irori agent's hand-off to a hibachi through the `hibachi` command
-  continues in one hibachi conversation per irori agent conversation
+- The irori agent's hand-off to a vault through `irori call`
+  continues in one vault conversation per irori agent conversation
   (`handedBy`), apart from the person's own conversations.
 
 ## Damage
@@ -156,7 +156,7 @@ not given the conversations folder.
 - `tests/sessions.test.ts`: the device id; resume only with the same access; a
   failed resume and the next turn; another device id; another checkout; a
   damaged device id (Codex protocol fixture).
-- `tests/conversation-migration.test.ts`: records of a hibachi and the irori
+- `tests/conversation-migration.test.ts`: records of a vault and the irori
   agent, a handle alone, damaged and misfiled records, the old files unchanged
   and a second run.
 - `scripts/conversations-ui-smoke.ts`: the migrated conversation, 新しい会話, a

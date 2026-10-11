@@ -208,8 +208,8 @@ function Definition({ file, reads }: { file: BrainAgent['definitions'][number]; 
 }
 
 /**
- * The irori agent (your AI): its Schema settings, the same as a hibachi's, its
- * folder as files, read-only, and the hibachi agent it hands each brain's work
+ * The irori agent (your AI): its Schema settings, the same as a vault's, its
+ * folder as files, read-only, and the vault agent it hands each brain's work
  * to. irori writes a missing definition when it hands that brain to the irori
  * agent, and never replaces one.
  */
@@ -226,7 +226,7 @@ export function YourAiScreen({
   /** The CLI your AI runs on. */
   agent: AgentId;
   spaces: Space[];
-  /** While the irori agent runs, its Schema does not change, as a hibachi's does not. */
+  /** While the irori agent runs, its Schema does not change, as a vault's does not. */
   running: boolean;
   /** Counts the host's file changes, the Schema settings' own writes among them. */
   revision: number;
@@ -241,7 +241,7 @@ export function YourAiScreen({
   // Which standard skills the folder lacks follows the folder, as the files do.
   const status = useResource(() => host.yourAi(), [], { refresh: reads });
   const missingSkills = status.data?.missingSkills ?? you.missingSkills;
-  // The Schema settings first, as in a hibachi; the folder's files are one click away.
+  // The Schema settings first, as in a vault; the folder's files are one click away.
   const [schemaFiles, setSchemaFiles] = useState(false);
   const [adding, setAdding] = useState(false);
   const [target, setTarget] = useState<SchemaTarget | undefined>({
@@ -392,20 +392,17 @@ export function YourAiScreen({
       )}
       <section
         className="you-panel you-brains chrome"
-        aria-label={t('hibachi agent', 'hibachi agents')}
+        aria-label={t('vault agent', 'vault agents')}
       >
         <header className="you-brains-head">
           <Icon name="users" size={16} />
-          <h2>{t('hibachi agent', 'hibachi agents')}</h2>
+          <h2>{t('vault agent', 'vault agents')}</h2>
           <span className="you-count">{spaces.length}</span>
         </header>
         <div className="you-brains-body">
           {!spaces.length ? (
             <p className="you-brains-note">
-              {t(
-                'このワークスペースに hibachi がありません。',
-                'This workspace has no hibachi yet.',
-              )}
+              {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
             </p>
           ) : (
             <div className="you-brain-list">
@@ -420,9 +417,7 @@ export function YourAiScreen({
                   >
                     <BrainTile space={space} size={26} radius={8} />
                     <span className="you-brain-names">
-                      <strong>
-                        {t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)}
-                      </strong>
+                      <strong>{`${space.name} agent`}</strong>
                       <small>{brain?.agent ?? '…'}</small>
                     </span>
                     {brain &&

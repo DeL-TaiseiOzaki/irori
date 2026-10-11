@@ -18,7 +18,7 @@ function gate() {
   return { wait, release };
 }
 
-test('Watcher boundaries exclude tool caches and nested hibachis, retaining knowledge and metadata events', () => {
+test('Watcher boundaries exclude tool caches and nested vaults, retaining knowledge and metadata events', () => {
   const space: Space = {
     schemaVersion: 1,
     scopeId: randomUUID(),
@@ -107,7 +107,7 @@ test('Registration changes rebuild cached watcher boundaries, including removal 
   assert.equal(lists, 3);
 });
 
-test('Boundary changes restart only the changed hibachi, its ancestors and descendants', async (t) => {
+test('Boundary changes restart only the changed vault, its ancestors and descendants', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-watch-registration-'));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
@@ -268,7 +268,7 @@ test(
 );
 
 test(
-  'Real watchers leave cache trees unobserved and route a nested hibachi only to its own scope',
+  'Real watchers leave cache trees unobserved and route a nested vault only to its own scope',
   { timeout: 10000 },
   async (t) => {
     const base = await mkdtemp(path.join(tmpdir(), 'irori-host-watch-events-'));

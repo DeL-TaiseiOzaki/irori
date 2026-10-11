@@ -11,8 +11,8 @@ const root = path.join(base, 'Knowledge');
 await mkdir(root);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const space = await files.register(root, '知識の地図', 'personal');
 await mkdir(path.join(root, 'ontology'));
 await mkdir(path.join(root, 'notes'));
@@ -148,11 +148,11 @@ try {
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'グラフ', exact: true }).first()).toBeFocused();
   await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toHaveValue(/\.irori\/ontology.json/);
   // The bundle KB: no declaration, so the panel offers to generate the graph index.
   await page
-    .getByRole('navigation', { name: 'hibachi' })
+    .getByRole('navigation', { name: 'vault' })
     .getByRole('button', { name: /^知識の束・AI/ })
     .click();
   await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();

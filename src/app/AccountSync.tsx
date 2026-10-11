@@ -41,7 +41,7 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
       setSaved(true);
     });
   }
-  const dropped = state?.saved?.hibachis.filter((item) => !item.here).length ?? 0;
+  const dropped = state?.saved?.vaults.filter((item) => !item.here).length ?? 0;
   return (
     <section className="settings-account" aria-label={t('アカウント', 'Account')}>
       <h3>{t('アカウント', 'Account')}</h3>
@@ -59,8 +59,8 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
           {dropped > 0 && (
             <p className="account-hint">
               {t(
-                `この端末にない hibachi ${dropped} 件は、保存すると外れます。`,
-                `Saving drops ${dropped} hibachi${dropped === 1 ? '' : 's'} not on this device.`,
+                `この端末にない vault ${dropped} 件は、保存すると外れます。`,
+                `Saving drops ${dropped} vault${dropped === 1 ? '' : 's'} not on this device.`,
               )}
             </p>
           )}
@@ -97,14 +97,14 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
 
 /**
  * Restores the environment saved on the GitHub account to this device: the
- * chosen hibachis are cloned, the workspaces and preferences taken in.
+ * chosen vaults are cloned, the workspaces and preferences taken in.
  */
 export function RestoreEnvironment({
   onClose,
   onRestored,
 }: {
   onClose: () => void;
-  /** This device's hibachis, workspaces and preferences changed. */
+  /** This device's vaults, workspaces and preferences changed. */
   onRestored: () => void | Promise<void>;
 }) {
   const { state, error, load } = useEnvironment();
@@ -114,9 +114,9 @@ export function RestoreEnvironment({
     [result, setResult] = useState<EnvironmentRestore>();
   const { busy, error: issue, run } = useAction();
   const saved = state?.saved;
-  // Every hibachi not yet here is chosen until the person says otherwise.
+  // Every vault not yet here is chosen until the person says otherwise.
   const chosen =
-    selected ?? saved?.hibachis.filter((item) => !item.here).map((item) => item.scopeId) ?? [];
+    selected ?? saved?.vaults.filter((item) => !item.here).map((item) => item.scopeId) ?? [];
   const agentMissing = !!saved?.agent && !saved.agent.here;
   async function chooseParent() {
     const folder = await host.chooseFolder();
@@ -151,8 +151,8 @@ export function RestoreEnvironment({
           <div className="restore-result">
             <p role="status">
               {t(
-                `hibachi ${result.restored.length} 件とワークスペース ${result.workspaces} 件を取り込みました。`,
-                `Took in ${result.restored.length} hibachi${result.restored.length === 1 ? '' : 's'} and ${result.workspaces} workspace${result.workspaces === 1 ? '' : 's'}.`,
+                `vault ${result.restored.length} 件とワークスペース ${result.workspaces} 件を取り込みました。`,
+                `Took in ${result.restored.length} vault${result.restored.length === 1 ? '' : 's'} and ${result.workspaces} workspace${result.workspaces === 1 ? '' : 's'}.`,
               )}
             </p>
             {result.failed.map((item) => (
@@ -172,8 +172,8 @@ export function RestoreEnvironment({
               GitHub: {state.account} · {when(saved.savedAt)}
             </p>
             <fieldset className="restore-list">
-              <legend>hibachi</legend>
-              {saved.hibachis.map((item) => (
+              <legend>vault</legend>
+              {saved.vaults.map((item) => (
                 <label key={item.scopeId} data-here={item.here || undefined}>
                   <input
                     type="checkbox"

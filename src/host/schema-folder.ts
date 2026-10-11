@@ -4,7 +4,7 @@ import type { FileService } from './files';
 import type { SettingKind } from '../domain/schema-settings';
 
 /**
- * A folder whose Schema the settings read and write: a hibachi's checkout, or
+ * A folder whose Schema the settings read and write: a vault's checkout, or
  * the irori agent's own folder. Each says where it is and how a path in it is
  * resolved, so the same rules (setting paths, no alias on the way, hash-checked
  * writes) hold for both.
@@ -13,7 +13,7 @@ export interface SchemaFolder {
   /** The folder's real path. */
   root: string;
   /**
-   * Whether its knowledge folders may hold their own `AGENTS.md` (a hibachi).
+   * Whether its knowledge folders may hold their own `AGENTS.md` (a vault).
    * The irori agent's folder has instructions only at its root.
    */
   knowledge: boolean;
@@ -27,7 +27,7 @@ export interface SchemaFolder {
   read(relative: string): Promise<string>;
 }
 
-/** A hibachi's checkout, through the file service and its own boundary checks. */
+/** A vault's checkout, through the file service and its own boundary checks. */
 export function spaceFolder(files: FileService, scopeId: string): SchemaFolder {
   const space = files.get(scopeId);
   return {

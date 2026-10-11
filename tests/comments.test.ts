@@ -23,7 +23,7 @@ import { nearest, positionsOf, quoteHead, sourceLineOf } from '../src/editor/sea
 
 const git = { userEmail: async () => 'alice@example.com' };
 
-async function hibachi(t: { after: (fn: () => unknown) => void }) {
+async function vault(t: { after: (fn: () => unknown) => void }) {
   const base = await mkdtemp(path.join(tmpdir(), 'irori comments '));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
@@ -36,8 +36,8 @@ async function hibachi(t: { after: (fn: () => unknown) => void }) {
   return { root, files, scopeId: space.scopeId };
 }
 
-test('A comment is kept in the hibachi beside the file it is about, with who and when', async (t) => {
-  const { root, files, scopeId } = await hibachi(t);
+test('A comment is kept in the vault beside the file it is about, with who and when', async (t) => {
+  const { root, files, scopeId } = await vault(t);
   assert.deepEqual(await readNoteComments(files, scopeId, 'wiki/topic.md'), []);
   const [first] = await addNoteComment(files, git, scopeId, 'wiki/topic.md', {
     body: '  Cite a source here.  ',
@@ -70,13 +70,13 @@ test('A comment is kept in the hibachi beside the file it is about, with who and
     await readFile(path.join(root, 'wiki', 'topic.md'), 'utf8'),
     '# Topic\n\nA claim.\nAnother claim.\n',
   );
-  // Any Markdown file of the hibachi takes comments, the Schema's included.
+  // Any Markdown file of the vault takes comments, the Schema's included.
   await addNoteComment(files, git, scopeId, 'AGENTS.md', { body: 'Too long.' });
   assert.deepEqual(await commentsCount(files, scopeId), { comments: 3, files: 2 });
 });
 
 test('Resolving the last comment removes its file and the folders it leaves empty', async (t) => {
-  const { root, files, scopeId } = await hibachi(t);
+  const { root, files, scopeId } = await vault(t);
   const [comment] = await addNoteComment(files, git, scopeId, 'wiki/topic.md', { body: 'One.' });
   const [, second] = await addNoteComment(files, git, scopeId, 'wiki/topic.md', { body: 'Two.' });
   assert.deepEqual(
@@ -91,7 +91,7 @@ test('Resolving the last comment removes its file and the folders it leaves empt
 });
 
 test('What irori does not know in a comments file is kept, and a broken one is never overwritten', async (t) => {
-  const { root, files, scopeId } = await hibachi(t);
+  const { root, files, scopeId } = await vault(t);
   const file = path.join(root, '.irori', 'comments', 'wiki', 'topic.md.json');
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(
@@ -136,8 +136,8 @@ test('What irori does not know in a comments file is kept, and a broken one is n
   assert.deepEqual(await commentsCount(files, scopeId), { comments: 0, files: 0 });
 });
 
-test('Comments stay inside the hibachi and only Markdown files take them', async (t) => {
-  const { root, files, scopeId } = await hibachi(t);
+test('Comments stay inside the vault and only Markdown files take them', async (t) => {
+  const { root, files, scopeId } = await vault(t);
   await writeFile(path.join(root, 'wiki', 'data.csv'), 'a,b\n');
   await assert.rejects(
     addNoteComment(files, git, scopeId, 'wiki/data.csv', { body: 'x' }),
@@ -149,7 +149,7 @@ test('Comments stay inside the hibachi and only Markdown files take them', async
   );
   await assert.rejects(addNoteComment(files, git, scopeId, 'wiki/absent.md', { body: 'x' }));
   await assert.rejects(addNoteComment(files, git, scopeId, 'wiki/topic.md', { body: '   ' }));
-  // A symbolic link where comments are kept would lead writes out of the hibachi.
+  // A symbolic link where comments are kept would lead writes out of the vault.
   const elsewhere = await mkdtemp(path.join(tmpdir(), 'irori comments elsewhere '));
   t.after(() => rm(elsewhere, { recursive: true, force: true }));
   await symlink(elsewhere, path.join(root, '.irori', 'comments'));
@@ -171,7 +171,7 @@ test('Comments stay inside the hibachi and only Markdown files take them', async
 });
 
 test("A moved note's comments move with it", async (t) => {
-  const { root, files, scopeId } = await hibachi(t);
+  const { root, files, scopeId } = await vault(t);
   await addNoteComment(files, git, scopeId, 'wiki/topic.md', { body: 'Keep me.' });
   await mkdir(path.join(root, 'archive'));
   await writeFile(path.join(root, 'archive', 'topic.md'), '# Topic\n');
@@ -191,7 +191,7 @@ test("A moved note's comments move with it", async (t) => {
   await moveNoteComments(files, scopeId, 'wiki/other.md', 'archive/topic.md');
 });
 
-test('An agent is given the comments of its note, or where the hibachi keeps them', () => {
+test('An agent is given the comments of its note, or where the vault keeps them', () => {
   const comments = [
     { id: 'a', body: 'Cite a source.', quote: 'A claim.', line: 3, by: 'human:alice', at: 'x' },
     { id: 'b', body: 'Split\nthis note.', at: 'y' },
@@ -219,21 +219,18 @@ test('An agent is given the comments of its note, or where the hibachi keeps the
   );
 });
 
-test('The irori agent hears which handed hibachis carry comments and where', () => {
+test('The irori agent hears which handed vaults carry comments and where', () => {
   const brains = [
-    { name: 'Work', agent: 'hibachi-work', root: '/kb/work' },
-    { name: 'Home', agent: 'hibachi-home', root: '/kb/home' },
+    { name: 'Work', agent: 'vault-work', root: '/kb/work' },
+    { name: 'Home', agent: 'vault-home', root: '/kb/home' },
   ];
   const quiet = brainsPreamble(brains, 'claude');
   assert.ok(!quiet.includes('comment'), quiet);
   const told = brainsPreamble(brains, 'claude', [0, 4]);
-  assert.match(told, /sub-agent "hibachi-home", 4 comments from people/);
-  assert.ok(!told.includes('"hibachi-work", '), told);
+  assert.match(told, /sub-agent "vault-home", 4 comments from people/);
+  assert.ok(!told.includes('"vault-work", '), told);
   assert.match(told, /\.irori\/comments\/<file path>\.json/);
-  assert.match(
-    brainsCommandPreamble(brains, 'Pi', [1, 0]),
-    /"hibachi-work", 1 comment from people/,
-  );
+  assert.match(brainsCommandPreamble(brains, 'Pi', [1, 0]), /"vault-work", 1 comment from people/);
 });
 
 test('A selection in the rendered note finds its line in the source', () => {

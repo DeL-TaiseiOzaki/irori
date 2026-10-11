@@ -5,9 +5,9 @@ description: Maintain AI instructions and reusable skills as ordinary files.
 
 ## Open settings
 
-Schema appears only when the hibachi agent is on in **Settings → Agents**.
+Schema appears only when the vault agent is on in **Settings → Agents**.
 
-Select an item in a hibachi's **Schema** to open its form in the center. Use a group's add action to create an item. The folder icon switches to **Show as files**.
+Select an item in a vault's **Schema** to open its form in the center. Use a group's add action to create an item. The folder icon switches to **Show as files**.
 
 | Item         | Stored file                                         |
 | ------------ | --------------------------------------------------- |
@@ -26,6 +26,6 @@ Choose a skill in the AI panel before sending to include its instructions with t
 
 ## Share ordinary files
 
-Settings are ordinary files inside the hibachi and can be shared through [Git](git.md). Edit the irori agent's Schema in the same way.
+Settings are ordinary files inside the vault and can be shared through [Git](git.md). Edit the irori agent's Schema in the same way.
 
 Hooks execute programs. Review the CLI and command before saving one. Deleting an item asks for confirmation.

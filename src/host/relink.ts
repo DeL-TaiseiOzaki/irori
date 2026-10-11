@@ -121,7 +121,7 @@ export async function relink(
 }
 
 /**
- * After a layer folder rename (ADR 024): rewrites every link in the hibachi's
+ * After a layer folder rename (ADR 024): rewrites every link in the vault's
  * Markdown files that led into `from` so it leads to the same file under `to`,
  * including the links of the moved files themselves. Contents is not walked: its
  * files are the originals of other places. Each write is the ordinary

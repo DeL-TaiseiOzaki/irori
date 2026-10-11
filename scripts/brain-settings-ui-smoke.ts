@@ -43,11 +43,11 @@ try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
-  const sheet = page.getByRole('dialog', { name: 'hibachi の設定' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
+  const sheet = page.getByRole('dialog', { name: 'vault の設定' });
   const open = async () => {
-    await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'hibachi の設定', exact: true }).click();
+    await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
     await expect(sheet).toBeVisible();
   };
 
@@ -165,33 +165,30 @@ try {
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await expect(
     page
-      .getByRole('navigation', { name: 'hibachi' })
+      .getByRole('navigation', { name: 'vault' })
       .getByRole('button', { name: /^Product Lab・AI/ }),
   ).toBeVisible();
   await expect(
-    page
-      .getByRole('navigation', { name: 'hibachi' })
-      .locator('.rail-brain .brain-tile img')
-      .first(),
+    page.getByRole('navigation', { name: 'vault' }).locator('.rail-brain .brain-tile img').first(),
   ).toBeVisible();
   expect(
     (await readdir(path.join(roots[0], '.irori'))).filter((name) => name.startsWith('icon-')),
   ).toHaveLength(1);
 
-  // Removing a hibachi takes it off the rail and the workspace; its folder stays.
-  const railAgain = page.getByRole('navigation', { name: 'hibachi' });
+  // Removing a vault takes it off the rail and the workspace; its folder stays.
+  const railAgain = page.getByRole('navigation', { name: 'vault' });
   await railAgain.getByRole('button', { name: /^Research・AI/ }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
-  await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'hibachi の設定', exact: true }).click();
+  await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
   await page
-    .getByRole('dialog', { name: 'hibachi の設定' })
-    .getByRole('button', { name: 'hibachi を削除', exact: true })
+    .getByRole('dialog', { name: 'vault の設定' })
+    .getByRole('button', { name: 'vault を削除', exact: true })
     .click();
   const removal = page.getByRole('dialog', { name: 'Research を削除' });
   await expect(removal.getByRole('checkbox', { name: 'フォルダもゴミ箱に移す' })).not.toBeChecked();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: 'test-results/irori-remove-hibachi.png' });
+  await page.screenshot({ path: 'test-results/irori-remove-vault.png' });
   await removal.getByRole('button', { name: '削除', exact: true }).click();
   await expect(removal).toHaveCount(0);
   await expect(railAgain.getByRole('button', { name: /^Research・AI/ })).toHaveCount(0);
@@ -204,7 +201,7 @@ try {
     JSON.parse(await readFile(path.join(roots[1], '.irori', 'scope.json'), 'utf8')).scopeId,
   ).toBe(research.scopeId);
 
-  // The start screen removes a hibachi without opening a workspace; its folder stays.
+  // The start screen removes a vault without opening a workspace; its folder stays.
   await app.close();
   app = await launch();
   page = await app.firstWindow();
@@ -216,7 +213,7 @@ try {
   await expect(startRemoval).toBeVisible();
   await expect(chip.getByRole('checkbox')).not.toBeChecked();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: 'test-results/irori-start-remove-hibachi.png' });
+  await page.screenshot({ path: 'test-results/irori-start-remove-vault.png' });
   await startRemoval.getByRole('button', { name: '削除', exact: true }).click();
   await expect(startRemoval).toHaveCount(0);
   await expect(page.locator('.start-chip')).toHaveCount(0);

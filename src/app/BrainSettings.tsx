@@ -135,8 +135,8 @@ export function CategoryField({
   );
 }
 
-/** Removes a hibachi from irori, and its folder too when the person asks for that. */
-export function RemoveHibachi({
+/** Removes a vault from irori, and its folder too when the person asks for that. */
+export function RemoveVault({
   space,
   onRemoved,
   onClose,
@@ -216,7 +216,7 @@ export function BrainSettings({
   onClose: () => void;
   /** Saves the open note before a folder it may be in moves; false stops the save. */
   beforeRename?: () => Promise<boolean>;
-  /** The hibachi left irori; without it, the sheet offers no removal. */
+  /** The vault left irori; without it, the sheet offers no removal. */
   onRemoved?: () => void;
 }) {
   const current = brainAppearance(space);
@@ -325,7 +325,7 @@ export function BrainSettings({
   }
   if (removing && onRemoved)
     return (
-      <RemoveHibachi
+      <RemoveVault
         space={space}
         beforeRemove={beforeRename}
         onRemoved={onRemoved}
@@ -336,7 +336,7 @@ export function BrainSettings({
   const others = spaces.filter((item) => item.scopeId !== space.scopeId).slice(0, 3);
   return (
     <Dialog
-      label={t('hibachi の設定', 'hibachi settings')}
+      label={t('vault の設定', 'vault settings')}
       className="modal-dialog brain-sheet-dialog"
       busy={saving}
       onClose={onClose}
@@ -350,7 +350,7 @@ export function BrainSettings({
       >
         <header className="brain-sheet-header">
           <BrainTile space={draft} image={image} size={26} radius={8} ring="stage" />
-          <h2>{t('hibachi の設定', 'hibachi settings')}</h2>
+          <h2>{t('vault の設定', 'vault settings')}</h2>
           <button
             type="button"
             className="stage-button"
@@ -574,7 +574,7 @@ export function BrainSettings({
               onClick={() => setRemoving(true)}
             >
               <Icon name="trash" size={14} />
-              {t('hibachi を削除', 'Remove hibachi')}
+              {t('vault を削除', 'Remove vault')}
             </button>
           )}
           <span className="brain-sheet-space" />

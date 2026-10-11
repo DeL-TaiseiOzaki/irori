@@ -84,7 +84,7 @@ function folderName(folder: string) {
 }
 
 /**
- * A hibachi's connected folders: folders on this computer, usually ones a sync app
+ * A vault's connected folders: folders on this computer, usually ones a sync app
  * (Drive for desktop, Dropbox, Box, iCloud, OneDrive) keeps, shown in contents
  * (ADR 019). A Google Drive connection from before 0.1.67 is switched to one (ADR 023).
  */

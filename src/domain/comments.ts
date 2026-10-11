@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 /**
- * Comments on a Markdown file are kept in the hibachi beside its other irori
+ * Comments on a Markdown file are kept in the vault beside its other irori
  * files, one JSON file per commented file named after its path, so they travel
- * with the hibachi through Git and any agent working in it can read them.
+ * with the vault through Git and any agent working in it can read them.
  */
 export const commentsDirectory = '.irori/comments';
 export const commentsFile = (notePath: string) => `${commentsDirectory}/${notePath}.json`;

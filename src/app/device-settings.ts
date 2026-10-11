@@ -14,7 +14,7 @@ let current: DeviceSettings = {
   language: 'ja',
   markdownFont: 'sans',
   editorAssistance: true,
-  hibachiAgent: false,
+  vaultAgent: false,
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
@@ -77,13 +77,13 @@ export function chooseEditorAssistance(editorAssistance: boolean) {
   return save({ editorAssistance });
 }
 
-/** Whether each hibachi's own agent and its Schema layer are offered (ADR 021). */
-export function currentHibachiAgent() {
-  return current.hibachiAgent;
+/** Whether each vault's own agent and its Schema layer are offered (ADR 021). */
+export function currentVaultAgent() {
+  return current.vaultAgent;
 }
 
-export function chooseHibachiAgent(hibachiAgent: boolean) {
-  return save({ hibachiAgent });
+export function chooseVaultAgent(vaultAgent: boolean) {
+  return save({ vaultAgent });
 }
 
 /** The runtimes routines may use on this device (ADR 016 D3). */

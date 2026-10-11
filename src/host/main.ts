@@ -24,6 +24,7 @@ import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
 import { DeviceIdentity } from './device';
 import { migrateConversations } from '../agents/conversation-migration';
+import { migrateToVault } from './vault-rename';
 import { brainAgentNames, sharedSchemaId } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
@@ -80,6 +81,12 @@ app
     if (!ownsDeviceData) return;
     const files = new FileService(app.getPath('userData'));
     await files.init();
+    // Your AI's folder is the device's, not a KB's: its record is read before any run.
+    const you = new YourAiService(files.dataDir);
+    // Records written while vaults were called hibachis take the new name first (ADR 033).
+    await migrateToVault(files.dataDir, (await you.load()).root).catch((error) =>
+      console.warn('Records could not be renamed to vault', String(error)),
+    );
     const settings = new SettingsService(app.getPath('userData'));
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
@@ -122,9 +129,6 @@ app
     const authorship = new AuthorshipStore(files.dataDir, (ref) =>
       git.noted(ref.scopeId, ref.path),
     );
-    // Your AI's folder is the device's, not a KB's: its record is read before any run.
-    const you = new YourAiService(files.dataDir);
-    await you.load();
     const terminals = new TerminalService(
       files,
       (event) => emit({ type: 'terminal', event }),
@@ -138,7 +142,7 @@ app
       youId: (await you.load()).id,
       spaceName: (scopeId) => files.list().find((space) => space.scopeId === scopeId)?.name,
     }).catch((error) => console.warn('Saved conversations could not be migrated', String(error)));
-    // The Schema settings take a hibachi's id, the irori agent's, whose folder is its
+    // The Schema settings take a vault's id, the irori agent's, whose folder is its
     // Schema, or the shared Schema's, kept inside that folder (ADR 027).
     const schemaFolder = async (scopeId: string) =>
       scopeId === sharedSchemaId
@@ -265,7 +269,7 @@ app
         watch(space);
         return space;
       });
-    /** Lets go of a hibachi's folder before it is removed, and says how to take it up again. */
+    /** Lets go of a vault's folder before it is removed, and says how to take it up again. */
     const releaseSpace = async (space: Space) => {
       await terminals.closeScope(space.scopeId);
       const connected = await cloud.suspend(space.scopeId);
@@ -280,7 +284,7 @@ app
       'Git 操作・接続・ルーティンが終わってからもう一度実行してください。',
       'Run it again after the Git operation, connection or routine finishes.',
     );
-    // The irori agent's `irori` command: hibachis it registers join the request's workspace.
+    // The irori agent's `irori` command: vaults it registers join the request's workspace.
     const setup = new AgentSetup({
       files,
       git,
@@ -288,7 +292,7 @@ app
       cloud,
       defaultParent,
       register: registerWatched,
-      // As the settings and explorer do, but the irori agent's own hold on a hibachi does not count.
+      // As the settings and explorer do, but the irori agent's own hold on a vault does not count.
       update: (scopeId, change) => {
         if (cloud.busy || git.busy) throw Error(setupWait);
         return changeFiles(() => files.update(scopeId, change));
@@ -343,7 +347,7 @@ app
       runRoutine: (ref, input) => routines.run(ref, input),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
-        emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),
+        emit(scopeId ? { type: 'files', scopeId } : { type: 'vaults', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
     // An MCP server's link opens only after the person agreed in the request.
@@ -402,8 +406,8 @@ app
         emit({ type: 'files', scopeId });
       }
     }
-    /** A change to a hibachi's files that waits for its runs and for connection setup. */
-    function changeHibachi<T>(scopeId: string, refusal: string, operation: () => Promise<T>) {
+    /** A change to a vault's files that waits for its runs and for connection setup. */
+    function changeVault<T>(scopeId: string, refusal: string, operation: () => Promise<T>) {
       return changeFiles(() =>
         changed(scopeId, async () => {
           if (agents.busy(scopeId) || cloud.busy) throw Error(refusal);
@@ -479,7 +483,7 @@ app
     }
     /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
     function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
-      return changeHibachi(
+      return changeVault(
         scopeId,
         t(
           '実行と接続の準備が終わってから Schema を変更してください。',
@@ -537,11 +541,11 @@ app
         return true;
       },
       moveNote: (ref, destination, links) =>
-        changeHibachi(ref.scopeId, organizing(), () => moveNoteCarrying(ref, destination, links)),
-      trashNote: (ref) => changeHibachi(ref.scopeId, organizing(), () => files.trashNote(ref)),
+        changeVault(ref.scopeId, organizing(), () => moveNoteCarrying(ref, destination, links)),
+      trashNote: (ref) => changeVault(ref.scopeId, organizing(), () => files.trashNote(ref)),
       trashedNotes: (id) => files.trashedNotes(id),
       restoreNote: (id, trashId) =>
-        changeHibachi(
+        changeVault(
           id,
           t(
             '実行と接続の準備が終わってから復元してください。',
@@ -618,9 +622,9 @@ app
           try {
             return await git.sync(...args);
           } finally {
-            // A pulled `.irori/scope.json` was taken in (ADR 028): the window reads the hibachis again.
+            // A pulled `.irori/scope.json` was taken in (ADR 028): the window reads the vaults again.
             const after = files.list().find((space) => space.scopeId === gitScope(args[0]));
-            if (before && after && before !== after) emit({ type: 'hibachis' });
+            if (before && after && before !== after) emit({ type: 'vaults' });
           }
         }),
       gitResolve: (...args) => changed(gitScope(args[0]), () => git.resolve(...args)),
@@ -640,7 +644,7 @@ app
           ),
         );
         const result = await environment.restore(input);
-        emit({ type: 'hibachis' });
+        emit({ type: 'vaults' });
         return result;
       },
       gitPublish: (...args) => changed(args[0], () => git.publish(...args)),
@@ -663,7 +667,7 @@ app
       ontology: (id) => readOntology(files, id),
       graphIndexStatus: (id) => graphIndex.status(id),
       updateGraphIndex: (id) =>
-        changeHibachi(
+        changeVault(
           id,
           t(
             '実行と接続の準備が終わってから索引を更新してください。',
@@ -741,8 +745,8 @@ app
         if (agents.busy(scopeId) || cloud.busy || git.busy)
           throw Error(
             t(
-              '実行・Git 操作・接続が終わってから hibachi の設定を変えてください。',
-              "Change the hibachi's settings after the run, Git operation and connection finish.",
+              '実行・Git 操作・接続が終わってから vault の設定を変えてください。',
+              "Change the vault's settings after the run, Git operation and connection finish.",
             ),
           );
         return changeFiles(() => files.update(scopeId, change));
@@ -751,8 +755,8 @@ app
         if (agents.busy(scopeId) || cloud.busy || git.busy || routines.busy)
           throw Error(
             t(
-              '実行・Git 操作・接続が終わってから hibachi を削除してください。',
-              'Remove the hibachi after the run, Git operation and connection finish.',
+              '実行・Git 操作・接続が終わってから vault を削除してください。',
+              'Remove the vault after the run, Git operation and connection finish.',
             ),
           );
         await changeFiles(() =>
@@ -770,7 +774,7 @@ app
         );
       },
       renameLayerFolder: (scopeId, layer, name) =>
-        changeHibachi(
+        changeVault(
           scopeId,
           t(
             '実行と接続の準備が終わってからフォルダ名を変えてください。',

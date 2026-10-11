@@ -201,7 +201,7 @@ test(
 );
 
 test(
-  "Two conversations of one hibachi run at once, each waiting only for its own queue's run",
+  "Two conversations of one vault run at once, each waiting only for its own queue's run",
   fixtureOptions,
   async (t) => {
     const { space, files } = await setup(t);
@@ -397,7 +397,7 @@ test(
 );
 
 test(
-  "A hibachi agent is given its note's comments, and otherwise where the hibachi keeps them",
+  "A vault agent is given its note's comments, and otherwise where the vault keeps them",
   fixtureOptions,
   async (t) => {
     const { root, space, files, calls, execute } = await setup(t);
@@ -427,9 +427,9 @@ test(
     );
     assert.ok(onNote.endsWith('address the comments'), 'the request stays last');
     const elsewhere = await sent({ notePath: 'other.md' });
-    assert.ok(elsewhere.includes('This hibachi has 1 comment from people on 1 file'), elsewhere);
+    assert.ok(elsewhere.includes('This vault has 1 comment from people on 1 file'), elsewhere);
     assert.ok(!elsewhere.includes('Say what the fixture is for.'), elsewhere);
-    assert.ok((await sent({})).includes('This hibachi has 1 comment'), 'without a note as well');
+    assert.ok((await sent({})).includes('This vault has 1 comment'), 'without a note as well');
   },
 );
 

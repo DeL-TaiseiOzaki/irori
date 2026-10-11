@@ -56,10 +56,10 @@ async function fixture(t: any) {
   git(seed, 'add', '.');
   git(seed, 'commit', '-m', 'Library note');
   git(seed, 'push', 'origin', 'HEAD:main');
-  // The hibachi, with a remote of its own.
-  const hibachi = path.join(base, 'hibachi.git'),
+  // The vault, with a remote of its own.
+  const vault = path.join(base, 'vault.git'),
     root = path.join(base, 'KB');
-  git(base, 'init', '--bare', '--initial-branch=main', hibachi);
+  git(base, 'init', '--bare', '--initial-branch=main', vault);
   await mkdir(root);
   git(root, 'init', '-b', 'main');
   identity(root);
@@ -67,16 +67,16 @@ async function fixture(t: any) {
   const space = await a.files.register(root, 'Main', 'personal');
   await writeFile(path.join(root, 'index.md'), '# Main\n');
   git(root, 'add', '.');
-  git(root, 'commit', '-m', 'Main hibachi');
-  git(root, 'remote', 'add', 'origin', hibachi);
+  git(root, 'commit', '-m', 'Main vault');
+  git(root, 'remote', 'add', 'origin', vault);
   git(root, 'push', '-u', 'origin', 'main');
-  return { base, library, hibachi, root, space, ...a };
+  return { base, library, vault, root, space, ...a };
 }
 
-/** Device B: a plain clone of the hibachi, registered on a device of its own. */
+/** Device B: a plain clone of the vault, registered on a device of its own. */
 async function peer(t: any, f: Awaited<ReturnType<typeof fixture>>) {
   const root = path.join(f.base, 'peer');
-  git(f.base, 'clone', f.hibachi, root);
+  git(f.base, 'clone', f.vault, root);
   identity(root);
   const b = await device(t, f.base, 'device-b');
   await b.files.register(root, 'Main', 'personal');
@@ -93,7 +93,7 @@ async function push(service: GitService, target: GitTarget) {
   return service.sync(target, 'push', (await service.status(target)).version);
 }
 
-test('a submodule is cloned into the hibachi, edited, committed and pushed in its own repository', async (t) => {
+test('a submodule is cloned into the vault, edited, committed and pushed in its own repository', async (t) => {
   const { service, space, root, library, base } = await fixture(t);
   const id = space.scopeId;
   const added = await service.addSubmodule(id, { url: library, path: 'projects/library' });
@@ -107,7 +107,7 @@ test('a submodule is cloned into the hibachi, edited, committed and pushed in it
     })),
     [{ path: 'projects/library', initialized: true, branch: 'main', changed: false }],
   );
-  // The hibachi stages the submodule and its declaration, ready to commit.
+  // The vault stages the submodule and its declaration, ready to commit.
   let main = await service.status(id);
   assert.deepEqual(main.changes.map((c) => [c.path, c.index, c.blocked]).sort(), [
     ['.gitmodules', 'A', undefined],
@@ -116,7 +116,7 @@ test('a submodule is cloned into the hibachi, edited, committed and pushed in it
   await service.commit(id, 'Add the library', main.version);
   const sub = { scopeId: id, repository: 'projects/library' };
   await writeFile(path.join(root, 'projects/library/doc.md'), '# Library\n\nEdited here\n');
-  // The edit is the submodule's; the hibachi does not list the file.
+  // The edit is the submodule's; the vault does not list the file.
   assert.deepEqual((await service.status(id)).changes, []);
   let state = await service.status(sub);
   assert.equal(state.branch, 'main');
@@ -132,7 +132,7 @@ test('a submodule is cloned into the hibachi, edited, committed and pushed in it
     git(base, `--git-dir=${library}`, 'log', '-1', '--format=%s', 'main'),
     'Edit the library',
   );
-  // The hibachi now records a newer commit of the submodule, which it commits and pushes.
+  // The vault now records a newer commit of the submodule, which it commits and pushes.
   main = await service.status(id);
   assert.deepEqual(
     main.changes.map((c) => [c.path, c.worktree, c.blocked]),
@@ -173,14 +173,14 @@ test('another device fetches the submodule on its branch and a pull moves it alo
   );
   assert.equal(await readFile(path.join(b.root, 'library/doc.md'), 'utf8'), '# Library\n');
   assert.deepEqual((await b.service.status(id)).changes, []);
-  // Device A moves the submodule and records that in the hibachi.
+  // Device A moves the submodule and records that in the vault.
   const subA = { scopeId: id, repository: 'library' };
   await writeFile(path.join(f.root, 'library/doc.md'), '# Library\n\nFrom device A\n');
   await commitAll(f.service, subA, 'From device A');
   await push(f.service, subA);
   await commitAll(f.service, id, 'Record the library');
   await push(f.service, id);
-  // Device B's pull of the hibachi fetches the submodule's commit and moves it there.
+  // Device B's pull of the vault fetches the submodule's commit and moves it there.
   const main = await b.service.sync(id, 'pull', (await b.service.status(id)).version);
   assert.equal(main.notice, undefined);
   assert.deepEqual(main.changes, []);
@@ -210,7 +210,7 @@ test('a pull leaves a submodule with its own uncommitted edit where it is, and s
   const main = await b.service.sync(id, 'pull', (await b.service.status(id)).version);
   assert.match(main.notice ?? '', /library/);
   assert.match(await readFile(path.join(b.root, 'library/doc.md'), 'utf8'), /Unfinished on B/);
-  // The hibachi shows that its submodule is not on the recorded commit.
+  // The vault shows that its submodule is not on the recorded commit.
   assert.deepEqual(
     main.changes.map((c) => c.path),
     ['library'],

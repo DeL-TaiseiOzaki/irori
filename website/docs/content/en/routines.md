@@ -5,14 +5,14 @@ description: Run programs and give instructions to AI in a defined sequence.
 
 ## Prepare a routine
 
-A routine is a folder containing `routine.yaml` and the files it needs. Put hibachi jobs in `.irori/routines/<name>/`, or workspace jobs in `routines/<name>/` inside the irori agent's folder.
+A routine is a folder containing `routine.yaml` and the files it needs. Put vault jobs in `.irori/routines/<name>/`, or workspace jobs in `routines/<name>/` inside the irori agent's folder.
 
-Here is a hibachi example.
+Here is a vault example.
 
 ```yaml
 name: Review notes
 steps:
-  - agent: hibachi
+  - agent: vault
     access: default
     prompt: |
       Read the notes and write a short review in Knowledge_Base/review.md.
@@ -20,13 +20,13 @@ steps:
 
 ## Review and run
 
-Open **Routines** in the left rail, between irori mode and the hibachis, and choose **Run**. The page also holds runtime settings and secrets, with the agent panel beside it. On the first run and after a file changes, irori shows the contents or diff for review. Choose **Confirm and run** to start.
+Open **Routines** in the left rail, between irori mode and the vaults, and choose **Run**. The page also holds runtime settings and secrets, with the agent panel beside it. On the first run and after a file changes, irori shows the contents or diff for review. Choose **Confirm and run** to start.
 
 **Stop** ends the current step and skips later ones. There is no automatic schedule, and routines do not run while irori is closed.
 
 ## Write steps
 
-`run` executes a program and `agent` gives instructions to AI. Up to 20 steps run in order and stop at the first failure. Agent steps require `access` and `prompt`. A hibachi routine uses `agent: hibachi`; an irori agent routine uses `agent: irori`.
+`run` executes a program and `agent` gives instructions to AI. Up to 20 steps run in order and stop at the first failure. Agent steps require `access` and `prompt`. A vault routine uses `agent: vault`; an irori agent routine uses `agent: irori`.
 
 Enable **Use JavaScript on this device** under **Runtimes** on the routines page to run JavaScript files. Use, for example, `- run: collect.js` or `- run: [gh, api, notifications]`. Python is not supported yet. Enter named secrets from the routine's row and manage them under **Secrets** on this page; values are stored with the operating system's keychain.
 

@@ -186,7 +186,7 @@ test(
 );
 
 test(
-  "A hibachi's local folders become Codex writable roots in standard access only",
+  "A vault's local folders become Codex writable roots in standard access only",
   { skip: process.platform === 'win32' && 'POSIX protocol fixture executable', timeout: 30000 },
   async (t) => {
     const { root, files, run } = await codex(t);
@@ -208,7 +208,7 @@ test(
       .map((m) => JSON.stringify(m.params));
     assert.equal(requests.length, 2);
     for (const request of requests) {
-      assert.match(request, /connected folders in this hibachi's contents: \\"contents\/Synced\\"/);
+      assert.match(request, /connected folders in this vault's contents: \\"contents\/Synced\\"/);
       assert.match(request, /rg -L/);
     }
     const starts = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))

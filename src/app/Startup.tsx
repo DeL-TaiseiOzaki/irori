@@ -16,7 +16,7 @@ import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import { RestoreEnvironment } from './AccountSync';
-import { CategoryField, RemoveHibachi } from './BrainSettings';
+import { CategoryField, RemoveVault } from './BrainSettings';
 import './startup.css';
 const host = window.irori;
 export function RegisterSpace({
@@ -53,7 +53,7 @@ export function RegisterSpace({
   });
   const info = repository.data;
   const issue = error || (creating ? '' : repository.error);
-  /** A new hibachi: made, registered, committed, then published when asked. */
+  /** A new vault: made, registered, committed, then published when asked. */
   async function create() {
     const result = await host.createSpace({
       parent,
@@ -62,7 +62,7 @@ export function RegisterSpace({
       category,
     });
     if (!publishing && !result.notice) return onRegistered(result.space);
-    // From here the hibachi exists; what follows can only add a notice to it.
+    // From here the vault exists; what follows can only add a notice to it.
     setCreated(result.space);
     if (result.notice) return setError(result.notice);
     try {
@@ -74,8 +74,8 @@ export function RegisterSpace({
       setError(
         [
           `${t(
-            'hibachi は作成しましたが、GitHub への公開は完了していません。',
-            'The hibachi was created, but publishing to GitHub did not finish.',
+            'vault は作成しましたが、GitHub への公開は完了していません。',
+            'The vault was created, but publishing to GitHub did not finish.',
           )}\n${advice}`,
           ...detail,
         ].join('\n\n'),
@@ -349,7 +349,7 @@ export function RegisterSpace({
           </p>
         )}
         <div className="actions">
-          {/* Once the hibachi exists, closing the form opens it rather than leaving it unseen. */}
+          {/* Once the vault exists, closing the form opens it rather than leaving it unseen. */}
           <button
             type="button"
             disabled={busy}
@@ -459,15 +459,15 @@ function Diagram({ spaces, profiles }: { spaces: Space[]; profiles: WorkspacePro
 export function Startup({
   spaces,
   refresh,
-  hibachiAgent,
-  onHibachiAgent,
+  vaultAgent,
+  onVaultAgent,
   onRestored,
   onOpen,
 }: {
   spaces: Space[];
   refresh: () => Promise<void>;
-  hibachiAgent: boolean;
-  onHibachiAgent: (on: boolean) => void;
+  vaultAgent: boolean;
+  onVaultAgent: (on: boolean) => void;
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   onOpen: (workspace: WorkspaceProfile) => void;
@@ -531,8 +531,8 @@ export function Startup({
           <LanguageSwitch onError={(e) => setError(errorText(e))} />
           <Settings
             start
-            hibachiAgent={hibachiAgent}
-            onHibachiAgent={onHibachiAgent}
+            vaultAgent={vaultAgent}
+            onVaultAgent={onVaultAgent}
             onRestored={restored}
             onError={(e) => setError(errorText(e))}
           />
@@ -614,7 +614,7 @@ export function Startup({
           <h3 id="start-combine">
             {editing
               ? t('ワークスペースを編集', 'Edit workspace')
-              : t('hibachi を選んで組み合わせる', 'Combine hibachis')}
+              : t('vault を選んで組み合わせる', 'Combine vaults')}
           </h3>
           <div className="start-library">
             {unavailable?.map((id) => (
@@ -625,7 +625,7 @@ export function Startup({
                   onChange={(on) => toggle(id, on)}
                 />
                 <span>
-                  {t('利用できない hibachi', 'Unavailable hibachi')}
+                  {t('利用できない vault', 'Unavailable vault')}
                   <small>{id}</small>
                 </span>
               </label>
@@ -643,7 +643,7 @@ export function Startup({
                   type="button"
                   className="start-chip-remove"
                   disabled={busy}
-                  title={t('hibachi を削除', 'Remove hibachi')}
+                  title={t('vault を削除', 'Remove vault')}
                   aria-label={t(`${space.name} を削除`, `Remove ${space.name}`)}
                   onClick={(event) => {
                     // The chip is a label: the click must not tick its checkbox.
@@ -656,7 +656,7 @@ export function Startup({
               </label>
             ))}
             {!spaces.length && (
-              <p className="start-note">{t('hibachi はまだありません。', 'No hibachis yet.')}</p>
+              <p className="start-note">{t('vault はまだありません。', 'No vaults yet.')}</p>
             )}
           </div>
           <form
@@ -704,7 +704,7 @@ export function Startup({
         </section>
         <hr />
         <section aria-labelledby="start-add">
-          <h3 id="start-add">{t('hibachi を追加', 'Add hibachi')}</h3>
+          <h3 id="start-add">{t('vault を追加', 'Add vault')}</h3>
           <div className="start-add">
             <button disabled={busy} onClick={() => setAdding('folder')}>
               <span className="start-add-icon">
@@ -746,7 +746,7 @@ export function Startup({
         <RestoreEnvironment onClose={() => setRestoring(false)} onRestored={restored} />
       )}
       {removing && (
-        <RemoveHibachi
+        <RemoveVault
           space={removing}
           onClose={() => setRemoving(undefined)}
           onRemoved={() => {

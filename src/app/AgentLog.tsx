@@ -260,7 +260,7 @@ export function AgentRequest({
       {brain && (
         <span className="request-brain">
           <BrainTile space={brain} size={16} radius={5} />
-          {t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)}
+          {t(`${brain.name} agent から`, `From the ${brain.name} agent`)}
         </span>
       )}
       <strong className="request-title">
@@ -376,18 +376,14 @@ const Steps = memo(function Steps({
 const TaskList = memo(function TaskList({ tasks, brains }: { tasks: RunTask[]; brains: Space[] }) {
   useLanguage();
   return (
-    <ul className="task-list" aria-label={t('hibachi への依頼', 'Hand-offs to hibachis')}>
+    <ul className="task-list" aria-label={t('vault への依頼', 'Hand-offs to vaults')}>
       {tasks.map((task) => {
         const brain = brains.find((space) => space.scopeId === task.scopeId);
         return (
           <li key={task.id} className={`task ${task.state}`}>
             {brain && <BrainTile space={brain} size={22} radius={7} />}
             <span className="task-text">
-              <small>
-                {brain
-                  ? t(`${brain.name} の hibachi agent`, `${brain.name}'s hibachi agent`)
-                  : t('hibachi agent', 'A hibachi agent')}
-              </small>
+              <small>{brain ? `${brain.name} agent` : t('vault agent', 'A vault agent')}</small>
               <span>{task.label}</span>
             </span>
             <span className={`task-state ${task.state}`}>
@@ -414,7 +410,7 @@ const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain
       <span className="report-from">
         {brain && <BrainTile space={brain} size={16} radius={5} />}
         {brain
-          ? t(`${brain.name} の hibachi agent から`, `From ${brain.name}'s hibachi agent`)
+          ? t(`${brain.name} agent から`, `From the ${brain.name} agent`)
           : t('報告', 'Report')}
       </span>
       <AgentMarkdown text={event.text} />

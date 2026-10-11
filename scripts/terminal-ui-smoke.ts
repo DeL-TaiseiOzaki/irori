@@ -75,9 +75,9 @@ try {
   await page.keyboard.press('Control+Backquote');
   await expect(panel).toHaveCount(0);
 
-  // irori mode hides the hibachi's stage, so its terminal is a drawer of its own,
-  // in the irori agent's folder, that outlives a visit to a hibachi.
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  // irori mode hides the vault's stage, so its terminal is a drawer of its own,
+  // in the irori agent's folder, that outlives a visit to a vault.
+  const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   const toggle = page
     .locator('.status-bar')

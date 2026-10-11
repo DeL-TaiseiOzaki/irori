@@ -7,13 +7,13 @@ export interface MapNode {
   y: number;
 }
 export const board = { width: 1000, height: 640 };
-/** How many hibachis share a row of the map. */
+/** How many vaults share a row of the map. */
 const rowSize = 4;
 
 /**
- * A plain, deterministic map: the hibachis in the workspace's order, a few to
+ * A plain, deterministic map: the vaults in the workspace's order, a few to
  * a row, spread evenly. Categories are not drawn (ADR 029); the rail's groups
- * are how a person arranges hibachis. The owner will design how the map is
+ * are how a person arranges vaults. The owner will design how the map is
  * built later, so this is the only place that decides positions.
  */
 export function mapLayout(
@@ -40,7 +40,7 @@ export function mapLayout(
   return { nodes, hearth: hearth ? { x: 140, y: board.height / 2 } : undefined };
 }
 
-/** One brain's hibachi agent read notes of another brain: drawn from the source to the reader. */
+/** One brain's vault agent read notes of another brain: drawn from the source to the reader. */
 export interface ReferenceLink {
   from: string;
   to: string;

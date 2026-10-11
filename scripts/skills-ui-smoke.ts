@@ -14,8 +14,8 @@ if (process.platform === 'win32') {
 const base = await mkdtemp(path.join(tmpdir(), 'irori skills UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const root = path.join(base, 'KB skills');
 const plain = path.join(base, 'KB plain');
 // A disposable home stands in for the user's, so the reach view reads nothing real.
@@ -93,7 +93,7 @@ try {
   for (const name of ['スキル検証', '素のKB'])
     await page.getByRole('checkbox', { name: new RegExp(name) }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
 
   const picker = page.getByLabel('スキル', { exact: true });
@@ -175,7 +175,7 @@ try {
   expect(sent.indexOf('Only ever append.')).toBeLessThan(sent.indexOf('sort out yesterday'));
 
   // Skills belong to the space that declares them; switching must not carry them over.
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: /^素のKB・AI/ }).click();
   await expect(page.getByLabel('スキル', { exact: true })).toHaveCount(0);
   await expect(page.getByText('読み込めないスキル')).toHaveCount(0);

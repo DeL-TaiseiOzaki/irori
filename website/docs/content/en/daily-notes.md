@@ -5,7 +5,7 @@ description: Open a dated note in a chosen location using your own template.
 
 ## Set the destination
 
-Declare daily notes in the hibachi's `.irori/notes.json`. This example places dated notes in a folder for each year.
+Declare daily notes in the vault's `.irori/notes.json`. This example places dated notes in a folder for each year.
 
 ```json
 {
@@ -34,6 +34,6 @@ Declare daily notes in the hibachi's `.irori/notes.json`. This example places da
 
 ## Open today's note
 
-**Today's note** appears when the hibachi declares daily notes. Choose it to open that day's file. If the file does not exist, irori creates it from the template.
+**Today's note** appears when the vault declares daily notes. Choose it to open that day's file. If the file does not exist, irori creates it from the template.
 
 An existing note is never overwritten with the template. Without a template, a new note starts with a date heading. Edit and save it like any [other note](notes.md).

@@ -6,7 +6,7 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
 }
 
 /**
- * A hibachi agent and the irori agent start in full access wherever the CLI
+ * A vault agent and the irori agent start in full access wherever the CLI
  * offers it. On Claude Code the irori agent's sub-agents inherit that mode, and
  * its write hook still decides every file write: hooks run before the mode.
  */

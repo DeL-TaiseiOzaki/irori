@@ -7,17 +7,17 @@
  * SDK's permission answer.
  */
 
-/** A hibachi's sub-agent tried to write outside its hibachi. */
-export const outsideHibachi = (brain: { name: string; root: string }) =>
-  `The ${brain.name} hibachi's agent works only inside that hibachi (${brain.root}). Report what else is needed instead.`;
+/** A vault's sub-agent tried to write outside its vault. */
+export const outsideVault = (brain: { name: string; root: string }) =>
+  `The ${brain.name} agent works only inside the ${brain.name} vault (${brain.root}). Report what else is needed instead.`;
 
-/** The irori agent, or another of its agents, tried to write in a handed hibachi itself. */
+/** The irori agent, or another of its agents, tried to write in a handed vault itself. */
 export const handToSubAgent = (brain: { name: string; agent: string }) =>
-  `Hand work in the ${brain.name} hibachi to its sub-agent "${brain.agent}", which reads that hibachi's Schema first.`;
+  `Hand work in the ${brain.name} vault to its sub-agent "${brain.agent}", which reads that vault's Schema first.`;
 
-/** The irori agent tried to write outside its folder and every handed hibachi. */
+/** The irori agent tried to write outside its folder and every handed vault. */
 export const outsideIroriAgent =
-  'The irori agent writes only in its own folder or, through their sub-agents, in the hibachis handed to it.';
+  'The irori agent writes only in its own folder or, through their sub-agents, in the vaults handed to it.';
 
 /** The person declined a permission request. */
 export const permissionDenied = 'The user denied this operation.';

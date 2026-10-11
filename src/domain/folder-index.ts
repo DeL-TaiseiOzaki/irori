@@ -20,7 +20,7 @@ export const foldersHeading = '# Folders';
 
 /** One page of a folder, as the walk read it. */
 export interface IndexedPage {
-  /** Its path in the hibachi, as on disk. */
+  /** Its path in the vault, as on disk. */
   path: string;
   type?: string;
   title?: string;
@@ -164,7 +164,7 @@ export function renderFolderIndex(input: {
 /**
  * The indexes a bundle's pages give. `root` is the knowledge folder; `pages`
  * and `indexes` hold only what the walk may index (subfolders that are hidden,
- * aliases, submodules or another hibachi are already left out). A folder gets an
+ * aliases, submodules or another vault are already left out). A folder gets an
  * index when a page is in it or below it, and it lists a subfolder that gets
  * one or already has an `index.md`, so a folder a person described keeps its
  * line before its first page arrives. An `index.md` in a folder with no page in

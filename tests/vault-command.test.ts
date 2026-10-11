@@ -5,9 +5,9 @@ import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { hibachiBridge } from '../src/agents/hibachi-bridge';
+import { iroriBridge } from '../src/agents/irori-bridge';
 import { commandLaunchers } from '../src/agents/command-bridge';
-import { hibachiOf, type Delegation } from '../src/agents/delegation';
+import { vaultOf, type Delegation } from '../src/agents/delegation';
 import { brainsCommandPreamble } from '../prompts';
 import { FileService } from '../src/host/files';
 import { YourAiService } from '../src/host/you';
@@ -22,55 +22,52 @@ const posixOnly = {
 };
 
 async function temp(t: TestContext) {
-  const base = await mkdtemp(path.join(tmpdir(), 'irori hibachi command '));
+  const base = await mkdtemp(path.join(tmpdir(), 'irori vault command '));
   t.after(() => rm(base, { recursive: true, force: true }));
   return base;
 }
 
-/** Runs the `hibachi` command as a CLI's shell would: by name, from the run's PATH. */
-function hibachi(env: NodeJS.ProcessEnv, args: string[], input?: string) {
+/** Runs `irori call` as a CLI's shell would: by name, from the run's PATH. */
+function call(env: NodeJS.ProcessEnv, args: string[], input?: string) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const child = execFile('hibachi', args, { env }, (error, stdout, stderr) =>
+    const child = execFile('irori', ['call', ...args], { env }, (error, stdout, stderr) =>
       resolve({ code: error ? Number(error.code) : 0, stdout, stderr }),
     );
     child.stdin?.end(input);
   });
 }
 
-test('a hibachi is named by its sub-agent name or its own name, and only if handed', () => {
+test('a vault is named by its sub-agent name or its own name, and only if handed', () => {
   const delegation: Delegation = {
     you: '/me/you',
     brains: [
-      { scopeId: 'a', name: 'Product Lab', agent: 'hibachi-product-lab', root: '/kb/a' },
-      { scopeId: 'b', name: 'Notes', agent: 'hibachi-notes', root: '/kb/b' },
-      { scopeId: 'c', name: 'notes', agent: 'hibachi-notes-cccccccc', root: '/kb/c' },
+      { scopeId: 'a', name: 'Product Lab', agent: 'vault-product-lab', root: '/kb/a' },
+      { scopeId: 'b', name: 'Notes', agent: 'vault-notes', root: '/kb/b' },
+      { scopeId: 'c', name: 'notes', agent: 'vault-notes-cccccccc', root: '/kb/c' },
     ],
   };
-  assert.equal(hibachiOf(delegation, 'hibachi-product-lab').scopeId, 'a');
-  assert.equal(hibachiOf(delegation, 'product  lab').scopeId, 'a');
-  assert.equal(hibachiOf(delegation, 'hibachi-notes-cccccccc').scopeId, 'c');
-  assert.throws(() => hibachiOf(delegation, 'Notes'), /More than one hibachi.*sub-agent name/);
-  assert.throws(
-    () => hibachiOf(delegation, 'Research'),
-    /No hibachi named "Research".*hibachi-notes/,
-  );
+  assert.equal(vaultOf(delegation, 'vault-product-lab').scopeId, 'a');
+  assert.equal(vaultOf(delegation, 'product  lab').scopeId, 'a');
+  assert.equal(vaultOf(delegation, 'vault-notes-cccccccc').scopeId, 'c');
+  assert.throws(() => vaultOf(delegation, 'Notes'), /More than one vault.*sub-agent name/);
+  assert.throws(() => vaultOf(delegation, 'Research'), /No vault named "Research".*vault-notes/);
 });
 
-test('the command preamble names each hibachi agent and the command, not their Schema', () => {
+test('the command preamble names each vault agent and the command, not their Schema', () => {
   const text = brainsCommandPreamble(
-    [{ name: 'Product', category: 'チーム', agent: 'hibachi-product', root: '/kb/p' }],
+    [{ name: 'Product', category: 'チーム', agent: 'vault-product', root: '/kb/p' }],
     'Hermes Agent',
   );
-  assert.match(text, /- Product \(チーム\): folder "\/kb\/p", hibachi agent "hibachi-product"\n/);
+  assert.match(text, /- Product \(チーム\): folder "\/kb\/p", vault agent "vault-product"\n/);
   assert.match(text, /You run on Hermes Agent/);
-  assert.match(text, /hibachi <hibachi agent or hibachi name> "<task>"/);
-  assert.match(text, /Do not change a hibachi's files yourself/);
+  assert.match(text, /irori call <vault agent or vault name> "<task>"/);
+  assert.match(text, /Do not change a vault's files yourself/);
   assert.doesNotMatch(text, /AGENTS\.md/);
 });
 
 test('the launchers run irori’s runtime as Node, quoting any path', () => {
   const { posix, windows } = commandLaunchers(
-    'hands a task to a hibachi agent and prints its report.',
+    'hands a task to a vault agent and prints its report.',
     "/Apps/it's irori/irori",
     'C:\\data\\100%\\client.cjs',
   );
@@ -81,59 +78,48 @@ test('the launchers run irori’s runtime as Node, quoting any path', () => {
   assert.match(windows, /"C:\\data\\100%%\\client\.cjs" %\*\r\n$/);
 });
 
-test(
-  'the hibachi command reaches only its own run’s bridge and prints the report',
-  posixOnly,
-  async (t) => {
-    const base = await temp(t);
-    const asked: [string, string][] = [];
-    const bridge = await hibachiBridge(
-      path.join(base, 'data'),
-      async (name, task) => {
-        asked.push([name, task]);
-        if (name === 'broken') throw Error('No hibachi named "broken" was handed to this request.');
-        return `Report from ${name}: done.`;
-      },
-      { PATH: process.env.PATH },
-    );
-    t.after(bridge.close);
-    // The launcher lives in irori's data directory, private to the person.
-    assert.equal(bridge.bin, path.join(base, 'data', 'agents', 'hibachi', 'bin'));
-    assert.equal((await stat(path.join(bridge.bin, 'hibachi'))).mode & 0o777, 0o700);
-    assert.ok(bridge.env.PATH!.startsWith(bridge.bin + path.delimiter));
+test('irori call reaches only its own run’s bridge and prints the report', posixOnly, async (t) => {
+  const base = await temp(t);
+  const asked: string[][] = [];
+  const bridge = await iroriBridge(
+    path.join(base, 'data'),
+    async ({ argv }) => {
+      asked.push(argv);
+      if (argv[1] === 'broken') throw Error('No vault named "broken" was handed to this request.');
+      return `Report from ${argv[1]}: done.`;
+    },
+    { PATH: process.env.PATH },
+  );
+  t.after(bridge.close);
+  // The launcher lives in irori's data directory, private to the person.
+  assert.equal(bridge.bin, path.join(base, 'data', 'agents', 'irori', 'bin'));
+  assert.equal((await stat(path.join(bridge.bin, 'irori'))).mode & 0o777, 0o700);
+  assert.ok(bridge.env.PATH!.startsWith(bridge.bin + path.delimiter));
 
-    const done = await hibachi(bridge.env, ['hibachi-product', 'Write', 'a note.']);
-    assert.deepEqual(done, { code: 0, stdout: 'Report from hibachi-product: done.\n', stderr: '' });
-    // The task may come on standard input.
-    const piped = await hibachi(bridge.env, ['Product'], 'Line one.\nLine two.\n');
-    assert.equal(piped.code, 0);
-    assert.deepEqual(asked.at(-1), ['Product', 'Line one.\nLine two.\n']);
-    // A refused hand-off exits non-zero with the reason.
-    const refused = await hibachi(bridge.env, ['broken', 'x']);
-    assert.equal(refused.code, 1);
-    assert.match(refused.stderr, /^hibachi: No hibachi named "broken"/);
-    assert.equal(refused.stdout, '');
-    // Without the run's URL, or with another token, nothing is handed over.
-    const outside = await hibachi({ PATH: bridge.env.PATH }, ['hibachi-product', 'x']);
-    assert.equal(outside.code, 1);
-    assert.match(outside.stderr, /only an irori agent run/);
-    const forged = await hibachi(
-      { ...bridge.env, IRORI_HIBACHI: bridge.url.replace(/\/[^/]+$/, '/forged') },
-      ['hibachi-product', 'x'],
-    );
-    assert.equal(forged.code, 1);
-    assert.match(forged.stderr, /Not found/);
-    const response = await fetch(bridge.url.replace(/\/[^/]+$/, '/nope'), {
-      method: 'POST',
-      body: JSON.stringify({ hibachi: 'hibachi-product', task: 'x' }),
-    });
-    assert.equal(response.status, 404);
-    const usage = await hibachi(bridge.env, []);
-    assert.equal(usage.code, 2);
-    assert.match(usage.stderr, /Usage: hibachi/);
-    assert.equal(asked.length, 3);
-  },
-);
+  const done = await call(bridge.env, ['vault-product', 'Write a note.']);
+  assert.deepEqual(done, { code: 0, stdout: 'Report from vault-product: done.\n', stderr: '' });
+  assert.deepEqual(asked.at(-1), ['call', 'vault-product', 'Write a note.']);
+  // The task may come on standard input.
+  const piped = await call(bridge.env, ['Product'], 'Line one.\nLine two.\n');
+  assert.equal(piped.code, 0);
+  assert.deepEqual(asked.at(-1), ['call', 'Product', 'Line one.\nLine two.\n']);
+  // A refused hand-off exits non-zero with the reason.
+  const refused = await call(bridge.env, ['broken', 'x']);
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /^irori: No vault named "broken"/);
+  assert.equal(refused.stdout, '');
+  // Without the run's URL, or with another token, nothing is handed over.
+  const outside = await call({ PATH: bridge.env.PATH }, ['vault-product', 'x']);
+  assert.equal(outside.code, 1);
+  assert.match(outside.stderr, /only an agent run that irori started/);
+  const forged = await call(
+    { ...bridge.env, IRORI_COMMAND: bridge.url.replace(/\/[^/]+$/, '/forged') },
+    ['vault-product', 'x'],
+  );
+  assert.equal(forged.code, 1);
+  assert.match(forged.stderr, /Not found/);
+  assert.equal(asked.length, 3);
+});
 
 async function handOffs(t: TestContext) {
   const base = await temp(t);
@@ -193,20 +179,22 @@ async function handOffs(t: TestContext) {
 }
 
 test(
-  'the irori agent on Pi hands a hibachi to its agent with the hibachi command (protocol fixture)',
+  'the irori agent on Pi hands a vault to its agent with irori call (protocol fixture)',
   posixOnly,
   async (t) => {
     const { base, brains, id, root, service, events, run, log } = await handOffs(t);
     const [product] = brains;
-    const { runId, done } = await run('Hand over.\nrun: hibachi hibachi-product "Tidy the notes."');
+    const { runId, done } = await run(
+      'Hand over.\nrun: irori call vault-product "Tidy the notes."',
+    );
     await done;
     const mine = events.filter((event) => event.runId === runId);
     assert.equal(mine.at(-1)?.outcome, 'completed', JSON.stringify(mine));
-    // The hibachi agent ran in its own hibachi, on the same CLI, recorded in its scope.
+    // The vault agent ran in its own vault, on the same CLI, recorded in its scope.
     const handedPrompt = (await log(product.root)).find((call) => call.type === 'prompt').message;
     assert.match(handedPrompt, /^irori: the irori agent handed you this task\./);
     assert.ok(handedPrompt.endsWith('\n\nTidy the notes.'));
-    // The hand-off is a conversation of the hibachi's own, apart from the person's,
+    // The hand-off is a conversation of the vault's own, apart from the person's,
     // titled with the task and naming the irori agent's conversation it came from.
     const [handed] = await service.conversationList(product.scopeId);
     assert.ok(handed && !('damaged' in handed));
@@ -221,9 +209,9 @@ test(
     const metas = await conversationMetas(path.join(base, 'device'));
     assert.ok(metas.some((meta) => meta.handedBy?.conversationId === mineId));
     assert.deepEqual(
-      metas.find((meta) => meta.id === mineId)?.hibachis,
+      metas.find((meta) => meta.id === mineId)?.vaults,
       [product.scopeId],
-      'the irori agent’s conversation names the hibachi its hand-off reached',
+      'the irori agent’s conversation names the vault its hand-off reached',
     );
     assert.ok(
       conversation.events.some((event) => event.role === 'user' && event.text === handedPrompt),
@@ -231,15 +219,15 @@ test(
     assert.ok(
       conversation.events.some((event) => event.type === 'done' && event.outcome === 'completed'),
     );
-    const hibachiRun = events.find(
+    const vaultRun = events.find(
       (event) => event.scopeId === product.scopeId && event.type === 'done',
     );
-    assert.equal(hibachiRun?.outcome, 'completed');
+    assert.equal(vaultRun?.outcome, 'completed');
     // The command printed that run's words, and the irori agent answered with them.
     const command = (await log(root)).find((call) => call.type === 'command');
     assert.equal(command.code, 0);
     assert.equal(command.stdout, '日本語\u2028の応答\n');
-    // The irori agent's log follows the hand-off as a task of the hibachi.
+    // The irori agent's log follows the hand-off as a task of the vault.
     const started = mine.find((event) => event.delegate?.state === 'started');
     assert.equal(started?.delegate?.scopeId, product.scopeId);
     assert.equal(started?.text, 'Tidy the notes.');
@@ -249,25 +237,23 @@ test(
     assert.ok(mine.some((event) => event.type === 'tool' && event.delegate?.state === 'working'));
     assert.equal(service.busy(product.scopeId), false);
     // Nothing was written in the irori agent's folder or the KB for the command.
-    await assert.rejects(stat(path.join(root, 'hibachi')));
-    assert.ok(
-      (await stat(path.join(base, 'device', 'agents', 'hibachi', 'bin', 'hibachi'))).isFile(),
-    );
+    await assert.rejects(stat(path.join(root, 'irori')));
+    assert.ok((await stat(path.join(base, 'device', 'agents', 'irori', 'bin', 'irori'))).isFile());
     assert.equal((await service.conversation(id, 'pi')).activeRunId, undefined);
   },
 );
 
 test(
-  'a hibachi not handed to the request is refused, and stopping the irori agent stops its hand-off (protocol fixture)',
+  'a vault not handed to the request is refused, and stopping the irori agent stops its hand-off (protocol fixture)',
   posixOnly,
   async (t) => {
     const { brains, id, root, service, events, run, log } = await handOffs(t);
     const [product, research] = brains;
-    const refused = await run('run: hibachi Research "Look around."');
+    const refused = await run('run: irori call Research "Look around."');
     await refused.done;
     const command = (await log(root)).find((call) => call.type === 'command');
     assert.equal(command.code, 1);
-    assert.match(command.stderr, /No hibachi named "Research" was handed to this request/);
+    assert.match(command.stderr, /No vault named "Research" was handed to this request/);
     assert.equal(
       events.some((event) => event.scopeId === research.scopeId),
       false,
@@ -279,7 +265,7 @@ test(
     );
 
     // A hand-off that is still working stops with the irori agent's run.
-    const held = await run('run: hibachi Product "hold on"', [product, research]);
+    const held = await run('run: irori call Product "hold on"', [product, research]);
     await new Promise<void>((resolve) => {
       const check = () =>
         events.some((event) => event.scopeId === product.scopeId && event.type === 'tool')
