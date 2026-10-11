@@ -196,6 +196,22 @@ function refuseYourMaterials(input: StartRun) {
       ),
     );
 }
+/**
+ * Whether a Codex notification is about the run's own thread and turn. One app
+ * server streams every thread it runs, so a sub-agent's replies, items and the
+ * end of its turn arrive with its own thread id; they are not the run's, and a
+ * sub-agent finishing does not finish the run. A notice naming neither is the run's.
+ */
+export function ownCodexNotice(
+  run: { threadId?: string; turnId?: string },
+  params: { threadId?: unknown; turnId?: unknown; turn?: { id?: unknown } },
+) {
+  const turn = params.turnId ?? params.turn?.id;
+  return (
+    (params.threadId === undefined || !run.threadId || params.threadId === run.threadId) &&
+    (turn === undefined || !run.turnId || turn === run.turnId)
+  );
+}
 /** What a hand-off's or a step's report keeps of the words it collects. */
 const reportLimit = 100000;
 /**
@@ -1294,6 +1310,7 @@ export class AgentService {
           return;
         }
         const p = m.params ?? {};
+        if (!ownCodexNotice(run, p)) return;
         if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
         if (
           m.method === 'item/started' &&
