@@ -235,7 +235,7 @@ try {
 } finally {
   await app.close();
 }
-// After a restart, one hibachi's unreadable record does not stop another's folder connecting.
+// After a restart, one vault's unreadable record does not stop another's folder connecting.
 const team = path.join(base, 'Box', 'チーム');
 await mkdir(team, { recursive: true });
 const teamConnection = await new CloudService(files).addLocal({
@@ -291,7 +291,7 @@ try {
           'duplicate-name rejection',
           'dialog text contrast in light and dark themes',
           'disconnect removes only the link; unregistering keeps the folder files',
-          'restart reconnects folders; one unreadable record does not stop another hibachi',
+          'restart reconnects folders; one unreadable record does not stop another vault',
           'device paths excluded from portable records',
         ],
         errors,

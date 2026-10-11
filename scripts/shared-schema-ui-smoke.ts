@@ -7,15 +7,15 @@ import { SettingsService } from '../src/host/settings';
 import { YourAiService } from '../src/host/you';
 
 // Every Schema from the settings (ADR 027): the shared Schema every agent
-// follows, written as files in the irori agent's folder, and a hibachi's own,
+// follows, written as files in the irori agent's folder, and a vault's own,
 // all through the forms and checked on disk. No model or cloud call is made.
 const base = await mkdtemp(path.join(tmpdir(), 'irori shared schema UI '));
 const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// Hibachi Schemas are offered while hibachi agents are on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// Vault Schemas are offered while vault agents are on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const { root: you } = await new YourAiService(files.dataDir, home).create();
 const root = path.join(base, 'KB');
 await mkdir(path.join(root, '.agents', 'skills', 'distill'), { recursive: true });
@@ -48,7 +48,7 @@ try {
 
   // The settings open every Schema; the shared one comes first.
   await page.getByRole('button', { name: /^設定（/ }).click();
-  await page.getByRole('button', { name: '共通・hibachi', exact: true }).click();
+  await page.getByRole('button', { name: '共通・vault', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Schema の設定' });
   const owners = dialog.getByRole('navigation', { name: 'Schema の設定' });
   await expect(owners.getByRole('button', { name: '共通', exact: true })).toHaveAttribute(
@@ -91,7 +91,7 @@ try {
   // The irori agent's own instructions are another Schema, untouched.
   expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).not.toContain('YYYY-MM-DD');
 
-  // A hibachi's own Schema from the same place, with all its kinds.
+  // A vault's own Schema from the same place, with all its kinds.
   await owners.getByRole('button', { name: 'Shared KB', exact: true }).click();
   await expect(group('ルール')).toBeVisible();
   await group('指示').getByRole('button', { name: 'AGENTS.md', exact: true }).click();
@@ -106,8 +106,8 @@ try {
   await owners.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(dialog).toHaveCount(0);
 
-  // The shared skill joins the hibachi's own in its composer.
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  // The shared skill joins the vault's own in its composer.
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   const picker = page.getByLabel('スキル', { exact: true });
   await expect(picker.locator('option')).toHaveText([
     'スキルなし',
@@ -122,8 +122,8 @@ try {
           'settings open every Schema, the shared one first',
           'the shared Schema offers instructions and skills only',
           'shared instructions and a shared skill written as files in the irori agent folder',
-          'a hibachi Schema edited from the same dialog',
-          'the shared skill offered in a hibachi composer beside its own',
+          'a vault Schema edited from the same dialog',
+          'the shared skill offered in a vault composer beside its own',
         ],
         errors,
       },

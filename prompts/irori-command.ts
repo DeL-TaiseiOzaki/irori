@@ -1,9 +1,9 @@
 /**
  * The `irori` command: how an agent asks irori to do what the person does in
- * irori — register and arrange hibachis (the irori agent), and move notes,
- * comment, update indexes and set up its own hibachi (either agent, ADR 031).
+ * irori — register and arrange vaults (the irori agent), and move notes,
+ * comment, update indexes and set up its own vault (either agent, ADR 031).
  *
- * Sent: a preamble before the person's words on every irori agent and hibachi
+ * Sent: a preamble before the person's words on every irori agent and vault
  * agent request when the command is on the run's PATH; the help and the
  * reports as the command's output, read by the agent in its shell.
  * Channel: the request text, and the command's standard output.
@@ -13,62 +13,69 @@ import { brainColors, brainGlyphs } from '../src/domain/brains';
 
 /** Said on every irori agent request that has the command. */
 export const iroriCommandPreamble = [
-  "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set hibachis up: `irori list` shows the hibachis, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register hibachis in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a hibachi's contents and take it out; `irori set` names a hibachi, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a hibachi off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
-  "Use it when the person asks you to set up, move in from another tool, or reorganize their hibachis, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A hibachi you register is handed to you from the next request.",
-  "Inside a hibachi, use irori rather than the shell where irori keeps things in step: `irori move` for a note (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the hibachi's agent as usual; its own `irori` command does the same.",
+  "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set vaults up: `irori list` shows the vaults, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register vaults in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a vault's contents and take it out; `irori set` names a vault, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a vault off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
+  "Use it when the person asks you to set up, move in from another tool, or reorganize their vaults, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
+  "Inside a vault, use irori rather than the shell where irori keeps things in step: `irori move` for a note (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the vault's agent as usual; its own `irori` command does the same.",
   "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
 
-/** Said on every hibachi agent request that has the command (ADR 031). */
-export function hibachiCommandPreamble(hibachi: string) {
+/** Said on every vault agent request that has the command (ADR 031). */
+export function vaultCommandPreamble(vault: string) {
   return [
-    `irori: the \`irori\` command is on your PATH for this request. It does in irori what the person does there, for this hibachi, "${hibachi}", only. Use it rather than the shell where irori keeps things in step:`,
+    `irori: the \`irori\` command is on your PATH for this request. It does in irori what the person does there, for this vault, "${vault}", only. Use it rather than the shell where irori keeps things in step:`,
     '- `irori move <note> <new path or folder>` moves or renames a knowledge note; links into it, its comments and its records follow. `mv` breaks them.',
     "- `irori trash <note>` puts a note in irori's trash, where the person can restore it, instead of deleting it.",
     '- `irori comment <file> "<text>" [--quote <passage>]` leaves a comment for the person; `irori resolve <file> <id>` removes one once it is dealt with and the person agreed. Comments are in .irori/comments/<file>.json.',
     '- `irori index` writes the graph index and folder indexes after pages change, when the knowledge folder is an OKF bundle.',
-    '- `irori set . --name/--category/--color/--icon/--knowledge-label/--contents-label`, `irori layer . knowledge|contents <folder> [--also]`, `irori connect . <folder>` and `irori disconnect . <name>` change this hibachi as its settings do; `irori list` shows it and `irori routines` checks its routines in .irori/routines/.',
-    "Through files, as the person does in irori: frontmatter is a page's properties, with their types and fields declared in .property/property.json when the knowledge folder is an OKF bundle; today's note and the new-note folder are in .irori/notes.json; routines are .irori/routines/<name>/routine.yaml; this hibachi's instructions and skills are AGENTS.md and .agents/skills/<name>/SKILL.md. Links irori follows are relative Markdown links, not [[wiki links]].",
-    "Registering, grouping and removing hibachis and starting routines are the irori agent's; the person asks it in irori mode. A secret's value, a routine's first review, accounts, updates and agent permissions stay with the person. Run `irori help` for the options.",
+    '- `irori set . --name/--category/--color/--icon/--knowledge-label/--contents-label`, `irori layer . knowledge|contents <folder> [--also]`, `irori connect . <folder>` and `irori disconnect . <name>` change this vault as its settings do; `irori list` shows it and `irori routines` checks its routines in .irori/routines/.',
+    "Through files, as the person does in irori: frontmatter is a page's properties, with their types and fields declared in .property/property.json when the knowledge folder is an OKF bundle; today's note and the new-note folder are in .irori/notes.json; routines are .irori/routines/<name>/routine.yaml; this vault's instructions and skills are AGENTS.md and .agents/skills/<name>/SKILL.md. Links irori follows are relative Markdown links, not [[wiki links]].",
+    "Registering, grouping and removing vaults and starting routines are the irori agent's; the person asks it in irori mode. A secret's value, a routine's first review, accounts, updates and agent permissions stay with the person. Run `irori help` for the options.",
   ].join('\n');
 }
 
-/** `irori help`: every form of the command, with where new hibachis go by default. */
-export function iroriCommandHelp(defaultParent: string, hibachiAgent = false) {
+/** Why `irori call` is refused: a vault agent's, or a run that hands work to sub-agents. */
+export function callRefused(vaultAgent: boolean) {
+  return vaultAgent
+    ? '"irori call" is the irori agent\'s. Ask the person to ask the irori agent in irori mode.'
+    : '"irori call" hands work over only on Pi or Hermes Agent, for vaults handed to this request. On this CLI, hand the work to the vault\'s sub-agent.';
+}
+
+/** `irori help`: every form of the command, with where new vaults go by default. */
+export function iroriCommandHelp(defaultParent: string, vaultAgent = false) {
   return `irori — do in irori what the person does there. No command deletes a file;
-remove --trash moves a hibachi's folder to the system trash, and trash moves a
+remove --trash moves a vault's folder to the system trash, and trash moves a
 note to irori's trash.${
-    hibachiAgent
+    vaultAgent
       ? `
 
-You are a hibachi agent: every form reaches your own hibachi alone, named by
-its name or "." from its folder. clone, create, add, workspace, remove and run
-are the irori agent's.`
+You are a vault agent: every form reaches your own vault alone, named by
+its name or "." from its folder. clone, create, add, workspace, remove, run
+and call are the irori agent's.`
       : ''
   }
 
 irori list
-  The hibachis on this computer: name, folder, GitHub repository, category,
+  The vaults on this computer: name, folder, GitHub repository, category,
   knowledge and contents folders, connected folders, and whether they are in
-  this workspace. Then the workspaces, and where new hibachis go.
+  this workspace. Then the workspaces, and where new vaults go.
 
-irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <hibachi name>] [--category <category>]
-  Clones the repository into a new folder and registers it as a hibachi in
+irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <vault name>] [--category <category>]
+  Clones the repository into a new folder and registers it as a vault in
   this workspace. A repository already registered here joins the workspace
   instead. The folder is the repository's name unless --folder says otherwise.
   --category is personal, team, organization or a name of your own, one line
   of at most 40 characters.
 
-irori create <folder name> [--parent <folder>] [--name <hibachi name>] [--category ...]
-  Makes a new hibachi: an empty folder, a Git repository on main, and a first
+irori create <folder name> [--parent <folder>] [--name <vault name>] [--category ...]
+  Makes a new vault: an empty folder, a Git repository on main, and a first
   commit of what irori writes there. It has no GitHub repository yet.
 
-irori add <folder> [--name <hibachi name>] [--category ...]
+irori add <folder> [--name <vault name>] [--category ...]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
 
 irori move <note> <new path or folder>
-  Moves or renames a Markdown note in a hibachi's knowledge, as the explorer
+  Moves or renames a Markdown note in a vault's knowledge, as the explorer
   does: links into it are rewritten, and its comments, images beside it and
   irori's records follow. Paths are taken from your working folder.
 
@@ -82,64 +89,70 @@ irori comment <file> <text> [--quote <passage>] [--line <n>]
 irori resolve <file> <comment id>
   Removes a comment, by the id in .irori/comments/<file>.json.
 
-irori index [<hibachi>]
-  Writes the hibachi's graph index and folder indexes, as 索引を更新 does,
-  when its knowledge folder is an OKF bundle. Without a name, the hibachi of
+irori index [<vault>]
+  Writes the vault's graph index and folder indexes, as 索引を更新 does,
+  when its knowledge folder is an OKF bundle. Without a name, the vault of
   your working folder.
 
 irori routines
-  The routines of your folder (routines/) and of this workspace's hibachis
+  The routines of your folder (routines/) and of this workspace's vaults
   (.irori/routines/), as irori reads them: whether each can run, and if not,
   why, and how its last run ended. Run it after writing or changing a routine.
 
-irori run <routine> [--hibachi <hibachi>]
+irori run <routine> [--vault <vault>]
   Starts a routine, named as in \`irori routines\` or by its folder, when the
   person asks you to. It runs in irori; this command does not wait for it.
   Only a routine the person has reviewed on the routines page runs, and a
   change to its files needs their review again. Its secrets go only to its
   programs and never to you. Your own routine of that name comes first;
-  --hibachi names a hibachi's. A routine's agent steps cannot start routines.
+  --vault names a vault's. A routine's agent steps cannot start routines.
 
-irori connect <hibachi> <folder> [--name <name in contents>] [--read-only]
+irori call <vault agent or vault name> "<task>"
+  On Pi or Hermes Agent, which load no sub-agents from files, hands a task to
+  the agent of a vault handed to this request, waits until it finishes and
+  prints its report. The task may come on standard input instead. On another
+  CLI, hand the work to the vault's sub-agent.
+
+irori connect <vault> <folder> [--name <name in contents>] [--read-only]
   Connects a folder on this computer, such as one Google Drive for desktop,
-  OneDrive or Dropbox syncs, into the hibachi's contents. The hibachi is named
+  OneDrive or Dropbox syncs, into the vault's contents. The vault is named
   as in \`irori list\` or by its folder.
 
-irori disconnect <hibachi> <name in contents>
-  Takes a connected folder out of the hibachi's contents. The folder itself
+irori disconnect <vault> <name in contents>
+  Takes a connected folder out of the vault's contents. The folder itself
   is not touched.
 
-irori set <hibachi> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
-  Changes the hibachi's name, its category, the names its Knowledge and
+irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
+  Changes the vault's name, its category, the names its Knowledge and
   Contents layers are shown under (one line, at most 40 characters), its
   color (${brainColors.join(', ')}) or its icon (${brainGlyphs.join(', ')},
   or one or two characters such as an emoji).
 
-irori layer <hibachi> knowledge <folder>
-irori layer <hibachi> contents <folder> [--also]
-  Chooses the hibachi's knowledge folder, where new notes go, or its contents
+irori layer <vault> knowledge <folder>
+irori layer <vault> contents <folder> [--also]
+  Chooses the vault's knowledge folder, where new notes go, or its contents
   folder, where folders are connected. A folder that exists already is taken
   as it is and nothing moves; otherwise the current one is renamed and links
   into it are rewritten. Everything outside Schema and contents is knowledge.
   With --also, an existing folder becomes contents beside the contents
   folder; it stays where it is and Git keeps tracking it.
 
-irori workspace <workspace name> [<hibachi>...] [--leave]
-  Makes the workspace if there is none of that name, and adds the hibachis to
+irori workspace <workspace name> [<vault>...] [--leave]
+  Makes the workspace if there is none of that name, and adds the vaults to
   it, or with --leave takes them out of it.
 
-irori remove <hibachi> [--trash]
-  Takes the hibachi off this computer and out of every workspace. Its folder
+irori remove <vault> [--trash]
+  Takes the vault off this computer and out of every workspace. Its folder
   stays and can be added again, unless --trash moves it to the system trash.
-  Only after the person said yes to removing that hibachi.
+  Only after the person said yes to removing that vault.
 
-New hibachis go in ${JSON.stringify(defaultParent)} unless --parent names another folder.
+New vaults go in ${JSON.stringify(defaultParent)} unless --parent names another folder.
 A relative --parent or folder is taken from your working folder.`;
 }
 
 /** `irori move`. */
 export function noteMoved(
-  hibachi: string,
+  vault: string,
   from: string,
   moved: {
     path: string;
@@ -150,7 +163,7 @@ export function noteMoved(
   return [
     moved.path === from
       ? `${from} is where it should be already.`
-      : `Moved ${from} to ${moved.path} in the hibachi "${hibachi}"${moved.links?.links ? `, and rewrote ${moved.links.links} links in ${moved.links.notes} notes` : ''}.`,
+      : `Moved ${from} to ${moved.path} in the vault "${vault}"${moved.links?.links ? `, and rewrote ${moved.links.links} links in ${moved.links.notes} notes` : ''}.`,
     ...(moved.links?.skipped.length
       ? [`Links not rewritten (changed, unsaved or unreadable): ${moved.links.skipped.join(', ')}.`]
       : []),
@@ -159,8 +172,8 @@ export function noteMoved(
 }
 
 /** `irori trash`. */
-export function noteTrashed(hibachi: string, note: string) {
-  return `Moved ${note} to irori's trash for the hibachi "${hibachi}". The person can restore it there. Links to it are left as they were.`;
+export function noteTrashed(vault: string, note: string) {
+  return `Moved ${note} to irori's trash for the vault "${vault}". The person can restore it there. Links to it are left as they were.`;
 }
 
 /** `irori comment`. */
@@ -175,18 +188,18 @@ export function commentResolved(file: string, id: string, left: number) {
 
 /** `irori index`. */
 export function indexUpdated(
-  hibachi: string,
+  vault: string,
   update: { declared: boolean; pages: number; written: string[] },
 ) {
   if (update.declared)
-    return `The hibachi "${hibachi}" declares its own ontology in .irori/ontology.json, so irori does not generate its graph index.${update.written.length ? ` Wrote ${update.written.length} folder indexes.` : ''}`;
+    return `The vault "${vault}" declares its own ontology in .irori/ontology.json, so irori does not generate its graph index.${update.written.length ? ` Wrote ${update.written.length} folder indexes.` : ''}`;
   return update.written.length
-    ? `Wrote ${update.written.length} index files for ${update.pages} pages in the hibachi "${hibachi}": ${update.written.join(', ')}.`
-    : `The indexes of the hibachi "${hibachi}" are current (${update.pages} pages).`;
+    ? `Wrote ${update.written.length} index files for ${update.pages} pages in the vault "${vault}": ${update.written.join(', ')}.`
+    : `The indexes of the vault "${vault}" are current (${update.pages} pages).`;
 }
 
-/** One hibachi in `irori list`. */
-export interface ListedHibachi {
+/** One vault in `irori list`. */
+export interface ListedVault {
   name: string;
   root: string;
   repository?: string;
@@ -198,37 +211,37 @@ export interface ListedHibachi {
 }
 
 /** `irori list`. */
-export function hibachiList(
-  hibachis: ListedHibachi[],
+export function vaultList(
+  vaults: ListedVault[],
   defaultParent: string,
   workspace: string | undefined,
-  workspaces: { name: string; hibachis: string[] }[] = [],
-  /** For a hibachi agent: its own hibachi, with nothing about the others. */
+  workspaces: { name: string; vaults: string[] }[] = [],
+  /** For a vault agent: its own vault, with nothing about the others. */
   own = false,
 ) {
-  if (own) return ['Your hibachi:', ...hibachis.map(line(undefined))].join('\n');
-  const lines = hibachis.map(line(workspace));
+  if (own) return ['Your vault:', ...vaults.map(line(undefined))].join('\n');
+  const lines = vaults.map(line(workspace));
   return [
-    hibachis.length ? 'Hibachis on this computer:' : 'No hibachis on this computer yet.',
+    vaults.length ? 'Vaults on this computer:' : 'No vaults on this computer yet.',
     ...lines,
     ...(workspaces.length
       ? [
           'Workspaces:',
           ...workspaces.map(
             (item) =>
-              `- ${item.name}: ${item.hibachis.length ? item.hibachis.join(', ') : 'no hibachis'}`,
+              `- ${item.name}: ${item.vaults.length ? item.vaults.join(', ') : 'no vaults'}`,
           ),
         ]
       : []),
     workspace
       ? `This request came from the workspace "${workspace}".`
-      : 'This request came from no workspace: new hibachis are registered but join none.',
-    `New hibachis go in ${JSON.stringify(defaultParent)} unless --parent names another folder.`,
+      : 'This request came from no workspace: new vaults are registered but join none.',
+    `New vaults go in ${JSON.stringify(defaultParent)} unless --parent names another folder.`,
   ].join('\n');
 }
 
-/** One hibachi's line in `irori list`. */
-const line = (workspace: string | undefined) => (item: ListedHibachi) => {
+/** One vault's line in `irori list`. */
+const line = (workspace: string | undefined) => (item: ListedVault) => {
   const layers = [
     item.category && `category ${item.category}`,
     item.knowledge && `knowledge ${JSON.stringify(item.knowledge)}`,
@@ -241,13 +254,13 @@ const line = (workspace: string | undefined) => (item: ListedHibachi) => {
   return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
 };
 
-/** What became of one hibachi a command registered or found registered. */
-export function hibachiRegistered(
-  hibachi: { name: string; root: string; repository?: string },
+/** What became of one vault a command registered or found registered. */
+export function vaultRegistered(
+  vault: { name: string; root: string; repository?: string },
   outcome: { already: boolean; joined: 'joined' | 'member' | 'no workspace'; notice?: string },
 ) {
   return [
-    `${outcome.already ? 'Already a hibachi' : 'Registered the hibachi'} "${hibachi.name}" at ${JSON.stringify(hibachi.root)}${hibachi.repository ? ` (GitHub ${hibachi.repository})` : ''}.`,
+    `${outcome.already ? 'Already a vault' : 'Registered the vault'} "${vault.name}" at ${JSON.stringify(vault.root)}${vault.repository ? ` (GitHub ${vault.repository})` : ''}.`,
     outcome.joined === 'joined'
       ? 'Added it to this workspace; it is handed to you from the next request.'
       : outcome.joined === 'member'
@@ -259,39 +272,39 @@ export function hibachiRegistered(
 
 /** `irori connect`. */
 export function folderConnected(
-  hibachi: string,
+  vault: string,
   connection: { name: string; contentsRoot: string; readOnly: boolean; folder: string },
 ) {
-  return `Connected ${JSON.stringify(connection.folder)} to the hibachi "${hibachi}" as ${connection.contentsRoot}/${connection.name}${connection.readOnly ? ', read-only' : ''}. Agents see it through a link: name that path, or use rg -L.`;
+  return `Connected ${JSON.stringify(connection.folder)} to the vault "${vault}" as ${connection.contentsRoot}/${connection.name}${connection.readOnly ? ', read-only' : ''}. Agents see it through a link: name that path, or use rg -L.`;
 }
 
 /** `irori disconnect`. */
 export function folderDisconnected(
-  hibachi: string,
+  vault: string,
   connection: { name: string; contentsRoot: string },
 ) {
-  return `Took ${connection.contentsRoot}/${connection.name} out of the hibachi "${hibachi}". The folder itself is as it was.`;
+  return `Took ${connection.contentsRoot}/${connection.name} out of the vault "${vault}". The folder itself is as it was.`;
 }
 
-/** `irori set`: the hibachi as it is now. */
-export function hibachiChanged(hibachi: {
+/** `irori set`: the vault as it is now. */
+export function vaultChanged(vault: {
   name: string;
   category?: string;
   labels?: { knowledge: string; contents: string };
   look?: { color?: string; icon?: string };
 }) {
-  const look = hibachi.look
+  const look = vault.look
     ? [
-        hibachi.look.color && `color ${hibachi.look.color}`,
-        hibachi.look.icon && `icon ${hibachi.look.icon}`,
+        vault.look.color && `color ${vault.look.color}`,
+        vault.look.icon && `icon ${vault.look.icon}`,
       ].filter(Boolean)
     : [];
-  return `The hibachi is now "${hibachi.name}"${hibachi.category ? `, category ${hibachi.category}` : ''}${hibachi.labels ? `, with its layers shown as ${JSON.stringify(hibachi.labels.knowledge)} and ${JSON.stringify(hibachi.labels.contents)}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
+  return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
 }
 
 /** `irori layer`: the folder a layer now has, and what could not be carried over. */
 export function layerChosen(
-  hibachi: string,
+  vault: string,
   layer: 'knowledge' | 'contents',
   change: {
     folder: string;
@@ -305,12 +318,12 @@ export function layerChosen(
   },
 ) {
   const head = change.also
-    ? `"${change.folder}" is contents of the hibachi "${hibachi}" too. It stays where it is and Git still tracks it; add it to .gitignore if it should stay out of the repository.`
+    ? `"${change.folder}" is contents of the vault "${vault}" too. It stays where it is and Git still tracks it; add it to .gitignore if it should stay out of the repository.`
     : change.previous === change.folder
-      ? `The ${layer} folder of the hibachi "${hibachi}" is "${change.folder}" already.`
+      ? `The ${layer} folder of the vault "${vault}" is "${change.folder}" already.`
       : change.moved
-        ? `Renamed the ${layer} folder of the hibachi "${hibachi}" from "${change.previous}" to "${change.folder}"${change.links ? `, and rewrote ${change.links} links in ${change.notes} files` : ''}.`
-        : `The ${layer} folder of the hibachi "${hibachi}" is now "${change.folder}"; nothing was moved.`;
+        ? `Renamed the ${layer} folder of the vault "${vault}" from "${change.previous}" to "${change.folder}"${change.links ? `, and rewrote ${change.links} links in ${change.notes} files` : ''}.`
+        : `The ${layer} folder of the vault "${vault}" is now "${change.folder}"; nothing was moved.`;
   return [
     head,
     ...(change.skipped?.length
@@ -322,11 +335,11 @@ export function layerChosen(
 
 /** `irori workspace`: the workspace after the change. */
 export function workspaceSaved(
-  workspace: { name: string; hibachis: string[] },
+  workspace: { name: string; vaults: string[] },
   outcome: { created: boolean; current: boolean },
 ) {
   return [
-    `${outcome.created ? 'Made the workspace' : 'The workspace'} "${workspace.name}" ${workspace.hibachis.length ? `holds ${workspace.hibachis.join(', ')}` : 'holds no hibachis'}.`,
+    `${outcome.created ? 'Made the workspace' : 'The workspace'} "${workspace.name}" ${workspace.vaults.length ? `holds ${workspace.vaults.join(', ')}` : 'holds no vaults'}.`,
     outcome.current
       ? 'It is the workspace this request came from; the person sees the change now.'
       : 'The person opens it from the start screen.',
@@ -334,18 +347,18 @@ export function workspaceSaved(
 }
 
 /** `irori remove`. */
-export function hibachiRemoved(hibachi: { name: string; root: string }, trash: boolean) {
+export function vaultRemoved(vault: { name: string; root: string }, trash: boolean) {
   return trash
-    ? `Removed the hibachi "${hibachi.name}" and moved ${JSON.stringify(hibachi.root)} to the system trash, where the person can restore it.`
-    : `Removed the hibachi "${hibachi.name}" from this computer and its workspaces. ${JSON.stringify(hibachi.root)} is as it was; "irori add" brings it back.`;
+    ? `Removed the vault "${vault.name}" and moved ${JSON.stringify(vault.root)} to the system trash, where the person can restore it.`
+    : `Removed the vault "${vault.name}" from this computer and its workspaces. ${JSON.stringify(vault.root)} is as it was; "irori add" brings it back.`;
 }
 
 /** One routine in `irori routines`. */
 export interface ListedRoutine {
   name: string;
-  owner: 'irori' | 'hibachi';
-  /** The hibachi's name, for a hibachi's routine. */
-  hibachi?: string;
+  owner: 'irori' | 'vault';
+  /** The vault's name, for a vault's routine. */
+  vault?: string;
   path: string;
   problem?: string;
   needs?: { text: string };
@@ -372,13 +385,13 @@ export function routineList(routines: ListedRoutine[], workspace: string | undef
         : routine.review === 'reviewed'
           ? 'ready'
           : 'ready; the person reviews its files before the next run';
-    return `- ${JSON.stringify(routine.name)} (${routine.owner === 'irori' ? 'irori agent' : `hibachi ${routine.hibachi}`}) at ${JSON.stringify(routine.path)}: ${state}${lastRun(routine)}`;
+    return `- ${JSON.stringify(routine.name)} (${routine.owner === 'irori' ? 'irori agent' : `vault ${routine.vault}`}) at ${JSON.stringify(routine.path)}: ${state}${lastRun(routine)}`;
   });
   return [
     routines.length ? 'Routines:' : 'No routines yet.',
     ...lines,
     workspace
-      ? `Hibachi routines are those of the workspace "${workspace}".`
+      ? `Vault routines are those of the workspace "${workspace}".`
       : 'This request came from no workspace: only your own routines are listed.',
     'The person starts a routine with 実行 (Run) on the routines page. When they ask you to, `irori run <routine>` starts one that is ready and reviewed.',
   ].join('\n');
@@ -402,8 +415,8 @@ export const routineRunRefused = {
     'This request came from no workspace, so no routine can run from it. The person starts routines on the routines page of a workspace.',
   notFound: (name: string) =>
     `No routine is named ${JSON.stringify(name)}. Run "irori routines" for their names.`,
-  ambiguous: (name: string, routines: { folder: string; hibachi?: string }[]) =>
-    `More than one routine is named ${JSON.stringify(name)}: ${routines.map((routine) => `folder ${JSON.stringify(routine.folder)} (${routine.hibachi ? `hibachi ${routine.hibachi}` : 'yours'})`).join(', ')}. Name it by its folder, with --hibachi for a hibachi's.`,
+  ambiguous: (name: string, routines: { folder: string; vault?: string }[]) =>
+    `More than one routine is named ${JSON.stringify(name)}: ${routines.map((routine) => `folder ${JSON.stringify(routine.folder)} (${routine.vault ? `vault ${routine.vault}` : 'yours'})`).join(', ')}. Name it by its folder, with --vault for a vault's.`,
   problem: (problem: string) => `The routine cannot run: ${problem}`,
   needs: (text: string) =>
     `The routine needs something on this device first: ${text} The person adds it on the routines page; a secret's value is entered only there.`,

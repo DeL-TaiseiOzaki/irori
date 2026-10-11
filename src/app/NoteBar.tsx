@@ -113,7 +113,7 @@ export function NoteMenu({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opens and closes the brain's hibachi agent; closed, it is the AI's own ember button. */
+/** Opens and closes the brain's vault agent; closed, it is the AI's own ember button. */
 /** Opens and closes the agent dock, named after the agent its first column shows. */
 export function AiToggle({
   open,
@@ -121,7 +121,7 @@ export function AiToggle({
   onToggle,
 }: {
   open: boolean;
-  name: 'hibachi agent' | 'irori agent';
+  name: 'vault agent' | 'irori agent';
   onToggle: () => void;
 }) {
   return open ? (

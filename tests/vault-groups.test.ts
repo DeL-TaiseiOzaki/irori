@@ -12,7 +12,7 @@ import {
   startGroup,
   toggleGroup,
   ungroup,
-} from '../src/domain/hibachi-groups';
+} from '../src/domain/vault-groups';
 import { dispatchHost, hostArguments, type HostHandlers } from '../src/domain/host-requests';
 import { WorkspaceService } from '../src/host/workspaces';
 import { fixture } from './fixtures/cloud';
@@ -21,20 +21,20 @@ const [a, b, c, d] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
 const g1 = randomUUID(),
   g2 = randomUUID();
 
-test('A group stands where its first hibachi is, holding its members in workspace order', () => {
+test('A group stands where its first vault is, holding its members in workspace order', () => {
   const groups = [{ id: g1, name: 'Lab', scopeIds: [d, b], open: false }];
   assert.deepEqual(railItems([a, b, c, d], groups), [
-    { kind: 'hibachi', scopeId: a },
+    { kind: 'vault', scopeId: a },
     { kind: 'group', group: { id: g1, name: 'Lab', scopeIds: [b, d], open: false } },
-    { kind: 'hibachi', scopeId: c },
+    { kind: 'vault', scopeId: c },
   ]);
   assert.deepEqual(railItems([a, b]), [
-    { kind: 'hibachi', scopeId: a },
-    { kind: 'hibachi', scopeId: b },
+    { kind: 'vault', scopeId: a },
+    { kind: 'vault', scopeId: b },
   ]);
 });
 
-test('Each hibachi is in one group at most, and a group without hibachis goes', () => {
+test('Each vault is in one group at most, and a group without vaults goes', () => {
   assert.deepEqual(
     normalizeGroups(
       [
@@ -48,7 +48,7 @@ test('Each hibachi is in one group at most, and a group without hibachis goes', 
   );
 });
 
-test('Grouping edits move hibachis between groups, rename, toggle and dissolve', () => {
+test('Grouping edits move vaults between groups, rename, toggle and dissolve', () => {
   let groups = startGroup([], a, ' Lab ', g1);
   assert.deepEqual(groups, [{ id: g1, name: 'Lab', scopeIds: [a], open: true }]);
   groups = joinGroup(groups, b, g1);
@@ -66,7 +66,7 @@ test('Grouping edits move hibachis between groups, rename, toggle and dissolve',
   assert.deepEqual(ungroup(groups, g2), []);
 });
 
-test('Workspace groups persist, follow the hibachis that stay, and reject invalid input', async (t) => {
+test('Workspace groups persist, follow the vaults that stay, and reject invalid input', async (t) => {
   const { files, space, base } = await fixture(t);
   const otherRoot = path.join(base, 'Team');
   await mkdir(otherRoot);
@@ -81,7 +81,7 @@ test('Workspace groups persist, follow the hibachis that stay, and reject invali
     { id: g1, name: 'Lab', scopeIds: [space.scopeId, other.scopeId], open: false },
   ]);
   assert.deepEqual((await new WorkspaceService(files).list())[0], saved);
-  // Renaming the workspace or removing one hibachi keeps the group for the rest.
+  // Renaming the workspace or removing one vault keeps the group for the rest.
   const renamed = await service.save('Renamed', [other.scopeId], profile.id);
   assert.deepEqual(renamed.groups, [
     { id: g1, name: 'Lab', scopeIds: [other.scopeId], open: false },

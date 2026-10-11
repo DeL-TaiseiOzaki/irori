@@ -68,18 +68,18 @@ export function YourAiPanel({
   workspaceId?: string;
   brains: Space[];
   ai: BrainAi;
-  /** The CLI your AI runs on; each hands a brain's work to its hibachi agent. */
+  /** The CLI your AI runs on; each hands a brain's work to its vault agent. */
   agent: AgentId;
   /** '' for the CLI's default. */
   model: string;
-  /** Full access by default where the CLI offers it, as for a hibachi agent. */
+  /** Full access by default where the CLI offers it, as for a vault agent. */
   access: AgentAccess;
   onAgent: (agent: AgentId) => void;
   onModel: (model: string) => void;
   onAccess: (access: AgentAccess) => void;
   /** Words to put in the message box, for the person to finish; each new `key` places them. */
   seed?: { text: string; key: number };
-  /** The conversation on show (ADR 017 D4): the irori agent's own, never a hibachi's. */
+  /** The conversation on show (ADR 017 D4): the irori agent's own, never a vault's. */
   conversationId?: string;
   onOpenConversation: (row: ConversationSummary) => void;
   onDeletedConversation: (id: string) => void;
@@ -237,7 +237,7 @@ export function YourAiPanel({
       >
         <span className="context-chip your-ai-scope">
           <Icon name="map" size={12} />
-          {t(`すべての hibachi（${brains.length}）`, `All hibachis (${brains.length})`)}
+          {t(`すべての vault（${brains.length}）`, `All vaults (${brains.length})`)}
         </span>
         {ai.queued.length > 0 && (
           <small className="your-ai-queued">

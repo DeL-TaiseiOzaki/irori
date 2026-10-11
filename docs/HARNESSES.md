@@ -69,7 +69,7 @@ used the standard mode on the 0.1.26 baseline.
 The selected access mode travels with queued instructions and the native
 session record. A mode change starts a new native session while retaining the
 display history. Workspace, KB or CLI changes and app restart reset the
-composer's selection to the Hibachi Agent's starting mode (full access where the
+composer's selection to the Vault Agent's starting mode (full access where the
 CLI offers it, since 2026-09-27; standard before); a session saved under the other
 mode is not silently resumed with that label. Google OAuth and mounts remain read-only independently
 of native agent access.

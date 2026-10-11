@@ -20,8 +20,8 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const roots: string[] = [];
 for (const name of ['Product', 'Research']) {
   const root = path.join(base, name);
@@ -74,7 +74,7 @@ try {
       .filter(Boolean)
       .map((line) => JSON.parse(line));
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
   // Your AI is set up from the Overview; its starter never overwrites anything.
@@ -84,11 +84,11 @@ try {
   const composer = island.getByLabel('irori agent への指示');
   await expect(composer).toBeVisible();
   expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).toContain('# irori agent');
-  // It comes with the standard skills for setting up hibachis.
+  // It comes with the standard skills for setting up vaults.
   expect(
     await readFile(path.join(you, '.agents', 'skills', 'irori-setup', 'SKILL.md'), 'utf8'),
   ).toContain('name: irori-setup');
-  const map = page.getByRole('region', { name: 'hibachi の地図' });
+  const map = page.getByRole('region', { name: 'vault map' });
   await expect(map.getByRole('button', { name: 'irori agent の Schema を開く' })).toBeVisible();
   // The island beside the map widens by its handle, and keeps that width on the device.
   const narrow = (await island.boundingBox())!.width;
@@ -107,34 +107,32 @@ try {
   // Before any hand-off the Your AI screen says irori writes the definitions;
   // one the person already wrote is kept as it is.
   await writeFile(
-    path.join(you, '.claude', 'agents', 'hibachi-research.md'),
-    '---\nname: hibachi-research\ndescription: Edited by the person.\n---\nMine.\n',
+    path.join(you, '.claude', 'agents', 'vault-research.md'),
+    '---\nname: vault-research\ndescription: Edited by the person.\n---\nMine.\n',
   );
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
-  const definitions = page.getByRole('region', { name: 'hibachi agent' });
-  await expect(
-    definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
-  ).toContainText('未作成');
-  await expect(
-    definitions.getByRole('button', { name: /^Research の hibachi agent/ }),
-  ).toContainText('定義済み');
+  const definitions = page.getByRole('region', { name: 'vault agent' });
+  await expect(definitions.getByRole('button', { name: /^Product agent/ })).toContainText('未作成');
+  await expect(definitions.getByRole('button', { name: /^Research agent/ })).toContainText(
+    '定義済み',
+  );
   await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
   // A standard skill the folder lacks is offered again; the others are left as they are.
   const youFolder = page.getByRole('region', { name: 'irori agent のフォルダ' });
   const addSkills = youFolder.getByRole('button', { name: '標準スキルを追加', exact: true });
   await expect(addSkills).toHaveCount(0);
   await rm(path.join(you, '.agents', 'skills', 'connect-folder'), { recursive: true });
-  await writeFile(path.join(you, '.agents', 'skills', 'new-hibachi', 'SKILL.md'), 'Mine.\n');
+  await writeFile(path.join(you, '.agents', 'skills', 'new-vault', 'SKILL.md'), 'Mine.\n');
   await youFolder.getByRole('button', { name: 'フォルダを読み直す', exact: true }).click();
   await addSkills.click();
   await expect(addSkills).toHaveCount(0);
   expect(
     await readFile(path.join(you, '.agents', 'skills', 'connect-folder', 'SKILL.md'), 'utf8'),
   ).toContain('irori connect');
-  expect(
-    await readFile(path.join(you, '.agents', 'skills', 'new-hibachi', 'SKILL.md'), 'utf8'),
-  ).toBe('Mine.\n');
-  // Its Schema is edited as settings, the same as a hibachi's: the instructions
+  expect(await readFile(path.join(you, '.agents', 'skills', 'new-vault', 'SKILL.md'), 'utf8')).toBe(
+    'Mine.\n',
+  );
+  // Its Schema is edited as settings, the same as a vault's: the instructions
   // open first, and a rule and a skill are added in its own folder.
   const youPanel = page.getByRole('region', { name: 'irori agent のフォルダ' });
   const youGroup = (name: string) =>
@@ -156,22 +154,22 @@ try {
   await youGroup('スキル').getByRole('button', { name: 'スキルを追加', exact: true }).click();
   await settings.getByRole('textbox', { name: '名前', exact: true }).fill('weekly');
   await settings.getByRole('textbox', { name: '説明', exact: true }).fill('Plans the week.');
-  await settings.getByRole('textbox', { name: '手順', exact: true }).fill('Ask each hibachi.');
+  await settings.getByRole('textbox', { name: '手順', exact: true }).fill('Ask each vault.');
   await settings.getByRole('button', { name: '作成', exact: true }).click();
   await expect(youGroup('スキル').getByRole('button', { name: 'weekly' })).toBeVisible();
   expect(await readFile(path.join(you, '.agents', 'skills', 'weekly', 'SKILL.md'), 'utf8')).toBe(
-    '---\nname: weekly\ndescription: Plans the week.\n---\n\nAsk each hibachi.\n',
+    '---\nname: weekly\ndescription: Plans the week.\n---\n\nAsk each vault.\n',
   );
   // The folder as files, read-only, still shows the definitions.
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
-  await youPanel.getByRole('button', { name: 'hibachi-research.md' }).click();
+  await youPanel.getByRole('button', { name: 'vault-research.md' }).click();
   await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText(
     'Edited by the person.',
   );
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
-  // The irori agent starts in full access like a hibachi agent. This part is
+  // The irori agent starts in full access like a vault agent. This part is
   // about requests, so it runs in the standard mode, chosen in the composer.
   const access = island.getByLabel('irori agent のアクセス', { exact: true });
   await expect(access).toHaveValue('full-access');
@@ -181,15 +179,15 @@ try {
   await composer.fill('Write a decision note.');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   const request = island.getByRole('group', { name: '許可の要求' });
-  await expect(request).toContainText('Product の hibachi agent から');
-  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText(
+  await expect(request).toContainText('Product agent から');
+  await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText(
     'Write a note in Product',
   );
-  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText('許可待ち');
+  await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText('許可待ち');
   // The map draws the hand-off, and the brains are held while your AI works.
   await expect(map.locator('.map-pill.hand-off')).toContainText('Write a note in Product');
   await expect(map.getByRole('button', { name: 'Product を開く' })).toHaveClass(/handed/);
-  // Its Schema waits while it runs, as a hibachi's does during its run.
+  // Its Schema waits while it runs, as a vault's does during its run.
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
   await expect(page.getByRole('region', { name: 'Schema の設定' })).toContainText(
     'irori agent の実行中は変更できません。',
@@ -199,11 +197,8 @@ try {
   await page.screenshot({ path: 'test-results/irori-your-ai.png' });
   await rail.getByRole('button', { name: /^Research・AI/ }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
-  await page
-    .getByTestId('stage')
-    .getByRole('button', { name: 'hibachi agent', exact: true })
-    .click();
-  // The person's own conversation in a handed hibachi is not held (ADR 020).
+  await page.getByTestId('stage').getByRole('button', { name: 'vault agent', exact: true }).click();
+  // The person's own conversation in a handed vault is not held (ADR 020).
   await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toBeEnabled();
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
@@ -212,8 +207,8 @@ try {
   await expect(island.locator('.message.report')).toContainText(
     'Wrote Knowledge_Base/from-your-ai.md.',
   );
-  await expect(island).toContainText("Handed the note to Product's hibachi agent.");
-  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText('完了');
+  await expect(island).toContainText('Handed the note to the Product agent.');
+  await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText('完了');
   expect(await readFile(path.join(roots[0], 'Knowledge_Base', 'from-your-ai.md'), 'utf8')).toBe(
     '# From your AI\n',
   );
@@ -238,15 +233,15 @@ try {
   ]);
   await expect(readFile(path.join(roots[0], 'direct.md'))).rejects.toThrow();
 
-  // The Your AI screen: its folder read-only, and each hibachi's sub-agent.
+  // The Your AI screen: its folder read-only, and each vault's sub-agent.
   // irori wrote the missing definition when it handed Product over, and left
   // the person's own one alone.
-  expect(log[0].loaded.sort()).toEqual(['hibachi-product', 'hibachi-research']);
+  expect(log[0].loaded.sort()).toEqual(['vault-product', 'vault-research']);
+  expect(await readFile(path.join(you, '.claude', 'agents', 'vault-product.md'), 'utf8')).toContain(
+    'name: vault-product',
+  );
   expect(
-    await readFile(path.join(you, '.claude', 'agents', 'hibachi-product.md'), 'utf8'),
-  ).toContain('name: hibachi-product');
-  expect(
-    await readFile(path.join(you, '.claude', 'agents', 'hibachi-research.md'), 'utf8'),
+    await readFile(path.join(you, '.claude', 'agents', 'vault-research.md'), 'utf8'),
   ).toContain('Edited by the person.');
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
   await expect(
@@ -254,25 +249,25 @@ try {
       .getByRole('region', { name: 'Schema の設定' })
       .getByRole('textbox', { name: '指示', exact: true }),
   ).toHaveValue(/^# irori agent\n/);
-  await expect(
-    definitions.getByRole('button', { name: /^Product の hibachi agent/ }),
-  ).toContainText('定義済み');
-  await definitions.getByRole('button', { name: /^Product の hibachi agent/ }).click();
-  await expect(definitions.locator('.you-definition')).toContainText('name: hibachi-product');
+  await expect(definitions.getByRole('button', { name: /^Product agent/ })).toContainText(
+    '定義済み',
+  );
+  await definitions.getByRole('button', { name: /^Product agent/ }).click();
+  await expect(definitions.locator('.you-definition')).toContainText('name: vault-product');
   await page.screenshot({ path: 'test-results/irori-your-ai-screen.png' });
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   await expect(map).toBeVisible();
 
   // Your AI on another CLI, with a model from that CLI's list: Pi loads no
-  // sub-agents, so it hands a brain to its hibachi agent with the `hibachi`
-  // command irori puts on its PATH (irori's own runtime run as Node). The
-  // hibachi agent runs in that brain, and its report comes back. The choice is kept.
+  // sub-agents, so it hands a brain to its vault agent with `irori call`
+  // on the command irori puts on its PATH (irori's own runtime run as Node). The
+  // vault agent runs in that brain, and its report comes back. The choice is kept.
   const cli = island.getByLabel('irori agent の CLI', { exact: true });
   await expect(cli).toHaveValue('claude');
   await cli.selectOption('pi');
   await expect(island.getByRole('button', { name: 'Pi · あなたの Schema' })).toBeVisible();
   await island.getByLabel('モデル', { exact: true }).selectOption('anthropic/claude-fixture');
-  await composer.fill('Tidy both brains.\nrun: hibachi Product "Tidy the Product notes."');
+  await composer.fill('Tidy both brains.\nrun: irori call Product "Tidy the Product notes."');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   const piLog = async () =>
     (await readFile(path.join(you, 'fixture-requests.jsonl'), 'utf8').catch(() => ''))
@@ -284,16 +279,16 @@ try {
     .poll(async () => (await piLog()).filter((entry) => entry.type === 'prompt').length)
     .toBe(1);
   await expect(island).toContainText('の応答');
-  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText(
+  await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText(
     'Tidy the Product notes.',
   );
-  await expect(island.getByRole('list', { name: 'hibachi への依頼' })).toContainText('完了');
+  await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText('完了');
   const sent = (await piLog()).find((entry) => entry.type === 'prompt').message as string;
-  expect(sent).toContain(`folder ${JSON.stringify(roots[0])}, hibachi agent "hibachi-product"`);
+  expect(sent).toContain(`folder ${JSON.stringify(roots[0])}, vault agent "vault-product"`);
   expect(sent).toContain('You run on Pi');
-  expect(sent).toContain('with the `hibachi` command in your shell');
+  expect(sent).toContain('with `irori call` in your shell');
   expect(sent).not.toContain('AGENTS.md');
-  expect(sent.endsWith('run: hibachi Product "Tidy the Product notes."')).toBe(true);
+  expect(sent.endsWith('run: irori call Product "Tidy the Product notes."')).toBe(true);
   const command = (await piLog()).find((entry) => entry.type === 'command');
   expect(command).toMatchObject({ code: 0, stdout: '日本語\u2028の応答\n' });
   // The hand-off is Product's own run, kept in a Product conversation of its own
@@ -328,7 +323,7 @@ try {
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
   // The irori agent registers a folder with the `irori` command: it becomes a
-  // hibachi of this workspace, and the rail and the map show it at once.
+  // vault of this workspace, and the rail and the map show it at once.
   const notes = path.join(base, 'Notes');
   await mkdir(notes);
   await composer.fill(`Register my notes.\nrun: irori add ${JSON.stringify(notes)} --name Notes`);
@@ -338,7 +333,7 @@ try {
     .toBe(2);
   const registered = (await piLog()).filter((entry) => entry.type === 'command')[1];
   expect(registered).toMatchObject({ code: 0 });
-  expect(registered.stdout).toContain('Registered the hibachi "Notes"');
+  expect(registered.stdout).toContain('Registered the vault "Notes"');
   expect(registered.stdout).toContain('Added it to this workspace');
   expect((await piLog()).filter((entry) => entry.type === 'prompt')[1].message).toContain(
     'the `irori` command is on your PATH',
@@ -351,7 +346,7 @@ try {
   expect(lab?.scopeIds.length).toBe(3);
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its hibachi agent with the hibachi command, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, and the irori agent island widened by its handle. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, and the irori agent island widened by its handle. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

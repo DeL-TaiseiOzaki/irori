@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 
-// ADR 021: the hibachi agent and the Schema layer are optional, and the agent dock
+// ADR 021: the vault agent and the Schema layer are optional, and the agent dock
 // shows conversations side by side beside the page, or without it.
 const base = await mkdtemp(path.join(tmpdir(), 'irori dock UI '));
 const root = path.join(base, 'Research');
@@ -30,9 +30,9 @@ const launch = () =>
 const width = (page: Page, selector: string) =>
   page.locator(selector).evaluate((element) => element.getBoundingClientRect().width);
 
-async function setHibachiAgent(page: Page, on: boolean) {
+async function setVaultAgent(page: Page, on: boolean) {
   await page.getByRole('button', { name: /^設定（/ }).click();
-  const box = page.getByRole('checkbox', { name: 'hibachi agent', exact: true });
+  const box = page.getByRole('checkbox', { name: 'vault agent', exact: true });
   if (on) await box.check();
   else await box.uncheck();
   await page.keyboard.press('Escape');
@@ -49,7 +49,7 @@ try {
   await expect(brain.getByRole('region', { name: 'Knowledge', exact: true })).toBeVisible();
   await expect(brain.getByRole('region', { name: 'Schema', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-card.schema')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'vault agent', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'irori agent', exact: true }).click();
   const columns = page.locator('.agent-panel');
   await expect(columns).toHaveCount(1);
@@ -58,10 +58,10 @@ try {
   await expect(page.getByRole('button', { name: /^表示するエージェント/ })).toHaveCount(0);
   await expect(page.locator('.schema-line')).toHaveCount(0);
 
-  // On: the Schema layer returns and the first column shows the hibachi's agent.
-  await setHibachiAgent(page, true);
+  // On: the Schema layer returns and the first column shows the vault's agent.
+  await setVaultAgent(page, true);
   await expect(brain.getByRole('region', { name: 'Schema', exact: true })).toBeVisible();
-  await expect(columns.first()).toHaveAttribute('aria-label', 'Research の hibachi agent');
+  await expect(columns.first()).toHaveAttribute('aria-label', 'Research agent');
   await expect(columns.first().locator('.schema-line')).toContainText('AGENTS.md');
 
   // A second column widens the dock past the old limit and keeps its own draft.
@@ -69,7 +69,7 @@ try {
   await columns.first().getByRole('button', { name: '列を追加' }).click();
   await expect(columns).toHaveCount(2);
   await expect.poll(() => width(page, '.assistant-pane')).toBeGreaterThan(before + 200);
-  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'Research の hibachi agent');
+  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'Research agent');
   const first = columns.first().getByRole('textbox', { name: 'エージェントへの指示' });
   const second = columns.nth(1).getByRole('textbox', { name: 'エージェントへの指示' });
   await expect(second).toBeEnabled();
@@ -83,7 +83,7 @@ try {
     .click();
   await page.getByRole('menuitemradio', { name: 'irori agent' }).click();
   await expect(columns.nth(1)).toHaveAttribute('aria-label', 'irori agent');
-  await expect(columns.first()).toHaveAttribute('aria-label', 'Research の hibachi agent');
+  await expect(columns.first()).toHaveAttribute('aria-label', 'Research agent');
 
   // The page folds away so only the agents show, and a file brings it back.
   await columns.first().getByRole('button', { name: '本文を隠す' }).click();
@@ -106,7 +106,7 @@ try {
   );
 
   // Off again: the Schema layer leaves and the dock shows the irori agent alone.
-  await setHibachiAgent(page, false);
+  await setVaultAgent(page, false);
   await expect(brain.getByRole('region', { name: 'Schema', exact: true })).toHaveCount(0);
   await expect(columns.first()).toHaveAttribute('aria-label', 'irori agent');
   await columns.first().getByRole('button', { name: 'irori agent を閉じる' }).click();
@@ -115,7 +115,7 @@ try {
   const stored = JSON.parse(
     await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8'),
   );
-  if (stored.hibachiAgent !== false) throw Error('The choice was not kept on the device.');
+  if (stored.vaultAgent !== false) throw Error('The choice was not kept on the device.');
 } finally {
   await app.close();
 }
@@ -125,7 +125,7 @@ await writeFile(
   path.join(files.dataDir, 'device-settings.json'),
   JSON.stringify({
     ...JSON.parse(await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8')),
-    hibachiAgent: true,
+    vaultAgent: true,
   }),
 );
 app = await launch();
@@ -136,9 +136,9 @@ try {
   await expect(
     page.locator('.brain-panel').getByRole('region', { name: 'Schema', exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vault agent', exact: true })).toBeVisible();
 } finally {
   await app.close();
 }
 if (errors.length) throw Error(errors.join('\n'));
-console.log('Dock UI smoke passed: optional hibachi agent, columns side by side, page hidden');
+console.log('Dock UI smoke passed: optional vault agent, columns side by side, page hidden');

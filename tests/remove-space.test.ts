@@ -9,7 +9,7 @@ import { removeSpace, type RemoveSpaceHost } from '../src/host/remove-space';
 import { hostArguments } from '../src/domain/host-requests';
 
 async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
-  const base = await mkdtemp(path.join(tmpdir(), 'irori remove hibachi '));
+  const base = await mkdtemp(path.join(tmpdir(), 'irori remove vault '));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
   await files.init();
@@ -48,7 +48,7 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   return { base, files, workspaces, roots, product, research, lab, solo, events, host };
 }
 
-test('removing a hibachi takes it off the device and every workspace, and keeps its folder', async (t) => {
+test('removing a vault takes it off the device and every workspace, and keeps its folder', async (t) => {
   const { base, files, workspaces, roots, product, research, lab, solo, events, host } =
     await fixture(t);
   await removeSpace(host(), research.scopeId, false);
@@ -61,7 +61,7 @@ test('removing a hibachi takes it off the device and every workspace, and keeps 
   const profiles = await workspaces.list();
   const labNow = profiles.find((item) => item.id === lab.id)!;
   assert.deepEqual(labNow.scopeIds, [product.scopeId]);
-  // Its group keeps the hibachi that stays; a workspace left with none stays too.
+  // Its group keeps the vault that stays; a workspace left with none stays too.
   assert.deepEqual(
     labNow.groups?.map((group) => group.scopeIds),
     [[product.scopeId]],
@@ -80,7 +80,7 @@ test('removing a hibachi takes it off the device and every workspace, and keeps 
     again.list().map((space) => space.name),
     ['Product'],
   );
-  // Registering the folder again brings the same hibachi back.
+  // Registering the folder again brings the same vault back.
   const back = await files.register(roots.research, 'ignored', 'team');
   assert.equal(back.scopeId, research.scopeId);
   assert.equal(back.name, 'Research');
@@ -96,7 +96,7 @@ test('with trash, the folder goes to the trash after irori lets go of it', async
   );
 });
 
-test('a folder that cannot go to the trash leaves the hibachi registered and taken up again', async (t) => {
+test('a folder that cannot go to the trash leaves the vault registered and taken up again', async (t) => {
   const { files, workspaces, research, lab, events, host } = await fixture(t);
   await assert.rejects(
     removeSpace(
@@ -119,13 +119,13 @@ test('a folder that cannot go to the trash leaves the hibachi registered and tak
   );
 });
 
-test('a folder holding another hibachi or irori’s own folders does not go to the trash', async (t) => {
+test('a folder holding another vault or irori’s own folders does not go to the trash', async (t) => {
   const { base, files, product, roots, events, host } = await fixture(t);
   const inner = path.join(roots.product, 'Knowledge_Base', 'Inner');
   await mkdir(inner, { recursive: true });
   await files.register(inner, 'Inner', 'personal');
   await assert.rejects(removeSpace(host(), product.scopeId, true), /Inner/);
-  // irori's data, or the irori agent's folder, inside a hibachi.
+  // irori's data, or the irori agent's folder, inside a vault.
   await assert.rejects(
     removeSpace(
       host({ keep: async () => [path.join(base, 'Research', 'you')] }),
@@ -136,7 +136,7 @@ test('a folder holding another hibachi or irori’s own folders does not go to t
   );
   assert.deepEqual(events, []);
   assert.equal(files.list().length, 3);
-  // Without the trash, the hibachi still leaves; its folder stays.
+  // Without the trash, the vault still leaves; its folder stays.
   await removeSpace(host(), product.scopeId, false);
   assert.deepEqual(
     files.list().map((space) => space.name),
@@ -144,7 +144,7 @@ test('a folder holding another hibachi or irori’s own folders does not go to t
   );
 });
 
-test('the request takes a hibachi id and whether to trash its folder', () => {
+test('the request takes a vault id and whether to trash its folder', () => {
   const id = crypto.randomUUID();
   assert.equal(hostArguments.removeSpace.safeParse([id, true]).success, true);
   assert.equal(hostArguments.removeSpace.safeParse([id]).success, false);

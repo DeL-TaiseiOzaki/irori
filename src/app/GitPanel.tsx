@@ -209,7 +209,7 @@ export function GitPanel({
     };
   }, [space.scopeId, revision, own]);
   const shown = submodules.find((m) => m.path === repository);
-  // A submodule that went away (another device removed it) shows the hibachi again.
+  // A submodule that went away (another device removed it) shows the vault again.
   useEffect(() => {
     if (repository && submodules.length && !shown) setRepository('');
   }, [submodules]);
@@ -306,7 +306,7 @@ function RepositoryPanel({
   beforeAction,
 }: {
   space: Space;
-  /** A submodule's folder, or empty for the hibachi's own repository. */
+  /** A submodule's folder, or empty for the vault's own repository. */
   repository: string;
   onBusy: (busy: boolean) => void;
   onChanged: () => void;
@@ -318,7 +318,7 @@ function RepositoryPanel({
 }) {
   const menuHost = useRef<HTMLDivElement>(null);
   const target: GitTarget = repository ? { scopeId: space.scopeId, repository } : space.scopeId;
-  // Paths Git reports are the repository's; the hibachi's layers are decided from its root.
+  // Paths Git reports are the repository's; the vault's layers are decided from its root.
   const prefix = repository ? repository + '/' : '';
   const label = repository ? `${space.name} / ${repository}` : space.name;
   const [status, setStatus] = useState<GitStatus>(),

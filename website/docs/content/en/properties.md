@@ -9,11 +9,11 @@ Markdown notes in Knowledge show their title, description, and property rows abo
 
 Properties are part of the note and can be shared with its text through Git.
 
-## Use a hibachi's definitions
+## Use a vault's definitions
 
-If a hibachi contains `.property/property.json`, its definitions supply options, required fields, and fields for each type. Notes can still open without that file.
+If a vault contains `.property/property.json`, its definitions supply options, required fields, and fields for each type. Notes can still open without that file.
 
-Saving fills fields defined as `auto: last-change` with the actor and time. Follow your hibachi's conventions for types and options.
+Saving fills fields defined as `auto: last-change` with the actor and time. Follow your vault's conventions for types and options.
 
 ## Check the YAML
 

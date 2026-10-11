@@ -25,7 +25,7 @@ export function ConversationHistory({
   onDeleted,
   onError,
 }: {
-  /** The owner: a hibachi's scope or the irori agent's id. */
+  /** The owner: a vault's scope or the irori agent's id. */
   scopeId: string;
   /** For the irori agent: the workspace whose history is listed (ADR 017 D4). */
   workspaceId?: string;

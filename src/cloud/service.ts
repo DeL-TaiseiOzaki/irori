@@ -28,7 +28,7 @@ import type {
 import { t } from '../domain/i18n';
 
 // Where a local connection's folder is on this device: a path names the person, and
-// often their account, so it stays here and out of the hibachi's records.
+// often their account, so it stays here and out of the vault's records.
 const localBindingSchema = z.object({
   scopeId: z.uuid(),
   mountId: z.uuid(),
@@ -65,7 +65,7 @@ const retiredError = () =>
   );
 type Mounted = {
   attachment: LocalAttachment;
-  /** Where the connection appears: `contents/<name>` in its hibachi. */
+  /** Where the connection appears: `contents/<name>` in its vault. */
   entry: string;
   /** Where its files are: the chosen local folder. */
   target: string;
@@ -78,7 +78,7 @@ type Mounted = {
   writable: boolean;
 };
 /**
- * The folders in a hibachi's contents. Each is a folder on this device, often one
+ * The folders in a vault's contents. Each is a folder on this device, often one
  * a sync app (Drive for desktop, Dropbox, Box, iCloud, OneDrive) keeps, shown at
  * `contents/<name>` through a link (ADR 019). Google Drive connections irori made
  * itself before 0.1.67 are listed as retired, to be switched to such a folder
@@ -433,7 +433,7 @@ export class CloudService {
   }
   /**
    * The folder a local connection may use: an existing directory, by its real path,
-   * that neither holds nor lies inside a hibachi or irori's own data. A hibachi in
+   * that neither holds nor lies inside a vault or irori's own data. A vault in
    * it would appear inside another's contents, and irori's data is not material.
    */
   private async localTarget(chosen: string) {
@@ -460,8 +460,8 @@ export class CloudService {
       if (overlaps(root, target) || overlaps(actual, target))
         throw Error(
           t(
-            'hibachi や irori のデータと重なるフォルダは選べません。',
-            "This folder overlaps a hibachi or irori's data.",
+            'vault や irori のデータと重なるフォルダは選べません。',
+            "This folder overlaps a vault or irori's data.",
           ),
         );
     }
@@ -694,14 +694,14 @@ export class CloudService {
     const binding = await this.localBinding(record.scopeId, record.mountId);
     if (binding && (await this.parent(record))) await this.unlink(record, binding.path);
   }
-  /** Where a hibachi's connected folders appear, as paths inside it, for CLI agents to be told. */
+  /** Where a vault's connected folders appear, as paths inside it, for CLI agents to be told. */
   linkedPaths(scopeId: string) {
     return [...this.mounted.values()]
       .filter((item) => item.attachment.scopeId === scopeId)
       .map((item) => `${item.attachment.contentsRoot}/${item.attachment.name}`)
       .sort();
   }
-  /** The local folders connected in a hibachi, for CLI agents to be allowed into. */
+  /** The local folders connected in a vault, for CLI agents to be allowed into. */
   localFolders(scopeId: string) {
     return [...this.mounted.values()]
       .filter((item) => item.attachment.scopeId === scopeId && item.attachment.provider === 'local')
@@ -721,7 +721,7 @@ export class CloudService {
     return this.mutate(() => this.unmount(scopeId, mountId));
   }
   /**
-   * Disconnects every connected folder of a hibachi before its contents folder is
+   * Disconnects every connected folder of a vault before its contents folder is
    * renamed (ADR 024), and returns which were connected, for `resume` to link again.
    */
   suspend(scopeId: string) {

@@ -4,7 +4,7 @@ import type { AgentAccess, AgentId } from './types';
 /**
  * Routines (ADR 016): jobs a person or an agent defines in a folder with
  * `routine.yaml`, and the person starts with a button. A routine belongs to the
- * irori agent's folder (`routines/<folder>/`) or to a hibachi
+ * irori agent's folder (`routines/<folder>/`) or to a vault
  * (`.irori/routines/<folder>/`).
  */
 
@@ -14,7 +14,7 @@ export const routineFolder = z
   .min(1)
   .max(120)
   .refine((value) => !value.startsWith('.') && !/[\\/\0]/.test(value));
-/** A routine is named by its owner (a hibachi's id or the irori agent's) and its folder. */
+/** A routine is named by its owner (a vault's id or the irori agent's) and its folder. */
 export const routineRef = z.object({ owner: z.uuid(), folder: routineFolder }).strict();
 export type RoutineRef = z.infer<typeof routineRef>;
 
@@ -68,9 +68,9 @@ export type RoutineStep =
     }
   | {
       kind: 'agent';
-      agent: 'irori' | 'hibachi';
-      /** The hibachis handed to the irori agent: their names, or all of the workspace's. */
-      hibachis?: 'all' | string[];
+      agent: 'irori' | 'vault';
+      /** The vaults handed to the irori agent: their names, or all of the workspace's. */
+      vaults?: 'all' | string[];
       access: AgentAccess;
       cli?: AgentId;
       model?: string;
@@ -123,7 +123,7 @@ export interface RoutineRun {
   endedAt?: string;
   state: RoutineRunState;
   steps: RoutineStepRun[];
-  /** Files each hibachi's Git status shows changed between the run's start and end. */
+  /** Files each vault's Git status shows changed between the run's start and end. */
   changes: { scopeId: string; name: string; paths: string[] }[];
   /** Why the run could not go on, when no step says it. */
   detail?: string;
@@ -137,7 +137,7 @@ export interface RoutineSource {
 
 export interface Routine {
   ref: RoutineRef;
-  owner: 'irori' | 'hibachi';
+  owner: 'irori' | 'vault';
   /** The name in `routine.yaml`, or the folder's when it cannot be read. */
   name: string;
   /** The routine's folder on this device. */
@@ -199,7 +199,7 @@ export function routineKey(ref: RoutineRef) {
 /** What a step is, in a few words. */
 export function stepLabel(step: RoutineStep) {
   if (step.kind === 'run') return Array.isArray(step.run) ? step.run.join(' ') : step.run;
-  return step.agent === 'irori' ? 'irori agent' : 'hibachi agent';
+  return step.agent === 'irori' ? 'irori agent' : 'vault agent';
 }
 
 /**

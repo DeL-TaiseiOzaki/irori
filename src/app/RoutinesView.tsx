@@ -49,13 +49,13 @@ const stepWords: Record<RoutineStepRun['state'], () => string> = {
   unknown: () => t('不明', 'Unknown'),
 };
 
-/** An agent step's hibachis, access and CLI, as written in `routine.yaml`. */
+/** An agent step's vaults, access and CLI, as written in `routine.yaml`. */
 function agentMeta(step: RoutineStep) {
   if (step.kind !== 'agent') return '';
-  const hibachis =
-    step.hibachis === 'all' ? t('全 hibachi', 'all hibachis') : step.hibachis?.join(', ');
+  const vaults =
+    step.vaults === 'all' ? t('すべての vault', 'all vaults') : step.vaults?.join(', ');
   return [
-    hibachis,
+    vaults,
     step.cli && agentNames[step.cli],
     step.access === 'full-access' ? t('フルアクセス', 'Full access') : t('標準', 'Standard'),
   ]
@@ -716,7 +716,7 @@ function RoutineCard({
   );
 }
 
-/** Where a new routine can live: the irori agent's folder once it is set up, and each hibachi. */
+/** Where a new routine can live: the irori agent's folder once it is set up, and each vault. */
 export function routineOwners(you: YourAi | undefined, spaces: Space[]) {
   return [
     ...(you?.state === 'ready' ? [{ id: you.id, name: 'irori agent' }] : []),
@@ -726,7 +726,7 @@ export function routineOwners(you: YourAi | undefined, spaces: Space[]) {
 
 /**
  * The rail's routines page (ADR 016): the irori agent's routines and each
- * hibachi's, started and stopped only here. The page's header offers a new
+ * vault's, started and stopped only here. The page's header offers a new
  * routine (`creating`) and asking the irori agent to write one.
  */
 export function RoutinesView({

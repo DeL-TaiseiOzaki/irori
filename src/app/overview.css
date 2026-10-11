@@ -528,7 +528,7 @@
   display: grid;
   grid-template-rows: subgrid;
 }
-/* Without the hibachi agent the AI and Schema rows are gone (ADR 021). */
+/* Without the vault agent the AI and Schema rows are gone (ADR 021). */
 .overview-columns.without-agents {
   grid-template-rows: auto auto 1fr;
 }

@@ -5,7 +5,7 @@ description: Write Markdown notes, add images, and keep working with automatic s
 
 ## Open or create a note
 
-Select a Markdown file in a hibachi's **Knowledge** section. To add a note, choose its name and destination. Notes are saved as `.md` files.
+Select a Markdown file in a vault's **Knowledge** section. To add a note, choose its name and destination. Notes are saved as `.md` files.
 
 The visual editor supports headings, lists, quotes, and tables. Switch to Markdown source mode to edit the syntax directly.
 

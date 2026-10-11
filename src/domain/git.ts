@@ -27,7 +27,7 @@ export interface GitStatus {
   fetchedAt?: string;
   /** What a completed operation could not also do, such as carry the authorship notes. */
   notice?: string;
-  /** The hibachi is an ordinary folder that `gitInit` can make a repository. */
+  /** The vault is an ordinary folder that `gitInit` can make a repository. */
   initializable?: boolean;
 }
 export interface GitDiff {
@@ -65,7 +65,7 @@ export interface CloneResult {
   path: string;
   notice?: string;
 }
-/** A new hibachi made here: an empty folder that becomes a Git repository and a KB. */
+/** A new vault made here: an empty folder that becomes a Git repository and a KB. */
 export interface CreateSpace {
   parent: string;
   /** The new folder's name. */
@@ -98,7 +98,7 @@ export function validRepositoryName(name: string) {
     /^[A-Za-z0-9._-]{1,100}$/.test(name) && name !== '.' && name !== '..' && !/\.git$/i.test(name)
   );
 }
-/** A repository name suggested from a folder or hibachi name; empty when nothing usable is left. */
+/** A repository name suggested from a folder or vault name; empty when nothing usable is left. */
 export function suggestRepositoryName(from: string) {
   const name = from
     .normalize('NFKC')
@@ -110,8 +110,8 @@ export function suggestRepositoryName(from: string) {
   return validRepositoryName(name) ? name : '';
 }
 /**
- * The repository a Git operation acts on: a hibachi's own checkout (its scope ID
- * alone), or a submodule inside it named by its path from the hibachi's root.
+ * The repository a Git operation acts on: a vault's own checkout (its scope ID
+ * alone), or a submodule inside it named by its path from the vault's root.
  */
 export type GitTarget = string | { scopeId: string; repository: string };
 export function gitScope(target: GitTarget) {
@@ -120,9 +120,9 @@ export function gitScope(target: GitTarget) {
 export function gitRepository(target: GitTarget) {
   return typeof target === 'string' ? '' : target.repository;
 }
-/** A repository a hibachi holds as a submodule (ADR 022). */
+/** A repository a vault holds as a submodule (ADR 022). */
 export interface GitSubmodule {
-  /** Its folder from the hibachi's root. */
+  /** Its folder from the vault's root. */
   path: string;
   name: string;
   /** owner/name when it comes from GitHub. */
@@ -140,7 +140,7 @@ export interface GitSubmodules {
 }
 export interface AddSubmodule {
   url: string;
-  /** The new folder, from the hibachi's root. */
+  /** The new folder, from the vault's root. */
   path: string;
 }
 /** A folder name suggested from a repository URL: its last segment without `.git`. */

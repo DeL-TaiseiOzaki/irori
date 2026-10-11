@@ -10,8 +10,8 @@ import { SettingsService } from '../src/host/settings';
 const base = await mkdtemp(path.join(tmpdir(), 'irori layers '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const spaces = [];
 for (const [name, category] of [
   ['個人KB', 'personal'],
@@ -74,7 +74,7 @@ try {
   for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   // The rail holds the workspace's brains in order; the panel shows one brain.
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
   const brain = (name: string) => rail.getByRole('button', { name: new RegExp(`^${name}・AI`) });
   for (const name of ['個人KB', 'Engineering', 'Research', '組織KB'])
     await expect(brain(name)).toBeVisible();
@@ -170,8 +170,8 @@ try {
   );
   expect(await readFile(path.join(spaces[2].root, 'memo.md'), 'utf8')).toBe('# Research notes\n');
   await expect(page.locator('.document-editor')).toContainText('Research notes');
-  // The hibachi agent belongs to the brain on show and names its Schema.
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  // The vault agent belongs to the brain on show and names its Schema.
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(page.getByLabel('相談の対象', { exact: true })).toContainText('Research');
   await expect(page.locator('.schema-line')).toContainText('Research の Schema');
   await expect(page.locator('.schema-line')).toContainText('AGENTS.md');
@@ -193,7 +193,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-brain-panel-narrow.png' });
   await page
     .locator('.agent-header')
-    .getByRole('button', { name: 'hibachi agent を閉じる', exact: true })
+    .getByRole('button', { name: 'vault agent を閉じる', exact: true })
     .click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   // The Contents action opens the connections of the brain it belongs to.

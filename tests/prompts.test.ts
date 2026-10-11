@@ -26,15 +26,15 @@ test('Connected folders are named for agents, with how to search inside the link
   assert.match(text, /rg PATTERN "contents\/Drive"/);
   assert.match(text, /rg -L/);
   const brains = [
-    { name: 'Lab', agent: 'hibachi-lab', root: '/kb/lab', linked: ['contents/Drive'] },
-    { name: 'Notes', agent: 'hibachi-notes', root: '/kb/notes' },
+    { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', linked: ['contents/Drive'] },
+    { name: 'Notes', agent: 'vault-notes', root: '/kb/notes' },
   ];
   const handed = prompts.brainsPreamble(brains, 'claude');
   assert.match(
     handed,
-    /- Lab: folder "\/kb\/lab", sub-agent "hibachi-lab", connected folders "contents\/Drive"/,
+    /- Lab: folder "\/kb\/lab", sub-agent "vault-lab", connected folders "contents\/Drive"/,
   );
-  assert.match(handed, /- Notes: folder "\/kb\/notes", sub-agent "hibachi-notes"$/m);
+  assert.match(handed, /- Notes: folder "\/kb\/notes", sub-agent "vault-notes"$/m);
   assert.equal(handed.match(/rg -L/g)?.length, 1);
   assert.match(prompts.brainsCommandPreamble(brains, 'Pi'), /connected folders "contents\/Drive"/);
   // Without connected folders nothing is said about them.

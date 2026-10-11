@@ -326,7 +326,7 @@ export function SchemaEditor({
   onClose,
 }: {
   scopeId: string;
-  /** The hibachi, or none for the irori agent's folder. */
+  /** The vault, or none for the irori agent's folder. */
   space?: Space;
   /** The shared Schema (ADR 027), kept in the irori agent's folder. */
   common?: boolean;
@@ -565,7 +565,7 @@ function InstructionsForm({
               <option key={choice} value={choice}>
                 {choice ||
                   (space
-                    ? t('hibachi 全体（AGENTS.md）', 'The whole hibachi (AGENTS.md)')
+                    ? t('vault 全体（AGENTS.md）', 'The whole vault (AGENTS.md)')
                     : common
                       ? t('すべてのエージェント（AGENTS.md）', 'Every agent (AGENTS.md)')
                       : t('irori agent（AGENTS.md）', 'The irori agent (AGENTS.md)'))}

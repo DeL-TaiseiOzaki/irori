@@ -137,7 +137,7 @@ export const newMeta = (
 ): ConversationMeta => ({
   schemaVersion: 1,
   updatedAt: meta.createdAt,
-  hibachis: [],
+  vaults: [],
   pinned: false,
   archived: false,
   forkedFrom: null,
@@ -304,7 +304,7 @@ function viewEvent(line: StoredEvent, meta: ConversationMeta): AgentEvent {
 export interface Placement {
   owner: ConversationOwner;
   agent: AgentId;
-  /** The irori agent's workspace for this request; none for a hibachi's. */
+  /** The irori agent's workspace for this request; none for a vault's. */
   workspace?: string;
   /** A new conversation may be made under this id: one the host chose, not one a view named. */
   create?: boolean;
@@ -553,13 +553,13 @@ export class ConversationStore {
     return value;
   }
   /**
-   * Whether a conversation belongs to the workspace asked for. A hibachi's
-   * history is the hibachi's wherever it is opened; the irori agent's is kept per
+   * Whether a conversation belongs to the workspace asked for. A vault's
+   * history is the vault's wherever it is opened; the irori agent's is kept per
    * workspace (ADR 017 D4).
    */
   private inWorkspace(id: string, workspace: string | undefined) {
     const meta = this.metas.get(id);
-    if (meta) return meta.owner.kind === 'hibachi' || meta.workspace === workspace;
+    if (meta) return meta.owner.kind === 'vault' || meta.workspace === workspace;
     const reserved = this.reserved.get(id);
     return !reserved || reserved.workspace === workspace;
   }
@@ -789,7 +789,7 @@ export class ConversationStore {
       (await this.latest(owner, agent, workspace))
     );
   }
-  /** The hibachi conversation that work from one of the irori agent's conversations went to. */
+  /** The vault conversation that work from one of the irori agent's conversations went to. */
   async handed(owner: string, agent: AgentId, from: string) {
     await this.scan();
     return [...this.metas.values()].find(
@@ -1027,7 +1027,7 @@ export class ConversationStore {
     ).then(() => {});
   }
   /** Writes the run's last events and its end before the end is reported. */
-  finish(id: string, event: AgentEvent, hibachis: string[] = []) {
+  finish(id: string, event: AgentEvent, vaults: string[] = []) {
     return this.queued(id, async () => {
       await this.drain(id);
       await this.append(id, [storedLine(event)]);
@@ -1035,7 +1035,7 @@ export class ConversationStore {
       await this.writeMeta({
         ...meta,
         updatedAt: this.now(),
-        hibachis: [...new Set([...meta.hibachis, ...hibachis])],
+        vaults: [...new Set([...meta.vaults, ...vaults])],
       });
       const state = this.states.get(id);
       if (state?.active) await this.writeState({ ...state, active: undefined });

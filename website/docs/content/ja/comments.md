@@ -19,6 +19,6 @@ description: ノートの一節や全体に、確認や修正のためのコメ�
 
 ## AI やチームに共有する
 
-コメントは hibachi の `.irori/comments/` に保存され、Git で共有できます。hibachi agent は対象ノートのコメントを受け取り、irori agent は hibachi ごとのコメント数を確認できます。
+コメントは vault の `.irori/comments/` に保存され、Git で共有できます。vault agent は対象ノートのコメントを受け取り、irori agent は vault ごとのコメント数を確認できます。
 
-「コメントを読んで、このノートを直してください」と[AI に依頼](agents.md)できます。現在の対象は hibachi 内の Markdown ファイルです。Drive のファイルと irori agent 自身のフォルダへのコメントにはまだ対応していません。
+「コメントを読んで、このノートを直してください」と[AI に依頼](agents.md)できます。現在の対象は vault 内の Markdown ファイルです。Drive のファイルと irori agent 自身のフォルダへのコメントにはまだ対応していません。

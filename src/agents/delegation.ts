@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { handToSubAgent, outsideHibachi, outsideIroriAgent } from '../../prompts';
+import { handToSubAgent, outsideVault, outsideIroriAgent } from '../../prompts';
 import { within } from '../domain/scopes';
 
 /**
@@ -41,7 +41,7 @@ export function writeDecision(
   if (brain)
     return within(brain.root, absolute)
       ? { allow: true }
-      : { allow: false, reason: outsideHibachi(brain) };
+      : { allow: false, reason: outsideVault(brain) };
   if (within(delegation.you, absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);
   return {
@@ -65,11 +65,11 @@ export const writeToolMatcher = 'Write|Edit|MultiEdit|NotebookEdit';
 export const writeTools = new RegExp(`^(${writeToolMatcher})$`);
 
 /**
- * The handed hibachi a `hibachi` command names: by its sub-agent name, or by its
- * name when only one handed hibachi has it. Any other is refused, with the names
+ * The handed vault `irori call` names: by its sub-agent name, or by its
+ * name when only one handed vault has it. Any other is refused, with the names
  * this run may use.
  */
-export function hibachiOf(delegation: Delegation, name: string) {
+export function vaultOf(delegation: Delegation, name: string) {
   const fold = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
   const byAgent = delegation.brains.find((brain) => brain.agent === name);
   if (byAgent) return byAgent;
@@ -78,7 +78,7 @@ export function hibachiOf(delegation: Delegation, name: string) {
   const names = delegation.brains.map((brain) => `${brain.agent} (${brain.name})`).join(', ');
   throw Error(
     byName.length
-      ? `More than one hibachi is named ${JSON.stringify(name)}. Use its sub-agent name: ${names}.`
-      : `No hibachi named ${JSON.stringify(name)} was handed to this request. Use one of: ${names || 'none'}.`,
+      ? `More than one vault is named ${JSON.stringify(name)}. Use its sub-agent name: ${names}.`
+      : `No vault named ${JSON.stringify(name)} was handed to this request. Use one of: ${names || 'none'}.`,
   );
 }

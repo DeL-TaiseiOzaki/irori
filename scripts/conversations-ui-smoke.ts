@@ -14,7 +14,7 @@ import { sessionKey } from '../src/agents/sessions';
 import { jsonLine, storedLine } from '../src/agents/conversations';
 import { SettingsService } from '../src/host/settings';
 
-// A hibachi's conversations (ADR 017 stage 1): a record from before is migrated,
+// A vault's conversations (ADR 017 stage 1): a record from before is migrated,
 // new conversations are listed, renamed, pinned, archived and deleted, a send in
 // one conversation waits behind another's run, and the irori agent's history is
 // its own. `pi` is a protocol fixture; no model runs.
@@ -27,13 +27,13 @@ const home = path.join(base, 'home');
 await mkdir(home);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const root = path.join(base, 'KB');
 await mkdir(root);
 await writeFile(path.join(root, 'note.md'), '# Conversation fixture\n');
 const space = await files.register(root, '会話検証', 'personal');
-// What 0.1.56 kept for this hibachi's Pi conversation.
+// What 0.1.56 kept for this vault's Pi conversation.
 const binding = { scopeId: space.scopeId, agent: 'pi' as const, root: space.root };
 const runId = randomUUID();
 await mkdir(path.join(files.dataDir, 'agent-conversations'), { recursive: true });
@@ -62,7 +62,7 @@ await writeFile(
   JSON.stringify({
     schemaVersion: 1,
     id: longId,
-    owner: { kind: 'hibachi', id: space.scopeId, name: '会話検証' },
+    owner: { kind: 'vault', id: space.scopeId, name: '会話検証' },
     agent: 'pi',
     model: null,
     title: '長い会話',
@@ -70,7 +70,7 @@ await writeFile(
     createdAt: longAt,
     updatedAt: longAt,
     linkedNote: null,
-    hibachis: [],
+    vaults: [],
     pinned: false,
     archived: false,
     forkedFrom: null,
@@ -120,8 +120,7 @@ const launch = () =>
   });
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
-const panel = (page: Page) =>
-  page.getByRole('complementary', { name: '会話検証 の hibachi agent' });
+const panel = (page: Page) => page.getByRole('complementary', { name: '会話検証 agent' });
 const history = (page: Page) => panel(page).getByRole('region', { name: '履歴' });
 const row = (page: Page, title: string) =>
   history(page).locator('.history-row').filter({ hasText: title });
@@ -163,7 +162,7 @@ try {
   page.setDefaultTimeout(20000);
   await page.getByRole('checkbox', { name: /会話検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
 
   // The record from before is one conversation, titled 以前の会話, with its events.
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
@@ -181,7 +180,7 @@ try {
   await send(page, '最初の話題\nrun: sleep 6');
   await expect(panel(page).locator('.message.user')).toHaveText(['最初の話題\nrun: sleep 6']);
   await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toBeVisible();
-  // Another conversation of the same hibachi runs beside that run, in a tab of its own (ADR 020).
+  // Another conversation of the same vault runs beside that run, in a tab of its own (ADR 020).
   await panel(page).getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(panel(page).getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   const tabs = panel(page).getByRole('tablist', { name: '開いている会話' });
@@ -226,7 +225,7 @@ try {
   await act(page, '以前の会話', 'アーカイブ');
   await expect(history(page).locator('details summary')).toHaveText('アーカイブ 1');
   await page.screenshot({ path: 'test-results/irori-conversation-history.png' });
-  // Deleting the conversation on show: the hibachi shows its latest other one.
+  // Deleting the conversation on show: the vault shows its latest other one.
   await act(page, '二つ目の話題', '削除');
   await expect(history(page).getByRole('group', { name: '削除の確認' })).toContainText(
     'CLI 側の履歴は残ります',
@@ -276,7 +275,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   page.setDefaultTimeout(20000);
   await page.locator('.workspace-card').filter({ hasText: 'マイワークスペース' }).click();
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await panel(page).getByRole('button', { name: '履歴', exact: true }).click();
   await expect(history(page).locator('.history-title')).toHaveText([
     '長い会話',
@@ -285,8 +284,8 @@ try {
   ]);
   await expect(history(page).locator('details summary')).toHaveText('アーカイブ 1');
 
-  // The irori agent's history is its own: none of the hibachi's conversations.
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  // The irori agent's history is its own: none of the vault's conversations.
+  const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   const island = page.getByRole('complementary', { name: 'irori agent' });
   await island.getByRole('button', { name: 'irori agent を用意する' }).click();

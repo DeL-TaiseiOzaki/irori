@@ -119,23 +119,23 @@ disabled then.
 Since 0.1.50 the irori agent's screen shows the same settings for its own
 folder ([YOUR-AI](YOUR-AI.md)): the same groups, forms, add and delete actions
 and the ファイルとして表示 toggle, which shows the folder read-only, including
-the hibachi sub-agent definitions irori writes. The four methods take the
+the vault sub-agent definitions irori writes. The four methods take the
 irori agent's id as the scope. The service resolves where a scope's files are
-through a `SchemaFolder` (`src/host/schema-folder.ts`): a hibachi's checkout
+through a `SchemaFolder` (`src/host/schema-folder.ts`): a vault's checkout
 through the file service, or the irori agent's folder through
 `YourAiService.schemaFolder`, which confines every path to the folder's real
 path and marks links. The same `settingKind` paths, alias checks and hashes
 apply. Two differences: only the root `AGENTS.md` counts as instructions (the
 folder has no knowledge folders), and that file cannot be deleted, since it
 marks the folder as set up. Its skills are listed from its own `.agents/skills`
-by the same reader as a hibachi's (`readFolderSkills`), and changes wait while
+by the same reader as a vault's (`readFolderSkills`), and changes wait while
 the irori agent runs.
 
 ### Shared Schema and Settings → Schema
 
 Since 0.1.80 ([ADR 027](decisions/027-shared-schema.md)) **設定 → Schema**
 opens one dialog with every Schema: the shared Schema (共通), the irori agent's
-and, while hibachi agents are on, each hibachi's of the workspace, edited with
+and, while vault agents are on, each vault's of the workspace, edited with
 the same forms (`src/app/SchemaDialog.tsx`). The shared Schema is the folder
 `.irori/shared/` inside the irori agent's folder (`YourAiService.sharedFolder`),
 with `AGENTS.md` and `.agents/skills/` only: the host refuses rules and hooks
@@ -143,7 +143,7 @@ there. The four methods take the fixed `sharedSchemaId` as its scope.
 
 irori puts the shared instructions and each shared skill's name, description
 and file first in every agent's request (`prompts/shared-schema.ts`). A
-hibachi's composer offers the shared skills after its own, marked (共通); its
+vault's composer offers the shared skills after its own, marked (共通); its
 own skill wins a name both have, and a run naming a skill its Schema lacks
 takes the shared one.
 

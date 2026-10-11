@@ -6,7 +6,7 @@ import { defaultKnowledgeFolder, knowledgeFolder } from './layers';
 /** Where a KB asks irori to put notes: `.irori/notes.json`, tracked with the KB. */
 export const notesDeclarationFile = '.irori/notes.json';
 export const defaultNoteDirectory = `${defaultKnowledgeFolder}/Notes`;
-/** Where a hibachi without a declaration puts new notes: `Notes` in its knowledge folder. */
+/** Where a vault without a declaration puts new notes: `Notes` in its knowledge folder. */
 export const defaultNoteDirectoryOf = (space: { knowledge?: string }) =>
   `${knowledgeFolder(space)}/Notes`;
 

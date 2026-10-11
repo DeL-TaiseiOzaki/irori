@@ -219,7 +219,7 @@ const sections: { layer: Layer; defaultSize: string }[] = [
   { layer: 'Knowledge_Base', defaultSize: '46%' },
   { layer: 'contents', defaultSize: '28%' },
 ];
-// Without the hibachi agent the Schema layer is not shown (ADR 021).
+// Without the vault agent the Schema layer is not shown (ADR 021).
 const editorSections: { layer: Layer; defaultSize: string }[] = [
   { layer: 'Knowledge_Base', defaultSize: '62%' },
   { layer: 'contents', defaultSize: '38%' },
@@ -297,7 +297,7 @@ export const BrainPanel = memo(function BrainPanel({
   onEntryAction: (space: Space, entry: Entry, action: EntryAction) => void;
   /**
    * The Schema section as settings; the files behind it stay one toggle away.
-   * Absent while the hibachi agent is off, and the section with it.
+   * Absent while the vault agent is off, and the section with it.
    */
   schema?: ReactNode;
   /** The Changes view, owned by the caller. */
@@ -432,8 +432,8 @@ export const BrainPanel = memo(function BrainPanel({
           <Menu.Root modal={false}>
             <Menu.Trigger
               className="icon-button"
-              aria-label={t('hibachi のメニュー', 'hibachi menu')}
-              title={t('hibachi のメニュー', 'hibachi menu')}
+              aria-label={t('vault のメニュー', 'vault menu')}
+              title={t('vault のメニュー', 'vault menu')}
             >
               <Icon name="more" size={16} />
             </Menu.Trigger>
@@ -442,7 +442,7 @@ export const BrainPanel = memo(function BrainPanel({
                 <Menu.Popup className="menu">
                   <Menu.Item disabled={locked} onClick={onSettings}>
                     <Icon name="penLine" size={14} />
-                    {t('hibachi の設定', 'hibachi settings')}
+                    {t('vault の設定', 'vault settings')}
                   </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
@@ -472,7 +472,7 @@ export const BrainPanel = memo(function BrainPanel({
         </button>
         <MagnetTabs
           className="brain-modes"
-          label={t('hibachi の表示', 'hibachi view')}
+          label={t('vault の表示', 'vault view')}
           value={mode}
           onValueChange={onModeChange}
           options={[

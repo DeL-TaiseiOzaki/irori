@@ -42,8 +42,8 @@ import {
 } from './notes';
 
 /**
- * A repository a hibachi holds: its own checkout (`prefix` empty) or a submodule
- * at `prefix` inside it. Paths Git reports are relative to `root`; the hibachi's
+ * A repository a vault holds: its own checkout (`prefix` empty) or a submodule
+ * at `prefix` inside it. Paths Git reports are relative to `root`; the vault's
  * layers and ownership are decided on `prefix + path` against `space`.
  */
 type Repo = Space & { prefix: string; space: Space };
@@ -113,10 +113,7 @@ export class GitService {
       this.boundary(main(s), repository);
       if (!(await this.submodulePaths(main(s))).has(repository))
         throw Error(
-          t(
-            'この hibachi の submodule ではありません。',
-            'This is not a submodule of the hibachi.',
-          ),
+          t('この vault の submodule ではありません。', 'This is not a submodule of the vault.'),
         );
       try {
         if ((await fs.realpath(root)) !== root) throw Error('alias');
@@ -152,7 +149,7 @@ export class GitService {
   }
   /**
    * The submodules `.gitmodules` declares, by name. A declaration whose path is
-   * unusable (outside the hibachi, a Git path, a link) is left out.
+   * unusable (outside the vault, a Git path, a link) is left out.
    */
   private async declared(s: Repo) {
     const file = path.join(s.root, '.gitmodules');
@@ -218,12 +215,12 @@ export class GitService {
     );
     return declared.filter((m) => links.has(m.path));
   }
-  /** A hibachi's submodules: declared in `.gitmodules` and recorded in its index. */
+  /** A vault's submodules: declared in `.gitmodules` and recorded in its index. */
   private async submodulePaths(s: Repo) {
     return new Set((await this.recorded(s)).map((m) => m.path));
   }
   /**
-   * `fresh`: the repository is a hibachi just made in a new folder, which no
+   * `fresh`: the repository is a vault just made in a new folder, which no
    * run, save or connection can be working in, so it waits for none of them.
    */
   private mutate<T>(
@@ -241,7 +238,7 @@ export class GitService {
           ),
         ),
       );
-    // A hibachi's submodules queue with it: committing one moves what the hibachi records.
+    // A vault's submodules queue with it: committing one moves what the vault records.
     const key = this.files.get(gitScope(id)).root;
     this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
     this.pending++;
@@ -319,7 +316,7 @@ export class GitService {
   }
   private exclusions(s: Repo) {
     return [
-      // Contents are declared from the hibachi's root; a submodule sees those inside it.
+      // Contents are declared from the vault's root; a submodule sees those inside it.
       ...s.space.contents.flatMap((c) =>
         !s.prefix ? [c] : c.startsWith(s.prefix) ? [c.slice(s.prefix.length)] : [],
       ),
@@ -375,8 +372,8 @@ export class GitService {
   private async readNoted(id: string, notePath: string, key: string): Promise<Set<string>> {
     this.validateName(notePath);
     // A note inside a submodule has its history, and its notes, in that repository.
-    const hibachi = main(this.files.get(id));
-    const repository = [...(await this.submodulePaths(hibachi))].find((m) =>
+    const vault = main(this.files.get(id));
+    const repository = [...(await this.submodulePaths(vault))].find((m) =>
       notePath.startsWith(m + '/'),
     );
     const s = await this.repo(repository ? { scopeId: id, repository } : id);
@@ -813,7 +810,7 @@ export class GitService {
     const submodules = await this.submodulePaths(s);
     await this.safePath(s, p, submodules);
     if (submodules.has(p)) {
-      // A submodule is on a commit, which is what the hibachi records of it.
+      // A submodule is on a commit, which is what the vault records of it.
       const root = path.join(s.root, p);
       if (!(await this.initialized(root))) return;
       return Buffer.from(await this.optional({ root }, ['rev-parse', '--verify', 'HEAD']));
@@ -1016,7 +1013,7 @@ export class GitService {
       );
     return state.remote;
   }
-  /** The submodule paths whose commit differs between two commits of a hibachi. */
+  /** The submodule paths whose commit differs between two commits of a vault. */
   private async movedSubmodules(s: Repo, from: string, to: string) {
     const raw = (
       await this.git(s, ['diff', '--raw', '-z', '--no-renames', '--no-abbrev', from, to, '--'])
@@ -1052,7 +1049,7 @@ export class GitService {
     return declaration;
   }
   /**
-   * An incoming `.irori/scope.json` is taken when it keeps the hibachi's identity
+   * An incoming `.irori/scope.json` is taken when it keeps the vault's identity
    * and passes the checks a local rename applies, and this side has not changed
    * it too (ADR 028). A removed file, another `scopeId` or a broken one is refused.
    */
@@ -1073,7 +1070,7 @@ export class GitService {
     if (await this.files.incomingDeclarationProblem(s.space.scopeId, text)) throw refused();
   }
   /**
-   * After a pull moved the commits the hibachi records for its submodules, moves
+   * After a pull moved the commits the vault records for its submodules, moves
    * each submodule along when that is a fast-forward of its branch with nothing
    * uncommitted. Returns what it left for the person to do.
    */
@@ -1371,7 +1368,7 @@ export class GitService {
       return this.snapshot(s);
     });
   }
-  /** The submodules the hibachi holds, with whether each one's files are here. */
+  /** The submodules the vault holds, with whether each one's files are here. */
   async submodules(id: string): Promise<GitSubmodules> {
     let s: Repo;
     try {
@@ -1417,7 +1414,7 @@ export class GitService {
     ];
   }
   /**
-   * Clones a repository into a new folder of the hibachi as a submodule. Git
+   * Clones a repository into a new folder of the vault as a submodule. Git
    * stages the submodule and `.gitmodules`; committing them is the person's.
    */
   async addSubmodule(id: string, input: AddSubmodule): Promise<GitSubmodules> {
@@ -1452,10 +1449,7 @@ export class GitService {
     return this.mutate(id, async (s) => {
       if (only && !(await this.submodulePaths(s)).has(only))
         throw Error(
-          t(
-            'この hibachi の submodule ではありません。',
-            'This is not a submodule of the hibachi.',
-          ),
+          t('この vault の submodule ではありません。', 'This is not a submodule of the vault.'),
         );
       const notice = await this.fetchSubmodules(s, only);
       if (only && notice) throw Error(notice);
@@ -1479,7 +1473,7 @@ export class GitService {
   /**
    * Fetches each submodule whose files are not here yet, and returns what could
    * not be fetched. A submodule comes only from an allowed remote, without its
-   * own submodules, and is put on its branch when the commit the hibachi records
+   * own submodules, and is put on its branch when the commit the vault records
    * is on it, so it can be committed to and pushed.
    */
   private async fetchSubmodules(s: Repo, only?: string): Promise<string | undefined> {
@@ -1528,7 +1522,7 @@ export class GitService {
       );
   }
   /**
-   * Puts a newly fetched submodule on a branch at the commit the hibachi records,
+   * Puts a newly fetched submodule on a branch at the commit the vault records,
    * when that commit is on the branch `.gitmodules` names or the remote's default.
    * Otherwise it stays on the commit itself, where it can be read but not committed to.
    */
@@ -1566,7 +1560,7 @@ export class GitService {
     return `https://github.com/${repository}`;
   }
   /**
-   * A new, empty folder for a clone or a new hibachi: outside every registered
+   * A new, empty folder for a clone or a new vault: outside every registered
    * space and cloud material, never an existing folder.
    */
   private async newFolder(parentInput: string, name: string, purpose: 'clone' | 'create') {
@@ -1604,8 +1598,8 @@ export class GitService {
                     'A repository cannot be cloned inside cloud materials.',
                   )
                 : t(
-                    'クラウド資料の中には hibachi を作成できません。',
-                    'A hibachi cannot be created inside cloud materials.',
+                    'クラウド資料の中には vault を作成できません。',
+                    'A vault cannot be created inside cloud materials.',
                   ),
             );
         }
@@ -1675,7 +1669,7 @@ export class GitService {
     }
   }
   /**
-   * The folder of a new hibachi: created empty and made a Git repository on
+   * The folder of a new vault: created empty and made a Git repository on
    * `main`, ready for registration. Nothing is committed yet.
    */
   async create(input: Pick<CreateSpace, 'parent' | 'folder'>, duringRuns = false): Promise<string> {
@@ -1696,7 +1690,7 @@ export class GitService {
     }
   }
   /**
-   * Removes a new hibachi's folder that could not be registered, but only while
+   * Removes a new vault's folder that could not be registered, but only while
    * it holds nothing beyond what irori itself wrote there.
    */
   async abandon(root: string) {
@@ -1713,7 +1707,7 @@ export class GitService {
     await this.git(s, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
   }
   /**
-   * The first commit of a hibachi made here: only the files registration wrote.
+   * The first commit of a vault made here: only the files registration wrote.
    * Returns why it was not made (no author identity, a hook, signing) instead of failing.
    */
   async firstCommit(id: string, duringRuns = false): Promise<string | undefined> {
@@ -1728,7 +1722,7 @@ export class GitService {
             'commit',
             '--quiet',
             '-m',
-            t(`hibachi「${s.name}」を作成`, `Create the hibachi ${s.name}`),
+            t(`vault「${s.name}」を作成`, `Create the vault ${s.name}`),
             '--',
             ...paths.map(literal),
           ]);
@@ -1740,14 +1734,14 @@ export class GitService {
       const [advice, ...detail] = (error as Error).message.split('\n\n');
       return [
         `${t(
-          'hibachi は作成しましたが、最初の commit はできませんでした。',
-          'The hibachi was created, but its first commit could not be made.',
+          'vault は作成しましたが、最初の commit はできませんでした。',
+          'The vault was created, but its first commit could not be made.',
         )}\n${advice}`,
         ...detail,
       ].join('\n\n');
     }
   }
-  /** Makes a registered hibachi that is an ordinary folder a Git repository on `main`. */
+  /** Makes a registered vault that is an ordinary folder a Git repository on `main`. */
   async init(id: string): Promise<GitStatus> {
     await this.mutate(
       id,
@@ -1758,8 +1752,8 @@ export class GitService {
         if (!status.initializable)
           throw Error(
             t(
-              'この hibachi はすでに Git リポジトリか、Git で扱えない場所にあります。',
-              'This hibachi is already a Git repository, or is somewhere Git cannot use.',
+              'この vault はすでに Git リポジトリか、Git で扱えない場所にあります。',
+              'This vault is already a Git repository, or is somewhere Git cannot use.',
             ),
           );
         await this.initialize(s);
@@ -1773,7 +1767,7 @@ export class GitService {
     return this.github.account();
   }
   /**
-   * Creates a repository on GitHub for a hibachi that has none, sets it as
+   * Creates a repository on GitHub for a vault that has none, sets it as
    * `origin` and pushes the checked-out branch to it, with the authorship notes.
    */
   async publish(id: string, input: PublishRepository, version: string): Promise<GitStatus> {
@@ -1786,8 +1780,8 @@ export class GitService {
       if (await this.optional(s, ['remote']))
         throw Error(
           t(
-            'この hibachi にはすでにリモートが設定されています。',
-            'This hibachi already has a remote.',
+            'この vault にはすでにリモートが設定されています。',
+            'This vault already has a remote.',
           ),
         );
       await this.git(s, ['check-ref-format', `refs/heads/${state.branch}`]);

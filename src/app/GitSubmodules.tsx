@@ -7,7 +7,7 @@ import { useAction } from './useAction';
 import { Icon } from './Icon';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 
-/** Chooses which of the hibachi's repositories the Changes view shows (ADR 022). */
+/** Chooses which of the vault's repositories the Changes view shows (ADR 022). */
 export function RepositoryPicker({
   name,
   submodules,
@@ -67,7 +67,7 @@ export function UnfetchedSubmodule({
   );
 }
 
-/** Clones a GitHub repository into a new folder of the hibachi as a submodule. */
+/** Clones a GitHub repository into a new folder of the vault as a submodule. */
 export function AddSubmoduleDialog({
   add,
   onCancel,

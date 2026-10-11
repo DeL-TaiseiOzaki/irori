@@ -14,8 +14,8 @@ await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(path.join(root, 'Knowledge_Base', 'welcome.md'), '# Welcome\n\nPlain notes.\n');
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const space = await files.register(root, 'Research', 'personal');
 await new WorkspaceService(files).save('Lab', [space.scopeId]);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
@@ -80,12 +80,12 @@ try {
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
 
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
-  await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vault agent', exact: true })).toBeVisible();
 
   // The switch is immediate: no restart, and the open workspace stays open.
   await chooseLanguage(page, 'English', /^設定（/);
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('en');
-  await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vault agent', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'welcome', exact: true }).click();
   await expect(page.locator('.document-editor')).toContainText('Plain notes.');
   await japaneseLeft(page, 'the workspace with a note open');
@@ -116,22 +116,22 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   visited.push('note creation dialog');
 
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(page.locator('.agent-panel')).toBeVisible();
-  await japaneseLeft(page, 'the hibachi agent');
-  await page.getByRole('button', { name: 'Close hibachi agent' }).first().click();
-  visited.push('hibachi agent');
+  await japaneseLeft(page, 'the vault agent');
+  await page.getByRole('button', { name: 'Close vault agent' }).first().click();
+  visited.push('vault agent');
 
-  const modes = page.getByRole('group', { name: 'hibachi view' });
+  const modes = page.getByRole('group', { name: 'vault view' });
   await modes.getByRole('button', { name: /^Changes/ }).click();
   await expect(page.locator('.git-sidebar')).toBeVisible();
   await japaneseLeft(page, 'source control');
   await modes.getByRole('button', { name: 'Files', exact: true }).click();
   visited.push('source control');
 
-  await page.getByRole('button', { name: 'hibachi menu', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'hibachi settings', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'hibachi settings' })).toBeVisible();
+  await page.getByRole('button', { name: 'vault menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'vault settings', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'vault settings' })).toBeVisible();
   await japaneseLeft(page, 'the brain settings sheet');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -139,22 +139,22 @@ try {
 
   // The Overview, as a map and side by side.
   await page.getByRole('button', { name: 'irori mode', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Map of hibachis' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Vault map' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Set up the irori agent' })).toBeVisible();
-  await page.getByRole('button', { name: 'hibachi agents', exact: true }).click();
-  await expect(page.getByRole('complementary', { name: 'hibachi agents' })).toBeVisible();
+  await page.getByRole('button', { name: 'vault agents', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: 'vault agents' })).toBeVisible();
   await japaneseLeft(page, 'the Overview map');
   await page.getByRole('button', { name: 'Columns', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'hibachis side by side' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'vaults side by side' })).toBeVisible();
   await japaneseLeft(page, 'the Overview columns');
   await page.getByRole('button', { name: 'Map', exact: true }).click();
-  await page.getByRole('button', { name: /^Search hibachis/ }).click();
-  await expect(page.getByRole('radio', { name: 'All hibachis', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: /^Search vaults/ }).click();
+  await expect(page.getByRole('radio', { name: 'All vaults', exact: true })).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Open Research', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Map of hibachis' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Vault map' })).toHaveCount(0);
   visited.push('Overview');
 
   // The host speaks the same language: a message it writes arrives in English.
@@ -185,7 +185,7 @@ try {
   visited.push('startup screen after restart');
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await chooseLanguage(page, '日本語', /^Settings \(/);
-  await expect(page.getByRole('button', { name: 'hibachi agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vault agent', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
 } finally {
   await app.close();

@@ -201,7 +201,7 @@ export function run() {
       stop_hook_active: false,
       agent_transcript_path: '',
     });
-    assistant([{ type: 'text', text: `Handed the note to ${brain.name}'s hibachi agent.` }]);
+    assistant([{ type: 'text', text: `Handed the note to the ${brain.name} agent.` }]);
     result();
   }
 

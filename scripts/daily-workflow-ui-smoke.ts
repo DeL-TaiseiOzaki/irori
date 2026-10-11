@@ -13,8 +13,8 @@ import { SettingsService } from '../src/host/settings';
 const base = await mkdtemp(path.join(tmpdir(), 'irori daily UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
-await new SettingsService(files.dataDir).save({ hibachiAgent: true });
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 const spaces: Space[] = [];
 for (const [name, category] of [
   ['日常の個人KB', 'personal'],
@@ -109,7 +109,7 @@ async function launch() {
     .getByRole('button', { name: '作業', exact: true })
     .click();
   await expect(page.locator('.ProseMirror')).toContainText('Daily fixture note');
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示', { exact: true })).toBeEnabled();
   return page;
 }
@@ -127,7 +127,7 @@ async function close() {
 function brainButton(page: Page, space: Space) {
   const name = space.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return page
-    .getByRole('navigation', { name: 'hibachi' })
+    .getByRole('navigation', { name: 'vault' })
     .getByRole('button', { name: new RegExp(`^${name}・AI`) });
 }
 /** Opens the note's menu and takes one of its actions. */
@@ -255,7 +255,7 @@ try {
   await expect(composer).toHaveValue('');
   await page
     .locator('.agent-panel')
-    .getByRole('button', { name: 'hibachi agent を閉じる', exact: true })
+    .getByRole('button', { name: 'vault agent を閉じる', exact: true })
     .click();
 
   await page.getByRole('button', { name: / にノートを作成$/ }).click();
@@ -329,7 +329,7 @@ try {
   expect(await exists(movedPath)).toBe(false);
   expect(await exists(path.join(root, destination, imageRelative))).toBe(true);
   await expect(page.locator('.stage .error[role="alert"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'hibachi のメニュー', exact: true }).click();
+  await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
   await page.getByRole('menuitem', { name: '削除したノートを復元', exact: true }).click();
   const restore = page.getByRole('dialog', { name: '削除済みノート', exact: true });
   await restore
@@ -342,7 +342,7 @@ try {
   expect(
     await page.evaluate((scopeId) => window.irori.trashedNotes(scopeId), spaces[0].scopeId),
   ).toEqual([]);
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/irori-daily-workflow.png' });
 

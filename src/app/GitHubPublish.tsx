@@ -18,7 +18,7 @@ export function initialPublish(from: string): PublishRepository {
 }
 
 /**
- * Where a hibachi goes on GitHub: the account or organization the GitHub CLI can
+ * Where a vault goes on GitHub: the account or organization the GitHub CLI can
  * see, the repository name and whether others can see it (private unless chosen).
  */
 export function PublishFields({
@@ -100,7 +100,7 @@ export function PublishFields({
   );
 }
 
-/** Publishes a hibachi without a remote to a new GitHub repository. */
+/** Publishes a vault without a remote to a new GitHub repository. */
 export function PublishDialog({
   suggestion,
   publish,

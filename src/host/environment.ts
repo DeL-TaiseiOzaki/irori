@@ -20,11 +20,12 @@ import {
   type RestoreEnvironment,
 } from '../domain/environment';
 import { githubOwnerPattern, validRepositoryName } from '../domain/git';
-import { normalizeGroups } from '../domain/hibachi-groups';
+import { normalizeGroups } from '../domain/vault-groups';
 import type { GitHubCli } from '../git/github';
 import type { GitService } from '../git/service';
 import type { FileService } from './files';
 import { ifPresent } from './local-json';
+import { fromSavedEnvironment } from './vault-rename';
 import { inspectRepository, workspaceProfile, type WorkspaceService } from './workspaces';
 
 const repository = z
@@ -40,7 +41,7 @@ const stored = z.object({
   schemaVersion: z.literal(1),
   savedAt: z.iso.datetime(),
   appVersion: z.string().max(64).optional(),
-  hibachis: z
+  vaults: z
     .array(z.object({ scopeId: z.uuid(), name: z.string().trim().min(1).max(120), repository }))
     .max(500),
   workspaces: z.array(workspaceProfile).max(100),
@@ -50,7 +51,7 @@ const stored = z.object({
       language: z.enum(languages),
       markdownFont: z.enum(markdownFonts),
       editorAssistance: z.boolean(),
-      hibachiAgent: z.boolean(),
+      vaultAgent: z.boolean(),
       yourAi: yourAiChoice,
     })
     .partial(),
@@ -73,15 +74,15 @@ export interface EnvironmentHost {
   };
   /** The irori agent's folder on this device. */
   agentRoot: () => Promise<string>;
-  /** Registers through the host's own guards and starts watching the hibachi. */
+  /** Registers through the host's own guards and starts watching the vault. */
   register: (root: string, name: string, category: Category) => Promise<Space>;
-  /** Where restored hibachis go unless another folder is chosen. */
+  /** Where restored vaults go unless another folder is chosen. */
   defaultParent: () => Promise<string>;
   appVersion?: string;
   now?: () => Date;
 }
 
-/** A hibachi on this device with its GitHub repository, when it has one. */
+/** A vault on this device with its GitHub repository, when it has one. */
 type Located = { space: Space; repository?: string };
 
 const same = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
@@ -93,8 +94,8 @@ const same = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toL
  */
 export class EnvironmentService {
   constructor(private host: EnvironmentHost) {}
-  /** The hibachis on this device with their GitHub repositories, when they have one. */
-  private async hibachis() {
+  /** The vaults on this device with their GitHub repositories, when they have one. */
+  private async vaults() {
     const found: Located[] = [];
     for (const space of this.host.files.list())
       found.push({ space, repository: (await inspectRepository(space.root)).repository });
@@ -107,12 +108,12 @@ export class EnvironmentService {
   }
   /** The environment as this device would save it. */
   private async local(here?: Located[], agent?: string): Promise<Stored> {
-    here ??= await this.hibachis();
+    here ??= await this.vaults();
     agent ??= await this.agentRepository();
-    const hibachis = here.flatMap(({ space, repository }) =>
+    const vaults = here.flatMap(({ space, repository }) =>
       repository ? [{ scopeId: space.scopeId, name: space.name, repository }] : [],
     );
-    const kept = new Set(hibachis.map((item) => item.scopeId));
+    const kept = new Set(vaults.map((item) => item.scopeId));
     const workspaces = (await this.host.workspaces.list()).map(({ groups = [], ...profile }) => {
       const scopeIds = profile.scopeIds.filter((id) => kept.has(id));
       const normalized = normalizeGroups(groups, scopeIds);
@@ -123,7 +124,7 @@ export class EnvironmentService {
       schemaVersion: 1,
       savedAt: (this.host.now?.() ?? new Date()).toISOString(),
       ...(this.host.appVersion && { appVersion: this.host.appVersion }),
-      hibachis,
+      vaults,
       workspaces,
       preferences: Object.fromEntries(environmentPreferences.map((key) => [key, settings[key]])),
       ...(agent && { agent: { repository: agent } }),
@@ -144,7 +145,7 @@ export class EnvironmentService {
     if (!found && create)
       await this.host.github.createPrivate(
         environmentRepository,
-        'irori settings: hibachis, workspaces and preferences',
+        'irori settings: vaults, workspaces and preferences',
       );
     return { login, full, exists: !!found || create };
   }
@@ -165,7 +166,8 @@ export class EnvironmentService {
           'The saved environment is from a newer irori. Update irori.',
         ),
       );
-    const parsed = stored.safeParse(value);
+    // An environment saved before ADR 033 names vaults hibachis.
+    const parsed = stored.safeParse(fromSavedEnvironment(value));
     if (!parsed.success)
       throw Error(
         t(
@@ -178,20 +180,20 @@ export class EnvironmentService {
   async state(): Promise<EnvironmentState> {
     const { login, full, exists } = await this.place(false);
     const saved = exists ? (await this.read(full))?.value : undefined;
-    const here = await this.hibachis();
+    const here = await this.vaults();
     const agentHere = await this.agentRepository();
     const local = await this.local(here, agentHere);
     return {
       account: login,
       local: {
-        hibachis: local.hibachis.length,
+        vaults: local.vaults.length,
         left: here.filter((item) => !item.repository).map((item) => item.space.name),
         ...(local.agent && { agent: local.agent.repository }),
       },
       ...(saved && {
         saved: {
           savedAt: saved.savedAt,
-          hibachis: saved.hibachis.map((item) => ({
+          vaults: saved.vaults.map((item) => ({
             ...item,
             here: here.some(
               ({ space, repository }) =>
@@ -230,7 +232,7 @@ export class EnvironmentService {
       : `https://github.com/${repository}.git`;
   }
   /**
-   * Adds the saved environment to this device: the chosen hibachis are cloned
+   * Adds the saved environment to this device: the chosen vaults are cloned
    * and registered, the workspaces are taken in and the preferences applied.
    * Nothing on this device is removed or overwritten but those preferences.
    */
@@ -252,17 +254,17 @@ export class EnvironmentService {
       workspaces: 0,
       agent: 'unchanged',
     };
-    // A saved hibachi's id here: its own, or that of a checkout of the same repository.
+    // A saved vault's id here: its own, or that of a checkout of the same repository.
     const ids = new Map<string, string>();
-    const here = await this.hibachis();
-    for (const item of saved.hibachis) {
+    const here = await this.vaults();
+    for (const item of saved.vaults) {
       const local = here.find(
         ({ space, repository }) =>
           space.scopeId === item.scopeId || same(repository, item.repository),
       );
       if (local) ids.set(item.scopeId, local.space.scopeId);
     }
-    for (const item of saved.hibachis) {
+    for (const item of saved.vaults) {
       if (ids.has(item.scopeId) || !input.scopeIds.includes(item.scopeId)) continue;
       try {
         const folder = item.repository.split('/')[1];

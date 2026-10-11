@@ -1,11 +1,11 @@
 ---
 title: 同期フォルダ
-description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同期するフォルダを、hibachi の資料として使います。
+description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同期するフォルダを、vault の資料として使います。
 ---
 
 ## 仕組み
 
-各サービスの公式アプリは、クラウドのフォルダをこのコンピューターに同期します。irori はその中のフォルダを hibachi の Contents に表示し、ノートとして編集し、hibachi agent に渡します。irori はクラウドに直接接続しません。同期はサービスのアプリが行います。
+各サービスの公式アプリは、クラウドのフォルダをこのコンピューターに同期します。irori はその中のフォルダを vault の Contents に表示し、ノートとして編集し、vault agent に渡します。irori はクラウドに直接接続しません。同期はサービスのアプリが行います。
 
 ## 準備
 
@@ -23,7 +23,7 @@ description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同
 
 ## フォルダを接続する
 
-1. hibachi の **接続** を開きます。
+1. vault の **接続** を開きます。
 2. **フォルダを選ぶ** から、同期フォルダの中のフォルダを選びます。
 3. Contents に表示する名前を確認し、**登録して接続** を押します。
 
@@ -32,7 +32,7 @@ description: Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同
 ## 注意
 
 - 一つのフォルダを複数の同期サービスで同時に同期しないでください。競合やデータの破損の原因になります。
-- hibachi 自体や、hibachi を含むフォルダは接続できません。
+- vault 自体や、vault を含むフォルダは接続できません。
 - irori で削除したファイルは、システムのごみ箱に移ります。クラウド側の履歴やごみ箱は各サービスの機能です。
 - AI に渡したファイルは、使う CLI とその提供者に送られます。[AI エージェント](agents.md)を確認してください。
 - 会社のアカウントでは、管理者が同期アプリを制限している場合があります。

@@ -14,8 +14,8 @@ A routine is a folder holding `routine.yaml` and the files its steps use.
 
 | Location | Working folder | Agent steps |
 | --- | --- | --- |
-| `<irori agent folder>/routines/<name>/` | the irori agent's folder | `agent: irori`, with hibachis handed to it |
-| `<hibachi>/.irori/routines/<name>/` | the hibachi's root | `agent: hibachi`, that hibachi's agent |
+| `<irori agent folder>/routines/<name>/` | the irori agent's folder | `agent: irori`, with vaults handed to it |
+| `<vault>/.irori/routines/<name>/` | the vault's root | `agent: vault`, that vault's agent |
 
 ```yaml
 name: Mail triage
@@ -24,18 +24,18 @@ steps:
   - run: [gh, api, notifications] # a command on PATH and its arguments
     secrets: [GH_TOKEN] # given to this step only
   - agent: irori
-    hibachis: all # or a list of hibachi names
+    vaults: all # or a list of vault names
     access: full-access # or default; required
     cli: claude # optional: the CLI chosen in the panel otherwise
     model: sonnet # optional
     prompt: |
       Read the mail in $IRORI_WORK/inbox. Put each one into contents/mail of the
-      hibachi it concerns. Leave any you cannot place and list them.
+      vault it concerns. Leave any you cannot place and list them.
 ```
 
 - `routine.yaml` is read strictly: an unknown key, a missing `access` or
   `prompt`, a step with both `run` and `agent`, a path leaving the folder, a
-  hibachi's routine using `agent: irori` (or the reverse), or an access mode
+  vault's routine using `agent: irori` (or the reverse), or an access mode
   the named CLI lacks makes the routine invalid. Its row shows the reason in one
   sentence, and it never runs.
 - Up to 20 steps. The folder holds at most 100 files and 5 MiB, and no links;
@@ -48,7 +48,7 @@ steps:
 The routines page's header has **新しいルーティン** and **irori agent に頼む**.
 
 - **新しいルーティン** asks for a name and a place: the irori agent (once it is
-  set up) or a hibachi of the workspace. irori makes a new folder named after
+  set up) or a vault of the workspace. irori makes a new folder named after
   it (characters a file system refuses become `-`; a taken name gets ` 2`,
   ` 3`…) holding a `routine.yaml` with one agent step whose `prompt` is empty,
   so it cannot run until the person writes it. The editor opens at once.
@@ -66,14 +66,14 @@ The routines page's header has **新しいルーティン** and **irori agent �
 ## Running one
 
 The left rail's **ルーティン** / **Routines** button, between irori mode and the
-hibachis, opens the dedicated routines page. It lists the irori agent's routines
-and those of the workspace's hibachis, grouped by owner. The page also holds
+vaults, opens the dedicated routines page. It lists the irori agent's routines
+and those of the workspace's vaults, grouped by owner. The page also holds
 the **シークレット** / **Secrets** list. The device's **JavaScript** switch is
 in **設定** under **ルーティン**. irori mode keeps its map and columns,
 remembering the chosen view when you return. The routines page also works in
-a workspace without hibachis. The agent panel stays beside it, so a
+a workspace without vaults. The agent panel stays beside it, so a
 routine's agent steps can be followed in their conversations. The list is read
-again every five seconds and whenever a hibachi's files change.
+again every five seconds and whenever a vault's files change.
 
 - **実行** starts a routine, and so does the irori agent when the person asks
   it to (`irori run <routine>`, for a routine already reviewed on this device
@@ -111,8 +111,8 @@ again every five seconds and whenever a hibachi's files change.
 - A `run` step fails on a non-zero exit. If its last line of standard output is
   `{"continue": false}`, the run ends as **対象なし** (nothing to do) and later
   steps do not run, so a fetcher that found nothing spends no agent turn.
-- **`agent`** starts an ordinary native run: the hibachi's agent for a
-  hibachi's routine, or the irori agent with the named hibachis handed to it
+- **`agent`** starts an ordinary native run: the vault's agent for a
+  vault's routine, or the irori agent with the named vaults handed to it
   (held for the run, as in irori mode). Each step is a conversation of its own
   for that agent ([CONVERSATIONS](CONVERSATIONS.md)), titled
   **ルーティン: <name>（ステップ n）** and naming the routine's run and the step,
@@ -128,7 +128,7 @@ again every five seconds and whenever a hibachi's files change.
   - The step fails when the CLI's turn fails or the report (the agent's words
     after its last tool call, request or hand-off) begins with `[FAILED]`;
     the reason after the marker is the step's detail.
-  - The step waits (**待機中**) while its agent or a handed hibachi is running,
+  - The step waits (**待機中**) while its agent or a handed vault is running,
     while Git, a save or a connection keeps agents from starting, and while that
     agent has queued instructions.
 - While a routine runs, Git operations wait, as they do for an agent run.
@@ -175,9 +175,9 @@ irori signs in to no provider.
 
 A run's record stays on the device, never in a knowledge base: start and end,
 each step's state, exit code and output (the last 16 KiB; an agent step's
-report), the agent step's conversation (**会話** opens it: the hibachi with its
+report), the agent step's conversation (**会話** opens it: the vault with its
 agent panel, or the irori agent's panel; a record from before 0.1.60, when
-steps had no conversations of their own, opens the agent's conversation on show), and the files each hibachi's Git
+steps had no conversations of their own, opens the agent's conversation on show), and the files each vault's Git
 status shows changed between the start and the end (**変更 n 件**). A run is
 running, **成功**, **対象なし**, **失敗**, **停止** or **不明**. A run that irori's
 exit or a crash left running becomes **不明** when irori next opens, and is
@@ -228,13 +228,13 @@ line) and no saved session. Document content cannot start a routine.
   write-back line; the Git change record including a path
   dirty before the run; an agent step in a fresh session that leaves the
   person's session, with the preamble, the environment and its conversation
-  line; a `[FAILED]` report; a step waiting for the hibachi and **停止** during
-  an agent step; an irori agent routine handing a named hibachi; an
+  line; a `[FAILED]` report; a step waiting for the vault and **停止** during
+  an agent step; an irori agent routine handing a named vault; an
   unfinished run marked unknown and not repeated; a new routine's folder
   name and template, an edit refused after a crossing change, and
   `irori routines` with and without a workspace; `irori run` refusing a missing
   secret, an unreviewed or changed routine, a routine step and a request from
-  no workspace, preferring the irori agent's own routine over `--hibachi`, and
+  no workspace, preferring the irori agent's own routine over `--vault`, and
   starting a reviewed one whose secret reaches its program but not the report.
 - `tests/irori-command.test.ts`: `irori routines` and `irori run` parsed, and the
   `write-routine` skill a valid package.
@@ -250,10 +250,10 @@ line) and no saved session. Document content cannot start a routine.
   output, changed files and history, the gate, **停止**, a secret entered from
   its row, listed in the review, hidden in the output, written back and
   deleted (with the reversible test store, since the display has no keychain), an agent step's request
-  answered in the step and its conversation opened in its hibachi, and an irori
+  answered in the step and its conversation opened in its vault, and an irori
   agent routine.
 - `npm run test:routines` (`scripts/routines-acceptance.ts`) runs real Claude
-  Code and Codex, or the one named, as agent steps in a disposable Git hibachi,
+  Code and Codex, or the one named, as agent steps in a disposable Git vault,
   and uses the person's allowance: a `run` step's output turned into a note by
   the agent, the change record, the conversation, no saved session, and a
   `[FAILED]` report failing its step. Permission requests are allowed by the
@@ -272,7 +272,7 @@ line) and no saved session. Document content cannot start a routine.
   DPAPI and a Linux secret service have not been tried. On macOS only saving a
   secret or running a step that names one touches the Keychain; an ad-hoc
   signed build is asked for the login password there, once per build.
-- Changes under a hibachi's contents folders and in hibachis that are not Git
+- Changes under a vault's contents folders and in vaults that are not Git
   repositories are not in the change record.
 - Agent steps ran on real Claude Code 2.1.280 and Codex 0.156.1 only
   ([STATUS](STATUS.md)); Pi, OpenCode and Hermes Agent steps are covered by

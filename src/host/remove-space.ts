@@ -7,10 +7,10 @@ import { t } from '../domain/i18n';
 export interface RemoveSpaceHost {
   files: FileService;
   workspaces: WorkspaceService;
-  /** Folders that never go to the trash with a hibachi: the irori agent's and irori's own data. */
+  /** Folders that never go to the trash with a vault: the irori agent's and irori's own data. */
   keep: () => Promise<string[]>;
   /**
-   * Lets go of the hibachi's folder: its terminals, connected folders and watcher.
+   * Lets go of the vault's folder: its terminals, connected folders and watcher.
    * Returns how to take it up again if the folder cannot be moved.
    */
   release: (space: Space) => Promise<() => Promise<void>>;
@@ -18,7 +18,7 @@ export interface RemoveSpaceHost {
 }
 
 /**
- * Removes a hibachi from this device's list and from every workspace. With
+ * Removes a vault from this device's list and from every workspace. With
  * `trash`, its folder also goes to the system trash, where it can be restored;
  * otherwise the folder stays as it is and can be registered again.
  */
@@ -62,7 +62,7 @@ export async function removeSpace(host: RemoveSpaceHost, scopeId: string, trash:
     }
     await host.files.unregister(scopeId);
   } catch (error) {
-    // A hibachi whose folder is still there stays as it was.
+    // A vault whose folder is still there stays as it was.
     if (!moved) await takeUp().catch(() => {});
     throw error;
   }

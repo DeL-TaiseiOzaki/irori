@@ -2,7 +2,7 @@ import type { DeviceSettings } from './types';
 
 /**
  * A device's environment kept on the person's GitHub account (ADR 026): the
- * hibachis that live on GitHub, the workspaces that combine them, the display
+ * vaults that live on GitHub, the workspaces that combine them, the display
  * and agent preferences, and the irori agent's folder when it is a repository.
  * It is a file in a private repository of that account, written and read with
  * the GitHub CLI's sign-in; notes and credentials never go there.
@@ -16,15 +16,15 @@ export const environmentPreferences = [
   'language',
   'markdownFont',
   'editorAssistance',
-  'hibachiAgent',
+  'vaultAgent',
   'yourAi',
 ] as const satisfies readonly (keyof DeviceSettings)[];
 export type EnvironmentPreferences = Partial<
   Pick<DeviceSettings, (typeof environmentPreferences)[number]>
 >;
 
-/** A hibachi of the saved environment, and whether this device has it. */
-export interface EnvironmentHibachi {
+/** A vault of the saved environment, and whether this device has it. */
+export interface EnvironmentVault {
   scopeId: string;
   name: string;
   /** owner/name on GitHub. */
@@ -37,9 +37,9 @@ export interface EnvironmentState {
   account: string;
   /** What saving would write from this device. */
   local: {
-    /** How many hibachis would be saved. */
-    hibachis: number;
-    /** The names of hibachis left out because they are not on GitHub. */
+    /** How many vaults would be saved. */
+    vaults: number;
+    /** The names of vaults left out because they are not on GitHub. */
     left: string[];
     /** The irori agent's repository, when its folder is one on GitHub. */
     agent?: string;
@@ -47,16 +47,16 @@ export interface EnvironmentState {
   /** The environment saved on the account, absent before the first save. */
   saved?: {
     savedAt: string;
-    hibachis: EnvironmentHibachi[];
+    vaults: EnvironmentVault[];
     workspaces: string[];
     agent?: { repository: string; here: boolean };
   };
-  /** Where restored hibachis are cloned unless another folder is chosen. */
+  /** Where restored vaults are cloned unless another folder is chosen. */
   parent: string;
 }
 
 export interface RestoreEnvironment {
-  /** The saved hibachis to clone here; ones this device has are skipped. */
+  /** The saved vaults to clone here; ones this device has are skipped. */
   scopeIds: string[];
   /** Clone the irori agent's folder when it is absent or empty here. */
   agent: boolean;
@@ -65,7 +65,7 @@ export interface RestoreEnvironment {
 }
 
 export interface EnvironmentRestore {
-  /** The names of the hibachis cloned and registered. */
+  /** The names of the vaults cloned and registered. */
   restored: string[];
   failed: { name: string; message: string }[];
   /** How many workspaces were added or brought up to date. */

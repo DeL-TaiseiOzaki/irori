@@ -34,7 +34,7 @@ test('instances other than plain objects never read the same', () => {
   assert.ok(!sameStructure({ a: 1 }, Object.assign(Object.create({ p: 1 }), { a: 1 })));
 });
 
-test("a change in one hibachi reaches that hibachi's views alone", () => {
+test("a change in one vault reaches that vault's views alone", () => {
   const once = bumpRevision(noRevisions, 'a');
   assert.equal(scopeRevision(once, 'a'), 1);
   assert.equal(scopeRevision(once, 'b'), 0);
@@ -42,7 +42,7 @@ test("a change in one hibachi reaches that hibachi's views alone", () => {
   const twice = bumpRevision(bumpRevision(once, 'b'), 'a');
   assert.equal(scopeRevision(twice, 'a'), 2);
   assert.equal(scopeRevision(twice, 'b'), 1);
-  // A change that may have reached every hibachi counts for each of them.
+  // A change that may have reached every vault counts for each of them.
   const everywhere = bumpRevision(twice);
   assert.equal(scopeRevision(everywhere, 'a'), 3);
   assert.equal(scopeRevision(everywhere, 'c'), 1);

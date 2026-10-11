@@ -261,7 +261,7 @@ function Document({ article, articles }: { article: Article; articles: Article[]
               <div className="layer-diagram" aria-label="Schema, Knowledge, Contents">
                 <div className="diagram-caption">
                   <Layers size={16} />
-                  <span>hibachi</span>
+                  <span>vault</span>
                   <span className="diagram-file">my-knowledge/</span>
                 </div>
                 <div className="diagram-row schema">

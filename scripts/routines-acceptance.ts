@@ -16,7 +16,7 @@ import type { AgentEvent, AgentId } from '../src/domain/types';
 import type { RoutineRef, RoutineRun } from '../src/domain/routines';
 
 // Real Claude Code and Codex as routine agent steps (ADR 016 D7), in a
-// disposable Git hibachi. It uses the person's CLI accounts and allowance:
+// disposable Git vault. It uses the person's CLI accounts and allowance:
 // run it only when real agent runs are authorized. `npm run test:routines`
 // runs both; name one CLI to run only that one. Permission requests are
 // allowed here, as the person would in the routine's step.
@@ -34,11 +34,11 @@ const base = await mkdtemp(path.join(tmpdir(), 'irori routines real '));
 const keep = process.argv.includes('--keep');
 const files = new FileService(path.join(base, 'device'));
 await files.init();
-const root = path.join(base, 'Inbox hibachi');
+const root = path.join(base, 'Inbox vault');
 await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
 await writeFile(
   path.join(root, 'AGENTS.md'),
-  'This is a disposable test hibachi. Work only inside this folder. Do not use Git, the network or subagents.\n',
+  'This is a disposable test vault. Work only inside this folder. Do not use Git, the network or subagents.\n',
 );
 const git = (...args: string[]) =>
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args], {
@@ -123,11 +123,11 @@ try {
       'routine.yaml': `name: Triage (${cli})
 steps:
   - run: fetch.js
-  - agent: hibachi
+  - agent: vault
     cli: ${cli}
     access: ${access(cli)}
     prompt: |
-      Read the file items.txt in the folder named by IRORI_WORK. Create ${target} in this hibachi with one Markdown bullet per line of that file, in the same order, and nothing else in it. Change no other file.
+      Read the file items.txt in the folder named by IRORI_WORK. Create ${target} in this vault with one Markdown bullet per line of that file, in the same order, and nothing else in it. Change no other file.
 `,
       'fetch.js': `require('node:fs').writeFileSync(require('node:path').join(process.env.IRORI_WORK, 'items.txt'), 'alpha mail\\nbeta mail\\ngamma mail\\n');\nconsole.log('fetched 3');\n`,
     });
@@ -142,7 +142,7 @@ steps:
     const failing = await routine(`failing-${cli}`, {
       'routine.yaml': `name: Failing (${cli})
 steps:
-  - agent: hibachi
+  - agent: vault
     cli: ${cli}
     access: ${access(cli)}
     prompt: |

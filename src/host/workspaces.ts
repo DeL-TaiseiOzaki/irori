@@ -6,8 +6,8 @@ import { SerialQueue } from './serial-queue';
 import { GitProcess } from '../git/process';
 import { isMissing, readLocalJson, writeLocalJson } from './local-json';
 import type { FileService } from './files';
-import type { HibachiGroup, WorkspaceProfile, RepositoryInfo } from '../domain/types';
-import { normalizeGroups } from '../domain/hibachi-groups';
+import type { VaultGroup, WorkspaceProfile, RepositoryInfo } from '../domain/types';
+import { normalizeGroups } from '../domain/vault-groups';
 import { githubRepository } from '../domain/git';
 import { t } from '../domain/i18n';
 const group = z.object({
@@ -41,7 +41,7 @@ export class WorkspaceService {
       scopeIds.forEach((scopeId) => {
         if (!previous?.scopeIds.includes(scopeId)) this.files.get(scopeId);
       });
-      // Groups follow the hibachis that stay; one left empty goes.
+      // Groups follow the vaults that stay; one left empty goes.
       const groups = normalizeGroups(previous?.groups ?? [], scopeIds);
       const value = workspaceProfile.parse({
         id: id ?? randomUUID(),
@@ -60,7 +60,7 @@ export class WorkspaceService {
       return value;
     });
   }
-  saveGroups(id: string, groups: HibachiGroup[]) {
+  saveGroups(id: string, groups: VaultGroup[]) {
     return this.queue.run(async () => {
       const current = await this.list();
       const previous = current.find((item) => item.id === id);
@@ -80,7 +80,7 @@ export class WorkspaceService {
       return value;
     });
   }
-  /** Takes a removed hibachi out of every workspace and its groups. */
+  /** Takes a removed vault out of every workspace and its groups. */
   forget(scopeId: string) {
     return this.queue.run(async () => {
       const current = await this.list();
@@ -99,9 +99,9 @@ export class WorkspaceService {
   }
   /**
    * Takes in workspaces saved on another device (ADR 026). A workspace this
-   * device has under the same id keeps its own hibachis beside the saved ones;
+   * device has under the same id keeps its own vaults beside the saved ones;
    * a different workspace with the same name keeps its name and the saved one
-   * gets a numbered name. Hibachis not on this device stay as unavailable.
+   * gets a numbered name. Vaults not on this device stay as unavailable.
    * Returns how many workspaces were added or changed.
    */
   adopt(saved: WorkspaceProfile[]) {

@@ -28,9 +28,9 @@ const unreadable = (detail: string) =>
   );
 
 /**
- * The comments file of a Markdown file in a hibachi, under its `.irori/comments/`.
+ * The comments file of a Markdown file in a vault, under its `.irori/comments/`.
  * Each folder on the way must be an ordinary folder, created when `create` is
- * set; an alias or symbolic link is refused, so a write never leaves the hibachi.
+ * set; an alias or symbolic link is refused, so a write never leaves the vault.
  */
 async function location(
   files: FileService,
@@ -43,7 +43,7 @@ async function location(
     throw Error(
       t('コメントできるのは Markdown ファイルです。', 'Only Markdown files take comments.'),
     );
-  // Confirms the file is in this hibachi and not another's, as any read would.
+  // Confirms the file is in this vault and not another's, as any read would.
   if (present) await files.resolve(scopeId, notePath);
   const root = files.get(scopeId).root;
   let directory = root;
@@ -89,7 +89,7 @@ async function readFile(filename: string): Promise<{ raw: NoteComments; exists: 
   return { raw: parsed.data, exists: true };
 }
 
-/** The comments on a Markdown file of a hibachi, oldest first. */
+/** The comments on a Markdown file of a vault, oldest first. */
 export async function readNoteComments(
   files: FileService,
   scopeId: string,
@@ -135,7 +135,7 @@ export async function addNoteComment(
 
 /**
  * Removes one comment. The last one gone removes the file and the folders it
- * leaves empty, so a hibachi without comments carries nothing for them.
+ * leaves empty, so a vault without comments carries nothing for them.
  */
 export async function removeNoteComment(
   files: FileService,
@@ -236,7 +236,7 @@ export async function moveNoteComments(
 }
 
 /**
- * How many comments a hibachi holds and on how many files, for the words before
+ * How many comments a vault holds and on how many files, for the words before
  * an agent's instruction. Files that cannot be read are not counted; the walk
  * stops after `limit` files.
  */

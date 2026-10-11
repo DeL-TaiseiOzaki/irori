@@ -3,7 +3,7 @@
  * its own Schema, kept in the irori agent's folder and written through the
  * settings (ADR 027).
  *
- * Sent: first in every request, to the irori agent, a hibachi agent and a
+ * Sent: first in every request, to the irori agent, a vault agent and a
  * routine's agent step alike. In full on a native session's first request and
  * whenever the shared Schema changed since that session last heard it;
  * otherwise as one line pointing at it.
@@ -40,7 +40,7 @@ export function sharedSchema(shared: SharedSchemaPrompt, handsOff: boolean) {
     );
   if (handsOff)
     parts.push(
-      `When you hand work to a hibachi's sub-agent, tell it to follow the shared Schema too: ${shared.file} and the shared skills above.`,
+      `When you hand work to a vault's sub-agent, tell it to follow the shared Schema too: ${shared.file} and the shared skills above.`,
     );
   return parts.join('\n\n');
 }

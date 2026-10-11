@@ -187,7 +187,7 @@ test(
     // Drive for desktop keeps the same Drive folder on this device.
     const folder = await syncedFolder(base, 'Research');
     await writeFile(path.join(folder, 'note.md'), '# Synced\n');
-    // A folder overlapping the hibachi is refused, and the retired record stays as it was.
+    // A folder overlapping the vault is refused, and the retired record stays as it was.
     await assert.rejects(cloud.switchToLocal(space.scopeId, record.mountId, space.root), /重なる/);
     assert.deepEqual(await declared(space, 'cloud-mounts.json'), [record, other]);
     assert.equal(await exists(binding), true);
@@ -209,7 +209,7 @@ test(
         access: 'read-only',
       },
     ]);
-    // The hibachi's record names the connection, never this device's path.
+    // The vault's record names the connection, never this device's path.
     assert.ok(
       !(await readFile(path.join(space.root, '.irori', 'local-folders.json'), 'utf8')).includes(
         base,

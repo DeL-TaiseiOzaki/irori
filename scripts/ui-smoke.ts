@@ -23,9 +23,9 @@ await writeFile(
   path.join(kb, 'AGENTS.md'),
   'Only edit the note selected by the user in this disposable fixture KB. Do not access files outside it.\n',
 );
-// This suite exercises the hibachi agent, which is off until turned on (ADR 021).
+// This suite exercises the vault agent, which is off until turned on (ADR 021).
 await mkdir(path.join(base, 'device'), { recursive: true });
-await new SettingsService(path.join(base, 'device')).save({ hibachiAgent: true });
+await new SettingsService(path.join(base, 'device')).save({ vaultAgent: true });
 const launchStart = Date.now();
 const env: Record<string, string> = Object.fromEntries(
   Object.entries({ ...process.env, IRORI_DATA_DIR: path.join(base, 'device') }).filter(
@@ -190,7 +190,7 @@ try {
   const paneWidth = () =>
     page.locator('.brain-pane').evaluate((element) => element.getBoundingClientRect().width);
   const startWidth = await paneWidth();
-  const handle = page.getByRole('separator', { name: 'hibachi パネルの幅', exact: true });
+  const handle = page.getByRole('separator', { name: 'vault パネルの幅', exact: true });
   const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
@@ -360,7 +360,7 @@ try {
     )
     .toBe(true);
   await expect(page.locator('.literal-block').filter({ hasText: '<br' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   const realResults: unknown[] = [];
   if (process.env.IRORI_UI_REAL_AGENTS === '1') {
     for (const agent of ['codex', 'claude']) {
@@ -505,7 +505,7 @@ if (process.env.IRORI_UI_REAL_AGENTS !== '1') {
             .evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBeGreaterThan(chosenWidth - 12);
-      await window.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+      await window.getByRole('button', { name: 'vault agent', exact: true }).click();
       await window.getByRole('button', { name: '履歴', exact: true }).click();
       const history = window.getByRole('region', { name: '履歴' });
       const earlier = history.locator('.history-row').filter({ hasText: '以前の会話' });

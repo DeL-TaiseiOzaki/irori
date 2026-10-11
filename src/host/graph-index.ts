@@ -286,7 +286,7 @@ export class GraphIndexService {
     return { folders: planned.length, added, changed };
   }
 
-  /** The module in this hibachi's knowledge folder. */
+  /** The module in this vault's knowledge folder. */
   private at(scopeId: string) {
     return graphIndexAt(knowledgeFolder(this.files.get(scopeId)));
   }

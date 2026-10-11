@@ -2,7 +2,7 @@
 // them from here; README.md lists each situation.
 export * from './irori-agent';
 export * from './irori-agent-starter';
-export * from './hibachi-agent';
+export * from './vault-agent';
 export * from './note';
 export * from './connected-folders';
 export * from './person-lines';

@@ -200,9 +200,9 @@ try {
     string,
     string
   >;
-  // The packaged run exercises the hibachi agent, which is off until turned on (ADR 021).
+  // The packaged run exercises the vault agent, which is off until turned on (ADR 021).
   await mkdir(env.IRORI_DATA_DIR, { recursive: true });
-  await new SettingsService(env.IRORI_DATA_DIR).save({ hibachiAgent: true });
+  await new SettingsService(env.IRORI_DATA_DIR).save({ vaultAgent: true });
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_PATH;
   delete env.NODE_OPTIONS;
@@ -512,7 +512,7 @@ try {
     restoredRecovery.note.text,
   );
   await restored.locator('.workspace-card').first().click();
-  await restored.getByRole('button', { name: 'hibachi agent', exact: true }).click();
+  await restored.getByRole('button', { name: 'vault agent', exact: true }).click();
   await expect(restored.getByLabel('送信待ち', { exact: true })).toContainText(
     'Packaged pending instruction 日本語',
   );

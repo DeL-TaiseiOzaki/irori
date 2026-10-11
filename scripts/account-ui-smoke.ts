@@ -8,7 +8,7 @@ import { SettingsService } from '../src/host/settings';
 import { fakeGh, git, remote } from '../tests/fixtures/github';
 
 // The environment kept on the GitHub account (ADR 026): one device saves its
-// hibachis, workspaces and preferences from the start screen's settings, before
+// vaults, workspaces and preferences from the start screen's settings, before
 // opening any workspace, and a new device restores them from the start screen.
 // gh is a stand-in answering from a folder.
 const base = await mkdtemp(path.join(tmpdir(), 'irori account UI '));
@@ -33,7 +33,7 @@ await writeFile(
 const fake = await fakeGh(base);
 const bin = path.dirname(fake.gh);
 
-// Device A has the hibachi, a workspace and a dark theme.
+// Device A has the vault, a workspace and a dark theme.
 const homeA = path.join(base, 'home-a'),
   homeB = path.join(base, 'home-b');
 const checkout = path.join(homeA, 'irori', 'kb');
@@ -88,7 +88,7 @@ try {
   await expect(account).toContainText('環境を保存：');
   await expect(page.locator('.settings-popover')).toContainText('Schema');
   const saved = JSON.parse(await fake.stored());
-  if (saved.hibachis[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
+  if (saved.vaults[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
     throw Error(`Unexpected saved environment: ${JSON.stringify(saved)}`);
   if (JSON.stringify(saved).includes(base)) throw Error('A device path reached GitHub');
   await app.close();
@@ -107,7 +107,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-account-restore.png' });
   await sheet.getByRole('button', { name: '復元', exact: true }).click();
   await expect(sheet.getByRole('status')).toHaveText(
-    'hibachi 1 件とワークスペース 1 件を取り込みました。',
+    'vault 1 件とワークスペース 1 件を取り込みました。',
   );
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await sheet.getByRole('button', { name: '閉じる' }).click();
@@ -115,9 +115,9 @@ try {
   const card = page.locator('.workspace-card').filter({ hasText: 'Lab' });
   await expect(card).toContainText('Research');
   const cloned = await readFile(path.join(homeB, 'irori', 'kb', 'knowledge', 'note.md'), 'utf8');
-  if (cloned !== '# Note\n') throw Error('The hibachi was not cloned');
+  if (cloned !== '# Note\n') throw Error('The vault was not cloned');
   await card.click();
-  await expect(page.getByRole('navigation', { name: 'hibachi' })).toContainText('Research');
+  await expect(page.getByRole('navigation', { name: 'vault' })).toContainText('Research');
   if (errors.length) throw Error(errors.join('\n'));
   console.log('Account UI smoke passed');
 } finally {

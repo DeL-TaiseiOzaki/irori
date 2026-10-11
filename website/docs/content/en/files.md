@@ -18,7 +18,7 @@ Office, PDF, and image viewers accept files up to 100 MiB. Rendering may differ 
 
 ## Open materials
 
-Select a file in a hibachi's Contents to open it in the center. [Google Drive](drive.md) materials can open while their connection is available.
+Select a file in a vault's Contents to open it in the center. [Google Drive](drive.md) materials can open while their connection is available.
 
 PDF and Office viewers are for reading. Edit those documents in their original applications. Markdown materials can be edited in irori when their connection permits writing.
 

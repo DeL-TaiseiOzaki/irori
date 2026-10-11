@@ -2,21 +2,21 @@ import { z } from 'zod';
 import type { Layer } from './types';
 import { t } from './i18n';
 
-/** The knowledge folder of a hibachi that declares none (ADR 024). */
+/** The knowledge folder of a vault that declares none (ADR 024). */
 export const defaultKnowledgeFolder = 'Knowledge_Base';
 /** The contents folder irori declares when it registers a KB. */
 export const defaultContentsFolder = 'contents';
-/** The layers whose folder and shown name a hibachi may change; Schema keeps both. */
+/** The layers whose folder and shown name a vault may change; Schema keeps both. */
 export type NamedLayer = Exclude<Layer, 'schema'>;
 const defaultLabels: Record<Layer, string> = {
   schema: 'Schema',
   Knowledge_Base: 'Knowledge',
   contents: 'Contents',
 };
-/** The files at the top of a hibachi that belong to Schema: its agents' instructions and settings. */
+/** The files at the top of a vault that belong to Schema: its agents' instructions and settings. */
 export const schemaFiles = ['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode.jsonc'];
 /**
- * The repository's front page at the top of a hibachi is Schema too (ADR 028):
+ * The repository's front page at the top of a vault is Schema too (ADR 028):
  * it introduces the checkout, it is not a knowledge page. Matched in any case,
  * as GitHub finds `readme.md` or `Readme.md` and a default Mac or Windows volume
  * reaches the same file through either spelling. A nested README stays knowledge.
@@ -30,14 +30,14 @@ const reserved = [
   'node_modules',
 ];
 
-/** What a hibachi says about its layers in `.irori/scope.json`. */
+/** What a vault says about its layers in `.irori/scope.json`. */
 interface LayerDeclaration {
   contents: string[];
   knowledge?: string;
   labels?: Partial<Record<NamedLayer, string>>;
 }
 
-/** The folder where the hibachi's knowledge pages live; everything outside Schema and contents is knowledge too. */
+/** The folder where the vault's knowledge pages live; everything outside Schema and contents is knowledge too. */
 export function knowledgeFolder(space: Pick<LayerDeclaration, 'knowledge'>) {
   return space.knowledge ?? defaultKnowledgeFolder;
 }
@@ -52,13 +52,13 @@ export function layerFolder(space: LayerDeclaration, layer: NamedLayer) {
 export function layerRoots(space: LayerDeclaration) {
   return [knowledgeFolder(space), ...space.contents];
 }
-/** The name a layer is shown under: the hibachi's own, or irori's. */
+/** The name a layer is shown under: the vault's own, or irori's. */
 export function layerLabel(space: Pick<LayerDeclaration, 'labels'> | undefined, layer: Layer) {
   return (layer !== 'schema' && space?.labels?.[layer]) || defaultLabels[layer];
 }
 export const defaultLayerLabel = (layer: Layer) => defaultLabels[layer];
 
-/** Why `name` cannot be a layer folder at the top of a hibachi, or undefined when it can. */
+/** Why `name` cannot be a layer folder at the top of a vault, or undefined when it can. */
 export function layerFolderProblem(name: string): string | undefined {
   if (!name || name.length > 64 || /[\u0000-\u001f/\\:*?"<>|]/.test(name))
     return t(

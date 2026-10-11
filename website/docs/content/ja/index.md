@@ -7,13 +7,13 @@ description: ノートを書き、資料をつなぎ、AI と次の仕事を進�
 
 irori は、複数の知識ベース（GitHub のリポジトリ）と、手元やクラウドにある資料を編集し、読むためのデスクトップ IDE です。ノートは手元のフォルダにある普通のファイルとして残ります。
 
-初めて使う方は、[クイックスタート](quickstart.md)から。アプリの準備は[インストール](installation.md)、既存のフォルダを開く方法は[hibachi とワークスペース](workspaces.md)で紹介しています。
+初めて使う方は、[クイックスタート](quickstart.md)から。アプリの準備は[インストール](installation.md)、既存のフォルダを開く方法は[vault とワークスペース](workspaces.md)で紹介しています。
 
 ## irori のしくみ
 
-知識ベースのフォルダを **hibachi** と呼びます。ノートは **Knowledge**、資料は **Contents** として表示されます。AI への指示は **Schema** で、エージェントをオンにしたときだけ表示されます。[3つの層](layers.md)を参照してください。
+知識ベースのフォルダを **vault** と呼びます。ノートは **Knowledge**、資料は **Contents** として表示されます。AI への指示は **Schema** で、エージェントをオンにしたときだけ表示されます。[3つの層](layers.md)を参照してください。
 
-**hibachi agent** は任意の機能で、**設定 → エージェント** でオンにします。複数の hibachi をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)を参照してください。
+**vault agent** は任意の機能で、**設定 → エージェント** でオンにします。複数の vault をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)を参照してください。
 
 ## 目的から探す
 

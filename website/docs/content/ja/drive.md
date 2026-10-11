@@ -1,13 +1,13 @@
 ---
 title: Google Drive
-description: パソコン版 Google ドライブが同期するフォルダを、hibachi の資料として使います。
+description: パソコン版 Google ドライブが同期するフォルダを、vault の資料として使います。
 ---
 
 ## つなぐ
 
 1. [パソコン版 Google ドライブ](https://www.google.com/drive/download/)を入れて、ログインします。
 2. 使うフォルダを **ミラーリング** か **オフラインで使用可能** にします。
-3. hibachi の **接続** から **フォルダを選ぶ** で、そのフォルダを選びます。
+3. vault の **接続** から **フォルダを選ぶ** で、そのフォルダを選びます。
 
 手順の詳細は[同期フォルダ](sync-folders.md)を参照してください。irori は Google に直接ログインしません。
 

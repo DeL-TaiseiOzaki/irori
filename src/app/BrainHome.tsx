@@ -114,7 +114,7 @@ export function BrainHome({
   git?: GitStatus;
   connections: CloudConnection[];
   skills: AgentSkill[];
-  /** The Schema card shows only with the hibachi agent (ADR 021). */
+  /** The Schema card shows only with the vault agent (ADR 021). */
   schemaLayer: boolean;
   daily: boolean;
   /** Actions that change the brain wait (a run, Git or a connection is in progress). */
@@ -168,8 +168,8 @@ export function BrainHome({
             {space.name}
             <button
               className="stage-button home-edit"
-              aria-label={t('hibachi の設定', 'hibachi settings')}
-              title={t('hibachi の設定', 'hibachi settings')}
+              aria-label={t('vault の設定', 'vault settings')}
+              title={t('vault の設定', 'vault settings')}
               disabled={locked}
               onClick={onSettings}
             >

@@ -56,17 +56,17 @@ async function checkUnrelatedFileEvent(
     throw Error(`File event reads did not settle: ${last}`);
   };
   try {
-    // What one event of this hibachi refreshes here.
+    // What one event of this vault refreshes here.
     await send(scopeId);
     await expect.poll(async () => (await counts()).reads).toBe(1);
     const own = await settled();
     expect(own.declarations).toBeGreaterThan(0);
     // Events reach the renderer in the order they are sent, so the other
-    // hibachi's event has been handled once this hibachi's next event is.
+    // vault's event has been handled once this vault's next event is.
     await send(otherScopeId);
     await send(scopeId);
     await expect.poll(async () => (await counts()).reads).toBe(2);
-    // A file in another hibachi refreshes nothing here: neither the document
+    // A file in another vault refreshes nothing here: neither the document
     // open in this one nor its notes declaration.
     expect((await settled()).declarations).toBe(own.declarations * 2);
   } finally {
@@ -279,7 +279,7 @@ git(
   `url.${path.join(base, 'missing.git')}.insteadOf`,
   'https://github.com/irori-fixture/missing.git',
 );
-// Hibachis made in the app commit with the person's own identity.
+// Vaults made in the app commit with the person's own identity.
 git(base, 'config', '--file', globalConfig, 'user.name', 'UI fixture');
 git(base, 'config', '--file', globalConfig, 'user.email', 'fixture@example.invalid');
 git(base, 'config', '--file', globalConfig, 'commit.gpgsign', 'false');
@@ -347,7 +347,7 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  const modes = page.getByRole('group', { name: 'hibachi の表示' });
+  const modes = page.getByRole('group', { name: 'vault の表示' });
   const notesView = modes.getByRole('button', { name: 'ファイル', exact: true });
   const gitView = modes.getByRole('button', { name: /^変更/ });
   await notesView.focus();
@@ -436,7 +436,7 @@ try {
   await expect(panel.getByLabel('差分', { exact: true })).toContainText('UI saved 日本語');
   await page.screenshot({ path: 'test-results/irori-git-history.png' });
   // Changes belong to the brain on show; choosing another brain shows its repository.
-  const rail = page.getByRole('navigation', { name: 'hibachi' });
+  const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: /^チームKB・AI/ }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText('リモート未設定');
   await panel.getByRole('button', { name: '履歴', exact: true }).click();
@@ -511,7 +511,7 @@ try {
     .getByRole('button', { name: 'memo', exact: true })
     .click();
   await page
-    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('group', { name: 'vault の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
   sidebar = page.getByRole('region', { name: 'ソース管理' });
@@ -538,9 +538,7 @@ try {
   await expect(page.getByRole('button', { name: 'ファイル', exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
   await expect(
-    page
-      .getByRole('navigation', { name: 'hibachi' })
-      .getByRole('button', { name: /^チームKB・AI/ }),
+    page.getByRole('navigation', { name: 'vault' }).getByRole('button', { name: /^チームKB・AI/ }),
   ).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(sidebar).toBeVisible();
@@ -642,7 +640,7 @@ try {
   await expect(page.locator('.document-editor')).toContainText('Combined');
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
-  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
+  await page.getByRole('button', { name: 'vault を追加', exact: true }).click();
   await page.getByRole('button', { name: 'GitHub から取得', exact: true }).click();
   const registration = page.getByRole('form', { name: 'スペース登録' });
   // Nothing to preview yet, so no empty panel sits under the form.
@@ -683,39 +681,39 @@ try {
     3,
   );
 
-  // A hibachi made in the app, published in the same step. GitHub refuses the
-  // first name; the hibachi stays created and is published from Source control.
-  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
+  // A vault made in the app, published in the same step. GitHub refuses the
+  // first name; the vault stays created and is published from Source control.
+  await page.getByRole('button', { name: 'vault を追加', exact: true }).click();
   const creation = page.getByRole('form', { name: 'スペース登録' });
   await creation.getByRole('button', { name: '新しく作成', exact: true }).click();
   await creation.getByRole('textbox', { name: '保存先の親フォルダ' }).fill(base);
-  await creation.getByRole('textbox', { name: '新しいフォルダ名' }).fill('new-hibachi');
-  await creation.getByRole('textbox', { name: 'スペース名' }).fill('新しい hibachi');
+  await creation.getByRole('textbox', { name: '新しいフォルダ名' }).fill('new-vault');
+  await creation.getByRole('textbox', { name: 'スペース名' }).fill('新しい vault');
   await expect(creation.getByRole('button', { name: '作成して開く', exact: true })).toBeEnabled();
   await creation.getByRole('checkbox', { name: 'GitHub にも作成' }).check();
   await expect(creation.getByRole('combobox', { name: 'GitHub アカウント' })).toHaveValue('octo');
   await expect(creation.getByRole('combobox', { name: '公開範囲' })).toHaveValue('private');
   const repositoryName = creation.getByRole('textbox', { name: 'リポジトリ名' });
-  await expect(repositoryName).toHaveValue('new-hibachi');
+  await expect(repositoryName).toHaveValue('new-vault');
   await repositoryName.fill('bad name');
   await expect(creation.getByRole('button', { name: '作成して公開', exact: true })).toBeDisabled();
   await repositoryName.fill('taken');
   await creation.getByRole('button', { name: '作成して公開', exact: true }).click();
   const partial = creation.getByRole('alert');
-  await expect(partial).toContainText('hibachi は作成しましたが');
+  await expect(partial).toContainText('vault は作成しましたが');
   await expect(partial).toContainText('同じ名前のリポジトリが GitHub にすでにあります');
-  const created = path.join(base, 'new-hibachi');
+  const created = path.join(base, 'new-vault');
   expect(git(created, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').sort()).toEqual([
     '.gitignore',
     '.irori/scope.json',
   ]);
-  expect(git(created, 'log', '-1', '--format=%s')).toBe('hibachi「新しい hibachi」を作成');
+  expect(git(created, 'log', '-1', '--format=%s')).toBe('vault「新しい vault」を作成');
   expect(git(created, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
   expect(git(created, 'remote')).toBe('');
   await creation.getByRole('button', { name: '開く', exact: true }).click();
   await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
   await page
-    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('group', { name: 'vault の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
   panel = page.locator('.git-sidebar, .git-workspace-detail');
@@ -725,31 +723,29 @@ try {
   await expect(publication.getByRole('combobox', { name: 'GitHub アカウント' })).toHaveValue(
     'octo',
   );
-  await expect(publication.getByRole('textbox', { name: 'リポジトリ名' })).toHaveValue(
-    'new-hibachi',
-  );
+  await expect(publication.getByRole('textbox', { name: 'リポジトリ名' })).toHaveValue('new-vault');
   await publication.getByRole('button', { name: '作成して送信', exact: true }).click();
   await expect(page.getByRole('form', { name: 'GitHub に公開' })).toHaveCount(0);
   // The publish dialog's own progress line is a status too; read the panel's notice.
   await expect(panel.locator('.git-notice[role="status"]')).toContainText(
-    'octo/new-hibachi を公開しました。',
+    'octo/new-vault を公開しました。',
   );
   expect(git(created, 'config', '--get', 'remote.origin.url')).toBe(
-    'https://github.com/octo/new-hibachi.git',
+    'https://github.com/octo/new-vault.git',
   );
   expect(git(created, 'config', '--get', 'branch.main.merge')).toBe('refs/heads/main');
-  expect(git(path.join(github, 'octo/new-hibachi.git'), 'rev-parse', 'main')).toBe(
+  expect(git(path.join(github, 'octo/new-vault.git'), 'rev-parse', 'main')).toBe(
     git(created, 'rev-parse', 'HEAD'),
   );
   await expect(panel.locator('.git-ahead')).toHaveText('↑0 ↓0');
   await expect(panel.getByRole('button', { name: 'GitHub に公開…' })).toHaveCount(0);
   await expect(panel.getByRole('button', { name: 'Push', exact: true })).toBeEnabled();
 
-  // A hibachi registered as an ordinary folder starts Git, commits, and goes to an organization.
+  // A vault registered as an ordinary folder starts Git, commits, and goes to an organization.
   const plain = path.join(base, 'plain KB');
   await mkdir(plain);
   await writeFile(path.join(plain, 'note.md'), '# Plain\n\nWritten before Git\n');
-  await page.getByRole('button', { name: 'hibachi を追加', exact: true }).click();
+  await page.getByRole('button', { name: 'vault を追加', exact: true }).click();
   await page.getByRole('textbox', { name: 'KBフォルダ', exact: true }).fill(plain);
   await expect(page.getByRole('form', { name: 'スペース登録' })).toContainText(
     'ローカルのKBフォルダ',
@@ -758,7 +754,7 @@ try {
   await page.getByRole('button', { name: '登録して開く', exact: true }).click();
   await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
   await page
-    .getByRole('group', { name: 'hibachi の表示' })
+    .getByRole('group', { name: 'vault の表示' })
     .getByRole('button', { name: /^変更/ })
     .click();
   await expect(panel.getByRole('heading', { name: 'Git 未設定' })).toBeVisible();
@@ -767,7 +763,7 @@ try {
   expect(git(plain, 'symbolic-ref', 'HEAD')).toBe('refs/heads/main');
   await expect(panel.locator('.git-file').filter({ hasText: 'note.md' })).toHaveCount(1);
   await panel.getByRole('button', { name: 'すべて追加', exact: true }).click();
-  await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Start the plain hibachi');
+  await panel.getByRole('textbox', { name: 'commit メッセージ' }).fill('Start the plain vault');
   await panel.getByRole('button', { name: 'コミット', exact: true }).click();
   await expect(panel.locator('.git-notice[role="status"]')).toContainText('コミットしました');
   await panel.getByRole('button', { name: 'GitHub に公開…', exact: true }).click();
@@ -789,7 +785,7 @@ try {
   expect(await ghCalls()).toEqual(
     expect.arrayContaining([
       'github.com|repo create octo/taken --private',
-      'github.com|repo create octo/new-hibachi --private',
+      'github.com|repo create octo/new-vault --private',
       'github.com|repo create team-a/plain-KB --public',
     ]),
   );
@@ -819,9 +815,9 @@ try {
           '1024px sidebar bounds',
           'a failed clone folds redacted Git output under one advice line and removes its empty folder',
           'real Git clone with fixture-only URL rewrite and normal scope registration',
-          'a hibachi created in the app is a repository on main whose first commit holds only .irori/scope.json and .gitignore',
-          'a GitHub refusal while creating keeps the hibachi and its form open, and Source control publishes it afterwards through a fake gh',
-          'an ordinary-folder hibachi starts Git, commits, and publishes to an organization as a public repository',
+          'a vault created in the app is a repository on main whose first commit holds only .irori/scope.json and .gitignore',
+          'a GitHub refusal while creating keeps the vault and its form open, and Source control publishes it afterwards through a fake gh',
+          'an ordinary-folder vault starts Git, commits, and publishes to an organization as a public repository',
           "a collaborator's h_ line in refs/notes/ai counts for the open note, a commit names the lines typed here as the committer's, and Push carries the ref",
         ],
         errors,

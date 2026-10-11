@@ -140,7 +140,7 @@ test('Copies once prepared for upload stay restorable, and unreadable records ar
   const recovered = await new DriveLeftovers(files.dataDir).prepared();
   assert.deepEqual(recovered.entries, [prepared]);
   assert.equal(recovered.unreadable, 2);
-  // The kept bytes outlive the hibachi they came from.
+  // The kept bytes outlive the vault they came from.
   assert.equal(await store.sourceText(recovered.entries[0].source), note.text);
   assert.deepEqual(hostArguments.recoverableCloudWrites.parse([]), []);
   assert.throws(() => hostArguments.recoverableCloudWrites.parse([ownerId]));

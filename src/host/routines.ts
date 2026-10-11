@@ -37,6 +37,7 @@ import { findExecutable } from './executables';
 import { readWriteBack, Redactor, unavailableText, type SecretStore } from './keystore';
 // Imported as sha256: several locals here are named `hash`.
 import { hash as sha256, utf8Text, type FileService } from './files';
+import { routineWithVaultKeys } from './vault-rename';
 import type { YourAiService } from './you';
 import { stepPreamble } from '../../prompts';
 
@@ -84,8 +85,8 @@ const runStep = z
   .strict();
 const agentStep = z
   .object({
-    agent: z.enum(['irori', 'hibachi']),
-    hibachis: z
+    agent: z.enum(['irori', 'vault']),
+    vaults: z
       .union([z.literal('all'), z.array(z.string().min(1).max(120)).min(1).max(50)])
       .optional(),
     access: z.enum(agentAccessModes),
@@ -142,7 +143,7 @@ function issueText(issues: z.core.$ZodIssue[], step?: number) {
 
 /**
  * Reads `routine.yaml` (ADR 016 D2). A routine in the irori agent's folder
- * instructs the irori agent; one in a hibachi instructs that hibachi's agent.
+ * instructs the irori agent; one in a vault instructs that vault's agent.
  */
 export function parseRoutine(
   text: string,
@@ -189,8 +190,8 @@ export function parseRoutine(
     }
     const step = agentStep.safeParse(fields, { reportInput: true });
     if (!step.success) return { name, problem: issueText(step.error.issues, n) };
-    const { agent, hibachis, access, cli } = step.data;
-    if (agent !== (owner === 'irori' ? 'irori' : 'hibachi'))
+    const { agent, vaults, access, cli } = step.data;
+    if (agent !== (owner === 'irori' ? 'irori' : 'vault'))
       return {
         name,
         problem:
@@ -200,16 +201,16 @@ export function parseRoutine(
                 `Step ${n}: an irori agent routine uses agent: irori.`,
               )
             : t(
-                `ステップ ${n}: hibachi のルーティンでは agent: hibachi を使います。`,
-                `Step ${n}: a hibachi's routine uses agent: hibachi.`,
+                `ステップ ${n}: vault のルーティンでは agent: vault を使います。`,
+                `Step ${n}: a vault's routine uses agent: vault.`,
               ),
       };
-    if (hibachis && agent !== 'irori')
+    if (vaults && agent !== 'irori')
       return {
         name,
         problem: t(
-          `ステップ ${n}: hibachis は agent: irori に書きます。`,
-          `Step ${n}: hibachis belongs to agent: irori.`,
+          `ステップ ${n}: vaults は agent: irori に書きます。`,
+          `Step ${n}: vaults belongs to agent: irori.`,
         ),
       };
     if (cli)
@@ -247,7 +248,7 @@ export function routineTemplate(name: string, owner: Routine['owner']) {
     ),
     `  - agent: ${owner}`,
     ...(owner === 'irori'
-      ? [t('    # hibachis: all  # 渡す hibachi', '    # hibachis: all  # hibachis to hand over')]
+      ? [t('    # vaults: all  # 渡す vault', '    # vaults: all  # vaults to hand over')]
       : []),
     '    access: default # or full-access',
     '    prompt: |',
@@ -279,7 +280,7 @@ export function failedReport(report: string) {
   );
 }
 
-/** The hibachis an irori agent step hands over, by name or all of the workspace's. */
+/** The vaults an irori agent step hands over, by name or all of the workspace's. */
 function handed(spec: 'all' | string[] | undefined, workspace: Space[]) {
   if (!spec) return { scopeIds: [] as string[] };
   if (spec === 'all') return { scopeIds: workspace.map((space) => space.scopeId) };
@@ -289,13 +290,10 @@ function handed(spec: 'all' | string[] | undefined, workspace: Space[]) {
     if (found.length !== 1)
       return {
         problem: found.length
-          ? t(
-              `「${name}」という hibachi が複数あります。`,
-              `More than one hibachi is named ${name}.`,
-            )
+          ? t(`「${name}」という vault が複数あります。`, `More than one vault is named ${name}.`)
           : t(
-              `hibachi「${name}」はこのワークスペースにありません。`,
-              `This workspace has no hibachi named ${name}.`,
+              `vault「${name}」はこのワークスペースにありません。`,
+              `This workspace has no vault named ${name}.`,
             ),
       };
     scopeIds.add(found[0].scopeId);
@@ -384,7 +382,7 @@ interface Owner {
   kind: Routine['owner'];
   id: string;
   name: string;
-  /** The working folder: the irori agent's folder or the hibachi's root. */
+  /** The working folder: the irori agent's folder or the vault's root. */
   root: string;
   /** Where its routines are. */
   dir: string;
@@ -435,7 +433,7 @@ export interface RoutineHost {
 
 /**
  * Routines on this device (ADR 016): discovery in the irori agent's folder and
- * the workspace's hibachis, the review of their files, runs started by the
+ * the workspace's vaults, the review of their files, runs started by the
  * person, and the record of each run. Nothing here starts a run by itself.
  */
 export class RoutineService {
@@ -488,7 +486,7 @@ export class RoutineService {
       };
     const space = this.host.files.get(id);
     return {
-      kind: 'hibachi',
+      kind: 'vault',
       id,
       name: space.name,
       root: space.root,
@@ -563,14 +561,26 @@ export class RoutineService {
         throw Error(
           t('フォルダが持ち主のフォルダの外にあります。', "The folder leaves its owner's."),
         );
-      const { files, digest } = await this.read(dir);
-      found.files = files;
-      found.digest = digest;
+      let { files, digest } = await this.read(dir);
       const yaml = files.find((file) => file.path === 'routine.yaml');
       if (!yaml) throw Error(t('routine.yaml がありません。', 'routine.yaml is missing.'));
       if (yaml.size > yamlLimit)
         throw Error(t('routine.yaml が大きすぎます。', 'routine.yaml is too large.'));
-      const parsed = parseRoutine(await fs.readFile(yaml.file, 'utf8'), owner.kind);
+      let text = await fs.readFile(yaml.file, 'utf8');
+      // A routine written while vaults were hibachis takes the new keys (ADR 033).
+      // irori made this change, so one the person confirmed stays confirmed.
+      const renamed = routineWithVaultKeys(text);
+      if (renamed !== text) {
+        const ref = { owner: owner.id, folder };
+        const confirmed = (await this.readReview(routineKey(ref)))?.digest === digest;
+        await fs.writeFile(yaml.file, renamed);
+        text = renamed;
+        ({ files, digest } = await this.read(dir));
+        if (confirmed) await this.confirm(ref, files, digest);
+      }
+      found.files = files;
+      found.digest = digest;
+      const parsed = parseRoutine(text, owner.kind);
       if (parsed.name) found.name = parsed.name;
       if ('problem' in parsed) throw Error(parsed.problem);
       for (const step of parsed.steps) {
@@ -631,8 +641,8 @@ export class RoutineService {
       if (step.agent !== 'irori') continue;
       if ((await this.host.you.status()).state !== 'ready')
         return { text: t('irori agent が用意されていません。', 'The irori agent is not set up.') };
-      const hibachis = handed(step.hibachis, workspace);
-      if ('problem' in hibachis) return { text: hibachis.problem! };
+      const vaults = handed(step.vaults, workspace);
+      if ('problem' in vaults) return { text: vaults.problem! };
     }
     return undefined;
   }
@@ -661,10 +671,10 @@ export class RoutineService {
     });
   }
   /**
-   * The irori agent's routines and those of the workspace's hibachis; with no
+   * The irori agent's routines and those of the workspace's vaults; with no
    * workspace, the irori agent's alone.
    */
-  /** The irori agent's routines and the workspace's hibachis', or with `only` one hibachi's alone. */
+  /** The irori agent's routines and the workspace's vaults', or with `only` one vault's alone. */
   async list(workspaceId: string | undefined, only?: string): Promise<Routine[]> {
     const workspace = workspaceId && !only ? await this.workspace(workspaceId) : [];
     const settings = await this.host.settings();
@@ -950,7 +960,7 @@ export class RoutineService {
     const { run, owner } = active;
     const key = routineKey(run.routine);
     const work = path.join(this.dir, 'work', run.id);
-    const reach = owner.kind === 'hibachi' ? [this.host.files.get(owner.id)] : active.workspace;
+    const reach = owner.kind === 'vault' ? [this.host.files.get(owner.id)] : active.workspace;
     let before: Map<string, Map<string, string>> | undefined;
     let state: RoutineRunState = 'succeeded';
     try {
@@ -1182,9 +1192,9 @@ export class RoutineService {
     const agent = step.cli ?? panel?.agent ?? 'claude';
     const model = step.model ?? (panel?.agent === agent ? panel.model : undefined);
     requireAgentAccess(agent, step.access);
-    const hibachis = handed(step.hibachis, active.workspace);
-    if ('problem' in hibachis) throw Error(hibachis.problem);
-    const scopeIds = [scopeId, ...hibachis.scopeIds];
+    const vaults = handed(step.vaults, active.workspace);
+    if ('problem' in vaults) throw Error(vaults.problem);
+    const scopeIds = [scopeId, ...vaults.scopeIds];
     const signal = active.abort.signal;
     let started: { runId: string; conversationId: string; done: Promise<StepEnd> } | undefined;
     while (!started) {
@@ -1202,8 +1212,8 @@ export class RoutineService {
               access: step.access,
               model,
               prompt: step.prompt,
-              brains: hibachis.scopeIds.length ? hibachis.scopeIds : undefined,
-              // Hibachis the irori agent registers join the routine's workspace.
+              brains: vaults.scopeIds.length ? vaults.scopeIds : undefined,
+              // Vaults the irori agent registers join the routine's workspace.
               workspace: active.owner.kind === 'irori' ? active.input.workspaceId : undefined,
             },
             {
@@ -1259,7 +1269,7 @@ export class RoutineService {
       signal.removeEventListener('abort', stop);
     }
   }
-  /** Each hibachi's changed paths with their state and content hash, from Git. */
+  /** Each vault's changed paths with their state and content hash, from Git. */
   private async changes(spaces: Space[]) {
     const found = new Map<string, Map<string, string>>();
     for (const space of spaces) {
@@ -1286,7 +1296,7 @@ export class RoutineService {
     }
     return found;
   }
-  /** The paths whose state or content changed since `before`, per hibachi (D8). */
+  /** The paths whose state or content changed since `before`, per vault (D8). */
   private async changed(before: Map<string, Map<string, string>>, spaces: Space[]) {
     const after = await this.changes(spaces);
     const changes: RoutineRun['changes'] = [];

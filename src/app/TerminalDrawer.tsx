@@ -9,7 +9,7 @@ const keepAbove = 200;
 
 /**
  * The irori agent's terminal at the foot of irori mode. It stays mounted while
- * a hibachi is on show, hidden, so its shell keeps running like a hibachi's.
+ * a vault is on show, hidden, so its shell keeps running like a vault's.
  */
 export function TerminalDrawer({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   const drawer = useRef<HTMLDivElement>(null);

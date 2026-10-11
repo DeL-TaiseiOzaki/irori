@@ -43,7 +43,7 @@ export class DraftService {
         key.kind === 'composer' ? key.agent : key.kind === 'git-resolution' ? key.path : '',
         // The first column's drafts keep the identity they had before columns existed.
         ...(key.kind === 'composer' && key.column ? [key.column] : []),
-        // The hibachi's own commit message keeps the identity it had before submodules.
+        // The vault's own commit message keeps the identity it had before submodules.
         ...(key.kind === 'git-commit' && key.repository ? [key.repository] : []),
       ]),
     );

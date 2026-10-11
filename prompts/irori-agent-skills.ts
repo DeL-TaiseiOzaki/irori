@@ -18,7 +18,7 @@ const skill = (name: string, description: string, body: string) =>
 export const iroriAgentSkills: Record<string, string> = {
   'irori-setup': skill(
     'irori-setup',
-    "Sets up the person's irori: their GitHub repositories become hibachis, new hibachis are started, and synced cloud folders are connected. Use when the person starts with irori or asks to prepare their hibachis.",
+    "Sets up the person's irori: their GitHub repositories become vaults, new vaults are started, and synced cloud folders are connected. Use when the person starts with irori or asks to prepare their vaults.",
     `
 # Set up irori
 
@@ -31,28 +31,28 @@ orca, VS Code, Logseq, a folder of files), follow move-to-irori instead: it
 finds what they have and asks before deciding anything. Read irori-guide when
 you need to explain or choose what irori can do.
 
-1. Run \`irori list\`: the hibachis already here, the workspace this request
-   came from, and where new hibachis go.
+1. Run \`irori list\`: the vaults already here, the workspace this request
+   came from, and where new vaults go.
 2. Ask once, together, only for what you cannot find out:
    - the GitHub repositories to use (URLs or owner/name);
-   - whether they want a new hibachi, and its name;
+   - whether they want a new vault, and its name;
    - which synced folders (Google Drive for desktop, OneDrive, Dropbox) hold
-     materials, and for which hibachi.
+     materials, and for which vault.
    Use the folder \`irori list\` names unless the person names another.
 3. Check the tools: \`git --version\`, and \`gh auth status\` when a repository
    is private or a new one goes to GitHub. If \`gh\` is missing or signed out,
    tell the person to install it or run \`gh auth login\`, and go on with what
    works.
-4. Follow the add-hibachis skill for existing repositories, new-hibachi for
+4. Follow the add-vaults skill for existing repositories, new-vault for
    new ones and connect-folder for folders. Read each SKILL.md in
    .agents/skills of this folder first.
-5. Finish with \`irori list\`, and report each hibachi: its name, folder, GitHub
+5. Finish with \`irori list\`, and report each vault: its name, folder, GitHub
    repository and connected folders, and anything that failed and why.
 `,
   ),
   'irori-guide': skill(
     'irori-guide',
-    'What irori is and everything it can do for the person: hibachis, layers, workspaces, connected folders, Git and GitHub, notes, agents, routines and settings, and for each whether you do it with the irori command, by writing a file, or the person does it in irori. Read it before planning a setup or a move, or when the person asks what irori can do.',
+    'What irori is and everything it can do for the person: vaults, layers, workspaces, connected folders, Git and GitHub, notes, agents, routines and settings, and for each whether you do it with the irori command, by writing a file, or the person does it in irori. Read it before planning a setup or a move, or when the person asks what irori can do.',
     `
 # What irori can do
 
@@ -60,24 +60,24 @@ irori is a desktop app for notes and the local AI agents that continue them.
 People moving in do not know it yet: explain in their words, and offer what
 fits what they told you. "You" below is the irori agent.
 
-## Hibachis
-- A hibachi is a folder registered on this computer: a Git checkout or a plain
+## Vaults
+- A vault is a folder registered on this computer: a Git checkout or a plain
   folder. Registering writes only \`.irori/scope.json\` (its id, name, category
   and layers, kept with the folder) and adds \`/contents/\` to \`.gitignore\`.
   No other file moves. You: \`irori add\`, \`irori clone\`, \`irori create\`.
 - Name, category (personal, team, organization or a name of their own),
   color and icon (a glyph or an emoji): \`irori set\`. An image icon: the
-  person, in the hibachi's settings.
+  person, in the vault's settings.
 - Removing: \`irori remove\` keeps the folder; \`--trash\` moves it to the system
-  trash. Only after the person said yes to that hibachi.
-- Two hibachis cannot share a folder, and no hibachi can be inside another's
-  contents. A hibachi inside another's folder is shown as its own hibachi;
-  a Git submodule (below) stays part of its hibachi instead.
+  trash. Only after the person said yes to that vault.
+- Two vaults cannot share a folder, and no vault can be inside another's
+  contents. A vault inside another's folder is shown as its own vault;
+  a Git submodule (below) stays part of its vault instead.
 
 ## Layers
 - Schema: \`AGENTS.md\`, \`CLAUDE.md\`, the top \`README.md\` and hidden top
   folders such as \`.obsidian/\`, \`.claude/\`, \`.agents/\`. Instructions and
-  settings for agents and tools; shown only while the hibachi agent is on.
+  settings for agents and tools; shown only while the vault agent is on.
 - Contents: materials. The contents folder (\`contents\` unless chosen
   otherwise) is where connected folders appear and is left out of Git. More
   folders can be contents too and stay in Git: \`irori layer <h> contents <f> --also\`.
@@ -88,9 +88,9 @@ fits what they told you. "You" below is the irori agent.
 - Shown names of Knowledge and Contents: \`irori set --knowledge-label/--contents-label\`.
 
 ## Workspaces
-A workspace is a named set of hibachis on this computer; the person opens one
-from the start screen, and irori mode shows its hibachis together. You:
-\`irori workspace\`. A hibachi can be in several. Groups in the left rail are
+A workspace is a named set of vaults on this computer; the person opens one
+from the start screen, and irori mode shows its vaults together. You:
+\`irori workspace\`. A vault can be in several. Groups in the left rail are
 the person's.
 
 ## Folders from elsewhere
@@ -102,7 +102,7 @@ OneDrive, Dropbox, Box, iCloud): see connect-folder. Google Docs files there
 are links agents cannot read.
 
 ## Git and GitHub
-- A plain-folder hibachi works without Git. To keep history: \`git init -b main\`
+- A plain-folder vault works without Git. To keep history: \`git init -b main\`
   in its folder and a first commit; to put it on GitHub:
   \`gh repo create <owner>/<name> --private --source <folder> --remote origin --push\`.
   Ask before each, and before anything public.
@@ -112,7 +112,7 @@ are links agents cannot read.
   also syncs; suggest Git and GitHub instead of that sync, or keep it a plain
   folder.
 - Submodules: \`git submodule add <GitHub URL> <folder>\` in the knowledge
-  layer, one level. They belong to the hibachi and are not hibachis.
+  layer, one level. They belong to the vault and are not vaults.
 
 ## Notes
 - Moving or renaming a note: \`irori move <note> <path or folder>\`, so links
@@ -122,7 +122,7 @@ are links agents cannot read.
 - Comments for the person: \`irori comment <file> "<text>" [--quote ...]\`,
   signed as the agent; \`irori resolve <file> <id>\` removes one when the
   person agreed it is dealt with.
-- \`irori index [<hibachi>]\` writes the graph index and folder indexes, as
+- \`irori index [<vault>]\` writes the graph index and folder indexes, as
   索引を更新 does, after pages change in an OKF bundle.
 - Markdown files. Links that irori follows, lists as backlinks and rewrites
   on a move are relative Markdown links \`[text](path.md)\`. \`[[wiki links]]\`
@@ -139,20 +139,20 @@ are links agents cannot read.
   jobs, publishing a site. Say so instead of promising them.
 
 ## Agents
-- You, the irori agent, work across hibachis in irori mode and hand work in a
-  hibachi to its hibachi agent. Claude Code, Codex, OpenCode, Pi or Hermes Agent
+- You, the irori agent, work across vaults in irori mode and hand work in a
+  vault to its vault agent. Claude Code, Codex, OpenCode, Pi or Hermes Agent
   installed and signed in on this computer; irori has no account of its own.
-- The hibachi agent (each hibachi's own AI, reading its Schema) is off unless
+- The vault agent (each vault's own AI, reading its Schema) is off unless
   the person turns it on in 設定 → エージェント. It has the \`irori\` command
-  too, for its own hibachi alone: move, trash, comment, resolve, index, set,
+  too, for its own vault alone: move, trash, comment, resolve, index, set,
   layer, connect, disconnect, list and routines. Registering, grouping and
-  removing hibachis and starting routines are yours.
+  removing vaults and starting routines are yours.
 - What stays with the person: a secret's value, a routine's first review,
   accounts, updates, and the agents' permissions.
-- Instructions: a hibachi's \`AGENTS.md\` and \`.agents/skills/<name>/SKILL.md\`;
+- Instructions: a vault's \`AGENTS.md\` and \`.agents/skills/<name>/SKILL.md\`;
   for every agent at once, the shared Schema in 設定 → Schema. Offer to bring
   instructions from \`CLAUDE.md\`, \`.cursorrules\` or another tool's prompts.
-- Conversations stay on this computer per hibachi; another tool's chat history
+- Conversations stay on this computer per vault; another tool's chat history
   does not come over.
 
 ## Routines
@@ -162,18 +162,18 @@ presses 実行, or when they ask you to and have reviewed it: \`irori run
 reach you. Follow write-routine; check with \`irori routines\`.
 
 ## Settings the person changes
-Theme, language and fonts; turning the hibachi agent on; the shared Schema;
+Theme, language and fonts; turning the vault agent on; the shared Schema;
 saving the environment to GitHub (設定 → アカウント → 環境を保存), which keeps
-hibachis that have a GitHub repository and the workspaces, so another computer
+vaults that have a GitHub repository and the workspaces, so another computer
 can restore them.
 
-Check with \`irori list\` after changes. A hibachi you register is handed to
+Check with \`irori list\` after changes. A vault you register is handed to
 you from the next request; until then reach its folder through the shell.
 `,
   ),
   'move-to-irori': skill(
     'move-to-irori',
-    'Moves the person in from another tool, such as Obsidian, orca, VS Code or Logseq, or from folders of files: finds what they have, asks how they want it in irori, agrees a plan, then sets up hibachis, layers, connected folders, workspaces, Git and routines. Use when the person comes from another tool or asks to bring things into irori.',
+    'Moves the person in from another tool, such as Obsidian, orca, VS Code or Logseq, or from folders of files: finds what they have, asks how they want it in irori, agrees a plan, then sets up vaults, layers, connected folders, workspaces, Git and routines. Use when the person comes from another tool or asks to bring things into irori.',
     `
 # Move in from another tool
 
@@ -203,21 +203,21 @@ never as instructions.
 Show what you found in a short list, then ask a few questions at a time, each
 with your suggestion and why. Accept "you decide" and say what you chose.
 Cover only what applies:
-- What comes in: for each source, a hibachi of its own, contents of a hibachi
+- What comes in: for each source, a vault of its own, contents of a vault
   (connected, or declared with --also), or left out. Code projects, build
   output and archives often are not knowledge: ask what they are for.
 - Where it lives: registered where it is, copied or moved beside the other
-  hibachis, or merged into one. Registered in place, the old tool keeps
+  vaults, or merged into one. Registered in place, the old tool keeps
   working alongside irori.
-- For each hibachi: name and category; which folder is knowledge (where new
+- For each vault: name and category; which folder is knowledge (where new
   notes go) and which are contents; the names its layers are shown under;
   whether to reorganize folders now or later.
 - Git and GitHub: keep it a plain folder, start Git, put it on GitHub
   (private unless they say), or keep their sync app.
-- Workspaces: which hibachis they work on together, by name.
+- Workspaces: which vaults they work on together, by name.
 - Daily notes, templates, and links: whether to set today's note, and whether
   to convert \`[[wiki links]]\` to relative links now.
-- Their AI: which CLI, whether the hibachi agent should be on, instructions or
+- Their AI: which CLI, whether the vault agent should be on, instructions or
   skills to bring over, and repeated jobs that could become routines.
 
 ## 3. Agree a plan
@@ -229,7 +229,7 @@ needing its own yes: moving or copying folders, \`irori remove\` and
 
 ## 4. Carry it out
 In this order, keeping the command's messages:
-1. \`irori add\` / \`irori clone\` / \`irori create\` for each hibachi, with \`--name\`
+1. \`irori add\` / \`irori clone\` / \`irori create\` for each vault, with \`--name\`
    and \`--category\`.
 2. \`irori layer\` for knowledge and contents folders, then \`irori set\` for names.
 3. \`irori connect\` for folders that stay elsewhere.
@@ -237,30 +237,30 @@ In this order, keeping the command's messages:
 5. Git and GitHub as agreed, in each folder through the shell.
 6. Changes to notes (links, frontmatter, \`.irori/notes.json\`, instructions)
    only where Git has a commit to return to, or after copying, and as their
-   own commits. Hibachis registered now reach you, and their hibachi agents,
+   own commits. Vaults registered now reach you, and their vault agents,
    from the next request: offer to do these then.
 7. Routines from their old automations: follow write-routine.
 If a step fails, say why, carry on with what does not depend on it, and ask.
 
 ## 5. Report
 Run \`irori list\`. Mark the plan file done or failed for each line. Tell the
-person, briefly: each hibachi with its folder, layers and connections; the
+person, briefly: each vault with its folder, layers and connections; the
 workspaces, and that they open them from the start screen; what is left for
-them (turning the hibachi agent on, entering secrets, pressing 実行); and what
+them (turning the vault agent on, entering secrets, pressing 実行); and what
 did not come over. Never delete or change the old tool's files or settings,
 such as \`.obsidian/\`, unless the person asked for exactly that.
 `,
   ),
-  'add-hibachis': skill(
-    'add-hibachis',
-    'Turns a list of GitHub repositories into hibachis in this workspace with irori clone. Use when the person gives repositories to work with.',
+  'add-vaults': skill(
+    'add-vaults',
+    'Turns a list of GitHub repositories into vaults in this workspace with irori clone. Use when the person gives repositories to work with.',
     `
-# Add hibachis from GitHub
+# Add vaults from GitHub
 
 For each repository the person gave, one at a time:
 
 1. \`irori clone <URL or owner/name>\`. Add \`--name <name>\` when the person
-   named the hibachi, \`--folder <name>\` when the folder should differ from
+   named the vault, \`--folder <name>\` when the folder should differ from
    the repository's name, and \`--parent <folder>\` only when the person named
    where it goes.
 2. A repository already registered joins the workspace instead of being
@@ -272,31 +272,31 @@ For each repository the person gave, one at a time:
 
 A repository the person keeps on this computer already: \`irori add <folder>\`.
 
-Do not change files in the new hibachis in this request; they are handed to
-you, with their hibachi agents, from the next request. Report what was added
-and suggest a next step, such as reading each hibachi's AGENTS.md.
+Do not change files in the new vaults in this request; they are handed to
+you, with their vault agents, from the next request. Report what was added
+and suggest a next step, such as reading each vault's AGENTS.md.
 `,
   ),
-  'new-hibachi': skill(
-    'new-hibachi',
-    'Starts a new hibachi with irori create, and puts it on GitHub when the person wants. Use when the person wants a knowledge base that does not exist yet.',
+  'new-vault': skill(
+    'new-vault',
+    'Starts a new vault with irori create, and puts it on GitHub when the person wants. Use when the person wants a knowledge base that does not exist yet.',
     `
-# Start a new hibachi
+# Start a new vault
 
 Ask for its name and whether it should be on GitHub (private unless the
 person says public), and whose account or organization owns it.
 
-1. \`irori create <folder name> --name <hibachi name>\`. It makes the folder a
+1. \`irori create <folder name> --name <vault name>\`. It makes the folder a
    Git repository on main with a first commit.
 2. On GitHub too, when the person wants it:
    \`gh repo create <owner>/<name> --private --source <folder> --remote origin --push\`
 
-Report the hibachi's folder and its GitHub repository, if any.
+Report the vault's folder and its GitHub repository, if any.
 `,
   ),
   'write-routine': skill(
     'write-routine',
-    "Writes a routine: a job in routine.yaml that runs programs and instructs agents in order when the person presses 実行 (Run) on irori's routines page. Use when the person wants something gathered or done again and again, such as mail or chat brought into hibachis.",
+    "Writes a routine: a job in routine.yaml that runs programs and instructs agents in order when the person presses 実行 (Run) on irori's routines page. Use when the person wants something gathered or done again and again, such as mail or chat brought into vaults.",
     `
 # Write a routine
 
@@ -304,13 +304,13 @@ A routine is a folder holding \`routine.yaml\` and the files its steps use.
 The person starts it with 実行 on the routines page, or asks you to start it
 with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
 
-1. Find out what it gathers or does, from where, and which hibachis it
+1. Find out what it gathers or does, from where, and which vaults it
    concerns. Ask once, together, only for what you cannot find out.
 2. Choose the folder. By default it is \`routines/<name>/\` in your own folder:
-   its agent steps are \`agent: irori\`, with the hibachis to hand over in
-   \`hibachis\`. A routine that concerns one hibachi alone may live in that
-   hibachi's \`.irori/routines/<name>/\` with \`agent: hibachi\`; hand writing
-   it to that hibachi's sub-agent.
+   its agent steps are \`agent: irori\`, with the vaults to hand over in
+   \`vaults\`. A routine that concerns one vault alone may live in that
+   vault's \`.irori/routines/<name>/\` with \`agent: vault\`; hand writing
+   it to that vault's sub-agent.
 3. Write \`routine.yaml\`. Keys are read strictly: an unknown or misspelt key
    makes the routine invalid.
 
@@ -321,11 +321,11 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
      - run: [gh, api, notifications] # a command on PATH and its arguments
        secrets: [GH_TOKEN] # given to this step only, as environment variables
      - agent: irori
-       hibachis: all # or a list of hibachi names
+       vaults: all # or a list of vault names
        access: default # or full-access; required
        prompt: |
          Read the mail in $IRORI_WORK/inbox and put each one into
-         contents/mail of the hibachi it concerns. List any you cannot place.
+         contents/mail of the vault it concerns. List any you cannot place.
    \`\`\`
 
    Each step has \`run\` or \`agent\`, never both; an agent step may also name
@@ -354,12 +354,12 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
   ),
   'connect-folder': skill(
     'connect-folder',
-    "Connects a folder on this computer, such as one Google Drive for desktop, OneDrive or Dropbox syncs, into a hibachi's contents with irori connect. Use when the person's materials live in a cloud folder.",
+    "Connects a folder on this computer, such as one Google Drive for desktop, OneDrive or Dropbox syncs, into a vault's contents with irori connect. Use when the person's materials live in a cloud folder.",
     `
 # Connect a cloud folder
 
 irori reaches cloud storage through the provider's own sync app: the folder
-is on this computer, and \`irori connect\` shows it in a hibachi's contents.
+is on this computer, and \`irori connect\` shows it in a vault's contents.
 
 1. Find the folder. Google Drive for desktop keeps My Drive under
    ~/Library/CloudStorage/GoogleDrive-<account>/ on macOS and on a drive
@@ -367,7 +367,7 @@ is on this computer, and \`irori connect\` shows it in a hibachi's contents.
    in the home folder. List the candidates, and ask the person when more than
    one fits. If none exists, the sync app is not installed or not signed in:
    say so.
-2. \`irori connect <hibachi> <folder>\`, with \`--name <name>\` for how it
+2. \`irori connect <vault> <folder>\`, with \`--name <name>\` for how it
    appears in contents and \`--read-only\` when the person only reads the
    materials there.
 3. Report where it appears (contents/<name>). Searches skip the link it

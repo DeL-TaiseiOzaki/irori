@@ -1,19 +1,19 @@
 ---
 title: irori mode
-description: See the workspace and ask for work that spans several hibachis.
+description: See the workspace and ask for work that spans several vaults.
 ---
 
 ## See the whole workspace
 
-Open **irori mode** from the left rail. The map shows hibachis by category. The columns view places each one's AI, Schema, Knowledge, and Contents beside the others.
+Open **irori mode** from the left rail. The vault map shows vaults by category. The side-by-side view places each one's AI, Schema, Knowledge, and Contents beside the others.
 
-Change hibachi names, icons, and colors in [hibachi settings](workspaces.md#section-3).
+Change vault names, icons, and colors in [vault settings](workspaces.md#section-3).
 
 ## Ask the irori agent
 
-The irori agent is the entry point for work across hibachis. For example: “Compare my research notes with the team's plan and prepare a memo for our next meeting.”
+The irori agent is the entry point for work across vaults. For example: “Compare my research notes with the team's plan and prepare a memo for our next meeting.”
 
-It splits the request, hands work to the relevant hibachi agents, and brings the results together. Review questions and permission requests from handed work in the interface.
+It splits the request, hands work to the relevant vault agents, and brings the results together. Review questions and permission requests from handed work in the interface.
 
 ## Manage instructions and conversations
 

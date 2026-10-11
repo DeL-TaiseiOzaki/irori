@@ -23,7 +23,7 @@ test('the map places each brain once, the same way every time, inside the board'
     assert.ok(node.x > 0 && node.x < board.width);
     assert.ok(node.y > 0 && node.y < board.height);
   }
-  // Categories do not move a hibachi: one row in the workspace's order, without areas.
+  // Categories do not move a vault: one row in the workspace's order, without areas.
   assert.deepEqual(
     layout.nodes.map((node) => node.scopeId),
     [ids.a, ids.b, ids.c, ids.d],
@@ -43,7 +43,7 @@ test('with your AI, the hearth is on the left and the brains keep to its right',
     assert.ok(node.x > layout.hearth.x + 150 && node.x < board.width);
 });
 
-test('many hibachis wrap into rows of four in order', () => {
+test('many vaults wrap into rows of four in order', () => {
   const spaces = Array.from({ length: 6 }, (_, i) => ({
     scopeId: `00000000-0000-4000-8000-00000000010${i}`,
   }));

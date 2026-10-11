@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { chmod, mkdir } from 'node:fs/promises';
 import writeFileAtomic from 'write-file-atomic';
 
-/** A command irori puts on an agent run's PATH (`hibachi`, `irori`). */
+/** A command irori puts on an agent run's PATH (`vault`, `irori`). */
 export interface BridgeCommand {
   /** The command's name, and its folder under `<irori data>/agents/`. */
   name: string;

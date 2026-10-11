@@ -32,7 +32,7 @@ const decomposed = 'Knowledge_Base/wiki/データ ノート.md'.normalize('NFD')
 // name, an undeclared and a missing type, a missing description, folder lines a
 // person described, prose that is not kept, a folder with only an index, and the
 // folders the walk must leave out (hidden, the graph module, a submodule and a
-// nested hibachi).
+// nested vault).
 const bundle: [string, string][] = [
   ['.property/property.json', JSON.stringify(declaration)],
   [
@@ -100,7 +100,7 @@ async function fixture(t: TestContext, files = bundle) {
     await writeFile(file, text);
   };
   for (const [relative, text] of files) await write(relative, text);
-  // A nested hibachi is another KB: its pages list nowhere here.
+  // A nested vault is another KB: its pages list nowhere here.
   await mkdir(path.join(root, 'Knowledge_Base/team'), { recursive: true });
   await service.register(path.join(root, 'Knowledge_Base/team'), '入れ子', 'team');
   await write('Knowledge_Base/team/Knowledge_Base/inner.md', page({ type: 'concept' }));

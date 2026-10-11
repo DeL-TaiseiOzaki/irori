@@ -1,5 +1,13 @@
 # irori continuation handoff
 
+Hibachis are vaults, 2026-10-11 (**0.1.98**, [ADR 033](decisions/033-vaults.md)):
+the owner renamed a hibachi to a vault, and a vault's agent to
+`<vault name> agent`. The rename covers the app, website, prompts, `irori` command and code
+with no alias; the hand-off on Pi and Hermes Agent is now `irori call`. A
+one-time migration at start renames this device's records and the irori agent's
+folder, and old saved environments and `routine.yaml` files are renamed when
+read. Entries below keep the name of their time.
+
 Published 2026-10-11: **0.1.97** ([#210](https://github.com/DeL-TaiseiOzaki/irori/pull/210),
 a Codex run ends only with its own thread's turn, so a sub-agent or forked
 thread finishing no longer stops the irori agent or a hibachi agent, and a

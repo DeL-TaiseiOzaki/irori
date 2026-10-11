@@ -47,8 +47,8 @@ import {
 
 const host = window.irori;
 
-/** Whose conversations a dock column shows: the hibachi on show's agent, or the irori agent. */
-export type ColumnOwner = 'hibachi' | 'irori';
+/** Whose conversations a dock column shows: the vault on show's agent, or the irori agent. */
+export type ColumnOwner = 'vault' | 'irori';
 /** One column of the agent dock (ADR 021). The first, `main`, stays while the dock is open. */
 export interface DockColumn {
   id: string;
@@ -61,7 +61,7 @@ export type Tab = { id: string; agent: AgentId };
 export interface DockShared {
   infos: AgentInfo[];
   spaces: Space[];
-  /** The note open on the stage, which goes with a hibachi agent's instruction. */
+  /** The note open on the stage, which goes with a vault agent's instruction. */
   doc?: Document;
   docLayer?: string;
   /** Lines the person wrote in the open note. */
@@ -96,7 +96,7 @@ export interface DockShared {
 }
 
 /**
- * One column of the agent dock: a conversation of the hibachi on show or of the
+ * One column of the agent dock: a conversation of the vault on show or of the
  * irori agent, with its tabs, history, log and composer. Columns run side by
  * side as Claudian's panes do (ADR 020, ADR 021).
  */
@@ -140,11 +140,11 @@ export function AgentColumn({
   /** 1 for the first column; later columns keep their own composer drafts. */
   number: number;
   shared: DockShared;
-  /** A hibachi column's hibachi: the one on show. */
+  /** A vault column's vault: the one on show. */
   space?: Space;
   /** An irori column's agent, once its record is read. */
   you?: YourAi;
-  /** The hibachis an irori column hands to its agent: the workspace's. */
+  /** The vaults an irori column hands to its agent: the workspace's. */
   brains: string[];
   /** The workspace open: an irori column's conversations are those kept for it. */
   workspaceId?: string;
@@ -158,9 +158,9 @@ export function AgentColumn({
   skillsRetired: Parameters<typeof retirementNotice>[0][];
   skillProblems: { directory: string }[];
   instructionFile?: string;
-  /** Files sent as references with the next instruction (a hibachi column's). */
+  /** Files sent as references with the next instruction (a vault column's). */
   sources: SourceRef[];
-  /** The hibachi agent is on, so the column may show either agent. */
+  /** The vault agent is on, so the column may show either agent. */
   ownerChoice: boolean;
   /** The first column hides and shows the stage beside the dock. */
   stage?: { hidden: boolean; onToggle: () => void };
@@ -181,7 +181,7 @@ export function AgentColumn({
   /** What the window needs to know: a send under way, and the queue's length. */
   onStatus: (status: { sending: boolean; queued: number }) => void;
   onCreateYou: () => Promise<void>;
-  /** An irori column's run began with these hibachis handed to it. */
+  /** An irori column's run began with these vaults handed to it. */
   onStarted?: (brains: string[]) => void;
 }) {
   // The column sits behind a memo boundary, so it follows the language itself.
@@ -200,7 +200,7 @@ export function AgentColumn({
     draining,
     report,
   } = shared;
-  // A hibachi column's draft is kept on the device; the irori agent's lives with the column.
+  // A vault column's draft is kept on the device; the irori agent's lives with the column.
   const draft = useDraft(
     !irori && space
       ? {
@@ -274,7 +274,7 @@ export function AgentColumn({
   );
   const agentInfo = infos.find((info) => info.id === agent);
   const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
-  // The open note of this hibachi goes with each instruction unless the person removed it.
+  // The open note of this vault goes with each instruction unless the person removed it.
   const noteInContext =
     !irori && !!doc && doc.scopeId === space?.scopeId && noteOmitted !== noteKey;
   const personLinesOffered = shared.personLineCount > 0 && noteInContext;
@@ -291,7 +291,7 @@ export function AgentColumn({
     onStatus({ sending, queued: queued.length });
   }, [sending, queued.length]);
   useEffect(() => () => onStatus({ sending: false, queued: 0 }), []);
-  // A skill choice belongs to one hibachi, even when another declares the same name.
+  // A skill choice belongs to one vault, even when another declares the same name.
   useEffect(() => setSkill(''), [scopeId]);
   useEffect(() => {
     if (skill && !skills.some((item) => item.name === skill)) setSkill('');
@@ -539,17 +539,13 @@ export function AgentColumn({
     gitBusy,
   ]);
 
-  // The hibachis an irori column's log names; the same list across renders keeps the log as it is.
+  // The vaults an irori column's log names; the same list across renders keeps the log as it is.
   const handedSpaces = useMemo(
     () => (irori ? spaces.filter((item) => brains.includes(item.scopeId)) : undefined),
     [irori, spaces, brains],
   );
-  const kind = irori ? 'irori agent' : 'hibachi agent';
-  const ownerName = irori
-    ? 'irori agent'
-    : space
-      ? t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)
-      : 'hibachi agent';
+  const kind = irori ? 'irori agent' : 'vault agent';
+  const ownerName = irori ? 'irori agent' : space ? `${space.name} agent` : 'vault agent';
   const mark = irori ? (
     <span className="agent-mark irori">
       <span className="overview-orb" aria-hidden="true">
@@ -594,10 +590,10 @@ export function AgentColumn({
                       });
                     }}
                   >
-                    {(['hibachi', 'irori'] as const).map((owner) => (
+                    {(['vault', 'irori'] as const).map((owner) => (
                       <Menu.RadioItem key={owner} value={owner} closeOnClick>
                         <Icon name="sparkles" size={14} />
-                        {owner === 'hibachi' ? 'hibachi agent' : 'irori agent'}
+                        {owner === 'vault' ? 'vault agent' : 'irori agent'}
                         <Menu.RadioItemIndicator className="menu-check">
                           <Icon name="check" size={14} />
                         </Menu.RadioItemIndicator>
@@ -827,7 +823,7 @@ export function AgentColumn({
       )}
       {!irori && !space && (
         <p className="hint">
-          {t('このワークスペースに hibachi がありません。', 'This workspace has no hibachi yet.')}
+          {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
         </p>
       )}
       {agentInfo?.available === false && (
@@ -974,8 +970,8 @@ export function AgentColumn({
               <span className="context-chip">
                 <Icon name="sparkles" size={12} />
                 {t(
-                  `hibachi ${brains.length}`,
-                  `${brains.length} hibachi${brains.length === 1 ? '' : 's'}`,
+                  `vault ${brains.length}`,
+                  `${brains.length} vault${brains.length === 1 ? '' : 's'}`,
                 )}
               </span>
             ) : (

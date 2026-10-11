@@ -77,29 +77,29 @@ async function fixture(t: any, options: Parameters<typeof fakeGh>[1] = {}) {
 }
 
 /** What the host's createSpace does: a new repository, registered, with its first commit. */
-async function createHibachi(f: Awaited<ReturnType<typeof fixture>>, folder = 'New KB') {
+async function createVault(f: Awaited<ReturnType<typeof fixture>>, folder = 'New KB') {
   const root = await f.service.create({ parent: f.base, folder });
-  const space = await f.files.register(root, '新しい hibachi', 'personal');
+  const space = await f.files.register(root, '新しい vault', 'personal');
   return { root, space, notice: await f.service.firstCommit(space.scopeId) };
 }
 
-test('a new hibachi is a repository on main whose first commit holds only what irori wrote', async (t) => {
+test('a new vault is a repository on main whose first commit holds only what irori wrote', async (t) => {
   const f = await fixture(t);
-  const { root, space, notice } = await createHibachi(f);
+  const { root, space, notice } = await createVault(f);
   assert.equal(notice, undefined);
   assert.equal(git(root, 'symbolic-ref', '--short', 'HEAD'), 'main');
   assert.deepEqual(git(root, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').sort(), [
     '.gitignore',
     '.irori/scope.json',
   ]);
-  assert.match(git(root, 'log', '-1', '--format=%s'), /新しい hibachi/);
+  assert.match(git(root, 'log', '-1', '--format=%s'), /新しい vault/);
   assert.equal(await readFile(path.join(root, '.gitignore'), 'utf8'), '/contents/\n');
   const status = await f.service.status(space.scopeId);
   assert.equal(status.available, true);
   assert.equal(status.remote, undefined);
   assert.deepEqual(status.changes, []);
 
-  // An existing folder is never reused, and nothing is made inside a registered hibachi.
+  // An existing folder is never reused, and nothing is made inside a registered vault.
   await assert.rejects(
     f.service.create({ parent: f.base, folder: 'New KB' }),
     /already exists|同じ名前のフォルダ/,
@@ -115,14 +115,14 @@ test('a new hibachi is a repository on main whose first commit holds only what i
   await assert.rejects(f.service.create({ parent: f.base, folder: '.hidden' }), /name|フォルダ名/);
 });
 
-test('a first commit a hook refuses leaves the hibachi created and says why', async (t) => {
+test('a first commit a hook refuses leaves the vault created and says why', async (t) => {
   const f = await fixture(t);
   const root = await f.service.create({ parent: f.base, folder: 'Hooked' });
   await writeFile(path.join(root, '.git/hooks/pre-commit'), '#!/bin/sh\necho no >&2\nexit 1\n');
   await chmod(path.join(root, '.git/hooks/pre-commit'), 0o755);
   const space = await f.files.register(root, 'Hooked', 'team');
   const notice = await f.service.firstCommit(space.scopeId);
-  assert.match(notice!, /hibachi was created|hibachi は作成しました/);
+  assert.match(notice!, /vault was created|vault は作成しました/);
   assert.equal((await f.service.status(space.scopeId)).head, undefined);
 });
 
@@ -165,7 +165,7 @@ test('Start Git makes only an ordinary registered folder a repository', async (t
 
 test('publishing creates the GitHub repository with gh, sets origin and pushes the branch', async (t) => {
   const f = await fixture(t);
-  const { root, space } = await createHibachi(f);
+  const { root, space } = await createVault(f);
   const account = await f.service.githubAccount();
   assert.deepEqual(account, { login: 'octo', organizations: ['team-a', 'team-b'] });
   const status = await f.service.status(space.scopeId);
@@ -190,7 +190,7 @@ test('publishing creates the GitHub repository with gh, sets origin and pushes t
     'gh always targets github.com',
   );
 
-  // A hibachi that already has a remote is sent with Push, not published again.
+  // A vault that already has a remote is sent with Push, not published again.
   await assert.rejects(
     f.service.publish(
       space.scopeId,
@@ -201,7 +201,7 @@ test('publishing creates the GitHub repository with gh, sets origin and pushes t
   );
 });
 
-test('publishing refuses a hibachi without a commit, and reports what GitHub refused', async (t) => {
+test('publishing refuses a vault without a commit, and reports what GitHub refused', async (t) => {
   const f = await fixture(t, { exists: true });
   const plain = path.join(f.base, 'Empty');
   await mkdir(plain);
@@ -214,7 +214,7 @@ test('publishing refuses a hibachi without a commit, and reports what GitHub ref
   );
   assert.equal((await f.calls()).length, 0, 'gh is not asked before the checks pass');
 
-  const { space: made } = await createHibachi(f);
+  const { space: made } = await createVault(f);
   const status = await f.service.status(made.scopeId);
   await assert.rejects(
     f.service.publish(made.scopeId, input, status.version),
@@ -229,7 +229,7 @@ test('publishing refuses a hibachi without a commit, and reports what GitHub ref
 
 test('a push that fails after the repository was created keeps origin for a later Push', async (t) => {
   const f = await fixture(t, { bare: false });
-  const { root, space } = await createHibachi(f);
+  const { root, space } = await createVault(f);
   const status = await f.service.status(space.scopeId);
   await assert.rejects(
     f.service.publish(

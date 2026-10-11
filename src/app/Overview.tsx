@@ -63,7 +63,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
   );
 }
 
-/** Reads one brain's hibachi agent and hands it up, so every view of the Overview shares one reading. */
+/** Reads one brain's vault agent and hands it up, so every view of the Overview shares one reading. */
 function AiWatch({
   scopeId,
   agent,
@@ -98,7 +98,7 @@ interface Actions {
 }
 
 /**
- * A brain's hibachi agent in a few lines: the request it waits on, the step it is taking,
+ * A brain's vault agent in a few lines: the request it waits on, the step it is taking,
  * what waits to be sent, or the last thing it was asked.
  */
 function AiCard({
@@ -123,19 +123,11 @@ function AiCard({
   const { busy, run } = useAction({ onError });
   const act = (action: () => Promise<void>) => void run(action);
   return (
-    <section
-      className={`ai-card ${aiState(ai)}`}
-      role="group"
-      aria-label={t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)}
-    >
+    <section className={`ai-card ${aiState(ai)}`} role="group" aria-label={`${space.name} agent`}>
       <header>
         {named && <BrainTile space={space} size={22} radius={7} />}
         <Icon name="sparkles" size={13} className="ai-card-spark" />
-        <span className="ai-card-name">
-          {named
-            ? t(`${space.name} の hibachi agent`, `${space.name}'s hibachi agent`)
-            : agentNames[agent]}
-        </span>
+        <span className="ai-card-name">{named ? `${space.name} agent` : agentNames[agent]}</span>
         <StateWords ai={ai} />
       </header>
       {ai.error ? (
@@ -189,7 +181,7 @@ function AiCard({
           <div className="ai-card-actions">
             <button className="ember-button" onClick={() => onEnter(space, { ai: true })}>
               <Icon name="sparkles" size={13} />
-              {t('hibachi agent', 'hibachi agent')}
+              {t('vault agent', 'vault agent')}
             </button>
           </div>
         </>
@@ -258,7 +250,7 @@ function OverviewMap({
   const node = (id: string) => layout.nodes.find((item) => item.scopeId === id)!;
   const space = (id: string) => spaces.find((item) => item.scopeId === id)!;
   return (
-    <section className="map-board" aria-label={t('hibachi の地図', 'Map of hibachis')}>
+    <section className="map-board" aria-label={t('vault map', 'Vault map')}>
       <div className="map-canvas">
         <svg
           className="map-lines"
@@ -366,7 +358,7 @@ function OverviewMap({
         )}
         <span>
           <i className="legend-reference" />
-          {t('別の hibachi のノートを参照', "Read another hibachi's notes")}
+          {t('別の vault のノートを参照', "Read another vault's notes")}
         </span>
       </footer>
     </section>
@@ -377,7 +369,7 @@ function BrainColumn({
   space,
   ai,
   agent,
-  hibachiAgent,
+  vaultAgent,
   revisions,
   onConnect,
   ...actions
@@ -385,8 +377,8 @@ function BrainColumn({
   space: Space;
   ai: BrainAi;
   agent: AgentId;
-  /** The AI and Schema rows show only with the hibachi agent (ADR 021). */
-  hibachiAgent: boolean;
+  /** The AI and Schema rows show only with the vault agent (ADR 021). */
+  vaultAgent: boolean;
   revisions: ScopeRevisions;
   onConnect: (space: Space) => void;
 } & Actions) {
@@ -404,7 +396,7 @@ function BrainColumn({
     { enabled: !!knowledgeRoot, refresh: revision },
   );
   const skills = useResource(() => host.skills(space.scopeId), [space.scopeId], {
-    enabled: hibachiAgent,
+    enabled: vaultAgent,
     refresh: revision,
   });
   const connections = useResource(() => host.cloudConnections(space.scopeId), [space.scopeId], {
@@ -438,12 +430,12 @@ function BrainColumn({
           </span>
         </button>
       </header>
-      {hibachiAgent && (
+      {vaultAgent && (
         <div className="column-cell">
           <AiCard space={space} ai={ai} agent={agent} {...actions} />
         </div>
       )}
-      {hibachiAgent && (
+      {vaultAgent && (
         <div className="column-cell">
           {roots.error && <small className="column-note">{roots.error}</small>}
           {schema.map((entry) => (
@@ -511,7 +503,7 @@ function OverviewColumns({
   spaces,
   ais,
   agentFor,
-  hibachiAgent,
+  vaultAgent,
   revisions,
   onConnect,
   ...actions
@@ -519,26 +511,26 @@ function OverviewColumns({
   spaces: Space[];
   ais: Record<string, BrainAi>;
   agentFor: (scopeId: string) => AgentId;
-  hibachiAgent: boolean;
+  vaultAgent: boolean;
   revisions: ScopeRevisions;
   onConnect: (space: Space) => void;
 } & Actions) {
   return (
     <div
-      className={`overview-columns ${hibachiAgent ? '' : 'without-agents'}`}
+      className={`overview-columns ${vaultAgent ? '' : 'without-agents'}`}
       role="region"
-      aria-label={t('hibachi の並列表示', 'hibachis side by side')}
+      aria-label={t('vault を並べて表示', 'vaults side by side')}
       style={{ '--columns': spaces.length } as CSSProperties}
     >
       <div className="columns-gutter" aria-hidden="true">
         <span />
-        {hibachiAgent && (
+        {vaultAgent && (
           <span>
             <Icon name="sparkles" size={15} className="ai-card-spark" />
             AI
           </span>
         )}
-        {hibachiAgent && (
+        {vaultAgent && (
           <span>
             <Icon name="schema" size={15} className="layer-icon schema" />
             Schema
@@ -559,7 +551,7 @@ function OverviewColumns({
           space={space}
           ai={ais[space.scopeId] ?? idle}
           agent={agentFor(space.scopeId)}
-          hibachiAgent={hibachiAgent}
+          vaultAgent={vaultAgent}
           revisions={revisions}
           onConnect={onConnect}
           {...actions}
@@ -569,7 +561,7 @@ function OverviewColumns({
   );
 }
 
-/** Sends one instruction to the chosen brain's hibachi agent, or queues it behind the run in progress. */
+/** Sends one instruction to the chosen brain's vault agent, or queues it behind the run in progress. */
 function OverviewComposer({
   spaces,
   ais,
@@ -605,7 +597,7 @@ function OverviewComposer({
       }}
     >
       <fieldset className="overview-targets">
-        <legend className="sr-only">{t('送信先の hibachi', 'hibachi to send to')}</legend>
+        <legend className="sr-only">{t('送信先の vault', 'vault to send to')}</legend>
         {spaces.map((item) => (
           <label
             key={item.scopeId}
@@ -623,14 +615,8 @@ function OverviewComposer({
         ))}
       </fieldset>
       <textarea
-        aria-label={t(
-          `${space.name} の hibachi agent への指示`,
-          `Instruction for ${space.name}'s hibachi agent`,
-        )}
-        placeholder={t(
-          `${space.name} の hibachi agent に指示…`,
-          `Instruct ${space.name}'s hibachi agent…`,
-        )}
+        aria-label={t(`${space.name} agent への指示`, `Instruction for the ${space.name} agent`)}
+        placeholder={t(`${space.name} agent に指示…`, `Instruct the ${space.name} agent…`)}
         rows={3}
         value={text}
         maxLength={promptLimit}
@@ -675,7 +661,7 @@ export function Overview({
   revisions,
   addDisabled,
   agentFor,
-  hibachiAgent,
+  vaultAgent,
   onView,
   onSearch,
   onAdd,
@@ -703,12 +689,12 @@ export function Overview({
   workspace: WorkspaceProfile;
   spaces: Space[];
   view: OverviewView;
-  /** The host's file changes, counted per hibachi. */
+  /** The host's file changes, counted per vault. */
   revisions: ScopeRevisions;
   addDisabled: boolean;
   agentFor: (scopeId: string) => AgentId;
-  /** Each hibachi's own agent is offered (ADR 021); otherwise the irori agent alone. */
-  hibachiAgent: boolean;
+  /** Each vault's own agent is offered (ADR 021); otherwise the irori agent alone. */
+  vaultAgent: boolean;
   onView: (view: OverviewView) => void;
   onSearch: () => void;
   onAdd: () => void;
@@ -744,7 +730,7 @@ export function Overview({
   const [creatingRoutine, setCreatingRoutine] = useState(false);
   // Words put in the irori agent's message box by 「irori agent に頼む」; `key` places them again.
   const [yourSeed, setYourSeed] = useState<{ text: string; key: number }>();
-  const island = hibachiAgent ? islandChoice : 'you';
+  const island = vaultAgent ? islandChoice : 'you';
   const yourAi = (you && ais[you.id]) ?? idle;
   // What the Overview itself did (a send, a resume) is read back at once.
   const [acted, setActed] = useState(0);
@@ -824,8 +810,8 @@ export function Overview({
             <span className="overview-sub">
               {workspace.name} ·{' '}
               {t(
-                `${spaces.length} hibachi`,
-                `${spaces.length} hibachi${spaces.length === 1 ? '' : 's'}`,
+                `${spaces.length} vault`,
+                `${spaces.length} vault${spaces.length === 1 ? '' : 's'}`,
               )}
             </span>
             {!routines && (
@@ -891,12 +877,12 @@ export function Overview({
                   disabled={!spaces.length}
                   onClick={onSearch}
                   aria-label={t(
-                    `hibachi を検索（${shortcut('K')}）`,
-                    `Search hibachis (${shortcut('K')})`,
+                    `vault を検索（${shortcut('K')}）`,
+                    `Search vaults (${shortcut('K')})`,
                   )}
                 >
                   <Icon name="search" size={15} />
-                  <span className="overview-label">{t('hibachi を検索', 'Search hibachis')}</span>
+                  <span className="overview-label">{t('vault を検索', 'Search vaults')}</span>
                   <kbd>{shortcut('K')}</kbd>
                 </button>
                 <button
@@ -905,7 +891,7 @@ export function Overview({
                   onClick={onAdd}
                 >
                   <Icon name="plus" size={14} />
-                  <span className="overview-label">{t('hibachi を追加', 'Add a hibachi')}</span>
+                  <span className="overview-label">{t('vault を追加', 'Add a vault')}</span>
                 </button>
               </>
             )}
@@ -935,10 +921,7 @@ export function Overview({
           ) : !spaces.length ? (
             <div className="overview-empty">
               <p>
-                {t(
-                  'このワークスペースに hibachi がありません。',
-                  'This workspace has no hibachi yet.',
-                )}
+                {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
               </p>
             </div>
           ) : view === 'map' ? (
@@ -956,7 +939,7 @@ export function Overview({
               spaces={spaces}
               ais={ais}
               agentFor={agentFor}
-              hibachiAgent={hibachiAgent}
+              vaultAgent={vaultAgent}
               revisions={revisions}
               onConnect={onConnect}
               {...shared}
@@ -975,10 +958,10 @@ export function Overview({
                 aria-label={
                   island === 'you'
                     ? t('irori agent', 'irori agent')
-                    : t('hibachi agent', 'hibachi agents')
+                    : t('vault agent', 'vault agents')
                 }
               >
-                {hibachiAgent && (
+                {vaultAgent && (
                   <MagnetTabs
                     className="overview-island-tabs"
                     label={
@@ -990,7 +973,7 @@ export function Overview({
                     onValueChange={setIsland}
                     options={[
                       { value: 'you', label: t('irori agent', 'irori agent') },
-                      { value: 'brains', label: t('hibachi agent', 'hibachi agents') },
+                      { value: 'brains', label: t('vault agent', 'vault agents') },
                     ]}
                   />
                 )}
@@ -1026,7 +1009,7 @@ export function Overview({
                         <Icon name="sparkles" size={15} strokeWidth={2.1} />
                       </span>
                       <span>
-                        <strong>{t('hibachi agent', 'hibachi agents')}</strong>
+                        <strong>{t('vault agent', 'vault agents')}</strong>
                         <small>
                           {running || waiting
                             ? [

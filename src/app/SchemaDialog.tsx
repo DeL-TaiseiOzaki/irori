@@ -10,7 +10,7 @@ import './schema-dialog.css';
 
 /**
  * Every Schema from the settings (ADR 027): the shared one every agent follows,
- * the irori agent's and each hibachi's, edited with the same forms as in their
+ * the irori agent's and each vault's, edited with the same forms as in their
  * own views. irori writes the files behind them, as `.obsidian` holds a vault's.
  */
 export function SchemaDialog({
@@ -22,7 +22,7 @@ export function SchemaDialog({
 }: {
   /** The irori agent; the shared Schema lives in its folder, so both need it set up. */
   you?: YourAi;
-  /** The workspace's hibachis whose Schema is offered (none while hibachi agents are off). */
+  /** The workspace's vaults whose Schema is offered (none while vault agents are off). */
   spaces: Space[];
   revision: number;
   /** Whether a run, a Git operation or a connection holds that Schema's folder. */

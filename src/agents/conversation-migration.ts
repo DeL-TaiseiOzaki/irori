@@ -88,7 +88,7 @@ export async function migrateConversations(
     deviceId: () => Promise<string>;
     /** The irori agent's id: its records become its conversations. */
     youId?: string;
-    /** A registered hibachi's name, for the conversation's owner. */
+    /** A registered vault's name, for the conversation's owner. */
     spaceName: (scopeId: string) => string | undefined;
   },
 ): Promise<Migration | undefined> {
