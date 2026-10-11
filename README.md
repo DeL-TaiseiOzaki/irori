@@ -80,6 +80,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - **ほかのツールから移る**：Obsidian・orca・エディタなどを使っていた場合は、irori agent に「移りたい」と頼んでください。いまある Vault やフォルダを調べ、どれを hibachi・Knowledge・Contents にするか、Git やワークスペースをどうするかを聞き取ってから、計画どおりに設定します。
 - 許可の扱いは各 CLI の設定に従います。hibachi agent は、CLI が対応していればフルアクセスで始まり、標準（CLI の設定・必要なときに承認）に切り替えられます。
 - 会話は hibachi ごと・irori agent ごとにいくつでも持て、この PC に丸ごと残ります。**新しい会話** と **履歴**（名前の変更・ピン留め・アーカイブ・削除）があります。同じ hibachi の会話はタブで開き、それぞれ同時に実行できます。実行中の会話への指示は送信待ちとして予約でき、再起動しても残ります（[CONVERSATIONS](docs/CONVERSATIONS.md)）。
+- 指示にはファイルを添付でき（クリップ・ドロップ・画像の貼り付け）、画像はエージェントにそのまま見せます。マイクで OS の音声入力を起動できます。エージェントからの質問は選択肢として表示されます（[ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)）。
 - **ルーティン**：左のレールの irori mode と hibachi の間にある **ルーティン** で、JavaScript の使用設定、シークレットの管理、決めた手順の「実行」ができます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か hibachi の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
 
 **資料**

@@ -64,7 +64,9 @@ const agents = new AgentService(
     void agents.respond(
       event.requestId!,
       true,
-      Object.fromEntries((event.questions ?? []).map((q) => [q.id, q.options?.[0] ?? 'yes'])),
+      Object.fromEntries(
+        (event.questions ?? []).map((q) => [q.id, q.options?.[0]?.label ?? 'yes']),
+      ),
     );
   },
   undefined,

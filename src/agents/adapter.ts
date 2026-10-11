@@ -8,6 +8,8 @@ export interface NativeContext {
   access?: AgentAccess;
   /** The model chosen for this instruction; the CLI's own default when absent. */
   model?: string;
+  /** Files the person attached: every one is named in the prompt, images go as pictures too. */
+  attached?: { name: string; path: string; image?: string }[];
   /** The environment and extra arguments the CLI starts with; its own defaults when absent. */
   env?: NodeJS.ProcessEnv;
   args?: string[];

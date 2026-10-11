@@ -37,6 +37,13 @@ import { ModelPicker } from './ModelPicker';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { aiStateWords, sendOnEnter } from './display';
+import {
+  AttachButton,
+  ComposerAttachments,
+  DictateButton,
+  attachedOnly,
+  useAttachments,
+} from './Attachments';
 
 const host = window.irori;
 
@@ -276,6 +283,9 @@ export function AgentColumn({
   const conversation = useRef<HTMLDivElement>(null);
   const followConversation = useRef(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const attachments = useAttachments(report);
+  // Something to send: words, or files alone.
+  const sendable = !!prompt.trim() || (attachments.refs.length > 0 && !attachments.pending);
 
   useEffect(() => {
     onStatus({ sending, queued: queued.length });
@@ -431,6 +441,7 @@ export function AgentColumn({
       access,
       model,
       prompt: message,
+      ...(attachments.refs.length && { attachments: attachments.refs }),
     };
     if (irori) return { ...common, brains, workspace: workspaceId };
     return {
@@ -449,12 +460,13 @@ export function AgentColumn({
       composer.error ||
       submitting.current ||
       gitBusy ||
-      !prompt.trim()
+      attachments.pending ||
+      !sendable
     )
       return;
     submitting.current = true;
     setSending(true);
-    const message = prompt;
+    const message = prompt.trim() ? prompt : attachedOnly();
     try {
       if (!(await composer.flush())) return;
       const draftRevision = composer.snapshot().record?.revision;
@@ -468,6 +480,7 @@ export function AgentColumn({
         if (irori) onStarted?.(brains);
         await shared.launch(scopeId, target?.id, () => host.start(input));
       }
+      attachments.clear();
       if (!(await composer.clear(draftRevision)))
         report(t('指示は送信済みです。', 'The instruction was sent.'));
     } catch (error) {
@@ -949,7 +962,13 @@ export function AgentColumn({
             )}
           </div>
         )}
-        <div className="composer-box">
+        <div
+          className="composer-box"
+          onDragOver={attachments.onDragOver}
+          onDrop={(event) => {
+            if (ready && !sending) attachments.onDrop(event);
+          }}
+        >
           <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
             {irori ? (
               <span className="context-chip">
@@ -1046,6 +1065,7 @@ export function AgentColumn({
               </button>
             )}
           </div>
+          <ComposerAttachments attachments={attachments} />
           <textarea
             ref={textarea}
             aria-label={
@@ -1064,9 +1084,12 @@ export function AgentColumn({
             maxLength={promptLimit}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={sendOnEnter(() => void start())}
+            onPaste={attachments.onPaste}
           />
           <div className="composer-actions">
             <div className="composer-selects">
+              <AttachButton attachments={attachments} disabled={!ready || sending} />
+              <DictateButton field={textarea} disabled={!ready || sending} onError={report} />
               {!irori && space && (skills.length > 0 || skillsRetired.length > 0) && (
                 <SkillPicker
                   key={space.scopeId}
@@ -1146,7 +1169,8 @@ export function AgentColumn({
                   sending ||
                   gitBusy ||
                   connecting ||
-                  !prompt.trim() ||
+                  !sendable ||
+                  attachments.pending ||
                   shared.external ||
                   agentInfo?.available !== true
                 }

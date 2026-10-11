@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import type { AttachmentRef } from '../domain/attachments';
 import {
   Group as PaneGroup,
   Panel as Pane,
@@ -719,7 +720,7 @@ export function Overview({
   scene?: { kind: 'leave' | 'return'; origin?: { x: number; y: number } };
   onCreateYou: () => Promise<void>;
   onShowYou: () => void;
-  onSendYou: (prompt: string) => Promise<void>;
+  onSendYou: (prompt: string, attachments?: AttachmentRef[]) => Promise<void>;
   onStopYou: (conversationId?: string) => Promise<void>;
   /** The CLI your AI runs on, and the model chosen for it ('' for the CLI's default). */
   yourAgent: AgentId;

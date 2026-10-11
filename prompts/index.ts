@@ -8,6 +8,7 @@ export * from './connected-folders';
 export * from './person-lines';
 export * from './comments';
 export * from './sources';
+export * from './attachments';
 export * from './skill';
 export * from './routine-step';
 export * from './boundaries';

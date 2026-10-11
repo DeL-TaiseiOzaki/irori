@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { sourceRef } from './knowledge';
 import { skillName } from './skills';
+import { attachmentLimit, attachmentRef } from './attachments';
 import {
   agentIds,
   agentAccessModes,
@@ -35,6 +36,8 @@ export const messageInput = z.object({
   brains: z.array(z.uuid()).max(50).optional(),
   /** The workspace an irori agent request was sent in; refused for a brain's own AI. */
   workspace: z.uuid().optional(),
+  /** Files the person attached, kept in irori's data directory. */
+  attachments: z.array(attachmentRef).max(attachmentLimit).optional(),
 });
 export const startInput = messageInput.extend({
   scopeId: z.uuid(),

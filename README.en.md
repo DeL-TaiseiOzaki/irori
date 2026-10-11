@@ -79,6 +79,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - **Moving in from another tool**: if you used Obsidian, orca or an editor, tell the irori agent you want to move in. It looks at your vaults and folders, asks which become hibachis, Knowledge or Contents and what to do about Git and workspaces, then sets them up as agreed.
 - Permissions follow each CLI's settings. A hibachi agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Each hibachi and the irori agent keep any number of whole conversations on this PC, with **新しい会話** and a **履歴** list (rename, pin, archive, delete). Instructions can be queued while an agent works, and survive a restart ([CONVERSATIONS](docs/CONVERSATIONS.md)).
+- Attach files to an instruction (paperclip, drop, or paste an image); agents see images as pictures. The microphone starts the system's dictation. An agent's questions show as choices ([ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)).
 - **Routines**: open **Routines** in the left rail, between irori mode and the hibachis, to configure JavaScript, manage secrets, and run a job you defined with one button. A routine is a folder with `routine.yaml` (in the irori agent's `routines/` or a hibachi's `.irori/routines/`) that lists programs to run and instructions for agents, in order. irori shows its files before the first run and after any change ([ROUTINES](docs/ROUTINES.md)).
 
 **Materials**

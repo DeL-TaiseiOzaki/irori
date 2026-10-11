@@ -20,6 +20,9 @@ if (process.platform === 'win32') {
   );
   process.exit(0);
 }
+// A one-pixel PNG, pasted into the message box.
+const onePixel =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const base = await mkdtemp(path.join(tmpdir(), 'irori harness UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -107,11 +110,16 @@ try {
     }
     await page.locator('.request').getByRole('button', { name: '拒否', exact: true }).click();
     if (agent === 'opencode') {
-      await page.getByRole('button', { name: 'Choice', exact: true }).click();
-      await page.getByRole('button', { name: 'Second', exact: true }).click();
-      await expect(page.getByLabel('Fixture answer', { exact: true })).toHaveValue(
-        'Choice\nSecond',
+      // A question offering several choices takes them as checkboxes, beside an answer of one's own.
+      const question = page.getByRole('group', { name: 'エージェントからの質問' });
+      await question.getByRole('checkbox', { name: 'Choice', exact: true }).click();
+      await question.getByRole('checkbox', { name: 'Second', exact: true }).click();
+      await expect(question.getByRole('checkbox', { name: 'Second', exact: true })).toHaveAttribute(
+        'aria-checked',
+        'true',
       );
+      await expect(question.getByRole('checkbox', { name: /^その他/ })).toBeVisible();
+      await page.screenshot({ path: 'test-results/irori-question.png' });
     } else await page.getByLabel('Fixture answer', { exact: true }).fill('Choice');
     await page.getByRole('button', { name: '回答する', exact: true }).click();
     await expect(page.locator('.message.done').last()).toContainText('完了');
@@ -243,6 +251,42 @@ try {
     await page.getByRole('link', { name: '危険', exact: true }).getAttribute('href'),
   ).not.toMatch(/javascript/i);
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
+  // Files go with an instruction, picked or pasted as an image; Pi is shown the picture.
+  await page.locator('.composer input[type=file]').setInputFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('attached words'),
+  });
+  await page.getByLabel('エージェントへの指示').evaluate((box, data) => {
+    const transfer = new DataTransfer();
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    transfer.items.add(new File([bytes], '', { type: 'image/png' }));
+    box.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }),
+    );
+  }, onePixel);
+  await expect(page.locator('.composer-attachments .attachment')).toHaveCount(2);
+  await expect(page.locator('.composer-attachments .attachment.pending')).toHaveCount(0);
+  await expect(page.locator('.composer-attachments img')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/irori-attachments-composer.png' });
+  // Files alone can be sent; the message says what they are for.
+  const finished = await page.locator('.message.done').count();
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.done')).toHaveCount(finished + 1);
+  await expect(page.locator('.composer-attachments')).toHaveCount(0);
+  const sent = page.locator('.message.user').last();
+  await expect(sent).toContainText('添付したファイルを見てください。');
+  await expect(sent).toContainText('notes.txt');
+  await expect(sent.locator('img.attachment-image')).toBeVisible();
+  const prompt = (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+    .filter((entry) => entry.type === 'prompt')
+    .at(-1);
+  expect(prompt.images).toEqual([{ type: 'image', data: onePixel, mimeType: 'image/png' }]);
+  expect(prompt.message).toContain('notes.txt');
+  await page.screenshot({ path: 'test-results/irori-attachments-sent.png' });
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
   // A brain's hibachi agent starts in full access.

@@ -15,6 +15,7 @@ import { layerFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
+import { attachmentByteLimit } from './attachments';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -262,6 +263,14 @@ export const hostArguments = {
   setSecret: z.tuple([secretName, secretValue]),
   deleteSecret: z.tuple([secretName]),
   cancel: z.union([z.tuple([]), z.tuple([id]), z.tuple([id, id])]),
+  stageAttachment: z.tuple([
+    z.string().min(1).max(1024),
+    z.instanceof(Uint8Array).refine((value) => value.length <= attachmentByteLimit),
+  ]),
+  discardAttachment: z.tuple([id]),
+  attachmentImage: z.tuple([id]),
+  openAttachment: z.tuple([id]),
+  dictate: z.tuple([]),
   respond: z.tuple([
     id,
     z.boolean(),

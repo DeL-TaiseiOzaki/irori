@@ -27,6 +27,7 @@ import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-jso
 import { SerialQueue } from '../host/serial-queue';
 import type { DeviceIdentity } from '../host/device';
 import { t } from '../domain/i18n';
+import { attachmentLimit, attachmentRef } from '../domain/attachments';
 
 const MiB = 1024 * 1024;
 /** A tool's details are kept to their first 1 MiB (ADR 017 D1). */
@@ -67,6 +68,8 @@ export const storedEvent = z.object({
   delegate: delegate.optional(),
   call: z.string().max(400).optional(),
   result: z.literal(true).optional(),
+  /** Files the person attached to the message. */
+  attachments: z.array(attachmentRef).max(attachmentLimit).optional(),
 });
 export type StoredEvent = z.infer<typeof storedEvent>;
 
@@ -176,6 +179,7 @@ export function storedLine(event: AgentEvent, at = new Date().toISOString()): St
     delegate: event.delegate,
     call: event.call,
     result: event.result || undefined,
+    attachments: event.attachments?.length ? event.attachments : undefined,
   });
 }
 
@@ -446,6 +450,7 @@ export class ConversationStore {
             type: 'status',
             role: 'user',
             text: active.input.prompt,
+            attachments: active.input.attachments,
           },
           active.at,
         ),
@@ -952,7 +957,14 @@ export class ConversationStore {
       try {
         await this.append(id, [
           storedLine(
-            { id: run.eventId, runId: run.runId, type: 'status', role: 'user', text: input.prompt },
+            {
+              id: run.eventId,
+              runId: run.runId,
+              type: 'status',
+              role: 'user',
+              text: input.prompt,
+              attachments: input.attachments,
+            },
             at,
           ),
         ]);

@@ -13,6 +13,24 @@ by release run `38117839427` from main's successful CI run `38117180653`
 - Owner checks remain: the installed Windows and Mac builds, a hibachi agent
   using `irori move`/`comment` with a real CLI, and the header at narrow widths.
 
+Chat attachments, dictation and questions, 2026-10-11 (**0.1.96**, [ADR 032](decisions/032-chat-attachments-dictation-questions.md)):
+the owner asked for Claudian's chat features: attaching images and any file,
+voice input, and proper choices when Claude Code or Codex asks a question.
+- `AttachmentStore` keeps files in `<data>/attachments/<id>/<name>`.
+  `stageAttachment`, `discardAttachment`, `attachmentImage` and
+  `openAttachment` are on the HostAPI. `StartRun.attachments` carries the
+  references, and the person's event keeps them in `events.jsonl`.
+- `attachedFiles` names each path in the request. Images also go to Claude Code
+  (image blocks plus `--add-dir`), Codex (`localImage`), OpenCode (file parts)
+  and Pi (RPC `images`).
+- `dictate()` starts the system's dictation: `startDictation:` on macOS, Win+H
+  through PowerShell on Windows. The owner chose this over a bundled Whisper
+  or an API key. The button is hidden on Linux.
+- `Question` keeps header, option descriptions/previews, other, secret,
+  multiline and optional. MCP elicitation from Claude Code and Codex becomes
+  questions (`src/domain/questions.ts`).
+- Open: real CLI runs, macOS dictation and Windows voice typing.
+
 Agents use what irori does, 2026-10-11 (**0.1.95**, [ADR 031](decisions/031-agents-use-what-irori-does.md)):
 the owner said the irori agent and the hibachi agents should be able to use
 everything irori offers. A review found the hibachi agent had no `irori` command,

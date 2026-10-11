@@ -83,11 +83,28 @@ export interface Document {
   /** Shown by a viewer rather than edited: `text` is empty and the bytes come from `viewerBytes`. */
   viewer?: import('./viewers').ViewerKind;
 }
+/** One answer a question offers; the answer sent back is its label. */
+export interface QuestionOption {
+  label: string;
+  description?: string;
+  /** Text shown beside the option while it is chosen (Claude Code's `preview`). */
+  preview?: string;
+}
 export interface Question {
   id: string;
   title: string;
-  options?: string[];
+  /** A short tag naming what is asked, as the CLI gives one. */
+  header?: string;
+  options?: QuestionOption[];
   multiple?: boolean;
+  /** The person may write an answer of their own beside the options. */
+  other?: boolean;
+  /** The answer is hidden while typed and never shown again. */
+  secret?: boolean;
+  /** A longer answer: several lines. */
+  multiline?: boolean;
+  /** The question may be left unanswered. */
+  optional?: boolean;
 }
 export type AgentAnswers = Record<string, string | string[]>;
 /**
@@ -119,6 +136,8 @@ export interface AgentEvent {
   outcome?: RunOutcome;
   /** Set on your AI's events that belong to a brain's sub-agent. */
   delegate?: Delegate;
+  /** Files the person attached to this message. */
+  attachments?: import('./attachments').AttachmentRef[];
   /** The tool call a `tool` event starts or reports on, as the CLI names it. */
   call?: string;
   /** A tool event carrying the call's result rather than the call. */
@@ -277,6 +296,8 @@ export interface StartRun {
   brains?: string[];
   /** The workspace an irori agent request was sent in: hibachis it registers join it. */
   workspace?: string;
+  /** Files the person attached, by the references `stageAttachment` returned. */
+  attachments?: import('./attachments').AttachmentRef[];
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
@@ -641,6 +662,19 @@ export interface HostAPI {
   /** Stops the run of one conversation, the runs in one space, or every run when neither is named. */
   cancel(scopeId?: string, conversationId?: string): Promise<void>;
   respond(requestId: string, allow: boolean, answers?: AgentAnswers): Promise<void>;
+  /** Keeps a file for the next instruction; it is sent by the reference returned. */
+  stageAttachment(name: string, bytes: Uint8Array): Promise<import('./attachments').AttachmentRef>;
+  /** Forgets a kept file that was not sent; one already sent stays with its conversation. */
+  discardAttachment(id: string): Promise<void>;
+  /** The bytes of an attached image, for its thumbnail; null when this device lacks it. */
+  attachmentImage(id: string): Promise<Uint8Array | null>;
+  /** Opens an attached file in the application the system chooses. */
+  openAttachment(id: string): Promise<void>;
+  /**
+   * Starts the operating system's dictation in the focused field: macOS 音声入力,
+   * Windows voice typing (Win+H). False where irori cannot start it.
+   */
+  dictate(): Promise<boolean>;
   onEvent(callback: (event: HostEvent) => void): () => void;
 }
 declare global {

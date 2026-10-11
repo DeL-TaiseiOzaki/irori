@@ -7,6 +7,8 @@ import type { OpencodeClient, Event, PermissionRuleset } from '@opencode-ai/sdk/
 import { agentEnv, launch } from './process';
 import type { NativeContext } from './adapter';
 import { t } from '../domain/i18n';
+import type { Question } from '../domain/types';
+import { pathToFileURL } from 'node:url';
 
 // A fresh authenticated native server per run; never attach to an arbitrary existing server.
 export class OpenCodeServer {
@@ -215,11 +217,17 @@ export async function runOpenCode(ctx: NativeContext) {
         );
         return;
       }
-      const questions = p.questions.map((q, i) => ({
+      const questions: Question[] = p.questions.map((q, i) => ({
         id: String(i),
         title: String(q.question),
-        options: q.options?.map((o) => String(o.label)),
+        ...(q.header && { header: String(q.header) }),
+        options: q.options?.map((o) => ({
+          label: String(o.label),
+          ...(o.description && { description: String(o.description) }),
+        })),
         multiple: q.multiple === true,
+        // OpenCode takes typed answers unless the question turns them off.
+        other: q.custom !== false,
       }));
       const reply = await ctx.ask(t('OpenCode からの質問', 'Question from OpenCode'), p, questions);
       if (!server.signal.aborted) {
@@ -320,7 +328,17 @@ export async function runOpenCode(ctx: NativeContext) {
       server.client.session.prompt(
         {
           sessionID: sessionId,
-          parts: [{ type: 'text', text: ctx.prompt }],
+          parts: [
+            ...(ctx.attached ?? [])
+              .filter((file) => file.image)
+              .map((file) => ({
+                type: 'file' as const,
+                mime: file.image!,
+                filename: file.name,
+                url: pathToFileURL(file.path).href,
+              })),
+            { type: 'text', text: ctx.prompt },
+          ],
           ...(model && { model }),
         },
         { fetch: async (request) => boundedResponse(await server.fetch(request, true)) },
