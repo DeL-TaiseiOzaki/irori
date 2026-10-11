@@ -1,5 +1,18 @@
 # irori continuation handoff
 
+Published 2026-10-11: **0.1.96** ([#208](https://github.com/DeL-TaiseiOzaki/irori/pull/208),
+attachments, dictation and questions as choices in the agent chat,
+[ADR 032](decisions/032-chat-attachments-dictation-questions.md)) merged at the
+owner's request as `bcab916`, and is published as
+[v0.1.96-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.96-preview.1)
+by release run `38129353146` from main's successful CI run `38128636898`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,205,824 bytes,
+  Mac 141,824,565 bytes and `irori-0.1.96-full.nupkg` 175,374,024 bytes.
+  The website manifest now offers 0.1.96.
+- Owner checks remain: real Claude Code and Codex shown an image and asking a
+  question, macOS 音声入力 from the microphone, and Windows voice typing (Win+H).
+
 Published 2026-10-11: **0.1.95** ([#206](https://github.com/DeL-TaiseiOzaki/irori/pull/206),
 agents do through irori what the person does in irori, [ADR 031](decisions/031-agents-use-what-irori-does.md),
 and irori mode's header fits a narrow pane) merged at the owner's request as
