@@ -254,7 +254,7 @@ test(
       notes,
     ]);
     // Deleting the conversation deletes its files.
-    await service.deleteConversation(saved.id);
+    await service.deleteConversation(saved.id!);
     assert.deepEqual(await readdir(service.attachments.root), []);
   },
 );
