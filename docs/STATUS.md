@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-11: **0.1.95** ([#206](https://github.com/DeL-TaiseiOzaki/irori/pull/206),
+agents do through irori what the person does in irori, [ADR 031](decisions/031-agents-use-what-irori-does.md),
+and irori mode's header fits a narrow pane) merged at the owner's request as
+`dd28551`, and is published as
+[v0.1.95-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.95-preview.1)
+by release run `38117839427` from main's successful CI run `38117180653`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,194,560 bytes,
+  Mac 141,837,204 bytes and `irori-0.1.95-full.nupkg` 175,363,120 bytes.
+  The website manifest now offers 0.1.95.
+- Owner checks remain: the installed Windows and Mac builds, a hibachi agent
+  using `irori move`/`comment` with a real CLI, and the header at narrow widths.
+
 Agents use what irori does, 2026-10-11 (**0.1.95**, [ADR 031](decisions/031-agents-use-what-irori-does.md)):
 the owner said the irori agent and the hibachi agents should be able to use
 everything irori offers. A review found the hibachi agent had no `irori` command,
