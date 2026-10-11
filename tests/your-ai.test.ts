@@ -292,6 +292,128 @@ test('irori writes an absent definition, never over one, and only inside the fol
   assert.deepEqual(await readdir(outside), []);
 });
 
+test('runs writing definitions at once make each folder once, with no failure', async (t) => {
+  const { you } = await yourAi(t);
+  const { root } = await you.create();
+  const brains = [{ name: 'Product', agent: 'vault-product', root: '/kb/product' }];
+  // The Codex and OpenCode folders are made by the first run that needs them.
+  for (const cli of ['codex', 'opencode'] as const) {
+    const written = await Promise.all(
+      Array.from({ length: 6 }, () => you.writeDefinitions(cli, brains)),
+    );
+    assert.equal(written.flat().length, 1, `${cli}: one run writes the file`);
+  }
+  assert.ok(existsSync(path.join(root, '.codex', 'agents', 'vault-product.toml')));
+  assert.ok(existsSync(path.join(root, '.opencode', 'agents', 'vault-product.md')));
+});
+
+// A Codex app server whose turn waits for a `release` file in its folder.
+const heldCodex = `#!/usr/bin/env node
+const fs = require('node:fs');
+const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
+const thread = 'fixture-thread-' + process.pid;
+require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+  const m = JSON.parse(line);
+  if (!m.method || m.id === undefined) return;
+  fs.appendFileSync('protocol.jsonl', JSON.stringify({ method: m.method, threadId: m.params.threadId }) + '\\n');
+  if (m.method !== 'turn/start') return send({ id: m.id, result: { thread: { id: thread } } });
+  send({ id: m.id, result: { turn: { id: 'turn-' + process.pid } } });
+  const timer = setInterval(() => {
+    if (!fs.existsSync('release')) return;
+    clearInterval(timer);
+    send({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  }, 50);
+});
+`;
+
+test(
+  'two threads of the irori agent run at once in its folder, each with its own session, kept to its workspace (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { base, you } = await yourAi(t);
+    const bin = path.join(base, 'bin');
+    await mkdir(bin);
+    await writeFile(path.join(bin, 'codex'), heldCodex, { mode: 0o700 });
+    const previous = process.env.PATH;
+    process.env.PATH = bin + path.delimiter + previous;
+    t.after(() => {
+      process.env.PATH = previous;
+    });
+    const files = new FileService(path.join(base, 'device'));
+    await files.init();
+    const brains: Space[] = [];
+    for (const name of ['Product', 'Research']) {
+      const root = path.join(base, name);
+      await mkdir(path.join(root, 'Knowledge_Base'), { recursive: true });
+      brains.push(await files.register(root, name, 'team'));
+    }
+    const { id, root } = await you.create();
+    const events: AgentEvent[] = [];
+    const service = new AgentService(
+      files,
+      (event) => events.push(event),
+      undefined,
+      undefined,
+      you,
+    );
+    t.after(() => service.cancel());
+    const [here, there] = [
+      '8f0c1d84-63c5-4a5e-9d7e-0d3c8d0f2a11',
+      'a3b9e6f2-5c47-4e8b-b1d2-7f6e5d4c3b2a',
+    ];
+    const start = (prompt: string) =>
+      service.startAccepted({
+        scopeId: id,
+        agent: 'codex',
+        access: 'full-access',
+        prompt,
+        brains: brains.map((brain) => brain.scopeId),
+        workspace: here,
+        conversationId: service.createConversation(id, 'codex', here),
+      });
+    // Both start in a folder that has no Codex definitions yet: each run writes them.
+    const runs = await Promise.all([start('First thread'), start('Second thread')]);
+    const conversationOf = (runId: string) =>
+      events.find((event) => event.runId === runId && event.conversationId)!.conversationId!;
+    const [one, two] = runs.map(conversationOf);
+    assert.notEqual(one, two);
+    assert.equal(service.running(id), true);
+    const rows = await service.conversationList(id, here);
+    assert.deepEqual(
+      rows.filter((row) => 'running' in row && row.running).length,
+      2,
+      'both run at once',
+    );
+    await writeFile(path.join(root, 'release'), '');
+    const ended = () =>
+      runs.every((runId) => events.some((event) => event.runId === runId && event.type === 'done'));
+    while (!ended()) await new Promise((resolve) => setTimeout(resolve, 50));
+    for (const runId of runs)
+      assert.equal(
+        events.find((event) => event.runId === runId && event.type === 'done')?.outcome,
+        'completed',
+      );
+    assert.equal(events.filter((event) => event.type === 'error').length, 0);
+    assert.ok(existsSync(path.join(root, '.codex', 'agents', 'vault-product.toml')));
+    // Each thread started its own native session.
+    const protocol = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assert.equal(protocol.filter((m) => m.method === 'thread/start').length, 2);
+    assert.equal(
+      new Set(protocol.filter((m) => m.method === 'turn/start').map((m) => m.threadId)).size,
+      2,
+    );
+    // A thread opens in its own workspace only, even when a view names it.
+    assert.equal((await service.conversation(id, 'codex', one, here)).id, one);
+    await assert.rejects(service.conversation(id, 'codex', one, there), /別のワークスペース/);
+    const reserved = service.createConversation(id, 'codex', here);
+    await assert.rejects(service.conversation(id, 'codex', reserved, there), /別のワークスペース/);
+    assert.deepEqual(await service.conversationList(id, there), []);
+  },
+);
+
 async function delegation(t: TestContext) {
   const { base, you } = await yourAi(t);
   const bin = path.join(base, 'bin');

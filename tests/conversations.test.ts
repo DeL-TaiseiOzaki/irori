@@ -556,6 +556,14 @@ test('The irori agent keeps a history per workspace; a vault keeps one wherever 
   // An id reserved in one workspace is not made in another.
   const reserved = restarted.reserve(you.id, 'pi', a);
   await assert.rejects(restarted.enqueue(reserved, inB, yours('x', b)), /ありません/);
+  // A view that names a conversation opens it only in its own workspace.
+  const fresh = open();
+  assert.equal(await fresh.belongs(first, a), true);
+  assert.equal(await fresh.belongs(first, b), false);
+  assert.equal(await fresh.belongs(older, a), false);
+  assert.equal(await fresh.belongs(theirs, b), true, "a vault's is everywhere");
+  assert.equal(await restarted.belongs(reserved, a), true);
+  assert.equal(await restarted.belongs(reserved, b), false);
   // A vault's history is the same whatever workspace is asked for.
   assert.deepEqual(
     (await restarted.list(vault.id, a)).map((row) => row.id),

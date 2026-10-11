@@ -19,4 +19,4 @@ It splits the request, hands work to the relevant vault agents, and brings the r
 
 Choose a CLI and model for the irori agent as well. It starts with full access. Edit its own Schema through the [same settings interface](schema.md).
 
-Use [conversations and history](conversations.md) to separate jobs. For a defined procedure, open the left rail's **Routines** button below irori mode and [run it](routines.md).
+Use [conversations and history](conversations.md) to separate jobs. **Add a column** runs another conversation beside the first, up to four. Each workspace keeps its own conversations and columns. For a defined procedure, open the left rail's **Routines** button below irori mode and [run it](routines.md).

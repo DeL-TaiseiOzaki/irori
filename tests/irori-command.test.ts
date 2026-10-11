@@ -388,6 +388,33 @@ test('clone, create and add register vaults and join the request’s workspace, 
   );
 });
 
+test('vaults added by two runs at once both join the workspace', async (t) => {
+  const { base, files, workspaces, setup } = await device(t);
+  const work = await workspaces.save('Work', []);
+  const folders = ['One', 'Two', 'Three'].map((name) => path.join(base, 'home', name));
+  for (const folder of folders) await mkdir(folder, { recursive: true });
+  // Each command reads the workspace and saves it; one must not drop another's vault.
+  await Promise.all(
+    folders.map((folder) => setup.run(['add', folder], base, { workspaceId: work.id })),
+  );
+  const joined = (await workspaces.list()).find((item) => item.id === work.id)!.scopeIds;
+  assert.deepEqual(
+    [...joined].sort(),
+    files
+      .list()
+      .map((space) => space.scopeId)
+      .sort(),
+  );
+  assert.equal(joined.length, 3);
+  // The same with the workspace command.
+  await Promise.all(
+    folders.map((folder) =>
+      setup.run(['workspace', 'Pair', path.basename(folder)], base, { workspaceId: work.id }),
+    ),
+  );
+  assert.equal((await workspaces.list()).find((item) => item.name === 'Pair')?.scopeIds.length, 3);
+});
+
 test('connect links a folder into the named vault’s contents', async (t) => {
   const { base, files, setup, deps, announced } = await device(t);
   const root = path.join(base, 'Notes');

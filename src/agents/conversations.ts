@@ -563,6 +563,14 @@ export class ConversationStore {
     const reserved = this.reserved.get(id);
     return !reserved || reserved.workspace === workspace;
   }
+  /**
+   * Whether a conversation, made or reserved, belongs to the workspace asked for,
+   * for a view that names it: the irori agent's opens only in its own workspace.
+   */
+  async belongs(id: string, workspace: string | undefined) {
+    await this.loadMeta(id).catch(() => undefined);
+    return this.inWorkspace(id, workspace);
+  }
   /** The conversation a run or a queued instruction goes to, made on its first instruction. */
   private async ensure(id: string, placement: Placement, input: StartRun) {
     const meta = await this.loadMeta(id);

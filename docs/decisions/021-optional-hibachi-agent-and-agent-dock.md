@@ -35,6 +35,9 @@ agent's sessions show.
 
 ### D2 — The agent dock holds columns
 
+> irori mode shows the irori agent in the same columns since 2026-10-12
+> ([ADR 034](034-irori-mode-threads.md)).
+
 - The pane beside the page is the agent dock. It holds one or more columns, each
   a conversation view with its own tabs, history, log and composer, as Claudian's
   panes do. **列を追加** adds a column to the right showing the same agent with a

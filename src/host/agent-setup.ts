@@ -49,7 +49,7 @@ import { renameLayerFolder } from './layer-folders';
 export interface AgentSetupHost {
   files: FileService;
   git: Pick<GitService, 'clone' | 'create' | 'abandon' | 'firstCommit'>;
-  workspaces: Pick<WorkspaceService, 'list' | 'save'> & Partial<Pick<WorkspaceService, 'forget'>>;
+  workspaces: Pick<WorkspaceService, 'list' | 'update'> & Partial<Pick<WorkspaceService, 'forget'>>;
   cloud: Pick<
     CloudService,
     'addLocal' | 'connect' | 'connections' | 'disconnect' | 'edit' | 'suspend' | 'resume'
@@ -253,14 +253,12 @@ export class AgentSetup {
     const workspace = await this.workspace(context);
     let joined: Joined = 'no workspace';
     let saved: WorkspaceProfile | undefined;
-    if (workspace?.scopeIds.includes(scopeId)) joined = 'member';
-    else if (workspace) {
-      saved = await this.host.workspaces.save(
-        workspace.name,
-        [...workspace.scopeIds, scopeId],
-        workspace.id,
-      );
-      joined = 'joined';
+    if (workspace) {
+      // Read again when saved: another run may have changed the workspace meanwhile.
+      ({ saved } = await this.host.workspaces.update(workspace, (current) =>
+        current && !current.scopeIds.includes(scopeId) ? [...current.scopeIds, scopeId] : undefined,
+      ));
+      joined = saved ? 'joined' : 'member';
     }
     this.host.announce?.({ workspace: saved });
     return joined;
@@ -611,13 +609,18 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     const spaces = command.vaults.map((name) => this.vault(name, cwd));
-    const existing = (await this.host.workspaces.list()).find((item) => item.name === command.name);
-    if (command.leave && !existing) throw Error(`There is no workspace named "${command.name}".`);
     const ids = spaces.map((space) => space.scopeId);
-    const scopeIds = command.leave
-      ? existing!.scopeIds.filter((id) => !ids.includes(id))
-      : [...(existing?.scopeIds ?? []), ...ids];
-    const saved = await this.host.workspaces.save(command.name, scopeIds, existing?.id);
+    const { before: existing, saved: written } = await this.host.workspaces.update(
+      { name: command.name },
+      (current) => {
+        if (command.leave && !current)
+          throw Error(`There is no workspace named "${command.name}".`);
+        return command.leave
+          ? current!.scopeIds.filter((id) => !ids.includes(id))
+          : [...(current?.scopeIds ?? []), ...ids];
+      },
+    );
+    const saved = written!;
     this.host.announce?.({ workspace: saved });
     const all = this.host.files.list();
     return workspaceSaved(

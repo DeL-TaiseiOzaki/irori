@@ -6,7 +6,7 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
-import { requestEnded } from '../domain/agent-log';
+import { requestEnded, runTasks } from '../domain/agent-log';
 import { errorText } from './ErrorMessage';
 
 const host = window.irori;
@@ -137,4 +137,20 @@ export function currentStep(ai: BrainAi) {
       (event) => event.role !== 'user' && (event.type === 'tool' || event.type === 'text'),
     )
   ];
+}
+
+/** The latest run of a conversation, and whether it is still going. */
+export function latestRun(ai: BrainAi) {
+  const last = ai.events.at(-1);
+  return last ? { runId: last.runId, active: ai.running } : undefined;
+}
+
+/** The irori agent's hand-offs still under way in a conversation, for the map's lines. */
+export function openTasks(ai: BrainAi) {
+  const run = latestRun(ai);
+  return run && run.active
+    ? runTasks(ai.events, run.runId, true).filter(
+        (task) => task.state === 'working' || task.state === 'waiting',
+      )
+    : [];
 }

@@ -32,33 +32,54 @@ export class WorkspaceService {
       .parse(await readLocalJson(path.join(this.files.dataDir, 'workspaces.json'), []));
   }
   save(name: string, scopeIds: string[], id?: string) {
+    return this.queue.run(async () => this.write(await this.list(), name, scopeIds, id));
+  }
+  /**
+   * Saves a workspace from the one saved at this moment, so two changes made at
+   * once both stay: `change` gets the workspace with that id (or, without one, that
+   * name), or undefined when there is none, and returns its vaults, or undefined
+   * to leave it as it is.
+   */
+  update(
+    ref: { id?: string; name: string },
+    change: (current?: WorkspaceProfile) => string[] | undefined,
+  ): Promise<{ before?: WorkspaceProfile; saved?: WorkspaceProfile }> {
     return this.queue.run(async () => {
-      scopeIds = [...new Set(scopeIds)];
-      const current = await this.list();
-      if (id && !current.some((item) => item.id === id)) throw Error('Unknown workspace');
-      const previous = current.find((item) => item.id === id);
-      // Editing a name must not discard temporarily unavailable repositories.
-      scopeIds.forEach((scopeId) => {
-        if (!previous?.scopeIds.includes(scopeId)) this.files.get(scopeId);
-      });
-      // Groups follow the vaults that stay; one left empty goes.
-      const groups = normalizeGroups(previous?.groups ?? [], scopeIds);
-      const value = workspaceProfile.parse({
-        id: id ?? randomUUID(),
-        name,
-        scopeIds,
-        ...(groups.length && { groups }),
-      });
-      if (current.some((item) => item.id !== id && item.name === value.name))
-        throw Error(
-          t('同じ名前のワークスペースがあります。', 'A workspace with the same name exists.'),
-        );
-      await writeLocalJson(path.join(this.files.dataDir, 'workspaces.json'), [
-        ...current.filter((item) => item.id !== id),
-        value,
-      ]);
-      return value;
+      const all = await this.list();
+      const before = all.find((item) => (ref.id ? item.id === ref.id : item.name === ref.name));
+      const scopeIds = change(before);
+      if (!scopeIds) return { before };
+      return {
+        before,
+        saved: await this.write(all, before?.name ?? ref.name, scopeIds, before?.id),
+      };
     });
+  }
+  private async write(current: WorkspaceProfile[], name: string, scopeIds: string[], id?: string) {
+    scopeIds = [...new Set(scopeIds)];
+    if (id && !current.some((item) => item.id === id)) throw Error('Unknown workspace');
+    const previous = current.find((item) => item.id === id);
+    // Editing a name must not discard temporarily unavailable repositories.
+    scopeIds.forEach((scopeId) => {
+      if (!previous?.scopeIds.includes(scopeId)) this.files.get(scopeId);
+    });
+    // Groups follow the vaults that stay; one left empty goes.
+    const groups = normalizeGroups(previous?.groups ?? [], scopeIds);
+    const value = workspaceProfile.parse({
+      id: id ?? randomUUID(),
+      name,
+      scopeIds,
+      ...(groups.length && { groups }),
+    });
+    if (current.some((item) => item.id !== id && item.name === value.name))
+      throw Error(
+        t('同じ名前のワークスペースがあります。', 'A workspace with the same name exists.'),
+      );
+    await writeLocalJson(path.join(this.files.dataDir, 'workspaces.json'), [
+      ...current.filter((item) => item.id !== id),
+      value,
+    ]);
+    return value;
   }
   saveGroups(id: string, groups: VaultGroup[]) {
     return this.queue.run(async () => {

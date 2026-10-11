@@ -78,7 +78,7 @@ try {
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
   // Your AI is set up from the Overview; its starter never overwrites anything.
-  const island = page.getByRole('complementary', { name: 'irori agent' });
+  const island = page.getByRole('complementary', { name: 'irori agent', exact: true });
   await expect(island).toContainText(you);
   await island.getByRole('button', { name: 'irori agent を用意する' }).click();
   const composer = island.getByLabel('irori agent への指示');
@@ -171,7 +171,7 @@ try {
 
   // The irori agent starts in full access like a vault agent. This part is
   // about requests, so it runs in the standard mode, chosen in the composer.
-  const access = island.getByLabel('irori agent のアクセス', { exact: true });
+  const access = island.getByLabel('エージェントのアクセス', { exact: true });
   await expect(access).toHaveValue('full-access');
   await access.selectOption('default');
   // A request goes to your AI with the workspace's brains; it hands a note to
@@ -262,10 +262,10 @@ try {
   // sub-agents, so it hands a brain to its vault agent with `irori call`
   // on the command irori puts on its PATH (irori's own runtime run as Node). The
   // vault agent runs in that brain, and its report comes back. The choice is kept.
-  const cli = island.getByLabel('irori agent の CLI', { exact: true });
+  const cli = island.getByLabel('エージェント', { exact: true });
   await expect(cli).toHaveValue('claude');
   await cli.selectOption('pi');
-  await expect(island.getByRole('button', { name: 'Pi · あなたの Schema' })).toBeVisible();
+  await expect(cli).toHaveValue('pi');
   await island.getByLabel('モデル', { exact: true }).selectOption('anthropic/claude-fixture');
   await composer.fill('Tidy both brains.\nrun: irori call Product "Tidy the Product notes."');
   await island.getByRole('button', { name: '送信', exact: true }).click();
