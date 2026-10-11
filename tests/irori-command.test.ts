@@ -17,12 +17,13 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { githubRepositoryURL, parseIroriCommand } from '../src/domain/irori-command';
 import { iroriBridge } from '../src/agents/irori-bridge';
-import { iroriAgentSkills, iroriCommandPreamble } from '../prompts';
+import { hibachiCommandPreamble, iroriAgentSkills, iroriCommandPreamble } from '../prompts';
 import { parseSkill } from '../src/host/skills';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { YourAiService } from '../src/host/you';
 import { AgentSetup } from '../src/host/agent-setup';
+import { addNoteComment, resolveNoteComment } from '../src/host/comments';
 import { AgentService } from '../src/agents/service';
 import { CloudService } from '../src/cloud/service';
 import { GitService } from '../src/git/service';
@@ -133,6 +134,45 @@ test('the command reads its forms, options and owner/name shorthand', () => {
     leave: false,
   });
   assert.throws(() => parseIroriCommand(['workspace']), /a workspace name/);
+  assert.deepEqual(parseIroriCommand(['move', 'a.md', 'wiki/']), {
+    kind: 'move',
+    note: 'a.md',
+    destination: 'wiki/',
+  });
+  assert.deepEqual(parseIroriCommand(['trash', 'a.md']), { kind: 'trash', note: 'a.md' });
+  assert.deepEqual(
+    parseIroriCommand(['comment', 'a.md', ' Check this ', '--quote', 'x', '--line', '3']),
+    {
+      kind: 'comment',
+      file: 'a.md',
+      body: 'Check this',
+      quote: 'x',
+      line: 3,
+    },
+  );
+  assert.throws(
+    () => parseIroriCommand(['comment', 'a.md', 'x', '--line', '3']),
+    /goes with --quote/,
+  );
+  assert.throws(() => parseIroriCommand(['comment', 'a.md', ' ']), /1 to 4000 characters/);
+  assert.deepEqual(parseIroriCommand(['resolve', 'a.md', 'abc']), {
+    kind: 'resolve',
+    file: 'a.md',
+    id: 'abc',
+  });
+  assert.deepEqual(parseIroriCommand(['index']), { kind: 'index' });
+  assert.deepEqual(parseIroriCommand(['index', 'Notes']), { kind: 'index', hibachi: 'Notes' });
+  assert.throws(() => parseIroriCommand(['index', 'a', 'b']), /at most one hibachi/);
+  assert.deepEqual(parseIroriCommand(['set', '.', '--color', 'ai', '--icon', 'flask']), {
+    kind: 'set',
+    hibachi: '.',
+    look: { color: 'ai', icon: { kind: 'glyph', glyph: 'flask' } },
+  });
+  assert.deepEqual((parseIroriCommand(['set', '.', '--icon', '🔥']) as { look: unknown }).look, {
+    icon: { kind: 'text', text: '🔥' },
+  });
+  assert.throws(() => parseIroriCommand(['set', '.', '--color', 'pink']), /--color is one of/);
+  assert.throws(() => parseIroriCommand(['set', '.', '--icon', 'abc']), /--icon is one of/);
   assert.throws(() => parseIroriCommand(['add', 'a', '--parent', 'b']), /has no --parent/);
   assert.throws(() => parseIroriCommand(['clone', 'octo/a', '--name']), /--name needs a value/);
   assert.throws(
@@ -490,6 +530,126 @@ test('set, layer, workspace, disconnect and remove change what irori holds, neve
   assert.match(await setup.run(['add', notes], base), /^Registered the hibachi "Notes"/);
 });
 
+test('a hibachi agent’s command reaches its own hibachi alone, and notes and comments go through irori', async (t) => {
+  const { base, files, workspaces, deps } = await device(t);
+  const mine = path.join(base, 'Mine');
+  const other = path.join(base, 'Other');
+  for (const folder of [path.join(mine, 'Knowledge_Base', 'wiki'), other])
+    await mkdir(folder, { recursive: true });
+  await writeFile(path.join(mine, 'Knowledge_Base', 'a.md'), '# A\n');
+  const own = await files.register(mine, 'Mine', 'personal');
+  await files.register(other, 'Other', 'personal');
+  const moved: string[][] = [];
+  const indexed: string[] = [];
+  const setup = new AgentSetup({
+    ...deps,
+    running: () => true,
+    moveNote: async (scopeId, from, to) => {
+      moved.push([scopeId, from, to]);
+      return { path: to, links: { notes: 1, links: 2, skipped: [] } };
+    },
+    trashNote: async (scopeId, notePath) => {
+      moved.push([scopeId, notePath, 'trash']);
+    },
+    addComment: (scopeId, file, comment, by) =>
+      addNoteComment(
+        files,
+        { userEmail: async () => 'person@example.invalid' },
+        scopeId,
+        file,
+        comment,
+        by,
+      ),
+    removeComment: (scopeId, file, id) => resolveNoteComment(files, scopeId, file, id),
+    updateIndex: async (scopeId) => {
+      indexed.push(scopeId);
+      return {
+        ...(await import('../src/domain/graph-index')).declaredGraphIndex,
+        declared: false,
+        pages: 1,
+        written: ['Knowledge_Base/index.md'],
+      };
+    },
+  });
+  const context = { hibachi: own.scopeId, by: 'Pi (hibachi agent)' };
+  const cwd = mine;
+
+  // Forms that arrange hibachis are the irori agent's.
+  for (const argv of [
+    ['add', other],
+    ['workspace', 'Lab', 'Mine'],
+    ['remove', 'Mine'],
+    ['run', 'x'],
+    ['clone', 'octo/kb'],
+  ])
+    await assert.rejects(setup.run(argv, cwd, context), /is the irori agent's/, argv[0]);
+  // Another hibachi is out of reach, by name or by path.
+  await assert.rejects(setup.run(['set', 'Other', '--name', 'X'], cwd, context), /is not yours/);
+  await assert.rejects(
+    setup.run(['comment', path.join(other, 'b.md'), 'hi'], cwd, context),
+    /is not yours/,
+  );
+  assert.match(await setup.run(['help'], cwd, context), /You are a hibachi agent/);
+  const listed = await setup.run(['list'], cwd, context);
+  assert.match(listed, /^Your hibachi:\n- Mine: folder /);
+  assert.doesNotMatch(listed, /Other|Workspaces|New hibachis/);
+
+  // Its own hibachi changes during its own run.
+  assert.match(
+    await setup.run(['set', '.', '--color', 'ai', '--icon', 'flask'], cwd, context),
+    /color ai, icon flask\.$/,
+  );
+  assert.deepEqual(files.get(own.scopeId).appearance, {
+    color: 'ai',
+    icon: { kind: 'glyph', glyph: 'flask' },
+  });
+  await setup.run(['set', '.', '--icon', '🔥'], cwd, context);
+  assert.equal(files.get(own.scopeId).appearance?.color, 'ai', 'an icon keeps the color');
+
+  // A note moves through irori; a folder as destination keeps its name.
+  assert.match(
+    await setup.run(['move', 'Knowledge_Base/a.md', 'Knowledge_Base/wiki'], cwd, context),
+    /^Moved Knowledge_Base\/a\.md to Knowledge_Base\/wiki\/a\.md in the hibachi "Mine", and rewrote 2 links in 1 notes\./,
+  );
+  assert.deepEqual(moved[0], [own.scopeId, 'Knowledge_Base/a.md', 'Knowledge_Base/wiki/a.md']);
+  await assert.rejects(
+    setup.run(['move', 'Knowledge_Base/a.md', path.join(other, 'a.md')], cwd, context),
+    /is not yours/,
+  );
+  assert.match(await setup.run(['trash', 'Knowledge_Base/a.md'], cwd, context), /irori's trash/);
+
+  // Comments are signed as the agent and resolved by id.
+  const added = await setup.run(
+    ['comment', 'Knowledge_Base/a.md', 'Source?', '--quote', '# A', '--line', '1'],
+    cwd,
+    context,
+  );
+  const id = /^Left comment ([0-9a-f]+) on Knowledge_Base\/a\.md; it has 1 comment now\.$/.exec(
+    added,
+  )![1];
+  const saved = JSON.parse(
+    await readFile(path.join(mine, '.irori/comments/Knowledge_Base/a.md.json'), 'utf8'),
+  );
+  assert.equal(saved.comments[0].by, 'Pi (hibachi agent)');
+  assert.equal(saved.comments[0].quote, '# A');
+  await assert.rejects(
+    setup.run(['resolve', 'Knowledge_Base/a.md', 'nope'], cwd, context),
+    /has no comment nope/,
+  );
+  assert.match(await setup.run(['resolve', 'Knowledge_Base/a.md', id], cwd, context), /0 left/);
+
+  // Indexes: its own hibachi without a name.
+  assert.match(
+    await setup.run(['index'], cwd, context),
+    /Wrote 1 index files for 1 pages in the hibachi "Mine"/,
+  );
+  assert.deepEqual(indexed, [own.scopeId]);
+  // The irori agent names any hibachi, or the one it stands in.
+  assert.match(await setup.run(['index', 'Other'], base, {}), /"Other"/);
+  await assert.rejects(setup.run(['index'], base, {}), /Name the hibachi/);
+  void workspaces;
+});
+
 /** Runs the `irori` command as a CLI's shell would: by name, from the run's PATH. */
 function irori(env: NodeJS.ProcessEnv, args: string[], cwd: string) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
@@ -524,7 +684,7 @@ test(
     assert.equal(failed.code, 1);
     assert.equal(failed.stderr, 'irori: No such thing.\n');
     const outside = await irori({ PATH: bridge.env.PATH }, ['list'], base);
-    assert.match(outside.stderr, /only an irori agent run/);
+    assert.match(outside.stderr, /only an agent run that irori started/);
     assert.notEqual(outside.code, 0);
   },
 );
@@ -607,7 +767,7 @@ test(
     assert.deepEqual(announced.at(-1)?.scopeIds, [research.scopeId]);
     // Nothing for the command was written in the irori agent's folder.
     await assert.rejects(stat(path.join(root, 'irori')));
-    // A hibachi's own agent gets neither the command nor a workspace.
+    // A hibachi's own agent gets no workspace.
     await assert.rejects(
       service.startAccepted({
         scopeId: research.scopeId,
@@ -617,5 +777,29 @@ test(
       }),
       /Only the irori agent/,
     );
+    // It has the command for its own hibachi alone (ADR 031).
+    let ended!: () => void;
+    const second = new Promise<void>((resolve) => (ended = resolve));
+    finished = ended;
+    const hibachiRun = await service.startAccepted({
+      scopeId: research.scopeId,
+      agent: 'pi',
+      prompt: 'Look.\nrun: irori list',
+    });
+    await second;
+    const own = events.filter((event) => event.runId === hibachiRun);
+    assert.equal(own.at(-1)?.outcome, 'completed', JSON.stringify(own));
+    const asked = (await readFile(path.join(folder, 'fixture-requests.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assert.ok(
+      asked
+        .find((call) => call.type === 'prompt')
+        .message.startsWith(hibachiCommandPreamble('Research')),
+    );
+    const listed = asked.find((call) => call.type === 'command');
+    assert.equal(listed.code, 0, listed.stderr);
+    assert.match(listed.stdout, /^Your hibachi:\n- Research: folder /);
   },
 );

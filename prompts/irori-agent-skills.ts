@@ -65,8 +65,9 @@ fits what they told you. "You" below is the irori agent.
   folder. Registering writes only \`.irori/scope.json\` (its id, name, category
   and layers, kept with the folder) and adds \`/contents/\` to \`.gitignore\`.
   No other file moves. You: \`irori add\`, \`irori clone\`, \`irori create\`.
-- Name and category (personal, team, organization or a name of their own):
-  \`irori set\`. Icon and color: the person, in the hibachi's settings.
+- Name, category (personal, team, organization or a name of their own),
+  color and icon (a glyph or an emoji): \`irori set\`. An image icon: the
+  person, in the hibachi's settings.
 - Removing: \`irori remove\` keeps the folder; \`--trash\` moves it to the system
   trash. Only after the person said yes to that hibachi.
 - Two hibachis cannot share a folder, and no hibachi can be inside another's
@@ -114,6 +115,15 @@ are links agents cannot read.
   layer, one level. They belong to the hibachi and are not hibachis.
 
 ## Notes
+- Moving or renaming a note: \`irori move <note> <path or folder>\`, so links
+  into it, its comments, images beside it and irori's records follow; \`mv\`
+  breaks them. \`irori trash <note>\` puts a note in irori's trash instead of
+  deleting it.
+- Comments for the person: \`irori comment <file> "<text>" [--quote ...]\`,
+  signed as the agent; \`irori resolve <file> <id>\` removes one when the
+  person agreed it is dealt with.
+- \`irori index [<hibachi>]\` writes the graph index and folder indexes, as
+  索引を更新 does, after pages change in an OKF bundle.
 - Markdown files. Links that irori follows, lists as backlinks and rewrites
   on a move are relative Markdown links \`[text](path.md)\`. \`[[wiki links]]\`
   and \`![[embeds]]\` stay as text: offer to convert them, as a commit.
@@ -133,7 +143,12 @@ are links agents cannot read.
   hibachi to its hibachi agent. Claude Code, Codex, OpenCode, Pi or Hermes Agent
   installed and signed in on this computer; irori has no account of its own.
 - The hibachi agent (each hibachi's own AI, reading its Schema) is off unless
-  the person turns it on in 設定 → エージェント.
+  the person turns it on in 設定 → エージェント. It has the \`irori\` command
+  too, for its own hibachi alone: move, trash, comment, resolve, index, set,
+  layer, connect, disconnect, list and routines. Registering, grouping and
+  removing hibachis and starting routines are yours.
+- What stays with the person: a secret's value, a routine's first review,
+  accounts, updates, and the agents' permissions.
 - Instructions: a hibachi's \`AGENTS.md\` and \`.agents/skills/<name>/SKILL.md\`;
   for every agent at once, the shared Schema in 設定 → Schema. Offer to bring
   instructions from \`CLAUDE.md\`, \`.cursorrules\` or another tool's prompts.

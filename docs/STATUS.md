@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Agents use what irori does, 2026-10-11 (**0.1.95**, [ADR 031](decisions/031-agents-use-what-irori-does.md)):
+the owner said the irori agent and the hibachi agents should be able to use
+everything irori offers. A review found the hibachi agent had no `irori` command,
+and neither agent could move notes with their links, comment, or update indexes.
+- Every hibachi agent run has the `irori` command, limited to its own hibachi
+  (`SetupContext.hibachi`). The irori agent's forms (`clone`, `create`, `add`,
+  `workspace`, `remove`, `run`) and other hibachis are refused.
+- New forms for both agents:
+  - `move` uses `moveNoteCarrying`, shared with the HostAPI's `moveNote`;
+  - `trash`;
+  - `comment`, signed as the agent;
+  - `resolve` (`resolveNoteComment`);
+  - `index`;
+  - `set --color/--icon`.
+- Agents are told: the hibachi agent through `hibachiCommandPreamble`; the
+  irori agent through its preamble, `irori-guide` and new sub-agent definitions.
+- What stays with the person: secret values, a routine's first review, accounts,
+  updates and agent permissions.
+- The irori mode header stays on one line: container queries on `.overview-main`
+  hide the count at 760px and turn labels into icons at 620px. Each label stays
+  as its control's accessible name. The owner reported tab labels wrapping
+  letter by letter.
+- Open: no real CLI run yet.
+
 Published 2026-10-09: **0.1.94** ([#200](https://github.com/DeL-TaiseiOzaki/irori/pull/200)
 0.1.92, routines open without a Keychain prompt on macOS;
 [#201](https://github.com/DeL-TaiseiOzaki/irori/pull/201) 0.1.93, the irori agent

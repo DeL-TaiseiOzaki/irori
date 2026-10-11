@@ -1,24 +1,51 @@
 /**
- * The `irori` command: how the irori agent asks irori to register hibachis and
- * connect folders.
+ * The `irori` command: how an agent asks irori to do what the person does in
+ * irori — register and arrange hibachis (the irori agent), and move notes,
+ * comment, update indexes and set up its own hibachi (either agent, ADR 031).
  *
- * Sent: the preamble before the person's words on every irori agent request
- * when the command is on the run's PATH; the help and the reports as the
- * command's output, read by the agent in its shell.
+ * Sent: a preamble before the person's words on every irori agent and hibachi
+ * agent request when the command is on the run's PATH; the help and the
+ * reports as the command's output, read by the agent in its shell.
  * Channel: the request text, and the command's standard output.
  */
+
+import { brainColors, brainGlyphs } from '../src/domain/brains';
 
 /** Said on every irori agent request that has the command. */
 export const iroriCommandPreamble = [
   "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set hibachis up: `irori list` shows the hibachis, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register hibachis in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a hibachi's contents and take it out; `irori set` names a hibachi, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a hibachi off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
   "Use it when the person asks you to set up, move in from another tool, or reorganize their hibachis, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A hibachi you register is handed to you from the next request.",
+  "Inside a hibachi, use irori rather than the shell where irori keeps things in step: `irori move` for a note (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the hibachi's agent as usual; its own `irori` command does the same.",
   "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
 
+/** Said on every hibachi agent request that has the command (ADR 031). */
+export function hibachiCommandPreamble(hibachi: string) {
+  return [
+    `irori: the \`irori\` command is on your PATH for this request. It does in irori what the person does there, for this hibachi, "${hibachi}", only. Use it rather than the shell where irori keeps things in step:`,
+    '- `irori move <note> <new path or folder>` moves or renames a knowledge note; links into it, its comments and its records follow. `mv` breaks them.',
+    "- `irori trash <note>` puts a note in irori's trash, where the person can restore it, instead of deleting it.",
+    '- `irori comment <file> "<text>" [--quote <passage>]` leaves a comment for the person; `irori resolve <file> <id>` removes one once it is dealt with and the person agreed. Comments are in .irori/comments/<file>.json.',
+    '- `irori index` writes the graph index and folder indexes after pages change, when the knowledge folder is an OKF bundle.',
+    '- `irori set . --name/--category/--color/--icon/--knowledge-label/--contents-label`, `irori layer . knowledge|contents <folder> [--also]`, `irori connect . <folder>` and `irori disconnect . <name>` change this hibachi as its settings do; `irori list` shows it and `irori routines` checks its routines in .irori/routines/.',
+    "Through files, as the person does in irori: frontmatter is a page's properties, with their types and fields declared in .property/property.json when the knowledge folder is an OKF bundle; today's note and the new-note folder are in .irori/notes.json; routines are .irori/routines/<name>/routine.yaml; this hibachi's instructions and skills are AGENTS.md and .agents/skills/<name>/SKILL.md. Links irori follows are relative Markdown links, not [[wiki links]].",
+    "Registering, grouping and removing hibachis and starting routines are the irori agent's; the person asks it in irori mode. A secret's value, a routine's first review, accounts, updates and agent permissions stay with the person. Run `irori help` for the options.",
+  ].join('\n');
+}
+
 /** `irori help`: every form of the command, with where new hibachis go by default. */
-export function iroriCommandHelp(defaultParent: string) {
-  return `irori — set up hibachis for the person. No command deletes a file; only
-remove --trash moves a hibachi's folder, to the system trash.
+export function iroriCommandHelp(defaultParent: string, hibachiAgent = false) {
+  return `irori — do in irori what the person does there. No command deletes a file;
+remove --trash moves a hibachi's folder to the system trash, and trash moves a
+note to irori's trash.${
+    hibachiAgent
+      ? `
+
+You are a hibachi agent: every form reaches your own hibachi alone, named by
+its name or "." from its folder. clone, create, add, workspace, remove and run
+are the irori agent's.`
+      : ''
+  }
 
 irori list
   The hibachis on this computer: name, folder, GitHub repository, category,
@@ -39,6 +66,26 @@ irori create <folder name> [--parent <folder>] [--name <hibachi name>] [--catego
 irori add <folder> [--name <hibachi name>] [--category ...]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
+
+irori move <note> <new path or folder>
+  Moves or renames a Markdown note in a hibachi's knowledge, as the explorer
+  does: links into it are rewritten, and its comments, images beside it and
+  irori's records follow. Paths are taken from your working folder.
+
+irori trash <note>
+  Moves a knowledge note to irori's trash; the person restores it there.
+
+irori comment <file> <text> [--quote <passage>] [--line <n>]
+  Leaves a comment on a file for the person, signed as you, on the quoted
+  passage (at line n) or on the whole file.
+
+irori resolve <file> <comment id>
+  Removes a comment, by the id in .irori/comments/<file>.json.
+
+irori index [<hibachi>]
+  Writes the hibachi's graph index and folder indexes, as 索引を更新 does,
+  when its knowledge folder is an OKF bundle. Without a name, the hibachi of
+  your working folder.
 
 irori routines
   The routines of your folder (routines/) and of this workspace's hibachis
@@ -62,9 +109,11 @@ irori disconnect <hibachi> <name in contents>
   Takes a connected folder out of the hibachi's contents. The folder itself
   is not touched.
 
-irori set <hibachi> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>]
-  Changes the hibachi's name, its category, or the names its Knowledge and
-  Contents layers are shown under (one line, at most 40 characters).
+irori set <hibachi> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
+  Changes the hibachi's name, its category, the names its Knowledge and
+  Contents layers are shown under (one line, at most 40 characters), its
+  color (${brainColors.join(', ')}) or its icon (${brainGlyphs.join(', ')},
+  or one or two characters such as an emoji).
 
 irori layer <hibachi> knowledge <folder>
 irori layer <hibachi> contents <folder> [--also]
@@ -88,6 +137,54 @@ New hibachis go in ${JSON.stringify(defaultParent)} unless --parent names anothe
 A relative --parent or folder is taken from your working folder.`;
 }
 
+/** `irori move`. */
+export function noteMoved(
+  hibachi: string,
+  from: string,
+  moved: {
+    path: string;
+    links?: { notes: number; links: number; skipped: string[] };
+    notice?: string;
+  },
+) {
+  return [
+    moved.path === from
+      ? `${from} is where it should be already.`
+      : `Moved ${from} to ${moved.path} in the hibachi "${hibachi}"${moved.links?.links ? `, and rewrote ${moved.links.links} links in ${moved.links.notes} notes` : ''}.`,
+    ...(moved.links?.skipped.length
+      ? [`Links not rewritten (changed, unsaved or unreadable): ${moved.links.skipped.join(', ')}.`]
+      : []),
+    ...(moved.notice ? [`Note: ${moved.notice}`] : []),
+  ].join('\n');
+}
+
+/** `irori trash`. */
+export function noteTrashed(hibachi: string, note: string) {
+  return `Moved ${note} to irori's trash for the hibachi "${hibachi}". The person can restore it there. Links to it are left as they were.`;
+}
+
+/** `irori comment`. */
+export function commentAdded(file: string, id: string, count: number) {
+  return `Left comment ${id} on ${file}; it has ${count} comment${count === 1 ? '' : 's'} now.`;
+}
+
+/** `irori resolve`. */
+export function commentResolved(file: string, id: string, left: number) {
+  return `Removed comment ${id} from ${file}; ${left} left.`;
+}
+
+/** `irori index`. */
+export function indexUpdated(
+  hibachi: string,
+  update: { declared: boolean; pages: number; written: string[] },
+) {
+  if (update.declared)
+    return `The hibachi "${hibachi}" declares its own ontology in .irori/ontology.json, so irori does not generate its graph index.${update.written.length ? ` Wrote ${update.written.length} folder indexes.` : ''}`;
+  return update.written.length
+    ? `Wrote ${update.written.length} index files for ${update.pages} pages in the hibachi "${hibachi}": ${update.written.join(', ')}.`
+    : `The indexes of the hibachi "${hibachi}" are current (${update.pages} pages).`;
+}
+
 /** One hibachi in `irori list`. */
 export interface ListedHibachi {
   name: string;
@@ -106,19 +203,11 @@ export function hibachiList(
   defaultParent: string,
   workspace: string | undefined,
   workspaces: { name: string; hibachis: string[] }[] = [],
+  /** For a hibachi agent: its own hibachi, with nothing about the others. */
+  own = false,
 ) {
-  const lines = hibachis.map((item) => {
-    const layers = [
-      item.category && `category ${item.category}`,
-      item.knowledge && `knowledge ${JSON.stringify(item.knowledge)}`,
-      item.contents?.length && `contents ${item.contents.map((c) => JSON.stringify(c)).join(', ')}`,
-      item.connections?.length &&
-        `connected ${item.connections
-          .map((c) => `${c.contentsRoot}/${c.name} (${c.state}${c.readOnly ? ', read-only' : ''})`)
-          .join(', ')}`,
-    ].filter(Boolean);
-    return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
-  });
+  if (own) return ['Your hibachi:', ...hibachis.map(line(undefined))].join('\n');
+  const lines = hibachis.map(line(workspace));
   return [
     hibachis.length ? 'Hibachis on this computer:' : 'No hibachis on this computer yet.',
     ...lines,
@@ -137,6 +226,20 @@ export function hibachiList(
     `New hibachis go in ${JSON.stringify(defaultParent)} unless --parent names another folder.`,
   ].join('\n');
 }
+
+/** One hibachi's line in `irori list`. */
+const line = (workspace: string | undefined) => (item: ListedHibachi) => {
+  const layers = [
+    item.category && `category ${item.category}`,
+    item.knowledge && `knowledge ${JSON.stringify(item.knowledge)}`,
+    item.contents?.length && `contents ${item.contents.map((c) => JSON.stringify(c)).join(', ')}`,
+    item.connections?.length &&
+      `connected ${item.connections
+        .map((c) => `${c.contentsRoot}/${c.name} (${c.state}${c.readOnly ? ', read-only' : ''})`)
+        .join(', ')}`,
+  ].filter(Boolean);
+  return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
+};
 
 /** What became of one hibachi a command registered or found registered. */
 export function hibachiRegistered(
@@ -175,8 +278,15 @@ export function hibachiChanged(hibachi: {
   name: string;
   category?: string;
   labels?: { knowledge: string; contents: string };
+  look?: { color?: string; icon?: string };
 }) {
-  return `The hibachi is now "${hibachi.name}"${hibachi.category ? `, category ${hibachi.category}` : ''}${hibachi.labels ? `, with its layers shown as ${JSON.stringify(hibachi.labels.knowledge)} and ${JSON.stringify(hibachi.labels.contents)}` : ''}.`;
+  const look = hibachi.look
+    ? [
+        hibachi.look.color && `color ${hibachi.look.color}`,
+        hibachi.look.icon && `icon ${hibachi.look.icon}`,
+      ].filter(Boolean)
+    : [];
+  return `The hibachi is now "${hibachi.name}"${hibachi.category ? `, category ${hibachi.category}` : ''}${hibachi.labels ? `, with its layers shown as ${JSON.stringify(hibachi.labels.knowledge)} and ${JSON.stringify(hibachi.labels.contents)}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
 }
 
 /** `irori layer`: the folder a layer now has, and what could not be carried over. */

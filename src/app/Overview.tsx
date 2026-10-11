@@ -838,7 +838,8 @@ export function Overview({
                     value: 'map',
                     label: (
                       <>
-                        <Icon name="map" size={14} /> {t('地図', 'Map')}
+                        <Icon name="map" size={14} />
+                        <span className="overview-label">{t('地図', 'Map')}</span>
                       </>
                     ),
                   },
@@ -846,7 +847,8 @@ export function Overview({
                     value: 'columns',
                     label: (
                       <>
-                        <Icon name="columns" size={14} /> {t('並列', 'Columns')}
+                        <Icon name="columns" size={14} />
+                        <span className="overview-label">{t('並列', 'Columns')}</span>
                       </>
                     ),
                   },
@@ -867,7 +869,9 @@ export function Overview({
                   }}
                 >
                   <Icon name="sparkles" size={14} />
-                  {t('irori agent に頼む', 'Ask the irori agent')}
+                  <span className="overview-label">
+                    {t('irori agent に頼む', 'Ask the irori agent')}
+                  </span>
                 </button>
                 <button
                   className="panel-button overview-add"
@@ -875,7 +879,7 @@ export function Overview({
                   onClick={() => setCreatingRoutine(true)}
                 >
                   <Icon name="plus" size={14} />
-                  {t('新しいルーティン', 'New routine')}
+                  <span className="overview-label">{t('新しいルーティン', 'New routine')}</span>
                 </button>
               </>
             )}
@@ -891,7 +895,7 @@ export function Overview({
                   )}
                 >
                   <Icon name="search" size={15} />
-                  <span>{t('hibachi を検索', 'Search hibachis')}</span>
+                  <span className="overview-label">{t('hibachi を検索', 'Search hibachis')}</span>
                   <kbd>{shortcut('K')}</kbd>
                 </button>
                 <button
@@ -900,7 +904,7 @@ export function Overview({
                   onClick={onAdd}
                 >
                   <Icon name="plus" size={14} />
-                  {t('hibachi を追加', 'Add a hibachi')}
+                  <span className="overview-label">{t('hibachi を追加', 'Add a hibachi')}</span>
                 </button>
               </>
             )}

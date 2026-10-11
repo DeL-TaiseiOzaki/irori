@@ -105,9 +105,12 @@ export async function addNoteComment(
   scopeId: string,
   notePath: string,
   input: NewComment,
+  /** Who signs it when not the person: an agent leaving a comment through the `irori` command. */
+  signer?: string,
 ): Promise<NoteComment[]> {
   const value = newComment.parse(input);
-  const by = actorFromEmail(await git.userEmail(scopeId).catch(() => ''));
+  const by =
+    signer?.trim().slice(0, 200) || actorFromEmail(await git.userEmail(scopeId).catch(() => ''));
   return queue.run(async () => {
     const filename = await location(files, scopeId, notePath, { create: true });
     const { raw } = await readFile(filename);
@@ -264,4 +267,17 @@ export async function commentsCount(files: FileService, scopeId: string, limit =
   const stat = await fs.lstat(top).catch(() => undefined);
   if (stat?.isDirectory() && !stat.isSymbolicLink()) await walk(top);
   return { comments, files: commented };
+}
+
+/** Removes one comment an agent names by id, refusing an id the file does not hold. */
+export async function resolveNoteComment(
+  files: FileService,
+  scopeId: string,
+  notePath: string,
+  id: string,
+): Promise<NoteComment[]> {
+  const before = await readNoteComments(files, scopeId, notePath);
+  if (!before.some((comment) => comment.id === id))
+    throw Error(`${notePath} has no comment ${id}.`);
+  return removeNoteComment(files, scopeId, notePath, id);
 }
