@@ -12,9 +12,11 @@ import type {
   AgentAnswers,
   Delegate,
   Question,
+  QuestionOption,
   StartRun,
 } from '../domain/types';
-import type { HookInput } from '@anthropic-ai/claude-agent-sdk';
+import type { HookInput, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
 import {
   agentAccessDetail,
@@ -69,6 +71,7 @@ import {
   selectedNote,
   connectedFolders,
   selectedSources,
+  attachedFiles,
   sharedSchema,
   sharedSchemaPointer,
 } from '../../prompts';
@@ -89,7 +92,17 @@ import {
   writeToolMatcher,
   type Delegation,
 } from './delegation';
+import { AttachmentStore } from './attachments';
+import { attachmentImageType, inlineImageByteLimit } from '../domain/attachments';
+import { elicitationContent, elicitationQuestions } from '../domain/questions';
 type Reply = { allow: boolean; answers?: AgentAnswers };
+/** A file the person attached, as a run hands it to its CLI. */
+export interface Attached {
+  name: string;
+  path: string;
+  /** The image type, when the CLI may be shown it as a picture. */
+  image?: string;
+}
 /** What a routine's agent step adds to an ordinary run (ADR 016 D7). */
 export interface StepRun {
   /** Put before the step's prompt; the conversation shows the prompt alone. */
@@ -150,6 +163,8 @@ type Run = {
   turnId?: string;
   finish?: () => void;
   bridge?: () => void;
+  /** Files the person attached to this instruction. */
+  attached?: Attached[];
   /** For your AI: the environment with the `irori` command, and its closing. */
   env?: NodeJS.ProcessEnv;
   commands?: () => void;
@@ -198,12 +213,22 @@ export function itemStart(item: Record<string, unknown>) {
     );
   return rest;
 }
+/** One option of a CLI's question, whichever of its spellings it came in. */
+export function questionOption(option: unknown): QuestionOption {
+  if (typeof option === 'string') return { label: option };
+  const value = (option ?? {}) as Record<string, unknown>;
+  const text = (key: string) =>
+    typeof value[key] === 'string' && value[key] ? { [key]: value[key] as string } : {};
+  return { label: String(value.label ?? ''), ...text('description'), ...text('preview') };
+}
 export class AgentService {
   // Runs by id: one per conversation, and an owner's conversations run side by
   // side in its checkout, as Claudian's tabs do in one vault (ADR 020).
   private runs = new Map<string, Run>();
   private device: DeviceIdentity;
   private conversations: ConversationStore;
+  /** Files the person attaches to instructions. */
+  readonly attachments: AttachmentStore;
   private catalog = new ModelCatalog();
   // Brains handed to the irori agent's runs in progress, with the runs that hold
   // them. A brain is busy while a sub-agent may be working in its checkout.
@@ -213,6 +238,8 @@ export class AgentService {
    * ran in, and where the request came from). Without it the command is not offered.
    */
   setup?: (argv: string[], cwd: string, context: SetupContext) => Promise<string>;
+  /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
+  openUrl?: (url: string) => Promise<void>;
   private requests = new Map<
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
@@ -229,6 +256,8 @@ export class AgentService {
     private you?: YourAiService,
   ) {
     this.device = new DeviceIdentity(files.dataDir);
+    this.attachments = new AttachmentStore(files.dataDir);
+    void this.attachments.prune().catch(() => {});
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, this.device, () => {
       for (const run of [...this.runs.values()]) {
@@ -312,10 +341,11 @@ export class AgentService {
   archiveConversation(id: string, archived: boolean) {
     return this.conversations.archive(id, archived);
   }
-  deleteConversation(id: string) {
+  async deleteConversation(id: string) {
     if ([...this.runs.values()].some((run) => run.conversationId === id))
       throw Error(stopBeforeDeleting());
-    return this.conversations.remove(id);
+    await this.conversations.remove(id);
+    await this.attachments.removeConversation(id);
   }
   /**
    * A conversation and the requests its run is waiting on now. A request is kept
@@ -382,6 +412,7 @@ export class AgentService {
     this.root(input.scopeId);
     if (this.isYou(input.scopeId)) refuseYourMaterials(input);
     const { id, placement } = await this.placement(input);
+    await this.attachments.claim(input.attachments, id);
     return this.conversations.enqueue(id, placement, input);
   }
   removeQueued(conversationId: string, id: string) {
@@ -741,6 +772,7 @@ export class AgentService {
       )
         throw Error(alreadyRunning());
       run.conversationId = placed.id;
+      await this.attachments.claim(input.attachments, placed.id);
       // The conversation's own queue goes first; `begin` refuses an instruction sent past it.
       const eventId = randomUUID();
       await this.conversations.begin(
@@ -752,7 +784,11 @@ export class AgentService {
       );
       run.recorded = true;
       run.accept();
-      this.publish(run, 'status', input.prompt, { role: 'user', id: eventId });
+      this.publish(run, 'status', input.prompt, {
+        role: 'user',
+        id: eventId,
+        ...(input.attachments?.length && { attachments: input.attachments }),
+      });
       if (run.step) this.event(run, 'status', run.step.notice);
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
@@ -898,6 +934,18 @@ export class AgentService {
           ),
         );
       if (run.step) promptParts.push(run.step.preamble);
+      if (input.attachments?.length) {
+        run.attached = await Promise.all(
+          input.attachments.map(async (ref) => ({
+            name: ref.name,
+            path: await this.attachments.path(ref),
+            image: attachmentImageType(ref.name),
+          })),
+        );
+        promptParts.push(
+          attachedFiles(run.attached.map((file) => ({ ...file, image: !!file.image }))),
+        );
+      }
       promptParts.push(input.prompt);
       let prompt = promptParts.join('\n\n');
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
@@ -1029,6 +1077,7 @@ export class AgentService {
           session: saved,
           access: run.access,
           model: input.model,
+          attached: run.attached,
           env: runEnv(run, command?.env ?? bridge?.env ?? run.env),
           args: bridge?.args,
           signal: run.abort.signal,
@@ -1306,7 +1355,12 @@ export class AgentService {
     if (run.cancelled) return;
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
-      input: [{ type: 'text', text: prompt, text_elements: [] }],
+      input: [
+        ...(run.attached ?? [])
+          .filter((file) => file.image)
+          .map((file) => ({ type: 'localImage', path: file.path })),
+        { type: 'text', text: prompt, text_elements: [] },
+      ],
       ...(model && { model }),
     });
     run.turnId = turn.turn.id;
@@ -1324,9 +1378,13 @@ export class AgentService {
       result = { decision: reply.allow ? 'accept' : 'decline' };
     } else if (m.method === 'item/tool/requestUserInput') {
       const questions: Question[] = p.questions.map((q: any) => ({
-        id: q.id,
-        title: q.question,
-        options: q.options?.map((o: any) => o.label),
+        id: String(q.id),
+        title: String(q.question),
+        ...(q.header && { header: String(q.header) }),
+        ...(Array.isArray(q.options) && q.options.length
+          ? { options: q.options.map(questionOption), other: q.isOther === true }
+          : { other: true }),
+        ...(q.isSecret === true && { secret: true }),
       }));
       const reply = await this.ask(
         run,
@@ -1351,6 +1409,8 @@ export class AgentService {
         p,
       );
       result = { permissions: reply.allow ? p.permissions : {}, scope: 'turn' };
+    } else if (m.method === 'mcpServer/elicitation/request') {
+      result = await this.elicit(run, p);
     } else {
       // Unsupported forms/dynamic tools must never be implicitly approved.
       this.event(
@@ -1365,6 +1425,60 @@ export class AgentService {
       return;
     }
     rpc.send({ id: m.id, result });
+  }
+  /**
+   * An MCP server's request for the person's input, from Claude Code or Codex:
+   * a form's fields become questions, and a link is opened only when the person
+   * agrees.
+   */
+  private async elicit(
+    run: Run,
+    request: {
+      serverName?: string;
+      message?: string;
+      mode?: string;
+      url?: string;
+      requestedSchema?: unknown;
+    },
+    extra: Partial<AgentEvent> = {},
+  ): Promise<{
+    action: 'accept' | 'decline' | 'cancel';
+    content?: Record<string, string | number | boolean | string[]>;
+  }> {
+    const server = String(request.serverName ?? 'MCP');
+    const message = String(request.message ?? '');
+    if (request.mode === 'url') {
+      const url = String(request.url ?? '');
+      const reply = await this.ask(
+        run,
+        t(
+          `${server} がブラウザで開くよう求めています`,
+          `${server} asks to open a page in the browser`,
+        ),
+        { message, url },
+        undefined,
+        extra,
+      );
+      if (!reply.allow || !/^https?:\/\//i.test(url)) return { action: 'decline' };
+      await this.openUrl?.(url);
+      return { action: 'accept' };
+    }
+    const questions = elicitationQuestions(request.requestedSchema);
+    const reply = await this.ask(
+      run,
+      message || t(`${server} からの質問`, `Question from ${server}`),
+      request,
+      questions.length
+        ? questions
+        : [{ id: 'confirm', title: message, options: [{ label: t('続ける', 'Continue') }] }],
+      extra,
+    );
+    return reply.allow
+      ? {
+          action: 'accept',
+          content: elicitationContent(request.requestedSchema, reply.answers ?? {}),
+        }
+      : { action: 'decline' };
   }
   private async claude(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
@@ -1404,8 +1518,34 @@ export class AgentService {
         ? { delegate: { scopeId: brain.scopeId, task: task ?? agentId, state: 'working' as const } }
         : {};
     };
+    // Attached images go as pictures beside the words; without any, the words alone.
+    const images = await Promise.all(
+      (run.attached ?? [])
+        .filter((file) => file.image)
+        .map(async (file) => {
+          const bytes = await fs.readFile(file.path).catch(() => undefined);
+          return bytes && bytes.length <= inlineImageByteLimit
+            ? {
+                type: 'image' as const,
+                source: {
+                  type: 'base64' as const,
+                  media_type: file.image as 'image/png',
+                  data: bytes.toString('base64'),
+                },
+              }
+            : undefined;
+        }),
+    ).then((blocks) => blocks.filter((block) => !!block));
+    const message = async function* (): AsyncGenerator<SDKUserMessage> {
+      yield {
+        type: 'user',
+        message: { role: 'user', content: [...images, { type: 'text', text: prompt }] },
+        parent_tool_use_id: null,
+      };
+    };
+    const attachedFolders = (run.attached ?? []).map((file) => path.dirname(file.path));
     const response = query({
-      prompt,
+      prompt: images.length ? message() : prompt,
       options: {
         cwd,
         pathToClaudeCodeExecutable: 'claude',
@@ -1417,13 +1557,15 @@ export class AgentService {
         includePartialMessages: true,
         resume: session,
         ...(model && { model }),
-        ...((delegation || run.step || this.localFolders(run).length) && {
+        ...((delegation || run.step || this.localFolders(run).length || attachedFolders.length) && {
           additionalDirectories: [
             ...(delegation?.brains.map((brain) => brain.root) ?? []),
             ...(run.step?.directories ?? []),
             ...this.localFolders(run),
+            ...attachedFolders,
           ],
         }),
+        onElicitation: (request) => this.elicit(run, request),
         // Told when it matters rather than on every turn: before an edit would
         // change lines the person wrote or revised, Claude Code hears which.
         hooks: {
@@ -1517,11 +1659,14 @@ export class AgentService {
         canUseTool: async (tool, input, options) => {
           const attributed = await delegateOfAgent(options.agentID);
           if (tool === 'AskUserQuestion') {
-            const questions = (input.questions as any[]).map((q) => ({
-              id: q.question,
-              title: q.question,
-              options: q.options?.map((o: any) => o.label),
+            // Claude Code always lets the person answer in words of their own.
+            const questions: Question[] = (input.questions as any[]).map((q) => ({
+              id: String(q.question),
+              title: String(q.question),
+              ...(q.header && { header: String(q.header) }),
+              options: Array.isArray(q.options) ? q.options.map(questionOption) : undefined,
               multiple: q.multiSelect === true,
+              other: true,
             }));
             const reply = await this.ask(
               run,

@@ -548,22 +548,183 @@
   min-width: 0;
 }
 .agent-question legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
   margin-bottom: 4px;
   font-size: 12.5px;
   color: var(--tx);
 }
+.agent-question legend small {
+  color: var(--tx-3);
+  font-size: 11px;
+}
+.question-number {
+  color: var(--tx-3);
+  font-variant-numeric: tabular-nums;
+}
+.question-header {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--tx-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+.question-title {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .choices {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 5px;
 }
-.agent-panel .choices button {
-  padding: 4px 10px;
+.choices .choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx);
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.choices .choice:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+}
+.choices .choice[aria-checked='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--ember);
+}
+.choice-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--hair-3);
+  color: var(--on-solid);
+}
+.choices.multiple .choice-mark {
+  border-radius: 4px;
+}
+.choice[aria-checked='true'] .choice-mark {
+  background: var(--ember);
+  box-shadow: none;
+}
+.choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.choice-label {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.choice-description {
+  color: var(--tx-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.choice-preview {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+}
+.agent-question input,
+.agent-question textarea {
+  width: 100%;
+}
+
+/* Files attached to a message, in the composer and in the log. */
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.message.user .attachment-list {
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+.attachment,
+.attachment > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.attachment {
+  height: 30px;
+  padding: 0 4px 0 6px;
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--tx-2);
   font-size: 12px;
 }
-.agent-panel .choices button[aria-pressed='true'] {
-  background: var(--solid);
-  color: var(--on-solid);
+.attachment.pending {
+  opacity: 0.6;
+}
+.attachment > button {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.composer-attachments .attachment > button {
+  padding: 3px;
+  border-radius: 5px;
+}
+.composer-attachments .attachment > button:hover {
+  background: var(--raised-2);
+  color: var(--tx);
+}
+.attachment small {
+  color: var(--tx-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.attachment-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.attachment.image {
+  height: auto;
+  padding: 0;
+  background: none;
+}
+.attachment-image {
+  display: block;
+  max-width: min(240px, 100%);
+  max-height: 180px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+.composer-tool .ui-icon {
+  display: block;
 }
 
 /* The composer. */

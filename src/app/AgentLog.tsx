@@ -1,5 +1,7 @@
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentAnswers, AgentEvent, Space } from '../domain/types';
+import type { AgentAnswers, AgentEvent, Question, Space } from '../domain/types';
+import { questionsAnswered } from '../domain/questions';
+import { MessageAttachments } from './Attachments';
 import { agentNames } from '../domain/types';
 import {
   eventTarget,
@@ -51,6 +53,156 @@ function StreamingMarkdown({ text, live }: { text: string; live: boolean }) {
   return <AgentMarkdown text={live ? shown : text} />;
 }
 
+/** What the person chose and wrote for one question, before it is sent. */
+interface Draft {
+  chosen: string[];
+  /** Words of their own, for a question that takes them. */
+  own: string;
+  /** "Other" is picked among the options, so their words are the answer. */
+  other: boolean;
+}
+const emptyDraft: Draft = { chosen: [], own: '', other: false };
+/** The answer each question sends: the labels chosen, and the person's own words. */
+function draftAnswers(questions: Question[], drafts: Record<string, Draft>): AgentAnswers {
+  return Object.fromEntries(
+    questions.map((q) => {
+      const draft = drafts[q.id] ?? emptyDraft;
+      const own = draft.own.trim();
+      // Without options, the words are the answer; with them, only when "Other" is picked.
+      const words = !q.options?.length || draft.other ? own : '';
+      if (q.multiple) {
+        const lines = q.options?.length ? (words ? [words] : []) : words.split('\n');
+        return [q.id, [...draft.chosen, ...lines].filter((value) => value.trim())];
+      }
+      return [q.id, words || draft.chosen[0] || ''];
+    }),
+  );
+}
+
+/** One question: its options with what each means, and a field for the person's own answer. */
+function QuestionField({
+  question: q,
+  number,
+  draft,
+  onChange,
+  onPick,
+}: {
+  question: Question;
+  /** Shown when the request asks more than one question. */
+  number?: number;
+  draft: Draft;
+  onChange: (draft: Draft) => void;
+  /** A single choice was picked: the request may be answered at once. */
+  onPick?: (label: string) => void;
+}) {
+  const options = q.options ?? [];
+  const preview = options.find((o) => o.preview && draft.chosen.includes(o.label))?.preview;
+  const ownField = (props: { autoFocus?: boolean }) => {
+    const common = {
+      'aria-label': options.length ? t(`${q.title}（その他）`, `${q.title} (other)`) : q.title,
+      placeholder: options.length
+        ? t('自由に入力…', 'Your own answer…')
+        : q.multiple
+          ? t('1行に1つ', 'One per line')
+          : t('回答を入力…', 'Type an answer…'),
+      value: draft.own,
+      autoFocus: props.autoFocus,
+    };
+    return q.multiline || (q.multiple && !options.length) ? (
+      <textarea
+        {...common}
+        rows={3}
+        onChange={(e) => onChange({ ...draft, own: e.target.value })}
+      />
+    ) : (
+      <input
+        {...common}
+        type={q.secret ? 'password' : 'text'}
+        autoComplete="off"
+        onChange={(e) => onChange({ ...draft, own: e.target.value })}
+      />
+    );
+  };
+  return (
+    <fieldset className="agent-question">
+      <legend>
+        {number !== undefined && <span className="question-number">{number}</span>}
+        {q.header && <span className="question-header">{q.header}</span>}
+        <span className="question-title">{q.title}</span>
+        {q.optional && <small>{t('任意', 'Optional')}</small>}
+      </legend>
+      {options.length > 0 && (
+        <div
+          className={`choices ${q.multiple ? 'multiple' : 'single'}`}
+          role={q.multiple ? 'group' : 'radiogroup'}
+          aria-label={q.title}
+        >
+          {options.map((o, index) => {
+            const chosen = draft.chosen.includes(o.label);
+            return (
+              <button
+                key={`${index}:${o.label}`}
+                type="button"
+                className="choice"
+                role={q.multiple ? 'checkbox' : 'radio'}
+                aria-checked={chosen}
+                onClick={() => {
+                  if (q.multiple)
+                    onChange({
+                      ...draft,
+                      chosen: chosen
+                        ? draft.chosen.filter((v) => v !== o.label)
+                        : [...draft.chosen, o.label],
+                    });
+                  else {
+                    onChange({ ...draft, chosen: [o.label], other: false });
+                    onPick?.(o.label);
+                  }
+                }}
+              >
+                <span className="choice-mark" aria-hidden="true">
+                  {chosen && <Icon name="check" size={11} strokeWidth={2.4} />}
+                </span>
+                <span className="choice-text">
+                  <span className="choice-label">{o.label}</span>
+                  {o.description && <small className="choice-description">{o.description}</small>}
+                </span>
+              </button>
+            );
+          })}
+          {q.other && (
+            <button
+              type="button"
+              className="choice"
+              role={q.multiple ? 'checkbox' : 'radio'}
+              aria-checked={draft.other}
+              onClick={() =>
+                onChange({
+                  ...draft,
+                  other: !draft.other || !q.multiple,
+                  chosen: q.multiple ? draft.chosen : [],
+                })
+              }
+            >
+              <span className="choice-mark" aria-hidden="true">
+                {draft.other && <Icon name="check" size={11} strokeWidth={2.4} />}
+              </span>
+              <span className="choice-text">
+                <span className="choice-label">{t('その他', 'Other')}</span>
+                <small className="choice-description">
+                  {t('自分の言葉で答える', 'Answer in your own words')}
+                </small>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+      {preview && <pre className="choice-preview">{preview}</pre>}
+      {(!options.length || (q.other && draft.other)) && ownField({ autoFocus: draft.other })}
+    </fieldset>
+  );
+}
+
 /** A permission or a question from a run, answered here or wherever else it shows. */
 export function AgentRequest({
   event,
@@ -64,14 +216,20 @@ export function AgentRequest({
   brain?: Space;
   onError: (e: unknown) => void;
 }) {
-  const [answers, setAnswers] = useState<AgentAnswers>({});
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [done, setDone] = useState(false);
-  async function reply(allow: boolean) {
+  const [sending, setSending] = useState(false);
+  const questions = event.questions;
+  async function reply(allow: boolean, answers?: AgentAnswers) {
+    if (sending) return;
+    setSending(true);
     try {
       await host.respond(event.requestId!, allow, answers);
       setDone(true);
     } catch (e) {
       onError(e);
+    } finally {
+      setSending(false);
     }
   }
   if (done || ended)
@@ -82,8 +240,23 @@ export function AgentRequest({
       </div>
     );
   const target = eventTarget(event.details);
+  const answers = questions ? draftAnswers(questions, drafts) : undefined;
+  // One question with one choice to make is answered by making it, as in Claude Code.
+  const quick =
+    questions?.length === 1 &&
+    !questions[0].multiple &&
+    !!questions[0].options?.length &&
+    !questions[0].options.some((o) => o.preview);
   return (
-    <div className="request" role="group" aria-label={t('許可の要求', 'Permission request')}>
+    <div
+      className={`request ${questions ? 'question' : ''}`}
+      role="group"
+      aria-label={
+        questions
+          ? t('エージェントからの質問', 'Question from the agent')
+          : t('許可の要求', 'Permission request')
+      }
+    >
       {brain && (
         <span className="request-brain">
           <BrainTile space={brain} size={16} radius={5} />
@@ -91,76 +264,37 @@ export function AgentRequest({
         </span>
       )}
       <strong className="request-title">
-        <Icon name="shield" size={16} />
+        <Icon name={questions ? 'question' : 'shield'} size={16} />
         {event.text}
       </strong>
       {target && <div className="request-target">{target}</div>}
-      {event.questions?.map((q) => (
-        <fieldset className="agent-question" key={q.id}>
-          <legend>{q.title}</legend>
-          {q.options && (
-            <div className="choices">
-              {q.options.map((o) => (
-                <button
-                  key={o}
-                  aria-pressed={
-                    q.multiple ? (answers[q.id] ?? []).includes(o) : answers[q.id] === o
-                  }
-                  onClick={() =>
-                    setAnswers((a) => {
-                      const previous = a[q.id];
-                      const values = Array.isArray(previous)
-                        ? previous
-                        : previous
-                          ? [previous]
-                          : [];
-                      return {
-                        ...a,
-                        [q.id]: q.multiple
-                          ? values.includes(o)
-                            ? values.filter((v) => v !== o)
-                            : [...values, o]
-                          : o,
-                      };
-                    })
-                  }
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-          )}
-          {q.multiple ? (
-            <textarea
-              aria-label={q.title}
-              placeholder={t('1行ずつ入力', 'One per line')}
-              value={
-                Array.isArray(answers[q.id])
-                  ? (answers[q.id] as string[]).join('\n')
-                  : (answers[q.id] ?? '')
-              }
-              onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value.split('\n') }))}
-            />
-          ) : (
-            <input
-              aria-label={q.title}
-              value={answers[q.id] ?? ''}
-              onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-            />
-          )}
-        </fieldset>
+      {questions?.map((q, index) => (
+        <QuestionField
+          key={q.id}
+          question={q}
+          number={questions.length > 1 ? index + 1 : undefined}
+          draft={drafts[q.id] ?? emptyDraft}
+          onChange={(draft) => setDrafts((all) => ({ ...all, [q.id]: draft }))}
+          onPick={quick ? (label) => void reply(true, { [q.id]: label }) : undefined}
+        />
       ))}
       <details className="request-details">
         <summary>{t('操作の詳細', 'Operation details')}</summary>
         <pre>{event.details}</pre>
       </details>
       <div className="request-actions">
-        <button className="panel-button" onClick={() => void reply(false)}>
-          {t('拒否', 'Deny')}
+        <button className="panel-button" disabled={sending} onClick={() => void reply(false)}>
+          {questions ? t('回答しない', 'Decline') : t('拒否', 'Deny')}
         </button>
-        <button className="ember-button" onClick={() => void reply(true)}>
-          {event.questions ? t('回答する', 'Answer') : t('今回のみ許可', 'Allow this time')}
-        </button>
+        {(!quick || Object.values(drafts).some((draft) => draft.other)) && (
+          <button
+            className="ember-button"
+            disabled={sending || (!!questions && !questionsAnswered(questions, answers!))}
+            onClick={() => void reply(true, answers)}
+          >
+            {questions ? t('回答する', 'Answer') : t('今回のみ許可', 'Allow this time')}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -344,6 +478,7 @@ export const AgentLog = memo(function AgentLog({
           case 'user':
             return (
               <div className="message user" key={item.key}>
+                <MessageAttachments attachments={item.event.attachments} />
                 <span>{item.event.text}</span>
               </div>
             );

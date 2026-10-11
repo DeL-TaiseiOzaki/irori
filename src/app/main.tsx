@@ -1,4 +1,5 @@
 import { classify, isPropertyPage } from '../domain/scopes';
+import type { AttachmentRef } from '../domain/attachments';
 import { knowledgeFolder, layerFolder, renamedPath } from '../domain/layers';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
@@ -1381,7 +1382,7 @@ function App() {
    * Sends to your AI with the workspace's brains, or queues behind its
    * conversation's run, on the CLI and model chosen for it on this device.
    */
-  async function sendToYou(message: string) {
+  async function sendToYou(message: string, attachments?: AttachmentRef[]) {
     if (!you) return;
     if (!(await save()))
       throw Error(
@@ -1399,6 +1400,7 @@ function App() {
       prompt: message,
       brains,
       workspace: workspace?.id,
+      ...(attachments?.length && { attachments }),
     };
     const value = await host.agentConversation(you.id, agentId, target?.id, workspace?.id);
     if (behind(input.conversationId, value)) {
@@ -1974,7 +1976,7 @@ function App() {
               onShowYou={() => {
                 if (you?.state === 'ready') goToLevel('you');
               }}
-              onSendYou={(prompt) => sendToYou(prompt)}
+              onSendYou={(prompt, attachments) => sendToYou(prompt, attachments)}
               yourAgent={yourChoice.agent}
               yourModel={yourChoice.models[yourChoice.agent] ?? ''}
               yourAccess={yourAccess}

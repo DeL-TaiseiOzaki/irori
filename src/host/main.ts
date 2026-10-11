@@ -60,6 +60,7 @@ import {
   type Space,
 } from '../domain/types';
 import type { NoteRef } from '../domain/note-operations';
+import { startDictation } from './dictation';
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers = new Map<string, FSWatcher>();
@@ -345,6 +346,11 @@ app
         emit(scopeId ? { type: 'files', scopeId } : { type: 'hibachis', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
+    // An MCP server's link opens only after the person agreed in the request.
+    agents.openUrl = async (url) => {
+      const address = webAddress(url);
+      if (address) await shell.openExternal(address.href);
+    };
     // The environment kept on the GitHub account (ADR 026).
     const environment = new EnvironmentService({
       files,
@@ -860,6 +866,12 @@ app
       deleteSecret: (name) => secrets.delete(name),
       cancel: (scopeId, conversationId) => agents.cancel(scopeId, conversationId),
       respond: (...args) => agents.respond(...args),
+      stageAttachment: (name, bytes) => agents.attachments.stage(name, bytes),
+      discardAttachment: (id) => agents.attachments.discard(id),
+      attachmentImage: (id) => agents.attachments.image(id),
+      openAttachment: async (id) => openFile(await agents.attachments.opened(id)),
+      // The field to type into has the focus already; the system's dictation types there.
+      dictate: () => startDictation(),
     } satisfies HostHandlers;
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {
       try {

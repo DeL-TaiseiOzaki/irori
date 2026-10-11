@@ -177,7 +177,13 @@ export async function runPi(ctx: NativeContext) {
             {
               id: event.id,
               title: String(event.title ?? t('Pi からの質問', 'Question from Pi')),
-              options: event.method === 'select' ? event.options : undefined,
+              options:
+                event.method === 'select' && Array.isArray(event.options)
+                  ? event.options.map((label: unknown) => ({ label: String(label) }))
+                  : undefined,
+              // Pi's select takes one of its options; input and editor take words.
+              other: event.method !== 'select',
+              multiline: event.method === 'editor',
             },
           ],
     );
@@ -203,7 +209,16 @@ export async function runPi(ctx: NativeContext) {
     sessionFile = state.sessionFile;
     // Observe native persistence after execution too: new session files may not exist until a response.
     started = true;
-    await rpc.request('prompt', { message: ctx.prompt });
+    const images = await Promise.all(
+      (ctx.attached ?? [])
+        .filter((file) => file.image)
+        .map(async (file) => ({
+          type: 'image',
+          data: (await fs.readFile(file.path)).toString('base64'),
+          mimeType: file.image,
+        })),
+    );
+    await rpc.request('prompt', { message: ctx.prompt, ...(images.length && { images }) });
     if (!sawAgentStart) {
       const current = await rpc.request('get_state');
       // Native extension commands may finish without starting an agent/model turn.

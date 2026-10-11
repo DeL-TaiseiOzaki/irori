@@ -12,6 +12,14 @@ import type { BrainAi } from './useBrainAi';
 import { ModelPicker } from './ModelPicker';
 import { ConversationHistory } from './ConversationHistory';
 import { promptLimit, type ConversationSummary } from '../domain/conversation';
+import type { AttachmentRef } from '../domain/attachments';
+import {
+  AttachButton,
+  ComposerAttachments,
+  DictateButton,
+  attachedOnly,
+  useAttachments,
+} from './Attachments';
 
 /** The latest run of a conversation, and whether it is still going. */
 export function latestRun(ai: BrainAi) {
@@ -80,7 +88,7 @@ export function YourAiPanel({
   onCreate: () => Promise<void>;
   /** Opens the Your AI screen: its folder and the brains' sub-agent definitions. */
   onShow: () => void;
-  onSend: (prompt: string) => Promise<void>;
+  onSend: (prompt: string, attachments?: AttachmentRef[]) => Promise<void>;
   /** Stops the run of the conversation on show; the irori agent's others go on. */
   onStop: (conversationId?: string) => Promise<void>;
   onError: (error: unknown) => void;
@@ -90,6 +98,7 @@ export function YourAiPanel({
   const [history, setHistory] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  const attachments = useAttachments(onError);
   // Placed words replace an empty box or follow what is there, with the caret after them.
   useEffect(() => {
     if (!seed) return;
@@ -122,9 +131,14 @@ export function YourAiPanel({
     );
   const run = latestRun(ai);
   const behind = ai.running || ai.queued.length > 0;
+  const sendable = !!text.trim() || (attachments.refs.length > 0 && !attachments.pending);
   const send = async () => {
-    if (!text.trim() || busy) return;
-    if (await act(() => onSend(text))) setText('');
+    if (!sendable || attachments.pending || busy) return;
+    const refs = attachments.refs;
+    if (await act(() => onSend(text.trim() ? text : attachedOnly(), refs))) {
+      setText('');
+      attachments.clear();
+    }
   };
   return (
     <>
@@ -212,6 +226,10 @@ export function YourAiPanel({
       </div>
       <form
         className="overview-composer"
+        onDragOver={attachments.onDragOver}
+        onDrop={(event) => {
+          if (!busy) attachments.onDrop(event);
+        }}
         onSubmit={(event) => {
           event.preventDefault();
           void send();
@@ -227,6 +245,7 @@ export function YourAiPanel({
             {t(`送信待ち ${ai.queued.length}`, `${ai.queued.length} pending`)}
           </small>
         )}
+        <ComposerAttachments attachments={attachments} />
         <textarea
           ref={box}
           aria-label={t('irori agent への指示', 'Instruction for the irori agent')}
@@ -237,9 +256,12 @@ export function YourAiPanel({
           disabled={busy}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={sendOnEnter(() => void send())}
+          onPaste={attachments.onPaste}
         />
         <footer>
           <span className="composer-selects your-ai-selects">
+            <AttachButton attachments={attachments} disabled={busy} />
+            <DictateButton field={box} disabled={busy} onError={onError} />
             <label className="composer-pill">
               <Icon name="sparkles" size={12} />
               <select
@@ -275,7 +297,7 @@ export function YourAiPanel({
           <button
             type="submit"
             className="ember-button"
-            disabled={!text.trim() || busy}
+            disabled={!sendable || attachments.pending || busy}
             aria-label={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
             title={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
           >

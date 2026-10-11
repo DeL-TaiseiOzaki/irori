@@ -361,9 +361,10 @@ try {
   await expect(request).toContainText('Fixture confirmation');
   await page.screenshot({ path: 'test-results/routines-request.png' });
   await request.getByRole('button', { name: '今回のみ許可' }).click();
-  await expect(request).toContainText('Fixture answer');
-  await request.getByLabel('Fixture answer').fill('Choice');
-  await request.getByRole('button', { name: '回答する' }).click();
+  const question = ask.getByRole('group', { name: 'エージェントからの質問' });
+  await expect(question).toContainText('Fixture answer');
+  await question.getByLabel('Fixture answer').fill('Choice');
+  await question.getByRole('button', { name: '回答する' }).click();
   await last('Ask', 'succeeded');
   await expect(ask.locator('.routine-step')).toContainText('hibachi agent');
   await ask.getByText('報告', { exact: true }).click();
