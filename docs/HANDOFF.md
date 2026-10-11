@@ -1,5 +1,22 @@
 # irori continuation handoff
 
+Published 2026-10-11: **0.1.97** ([#210](https://github.com/DeL-TaiseiOzaki/irori/pull/210),
+a Codex run ends only with its own thread's turn, so a sub-agent or forked
+thread finishing no longer stops the irori agent or a hibachi agent, and a
+sub-agent's words stay out of the reply) merged at the owner's request as
+`1693074`, and is published as
+[v0.1.97-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.1.97-preview.1)
+by release run `38144892600` from main's successful CI run `38144009003`
+(verify plus Linux, Windows and macOS packages). A second dispatch for the same
+tag (`38144902730`) stopped at its existing-tag check and published nothing.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,202,752 bytes,
+  Mac 141,827,218 bytes and `irori-0.1.97-full.nupkg` 175,372,196 bytes.
+  The website manifest now offers 0.1.97.
+- The PR's first CI run failed once in `routines-ui-smoke` (the Collect row's
+  「変更あり」 label within 5 s); its rerun and two local runs passed.
+- Owner check remains: a real Codex conversation that starts sub-agents keeps
+  running until the parent's own turn ends.
+
 Published 2026-10-11: **0.1.96** ([#208](https://github.com/DeL-TaiseiOzaki/irori/pull/208),
 attachments, dictation and questions as choices in the agent chat,
 [ADR 032](decisions/032-chat-attachments-dictation-questions.md)) merged at the
