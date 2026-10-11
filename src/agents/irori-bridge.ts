@@ -7,13 +7,13 @@ export type IroriAnswer = (
   signal: AbortSignal,
 ) => Promise<string>;
 
-// The irori agent sets up hibachis through an `irori` command on its run's
-// PATH, on every CLI. The client passes its arguments and working folder to
+// The irori agent and the hibachi agents do what the person does in irori
+// through an `irori` command on their run's PATH, on every CLI (ADR 025, 031). The client passes its arguments and working folder to
 // irori over a loopback URL that only this run's environment carries, and
 // prints irori's answer.
 const client = `${clientBase('irori')}
 const address = process.env.IRORI_COMMAND;
-if (!address) fail('only an irori agent run that irori started can use this command.');
+if (!address) fail('only an agent run that irori started can use this command.');
 else
   post(
     address,
@@ -24,14 +24,14 @@ else
 
 export const iroriCommand: BridgeCommand = {
   name: 'irori',
-  purpose: 'sets up hibachis for the irori agent and prints what was done.',
+  purpose: 'does in irori what the person does there, for the agent, and prints what was done.',
   client,
   variable: 'IRORI_COMMAND',
   // Room for every argument and the folder, each escaped in JSON at worst.
   limit: (iroriArgumentLimit.count + 1) * iroriArgumentLimit.length * 6 + 64,
 };
 
-/** Serves one irori agent run's `irori` command (see `commandBridge`). */
+/** Serves one agent run's `irori` command (see `commandBridge`). */
 export function iroriBridge(
   dataDir: string,
   answer: IroriAnswer,

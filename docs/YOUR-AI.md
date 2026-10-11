@@ -172,6 +172,15 @@ agent sets up the person's hibachis.
   knowledge|contents <folder> [--also]`, `irori workspace <name> [<hibachi>...]
   [--leave]` and `irori remove <hibachi> [--trash]`. `irori list` also shows each
   hibachi's category, layer folders and connected folders, and the workspaces.
+- Since 0.1.95 ([ADR 031](decisions/031-agents-use-what-irori-does.md)) the
+  note forms `irori move <note> <path or folder>`, `irori trash <note>`,
+  `irori comment <file> <text> [--quote] [--line]`, `irori resolve <file> <id>`
+  and `irori index [<hibachi>]`, and `--color`/`--icon` on `set`. Every hibachi
+  agent run also has the command (`hibachiCommandPreamble`), limited to its own
+  hibachi (`SetupContext.hibachi`): `clone`, `create`, `add`, `workspace`,
+  `remove` and `run` are refused, another hibachi is refused by name or path,
+  and its own changes go ahead during its own run. Comments it leaves are signed
+  `<CLI> (hibachi agent)` or `<CLI> (irori agent)`.
 - A hibachi is registered on this device and added to the workspace the
   request came from (`StartRun.workspace`); a folder is linked into a hibachi's
   first contents folder. A repository or folder already registered just joins

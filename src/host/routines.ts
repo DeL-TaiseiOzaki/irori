@@ -664,10 +664,12 @@ export class RoutineService {
    * The irori agent's routines and those of the workspace's hibachis; with no
    * workspace, the irori agent's alone.
    */
-  async list(workspaceId: string | undefined): Promise<Routine[]> {
-    const workspace = workspaceId ? await this.workspace(workspaceId) : [];
+  /** The irori agent's routines and the workspace's hibachis', or with `only` one hibachi's alone. */
+  async list(workspaceId: string | undefined, only?: string): Promise<Routine[]> {
+    const workspace = workspaceId && !only ? await this.workspace(workspaceId) : [];
     const settings = await this.host.settings();
-    const owners = [await this.owner((await this.host.you.load()).id)];
+    const owners = only ? [] : [await this.owner((await this.host.you.load()).id)];
+    if (only) owners.push(await this.owner(only));
     for (const space of workspace) owners.push(await this.owner(space.scopeId));
     const routines: Routine[] = [];
     for (const owner of owners) {

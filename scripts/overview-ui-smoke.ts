@@ -114,6 +114,27 @@ try {
   const ais = page.getByRole('complementary', { name: 'hibachi agent' });
   const productAi = ais.getByRole('group', { name: 'Product の hibachi agent' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
+  // A narrow window keeps the header on one line: labels give way to icons, not to wrapping.
+  const header = page.locator('.overview-header');
+  const fits = () =>
+    header.evaluate((element) => {
+      const tall = [...element.querySelectorAll('h1, .obsidian-magnet-tab, button')].filter(
+        (item) => (item as HTMLElement).offsetHeight > 36,
+      );
+      return element.scrollWidth <= element.clientWidth + 1 && !tall.length;
+    });
+  expect(await fits()).toBe(true);
+  for (const width of [1100, 980]) {
+    await app.evaluate(
+      ({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size, 800),
+      width,
+    );
+    await expect.poll(fits).toBe(true);
+  }
+  await expect(page.locator('.overview-sub')).toBeHidden();
+  await expect(page.getByRole('button', { name: /^hibachi を検索/ })).toBeVisible();
+  await page.screenshot({ path: 'test-results/irori-overview-narrow.png' });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 940));
   // Search from the Overview covers every brain.
   await page.getByRole('button', { name: /^hibachi を検索/ }).click();
   await expect(page.getByRole('radio', { name: 'すべての hibachi', exact: true })).toBeChecked();

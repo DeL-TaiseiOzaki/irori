@@ -2,14 +2,19 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  commentAdded,
+  commentResolved,
   folderConnected,
   folderDisconnected,
   hibachiChanged,
   hibachiList,
   hibachiRegistered,
   hibachiRemoved,
+  indexUpdated,
   iroriCommandHelp,
   layerChosen,
+  noteMoved,
+  noteTrashed,
   routineList,
   workspaceSaved,
   routineRunRefused,
@@ -28,6 +33,9 @@ import type {
 import { knowledgeFolder, layerFolder, layerLabel, type NamedLayer } from '../domain/layers';
 import { categoryName } from '../domain/brains';
 import type { Routine, RoutineRef, RunRoutine } from '../domain/routines';
+import type { NewComment, NoteComment } from '../domain/comments';
+import type { GraphIndexUpdate } from '../domain/graph-index';
+import { owner } from '../domain/scopes';
 import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
@@ -57,8 +65,31 @@ export interface AgentSetupHost {
   declareContents?: (scopeId: string, folder: string) => Promise<Space>;
   /** Takes a hibachi off this device and out of every workspace; `trash` moves its folder there. */
   remove?: (scopeId: string, trash: boolean) => Promise<void>;
-  /** The irori agent's routines and those of the workspace's hibachis, as checked for a run. */
-  routines?: (workspaceId: string | undefined) => Promise<Routine[]>;
+  /** The irori agent's routines and those of the workspace's hibachis, or one hibachi's alone. */
+  routines?: (workspaceId: string | undefined, only?: string) => Promise<Routine[]>;
+  /** Moves a knowledge note as the explorer does: links, comments and records follow (ADR 031). */
+  moveNote?: (
+    scopeId: string,
+    from: string,
+    to: string,
+  ) => Promise<{
+    path: string;
+    links?: { notes: number; links: number; skipped: string[] };
+    notice?: string;
+  }>;
+  /** Moves a knowledge note to irori's trash, from which the person restores it. */
+  trashNote?: (scopeId: string, notePath: string) => Promise<void>;
+  /** Adds a comment to a file, signed as the agent. */
+  addComment?: (
+    scopeId: string,
+    file: string,
+    comment: NewComment,
+    by: string,
+  ) => Promise<NoteComment[]>;
+  /** Removes one comment from a file, refusing an id it does not hold. */
+  removeComment?: (scopeId: string, file: string, id: string) => Promise<NoteComment[]>;
+  /** Writes the hibachi's graph index and folder indexes, as 索引を更新 does. */
+  updateIndex?: (scopeId: string) => Promise<GraphIndexUpdate>;
   /** Starts a routine as 実行 does, without a review: only reviewed files run (ADR 016 D4). */
   runRoutine?: (ref: RoutineRef, input: RunRoutine) => Promise<string>;
   /** Whether a run of the hibachi's own agent is in progress there. */
@@ -68,8 +99,16 @@ export interface AgentSetupHost {
   home?: string;
 }
 
-/** Where a request to the irori agent came from. */
+/** Where a request came from. */
 export interface SetupContext {
+  /**
+   * The hibachi whose own agent runs the command (ADR 031). It reaches that
+   * hibachi alone and none of the forms that register, group or remove
+   * hibachis or start routines.
+   */
+  hibachi?: string;
+  /** Who signs what the agent writes in irori's name, such as a comment. */
+  by?: string;
   /** The workspace the request was sent in, which new hibachis join. */
   workspaceId?: string;
   /** The CLI and model the request runs on, for the agent steps of a routine it starts. */
@@ -79,6 +118,9 @@ export interface SetupContext {
 }
 
 type Joined = 'joined' | 'member' | 'no workspace';
+
+/** Forms only the irori agent has: they register, group or remove hibachis, or start routines. */
+const irori = new Set(['clone', 'create', 'add', 'workspace', 'remove', 'run']);
 
 /**
  * Carries out the irori agent's `irori` command: what the person does in
@@ -108,17 +150,21 @@ export class AgentSetup {
   }
   async run(argv: string[], cwd: string, context: SetupContext = {}): Promise<string> {
     const command = parseIroriCommand(argv);
+    if (context.hibachi && irori.has(command.kind))
+      throw Error(
+        `"irori ${command.kind}" is the irori agent's. Ask the person to ask the irori agent in irori mode.`,
+      );
     switch (command.kind) {
       case 'help':
-        return iroriCommandHelp(await this.host.defaultParent());
+        return iroriCommandHelp(await this.host.defaultParent(), !!context.hibachi);
       case 'list':
         return this.list(context);
       case 'routines': {
         if (!this.host.routines) throw Error('Routines are not available here.');
-        const workspace = await this.workspace(context);
+        const workspace = context.hibachi ? undefined : await this.workspace(context);
         const spaces = this.host.files.list();
         return routineList(
-          (await this.host.routines(workspace?.id)).map((routine) => ({
+          (await this.host.routines(workspace?.id, context.hibachi)).map((routine) => ({
             ...routine,
             hibachi: spaces.find((space) => space.scopeId === routine.ref.owner)?.name,
           })),
@@ -132,19 +178,29 @@ export class AgentSetup {
       case 'add':
         return this.add(this.folder(cwd, command.folder), command, context);
       case 'connect':
-        return this.connect(command, cwd);
+        return this.connect(command, cwd, context);
       case 'disconnect':
-        return this.disconnect(command, cwd);
+        return this.disconnect(command, cwd, context);
       case 'set':
-        return this.set(command, cwd);
+        return this.set(command, cwd, context);
       case 'layer':
-        return this.layer(command, cwd);
+        return this.layer(command, cwd, context);
       case 'workspace':
         return this.saveWorkspace(command, cwd, context);
       case 'remove':
         return this.remove(command, cwd, context);
       case 'run':
         return this.startRoutine(command, cwd, context);
+      case 'move':
+        return this.moveNote(command, cwd, context);
+      case 'trash':
+        return this.trashNote(command, cwd, context);
+      case 'comment':
+        return this.comment(command, cwd, context);
+      case 'resolve':
+        return this.resolve(command, cwd, context);
+      case 'index':
+        return this.index(command, cwd, context);
     }
   }
   private async workspace(context: SetupContext) {
@@ -155,7 +211,10 @@ export class AgentSetup {
     const workspace = await this.workspace(context);
     const spaces = this.host.files.list();
     const hibachis: ListedHibachi[] = [];
-    for (const space of spaces)
+    // A hibachi agent sees its own hibachi alone.
+    for (const space of spaces.filter(
+      (item) => !context.hibachi || item.scopeId === context.hibachi,
+    ))
       hibachis.push({
         name: space.name,
         root: space.root,
@@ -179,10 +238,13 @@ export class AgentSetup {
       hibachis,
       await this.host.defaultParent(),
       workspace?.name,
-      (await this.host.workspaces.list()).map((item) => ({
-        name: item.name,
-        hibachis: names(item.scopeIds),
-      })),
+      context.hibachi
+        ? []
+        : (await this.host.workspaces.list()).map((item) => ({
+            name: item.name,
+            hibachis: names(item.scopeIds),
+          })),
+      !!context.hibachi,
     );
   }
   /** Adds the hibachi to the request's workspace, unless it is in it already. */
@@ -357,7 +419,7 @@ export class AgentSetup {
     );
   }
   /** The registered hibachi a command names: by name, sub-agent name or folder. */
-  private hibachi(name: string, cwd: string) {
+  private hibachi(name: string, cwd: string, scope?: string) {
     const spaces = this.host.files.list();
     const agents = brainAgentNames(spaces);
     const folder = this.folder(cwd, name);
@@ -368,18 +430,39 @@ export class AgentSetup {
         agents.get(space.scopeId) === name.trim() ||
         space.root === folder,
     );
-    if (found.length === 1) return found[0];
+    if (found.length === 1) return this.allowed(found[0], scope);
     if (found.length)
       throw Error(
         `More than one hibachi is named "${name}". Name it by its folder: ${found.map((space) => JSON.stringify(space.root)).join(', ')}.`,
       );
     throw Error(`No hibachi is named "${name}". Run "irori list" for their names and folders.`);
   }
+  /** Refuses another hibachi to a hibachi agent's command. */
+  private allowed(space: Space, scope: string | undefined) {
+    if (scope && space.scopeId !== scope)
+      throw Error(
+        `You are the hibachi agent of another hibachi; "${space.name}" is not yours. Ask the person to ask the irori agent.`,
+      );
+    return space;
+  }
+  /** The hibachi a file is in, and the file's path in it, refused outside the hibachis this run reaches. */
+  private located(cwd: string, file: string, scope: string | undefined) {
+    const absolute = this.folder(cwd, file);
+    const space = owner(this.host.files.list(), absolute);
+    if (!space || absolute === space.root)
+      throw Error(`${JSON.stringify(file)} is not a file in a hibachi.`);
+    return {
+      space: this.allowed(space, scope),
+      path: path.relative(space.root, absolute).split(path.sep).join('/'),
+    };
+  }
+
   private async connect(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'connect' }>,
     cwd: string,
+    context: SetupContext,
   ) {
-    const space = this.hibachi(command.hibachi, cwd);
+    const space = this.hibachi(command.hibachi, cwd, context.hibachi);
     if (this.host.running?.(space.scopeId))
       throw Error(
         `The hibachi "${space.name}" has its own agent running. Connect the folder after that run finishes.`,
@@ -406,8 +489,9 @@ export class AgentSetup {
     });
   }
   /** Refuses a change to a hibachi while its own agent works there. */
-  private idle(space: Space, change: string) {
-    if (this.host.running?.(space.scopeId))
+  private idle(space: Space, change: string, scope: string | undefined) {
+    // A hibachi agent changes its own hibachi during its own run.
+    if (!scope && this.host.running?.(space.scopeId))
       throw Error(
         `The hibachi "${space.name}" has its own agent running. ${change} after that run finishes.`,
       );
@@ -415,9 +499,10 @@ export class AgentSetup {
   private async disconnect(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'disconnect' }>,
     cwd: string,
+    context: SetupContext,
   ) {
-    const space = this.hibachi(command.hibachi, cwd);
-    this.idle(space, 'Take the folder out');
+    const space = this.hibachi(command.hibachi, cwd, context.hibachi);
+    this.idle(space, 'Take the folder out', context.hibachi);
     const wanted = command.name.replace(/^.*[\\/]/, '');
     const connection = (await this.host.cloud.connections(space.scopeId)).find(
       (item) => item.name === wanted,
@@ -437,13 +522,16 @@ export class AgentSetup {
   private async set(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'set' }>,
     cwd: string,
+    context: SetupContext,
   ) {
-    const space = this.hibachi(command.hibachi, cwd);
-    this.idle(space, "Change the hibachi's settings");
+    const space = this.hibachi(command.hibachi, cwd, context.hibachi);
+    this.idle(space, "Change the hibachi's settings", context.hibachi);
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),
       ...(command.labels && { labels: command.labels }),
+      // An icon or color keeps the other one.
+      ...(command.look && { appearance: { ...space.appearance, ...command.look } }),
     };
     const next = await (this.host.update ?? ((id, c) => this.host.files.update(id, c)))(
       space.scopeId,
@@ -453,6 +541,17 @@ export class AgentSetup {
     return hibachiChanged({
       name: next.name,
       category: categoryName(next.category),
+      ...(command.look && {
+        look: {
+          color: next.appearance?.color,
+          icon:
+            next.appearance?.icon?.kind === 'glyph'
+              ? next.appearance.icon.glyph
+              : next.appearance?.icon?.kind === 'text'
+                ? next.appearance.icon.text
+                : next.appearance?.icon && 'an image',
+        },
+      }),
       ...(command.labels && {
         labels: {
           knowledge: layerLabel(next, 'Knowledge_Base'),
@@ -464,10 +563,11 @@ export class AgentSetup {
   private async layer(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'layer' }>,
     cwd: string,
+    context: SetupContext,
   ) {
-    const space = this.hibachi(command.hibachi, cwd);
+    const space = this.hibachi(command.hibachi, cwd, context.hibachi);
     const word = command.layer === 'contents' ? 'contents' : 'knowledge';
-    this.idle(space, `Choose its ${word} folder`);
+    this.idle(space, `Choose its ${word} folder`, context.hibachi);
     try {
       if (command.also) {
         await (
@@ -535,7 +635,7 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     const space = this.hibachi(command.hibachi, cwd);
-    this.idle(space, 'Remove it');
+    this.idle(space, 'Remove it', context.hibachi);
     if (this.host.remove) await this.host.remove(space.scopeId, command.trash);
     else {
       if (command.trash) throw Error('The trash is not available here.');
@@ -545,5 +645,86 @@ export class AgentSetup {
     // The workspace on show lets the hibachi go.
     this.host.announce?.({ workspace: await this.workspace(context) });
     return hibachiRemoved(space, command.trash);
+  }
+  private async moveNote(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'move' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.moveNote) throw Error('Moving notes is not available here.');
+    const from = this.located(cwd, command.note, context.hibachi);
+    let to = this.located(cwd, command.destination, context.hibachi);
+    if (to.space.scopeId !== from.space.scopeId)
+      throw Error('A note moves within its own hibachi.');
+    // A folder as the destination keeps the note's name.
+    const folder = await fs
+      .stat(path.join(to.space.root, to.path))
+      .then((stat) => stat.isDirectory())
+      .catch(() => false);
+    if (folder) to = { ...to, path: `${to.path}/${path.posix.basename(from.path)}` };
+    const moved = await this.host.moveNote(from.space.scopeId, from.path, to.path);
+    this.host.announce?.({ scopeId: from.space.scopeId });
+    return noteMoved(from.space.name, from.path, moved);
+  }
+  private async trashNote(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'trash' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.trashNote) throw Error("irori's trash is not available here.");
+    const note = this.located(cwd, command.note, context.hibachi);
+    await this.host.trashNote(note.space.scopeId, note.path);
+    this.host.announce?.({ scopeId: note.space.scopeId });
+    return noteTrashed(note.space.name, note.path);
+  }
+  private async comment(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'comment' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.addComment) throw Error('Comments are not available here.');
+    const file = this.located(cwd, command.file, context.hibachi);
+    const comments = await this.host.addComment(
+      file.space.scopeId,
+      file.path,
+      {
+        body: command.body,
+        ...(command.quote !== undefined && { quote: command.quote }),
+        ...(command.line !== undefined && { line: command.line }),
+      },
+      context.by ?? 'agent',
+    );
+    this.host.announce?.({ scopeId: file.space.scopeId });
+    return commentAdded(file.path, comments.at(-1)!.id, comments.length);
+  }
+  private async resolve(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'resolve' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.removeComment) throw Error('Comments are not available here.');
+    const file = this.located(cwd, command.file, context.hibachi);
+    const left = await this.host.removeComment(file.space.scopeId, file.path, command.id);
+    this.host.announce?.({ scopeId: file.space.scopeId });
+    return commentResolved(file.path, command.id, left.length);
+  }
+  private async index(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'index' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.updateIndex) throw Error('Indexes are not available here.');
+    const here = owner(this.host.files.list(), this.folder(cwd, '.'));
+    const space = command.hibachi
+      ? this.hibachi(command.hibachi, cwd, context.hibachi)
+      : context.hibachi
+        ? this.host.files.get(context.hibachi)
+        : here
+          ? this.allowed(here, undefined)
+          : undefined;
+    if (!space) throw Error('Name the hibachi: "irori index <hibachi>".');
+    const update = await this.host.updateIndex(space.scopeId);
+    this.host.announce?.({ scopeId: space.scopeId });
+    return indexUpdated(space.name, update);
   }
 }

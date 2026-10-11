@@ -57,6 +57,7 @@ import { DeviceIdentity } from '../host/device';
 import {
   brainsCommandPreamble,
   iroriCommandPreamble,
+  hibachiCommandPreamble,
   brainsPreamble,
   commentsPointer,
   commentsSummary,
@@ -772,6 +773,21 @@ export class AgentService {
               workspaceId: input.workspace,
               agent: { agent: input.agent, model: input.model },
               inRoutine: !!run.step,
+              by: `${agentNames[input.agent]} (irori agent)`,
+            }),
+          agentEnv(),
+        );
+        run.env = commands.env;
+        run.commands = commands.close;
+      } else if (this.setup) {
+        // A hibachi agent's command reaches its own hibachi alone (ADR 031).
+        const setup = this.setup;
+        const commands = await iroriBridge(
+          this.files.dataDir,
+          ({ argv, cwd }) =>
+            setup(argv, cwd, {
+              hibachi: input.scopeId,
+              by: `${agentNames[input.agent]} (hibachi agent)`,
             }),
           agentEnv(),
         );
@@ -817,7 +833,8 @@ export class AgentService {
           promptParts.push(brainsPreamble(brains, cli, comments));
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
-      if (run.commands) promptParts.push(iroriCommandPreamble);
+      if (run.commands)
+        promptParts.push(you ? iroriCommandPreamble : hibachiCommandPreamble(space.name));
       // Searches that walk the hibachi skip the links its connected folders appear through.
       const linked = you ? [] : (this.files.cloud?.linkedPaths?.(input.scopeId) ?? []);
       if (linked.length) promptParts.push(connectedFolders(linked));

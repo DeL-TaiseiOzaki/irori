@@ -37,7 +37,13 @@ import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readPageProperties } from './properties';
-import { addNoteComment, moveNoteComments, readNoteComments, removeNoteComment } from './comments';
+import {
+  addNoteComment,
+  moveNoteComments,
+  readNoteComments,
+  removeNoteComment,
+  resolveNoteComment,
+} from './comments';
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
@@ -53,6 +59,7 @@ import {
   type HostEvent,
   type Space,
 } from '../domain/types';
+import type { NoteRef } from '../domain/note-operations';
 let window: BrowserWindow | undefined;
 let closing = false;
 const watchers = new Map<string, FSWatcher>();
@@ -311,7 +318,27 @@ app
           ),
         );
       },
-      routines: (workspaceId) => routines.list(workspaceId),
+      routines: (workspaceId, only) => routines.list(workspaceId, only),
+      moveNote: (scopeId, from, to) =>
+        agentChange(scopeId, async () => {
+          const doc = await files.read(scopeId, from);
+          const moved = await moveNoteCarrying({ scopeId, path: from, hash: doc.hash }, to, true);
+          return {
+            path: moved.path,
+            notice: 'notice' in moved ? moved.notice : undefined,
+            links: 'links' in moved ? moved.links : undefined,
+          };
+        }),
+      trashNote: (scopeId, notePath) =>
+        agentChange(scopeId, async () => {
+          const doc = await files.read(scopeId, notePath);
+          await files.trashNote({ scopeId, path: notePath, hash: doc.hash });
+        }),
+      addComment: (scopeId, file, comment, by) =>
+        agentChange(scopeId, () => addNoteComment(files, git, scopeId, file, comment, by)),
+      removeComment: (scopeId, file, id) =>
+        agentChange(scopeId, () => resolveNoteComment(files, scopeId, file, id)),
+      updateIndex: (scopeId) => agentChange(scopeId, () => graphIndex.update(scopeId)),
       runRoutine: (ref, input) => routines.run(ref, input),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
@@ -378,6 +405,72 @@ app
         }),
       );
     }
+    /**
+     * Moves a note and carries what names it: material IDs, comments, the record of
+     * human-written lines and, with `links`, the links into it.
+     */
+    async function moveNoteCarrying(ref: NoteRef, destination: string, links: boolean) {
+      const source = await knowledge.capture(ref);
+      if (source.hash !== ref.hash)
+        throw Error(t('ノートが変更されています。', 'The note has changed.'));
+      const next = await files.moveNote(ref, destination, links);
+      if (next.path === ref.path) return next;
+      // The record is rebound to the bytes as moved, before any link is rewritten.
+      let notice = await knowledge.rebind(source, { scopeId: next.scopeId, path: next.path }).then(
+        () => undefined,
+        () =>
+          t(
+            'ノートは移動しましたが、資料 ID を再接続できませんでした。',
+            'The note moved, but its material IDs could not be reconnected.',
+          ),
+      );
+      const addNotice = (more: string) => {
+        notice = [notice, more].filter(Boolean).join(' ');
+      };
+      try {
+        await moveNoteComments(files, ref.scopeId, ref.path, next.path);
+      } catch {
+        addNotice(
+          t(
+            'ノートは移動しましたが、コメントを移せませんでした。',
+            'The note moved, but its comments could not be moved with it.',
+          ),
+        );
+      }
+      try {
+        await authorship.carry(ref, next, next.text);
+      } catch {
+        addNotice(
+          t(
+            'ノートは移動しましたが、人の行の記録を引き継げませんでした。',
+            'The note moved, but the record of human-written lines could not be carried over.',
+          ),
+        );
+      }
+      if (!links) return { ...next, notice };
+      const update = await relink(files, search, next, ref.path, async (before, after) => {
+        try {
+          await authorship.carry(before, after, before.text, after.text);
+        } catch {
+          addNotice(
+            t(
+              `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
+              `Links in ${after.path} were updated, but the record of human-written lines could not be carried over.`,
+            ),
+          );
+        }
+      });
+      return { ...update.doc, notice, links: update.links };
+    }
+    /** A change an agent asks for with the `irori` command, during its own run (ADR 031). */
+    function agentChange<T>(scopeId: string, operation: () => Promise<T>) {
+      return changeFiles(() =>
+        changed(scopeId, async () => {
+          if (cloud.busy || git.busy) throw Error(setupWait);
+          return operation();
+        }),
+      );
+    }
     /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
     function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
       return changeHibachi(
@@ -438,61 +531,7 @@ app
         return true;
       },
       moveNote: (ref, destination, links) =>
-        changeHibachi(ref.scopeId, organizing(), async () => {
-          const source = await knowledge.capture(ref);
-          if (source.hash !== ref.hash)
-            throw Error(t('ノートが変更されています。', 'The note has changed.'));
-          const next = await files.moveNote(ref, destination, links);
-          if (next.path === ref.path) return next;
-          // The record is rebound to the bytes as moved, before any link is rewritten.
-          let notice = await knowledge
-            .rebind(source, { scopeId: next.scopeId, path: next.path })
-            .then(
-              () => undefined,
-              () =>
-                t(
-                  'ノートは移動しましたが、資料 ID を再接続できませんでした。',
-                  'The note moved, but its material IDs could not be reconnected.',
-                ),
-            );
-          const addNotice = (more: string) => {
-            notice = [notice, more].filter(Boolean).join(' ');
-          };
-          try {
-            await moveNoteComments(files, ref.scopeId, ref.path, next.path);
-          } catch {
-            addNotice(
-              t(
-                'ノートは移動しましたが、コメントを移せませんでした。',
-                'The note moved, but its comments could not be moved with it.',
-              ),
-            );
-          }
-          try {
-            await authorship.carry(ref, next, next.text);
-          } catch {
-            addNotice(
-              t(
-                'ノートは移動しましたが、人の行の記録を引き継げませんでした。',
-                'The note moved, but the record of human-written lines could not be carried over.',
-              ),
-            );
-          }
-          if (!links) return { ...next, notice };
-          const update = await relink(files, search, next, ref.path, async (before, after) => {
-            try {
-              await authorship.carry(before, after, before.text, after.text);
-            } catch {
-              addNotice(
-                t(
-                  `${after.path} のリンクは更新しましたが、人の行の記録を引き継げませんでした。`,
-                  `Links in ${after.path} were updated, but the record of human-written lines could not be carried over.`,
-                ),
-              );
-            }
-          });
-          return { ...update.doc, notice, links: update.links };
-        }),
+        changeHibachi(ref.scopeId, organizing(), () => moveNoteCarrying(ref, destination, links)),
       trashNote: (ref) => changeHibachi(ref.scopeId, organizing(), () => files.trashNote(ref)),
       trashedNotes: (id) => files.trashedNotes(id),
       restoreNote: (id, trashId) =>

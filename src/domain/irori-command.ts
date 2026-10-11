@@ -1,4 +1,12 @@
-import { categoryText, categoryValue } from './brains';
+import {
+  brainColors,
+  brainGlyphs,
+  brainLook,
+  categoryText,
+  categoryValue,
+  type BrainLook,
+} from './brains';
+import { commentBodyLimit, commentQuoteLimit } from './comments';
 import type { Category } from './types';
 import type { NamedLayer } from './layers';
 
@@ -33,11 +41,17 @@ export type IroriCommand =
       name?: string;
       category?: Category;
       labels?: Partial<Record<NamedLayer, string>>;
+      look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
     }
   | { kind: 'layer'; hibachi: string; layer: NamedLayer; folder: string; also: boolean }
   | { kind: 'workspace'; name: string; hibachis: string[]; leave: boolean }
   | { kind: 'remove'; hibachi: string; trash: boolean }
-  | { kind: 'run'; routine: string; hibachi?: string };
+  | { kind: 'run'; routine: string; hibachi?: string }
+  | { kind: 'move'; note: string; destination: string }
+  | { kind: 'trash'; note: string }
+  | { kind: 'comment'; file: string; body: string; quote?: string; line?: number }
+  | { kind: 'resolve'; file: string; id: string }
+  | { kind: 'index'; hibachi?: string };
 
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
@@ -48,11 +62,16 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   add: ['name', 'category'],
   connect: ['name', 'read-only'],
   disconnect: [],
-  set: ['name', 'category', 'knowledge-label', 'contents-label'],
+  set: ['name', 'category', 'knowledge-label', 'contents-label', 'color', 'icon'],
   layer: ['also'],
   workspace: ['leave'],
   remove: ['trash'],
   run: ['hibachi'],
+  move: [],
+  trash: [],
+  comment: ['quote', 'line'],
+  resolve: [],
+  index: [],
 };
 const flags = new Set(['read-only', 'also', 'leave', 'trash']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
@@ -67,6 +86,11 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   workspace: [1, 'a workspace name and then hibachis'],
   remove: [1, 'one hibachi'],
   run: [1, 'one routine'],
+  move: [2, 'a note and where it goes'],
+  trash: [1, 'one note'],
+  comment: [2, 'a file and the comment'],
+  resolve: [2, "a file and the comment's id"],
+  index: [1, 'at most one hibachi'],
 };
 
 /**
@@ -119,7 +143,13 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     values[key] = value;
   }
   const [count, wanted] = positional[kind];
-  if (kind === 'workspace' ? !words.length : words.length !== count)
+  if (
+    kind === 'workspace'
+      ? !words.length
+      : kind === 'index'
+        ? words.length > count
+        : words.length !== count
+  )
     throw Error(`"irori ${kind}" takes ${wanted}. Run "irori help".`);
   const text = (key: string) => values[key] as string | undefined;
   // A preset's name in either language is the preset; any other name is the KB's own.
@@ -171,13 +201,40 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
           throw Error(`--${key} is one line of at most 40 characters.`);
         labels[layer] = label;
       }
-      if (!common.name && !common.category && !Object.keys(labels).length)
-        throw Error('"irori set" needs --name, --category, --knowledge-label or --contents-label.');
+      const look: NonNullable<Extract<IroriCommand, { kind: 'set' }>['look']> = {};
+      const color = text('color')?.trim();
+      if (color !== undefined) {
+        if (!(brainColors as readonly string[]).includes(color))
+          throw Error(`--color is one of ${brainColors.join(', ')}.`);
+        look.color = color as BrainLook['color'];
+      }
+      const icon = text('icon')?.trim();
+      if (icon !== undefined) {
+        const mark = (brainGlyphs as readonly string[]).includes(icon)
+          ? { kind: 'glyph', glyph: icon }
+          : { kind: 'text', text: icon };
+        const parsed = brainLook.safeParse({ icon: mark });
+        if (!parsed.success)
+          throw Error(
+            `--icon is one of ${brainGlyphs.join(', ')}, or one or two characters such as an emoji.`,
+          );
+        look.icon = parsed.data.icon;
+      }
+      if (
+        !common.name &&
+        !common.category &&
+        !Object.keys(labels).length &&
+        !Object.keys(look).length
+      )
+        throw Error(
+          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --color or --icon.',
+        );
       return {
         kind,
         hibachi: words[0],
         ...common,
         ...(Object.keys(labels).length ? { labels } : {}),
+        ...(Object.keys(look).length ? { look } : {}),
       };
     }
     case 'layer': {
@@ -202,5 +259,32 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       return { kind, hibachi: words[0], trash: values.trash === true };
     case 'run':
       return { kind, routine: words[0], ...(text('hibachi') && { hibachi: text('hibachi') }) };
+    case 'move':
+      return { kind, note: words[0], destination: words[1] };
+    case 'trash':
+      return { kind, note: words[0] };
+    case 'comment': {
+      const body = words[1].trim();
+      if (!body || body.length > commentBodyLimit)
+        throw Error(`The comment is 1 to ${commentBodyLimit} characters.`);
+      const quote = text('quote');
+      if (quote !== undefined && quote.length > commentQuoteLimit)
+        throw Error(`--quote is at most ${commentQuoteLimit} characters.`);
+      const line = text('line');
+      if (line !== undefined && !/^[1-9]\d{0,6}$/.test(line))
+        throw Error('--line is a line number.');
+      if (line !== undefined && quote === undefined) throw Error('--line goes with --quote.');
+      return {
+        kind,
+        file: words[0],
+        body,
+        ...(quote !== undefined && { quote }),
+        ...(line !== undefined && { line: Number(line) }),
+      };
+    }
+    case 'resolve':
+      return { kind, file: words[0], id: words[1].trim() };
+    case 'index':
+      return { kind, ...(words[0] && { hibachi: words[0] }) };
   }
 }

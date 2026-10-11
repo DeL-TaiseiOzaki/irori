@@ -19,12 +19,23 @@
   display: flex;
   flex-direction: column;
 }
+.overview-main {
+  container: overview-main / inline-size;
+}
+/* One line however narrow the pane: the count goes first, then the labels
+   give way to their icons, which keep the labels as their names. */
 .overview-header {
   display: flex;
   align-items: center;
   gap: 12px;
   height: 56px;
+  min-width: 0;
   padding: 0 4px 0 14px;
+  overflow: hidden;
+}
+.overview-header > * {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .overview-header h1 {
   margin: 0;
@@ -33,12 +44,19 @@
   letter-spacing: 0.01em;
 }
 .overview-sub {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--tx-3);
   font-size: 12.5px;
-  white-space: nowrap;
 }
 .overview-space {
   flex: 1;
+}
+.overview-header .overview-search {
+  flex: 0 1 300px;
+  min-width: 120px;
 }
 .overview-search {
   display: inline-flex;
@@ -68,6 +86,39 @@
 }
 .overview-add {
   height: 34px;
+}
+.overview-views .obsidian-magnet-tab,
+.overview-header .panel-button {
+  white-space: nowrap;
+}
+@container overview-main (max-width: 760px) {
+  .overview-sub {
+    display: none;
+  }
+}
+@container overview-main (max-width: 620px) {
+  .overview-header {
+    gap: 8px;
+  }
+  .overview-header .overview-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .overview-header .overview-search {
+    flex: 0 0 34px;
+    min-width: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+  .overview-header .overview-search kbd {
+    display: none;
+  }
+  .overview-header .overview-views .obsidian-magnet-tab {
+    padding: 0 9px;
+  }
 }
 .overview-empty {
   flex: 1;
