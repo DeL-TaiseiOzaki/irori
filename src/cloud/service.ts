@@ -13,6 +13,7 @@ import {
 import { owner, within } from '../domain/scopes';
 import { isMissing, readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, editableText, hash, readDocument } from '../host/files';
+import { renameEntry, writeNewEntry } from '../host/entries';
 import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type {
@@ -24,6 +25,7 @@ import type {
   Document,
   Entry,
   LocalAttachment,
+  NewEntry,
 } from '../domain/types';
 import { t } from '../domain/i18n';
 
@@ -884,35 +886,13 @@ export class CloudService {
           ),
         );
       const destination = path.join(parent, name);
-      const key = nameKey(name);
-      if (
-        (await fs.readdir(parent)).some(
-          (item) => nameKey(item) === key && path.join(parent, item) !== actual,
-        )
-      )
-        throw Error(
-          t(
-            '同じ名前のファイルまたはフォルダがあります。',
-            'A file or folder with the same name exists.',
-          ),
-        );
-      if (destination !== actual) {
-        if (path.dirname(actual) === parent && nameKey(path.basename(actual)) === key) {
-          // Only the case or the normalization of the name changes. A case-insensitive
-          // mount can take both names for one entry, so go through a name it tells apart.
-          const temporary = path.join(parent, `${name}.irori-${randomUUID().slice(0, 8)}`);
-          await fs.rename(actual, temporary);
-          try {
-            await fs.rename(temporary, destination);
-          } catch (error) {
-            await fs.rename(temporary, actual).catch(() => {});
-            throw error;
-          }
-        } else await fs.rename(actual, destination);
+      // In place, so a sync app sees a rename rather than a new file.
+      await renameEntry(actual, destination);
+      if (destination !== actual && info.isFile()) {
         // A kept draft follows its file. Drafts are found by a hash of the path, so
         // those of files inside a moved folder stay under their old paths: the open
         // document is saved before a move, so at most a conflict draft is left behind.
-        if (info.isFile()) await this.moveDraft(scopeId, from, to);
+        await this.moveDraft(scopeId, from, to);
       }
       return {
         path: to,
@@ -940,6 +920,22 @@ export class CloudService {
       if (!this.trash) throw Error(t('ごみ箱を使えません。', 'The trash is not available.'));
       await this.trash(actual);
       await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
+    });
+  }
+  /** Adds a file or folder to a folder of an editable connection; an existing entry is never replaced. */
+  createEntry(scopeId: string, directory: string, entry: NewEntry): Promise<Entry> {
+    return this.mutate(async () => {
+      const folder = await this.resolve(scopeId, directory);
+      await this.assertWritable(scopeId, directory);
+      const name = await writeNewEntry(folder, entry);
+      return {
+        path: `${directory}/${name}`,
+        name,
+        directory: entry.kind === 'folder',
+        layer: 'contents',
+        note: entry.kind === 'file' && /\.md$/i.test(name),
+        writable: true,
+      };
     });
   }
   /** Adds an empty Markdown note to an editable connected folder; an existing file is never replaced. */

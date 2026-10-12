@@ -74,7 +74,7 @@ export interface AgentSetupHost {
   remove?: (scopeId: string, trash: boolean) => Promise<void>;
   /** The irori agent's routines and those of the workspace's vaults, or one vault's alone. */
   routines?: (workspaceId: string | undefined, only?: string) => Promise<Routine[]>;
-  /** Moves a knowledge note as the explorer does: links, comments and records follow (ADR 031). */
+  /** Moves a note, file or folder of knowledge as the explorer does: links, comments and records follow (ADR 031). */
   moveNote?: (
     scopeId: string,
     from: string,

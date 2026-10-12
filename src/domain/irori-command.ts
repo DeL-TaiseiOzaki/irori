@@ -86,7 +86,7 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   workspace: [1, 'a workspace name and then vaults'],
   remove: [1, 'one vault'],
   run: [1, 'one routine'],
-  move: [2, 'a note and where it goes'],
+  move: [2, 'a note, file or folder and where it goes'],
   trash: [1, 'one note'],
   comment: [2, 'a file and the comment'],
   resolve: [2, "a file and the comment's id"],

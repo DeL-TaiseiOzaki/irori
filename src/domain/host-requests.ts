@@ -16,11 +16,13 @@ import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
+import { viewerByteLimit } from './viewers';
 
 const id = z.uuid(),
   path = z.string().max(4096),
   text = z.string().max(2 * 1024 * 1024);
 const name = z.string().min(1).max(120),
+  entryName = z.string().min(1).max(255),
   version = z.string().regex(/^[a-f0-9]{64}$/);
 const document = z.object({ scopeId: id, path, text, hash: version });
 // A submodule's folder from the vault's root; the host checks it is one.
@@ -164,8 +166,26 @@ export const hostArguments = {
   setCloudAccess: z.tuple([id, id, z.enum(['read-only', 'read-write'])]),
   openCloudFolder: z.tuple([id, id]),
   createCloudNote: z.tuple([id, path, name.trim().min(1)]),
-  moveCloudEntry: z.tuple([id, path, path]),
-  deleteCloudEntry: z.tuple([id, path]),
+  createEntry: z.tuple([
+    id,
+    path,
+    z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('folder'), name: entryName }).strict(),
+      z
+        .object({
+          kind: z.literal('file'),
+          name: entryName,
+          bytes: z
+            .instanceof(Uint8Array)
+            .refine((value) => value.length <= viewerByteLimit)
+            .optional(),
+        })
+        .strict(),
+    ]),
+  ]),
+  moveEntry: z.tuple([id, path.min(1), path.min(1)]),
+  trashEntry: z.tuple([id, path.min(1)]),
+  revealEntry: z.tuple([id, path]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, categoryText]),

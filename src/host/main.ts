@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } 
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { realpath } from 'node:fs/promises';
+import { lstat, realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
@@ -11,7 +11,8 @@ import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { resolveLink } from './links';
 import { referringLinks, relink } from './relink';
-import { renameLayerFolder } from './layer-folders';
+import { carryMove, renameLayerFolder } from './layer-folders';
+import { classify } from '../domain/scopes';
 import { DraftService } from './drafts';
 import { writeExclusive } from './local-json';
 import { UpdateService } from './updates';
@@ -57,6 +58,7 @@ import {
   nativeThemeSource,
   type Category,
   type DeviceSettings,
+  type EntryMove,
   type HostEvent,
   type Space,
 } from '../domain/types';
@@ -326,13 +328,8 @@ app
       routines: (workspaceId, only) => routines.list(workspaceId, only),
       moveNote: (scopeId, from, to) =>
         agentChange(scopeId, async () => {
-          const doc = await files.read(scopeId, from);
-          const moved = await moveNoteCarrying({ scopeId, path: from, hash: doc.hash }, to, true);
-          return {
-            path: moved.path,
-            notice: 'notice' in moved ? moved.notice : undefined,
-            links: 'links' in moved ? moved.links : undefined,
-          };
+          const moved = await moveKnowledgeEntry(scopeId, from, to);
+          return { path: moved.entry.path, notice: moved.notice, links: moved.links };
         }),
       trashNote: (scopeId, notePath) =>
         agentChange(scopeId, async () => {
@@ -471,6 +468,57 @@ app
         }
       });
       return { ...update.doc, notice, links: update.links };
+    }
+    /** Whether a path of knowledge is a Markdown note: a file whose name ends in `.md`. */
+    async function isNote(scopeId: string, rel: string) {
+      if (!/\.md$/i.test(rel)) return false;
+      return (await lstat(await files.resolve(scopeId, rel))).isFile();
+    }
+    /**
+     * Moves a file or folder within knowledge, as the explorer does. A note that
+     * stays a note moves as one (`moveNoteCarrying`); anything else moves as it
+     * is, and what names its paths follows it (`carryMove`).
+     */
+    async function moveKnowledgeEntry(
+      scopeId: string,
+      from: string,
+      to: string,
+    ): Promise<EntryMove> {
+      if (/\.md$/i.test(to) && (await isNote(scopeId, from))) {
+        const doc = await files.read(scopeId, from);
+        const moved = await moveNoteCarrying({ scopeId, path: from, hash: doc.hash }, to, true);
+        return {
+          entry: {
+            path: moved.path,
+            name: path.posix.basename(moved.path),
+            directory: false,
+            layer: 'Knowledge_Base',
+            note: true,
+          },
+          notice: 'notice' in moved ? moved.notice : undefined,
+          links: 'links' in moved ? moved.links : undefined,
+        };
+      }
+      const { entry, files: moved } = await files.moveEntry(scopeId, from, to);
+      if (from === to) return { entry };
+      const carried = await carryMove(
+        { files, knowledge, authorship },
+        scopeId,
+        { from, to },
+        moved,
+      );
+      return {
+        entry,
+        links: { self: 0, ...carried.links, incomplete: false },
+        ...(carried.notices.length ? { notice: carried.notices.join(' ') } : {}),
+      };
+    }
+    /** Deletes a file or folder of knowledge: a note to irori's deleted notes, the rest to the system trash. */
+    async function trashKnowledgeEntry(scopeId: string, target: string) {
+      if (await isNote(scopeId, target)) {
+        const doc = await files.read(scopeId, target);
+        await files.trashNote({ scopeId, path: target, hash: doc.hash });
+      } else await files.trashEntry(scopeId, target, (filename) => shell.trashItem(filename));
     }
     /** A change an agent asks for with the `irori` command, during its own run (ADR 031). */
     function agentChange<T>(scopeId: string, operation: () => Promise<T>) {
@@ -697,10 +745,26 @@ app
       },
       createCloudNote: (scopeId, directory, name) =>
         changeFiles(() => changed(scopeId, () => cloud.createNote(scopeId, directory, name))),
-      moveCloudEntry: (scopeId, from, to) =>
-        changeFiles(() => changed(scopeId, () => cloud.moveEntry(scopeId, from, to))),
-      deleteCloudEntry: (scopeId, target) =>
-        changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target))),
+      createEntry: (scopeId, directory, entry) =>
+        changeFiles(() =>
+          changed(scopeId, () =>
+            classify(files.get(scopeId), directory) === 'contents'
+              ? cloud.createEntry(scopeId, directory, entry)
+              : files.createEntry(scopeId, directory, entry),
+          ),
+        ),
+      moveEntry: (scopeId, from, to) =>
+        classify(files.get(scopeId), from) === 'contents'
+          ? changeFiles(() =>
+              changed(scopeId, async () => ({ entry: await cloud.moveEntry(scopeId, from, to) })),
+            )
+          : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
+      trashEntry: (scopeId, target) =>
+        classify(files.get(scopeId), target) === 'contents'
+          ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
+          : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
+      revealEntry: async (scopeId, target) =>
+        shell.showItemInFolder(await files.resolve(scopeId, target, true)),
       addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),

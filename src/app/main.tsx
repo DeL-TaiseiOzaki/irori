@@ -4,12 +4,18 @@ import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
-  CloudEntryDialog,
+  EntryDialog,
+  NewEntryDialog,
   entryActions,
   actionLabel,
+  movedNotice,
+  fileManagerName,
+  type CreateKind,
   type EntryAction,
   type EntryChange,
-} from './CloudEntryActions';
+  type EntrySpace,
+  type Explorer,
+} from './EntryActions';
 import type { SearchTarget } from '../editor/search-navigation';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { type Conversation, isDamaged } from '../domain/conversation';
@@ -80,7 +86,7 @@ import type {
 import { agentIds } from '../domain/types';
 import type { AgentSkill, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
-import { opensInIrori } from '../domain/viewers';
+import { opensInIrori, viewerByteLimit } from '../domain/viewers';
 const PageEditor = lazy(() =>
   import('./PageEditor').then((module) => ({ default: module.PageEditor })),
 );
@@ -493,11 +499,20 @@ function App() {
   const [creatingNote, setCreatingNote] = useState(false);
   // An editable connected folder the next note goes into, instead of the active KB.
   const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
-  // A file or folder of an editable connected folder being renamed, moved or deleted.
+  // A file or folder of knowledge or an editable connected folder being renamed, moved or deleted.
   const [entryAction, setEntryAction] = useState<{
-    space: CloudRoot;
+    space: EntrySpace;
     entry: Entry;
     action: EntryAction;
+  }>();
+  // The file input behind "Add files…", and the folder the chosen files go into.
+  const picker = useRef<HTMLInputElement>(null);
+  const picking = useRef<{ space: Space; directory: string }>(undefined);
+  // A new empty file or folder being named, in the folder it goes into.
+  const [newEntry, setNewEntry] = useState<{
+    scopeId: string;
+    directory: string;
+    kind: 'file' | 'folder';
   }>();
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
@@ -1568,10 +1583,66 @@ function App() {
     bump(change.scopeId);
     setStatus(
       change.action === 'delete'
-        ? t('ゴミ箱に移動', 'Moved to trash')
-        : change.action === 'rename'
-          ? t('名前を変更', 'Renamed')
-          : t('移動', 'Moved'),
+        ? t('削除しました', 'Deleted')
+        : [
+            change.action === 'rename' ? t('名前を変更', 'Renamed') : t('移動', 'Moved'),
+            change.notice,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+    );
+  }
+  /**
+   * Runs a change to the vault's files that the open note must not race: it is
+   * saved first, and the change waits while an agent, Git or a connection works.
+   */
+  async function organize<T>(operation: () => Promise<T>) {
+    if (running || sending || queuedHere || gitBusy || connecting)
+      throw Error(t('作業中はファイルを整理できません。', "Can't organize files while busy."));
+    if (!(await save()))
+      throw Error(t('開いているノートを保存してください。', 'Save the open note first.'));
+    reconciliation.current++;
+    organizing.current = true;
+    try {
+      return await operation();
+    } finally {
+      organizing.current = false;
+      void reconcile();
+    }
+  }
+  /** Copies files from the file manager into a folder of the vault, under free names. */
+  async function bringIn(space: Space, directory: string, files: File[], skipped: number) {
+    const added: string[] = [];
+    const refused: string[] = [];
+    for (const file of files) {
+      if (file.size > viewerByteLimit) {
+        refused.push(file.name);
+        continue;
+      }
+      const entry = await host.createEntry(space.scopeId, directory, {
+        kind: 'file',
+        name: file.name,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      });
+      added.push(entry.name);
+    }
+    bump(space.scopeId);
+    setStatus(
+      [
+        added.length && t(`${added.length} 件のファイルを追加`, `Added ${added.length} files`),
+        refused.length &&
+          t(
+            `100 MiB を超えるため追加しなかったファイル: ${refused.join('、')}`,
+            `Not added, over 100 MiB: ${refused.join(', ')}`,
+          ),
+        skipped &&
+          t(
+            `フォルダ ${skipped} 件は追加していません。${fileManagerName()}から追加してください`,
+            `${skipped} folders not added; add them in ${fileManagerName()}`,
+          ),
+      ]
+        .filter(Boolean)
+        .join(' · '),
     );
   }
   // Pane sizes are the user's, not the stylesheet's: the group remembers each
@@ -1749,12 +1820,47 @@ function App() {
     },
     openMaterials,
     openBrainSettings: () => setBrainSettings(true),
-    createIn: (space: Space, entry: Entry) => {
-      setCloudNoteTarget({ scopeId: space.scopeId, directory: entry.path });
-      setNewNote(true);
+    createIn: (space: Space, directory: string, kind: CreateKind) => {
+      if (kind !== 'note') setNewEntry({ scopeId: space.scopeId, directory, kind });
+      else if (classify(space, directory) === 'contents') {
+        setCloudNoteTarget({ scopeId: space.scopeId, directory });
+        setNewNote(true);
+      } else {
+        setNoteDirectory(directory);
+        setNewNote(true);
+      }
+    },
+    bringIn: (space: Space, directory: string, files?: File[], skipped = 0) => {
+      if (!files) {
+        // The system's file dialog; the chosen files come back through the picker below.
+        picking.current = { space, directory };
+        picker.current?.click();
+        return;
+      }
+      void organize(() => bringIn(space, directory, files, skipped)).catch((error) => {
+        bump(space.scopeId);
+        report(error);
+      });
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
       setEntryAction({ space, entry, action }),
+    moveInto: (space: Space, entry: Entry, directory: string) =>
+      void organize(async () => {
+        const moved = await host.moveEntry(
+          space.scopeId,
+          entry.path,
+          directory ? `${directory}/${entry.name}` : entry.name,
+        );
+        await entryChanged({
+          scopeId: space.scopeId,
+          action: 'move',
+          from: entry.path,
+          to: moved.entry.path,
+          notice: movedNotice(moved),
+        });
+      }).catch(report),
+    reveal: (space: Space, path: string) =>
+      void host.revealEntry(space.scopeId, path).catch(report),
     selectSchema: (target: SchemaTarget) => {
       if (!active) return;
       const scopeId = active.scopeId;
@@ -1816,6 +1922,18 @@ function App() {
     setColumnStatus,
     setHanded,
   });
+  // The explorer of the vault on show; its rows keep it while the vault stays.
+  const explorer = useMemo<Explorer | undefined>(
+    () =>
+      active && {
+        create: (directory, kind) => act.createIn(active, directory, kind),
+        bringIn: (directory, files, skipped) => act.bringIn(active, directory, files, skipped),
+        act: (entry, action) => act.entryAction(active, entry, action),
+        moveInto: (entry, directory) => act.moveInto(active, entry, directory),
+        reveal: (path) => act.reveal(active, path),
+      },
+    [active, act],
+  );
   const hidden = level !== 'brain';
   const dockShared = useMemo<DockShared>(
     () => ({
@@ -2183,8 +2301,7 @@ function App() {
                 onMaterials={act.openMaterials}
                 onSettings={act.openBrainSettings}
                 onSearch={act.searchHere}
-                onCreateIn={act.createIn}
-                onEntryAction={act.entryAction}
+                explorer={explorer}
                 schema={schemaList}
               >
                 {gitPanel}
@@ -2365,8 +2482,10 @@ function App() {
                             </Menu.Item>
                           </>
                         )}
-                        {doc.cloud &&
-                          !doc.readOnly &&
+                        {/* A connected folder's file, or a file of knowledge that is not a note. */}
+                        {!doc.readOnly &&
+                          (doc.cloud ||
+                            (docLayer === 'Knowledge_Base' && !noteActionsApply(doc))) &&
                           entryActions.map((action) => (
                             <Menu.Item
                               key={action}
@@ -2375,7 +2494,13 @@ function App() {
                                 if (space)
                                   setEntryAction({
                                     space,
-                                    entry: { ...fileEntry(doc.path, 'contents'), writable: true },
+                                    entry: {
+                                      ...fileEntry(
+                                        doc.path,
+                                        doc.cloud ? 'contents' : 'Knowledge_Base',
+                                      ),
+                                      writable: true,
+                                    },
                                     action,
                                   });
                               }}
@@ -3163,8 +3288,40 @@ function App() {
           </form>
         </Dialog>
       )}
+      <input
+        ref={picker}
+        type="file"
+        multiple
+        hidden
+        onChange={(event) => {
+          const target = picking.current;
+          const chosen = [...(event.target.files ?? [])];
+          event.target.value = '';
+          if (target && chosen.length) act.bringIn(target.space, target.directory, chosen);
+        }}
+      />
+      {newEntry && (
+        <NewEntryDialog
+          key={`${newEntry.scopeId}:${newEntry.directory}:${newEntry.kind}`}
+          scopeId={newEntry.scopeId}
+          directory={newEntry.directory}
+          kind={newEntry.kind}
+          onDone={(entry) => {
+            bump(newEntry.scopeId);
+            setStatus(t(`${entry.name} を作成`, `Created ${entry.name}`));
+            // A new text file opens for writing; another kind waits for its application.
+            if (
+              !entry.directory &&
+              opensInIrori(entry.path) &&
+              active?.scopeId === newEntry.scopeId
+            )
+              void open(active, entry);
+          }}
+          onClose={() => setNewEntry(undefined)}
+        />
+      )}
       {entryAction && (
-        <CloudEntryDialog
+        <EntryDialog
           key={`${entryAction.space.scopeId}:${entryAction.entry.path}:${entryAction.action}`}
           space={entryAction.space}
           entry={entryAction.entry}

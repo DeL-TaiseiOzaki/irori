@@ -121,8 +121,8 @@ export async function relink(
 }
 
 /**
- * After a layer folder rename (ADR 024) or a move to or from the vault's root
- * (ADR 035): rewrites every link in the vault's Markdown files that led to a
+ * After a layer folder rename (ADR 024), a move to or from the vault's root
+ * (ADR 035) or a file or folder the explorer moved within knowledge: rewrites every link in the vault's Markdown files that led to a
  * moved file so it leads to the same file where it is now. A moved file's own
  * links keep their targets from its new place, which may be at another depth.
  * Contents is not walked: its files are the originals of other places. Each
@@ -134,10 +134,12 @@ export async function relinkFolder(
   scopeId: string,
   move: LayerMove,
   onSaved?: (before: Document, after: Document) => Promise<void>,
+  /** The move renamed a layer folder, so `sources` may still start from its old name. */
+  layerFolder = true,
 ) {
   const space = files.get(scopeId);
   // A `sources` path written from the old folder name still counts as rooted.
-  const roots = [...layerRoots(space), move.from].filter(Boolean);
+  const roots = [...layerRoots(space), ...(layerFolder ? [move.from] : [])].filter(Boolean);
   const back = reversedMove(move);
   const pages: string[] = [];
   const visit = async (directory: string, prefix: string) => {

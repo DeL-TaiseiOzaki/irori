@@ -115,9 +115,9 @@ are links agents cannot read.
   layer, one level. They belong to the vault and are not vaults.
 
 ## Notes
-- Moving or renaming a note: \`irori move <note> <path or folder>\`, so links
-  into it, its comments, images beside it and irori's records follow; \`mv\`
-  breaks them. \`irori trash <note>\` puts a note in irori's trash instead of
+- Moving or renaming a note, file or folder of knowledge: \`irori move <path>
+  <path or folder>\`, so links into it, its comments, images beside it and
+  irori's records follow; \`mv\` breaks them. \`irori trash <note>\` puts a note in irori's trash instead of
   deleting it.
 - Comments for the person: \`irori comment <file> "<text>" [--quote ...]\`,
   signed as the agent; \`irori resolve <file> <id>\` removes one when the

@@ -15,7 +15,7 @@ import { brainColors, brainGlyphs } from '../src/domain/brains';
 export const iroriCommandPreamble = [
   "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set vaults up: `irori list` shows the vaults, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register vaults in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a vault's contents and take it out; `irori set` names a vault, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a vault off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
   "Use it when the person asks you to set up, move in from another tool, or reorganize their vaults, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
-  "Inside a vault, use irori rather than the shell where irori keeps things in step: `irori move` for a note (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the vault's agent as usual; its own `irori` command does the same.",
+  "Inside a vault, use irori rather than the shell where irori keeps things in step: `irori move` for a note, file or folder of knowledge (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the vault's agent as usual; its own `irori` command does the same.",
   "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
 
@@ -23,7 +23,7 @@ export const iroriCommandPreamble = [
 export function vaultCommandPreamble(vault: string) {
   return [
     `irori: the \`irori\` command is on your PATH for this request. It does in irori what the person does there, for this vault, "${vault}", only. Use it rather than the shell where irori keeps things in step:`,
-    '- `irori move <note> <new path or folder>` moves or renames a knowledge note; links into it, its comments and its records follow. `mv` breaks them.',
+    '- `irori move <path> <new path or folder>` moves or renames a note, file or folder of knowledge; links into it, its comments and its records follow. `mv` breaks them.',
     "- `irori trash <note>` puts a note in irori's trash, where the person can restore it, instead of deleting it.",
     '- `irori comment <file> "<text>" [--quote <passage>]` leaves a comment for the person; `irori resolve <file> <id>` removes one once it is dealt with and the person agreed. Comments are in .irori/comments/<file>.json.',
     '- `irori index` writes the graph index and folder indexes after pages change, when the knowledge folder is an OKF bundle.',
@@ -74,10 +74,11 @@ irori add <folder> [--name <vault name>] [--category ...]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
 
-irori move <note> <new path or folder>
-  Moves or renames a Markdown note in a vault's knowledge, as the explorer
-  does: links into it are rewritten, and its comments, images beside it and
-  irori's records follow. Paths are taken from your working folder.
+irori move <path> <new path or folder>
+  Moves or renames a note, file or folder in a vault's knowledge, as the
+  explorer does: links into it are rewritten, and its comments, a note's
+  images beside it and irori's records follow. Paths are taken from your
+  working folder.
 
 irori trash <note>
   Moves a knowledge note to irori's trash; the person restores it there.
