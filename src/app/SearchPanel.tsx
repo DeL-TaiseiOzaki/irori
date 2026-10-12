@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { BrainTile } from './BrainTile';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 
 const host = window.irori;
 /** The chip and `scopeId` value that searches every brain, grouping the results by brain. */
@@ -73,7 +74,7 @@ export function SearchPanel({
   );
   useEffect(
     () =>
-      host.onEvent((event) => {
+      hostEvents.onEvent((event) => {
         if (event.type !== 'files') return;
         if (
           allBrains

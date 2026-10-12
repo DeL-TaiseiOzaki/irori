@@ -261,11 +261,13 @@ export class FileService {
         .array(z.object({ root: z.string(), scopeId: z.uuid() }))
         .parse(JSON.parse(await fs.readFile(path.join(this.dataDir, 'spaces.json'), 'utf8')));
       this.bindings = bindings;
+      // Each space's contents are resolved once for the whole startup, not once per pair.
+      const contents = new Map<Space, Promise<string[]>>();
       for (const b of bindings) {
         try {
           const s = await this.inspect(b.root);
           if (s.scopeId !== b.scopeId) throw Error('Scope identity changed');
-          await this.validateRoot(s);
+          await this.validateRoot(s, contents);
           this.spaces.push(s);
         } catch (error) {
           console.warn('Space unavailable:', b.root, String(error));
@@ -310,13 +312,19 @@ export class FileService {
     }
     return paths;
   }
-  private async validateRoot(candidate: Space) {
+  /** `contents` keeps the spaces' resolved contents for the checks of one pass. */
+  private async validateRoot(candidate: Space, contents = new Map<Space, Promise<string[]>>()) {
+    const contentsOf = (space: Space) => {
+      let paths = contents.get(space);
+      if (!paths) contents.set(space, (paths = this.contentsPaths(space)));
+      return paths;
+    };
     for (const s of this.spaces) {
       if (s.root === candidate.root || s.scopeId === candidate.scopeId)
         throw Error('This space or identity is already registered');
       if (
-        (await this.contentsPaths(s)).some((c) => within(c, candidate.root)) ||
-        (await this.contentsPaths(candidate)).some((c) => within(c, s.root))
+        (await contentsOf(s)).some((c) => within(c, candidate.root)) ||
+        (await contentsOf(candidate)).some((c) => within(c, s.root))
       )
         throw Error('A space cannot be registered inside contents (including aliases)');
     }

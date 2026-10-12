@@ -165,6 +165,7 @@ import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
 import { TerminalDrawer } from './TerminalDrawer';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 import { categoryChoices } from '../domain/brains';
 const host = window.irori;
 /** A backlink points at a link on the line, a search hit at matching text; the notice says which. */
@@ -780,9 +781,11 @@ function App() {
   const connections = connectionsRead.data ?? noConnections;
   const defaultNoteDirectory =
     notesDeclared?.newNoteDirectory ?? defaultNoteDirectoryOf(active ?? {});
+  // The first dock column shows this draft; the app only writes and flushes it.
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
+    { watch: false },
   );
   function setPrompt(value: string | ((previous: string) => string)) {
     composer.setText(typeof value === 'function' ? value(composer.snapshot().text) : value);
@@ -1186,7 +1189,7 @@ function App() {
   useEffect(() => {
     void refreshSpaces().catch(report);
     void host.agents().then(setInfos).catch(report);
-    return host.onEvent((event) => {
+    return hostEvents.onEvent((event) => {
       if (event.type === 'files') {
         bump(event.scopeId);
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();

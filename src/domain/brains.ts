@@ -47,9 +47,12 @@ export const brainGlyphs = [
 ] as const;
 export type BrainGlyph = (typeof brainGlyphs)[number];
 
+/** Splits text as a reader sees it; one is enough, since it keeps no state between texts. */
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 /** How many characters a reader sees, counting an emoji or a combined letter as one. */
 export function graphemes(text: string) {
-  return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].length;
+  return [...graphemeSegmenter.segment(text)].length;
 }
 
 /** An image icon lives in the KB's `.irori/`, named by its content. */
@@ -156,9 +159,7 @@ export function categoryChoices(spaces: { category?: Category }[]) {
 
 /** The first character a reader would pick out of the name, capitalised when it has case. */
 function initial(name: string) {
-  const first =
-    [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(name.trim())][0]
-      ?.segment ?? '?';
+  const first = [...graphemeSegmenter.segment(name.trim())][0]?.segment ?? '?';
   return first.toLocaleUpperCase();
 }
 

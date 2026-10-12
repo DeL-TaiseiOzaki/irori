@@ -36,6 +36,7 @@ import { Icon } from './Icon';
 import { ModelPicker } from './ModelPicker';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 import { aiStateWords, sendOnEnter } from './display';
 import {
   AttachButton,
@@ -422,7 +423,7 @@ export function AgentColumn({
     const id = target.id;
     flushPending.current = flush;
     document.addEventListener('visibilitychange', shown);
-    const stop = host.onEvent((event) => {
+    const stop = hostEvents.onEvent((event) => {
       if (event.type !== 'agent' || event.event.conversationId !== id) return;
       const incoming = event.event;
       // Fragments join in the batch, which stays within the window however long it waits.

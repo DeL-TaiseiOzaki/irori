@@ -49,7 +49,9 @@ export function PageEditor({
   properties: Declared | null | undefined;
 }) {
   const inner = useRef<EditorHandle>(null);
-  const initial = useRef(splitPage(text));
+  // Split once: only the first text is used, and a long page is not split on every keystroke.
+  const [initialPage] = useState(() => splitPage(text));
+  const initial = useRef(initialPage);
   // A BOM before a page without frontmatter stays with the body; no head is added there.
   const split = page && mode === 'rich' && !(initial.current.bom && !initial.current.head);
   const head = useRef(split ? initial.current.head : '');
