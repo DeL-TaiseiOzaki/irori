@@ -1,37 +1,15 @@
 import { useState } from 'react';
 import type { Document } from '../domain/types';
 import { noteFilename } from '../domain/note-operations';
-import type { LinkUpdate } from '../domain/note-links';
 import { noteLabel } from '../domain/overview';
 import { parentPath } from '../domain/paths';
 import { Dialog } from './Dialog';
 import { displayLocale, t } from '../domain/i18n';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
+import { linkNotice } from './EntryActions';
 
 const host = window.irori;
-
-/** What the move did to links, for the status line. */
-function linkNotice(update: LinkUpdate) {
-  const selfJa = update.self ? `このノート内 ${update.self} 件` : '';
-  const selfEn = update.self ? `${update.self} in this note` : '';
-  const notesJa = update.notes ? `参照元 ${update.notes} 件のノートの ${update.links} 件` : '';
-  const notesEn = update.notes ? `${update.links} across ${update.notes} referring notes` : '';
-  const doneJa = [selfJa, notesJa].filter(Boolean).join('と');
-  const doneEn = [selfEn, notesEn].filter(Boolean).join(' and ');
-  return [
-    doneJa
-      ? t(`${doneJa}のリンクを更新しました。`, `Updated ${doneEn} links.`)
-      : t('更新が必要なリンクはありませんでした。', 'No links needed updating.'),
-    update.skipped.length
-      ? t(
-          `更新できなかったノート: ${update.skipped.join('、')}。`,
-          ` Notes that could not be updated: ${update.skipped.join(', ')}.`,
-        )
-      : '',
-    update.incomplete ? t(' 一部確認できていません。', ' Some notes could not be checked.') : '',
-  ].join('');
-}
 
 export type NoteAction = 'move' | 'trash';
 

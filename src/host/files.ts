@@ -16,7 +16,9 @@ import {
   writeLocalJson,
 } from './local-json';
 import { classify, owner, within } from '../domain/scopes';
-import type { Category, Document, Entry, Space, SpaceChange } from '../domain/types';
+import type { Category, Document, Entry, NewEntry, Space, SpaceChange } from '../domain/types';
+import { entryNameError } from '../domain/connections';
+import { renameEntry, writeNewEntry } from './entries';
 import { brainLook, categoryText, iconImagePath } from '../domain/brains';
 import {
   imagesForNoteMove,
@@ -1064,6 +1066,159 @@ export class FileService {
       await this.noteDirectory(id, directory === '.' ? '' : directory, true);
       await fs.writeFile(destination, text, { flag: 'wx' });
       return this.read(id, rel);
+    });
+  }
+  /**
+   * A file or folder of this vault's knowledge that the explorer changes: inside
+   * knowledge and this vault, and not the knowledge folder itself, whose name
+   * belongs to the vault's settings (ADR 024).
+   */
+  private knowledgeEntry(id: string, rel: string) {
+    const space = this.get(id);
+    relative.parse(rel);
+    if (
+      classify(space, rel) !== 'Knowledge_Base' ||
+      owner(this.spaces, path.join(space.root, rel))?.scopeId !== id
+    )
+      throw Error(
+        t(
+          'この vault のナレッジの中を指定してください。',
+          "Choose a place in this vault's knowledge.",
+        ),
+      );
+    if (rel === knowledgeFolder(space))
+      throw Error(
+        t(
+          'ナレッジのフォルダ名は vault の設定で変更してください。',
+          "Change the knowledge folder's name in the vault settings.",
+        ),
+      );
+    return space;
+  }
+  /** A name for a new or renamed entry; a hidden name would be Schema's, not knowledge's. */
+  private entryName(name: string) {
+    const problem =
+      entryNameError(name) ??
+      (name.startsWith('.')
+        ? t(
+            'ナレッジでは「.」で始まる名前は使えません。',
+            'Names in knowledge cannot start with ".".',
+          )
+        : undefined);
+    if (problem) throw Error(problem);
+  }
+  /**
+   * The real folder of `directory` in knowledge, an ordinary folder all the way
+   * down. A vault may not have its knowledge folder yet; it is made on first use.
+   */
+  private knowledgeFolderOf(id: string, directory: string) {
+    if (!directory) return this.resolve(id, '', true);
+    return this.noteDirectory(id, directory, directory === knowledgeFolder(this.get(id)));
+  }
+  /** Refuses a folder whose move or deletion would take another vault or contents with it. */
+  private holdsNoBoundary(space: Space, rel: string) {
+    const folder = path.join(space.root, rel);
+    if (
+      this.spaces.some((other) => other.scopeId !== space.scopeId && within(folder, other.root)) ||
+      space.contents.some((root) => root.startsWith(`${rel}/`))
+    )
+      throw Error(
+        t(
+          'このフォルダには別の vault かコンテンツが入っています。',
+          'This folder holds another vault or contents.',
+        ),
+      );
+  }
+  /** Adds a file or folder to a folder of knowledge; an existing entry is never replaced. */
+  async createEntry(id: string, directory: string, entry: NewEntry): Promise<Entry> {
+    return this.queue.run(async () => {
+      this.entryName(entry.name);
+      if (directory) this.knowledgeEntry(id, `${directory}/${entry.name}`);
+      else this.knowledgeEntry(id, entry.name);
+      const name = await writeNewEntry(await this.knowledgeFolderOf(id, directory), entry);
+      return {
+        path: directory ? `${directory}/${name}` : name,
+        name,
+        directory: entry.kind === 'folder',
+        layer: 'Knowledge_Base',
+        note: entry.kind === 'file' && /\.md$/i.test(name),
+      };
+    });
+  }
+  /**
+   * Renames or moves a file or folder within knowledge. The caller carries what
+   * names its paths, from the files returned: their paths before the move.
+   */
+  async moveEntry(
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<{ entry: Entry; files: string[] }> {
+    return this.queue.run(async () => {
+      const space = this.knowledgeEntry(id, from);
+      this.knowledgeEntry(id, to);
+      const name = path.posix.basename(to);
+      this.entryName(name);
+      const parentOf = (rel: string) => {
+        const directory = path.posix.dirname(rel);
+        return this.knowledgeFolderOf(id, directory === '.' ? '' : directory);
+      };
+      const actual = path.join(await parentOf(from), path.posix.basename(from));
+      const info = await fs.lstat(actual);
+      if (info.isSymbolicLink())
+        throw Error(
+          t(
+            'alias / シンボリックリンクは移動できません。',
+            'Aliases and symbolic links cannot be moved.',
+          ),
+        );
+      if (info.isDirectory()) {
+        if (to === from || to.startsWith(`${from}/`))
+          throw Error(
+            t(
+              'フォルダを自分自身やその中のフォルダには移動できません。',
+              'A folder cannot be moved into itself or into one of its own folders.',
+            ),
+          );
+        this.holdsNoBoundary(space, from);
+      }
+      const destination = path.join(await parentOf(to), name);
+      const moved = info.isDirectory() ? await this.walk(actual, from) : [from];
+      await renameEntry(actual, destination);
+      // A kept draft follows its file.
+      if (from !== to)
+        for (const file of moved)
+          await fs
+            .rename(
+              draftFile(this.dataDir, id, file),
+              draftFile(this.dataDir, id, movedPath({ from, to }, file)!),
+            )
+            .catch(() => {});
+      return {
+        entry: {
+          path: to,
+          name,
+          directory: info.isDirectory(),
+          layer: 'Knowledge_Base',
+          note: info.isFile() && /\.md$/i.test(name),
+        },
+        files: moved,
+      };
+    });
+  }
+  /** Hands a file or folder of knowledge to `trash`, the system trash. */
+  async trashEntry(id: string, rel: string, trash: (filename: string) => Promise<void>) {
+    return this.queue.run(async () => {
+      const space = this.knowledgeEntry(id, rel);
+      const directory = path.posix.dirname(rel);
+      const actual = path.join(
+        await this.knowledgeFolderOf(id, directory === '.' ? '' : directory),
+        path.posix.basename(rel),
+      );
+      const info = await fs.lstat(actual);
+      if (info.isDirectory()) this.holdsNoBoundary(space, rel);
+      await trash(actual);
+      if (info.isFile()) await fs.rm(draftFile(this.dataDir, id, rel), { force: true });
     });
   }
   /**

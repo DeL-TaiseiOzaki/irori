@@ -77,6 +77,20 @@ export interface Entry {
   /** The connection is a folder on this device (every connection since 0.1.67). */
   local?: boolean;
 }
+/**
+ * A file or folder the explorer adds. A file with `bytes` is one the person
+ * brought in from elsewhere: it takes a free name (`name 2.pdf`) when its own is
+ * taken. Without them it is a new empty file, and a taken name is refused.
+ */
+export type NewEntry =
+  { kind: 'folder'; name: string } | { kind: 'file'; name: string; bytes?: Uint8Array };
+/** Where a moved file or folder is now and, in knowledge, what followed it. */
+export interface EntryMove {
+  entry: Entry;
+  /** Links rewritten to lead to it where it is now (knowledge only). */
+  links?: import('./note-links').LinkUpdate;
+  notice?: string;
+}
 export interface Document {
   scopeId: string;
   path: string;
@@ -478,12 +492,25 @@ export interface HostAPI {
   /** Creates an empty Markdown note in an editable connected folder and returns it. */
   createCloudNote(scopeId: string, directory: string, name: string): Promise<Document>;
   /**
-   * Renames or moves a file or folder inside one editable connected folder. `to` is
-   * the full new path; an existing entry is never replaced. Returns the moved entry.
+   * Adds a file or folder in `directory` of the vault's knowledge or of an
+   * editable connected folder, as a file manager does. Never replaces an entry.
    */
-  moveCloudEntry(scopeId: string, from: string, to: string): Promise<Entry>;
-  /** Moves a file or folder of an editable connected folder to the system trash. */
-  deleteCloudEntry(scopeId: string, path: string): Promise<void>;
+  createEntry(scopeId: string, directory: string, entry: NewEntry): Promise<Entry>;
+  /**
+   * Renames or moves a file or folder of the vault's knowledge, or inside one
+   * editable connected folder. `to` is the full new path; an existing entry is
+   * never replaced. In knowledge the links into it, its comments and the device's
+   * records follow, as they do for a note.
+   */
+  moveEntry(scopeId: string, from: string, to: string): Promise<EntryMove>;
+  /**
+   * Deletes a file or folder of the vault's knowledge or of an editable connected
+   * folder. A note of knowledge goes to irori's deleted notes; anything else to
+   * the system trash.
+   */
+  trashEntry(scopeId: string, path: string): Promise<void>;
+  /** Shows a file or folder of the vault in the system file manager. */
+  revealEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
   register(root: string, name: string, category: Category): Promise<Space>;

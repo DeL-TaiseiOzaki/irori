@@ -12,6 +12,19 @@ by release run `38206579080` from main's successful CI run `38205671421`
   The website manifest now offers 0.2.1.
 - Not profiled. Not tried with real CLIs, on Windows or on macOS.
 
+Explorer as a file manager, 2026-10-12 (**0.2.2**, not yet published): the
+owner asked for Knowledge and Contents to make folders and any file, as
+Explorer or Finder do ([ADR 036](decisions/036-explorer-as-file-manager.md)).
+- One menu (right click or ⋯) makes notes, files and folders, brings files in,
+  renames, moves, deletes and shows an entry in the file manager. Rows drag
+  onto folders; files dropped from the file manager are copied in.
+- `createEntry`/`moveEntry`/`trashEntry`/`revealEntry` replace the cloud-only
+  entry calls. A Knowledge move that is not a note's goes through `carryMove`
+  (extracted from the layer folder rename) for links, comments, drafts and
+  records; `irori move` uses the same path for files and folders.
+- Verified by `tests/explorer-entries.test.ts` and `scripts/explorer-ui-smoke.ts`
+  on Linux. Not tried on Windows or macOS or with a real file manager drop.
+
 Lighter without UI change, 2026-10-12 (**0.2.1**): the owner asked for safe
 speed-ups that change nothing on screen. Three code-reading audits (renderer,
 host, agents) and an independent risk review chose these:

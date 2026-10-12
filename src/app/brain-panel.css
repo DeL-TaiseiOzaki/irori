@@ -244,6 +244,16 @@ kbd {
   flex-direction: column;
   gap: 1px;
 }
+/* The empty space below the knowledge tree takes a right click or a drop for its folder. */
+.section-body > .tree {
+  min-height: 100%;
+}
+.tree.drop-target,
+.brain-panel .tree-row.drop-target {
+  border-radius: 7px;
+  background: var(--ember-soft);
+  box-shadow: inset 0 0 0 1px var(--ember-line);
+}
 .tree-item {
   position: relative;
 }

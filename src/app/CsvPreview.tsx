@@ -12,6 +12,8 @@ export function CsvPreview({ text }: { text: string }) {
       return { error: errorText(error) };
     }
   }, [text]);
+  // A file just made has nothing to show yet; that is not an error.
+  if (!text.trim()) return <p className="muted">{t('空の CSV', 'Empty CSV')}</p>;
   if (!result.table)
     return (
       <p className="error" role="alert">
