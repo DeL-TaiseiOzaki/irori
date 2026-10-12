@@ -1,6 +1,7 @@
 // Keeps main and the published preview in step (docs/DISTRIBUTION.md). It decides whether a
 // change reaches the desktop package, requires such a pull request to carry a new version and
-// its release notes, and reports how long main has held a shipped change without a release.
+// its release notes, reports how long main has held a shipped change without a release, and
+// tells automatic publishing whether main is due a release.
 // Plain Node runs it with type stripping, so CI needs no dependency install.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -15,7 +16,8 @@ const notShipped = [
   /^website\//,
   /^\.github\/(?!workflows\/app\.yml$)/,
   /^scripts\/[^/]+-smoke\.ts$/,
-  /^scripts\/(real-agents|lifecycle-agents|preview-vm|process-metrics|release-policy)\.ts$/,
+  // Release tooling that only workflows run; the build never reads it.
+  /^scripts\/(real-agents|lifecycle-agents|preview-vm|process-metrics|release-policy|release-source)\.ts$/,
   /^scripts\/(preview-vm\.html|record-evidence\.mjs|start\.mjs)$/,
   /^(README(\.[a-z]+)?\.md|AGENTS\.md|CLAUDE\.md|\.gitignore|\.prettierrc\.json)$/,
 ];
@@ -80,17 +82,16 @@ export interface Report {
   outputs: Record<string, string>;
 }
 
-/** A pull request that changes what ships must be publishable as soon as it merges. */
-export function checkPullRequest(cwd: string, base: string, head: string): Report {
-  const mergeBase = git(cwd, ['merge-base', base, head]).trim();
-  const reaching = changedPaths(cwd, mergeBase, head).filter(shipped);
-  if (!reaching.length)
-    return { ok: true, lines: ['No change reaches the desktop package.'], outputs: {} };
-
+/** What keeps `revision` from being published as the next preview after `latest`. */
+function releaseProblems(
+  cwd: string,
+  revision: string,
+  latest: { tag: string; core: Core } | undefined,
+): { version: unknown; problems: string[] } {
   const problems: string[] = [];
   const read = (path: string) => {
     try {
-      return JSON.parse(fileAt(cwd, head, path) ?? 'null');
+      return JSON.parse(fileAt(cwd, revision, path) ?? 'null');
     } catch {
       return null;
     }
@@ -101,19 +102,29 @@ export function checkPullRequest(cwd: string, base: string, head: string): Repor
   if (!core) problems.push(`\`package.json\` version \`${version}\` is not a plain x.y.z version.`);
   if (lock?.version !== version || lock?.packages?.['']?.version !== version)
     problems.push('`package-lock.json` does not carry the same version as `package.json`.');
-  const latest = latestPreview(git(cwd, ['tag', '--list', 'v*']).split('\n'));
   if (core && latest && compareCore(core, latest.core) <= 0)
     problems.push(
       `\`package.json\` is \`${version}\`, but \`${latest.tag}\` is already published. ` +
         'Advance the version: the update check never offers a newer preview of the version a reader already runs.',
     );
   const notes = `docs/releases/${version}-preview.1.md`;
-  const text = fileAt(cwd, head, notes);
+  const text = fileAt(cwd, revision, notes);
   if (text === undefined)
     problems.push(`\`${notes}\` is missing. Write the notes this version will be published with.`);
   else if (!/^# \S/.test(text))
     problems.push(`\`${notes}\` must start with a \`# \` title; it becomes the release title.`);
+  return { version, problems };
+}
 
+/** A pull request that changes what ships must be publishable as soon as it merges. */
+export function checkPullRequest(cwd: string, base: string, head: string): Report {
+  const mergeBase = git(cwd, ['merge-base', base, head]).trim();
+  const reaching = changedPaths(cwd, mergeBase, head).filter(shipped);
+  if (!reaching.length)
+    return { ok: true, lines: ['No change reaches the desktop package.'], outputs: {} };
+
+  const latest = latestPreview(git(cwd, ['tag', '--list', 'v*']).split('\n'));
+  const { version, problems } = releaseProblems(cwd, head, latest);
   return {
     ok: problems.length === 0,
     lines: [
@@ -126,6 +137,44 @@ export function checkPullRequest(cwd: string, base: string, head: string): Repor
       ...problems.map((problem) => `- ${problem}`),
     ],
     outputs: {},
+  };
+}
+
+/**
+ * Whether `ref` holds a shipped change the latest preview lacks, and the tag that publishes it.
+ * Automatic publishing (publish.yml) acts only on `due=true`; a change that ships but cannot be
+ * published fails here, and the drift check keeps reporting it.
+ */
+export function checkDue(cwd: string, ref: string): Report {
+  const latest = latestPreview(git(cwd, ['tag', '--list', 'v*']).split('\n'));
+  if (!latest) return { ok: false, lines: ['No published preview tag exists.'], outputs: {} };
+  const released = git(cwd, ['rev-list', '-n', '1', latest.tag]).trim();
+  try {
+    git(cwd, ['merge-base', '--is-ancestor', released, ref]);
+  } catch {
+    return { ok: false, lines: [`\`${latest.tag}\` is not on \`${ref}\`.`], outputs: {} };
+  }
+  const reaching = changedPaths(cwd, released, ref).filter(shipped);
+  if (!reaching.length)
+    return {
+      ok: true,
+      lines: [`\`${ref}\` is in step with \`${latest.tag}\`; nothing to publish.`],
+      outputs: { due: 'false' },
+    };
+  const { version, problems } = releaseProblems(cwd, ref, latest);
+  const tag = `v${version}-preview.1`;
+  return {
+    ok: problems.length === 0,
+    lines: [
+      `\`${ref}\` holds changes that reach the desktop package and are not in \`${latest.tag}\`:`,
+      ...listed(reaching),
+      '',
+      problems.length
+        ? `\`${ref}\` cannot be published as it stands:`
+        : `Publish it as \`${tag}\`.`,
+      ...problems.map((problem) => `- ${problem}`),
+    ],
+    outputs: problems.length ? { due: 'false' } : { due: 'true', tag },
   };
 }
 
@@ -189,9 +238,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     publish(checkPullRequest(process.cwd(), positional[0], positional[1]));
   else if (command === 'drift')
     publish(checkDrift(process.cwd(), positional[0] ?? 'origin/main', Date.now(), grace));
+  else if (command === 'due') publish(checkDue(process.cwd(), positional[0] ?? 'origin/main'));
   else {
     console.error(
-      'Usage: node scripts/release-policy.ts pr <base> <head> | drift [ref] [--grace-minutes=60]',
+      'Usage: node scripts/release-policy.ts pr <base> <head> | drift [ref] [--grace-minutes=60] | due [ref]',
     );
     process.exitCode = 2;
   }

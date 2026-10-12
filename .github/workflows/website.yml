@@ -1,15 +1,30 @@
 name: Publish download website
 
-# Publishing remains explicit; a main push alone does not change public downloads.
+# A maintainer dispatches this, or publish.yml calls it after publishing a release; a main push
+# alone does not change public downloads. The page offers the published preview it is built
+# from: website/manifest.ts reads that release's uploaded installers, so no commit has to
+# carry the manifest first.
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Preview to offer; the latest published preview when empty
+        required: false
+      dry_run:
+        description: Build the page without deploying it
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: false
+      dry_run:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: github-pages
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,6 +38,11 @@ jobs:
       - run: npm ci
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Write the manifest from the published preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: npx tsx website/manifest.ts ${TAG:+"$TAG"}
       - run: npm run build:website
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
@@ -30,7 +50,11 @@ jobs:
           path: dist-website
   deploy:
     needs: build
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write

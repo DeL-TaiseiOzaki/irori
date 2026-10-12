@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request replaces its run. main's runs always finish: a release can
+# publish from one, and cancelling it would leave a merged change without tested packages.
 concurrency:
-  group: desktop-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -34,8 +36,9 @@ jobs:
       - run: npm run build:website
       - run: xvfb-run -a npm run test:website
 
+  # Packaging does not wait for verify. A release still needs the whole run to succeed, so
+  # nothing is published from packages whose source failed verification.
   package:
-    needs: verify
     strategy:
       fail-fast: false
       matrix:
