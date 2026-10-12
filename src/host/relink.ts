@@ -7,7 +7,7 @@ import type { Document } from '../domain/types';
 import type { FileService } from './files';
 import type { SearchService } from './search';
 import { foldsCase } from './links';
-import { layerRoots, renamedPath } from '../domain/layers';
+import { layerRoots, movedPath, reversedMove, type LayerMove } from '../domain/layers';
 import { owner } from '../domain/scopes';
 
 /** The other notes whose links lead to `target`, as the backlink scan finds them. */
@@ -121,22 +121,24 @@ export async function relink(
 }
 
 /**
- * After a layer folder rename (ADR 024): rewrites every link in the vault's
- * Markdown files that led into `from` so it leads to the same file under `to`,
- * including the links of the moved files themselves. Contents is not walked: its
- * files are the originals of other places. Each write is the ordinary
- * hash-checked save, so a file changed meanwhile or holding unsaved text is
- * skipped rather than overwritten.
+ * After a layer folder rename (ADR 024) or a move to or from the vault's root
+ * (ADR 035): rewrites every link in the vault's Markdown files that led to a
+ * moved file so it leads to the same file where it is now. A moved file's own
+ * links keep their targets from its new place, which may be at another depth.
+ * Contents is not walked: its files are the originals of other places. Each
+ * write is the ordinary hash-checked save, so a file changed meanwhile or
+ * holding unsaved text is skipped rather than overwritten.
  */
 export async function relinkFolder(
   files: FileService,
   scopeId: string,
-  from: string,
-  to: string,
+  move: LayerMove,
   onSaved?: (before: Document, after: Document) => Promise<void>,
 ) {
   const space = files.get(scopeId);
-  const roots = [...layerRoots(space), from];
+  // A `sources` path written from the old folder name still counts as rooted.
+  const roots = [...layerRoots(space), move.from].filter(Boolean);
+  const back = reversedMove(move);
   const pages: string[] = [];
   const visit = async (directory: string, prefix: string) => {
     for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
@@ -158,12 +160,13 @@ export async function relinkFolder(
     try {
       const note = await files.read(scopeId, page);
       if (note.draft && note.draft.text !== note.text) throw Error('Unsaved text');
-      const at = renamedPath(page, to, from) ?? page;
+      const at = movedPath(back, page) ?? page;
       const rewritten = rewriteNoteReferences(
         note.text,
         at,
         page,
-        (p) => renamedPath(p, from, to),
+        // A file that moved recomputes every link; another only those to moved files.
+        at === page ? (p) => movedPath(move, p) : (p) => movedPath(move, p) ?? p,
         roots,
       );
       if (!rewritten.links) continue;

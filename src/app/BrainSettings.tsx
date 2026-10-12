@@ -15,10 +15,14 @@ import {
 import type { Category, LayerFolderRename, Space } from '../domain/types';
 import { presetCategories } from '../domain/types';
 import {
+  defaultKnowledgeFolder,
   defaultLayerLabel,
+  knowledgeFolder,
   layerFolder,
   layerFolderProblem,
   layerLabel,
+  rootKnowledgeFolder,
+  shownFolder,
   type NamedLayer,
 } from '../domain/layers';
 import { t } from '../domain/i18n';
@@ -240,11 +244,19 @@ export function BrainSettings({
     contents: space.labels?.contents ?? '',
   }));
   const [folders, setFolders] = useState(() => ({
-    Knowledge_Base: layerFolder(space, 'Knowledge_Base'),
+    Knowledge_Base: knowledgeFolder(space) || defaultKnowledgeFolder,
     contents: baseName(layerFolder(space, 'contents')),
   }));
+  // The vault's root as the knowledge folder (ADR 035).
+  const [knowledgeAtRoot, setKnowledgeAtRoot] = useState(!knowledgeFolder(space));
+  const chosenFolder = (layer: NamedLayer) =>
+    layer === 'Knowledge_Base' && knowledgeAtRoot ? rootKnowledgeFolder : folders[layer].trim();
   const folderProblems = Object.fromEntries(
-    namedLayers.map((layer) => [layer, layerFolderProblem(folders[layer].trim()) ?? '']),
+    namedLayers.map((layer) => [
+      layer,
+      (chosenFolder(layer) !== rootKnowledgeFolder && layerFolderProblem(chosenFolder(layer))) ||
+        '',
+    ]),
   ) as Record<NamedLayer, string>;
   const folderProblem = namedLayers.some((layer) => folderProblems[layer]);
   const { busy: saving, error, setError, run } = useAction();
@@ -313,8 +325,8 @@ export function BrainSettings({
       });
       const renamed: (LayerFolderRename & { layer: NamedLayer })[] = [];
       for (const layer of namedLayers) {
-        const folder = folders[layer].trim();
-        if (folder === baseName(layerFolder(next, layer))) continue;
+        const folder = chosenFolder(layer);
+        if (folder === shownFolder(baseName(layerFolder(next, layer)))) continue;
         if (beforeRename && !(await beforeRename())) break;
         const result = await host.renameLayerFolder(space.scopeId, layer, folder);
         next = result.space;
@@ -450,7 +462,12 @@ export function BrainSettings({
                   />
                   <input
                     className="mono"
-                    value={folders[layer]}
+                    value={
+                      layer === 'Knowledge_Base' && knowledgeAtRoot
+                        ? rootKnowledgeFolder
+                        : folders[layer]
+                    }
+                    disabled={layer === 'Knowledge_Base' && knowledgeAtRoot}
                     maxLength={64}
                     aria-label={t(
                       `${defaultLayerLabel(layer)} のフォルダ`,
@@ -461,6 +478,16 @@ export function BrainSettings({
                       setFolders((value) => ({ ...value, [layer]: event.target.value }))
                     }
                   />
+                  {layer === 'Knowledge_Base' && (
+                    <label className="brain-sheet-layer-root">
+                      <input
+                        type="checkbox"
+                        checked={knowledgeAtRoot}
+                        onChange={(event) => setKnowledgeAtRoot(event.target.checked)}
+                      />{' '}
+                      {t('vault のルート', "The vault's root")}
+                    </label>
+                  )}
                   {folderProblems[layer] && <small role="alert">{folderProblems[layer]}</small>}
                 </div>
               ))}

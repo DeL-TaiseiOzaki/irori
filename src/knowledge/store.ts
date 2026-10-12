@@ -20,7 +20,7 @@ import {
 } from '../domain/knowledge';
 import { runOutcomes, type StartRun } from '../domain/types';
 import { t } from '../domain/i18n';
-import { renamedPath } from '../domain/layers';
+import { movedPath, type LayerMove } from '../domain/layers';
 
 /** The largest file kept as a material. */
 const materialLimit = 64 * 1024 * 1024;
@@ -340,13 +340,13 @@ export class KnowledgeStore {
     });
   }
   /** Keeps the material IDs of a renamed layer folder's files at their new paths (ADR 024). */
-  renameFolder(scopeId: string, from: string, to: string) {
+  renameFolder(scopeId: string, move: LayerMove) {
     return this.queue.run(async () => {
       const { filename, entries } = await this.index(scopeId);
       let changed = false;
       const next: Record<string, string> = {};
       for (const [key, id] of Object.entries(entries)) {
-        const moved = renamedPath(key, from, to);
+        const moved = movedPath(move, key);
         if (moved !== undefined) changed = true;
         next[moved ?? key] = id;
       }

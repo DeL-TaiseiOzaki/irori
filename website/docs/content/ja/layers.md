@@ -19,6 +19,8 @@ description: AI への指示、書きためる知識、元になる資料を分�
 
 トップレベルの隠しファイルや隠しフォルダ、`AGENTS.md` などは Schema として扱われます。Contents の場所は vault の宣言に従い、それ以外の知識用ファイルが Knowledge に表示されます。
 
+Knowledge のフォルダは vault の設定の **層** で選べます。**vault のルート** にすると、ノートはリポジトリの直下に `AGENTS.md` と並びます。
+
 おすすめの構成は[irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete)を参照できます。新規 vault を作る操作だけで、そのテンプレート全体がコピーされるわけではありません。
 
 ## AI が使うもの

@@ -1288,6 +1288,17 @@ button.home-row:hover {
 .brain-sheet-layer input {
   min-width: 0;
 }
+.brain-sheet-layer-root {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.brain-sheet-layer-root input {
+  margin: 0;
+}
 .brain-sheet-layer small[role='alert'] {
   grid-column: 2 / -1;
   font-size: 12px;

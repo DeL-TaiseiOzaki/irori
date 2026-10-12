@@ -15,7 +15,7 @@ import { Crumbs } from './NoteBar';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { selectSubgraph, type OntologyView } from '../domain/ontology';
-import type { FolderIndexStatus, GraphIndexStatus } from '../domain/graph-index';
+import { graphIndexAt, type FolderIndexStatus, type GraphIndexStatus } from '../domain/graph-index';
 import { knowledgeFolder, layerLabel } from '../domain/layers';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -397,7 +397,7 @@ export function OntologyPanel({
   const matches =
     (!indexed || !!status.data?.current) && (!indexes || !(indexes.added || indexes.changed));
   // The module lives in the vault's knowledge folder (ADR 024).
-  const indexFolder = `${knowledgeFolder(space)}/ontology/`;
+  const indexFolder = `${graphIndexAt(knowledgeFolder(space)).folder}/`;
   return (
     <StageView
       label={t('オントロジー', 'Ontology')}

@@ -1,5 +1,6 @@
 import { compareCodePoints } from './graph-index';
 import type { PropertyDeclaration } from './properties';
+import { inFolder, underFolder } from './layers';
 
 /**
  * The folder indexes of an Open Knowledge Format bundle (ADR 028), generated
@@ -162,7 +163,8 @@ export function renderFolderIndex(input: {
 }
 
 /**
- * The indexes a bundle's pages give. `root` is the knowledge folder; `pages`
+ * The indexes a bundle's pages give. `root` is the knowledge folder, `''` the
+ * vault's root, where a folder's parent is `''` too; `pages`
  * and `indexes` hold only what the walk may index (subfolders that are hidden,
  * aliases, submodules or another vault are already left out). A folder gets an
  * index when a page is in it or below it, and it lists a subfolder that gets
@@ -179,7 +181,7 @@ export function planFolderIndexes(input: {
   frontmatter: string;
 }): PlannedIndex[] {
   const { root } = input;
-  const inside = (folder: string) => folder === root || folder.startsWith(`${root}/`);
+  const inside = (folder: string) => underFolder(root, folder);
   const withPages = new Set<string>();
   for (const page of input.pages)
     for (let folder = parentOf(page.path); inside(folder); folder = parentOf(folder)) {
@@ -214,7 +216,7 @@ export function planFolderIndexes(input: {
       pages: (pagesIn.get(folder) ?? []).map((page) => ({ ...page, file: fileName(page.path) })),
       declaration: input.declaration,
     });
-    planned.push({ path: existing?.path ?? `${folder}/index.md`, text });
+    planned.push({ path: existing?.path ?? inFolder(folder, 'index.md'), text });
   }
   return planned.sort((a, b) => compareCodePoints(a.path, b.path));
 }

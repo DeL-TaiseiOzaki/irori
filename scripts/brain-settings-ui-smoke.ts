@@ -132,6 +132,22 @@ try {
   expect(layers.labels).toEqual({ Knowledge_Base: '知識' });
   expect(await readFile(path.join(roots[0], 'wiki', 'note.md'), 'utf8')).toBe('# Product\n');
 
+  // The vault's root as the Knowledge folder: the pages move up beside Schema (ADR 035).
+  await open();
+  await sheet.getByRole('checkbox', { name: 'vault のルート' }).check();
+  await expect(sheet.getByRole('textbox', { name: 'Knowledge のフォルダ' })).toHaveValue('.');
+  await expect(sheet.getByRole('textbox', { name: 'Knowledge のフォルダ' })).toBeDisabled();
+  await sheet.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  expect((await scope()).knowledge).toBe('.');
+  expect(await readFile(path.join(roots[0], 'note.md'), 'utf8')).toBe('# Product\n');
+  await expect(
+    brain.getByRole('region', { name: '知識', exact: true }).getByText('note', { exact: true }),
+  ).toBeVisible();
+  await open();
+  await expect(sheet.getByRole('checkbox', { name: 'vault のルート' })).toBeChecked();
+  await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
+
   // An image, kept in .irori and shown on the rail.
   await open();
   await sheet.getByRole('radio', { name: '画像', exact: true }).check();
@@ -224,7 +240,7 @@ try {
   expect((await scope()).scopeId).toBe(product.scopeId);
   expect(errors).toEqual([]);
   console.log(
-    'Brain settings UI passed: name, no category, a category of its own, a preset typed in English, symbol, colour, letters with their limit, cancel, layer name and folder, image icon, restart, removal, removal from the start screen.',
+    'Brain settings UI passed: name, no category, a category of its own, a preset typed in English, symbol, colour, letters with their limit, cancel, layer name and folder, the vault root as Knowledge folder, image icon, restart, removal, removal from the start screen.',
   );
 } finally {
   await app.close();

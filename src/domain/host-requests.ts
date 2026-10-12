@@ -11,7 +11,7 @@ import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { brainLook, categoryText } from './brains';
-import { layerFolderName, layerLabelChanges } from './layers';
+import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
@@ -189,7 +189,8 @@ export const hostArguments = {
       })
       .strict(),
   ]),
-  renameLayerFolder: z.tuple([id, z.enum(['Knowledge_Base', 'contents']), layerFolderName]),
+  // Only the knowledge folder may be the root `.`; the host refuses it for contents.
+  renameLayerFolder: z.tuple([id, z.enum(['Knowledge_Base', 'contents']), knowledgeFolderName]),
   saveSpaceIcon: z.tuple([
     id,
     z.instanceof(Uint8Array).refine((value) => value.length <= 2 * 1024 * 1024),

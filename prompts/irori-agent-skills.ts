@@ -84,7 +84,7 @@ fits what they told you. "You" below is the irori agent.
 - Knowledge: everything else. The knowledge folder (\`Knowledge_Base\` unless
   chosen) is where new notes go. \`irori layer <h> knowledge <folder>\` takes a
   folder that exists as it is; otherwise it renames the current one and
-  rewrites links into it.
+  rewrites links into it. Folder \`.\` is the vault's root.
 - Shown names of Knowledge and Contents: \`irori set --knowledge-label/--contents-label\`.
 
 ## Workspaces

@@ -13,6 +13,18 @@ by release run `38158919978` from main's successful CI run `38158080226`
 - Owner checks remain: real Claude Code and Codex threads at once in irori
   mode, and whether one conversation still shows in every workspace.
 
+Knowledge at the vault's root, 2026-10-12 (**0.2.0**, [ADR 035](decisions/035-knowledge-at-the-vault-root.md)):
+`knowledge: "."` in `.irori/scope.json` makes the vault's root its knowledge
+folder (`knowledgeFolder()` returns `''`; join and test paths with `inFolder`
+and `underFolder`). `irori layer <vault> knowledge .` and **vault のルート** in
+the settings move the knowledge folder's entries to the root, refusing taken,
+Schema or contents names; naming a folder again moves the top-level knowledge
+entries back. Links, rooted `sources`, comments, drafts, material IDs,
+person-line records and notes.json follow through `LayerMove`. The graph index,
+OKF check and folder indexes work from the root, and a first registration of a
+folder with an OKF root `index.md` and no `Knowledge_Base/` declares `.`.
+irori-templete's move to this layout follows the release.
+
 Threads in irori mode, 2026-10-12 (**0.1.99**, [ADR 034](decisions/034-irori-mode-threads.md)):
 irori mode shows the irori agent in up to four columns of the dock's kind, so
 its threads run side by side. A closed column's running thread comes back as a

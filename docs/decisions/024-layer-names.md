@@ -1,6 +1,8 @@
 # 024 — A hibachi names its Knowledge and Contents layers and their folders
 
 Date: 2026-10-05. Status: owner request; implemented for 0.1.70.
+Decision 3 extended by [ADR 035](035-knowledge-at-the-vault-root.md): the
+knowledge folder may be the vault's root.
 
 ## Context
 

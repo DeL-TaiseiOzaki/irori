@@ -31,7 +31,13 @@ import type {
   SpaceChange,
   WorkspaceProfile,
 } from '../domain/types';
-import { knowledgeFolder, layerFolder, layerLabel, type NamedLayer } from '../domain/layers';
+import {
+  knowledgeFolder,
+  layerFolder,
+  layerLabel,
+  shownFolder,
+  type NamedLayer,
+} from '../domain/layers';
 import { categoryName } from '../domain/brains';
 import type { Routine, RoutineRef, RunRoutine } from '../domain/routines';
 import type { NewComment, NoteComment } from '../domain/comments';
@@ -222,7 +228,7 @@ export class AgentSetup {
         repository: (await inspectRepository(space.root)).repository,
         inWorkspace: !!workspace?.scopeIds.includes(space.scopeId),
         category: categoryName(space.category),
-        knowledge: knowledgeFolder(space),
+        knowledge: shownFolder(knowledgeFolder(space)),
         contents: space.contents,
         connections: (await this.host.cloud.connections(space.scopeId).catch(() => [])).map(
           (item) => ({
@@ -589,9 +595,10 @@ export class AgentSetup {
       const folder =
         command.layer === 'contents' ? renamed.space.contents[0] : knowledgeFolder(renamed.space);
       return layerChosen(space.name, word, {
-        folder,
-        previous: renamed.previous,
-        moved: moves,
+        folder: shownFolder(folder),
+        previous: shownFolder(renamed.previous),
+        // To or from the root, what moved is the entries (ADR 035).
+        moved: renamed.entries ? renamed.entries.length > 0 : moves,
         links: renamed.links,
         notes: renamed.notes,
         skipped: renamed.skipped,

@@ -165,7 +165,9 @@ export function rewriteNoteReferences(
     const fragment = reference.href.includes('#')
       ? reference.href.slice(reference.href.indexOf('#'))
       : '';
-    let value = relative(origin(to, reference), next);
+    // A rooted path stays rooted only while a layer folder still starts it (ADR 035).
+    const rooted = reference.rooted && roots.some((root) => next.startsWith(root + '/'));
+    let value = relative(rooted ? 'index.md' : to, next);
     value = value.replace(/[%#]/g, (char) => '%' + char.charCodeAt(0).toString(16).toUpperCase());
     if (/^[a-z][a-z0-9+.-]*:/i.test(value)) value = './' + value;
     output +=

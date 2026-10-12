@@ -134,6 +134,9 @@ irori layer <vault> contents <folder> [--also]
   folder, where folders are connected. A folder that exists already is taken
   as it is and nothing moves; otherwise the current one is renamed and links
   into it are rewritten. Everything outside Schema and contents is knowledge.
+  Knowledge folder "." is the vault's root: what the current one holds moves
+  up beside Schema and contents, and links follow; a name already at the root
+  stops the move.
   With --also, an existing folder becomes contents beside the contents
   folder; it stays where it is and Git keeps tracking it.
 
@@ -317,13 +320,16 @@ export function layerChosen(
     notice?: string;
   },
 ) {
+  // `.` is the vault's root (ADR 035).
+  const place = (folder?: string) => (folder === '.' ? "the vault's root" : `"${folder}"`);
+  const root = change.folder === '.' || change.previous === '.';
   const head = change.also
     ? `"${change.folder}" is contents of the vault "${vault}" too. It stays where it is and Git still tracks it; add it to .gitignore if it should stay out of the repository.`
     : change.previous === change.folder
-      ? `The ${layer} folder of the vault "${vault}" is "${change.folder}" already.`
+      ? `The ${layer} folder of the vault "${vault}" is ${place(change.folder)} already.`
       : change.moved
-        ? `Renamed the ${layer} folder of the vault "${vault}" from "${change.previous}" to "${change.folder}"${change.links ? `, and rewrote ${change.links} links in ${change.notes} files` : ''}.`
-        : `The ${layer} folder of the vault "${vault}" is now "${change.folder}"; nothing was moved.`;
+        ? `${root ? 'Moved' : 'Renamed'} the ${layer} folder of the vault "${vault}" from ${place(change.previous)} to ${place(change.folder)}${change.links ? `, and rewrote ${change.links} links in ${change.notes} files` : ''}.`
+        : `The ${layer} folder of the vault "${vault}" is now ${place(change.folder)}; nothing was moved.`;
   return [
     head,
     ...(change.skipped?.length
