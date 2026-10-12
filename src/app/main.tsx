@@ -1,5 +1,6 @@
 import { classify, isPropertyPage } from '../domain/scopes';
-import { knowledgeFolder, layerFolder, renamedPath } from '../domain/layers';
+import { layerFolder, movedPath } from '../domain/layers';
+import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
@@ -778,7 +779,7 @@ function App() {
   );
   const connections = connectionsRead.data ?? noConnections;
   const defaultNoteDirectory =
-    notesDeclared?.newNoteDirectory ?? `${knowledgeFolder(active ?? {})}/Notes`;
+    notesDeclared?.newNoteDirectory ?? defaultNoteDirectoryOf(active ?? {});
   const composer = useDraft(
     active ? { scopeId: active.scopeId, kind: 'composer', agent } : null,
     active?.root,
@@ -2962,7 +2963,14 @@ function App() {
             for (const item of renamed) {
               const moved =
                 open?.scopeId === next.scopeId
-                  ? renamedPath(open.path, item.previous, layerFolder(next, item.layer))
+                  ? movedPath(
+                      {
+                        from: item.previous,
+                        to: layerFolder(next, item.layer),
+                        entries: item.entries,
+                      },
+                      open.path,
+                    )
                   : undefined;
               if (moved)
                 void host

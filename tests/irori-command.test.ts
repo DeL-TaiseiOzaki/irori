@@ -436,6 +436,32 @@ test('connect links a folder into the named vault’s contents', async (t) => {
   await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
 });
 
+test('layer knowledge . moves the knowledge folder to the vault’s root and back', async (t) => {
+  const { base, files, setup } = await device(t);
+  const vault = path.join(base, 'Root');
+  await mkdir(path.join(vault, 'Knowledge_Base', 'wiki'), { recursive: true });
+  await writeFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), '# A\n');
+  await writeFile(path.join(vault, 'AGENTS.md'), 'See [A](Knowledge_Base/wiki/a.md).\n');
+  await setup.run(['add', vault, '--name', 'Root'], base);
+  const id = files.list().find((space) => space.name === 'Root')!.scopeId;
+  assert.equal(
+    await setup.run(['layer', 'Root', 'knowledge', '.'], base),
+    'Moved the knowledge folder of the vault "Root" from "Knowledge_Base" to the vault\'s root, and rewrote 1 links in 1 files.',
+  );
+  assert.equal(files.get(id).knowledge, '.');
+  assert.equal(await readFile(path.join(vault, 'AGENTS.md'), 'utf8'), 'See [A](wiki/a.md).\n');
+  assert.match(await setup.run(['list'], base), /knowledge "\."/);
+  assert.match(
+    await setup.run(['layer', 'Root', 'knowledge', '.'], base),
+    /knowledge folder of the vault "Root" is the vault's root already/,
+  );
+  assert.match(
+    await setup.run(['layer', 'Root', 'knowledge', 'Knowledge_Base'], base),
+    /^Moved the knowledge folder of the vault "Root" from the vault's root to "Knowledge_Base"/,
+  );
+  assert.equal(await readFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), 'utf8'), '# A\n');
+});
+
 test('set, layer, workspace, disconnect and remove change what irori holds, never the files', async (t) => {
   const { base, files, workspaces, setup, deps, announced } = await device(t);
   // An Obsidian-like vault: notes in wiki/, attachments beside them, code apart.

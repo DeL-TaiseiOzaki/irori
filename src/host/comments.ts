@@ -6,6 +6,7 @@ import type { FileService } from './files';
 import { isMissing, issueSummary, parseJsonText } from './local-json';
 import type { GitService } from '../git/service';
 import { SerialQueue } from './serial-queue';
+import { movedPath, type LayerMove } from '../domain/layers';
 import { actorFromEmail } from '../domain/properties';
 import {
   commentsFileLimit,
@@ -162,14 +163,14 @@ export async function removeNoteComment(
 
 /**
  * Carries the comments on the files of a renamed layer folder to their new paths
- * (ADR 024), one file at a time as a note move does. Returns the files whose
- * comments stayed behind: their file is gone, or a comments file is already there.
+ * (ADR 024), or of the entries a move to or from the vault's root took (ADR 035),
+ * one file at a time as a note move does. Returns the files whose comments
+ * stayed behind: their file is gone, or a comments file is already there.
  */
 export async function moveFolderComments(
   files: FileService,
   scopeId: string,
-  from: string,
-  to: string,
+  move: LayerMove,
 ): Promise<string[]> {
   const top = path.join(files.get(scopeId).root, '.irori', 'comments');
   const notes: string[] = [];
@@ -179,17 +180,26 @@ export async function moveFolderComments(
       return [];
     });
     for (const entry of entries) {
-      const p = `${prefix}/${entry.name}`;
+      const p = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) await visit(path.join(directory, entry.name), p);
       else if (entry.isFile() && /\.md\.json$/i.test(entry.name)) notes.push(p.slice(0, -5));
     }
   };
-  const stat = await fs.lstat(path.join(top, from)).catch(() => undefined);
-  if (!stat?.isDirectory() || stat.isSymbolicLink()) return [];
-  await visit(path.join(top, from), from);
+  const roots = move.from ? [move.from] : (move.entries ?? []);
+  for (const root of roots) {
+    const stat = await fs.lstat(path.join(top, root)).catch(() => undefined);
+    if (stat?.isDirectory() && !stat.isSymbolicLink()) await visit(path.join(top, root), root);
+    // A page at the root keeps its comments beside the folders.
+    else if (
+      /\.md$/i.test(root) &&
+      (await fs.lstat(path.join(top, `${root}.json`)).catch(() => undefined))?.isFile()
+    )
+      notes.push(root);
+  }
   const kept: string[] = [];
   for (const note of notes) {
-    const next = to + note.slice(from.length);
+    const next = movedPath(move, note);
+    if (next === undefined) continue;
     await moveNoteComments(files, scopeId, note, next).catch(() => kept.push(note));
   }
   return kept;

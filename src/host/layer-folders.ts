@@ -2,7 +2,7 @@ import type { CloudService } from '../cloud/service';
 import type { KnowledgeStore } from '../knowledge/store';
 import type { AuthorshipStore } from '../knowledge/authorship';
 import type { LayerFolderRename } from '../domain/types';
-import { layerFolder, renamedPath, type NamedLayer } from '../domain/layers';
+import { layerFolder, movedPath, type LayerMove, type NamedLayer } from '../domain/layers';
 import { t } from '../domain/i18n';
 import type { FileService } from './files';
 import { moveFolderComments } from './comments';
@@ -14,6 +14,8 @@ import { relinkFolder } from './relink';
  * its paths (ADR 024): the connected folders are linked again under the new
  * name, then the device's material IDs and person-line records, the notes
  * declaration, the comments and every link that led into the folder follow.
+ * Making the vault's root the knowledge folder, or a named folder again,
+ * carries the same records for the entries that moved (ADR 035).
  * The folder and its declaration change together or not at all; what could not
  * be carried after that is reported, not undone.
  */
@@ -52,12 +54,22 @@ export async function renameLayerFolder(
         ),
       );
   }
-  const { space, previous, files: moved } = renamed;
+  const { space, previous, files: moved, entries } = renamed;
   const next = layerFolder(space, layer);
-  const result: LayerFolderRename = { space, previous, links: 0, notes: 0, skipped: [] };
+  const result: LayerFolderRename = {
+    space,
+    previous,
+    ...(entries && { entries }),
+    links: 0,
+    notes: 0,
+    skipped: [],
+  };
   if (next === previous) return result;
+  const move: LayerMove = { from: previous, to: next, entries };
+  // A knowledge folder taken as it is from the root moved nothing.
+  if (!previous && !entries?.length) return result;
   note(
-    await succeeds(knowledge?.renameFolder(scopeId, previous, next)),
+    await succeeds(knowledge?.renameFolder(scopeId, move)),
     '資料 ID を新しい場所に再接続できませんでした。',
     'Material IDs could not be reconnected at the new location.',
   );
@@ -67,7 +79,7 @@ export async function renameLayerFolder(
       await succeeds(
         authorship?.renameFiles(
           scopeId,
-          pages.map((file) => [file, renamedPath(file, previous, next)!]),
+          pages.map((file) => [file, movedPath(move, file)!]),
         ),
       ),
       '人の行の記録を引き継げませんでした。',
@@ -75,17 +87,17 @@ export async function renameLayerFolder(
     );
   if (layer === 'Knowledge_Base')
     note(
-      await succeeds(renameInNotesDeclaration(files, scopeId, previous, next)),
+      await succeeds(renameInNotesDeclaration(files, scopeId, move)),
       '.irori/notes.json のノートの場所を更新できませんでした。',
       'The note locations in .irori/notes.json could not be updated.',
     );
-  const kept = await moveFolderComments(files, scopeId, previous, next).catch(() => [previous]);
+  const kept = await moveFolderComments(files, scopeId, move).catch(() => [previous]);
   note(
     !kept.length,
     `${kept.length} 件のファイルのコメントを移せませんでした。`,
     `Comments on ${kept.length} files could not be moved.`,
   );
-  const links = await relinkFolder(files, scopeId, previous, next, async (before, after) => {
+  const links = await relinkFolder(files, scopeId, move, async (before, after) => {
     // A link rewrite keeps every line's author.
     await authorship?.carry(before, after, before.text, after.text).catch(() => {});
   }).catch(() => undefined);

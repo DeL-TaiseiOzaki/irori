@@ -12,7 +12,7 @@ import {
   type NotesDeclaration,
 } from '../domain/notes';
 import { t } from '../domain/i18n';
-import { renamedPath } from '../domain/layers';
+import { movedPath, type LayerMove } from '../domain/layers';
 
 async function insideKnowledge(files: FileService, scopeId: string, relative: string) {
   const space = files.get(scopeId);
@@ -64,14 +64,15 @@ export async function readNotesDeclaration(
 
 /**
  * Keeps `.irori/notes.json` pointing at the same places after the knowledge
- * folder is renamed (ADR 024). Only the paths change; the rest of the file stays
- * as written. Returns whether the file was rewritten.
+ * folder is renamed (ADR 024) or moved to or from the vault's root (ADR 035).
+ * Only the paths change; the rest of the file stays as written, except a
+ * new-note folder that became the root itself, which returns to irori's
+ * default. Returns whether the file was rewritten.
  */
 export async function renameInNotesDeclaration(
   files: FileService,
   scopeId: string,
-  from: string,
-  to: string,
+  move: LayerMove,
 ) {
   const doc = await ifPresent(files.read(scopeId, notesDeclarationFile));
   if (!doc) return false;
@@ -81,11 +82,12 @@ export async function renameInNotesDeclaration(
   };
   let changed = false;
   const carry = (value: unknown) => {
-    const next = typeof value === 'string' ? renamedPath(value, from, to) : undefined;
+    const next = typeof value === 'string' ? movedPath(move, value) : undefined;
     if (next !== undefined) changed = true;
     return next ?? value;
   };
   if (raw.newNoteDirectory !== undefined) raw.newNoteDirectory = carry(raw.newNoteDirectory);
+  if (raw.newNoteDirectory === '') delete raw.newNoteDirectory;
   if (raw.daily && typeof raw.daily === 'object') {
     if (raw.daily.path !== undefined) raw.daily.path = carry(raw.daily.path);
     if (raw.daily.template !== undefined) raw.daily.template = carry(raw.daily.template);

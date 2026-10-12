@@ -30,13 +30,16 @@ import { defaultNoteDirectory } from '../domain/notes';
 import {
   defaultKnowledgeFolder,
   knowledgeFolder,
-  layerFolderName,
+  knowledgeFolderName,
   layerFolderProblem,
   layerLabels,
   layerRoots,
-  renamedPath,
+  movedPath,
+  rootKnowledgeFolder,
+  type LayerMove,
   type NamedLayer,
 } from '../domain/layers';
+import { frontmatterBlock } from '../domain/graph-index';
 import { t } from '../domain/i18n';
 import { textFileByteLimit, textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
 const relative = z
@@ -54,7 +57,7 @@ const declaration = z.object({
   name: z.string().min(1).max(120),
   category: categoryText.optional(),
   contents: z.array(relative).min(1),
-  knowledge: layerFolderName.optional(),
+  knowledge: knowledgeFolderName.optional(),
   labels: layerLabels.optional(),
   appearance: brainLook.optional(),
 });
@@ -136,6 +139,9 @@ const unwatchedNames = new Set([
   '.cache',
   '.DS_Store',
 ]);
+
+/** Files that only keep a folder or its look, which go with a knowledge folder emptied into the root. */
+const placeholders = ['.DS_Store', '.gitkeep'];
 
 /** One registration's watcher boundaries, computed outside chokidar's path callback. */
 export function watcherIgnored(space: Space, spaces: Space[]) {
@@ -332,6 +338,7 @@ export class FileService {
             name,
             category,
             contents: ['contents'],
+            ...((await bundleAtRoot(root)) && { knowledge: rootKnowledgeFolder }),
           }),
           root,
         };
@@ -444,7 +451,8 @@ export class FileService {
       return 'The incoming declaration does not parse';
     }
     if (next.scopeId !== s.scopeId) return 'The incoming declaration changes the identity';
-    const folders = [knowledgeFolder(next), ...next.contents];
+    // A knowledge folder at the vault's root overlaps nothing and needs no name check.
+    const folders = [knowledgeFolder(next), ...next.contents].filter(Boolean);
     for (const folder of folders) {
       if (folder === knowledgeFolder(s) || s.contents.includes(folder)) continue;
       const problem = folder.split('/').map(layerFolderProblem).find(Boolean);
@@ -497,12 +505,19 @@ export class FileService {
    * knowledge files. Returns the knowledge files that moved, by their previous
    * paths; links, comments and device records are the caller's to carry.
    */
-  async renameLayerFolder(id: string, layer: NamedLayer, name: string) {
+  async renameLayerFolder(
+    id: string,
+    layer: NamedLayer,
+    name: string,
+  ): Promise<{ space: Space; previous: string; files: string[]; entries?: string[] }> {
     return this.queue.run(async () => {
-      const problem = layerFolderProblem(name);
+      const atRoot = layer === 'Knowledge_Base' && (name === rootKnowledgeFolder || name === '');
+      const problem = atRoot ? undefined : layerFolderProblem(name);
       if (problem) throw Error(problem);
       const s = this.get(id);
       const previous = layer === 'contents' ? s.contents[0] : knowledgeFolder(s);
+      if (layer === 'Knowledge_Base' && (atRoot || !previous))
+        return this.moveKnowledgeRoot(s, previous, atRoot ? '' : name);
       // A contents folder declared inside another folder keeps its place.
       const parent = layer === 'contents' ? path.posix.dirname(previous) : '.';
       const next = parent === '.' ? name : `${parent}/${name}`;
@@ -572,13 +587,146 @@ export class FileService {
       this.registrationsChanged();
       if (layer === 'contents') await this.ignoreContents(s.root, previous, next);
       for (const file of moved) {
-        const target = renamedPath(file, previous, next)!;
+        const target = movedPath({ from: previous, to: next }, file)!;
         await fs
           .rename(draftFile(this.dataDir, id, file), draftFile(this.dataDir, id, target))
           .catch(() => {});
       }
       return { space, previous, files: moved };
     });
+  }
+  /**
+   * Makes the vault's root its knowledge folder, or a named folder again (ADR
+   * 035). To the root, the knowledge folder's children move up beside Schema
+   * and contents, and the emptied folder goes; refused when one of them would
+   * land on a name the root already has, or on one that is Schema or contents
+   * there. From the root, every top-level knowledge entry moves into the named
+   * folder, unless that folder exists, which is then taken as it is. The moves
+   * and the declaration change together or not at all; links and other records
+   * are the caller's to carry, by the entries returned.
+   */
+  private async moveKnowledgeRoot(s: Space, previous: string, next: string) {
+    if (next === previous) return { space: s, previous, files: [] as string[], entries: [] };
+    const id = s.scopeId;
+    const meta = await this.metadata(s.root);
+    const original = await fs.readFile(meta, 'utf8');
+    const raw = JSON.parse(original) as Record<string, unknown>;
+    if (raw.scopeId !== s.scopeId) throw Error('Scope identity changed');
+    if (next === defaultKnowledgeFolder) delete raw.knowledge;
+    else raw.knowledge = next || rootKnowledgeFolder;
+    const space: Space = { ...declaration.parse(raw), root: s.root };
+    const stat = (relative: string) =>
+      fs.lstat(path.join(s.root, relative)).catch((error) => {
+        if (!isMissing(error)) throw error;
+      });
+    const notFolder = Error(
+      t(
+        'フォルダの alias / シンボリックリンクは名前を変えられません。',
+        'Folder aliases and symbolic links cannot be renamed.',
+      ),
+    );
+    const ownEntry = (relative: string) =>
+      owner(this.spaces, path.join(s.root, relative))?.scopeId === id;
+    // Each top-level entry that moves, by its name at the root, and where it goes.
+    const entries: string[] = [];
+    const refused: string[] = [];
+    let created = false;
+    let emptied: string | undefined;
+    if (!next) {
+      const folder = await stat(previous);
+      if (folder && (folder.isSymbolicLink() || !folder.isDirectory())) throw notFolder;
+      if (folder) {
+        for (const entry of await fs.readdir(path.join(s.root, previous))) {
+          if (placeholders.includes(entry)) continue;
+          if (
+            classify(space, entry) !== 'Knowledge_Base' ||
+            (await stat(entry)) ||
+            !ownEntry(`${previous}/${entry}`)
+          )
+            refused.push(entry);
+          else entries.push(entry);
+        }
+        emptied = previous;
+      }
+    } else {
+      const overlaps = (a: string, b: string) =>
+        a === b || a.startsWith(b + '/') || b.startsWith(a + '/');
+      if (s.contents.some((other) => overlaps(other, next)) || !ownEntry(next))
+        throw Error(
+          t(
+            'その名前は別の層か別の vault のフォルダです。',
+            "That name is another layer's or another vault's folder.",
+          ),
+        );
+      const folder = await stat(next);
+      if (folder && (folder.isSymbolicLink() || !folder.isDirectory())) throw notFolder;
+      if (!folder) {
+        for (const entry of await fs.readdir(s.root))
+          if (
+            classify(s, entry) === 'Knowledge_Base' &&
+            entry !== 'node_modules' &&
+            // A folder holding a contents folder stays, and so does another vault.
+            !s.contents.some((root) => root.startsWith(`${entry}/`)) &&
+            ownEntry(entry)
+          )
+            entries.push(entry);
+        created = true;
+      }
+    }
+    if (refused.length)
+      throw Error(
+        t(
+          `vault のルートに同じ名前があるか、Schema か contents になる名前のため移せません: ${refused.join(', ')}`,
+          `These cannot move to the vault's root, which has the same name or keeps it for Schema or contents: ${refused.join(', ')}`,
+        ),
+      );
+    const move: LayerMove = { from: previous, to: next, entries };
+    const from = (entry: string) => (next ? entry : `${previous}/${entry}`);
+    const to = (entry: string) => (next ? `${next}/${entry}` : entry);
+    const moved: string[] = [];
+    for (const entry of entries) {
+      const at = await stat(from(entry));
+      if (at?.isDirectory())
+        moved.push(...(await this.walk(path.join(s.root, from(entry)), from(entry))));
+      else if (at?.isFile()) moved.push(from(entry));
+    }
+    const done: string[] = [];
+    const undo = async () => {
+      if (emptied) await fs.mkdir(path.join(s.root, emptied), { recursive: true }).catch(() => {});
+      for (const entry of done.reverse())
+        await fs
+          .rename(path.join(s.root, to(entry)), path.join(s.root, from(entry)))
+          .catch(() => {});
+      if (created) await fs.rmdir(path.join(s.root, next)).catch(() => {});
+    };
+    try {
+      if (created) await fs.mkdir(path.join(s.root, next));
+      for (const entry of entries) {
+        await fs.rename(path.join(s.root, from(entry)), path.join(s.root, to(entry)));
+        done.push(entry);
+      }
+      if (emptied) {
+        for (const placeholder of placeholders)
+          await fs.rm(path.join(s.root, emptied, placeholder), { force: true });
+        await fs.rmdir(path.join(s.root, emptied));
+      }
+      await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
+    } catch (error) {
+      // The entries and the declaration change together or not at all.
+      await writeFileAtomic(meta, original).catch(() => {});
+      await undo();
+      throw error;
+    }
+    this.spaces = this.spaces.map((item) => (item.scopeId === id ? space : item));
+    this.registrationsChanged();
+    for (const file of moved)
+      await fs
+        .rename(
+          draftFile(this.dataDir, id, file),
+          draftFile(this.dataDir, id, movedPath(move, file)!),
+        )
+        .catch(() => {});
+    return { space, previous, files: moved, entries };
   }
   /**
    * Declares a folder the vault already has as contents beside its contents
@@ -1159,5 +1307,24 @@ export class FileService {
         };
       }
     });
+  }
+}
+
+/**
+ * Whether a folder irori registers for the first time keeps its OKF bundle at
+ * its root (ADR 035): no `Knowledge_Base/`, and a root `index.md` whose
+ * frontmatter names `okf_version`, as irori-templete lays a knowledge base out.
+ */
+async function bundleAtRoot(root: string) {
+  try {
+    if (await fs.lstat(path.join(root, defaultKnowledgeFolder)).then(Boolean, () => false))
+      return false;
+    const index = path.join(root, 'index.md');
+    const stat = await fs.lstat(index);
+    if (!stat.isFile() || stat.size > textFileByteLimit) return false;
+    const block = frontmatterBlock(await fs.readFile(index, 'utf8'));
+    return block !== undefined && /^okf_version[ \t]*:/m.test(block);
+  } catch {
+    return false;
   }
 }

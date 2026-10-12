@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import { resolveNoteLink } from './note-links';
 import { ontologyDeclaration, parseCsv } from './ontology';
-import { defaultKnowledgeFolder } from './layers';
+import { defaultKnowledgeFolder, inFolder, isSchemaPath } from './layers';
 
 /**
  * The graph index a knowledge base carries: `ontology/` in its knowledge folder, a CSV
@@ -14,9 +14,9 @@ import { defaultKnowledgeFolder } from './layers';
  * module while one exists.
  */
 export const bundleRoot = defaultKnowledgeFolder;
-/** The module's folder and files in a bundle rooted at a vault's knowledge folder (ADR 024). */
+/** The module's folder and files in a bundle rooted at a vault's knowledge folder (ADR 024), `''` the vault's root (ADR 035). */
 export function graphIndexAt(root: string = bundleRoot) {
-  const folder = `${root}/ontology`;
+  const folder = inFolder(root, 'ontology');
   return {
     folder,
     files: {
@@ -59,11 +59,12 @@ export function graphIndexDeclaration(relations: boolean, root: string = bundleR
 
 /**
  * A page of the bundle: a `.md` under the knowledge folder that is neither a
- * folder's `index.md` nor inside the module itself.
+ * folder's `index.md` nor inside the module itself. At the vault's root, the
+ * Schema files beside the bundle are not pages; the walk leaves contents out.
  */
 export function bundlePage(path: string, root: string = bundleRoot) {
   return (
-    path.startsWith(`${root}/`) &&
+    (root ? path.startsWith(`${root}/`) : !isSchemaPath(path)) &&
     /\.md$/i.test(path) &&
     !/(^|\/)index\.md$/i.test(path) &&
     !path.startsWith(`${graphIndexAt(root).folder}/`)
@@ -72,7 +73,7 @@ export function bundlePage(path: string, root: string = bundleRoot) {
 
 /** A page's id in the index: its path inside the bundle without `.md`. */
 export function pageId(path: string, root: string = bundleRoot) {
-  return path.slice(root.length + 1).replace(/\.md$/i, '');
+  return (root ? path.slice(root.length + 1) : path).replace(/\.md$/i, '');
 }
 
 /**
@@ -214,7 +215,7 @@ this bundle — each page's \`type\`, \`title\` and \`relations\` in its
 frontmatter. Regenerate them in irori (オントロジー → 索引を更新) rather
 than editing them.
 
-- \`entities.csv\`: one row per page that takes part in a relation — \`id\` (the page's path inside \`${root}/\` without \`.md\`), \`label\` (its title), \`note\` (its path from the repository root), \`parentId\` (empty) and \`group\` (its type).
+- \`entities.csv\`: one row per page that takes part in a relation — \`id\` (the page's path ${root ? `inside \`${root}/\`` : 'from the repository root'} without \`.md\`), \`label\` (its title), \`note\` (its path from the repository root), \`parentId\` (empty) and \`group\` (its type).
 - \`relations.csv\`: one row per relation — \`sourceId\`, \`relation\` and \`targetId\`.
 `;
 

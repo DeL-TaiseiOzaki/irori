@@ -4,6 +4,8 @@ import { t } from './i18n';
 
 /** The knowledge folder of a vault that declares none (ADR 024). */
 export const defaultKnowledgeFolder = 'Knowledge_Base';
+/** How `.irori/scope.json` names the vault's root as its knowledge folder (ADR 035). */
+export const rootKnowledgeFolder = '.';
 /** The contents folder irori declares when it registers a KB. */
 export const defaultContentsFolder = 'contents';
 /** The layers whose folder and shown name a vault may change; Schema keeps both. */
@@ -22,6 +24,19 @@ export const schemaFiles = ['AGENTS.md', 'CLAUDE.md', 'opencode.json', 'opencode
  * reaches the same file through either spelling. A nested README stays knowledge.
  */
 export const isRootReadme = (relative: string) => /^readme\.md$/i.test(relative);
+/**
+ * Whether a vault path is Schema: a hidden top-level entry, `schema/`, an
+ * agent's instructions at the top or the repository's front page.
+ */
+export function isSchemaPath(relative: string) {
+  const top = relative.split('/')[0];
+  return (
+    top.startsWith('.') ||
+    top === 'schema' ||
+    schemaFiles.includes(relative) ||
+    isRootReadme(relative)
+  );
+}
 /** Top-level names that already mean Schema, or that tools own. */
 const reserved = [
   'schema',
@@ -37,10 +52,22 @@ interface LayerDeclaration {
   labels?: Partial<Record<NamedLayer, string>>;
 }
 
-/** The folder where the vault's knowledge pages live; everything outside Schema and contents is knowledge too. */
+/**
+ * The folder where the vault's knowledge pages live; everything outside Schema
+ * and contents is knowledge too. `''` is the vault's root (ADR 035).
+ */
 export function knowledgeFolder(space: Pick<LayerDeclaration, 'knowledge'>) {
-  return space.knowledge ?? defaultKnowledgeFolder;
+  const folder = space.knowledge ?? defaultKnowledgeFolder;
+  return folder === rootKnowledgeFolder ? '' : folder;
 }
+/** A layer folder as a person reads and types it: the vault's root is `.`. */
+export const shownFolder = (folder: string) => folder || rootKnowledgeFolder;
+/** `relative` inside `folder`, where `''` is the vault's root. */
+export const inFolder = (folder: string, relative: string) =>
+  folder ? `${folder}/${relative}` : relative;
+/** Whether `p` is `folder` or lies below it; every path lies below the vault's root `''`. */
+export const underFolder = (folder: string, p: string) =>
+  !folder || p === folder || p.startsWith(`${folder}/`);
 /** The contents folder irori connects folders into and renames. */
 export function contentsFolder(space: Pick<LayerDeclaration, 'contents'>) {
   return space.contents[0];
@@ -48,9 +75,13 @@ export function contentsFolder(space: Pick<LayerDeclaration, 'contents'>) {
 export function layerFolder(space: LayerDeclaration, layer: NamedLayer) {
   return layer === 'contents' ? contentsFolder(space) : knowledgeFolder(space);
 }
-/** The folders an OKF `sources` path may start from: the knowledge folder and each contents root. */
+/**
+ * The folders an OKF `sources` path may start from: the knowledge folder and
+ * each contents root. A knowledge folder at the vault's root is none: a path
+ * into it is relative to its page.
+ */
 export function layerRoots(space: LayerDeclaration) {
-  return [knowledgeFolder(space), ...space.contents];
+  return [knowledgeFolder(space), ...space.contents].filter(Boolean);
 }
 /** The name a layer is shown under: the vault's own, or irori's. */
 export function layerLabel(space: Pick<LayerDeclaration, 'labels'> | undefined, layer: Layer) {
@@ -77,6 +108,8 @@ export function layerFolderProblem(name: string): string | undefined {
     );
 }
 export const layerFolderName = z.string().refine((name) => !layerFolderProblem(name));
+/** A knowledge folder may also be the vault's root, written `.` (ADR 035). */
+export const knowledgeFolderName = z.union([z.literal(rootKnowledgeFolder), layerFolderName]);
 const labelLength = 40;
 const namedLayers = <T extends z.ZodType>(label: T) =>
   z.object({ Knowledge_Base: label, contents: label }).strict();
@@ -88,5 +121,31 @@ export const layerLabelChanges = namedLayers(z.string().max(labelLength).nullabl
 /** A path moved by a layer folder rename: `from/...` becomes `to/...`, anything else stays. */
 export function renamedPath(p: string, from: string, to: string) {
   if (p === from) return to;
-  return p.startsWith(from + '/') ? to + p.slice(from.length) : undefined;
+  return p.startsWith(from + '/') ? inFolder(to, p.slice(from.length + 1)) : undefined;
 }
+
+/**
+ * What a change of layer folder moved. Between two named folders, `from/...`
+ * became `to/...`. When either is the vault's root (`''`), only the entries
+ * named in `entries` moved, by their names at the root: the knowledge folder's
+ * children, or the top-level knowledge entries (ADR 035).
+ */
+export interface LayerMove {
+  from: string;
+  to: string;
+  entries?: readonly string[];
+}
+/** Where `p` is after `move`, or undefined when the move left it in place. */
+export function movedPath(move: LayerMove, p: string): string | undefined {
+  if (move.from) return renamedPath(p, move.from, move.to);
+  const top = p.split('/')[0].normalize('NFC');
+  return move.entries?.some((entry) => entry.normalize('NFC') === top)
+    ? inFolder(move.to, p)
+    : undefined;
+}
+/** The same move undone: where a path that moved came from. */
+export const reversedMove = (move: LayerMove): LayerMove => ({
+  ...move,
+  from: move.to,
+  to: move.from,
+});

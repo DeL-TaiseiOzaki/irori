@@ -22,7 +22,7 @@ export interface ScopeDeclaration {
   /** A preset or a name of the KB's own; a brain may carry none (ADR 014, ADR 029). */
   category?: Category;
   contents: string[];
-  /** The knowledge folder when it is not `Knowledge_Base` (ADR 024). */
+  /** The knowledge folder when it is not `Knowledge_Base` (ADR 024); `.` is the vault's root (ADR 035). */
   knowledge?: string;
   /** The names the Knowledge and Contents layers are shown under (ADR 024). */
   labels?: Partial<Record<import('./layers').NamedLayer, string>>;
@@ -40,7 +40,13 @@ export interface SpaceChange {
 /** What a layer folder rename did, and what it could not carry over. */
 export interface LayerFolderRename {
   space: Space;
+  /** The folder before the change, `''` for the vault's root. */
   previous: string;
+  /**
+   * When the knowledge folder became or stopped being the vault's root, the
+   * entries that moved, by their names at the root (`LayerMove`, ADR 035).
+   */
+  entries?: string[];
   /** Links rewritten, and in how many files. */
   links: number;
   notes: number;

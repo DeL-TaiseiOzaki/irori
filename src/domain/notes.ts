@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { kbPath } from './ontology';
 import { t } from './i18n';
-import { defaultKnowledgeFolder, knowledgeFolder } from './layers';
+import { defaultKnowledgeFolder, inFolder, knowledgeFolder } from './layers';
 
 /** Where a KB asks irori to put notes: `.irori/notes.json`, tracked with the KB. */
 export const notesDeclarationFile = '.irori/notes.json';
 export const defaultNoteDirectory = `${defaultKnowledgeFolder}/Notes`;
 /** Where a vault without a declaration puts new notes: `Notes` in its knowledge folder. */
 export const defaultNoteDirectoryOf = (space: { knowledge?: string }) =>
-  `${knowledgeFolder(space)}/Notes`;
+  inFolder(knowledgeFolder(space), 'Notes');
 
 const tokenPattern = /\{\{(yyyy|MM|dd|date|datetime)\}\}/g;
 const notePath = kbPath.refine((value) => /\.md$/i.test(value), 'A Markdown note is required');

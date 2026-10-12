@@ -19,6 +19,8 @@ The layers describe roles and presentation. They do not require every vault to h
 
 Top-level hidden files and folders, and files such as `AGENTS.md`, belong to Schema. Contents locations follow the vault's declarations. Other knowledge files appear in Knowledge.
 
+The Knowledge folder is chosen in the vault's settings under **Layers**. With **The vault's root**, notes sit at the top of the repository beside `AGENTS.md`.
+
 See [irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete) for a recommended structure. Creating a new vault does not automatically copy the entire template.
 
 ## What agents use
