@@ -78,12 +78,14 @@ export interface Entry {
   local?: boolean;
 }
 /**
- * A file or folder the explorer adds. A file with `bytes` is one the person
- * brought in from elsewhere: it takes a free name (`name 2.pdf`) when its own is
- * taken. Without them it is a new empty file, and a taken name is refused.
+ * A file or folder the explorer adds. A file with `bytes`, or a folder with
+ * `brought`, is one the person brought in from elsewhere: it takes a free name
+ * (`name 2.pdf`) when its own is taken. Otherwise it is new and empty, and a
+ * taken name is refused.
  */
 export type NewEntry =
-  { kind: 'folder'; name: string } | { kind: 'file'; name: string; bytes?: Uint8Array };
+  | { kind: 'folder'; name: string; brought?: boolean }
+  | { kind: 'file'; name: string; bytes?: Uint8Array };
 /** Where a moved file or folder is now and, in knowledge, what followed it. */
 export interface EntryMove {
   entry: Entry;

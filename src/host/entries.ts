@@ -42,14 +42,14 @@ export async function freeName(parent: string, name: string) {
 
 /**
  * Writes a new file or folder into the existing folder `parent` and returns the
- * name it took. A brought-in file takes a free name; anything else refuses a taken one.
+ * name it took. A brought-in entry takes a free name; a new one refuses a taken name.
  */
 export async function writeNewEntry(parent: string, entry: NewEntry) {
   const problem = entryNameError(entry.name);
   if (problem) throw Error(problem);
   if (!(await fs.stat(parent)).isDirectory())
     throw Error(t('フォルダを指定してください。', 'Choose a folder.'));
-  const brought = entry.kind === 'file' && entry.bytes;
+  const brought = entry.kind === 'file' ? !!entry.bytes : !!entry.brought;
   const name = brought ? await freeName(parent, entry.name) : entry.name;
   if (!brought && (await nameTaken(parent, name))) throw taken();
   const filename = path.join(parent, name);

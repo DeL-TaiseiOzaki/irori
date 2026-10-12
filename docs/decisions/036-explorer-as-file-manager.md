@@ -1,6 +1,6 @@
 # 036 — The explorer works as a file manager
 
-Date: 2026-10-12. Status: owner request; implemented for 0.2.2.
+Date: 2026-10-12. Status: owner request; implemented for 0.2.2, folder drops for 0.2.5.
 Extends [ADR 031](031-agents-use-what-irori-does.md) decision 3 (`irori move`).
 
 ## Context
@@ -22,8 +22,9 @@ Explorer or Finder does. Until 0.2.1:
    **New folder**, **Add files…** for a folder; **Rename**, **Move**, **Delete**
    for an entry; and **Show in Finder** (Explorer, file manager). F2 renames and
    Delete deletes the focused row. Dragging a row onto a folder moves it there;
-   files dropped from the file manager are copied in. A folder dropped from the
-   file manager is not copied, and the status line says so.
+   files and folders dropped from the file manager are copied in, a folder with
+   everything inside it except hidden entries (0.2.5). A closed folder held
+   under a drag opens.
 2. **What may change.** In Knowledge, every file and folder except the
    knowledge folder itself, whose name belongs to the vault settings (ADR 024).
    In Contents, what an editable connected folder holds; the connected folder's
@@ -32,8 +33,9 @@ Explorer or Finder does. Until 0.2.1:
    a contents folder is neither moved nor deleted.
 3. **Never replace.** A new file or folder refuses a name its folder holds in
    any case or normalization. A file brought in instead takes the first free
-   `name 2.ext`, as Finder keeps both. Files up to 100 MiB are brought in
-   through irori; larger ones through the file manager.
+   `name 2.ext`, as Finder keeps both; so does a brought-in folder. Files up to
+   100 MiB, and up to 2,000 files in one drop, are brought in through irori;
+   more through the file manager.
 4. **A move in Knowledge carries what names its paths.** A note that stays a
    note moves as before (`moveNoteCarrying`). Any other file or folder moves as
    it is, then `carryMove` — shared with the layer folder rename — rewrites the

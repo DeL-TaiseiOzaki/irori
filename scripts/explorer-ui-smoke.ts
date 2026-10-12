@@ -124,6 +124,29 @@ try {
   await page.getByRole('textbox', { name: 'フォルダ名' }).fill('2026');
   await page.getByRole('button', { name: '作成', exact: true }).click();
   await expect.poll(async () => (await readdir(shared)).sort()).toEqual(['2026', 'old.md']);
+  // Held under a drag from the file manager, a closed folder opens; files dropped
+  // there are copied in, keeping both where a name is taken.
+  await writeFile(path.join(shared, '2026', 'a.txt'), 'before');
+  const drag = (type: string, names: string[]) =>
+    row(contents, '2026').evaluate(
+      (target, { type, names }) => {
+        const transfer = new DataTransfer();
+        for (const name of names) transfer.items.add(new File([name], name));
+        target.dispatchEvent(
+          new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer }),
+        );
+      },
+      { type, names },
+    );
+  await expect(row(contents, '2026')).toHaveAttribute('aria-expanded', 'false');
+  await drag('dragover', ['a.txt']);
+  await expect(row(contents, '2026')).toHaveAttribute('aria-expanded', 'true');
+  await drag('drop', ['a.txt', 'b.csv']);
+  await expect
+    .poll(async () => (await readdir(path.join(shared, '2026'))).sort())
+    .toEqual(['a 2.txt', 'a.txt', 'b.csv']);
+  expect(await readFile(path.join(shared, '2026', 'a.txt'), 'utf8')).toBe('before');
+  await expect(page.getByRole('contentinfo')).toContainText('2 件のファイルを追加');
   await row(contents, '共有').click({ button: 'right' });
   const chooser = page.waitForEvent('filechooser');
   await menuItem('ファイルを追加…').click();
@@ -153,6 +176,7 @@ try {
           "a note deleted with the Delete key goes to irori's deleted notes",
           'the knowledge folder itself offers no rename',
           'a connected folder takes a new folder and files brought in from elsewhere',
+          'a closed folder opens under a drag; dropped files keep both on a taken name',
         ],
         errors,
       },

@@ -87,6 +87,7 @@ import { agentIds } from '../domain/types';
 import type { AgentSkill, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
 import { opensInIrori, viewerByteLimit } from '../domain/viewers';
+import { broughtFileLimit, broughtFiles, TooManyFiles, type Brought } from './dropped';
 const PageEditor = lazy(() =>
   import('./PageEditor').then((module) => ({ default: module.PageEditor })),
 );
@@ -1610,35 +1611,47 @@ function App() {
       void reconcile();
     }
   }
-  /** Copies files from the file manager into a folder of the vault, under free names. */
-  async function bringIn(space: Space, directory: string, files: File[], skipped: number) {
-    const added: string[] = [];
+  /**
+   * Copies files and folders from the file manager into a folder of the vault,
+   * under free names, with the folders' contents in the folders made for them.
+   */
+  async function bringIn(space: Space, directory: string, items: Brought[]) {
+    const total = broughtFiles(items);
+    let added = 0;
     const refused: string[] = [];
-    for (const file of files) {
-      if (file.size > viewerByteLimit) {
-        refused.push(file.name);
-        continue;
+    const place = async (folder: string, list: Brought[]) => {
+      for (const item of list) {
+        if (!('file' in item)) {
+          const made = await host.createEntry(space.scopeId, folder, {
+            kind: 'folder',
+            name: item.name,
+            brought: true,
+          });
+          await place(made.path, item.entries);
+        } else if (item.file.size > viewerByteLimit) refused.push(item.name);
+        else {
+          await host.createEntry(space.scopeId, folder, {
+            kind: 'file',
+            name: item.name,
+            bytes: new Uint8Array(await item.file.arrayBuffer()),
+          });
+          added++;
+          if (total > 1) setStatus(t(`追加中… ${added}/${total}`, `Adding… ${added}/${total}`));
+        }
       }
-      const entry = await host.createEntry(space.scopeId, directory, {
-        kind: 'file',
-        name: file.name,
-        bytes: new Uint8Array(await file.arrayBuffer()),
-      });
-      added.push(entry.name);
+    };
+    try {
+      await place(directory, items);
+    } finally {
+      bump(space.scopeId);
     }
-    bump(space.scopeId);
     setStatus(
       [
-        added.length && t(`${added.length} 件のファイルを追加`, `Added ${added.length} files`),
+        added && t(`${added} 件のファイルを追加`, `Added ${added} files`),
         refused.length &&
           t(
             `100 MiB を超えるため追加しなかったファイル: ${refused.join('、')}`,
             `Not added, over 100 MiB: ${refused.join(', ')}`,
-          ),
-        skipped &&
-          t(
-            `フォルダ ${skipped} 件は追加していません。${fileManagerName()}から追加してください`,
-            `${skipped} folders not added; add them in ${fileManagerName()}`,
           ),
       ]
         .filter(Boolean)
@@ -1830,17 +1843,29 @@ function App() {
         setNewNote(true);
       }
     },
-    bringIn: (space: Space, directory: string, files?: File[], skipped = 0) => {
-      if (!files) {
+    bringIn: (space: Space, directory: string, items?: Promise<Brought[]>) => {
+      if (!items) {
         // The system's file dialog; the chosen files come back through the picker below.
         picking.current = { space, directory };
         picker.current?.click();
         return;
       }
-      void organize(() => bringIn(space, directory, files, skipped)).catch((error) => {
-        bump(space.scopeId);
-        report(error);
-      });
+      void (async () => {
+        let read: Brought[];
+        try {
+          read = await items;
+        } catch (error) {
+          throw error instanceof TooManyFiles
+            ? Error(
+                t(
+                  `一度に追加できるのは ${broughtFileLimit} ファイルまでです。${fileManagerName()}から追加してください。`,
+                  `Up to ${broughtFileLimit} files can be added at once; add more in ${fileManagerName()}.`,
+                ),
+              )
+            : error;
+        }
+        if (read.length) await organize(() => bringIn(space, directory, read));
+      })().catch(report);
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
       setEntryAction({ space, entry, action }),
@@ -1927,7 +1952,7 @@ function App() {
     () =>
       active && {
         create: (directory, kind) => act.createIn(active, directory, kind),
-        bringIn: (directory, files, skipped) => act.bringIn(active, directory, files, skipped),
+        bringIn: (directory, items) => act.bringIn(active, directory, items),
         act: (entry, action) => act.entryAction(active, entry, action),
         moveInto: (entry, directory) => act.moveInto(active, entry, directory),
         reveal: (path) => act.reveal(active, path),
@@ -3297,7 +3322,12 @@ function App() {
           const target = picking.current;
           const chosen = [...(event.target.files ?? [])];
           event.target.value = '';
-          if (target && chosen.length) act.bringIn(target.space, target.directory, chosen);
+          if (target && chosen.length)
+            act.bringIn(
+              target.space,
+              target.directory,
+              Promise.resolve(chosen.map((file) => ({ name: file.name, file }))),
+            );
         }}
       />
       {newEntry && (

@@ -107,6 +107,18 @@ test('A file brought in keeps its bytes and takes a free name beside one it woul
     bytes,
   );
   assert.equal(await freeName(path.join(root, 'Knowledge_Base'), 'README'), 'README');
+  // A folder brought in keeps both too; a new one refuses the taken name.
+  await files.createEntry(id, 'Knowledge_Base', { kind: 'folder', name: '資料' });
+  const folder = await files.createEntry(id, 'Knowledge_Base', {
+    kind: 'folder',
+    name: '資料',
+    brought: true,
+  });
+  assert.equal(folder.path, 'Knowledge_Base/資料 2');
+  await assert.rejects(
+    files.createEntry(id, 'Knowledge_Base', { kind: 'folder', name: '資料' }),
+    /同じ名前/,
+  );
 });
 
 test('Moving a knowledge folder carries the links, comments, drafts and note places that name it', async (t) => {
