@@ -24,6 +24,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { EntryMenu, ExplorerItems, type Explorer } from './EntryActions';
 import { parentPath } from '../domain/paths';
+import { readDropped } from './dropped';
 import { Icon, type IconName } from './Icon';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { layoutStorage } from './device-settings';
@@ -124,36 +125,48 @@ export function Tree({
       return dragged?.scopeId === space.scopeId && dragged.entry.layer === layer;
     return types.includes('Files');
   };
+  // A closed folder held under a drag opens, so a drop can reach the folders inside.
+  const opening = useRef<{ path: string; timer: number }>(undefined);
+  const openLater = (path?: string) => {
+    if (opening.current?.path === path) return;
+    if (opening.current) clearTimeout(opening.current.timer);
+    opening.current =
+      path === undefined
+        ? undefined
+        : {
+            path,
+            timer: window.setTimeout(() => {
+              opening.current = undefined;
+              expand(path);
+            }, 700),
+          };
+  };
   const dragOver = (event: DragEvent, folder: string) => {
     if (!explorer || !accepts(event)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = event.dataTransfer.types.includes(entryDrag) ? 'move' : 'copy';
     if (drop.over !== folder) drop.setOver(folder);
+    openLater(folder !== directory && !expanded.includes(folder) ? folder : undefined);
   };
   function dropInto(event: DragEvent, folder: string) {
     if (!explorer || !accepts(event)) return;
     event.preventDefault();
     event.stopPropagation();
     drop.setOver(undefined);
+    openLater(undefined);
     if (event.dataTransfer.types.includes(entryDrag)) {
       const source = dragged?.entry;
       dragged = undefined;
       if (!source || parentPath(source.path) === folder) return;
       explorer.moveInto(source, folder);
     } else {
-      const files: File[] = [];
-      let skipped = 0;
-      for (const item of event.dataTransfer.items) {
-        if (item.kind !== 'file') continue;
-        // A folder from the file manager arrives as a File too; only its entry tells.
-        if (item.webkitGetAsEntry()?.isDirectory) skipped++;
-        else {
-          const file = item.getAsFile();
-          if (file) files.push(file);
-        }
-      }
-      if (files.length || skipped) explorer.bringIn(folder, files, skipped);
+      // The entries are taken during the drop; what they hold is read after it.
+      const entries = [...event.dataTransfer.items]
+        .filter((item) => item.kind === 'file')
+        .map((item) => item.webkitGetAsEntry() ?? item.getAsFile())
+        .filter((entry) => entry !== null);
+      if (entries.length) explorer.bringIn(folder, readDropped(entries));
     }
     if (folder !== directory) expand(folder);
   }
@@ -164,9 +177,9 @@ export function Tree({
       if (folder !== directory) expand(folder);
       explorer.create(folder, kind);
     },
-    bringIn: (folder, files, skipped) => {
+    bringIn: (folder, items) => {
       if (folder !== directory) expand(folder);
-      explorer.bringIn(folder, files, skipped);
+      explorer.bringIn(folder, items);
     },
   };
   const levelMenu = menu && (

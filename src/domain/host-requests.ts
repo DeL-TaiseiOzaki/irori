@@ -170,7 +170,9 @@ export const hostArguments = {
     id,
     path,
     z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('folder'), name: entryName }).strict(),
+      z
+        .object({ kind: z.literal('folder'), name: entryName, brought: z.boolean().optional() })
+        .strict(),
       z
         .object({
           kind: z.literal('file'),

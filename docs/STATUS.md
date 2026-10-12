@@ -12,6 +12,14 @@ by release run `38206579080` from main's successful CI run `38205671421`
   The website manifest now offers 0.2.1.
 - Not profiled. Not tried with real CLIs, on Windows or on macOS.
 
+Folder drops, 2026-10-12 (**0.2.3**, not yet published; 0.2.2 was merged as
+`d07c2d8` but its release dispatch was refused by the session's permission
+check, so 0.2.3 carries it): the owner asked for drag-and-drop uploads into
+Knowledge and Contents. `src/app/dropped.ts` reads dropped folders whole
+(hidden entries skipped, 2,000 files per drop); a brought-in folder takes a free
+name like a file; a closed folder opens after 700 ms under a drag; the status
+line counts progress.
+
 Explorer as a file manager, 2026-10-12 (**0.2.2**, not yet published): the
 owner asked for Knowledge and Contents to make folders and any file, as
 Explorer or Finder do ([ADR 036](decisions/036-explorer-as-file-manager.md)).
