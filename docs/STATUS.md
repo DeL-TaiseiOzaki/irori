@@ -1,6 +1,37 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Faster publishing, 2026-10-12 (**0.2.4**, not yet published): the owner asked
+Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222),
+whole folders dropped from the file manager) merged at the owner's request as
+`e76f209`. It is the first preview published by `publish.yml` with no hand
+dispatch: run `38249205721` (after main's CI `38248567494`) released
+[v0.2.5-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.5-preview.1),
+deployed the page with a generated manifest and ran the drift check, in step.
+- Merge 12:21:52 UTC, main's CI done 12:28:03 (6:09 with packaging beside
+  verify), release public 12:29:47 (7:55), page 12:31:33 (9:41).
+- The faster path missed: the push's own run `38248567848` failed in `decide`
+  two seconds after the merge. The pull request lookup exited 1 and its reason
+  was lost in `$(...)`; the same lookup found run `38246931584` a minute later.
+  [#225](https://github.com/DeL-TaiseiOzaki/irori/pull/225) prints the reason,
+  asks three times and otherwise leaves the release to main's run.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,212,992 bytes,
+  Mac 141,851,762 bytes and `irori-0.2.5-full.nupkg` 175,382,539 bytes.
+- Not tried on Windows or macOS or with a real file manager drop.
+
+Published 2026-10-12: **0.2.4** ([#223](https://github.com/DeL-TaiseiOzaki/irori/pull/223),
+faster publishing; it also carries 0.2.2's explorer changes, never published on
+their own) merged at the owner's request as `37408d9`. It is published as
+[v0.2.4-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.4-preview.1)
+by release run `38245938880` from the pull request's run `38244393093`, whose
+test merge had `37408d9`'s tree, without waiting for main's run. Website run
+`38246213364` generated the manifest; drift run `38246439692` is in step.
+- Merge 11:56:34 UTC, release public 11:58:26 (1:52), page deployed 12:00:53
+  (4:19), against 14 and 31 minutes for 0.2.0 and 0.2.1. Both dispatches were
+  by hand; the owner had `IRORI_AUTO_PUBLISH=on` set afterwards (12:19 UTC).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,214,016 bytes,
+  Mac 141,851,385 bytes and `irori-0.2.4-full.nupkg` 175,382,046 bytes.
+- Not tried on Windows or macOS.
+
+Faster publishing, 2026-10-12 (**0.2.4**): the owner asked
 why a release took so long after a merge. Measured on 0.2.0 and 0.2.1: about 31
 minutes from merge to the page (14 to the release). 24 of those were two more
 runs of `app.yml`: `main` rebuilding the source its pull request had already
@@ -12,8 +43,8 @@ request. Changes, with the owner's agreement on all four:
   (`website/manifest.ts`); no manifest pull request.
 - `app.yml` packages alongside verify, and no longer cancels `main`'s runs.
 - `publish.yml` publishes a due merge by itself (release, page, drift check)
-  once the owner sets the repository variable `IRORI_AUTO_PUBLISH=on`. The owner
-  reviews its write permissions before merging.
+  once the repository variable `IRORI_AUTO_PUBLISH` is `on`. The owner
+  reviewed its write permissions and approved the merge.
 - `release-policy.ts due` reports whether a commit is due a release. The list
   of paths that do not ship gained only `scripts/release-source.ts`, release
   tooling the build never reads.
@@ -33,14 +64,14 @@ by release run `38206579080` from main's successful CI run `38205671421`
   The website manifest now offers 0.2.1.
 - Not profiled. Not tried with real CLIs, on Windows or on macOS.
 
-Folder drops, 2026-10-12 (**0.2.5**, not yet published; written as 0.2.3 and
+Folder drops, 2026-10-12 (**0.2.5**, published; written as 0.2.3 and
 renumbered after 0.2.4 was published, carrying 0.2.2's changes): the owner asked for drag-and-drop uploads into
 Knowledge and Contents. `src/app/dropped.ts` reads dropped folders whole
 (hidden entries skipped, 2,000 files per drop); a brought-in folder takes a free
 name like a file; a closed folder opens after 700 ms under a drag; the status
 line counts progress.
 
-Explorer as a file manager, 2026-10-12 (**0.2.2**, not yet published): the
+Explorer as a file manager, 2026-10-12 (**0.2.2**, published with 0.2.4): the
 owner asked for Knowledge and Contents to make folders and any file, as
 Explorer or Finder do ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - One menu (right click or ⋯) makes notes, files and folders, brings files in,

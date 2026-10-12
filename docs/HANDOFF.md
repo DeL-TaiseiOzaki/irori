@@ -1,5 +1,33 @@
 # irori continuation handoff
 
+**Publishing a preview, from 0.2.4** ([DISTRIBUTION](DISTRIBUTION.md#how-the-rule-is-held)).
+`IRORI_AUTO_PUBLISH=on` is set, so merging a pull request that ships publishes
+it by itself through `publish.yml`: release, page with a generated manifest,
+drift check. Do not dispatch `release.yml` or `website.yml` by hand for it, and
+do not open a manifest pull request. After a merge:
+1. Watch the `publish.yml` run of the merge. The `push` run uses the pull
+   request's packages when the trees match; otherwise the `workflow_run` run
+   publishes after main's CI.
+2. Download the three files anonymously and check them against
+   `SHA256SUMS.txt`.
+3. Record the release in STATUS and HANDOFF.
+If a run fails, read its log, fix the cause, and publish by hand:
+`release.yml` with a qualifying run id (`dry_run=true` first if unsure), then
+`website.yml`. A ship-affecting PR still needs a version above the latest
+published preview, and two open ones need distinct versions: renumber the later
+one after the first is published. main's `app.yml` runs are no longer cancelled,
+so pushing to main during a release is safe.
+
+Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222))
+as `e76f209`, the first preview `publish.yml` published by itself (run
+`38249205721`, after main's CI): merge to page 9:41. The push's own run failed
+in `decide`; [#225](https://github.com/DeL-TaiseiOzaki/irori/pull/225) fixes it.
+Downloads verified. See STATUS.
+
+Published 2026-10-12: **0.2.4** ([#223](https://github.com/DeL-TaiseiOzaki/irori/pull/223),
+faster publishing, with 0.2.2's explorer changes) as `37408d9`, by hand from the
+pull request's run: merge to page 4:19. Downloads verified. See STATUS.
+
 Published 2026-10-12: **0.2.1** ([#217](https://github.com/DeL-TaiseiOzaki/irori/pull/217),
 less work behind the same screens: composer typing, irori mode streaming, one
 bridge subscription for the renderer's listeners; nothing on screen changes)
@@ -1359,4 +1387,4 @@ The owner authorized development, verification, feature-branch commit/push and P
 
 The old VM preview may still be running older code. `.local/vm-preview/samples` and `.local/vm-preview/device` contain untracked user data: preserve them and do not reset/delete them. This checkpoint did not restart that preview. `.local/publication/`, `.local/rclone/`, `.local/downloads/`, `out/` and `test-results/` hold ignored tools/test artifacts, including a synthetic-client local package; publish only the verified CI artifact for the exact intended commit. The anonymous download checker is `.local/publication/check-site.mjs`, not a tracked production dependency.
 
-Desktop CI creates temporary engineering artifacts; it does not publish releases or Pages. Website deployment is manual via `.github/workflows/website.yml`. A new published installer requires a distinct version, verified native bytes, notes/checksums, the matching manifest, and anonymous delivery verification. Keep live Google client values, account tokens, authorization URLs, user notes and transcripts out of tracked evidence.
+Desktop CI creates temporary engineering artifacts; it does not publish releases or Pages. Since 0.2.4, `publish.yml` publishes a merged preview and its website by itself; see the top of this file and DISTRIBUTION. A new published installer requires a distinct version, verified native bytes, notes/checksums, the matching manifest, and anonymous delivery verification. Keep live Google client values, account tokens, authorization URLs, user notes and transcripts out of tracked evidence.
