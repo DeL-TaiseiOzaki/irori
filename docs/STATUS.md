@@ -1,6 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Faster publishing, 2026-10-12 (**0.2.4**, not yet published): the owner asked
+Published 2026-10-12: **0.2.4** ([#223](https://github.com/DeL-TaiseiOzaki/irori/pull/223),
+faster publishing; it also carries 0.2.2's explorer changes, never published on
+their own) merged at the owner's request as `37408d9`. It is published as
+[v0.2.4-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.4-preview.1)
+by release run `38245938880` from the pull request's run `38244393093`, whose
+test merge had `37408d9`'s tree, without waiting for main's run. Website run
+`38246213364` generated the manifest; drift run `38246439692` is in step.
+- Merge 11:56:34 UTC, release public 11:58:26 (1:52), page deployed 12:00:53
+  (4:19), against 14 and 31 minutes for 0.2.0 and 0.2.1. Both dispatches were
+  by hand; `IRORI_AUTO_PUBLISH` is not set.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,214,016 bytes,
+  Mac 141,851,385 bytes and `irori-0.2.4-full.nupkg` 175,382,046 bytes.
+- Not tried on Windows or macOS.
+
+Faster publishing, 2026-10-12 (**0.2.4**): the owner asked
 why a release took so long after a merge. Measured on 0.2.0 and 0.2.1: about 31
 minutes from merge to the page (14 to the release). 24 of those were two more
 runs of `app.yml`: `main` rebuilding the source its pull request had already
@@ -33,7 +47,7 @@ by release run `38206579080` from main's successful CI run `38205671421`
   The website manifest now offers 0.2.1.
 - Not profiled. Not tried with real CLIs, on Windows or on macOS.
 
-Explorer as a file manager, 2026-10-12 (**0.2.2**, not yet published): the
+Explorer as a file manager, 2026-10-12 (**0.2.2**, published with 0.2.4): the
 owner asked for Knowledge and Contents to make folders and any file, as
 Explorer or Finder do ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - One menu (right click or ⋯) makes notes, files and folders, brings files in,
