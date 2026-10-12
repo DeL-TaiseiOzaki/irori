@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
 import {
@@ -106,7 +106,7 @@ export function PageProperties({
   const [problem, setProblem] = useState('');
   const [adding, setAdding] = useState('');
   const declaration = declared?.declaration ?? null;
-  const parsed = parseProperties(yaml);
+  const parsed = useMemo(() => parseProperties(yaml), [yaml]);
   const values = parsed.values;
 
   function set(path: string[], value: YamlValue | undefined) {

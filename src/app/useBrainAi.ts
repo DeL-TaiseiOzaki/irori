@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { AgentEvent, AgentId } from '../domain/types';
 import {
-  appendConversationEvent,
+  appendConversationEvents,
   lastIndex,
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
 import { requestEnded, runTasks } from '../domain/agent-log';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 
 const host = window.irori;
 
@@ -53,6 +54,33 @@ export function useBrainAi(
     let current = true;
     let shown = conversationId;
     let controlRevision = 0;
+    // Streamed events join the state once per frame; a window without frames (hidden
+    // or throttled) takes them within a moment, and on its return.
+    let pending: AgentEvent[] = [];
+    let frame: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flush = () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      frame = timer = undefined;
+      if (!pending.length) return;
+      const batch = pending;
+      pending = [];
+      setState((previous) => ({
+        ...previous,
+        running: true,
+        events: appendConversationEvents(previous.events, batch).slice(-120),
+      }));
+    };
+    const schedule = () => {
+      if (frame !== undefined || timer !== undefined) return;
+      if (!document.hidden) frame = requestAnimationFrame(flush);
+      timer = setTimeout(flush, 250);
+    };
+    const onVisible = () => {
+      if (!document.hidden) flush();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     void (async () => {
       while (current) {
         const before = controlRevision;
@@ -62,6 +90,8 @@ export function useBrainAi(
         // ordinary fragments must not restart a full-history read indefinitely.
         if (before !== controlRevision) continue;
         shown = value.id;
+        // Events taken in while it was read land first and give way to it, as they did one by one.
+        flush();
         setState({
           id: value.id,
           agent: value.summary?.agent,
@@ -77,7 +107,7 @@ export function useBrainAi(
     })().catch(
       (error) => current && setState((previous) => ({ ...previous, error: errorText(error) })),
     );
-    const stop = host.onEvent((event) => {
+    const stop = hostEvents.onEvent((event) => {
       if (event.type !== 'agent') return;
       const incoming = event.event;
       if (incoming.scopeId !== scopeId) return;
@@ -85,21 +115,23 @@ export function useBrainAi(
       // A run of another conversation shows here only when it is the owner's on show.
       if (incoming.type === 'done' || incoming.role === 'user') {
         controlRevision++;
+        // What arrived before it lands first, in the order it came.
+        flush();
         setReread((value) => value + 1);
       } else if (!conversationId && shown && incoming.conversationId !== shown) return;
       else {
         if (incoming.type === 'permission' || incoming.type === 'question' || incoming.resolved)
           controlRevision++;
-        setState((previous) => ({
-          ...previous,
-          running: true,
-          events: appendConversationEvent(previous.events, incoming).slice(-120),
-        }));
+        pending.push(incoming);
+        schedule();
       }
     });
     return () => {
+      // Events taken in before the next read still land, as they did one by one.
+      flush();
       current = false;
       stop();
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [scopeId, agent, refresh, reread, conversationId, workspaceId]);
   return state;

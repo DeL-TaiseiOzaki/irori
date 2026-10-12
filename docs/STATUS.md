@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Lighter without UI change, 2026-10-12 (**0.1.100**): the owner asked for safe
+speed-ups that change nothing on screen. Three code-reading audits (renderer,
+host, agents) and an independent risk review chose these:
+- App reads the vault composer's draft without subscribing (`useDraft(..., { watch: false })`),
+  so typing re-renders only the column.
+- `useBrainAi` applies streamed events once per frame. A snapshot or a `done`
+  takes the held events first, as one-by-one updates did.
+- `src/domain/event-hub.ts` makes one `onEvent` subscription across the bridge
+  for the renderer's listeners. `UpdateNotice` keeps its injected host.
+- Smaller fixes: `PageEditor` splits the page once, `PageProperties` memoises
+  its parse, there is one shared `Intl.Segmenter`, and startup validation
+  resolves each vault's contents once.
+
+Considered and left out as unsafe or not worth it:
+- A smaller host snapshot window: it moves requests whose status line falls
+  outside 400 events.
+- Recursive `fs.watch` instead of chokidar: event delivery differs on
+  macOS/Windows, which CI does not run.
+- Throttled editor serialisation: it reintroduces the quick save/undo race.
+- Skipping `ps` in `killTree` for an exited child: it leaks detached
+  grandchildren.
+- Fewer fsyncs for conversations and drafts: durability after power loss.
+- git status memoisation, keeping the search index open, the routines review
+  cache, an IPC trust memo, and the `MagnetTabs`/map animation changes, whose
+  timing could differ slightly.
+
+Nothing was profiled.
 Published 2026-10-12: **0.2.0** ([#216](https://github.com/DeL-TaiseiOzaki/irori/pull/216),
 a vault's knowledge folder can be its root, [ADR 035](decisions/035-knowledge-at-the-vault-root.md))
 merged at the owner's request as `23d9748`. The owner chose this release to

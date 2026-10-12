@@ -6,6 +6,7 @@ import type { Space, TerminalEvent, TerminalSession, TerminalShell } from '../do
 import { Icon } from './Icon';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 
 const host = window.irori;
 
@@ -80,7 +81,7 @@ export default function TerminalPanel({
         session.current = undefined;
       }
     };
-    const unsubscribe = host.onEvent((message) => {
+    const unsubscribe = hostEvents.onEvent((message) => {
       if (message.type !== 'terminal') return;
       if (!current) early.push(message.event);
       else receive(message.event);

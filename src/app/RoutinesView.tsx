@@ -20,6 +20,7 @@ import { AgentRequest } from './AgentLog';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
+import { hostEvents } from './host-events';
 import { Icon } from './Icon';
 import { chooseRoutineRuntimes, currentRoutineRuntimes } from './device-settings';
 import { openRequest, useBrainAi } from './useBrainAi';
@@ -767,7 +768,7 @@ export function RoutinesView({
   const [editing, setEditing] = useState<{ ref: RoutineRef; name: string; path?: string }>();
   useEffect(
     () =>
-      host.onEvent((event) => {
+      hostEvents.onEvent((event) => {
         if (event.type !== 'routine') return;
         const key = routineKey(event.run.routine);
         setLive((all) => ({ ...all, [key]: event.run }));
