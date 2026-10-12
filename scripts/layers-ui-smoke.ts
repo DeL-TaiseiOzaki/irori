@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { FileService } from '../src/host/files';
 import type { Category } from '../src/domain/types';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori layers '));
 const files = new FileService(path.join(base, 'device'));
@@ -55,6 +56,7 @@ for (const [name, category] of [
     ]),
   );
 }
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

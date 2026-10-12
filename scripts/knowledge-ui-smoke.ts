@@ -6,6 +6,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
 import { pendingWrite } from '../src/domain/knowledge';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Real disposable files and persisted records; no provider/model process is started.
 const base = await mkdtemp(path.join(tmpdir(), 'irori records UI '));
@@ -67,6 +68,7 @@ const unrelated = await store.begin(randomUUID(), {
 });
 await store.finish(unrelated, 'completed');
 await rename(path.join(root, '資料.md'), path.join(root, '移動先.md'));
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const launch = () =>

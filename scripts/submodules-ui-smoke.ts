@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // A vault holding another repository as a submodule (ADR 022): it is added from
 // Source control, edited, committed and pushed in its own repository, recorded
@@ -54,6 +55,7 @@ for (const [key, value] of [
   ['commit.gpgsign', 'false'],
 ])
   git(base, 'config', '--file', globalConfig, key, value);
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   IRORI_DATA_DIR: files.dataDir,

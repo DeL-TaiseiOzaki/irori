@@ -6,6 +6,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { fakeGh, git, remote } from '../tests/fixtures/github';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The environment kept on the GitHub account (ADR 026): one device saves its
 // vaults, workspaces and preferences from the start screen's settings, before
@@ -45,7 +46,7 @@ const filesA = new FileService(path.join(base, 'device-a'));
 await filesA.init();
 const research = await filesA.register(checkout, 'Research', 'personal');
 await new WorkspaceService(filesA).save('Lab', [research.scopeId]);
-await new SettingsService(filesA.dataDir).save({ theme: 'dark' });
+await new SettingsService(filesA.dataDir).save({ theme: 'dark', language: 'ja' });
 
 const launch = (data: string, home: string) => {
   const env = {
@@ -93,7 +94,8 @@ try {
   if (JSON.stringify(saved).includes(base)) throw Error('A device path reached GitHub');
   await app.close();
 
-  // Device B starts empty and restores from the start screen.
+  // Device B starts empty and restores from the start screen, read in Japanese like device A.
+  await chooseJapanese(path.join(base, 'device-b'));
   app = await launch(path.join(base, 'device-b'), homeB);
   page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));

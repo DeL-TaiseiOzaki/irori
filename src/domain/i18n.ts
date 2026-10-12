@@ -11,6 +11,8 @@
 export const languages = ['ja', 'en'] as const;
 export type Language = (typeof languages)[number];
 
+// The source text until the device setting is applied. A device's own default is English
+// (ADR 011); the host and the renderer set it from the device record before showing anything.
 let current: Language = 'ja';
 const listeners = new Set<() => void>();
 

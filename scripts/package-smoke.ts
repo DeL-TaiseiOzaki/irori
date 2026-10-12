@@ -202,7 +202,8 @@ try {
   >;
   // The packaged run exercises the vault agent, which is off until turned on (ADR 021).
   await mkdir(env.IRORI_DATA_DIR, { recursive: true });
-  await new SettingsService(env.IRORI_DATA_DIR).save({ vaultAgent: true });
+  // The checks below read the interface in Japanese; a new device starts in English (ADR 011).
+  await new SettingsService(env.IRORI_DATA_DIR).save({ vaultAgent: true, language: 'ja' });
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_PATH;
   delete env.NODE_OPTIONS;

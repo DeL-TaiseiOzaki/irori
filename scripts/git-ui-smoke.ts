@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import type { Space } from '../src/domain/types';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 async function checkUnrelatedFileEvent(
   app: ElectronApplication,
@@ -312,6 +313,7 @@ esac
 await chmod(path.join(ghBin, 'gh'), 0o755);
 const ghCalls = async () =>
   (await readFile(ghLog, 'utf8').catch(() => '')).split('\n').filter(Boolean);
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   IRORI_DATA_DIR: files.dataDir,

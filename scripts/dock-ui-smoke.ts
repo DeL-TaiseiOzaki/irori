@@ -4,6 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // ADR 021: the vault agent and the Schema layer are optional, and the agent dock
 // shows conversations side by side beside the page, or without it.
@@ -16,6 +17,7 @@ const files = new FileService(path.join(base, 'device'));
 await files.init();
 const space = await files.register(root, 'Research', 'personal');
 await new WorkspaceService(files).save('Lab', [space.scopeId]);
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors: string[] = [];

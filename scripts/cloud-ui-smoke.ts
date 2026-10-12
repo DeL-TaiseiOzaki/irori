@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Folders on this computer, shown in contents through a link (ADR 019), and Google
 // Drive connections from before 0.1.67, which irori no longer makes itself (ADR 023).
@@ -91,6 +92,7 @@ const research = path.join(base, 'Dropbox', '研究');
 for (const folder of [drive, research]) await mkdir(folder, { recursive: true });
 await writeFile(path.join(drive, 'memo.md'), '# 共有メモ\n');
 await writeFile(path.join(research, 'memo.md'), '# 研究メモ\n');
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const launch = () =>

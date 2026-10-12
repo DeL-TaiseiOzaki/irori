@@ -6,6 +6,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { YourAiService } from '../src/host/you';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // irori mode's threads (ADR 034): the irori agent's conversations run side by side
 // in columns, a closed column's run goes on in a tab, each workspace keeps its own
@@ -77,6 +78,7 @@ const second = await workspaces.save('Second', [ids.Beta]);
 const bin = path.join(base, 'bin');
 await mkdir(bin);
 await writeFile(path.join(bin, 'codex'), codexFixture, { mode: 0o700 });
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   HOME: home,

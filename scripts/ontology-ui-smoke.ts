@@ -5,6 +5,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { ontologyFixture as fixture } from '../tests/fixtures/ontology';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori ontology UI 日本語 '));
 const root = path.join(base, 'Knowledge');
@@ -55,6 +56,7 @@ for (const [relative, text] of [
   ['Knowledge_Base/wiki/監視.md', pageText('concept', '監視')],
 ])
   await bundlePage(relative, text);
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

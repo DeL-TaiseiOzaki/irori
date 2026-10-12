@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { AuthorshipStore } from '../src/knowledge/authorship';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Real disposable notes linking to each other by relative path, as the recommended
 // knowledge base writes them. No provider or model process is started.
@@ -27,6 +28,7 @@ await new AuthorshipStore(files.dataDir).observe(
   '# 到着点\n',
   '',
 );
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

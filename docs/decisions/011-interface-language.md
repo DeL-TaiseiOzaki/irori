@@ -1,20 +1,26 @@
 # 011 — Interface language: Japanese or English
 
-Date: 2026-09-25. Status: owner request accepted and implemented for 0.1.33.
+Date: 2026-09-25. Status: owner request accepted and implemented for 0.1.33;
+default changed to English for 0.2.6 (2026-10-12).
 
 ## Decision
 
 The owner asked for the system language to be selectable between English and
 Japanese. The interface now has a device setting, `language`, with the values
-`ja` and `en`. Japanese stays the default, so existing installations and every
-test that names an element by its Japanese text behave as before.
+`ja` and `en`. A new device starts in English (0.2.6; it was Japanese before).
+Every save writes the whole device record, language included, so an
+installation that has saved anything keeps its language. A damaged record falls
+back to every default, so it now reads in English. Japanese stays the
+source text: `src/domain/i18n.ts` holds it until the device setting is applied,
+and the UI smokes choose Japanese for their test device
+(`tests/fixtures/japanese-interface.ts`).
 
 - **Where it is chosen.** The display settings menu, beside theme and Markdown
   font, lists **日本語** and **English**, each named in its own language. The
   choice is kept in the device record with the other display settings, not in a
   knowledge base. The startup screen has no rail, so its footer offers the other
   language as one button named in that language (added 2026-10-02 for 0.1.64);
-  without it a first launch could only be read in Japanese.
+  without it a first launch could only be read in the default language.
 - **Applying it.** The renderer re-renders from the application root when the
   language changes, so the switch is immediate and keeps component state, open
   notes and drafts. The host sets its own copy when the setting is saved, so its

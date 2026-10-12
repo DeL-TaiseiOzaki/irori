@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The explorer as a file manager: folders and files of any kind in knowledge and in a
 // connected folder, renamed, moved by dragging and deleted, with links following.
@@ -30,6 +31,7 @@ await new CloudService(files).addLocal({
   access: 'read-write',
 });
 
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
