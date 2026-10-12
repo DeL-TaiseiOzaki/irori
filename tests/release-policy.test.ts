@@ -4,7 +4,13 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { checkDrift, checkPullRequest, latestPreview, shipped } from '../scripts/release-policy';
+import {
+  checkDrift,
+  checkDue,
+  checkPullRequest,
+  latestPreview,
+  shipped,
+} from '../scripts/release-policy';
 
 test('Only paths that cannot reach the package are exempt from a release', () => {
   for (const file of [
@@ -33,6 +39,8 @@ test('Only paths that cannot reach the package are exempt from a release', () =>
     'scripts/package-smoke.ts',
     'scripts/real-agents.ts',
     'scripts/release-policy.ts',
+    'scripts/release-source.ts',
+    'website/manifest.ts',
     'scripts/start.mjs',
     '.github/workflows/release.yml',
     'README.md',
@@ -178,4 +186,31 @@ test('Drift counts from the first shipped change main holds beyond the latest re
   await r.write('src/a.ts', 'export const a = 1;\n');
   r.commit('Revert code', r.at(5));
   assert.equal(checkDrift(r.root, 'main', shippedAt + 600 * 60000, 60).outputs.state, 'in-sync');
+});
+
+test('Automatic publishing acts only on a shipped change main can publish', async (t) => {
+  const r = await repository(t);
+  await r.write('docs/STATUS.md', 'docs after the release\n');
+  r.commit('Docs only');
+  const quiet = checkDue(r.root, 'main');
+  assert.equal(quiet.ok, true);
+  assert.equal(quiet.outputs.due, 'false');
+
+  // A shipped change without a version cannot be published; the run must say so, not skip it.
+  await r.write('src/a.ts', 'export const a = 7;\n');
+  r.commit('Code');
+  const stuck = checkDue(r.root, 'main');
+  assert.equal(stuck.ok, false);
+  assert.equal(stuck.outputs.due, 'false');
+  assert.match(stuck.lines.join('\n'), /0\.1\.0-preview\.1` is already published/);
+
+  await r.version('0.1.1');
+  await r.write('docs/releases/0.1.1-preview.1.md', '# irori 0.1.1 — fixture\n');
+  r.commit('Version');
+  const due = checkDue(r.root, 'main');
+  assert.equal(due.ok, true, due.lines.join('\n'));
+  assert.deepEqual(due.outputs, { due: 'true', tag: 'v0.1.1-preview.1' });
+
+  r.git('tag', 'v0.1.1-preview.1');
+  assert.equal(checkDue(r.root, 'main').outputs.due, 'false');
 });

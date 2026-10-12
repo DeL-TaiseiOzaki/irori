@@ -1,8 +1,9 @@
 name: Publish desktop prerelease
 
-# Publishing stays explicit: nothing here runs on a push. A maintainer names the
-# verification run whose artifacts are published, so the release always carries
-# bytes that a package job already tested, never a rebuild made for the release.
+# A maintainer dispatches this with the verification run whose artifacts are published, or
+# publish.yml calls it after a merge. Either way the release carries bytes that a package job
+# already tested, never a rebuild made for the release. The run may be main's own, or the
+# merged pull request's when it packaged the very tree main received (scripts/release-source.ts).
 on:
   workflow_dispatch:
     inputs:
@@ -15,21 +16,38 @@ on:
       platforms:
         description: Installers to publish
         required: true
-        default: macos
+        default: both
         type: choice
         options: [macos, windows, both]
+      dry_run:
+        description: Check the run and stage the files without publishing
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      run_id:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      platforms:
+        type: string
+        default: both
+      dry_run:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: desktop-release
-  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    concurrency:
+      group: desktop-release
+      cancel-in-progress: false
     permissions:
       # Creating the release and uploading its assets is the only write this needs.
       contents: write
@@ -40,6 +58,9 @@ jobs:
           # main's tip, so any tested commit behind it, which is every commit whose
           # release notes are committed afterwards, fails as "not a valid commit".
           fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.21.0'
 
       - name: Resolve the named run
         id: source
@@ -49,24 +70,15 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          # A release must not be built from a failed, unrelated or rebuilt run.
-          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")
-          for field in status conclusion head_sha head_branch path; do
-            printf '%s=%s\n' "$field" "$(jq -r ".$field" <<<"$run")"
-          done
-          [ "$(jq -r .status <<<"$run")" = completed ] || { echo "::error::Run is not completed"; exit 1; }
-          [ "$(jq -r .conclusion <<<"$run")" = success ] || { echo "::error::Run did not succeed"; exit 1; }
-          [ "$(jq -r .path <<<"$run")" = .github/workflows/app.yml ] || { echo "::error::Not a verify and package run"; exit 1; }
-          sha=$(jq -r .head_sha <<<"$run")
-          # The published bytes must come from a commit that is actually on main.
+          # A release must not be built from a failed, unrelated or rebuilt run, nor from
+          # source other than a commit on main.
           git fetch --no-tags origin main
-          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha is not on main"; exit 1; }
+          node scripts/release-source.ts resolve "$RUN_ID"
           case "$TAG" in
             v[0-9]*.[0-9]*.[0-9]*-preview.[0-9]*) ;;
             *) echo "::error::Tag must look like v0.0.0-preview.0"; exit 1 ;;
           esac
           if gh release view "$TAG" >/dev/null 2>&1; then echo "::error::$TAG already exists"; exit 1; fi
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Collect the tested installers
         id: assets
@@ -74,7 +86,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ inputs.run_id }}
           PLATFORMS: ${{ inputs.platforms }}
-          SHA: ${{ steps.source.outputs.sha }}
+          BUILT: ${{ steps.source.outputs.built }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p staged
@@ -99,10 +112,12 @@ jobs:
           publish_one() {
             local platform="$1" pattern="$2" suffix="$3" dir
             dir="artifact-$platform"
-            gh run download "$RUN_ID" -n "unsigned-irori-$platform-$SHA" -D "$dir"
+            gh run download "$RUN_ID" -n "unsigned-irori-$platform-$BUILT" -D "$dir"
             local evidence="$dir/test-results/package-smoke.json"
             local version
             version=$(jq -r .runtime.version "$evidence")
+            # The update check compares the tag with the running version, so they must agree.
+            [ "v$version" = "${TAG%-preview.*}" ] || { echo "::error::$platform packaged $version, not the version $TAG names"; exit 1; }
             # The engineering zip and Squirrel's RELEASES file are never published.
             stage "$dir" "$pattern" "irori-$version-$suffix"
             # An installed irori applies Squirrel's full package itself (docs/decisions/010).
@@ -122,11 +137,13 @@ jobs:
           sort -k2 -o staged/SHA256SUMS.txt staged/SHA256SUMS.txt
           ls -l staged
 
-      - name: Publish the prerelease
+      - name: Write the release notes
+        id: notes
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-          SHA: ${{ steps.source.outputs.sha }}
+          SHA: ${{ steps.source.outputs.commit }}
+          TREE: ${{ steps.source.outputs.tree }}
+          PULL_REQUEST: ${{ steps.source.outputs.pull_request }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ inputs.run_id }}
         run: |
           set -euo pipefail
@@ -142,17 +159,33 @@ jobs:
           {
             cat "$notes"
             printf '\n## Exact package\n\n'
-            printf -- '- Application source: `%s`. [CI](%s) verified and packaged exactly that commit; these files are its artifacts, renamed for download and otherwise unchanged.\n' "$SHA" "$RUN_URL"
+            if [ -n "$PULL_REQUEST" ]; then
+              printf -- '- Application source: `%s`. [CI](%s) verified and packaged pull request #%s merged into main, the same tree `%s` as that commit; these files are its artifacts, renamed for download and otherwise unchanged.\n' "$SHA" "$RUN_URL" "$PULL_REQUEST" "$TREE"
+            else
+              printf -- '- Application source: `%s`. [CI](%s) verified and packaged exactly that commit; these files are its artifacts, renamed for download and otherwise unchanged.\n' "$SHA" "$RUN_URL"
+            fi
             while read -r digest name; do
               printf -- '- `%s`: %s bytes, SHA-256 `%s`.\n' "$name" "$(stat -c%s "staged/$name")" "$digest"
             done < staged/SHA256SUMS.txt
             printf -- '- `SHA256SUMS.txt` and each platform'"'"'s package evidence are attached.\n'
           } > release-body.md
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+          cat release-body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the prerelease
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ steps.source.outputs.commit }}
+          TITLE: ${{ steps.notes.outputs.title }}
+        run: |
+          set -euo pipefail
           # A preview tag must be a prerelease: the update check skips a tag whose
           # prerelease flag disagrees with its name. The release stays a draft until every
           # file is uploaded: v0.1.29 was published one second after its last upload, and
           # GitHub's release list then served it without files for over half an hour.
-          gh release create "$TAG" --draft --target "$SHA" --prerelease --title "$title" --notes-file release-body.md staged/*
+          gh release create "$TAG" --draft --target "$SHA" --prerelease --title "$TITLE" --notes-file release-body.md staged/*
           expected=$(ls staged | wc -l)
           uploaded=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.state == "uploaded")] | length')
           [ "$uploaded" = "$expected" ] || { echo "::error::$uploaded of $expected files uploaded; $TAG stays a draft"; exit 1; }
@@ -161,6 +194,7 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size) \(.state)"'
 
       - name: Check what an installed irori sees
+        if: ${{ !inputs.dry_run }}
         env:
           TAG: ${{ inputs.tag }}
         run: |

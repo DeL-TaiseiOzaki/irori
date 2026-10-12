@@ -4,12 +4,14 @@ name: Keep main and the preview in step
 # changes what ships must already carry the version and notes it will be published with,
 # and main must not hold such a change unpublished for longer than the grace period.
 # scripts/release-policy.ts decides what ships. This file is not part of that set, so
-# changing it does not itself require a release.
+# changing it does not itself require a release. publish.yml also calls it once a release
+# and its page are out, so a drift left by automatic publishing shows at once.
 on:
   pull_request:
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

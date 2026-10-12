@@ -1,6 +1,6 @@
 # 036 — The explorer works as a file manager
 
-Date: 2026-10-12. Status: owner request; implemented for 0.2.2, folder drops for 0.2.3.
+Date: 2026-10-12. Status: owner request; implemented for 0.2.2, folder drops for 0.2.5.
 Extends [ADR 031](031-agents-use-what-irori-does.md) decision 3 (`irori move`).
 
 ## Context
@@ -23,7 +23,7 @@ Explorer or Finder does. Until 0.2.1:
    for an entry; and **Show in Finder** (Explorer, file manager). F2 renames and
    Delete deletes the focused row. Dragging a row onto a folder moves it there;
    files and folders dropped from the file manager are copied in, a folder with
-   everything inside it except hidden entries (0.2.3). A closed folder held
+   everything inside it except hidden entries (0.2.5). A closed folder held
    under a drag opens.
 2. **What may change.** In Knowledge, every file and folder except the
    knowledge folder itself, whose name belongs to the vault settings (ADR 024).

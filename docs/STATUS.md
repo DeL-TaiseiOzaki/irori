@@ -1,5 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Faster publishing, 2026-10-12 (**0.2.4**, not yet published): the owner asked
+why a release took so long after a merge. Measured on 0.2.0 and 0.2.1: about 31
+minutes from merge to the page (14 to the release). 24 of those were two more
+runs of `app.yml`: `main` rebuilding the source its pull request had already
+packaged (the trees were identical for 0.1.99 to 0.2.2), and the manifest pull
+request. Changes, with the owner's agreement on all four:
+- `release.yml` accepts the merged pull request's run when its test merge has
+  `main`'s exact tree (`scripts/release-source.ts`); otherwise `main`'s run.
+- `website.yml` writes `website/releases.json` from the published release
+  (`website/manifest.ts`); no manifest pull request.
+- `app.yml` packages alongside verify, and no longer cancels `main`'s runs.
+- `publish.yml` publishes a due merge by itself (release, page, drift check)
+  once the owner sets the repository variable `IRORI_AUTO_PUBLISH=on`. The owner
+  reviews its write permissions before merging.
+- `release-policy.ts due` reports whether a commit is due a release. The list
+  of paths that do not ship gained only `scripts/release-source.ts`, release
+  tooling the build never reads.
+- Verified by `npm run build`, `npm test` and dry runs of `release.yml` and
+  `website.yml` on the branch. The automatic path runs only from `main` and
+  cannot be tried before merge.
+
 Published 2026-10-12: **0.2.1** ([#217](https://github.com/DeL-TaiseiOzaki/irori/pull/217),
 less work behind the same screens: composer typing, irori mode streaming, one
 bridge subscription for the renderer's listeners; nothing on screen changes)
@@ -12,9 +33,8 @@ by release run `38206579080` from main's successful CI run `38205671421`
   The website manifest now offers 0.2.1.
 - Not profiled. Not tried with real CLIs, on Windows or on macOS.
 
-Folder drops, 2026-10-12 (**0.2.3**, not yet published; 0.2.2 was merged as
-`d07c2d8` but its release dispatch was refused by the session's permission
-check, so 0.2.3 carries it): the owner asked for drag-and-drop uploads into
+Folder drops, 2026-10-12 (**0.2.5**, not yet published; written as 0.2.3 and
+renumbered after 0.2.4 was published, carrying 0.2.2's changes): the owner asked for drag-and-drop uploads into
 Knowledge and Contents. `src/app/dropped.ts` reads dropped folders whole
 (hidden entries skipped, 2,000 files per drop); a brought-in folder takes a free
 name like a file; a closed folder opens after 700 ms under a drag; the status
