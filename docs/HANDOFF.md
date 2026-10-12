@@ -13,7 +13,7 @@ by release run `38158919978` from main's successful CI run `38158080226`
 - Owner checks remain: real Claude Code and Codex threads at once in irori
   mode, and whether one conversation still shows in every workspace.
 
-Knowledge at the vault's root, 2026-10-12 (**0.1.100**, [ADR 035](decisions/035-knowledge-at-the-vault-root.md)):
+Knowledge at the vault's root, 2026-10-12 (**0.2.0**, [ADR 035](decisions/035-knowledge-at-the-vault-root.md)):
 `knowledge: "."` in `.irori/scope.json` makes the vault's root its knowledge
 folder (`knowledgeFolder()` returns `''`; join and test paths with `inFolder`
 and `underFolder`). `irori layer <vault> knowledge .` and **vault のルート** in

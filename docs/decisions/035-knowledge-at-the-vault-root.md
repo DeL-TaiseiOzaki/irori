@@ -1,6 +1,6 @@
 # 035 — The vault's root can be its knowledge folder
 
-Date: 2026-10-12. Status: owner request; implemented for 0.1.100.
+Date: 2026-10-12. Status: owner request; implemented for 0.2.0.
 Extends [ADR 024](024-layer-names.md) decision 3 (the declared knowledge
 folder) and [ADR 028](028-generated-indexes.md) (the OKF bundle and its folder
 indexes).
@@ -72,7 +72,7 @@ and knowledge would then be separate repositories, and commits, links and
 - An existing vault moves with `irori layer <vault> knowledge .` or the
   settings; Git sees the moves as renames once committed.
 - irori-templete can lay its bundle out at the repository root. A vault made
-  from it must be registered with 0.1.100 or later to be recognised; an older
+  from it must be registered with 0.2.0 or later to be recognised; an older
   irori declares `Knowledge_Base` and shows the root pages as knowledge outside
   the knowledge folder.
 - Text in a vault's `AGENTS.md` or skills that names `Knowledge_Base/…` without
