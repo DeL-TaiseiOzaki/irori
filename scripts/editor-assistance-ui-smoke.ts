@@ -4,6 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Exercise the real desktop, editor views, settings and disposable KB. The IPC
 // wrapper only observes writes and injects one explicitly bounded save failure.
@@ -22,11 +23,16 @@ await writeFile(path.join(root, 'config.json'), json);
 await writeFile(path.join(root, 'note.md'), markdown);
 await new WorkspaceService(files).save('コード支援の検証', [space.scopeId]);
 const settingsFile = path.join(files.dataDir, 'device-settings.json');
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors: string[] = [];
 let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
 type Observation = { saves: number; drafts: number; forbidden: number; rejectSave: boolean };
+// The device reads in Japanese until the last launch, whose damaged record falls back to
+// every default, English included (ADR 011).
+let english = false;
+const L = (ja: string, en: string) => (english ? en : ja);
 
 async function launch() {
   app = await electron.launch({
@@ -40,7 +46,10 @@ async function launch() {
   page.on('pageerror', (error) => errors.push(String(error)));
   // Wrap the handler only after the first load, or the reload below aborts it.
   await expect(
-    page.getByRole('heading', { name: 'ワークスペースを選択', exact: true }),
+    page.getByRole('heading', {
+      name: L('ワークスペースを選択', 'Choose a workspace'),
+      exact: true,
+    }),
   ).toBeVisible();
   await app.evaluate(({ ipcMain }) => {
     type Handler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
@@ -90,9 +99,10 @@ async function close() {
   app = undefined;
 }
 // Code assistance is a checkbox in the note's menu, which stays open after it.
-const toggle = (page: Page) => page.getByRole('menuitemcheckbox', { name: 'コード支援' });
+const toggle = (page: Page) =>
+  page.getByRole('menuitemcheckbox', { name: L('コード支援', 'Code assistance') });
 async function inMenu(page: Page, act: () => Promise<void>) {
-  await page.getByRole('button', { name: 'その他', exact: true }).click();
+  await page.getByRole('button', { name: L('その他', 'More'), exact: true }).click();
   await act();
   await page.keyboard.press('Escape');
   await expect(toggle(page)).toHaveCount(0);
@@ -265,6 +275,7 @@ try {
   // record. This is a real host reload, not a renderer-local replacement value.
   const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
   await writeFile(settingsFile, JSON.stringify({ ...stored, editorAssistance: 'invalid' }));
+  english = true;
   page = await launch();
   await page
     .locator('.brain-panel')

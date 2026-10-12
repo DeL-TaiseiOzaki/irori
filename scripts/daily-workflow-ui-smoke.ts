@@ -7,6 +7,7 @@ import { WorkspaceService } from '../src/host/workspaces';
 import type { AgentId, Space } from '../src/domain/types';
 import { dateTokens } from '../src/domain/notes';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Exercise the actual desktop bridge and disk persistence in disposable KBs.
 // Only provider discovery is stubbed; model starts and update requests are rejected.
@@ -52,6 +53,7 @@ await new WorkspaceService(files).save(
   '日常操作の検証',
   spaces.map((space) => space.scopeId),
 );
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors: string[] = [];

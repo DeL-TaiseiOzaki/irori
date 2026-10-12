@@ -10,7 +10,7 @@ import { routineRuntimes } from '../domain/routines';
 
 const settings = z.object({
   theme: z.enum(themes).default('system'),
-  language: z.enum(languages).default('ja'),
+  language: z.enum(languages).default('en'),
   markdownFont: z.enum(markdownFonts).default('sans'),
   editorAssistance: z.boolean().default(true),
   vaultAgent: z.boolean().default(false),

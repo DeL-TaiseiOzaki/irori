@@ -23,9 +23,10 @@ await writeFile(
   path.join(kb, 'AGENTS.md'),
   'Only edit the note selected by the user in this disposable fixture KB. Do not access files outside it.\n',
 );
-// This suite exercises the vault agent, which is off until turned on (ADR 021).
+// This suite exercises the vault agent, which is off until turned on (ADR 021), and reads
+// the interface in Japanese, which a new device no longer starts in (ADR 011).
 await mkdir(path.join(base, 'device'), { recursive: true });
-await new SettingsService(path.join(base, 'device')).save({ vaultAgent: true });
+await new SettingsService(path.join(base, 'device')).save({ vaultAgent: true, language: 'ja' });
 const launchStart = Date.now();
 const env: Record<string, string> = Object.fromEntries(
   Object.entries({ ...process.env, IRORI_DATA_DIR: path.join(base, 'device') }).filter(

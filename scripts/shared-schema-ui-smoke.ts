@@ -5,6 +5,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
 import { YourAiService } from '../src/host/you';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Every Schema from the settings (ADR 027): the shared Schema every agent
 // follows, written as files in the irori agent's folder, and a vault's own,
@@ -28,6 +29,7 @@ await writeFile(
 await files.register(root, 'Shared KB', 'personal');
 const shared = (relative: string) => readFile(path.join(you, '.irori', 'shared', relative), 'utf8');
 
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, HOME: home, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

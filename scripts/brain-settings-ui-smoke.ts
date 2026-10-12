@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // A brain's name, category, icon and colour are chosen in one sheet and kept in
 // the KB's .irori/scope.json, so they survive a restart and travel with the KB.
@@ -27,6 +28,7 @@ const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
 );
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const launch = () =>

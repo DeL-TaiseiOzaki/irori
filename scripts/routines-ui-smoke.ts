@@ -8,6 +8,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { YourAiService } from '../src/host/you';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Routines from their own rail entry (ADR 016): navigation, a routine made
 // from the page's template and edited there, the request to the irori agent,
@@ -92,6 +93,7 @@ await writeFile(
   `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
   { mode: 0o700 },
 );
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   HOME: home,

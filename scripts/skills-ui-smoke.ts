@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 if (process.platform === 'win32') {
   console.log(
     'Skill UI executable fixtures are POSIX only; native Windows acceptance remains open.',
@@ -71,6 +72,7 @@ await writeFile(
   `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run("pi"));\n`,
   { mode: 0o700 },
 );
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   PATH: bin + path.delimiter + process.env.PATH,

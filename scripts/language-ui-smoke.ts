@@ -66,15 +66,14 @@ let app = await launch();
 try {
   const page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
-  await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
-
-  // The startup screen has no rail, so it offers the language itself.
-  await page.getByRole('button', { name: 'English', exact: true }).click();
+  // A new device starts in English (ADR 011).
   await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('en');
   await expect(page.getByRole('textbox', { name: 'Workspace name' })).toHaveValue('My workspace');
   await japaneseLeft(page, 'the startup screen');
   visited.push('startup screen');
+
+  // The startup screen has no rail, so it offers the language itself.
   await page.getByRole('button', { name: '日本語', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
@@ -190,11 +189,22 @@ try {
 } finally {
   await app.close();
 }
+
+// Japanese, once chosen, is kept as well: the default does not take the device back.
+app = await launch();
+try {
+  const page = await app.firstWindow();
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('ja');
+} finally {
+  await app.close();
+}
 expect(errors).toEqual([]);
 await writeFile(
   'test-results/language-ui-smoke.json',
   JSON.stringify({ visitedInEnglish: visited, errors }, null, 2),
 );
 console.log(
-  `Language UI passed: English on ${visited.join(', ')}; restart kept it; back to Japanese.`,
+  `Language UI passed: a new device starts in English; English on ${visited.join(', ')}; restarts keep English and Japanese.`,
 );

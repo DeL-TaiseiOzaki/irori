@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // A disposable knowledge base with one page whose frontmatter sits above the
 // body, so a line found in the rendered view has to count the lines the
@@ -20,6 +21,7 @@ await writeFile(path.join(root, 'topic.md'), text);
 const files = new FileService(path.join(base, 'device'));
 await files.init();
 await files.register(root, 'コメントのKB', 'personal');
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

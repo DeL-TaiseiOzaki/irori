@@ -9,7 +9,7 @@ import { markdownFonts, nativeThemeSource } from '../src/domain/types';
 
 const defaults = {
   theme: 'system',
-  language: 'ja',
+  language: 'en',
   markdownFont: 'sans',
   editorAssistance: true,
   vaultAgent: false,
@@ -42,15 +42,21 @@ test('a choice is written down and read back after a restart', async () => {
   assert.match(await readFile(path.join(dir, 'device-settings.json'), 'utf8'), /"theme": "dark"/);
 });
 
-test('the interface language is Japanese until chosen, and a choice survives a restart', async () => {
+test('the interface language is English until chosen, and a choice survives a restart', async () => {
   const { dir, settings } = await service();
-  // A record written before the language setting existed still reads as Japanese.
-  await writeFile(path.join(dir, 'device-settings.json'), '{"theme":"dark"}');
+  assert.equal((await settings.read()).language, 'en');
+  // Every save writes the whole record, so a device that chose nothing keeps the
+  // language it was saved with; only a record without one reads as the new default.
+  await writeFile(path.join(dir, 'device-settings.json'), '{"theme":"dark","language":"ja"}');
   assert.equal((await settings.read()).language, 'ja');
-  await settings.save({ language: 'en' });
+  await settings.save({ theme: 'light' });
+  assert.equal((await new SettingsService(dir).read()).language, 'ja');
+  await writeFile(path.join(dir, 'device-settings.json'), '{"theme":"dark"}');
+  assert.equal((await settings.read()).language, 'en');
+  await settings.save({ language: 'ja' });
   await settings.save({ theme: 'light' });
   const restarted = await new SettingsService(dir).read();
-  assert.equal(restarted.language, 'en');
+  assert.equal(restarted.language, 'ja');
   assert.equal(restarted.theme, 'light');
 });
 

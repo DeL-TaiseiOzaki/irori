@@ -11,7 +11,7 @@ const host = window.irori;
  */
 let current: DeviceSettings = {
   theme: 'system',
-  language: 'ja',
+  language: 'en',
   markdownFont: 'sans',
   editorAssistance: true,
   vaultAgent: false,

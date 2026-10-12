@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // A disposable knowledge base shaped like irori-templete's: a property
 // declaration in the schema layer, pages with frontmatter, a folder index, a
@@ -63,6 +64,7 @@ await writeFile(path.join(root, 'broken.md'), '---\ntitle: [unclosed\n---\n# 壊
 const files = new FileService(path.join(base, 'device'));
 await files.init();
 await files.register(root, 'プロパティのKB', 'personal');
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

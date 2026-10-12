@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+English first, 2026-10-12 (**0.2.6**, not yet published): the owner asked for
+English as the default interface language ([ADR 011](decisions/011-interface-language.md)).
+- A new device's record defaults to `en` (`src/host/settings.ts`,
+  `src/app/device-settings.ts`). An installation with a saved language keeps
+  it; every save writes the language, so only a device that never saved
+  anything, or whose record is damaged and falls back to every default, changes.
+- `src/domain/i18n.ts` still starts in Japanese, the source text; both
+  processes apply the device language before showing anything.
+- UI smokes choose Japanese first through `tests/fixtures/japanese-interface.ts`;
+  `language-ui-smoke` checks the English first launch and both restarts, and
+  `editor-assistance-ui-smoke` reads its damaged-record launch in English.
+- In the full local `test:ui` run, `knowledge-ui-smoke` failed once at its Drive
+  recovery file (ENOENT while polling); it passed twice alone, and nothing in it
+  depends on the language.
+- Verified by `npm run build`, `npm test` and `npm run test:ui` on Linux. Not
+  tried on Windows or macOS.
+
 Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222),
 whole folders dropped from the file manager) merged at the owner's request as
 `e76f209`. It is the first preview published by `publish.yml` with no hand

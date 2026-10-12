@@ -4,6 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Vaults gathered into a named group in the rail: made and filled from each
 // vault's menu, closed and opened by the group's button, kept across a restart,
@@ -19,6 +20,7 @@ for (const name of ['Home', 'Paper', 'Data']) {
   ids.push((await files.register(root, name, 'personal')).scopeId);
 }
 await new WorkspaceService(files).save('Lab', ids);
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const errors: string[] = [];

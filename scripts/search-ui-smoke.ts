@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import type { KnowledgeSearch } from '../src/domain/search';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Disposable local KBs exercise the actual renderer/HostAPI/filesystem path.
 // No provider/model or external cloud process is started.
@@ -40,6 +41,7 @@ for (const name of [
   await writeFile(path.join(root, name), 'ORBITAL excluded content\n');
 await writeFile(path.join(otherRoot, 'reference.md'), '# Reference\n\nORBITAL in another KB.\n');
 
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 /** The note's human-line count, read from its details popover. */
 async function authorship(page: import('@playwright/test').Page) {
@@ -41,6 +42,7 @@ for (const id of ['pi', 'opencode', 'hermes'])
     `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
     { mode: 0o700 },
   );
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   PATH: bin + path.delimiter + process.env.PATH,

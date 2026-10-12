@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Your AI in the Overview: set up its folder, hand work to a brain's sub-agent,
 // answer the sub-agent's request, read its report, keep your AI out of the
@@ -46,6 +47,7 @@ await writeFile(
   `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
   { mode: 0o700 },
 );
+await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
   HOME: home,

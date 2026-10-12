@@ -25,6 +25,9 @@ try {
     stdin: {
       contents: `import { createRoot } from 'react-dom/client';
 import { UpdateNotice } from './src/app/UpdateNotice';
+import { setLanguage } from './src/domain/i18n';
+// The checks read the notice in Japanese; a new device starts in English (ADR 011).
+setLanguage('ja');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fixture = window.updateFixture = {
   checks: 0, stateCalls: 0, installs: 0, cancels: 0, restarts: 0, opened: [],

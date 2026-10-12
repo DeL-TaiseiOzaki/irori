@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
+import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The Schema section as settings: every change is made through the forms and
 // checked on disk, in a disposable KB. No model or cloud call is made.
@@ -29,6 +30,7 @@ await writeFile(
 await files.register(root, 'Schema KB', 'personal');
 const read = (relative: string) => readFile(path.join(root, relative), 'utf8');
 
+await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({
