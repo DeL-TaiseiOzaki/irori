@@ -1,0 +1,110 @@
+name: Publish merged preview
+
+# Stage 2 of docs/DISTRIBUTION.md: a merge that main is due to publish goes out without a
+# hand-dispatched run. It does nothing until the repository variable IRORI_AUTO_PUBLISH is `on`.
+#
+# A push to main publishes from the merged pull request's Verify and package run when that run
+# packaged the very tree main received. Otherwise, as after a direct push or when main moved
+# while the pull request was tested, main's own run publishes once it succeeds. release.yml
+# checks the run, the tree and the package evidence again before uploading anything, and the
+# drift check runs last.
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: [Verify and package desktop]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One queue per commit: an event for another commit must not replace this one while it waits.
+concurrency:
+  group: desktop-auto-publish-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    if: >-
+      vars.IRORI_AUTO_PUBLISH == 'on' &&
+      (github.event_name == 'push' ||
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      run_id: ${{ steps.run.outputs.run_id }}
+      tag: ${{ steps.due.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The policy compares the commit with the latest preview tag.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.21.0'
+      - name: Decide whether the commit is due a release
+        id: due
+        env:
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$COMMIT" origin/main || { echo "::error::$COMMIT is not on main"; exit 1; }
+          node scripts/release-policy.ts due "$COMMIT"
+      - name: Choose the run to publish
+        id: run
+        if: steps.due.outputs.due == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          TAG: ${{ steps.due.outputs.tag }}
+          MAIN_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          # The push and main's run both reach here for one merge; the first publishes.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          run=$MAIN_RUN
+          if [ -z "$run" ]; then
+            run=$(node scripts/release-source.ts find "$COMMIT")
+            if [ -z "$run" ] || ! node scripts/release-source.ts resolve "$run"; then
+              echo "No pull request run packaged $COMMIT's tree; main's own run will publish $TAG." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "Publishing $TAG from run $run." >> "$GITHUB_STEP_SUMMARY"
+          echo "run_id=$run" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: decide
+    if: needs.decide.outputs.run_id != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      run_id: ${{ needs.decide.outputs.run_id }}
+      tag: ${{ needs.decide.outputs.tag }}
+      platforms: both
+
+  website:
+    needs: [decide, release]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/website.yml
+    with:
+      tag: ${{ needs.decide.outputs.tag }}
+
+  drift:
+    needs: website
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-sync.yml

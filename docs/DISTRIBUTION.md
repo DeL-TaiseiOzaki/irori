@@ -70,23 +70,54 @@ tests, the website and test scripts, and treats everything else as shipping.
   an **Exact package** section when it publishes, listing the source commit, the
   CI run, and each file's size and SHA-256. Do not type digests into the notes.
 
-- **After merge.** Publish from `main`'s successful **Verify and package
-  desktop** run: dispatch `release.yml` with that run id,
-  `tag=v<version>-preview.1` and `platforms=both`. Then update
-  `website/releases.json` and dispatch `website.yml`. Do not push to `main` while
-  that run is still going, because `app.yml` cancels an in-progress run on the
-  same ref.
-- **Drift.** The same workflow runs hourly and on demand. It fails when `main`
-  has held a change that ships for more than 60 minutes without a release. It
-  also fails when the latest preview lacks either installer or `SHA256SUMS.txt`,
-  or the download website does not offer it. It never publishes anything.
+- **After merge.** The release carries packages a **Verify and package desktop**
+  run already tested. `scripts/release-source.ts` accepts two kinds of run:
+  - `main`'s own run of the commit;
+  - the merged pull request's run, when the test merge it packaged has the same
+    tree as the merge commit `main` received. That is usually the case, so a
+    release need not wait for `main` to rebuild identical source. If `main` moved
+    between that run and the merge, the trees differ and only `main`'s run
+    qualifies.
+
+  Either way the source must be a commit on `main` and every package job must
+  have passed. `release.yml` also checks each file against its package evidence
+  and that the packaged version is the one the tag names.
+- **Automatic publishing.** `publish.yml` runs on every push to `main` and after
+  each successful `main` run of `app.yml`. It publishes when
+  `node scripts/release-policy.ts due` finds a shipped change no preview holds.
+  It first tries the pull request's run, otherwise it waits for `main`'s own run.
+  It then calls `release.yml`, then `website.yml`, then the drift check. It acts
+  only while the repository variable `IRORI_AUTO_PUBLISH` is `on`. Those runs
+  hold `contents: write` for the release and `pages: write` and `id-token: write`
+  for the page, which before held only by hand-dispatched runs. Setting that
+  variable is the owner's decision.
+- **By hand.** With the variable unset, or to repeat a failed step, dispatch
+  `release.yml` with a run id that qualifies (the pull request's or `main`'s),
+  `tag=v<version>-preview.1` and `platforms=both`. Then dispatch `website.yml`.
+  `dry_run=true` checks the run and stages the files, or builds the page, without
+  publishing.
+- **The download page's manifest.** `website.yml` writes
+  `website/releases.json` from the published preview before building, with
+  `website/manifest.ts`. It reads the release's own uploaded installers, so no
+  commit has to update the manifest first. The committed file is the default for
+  local builds and tests only.
+- `main`'s runs of `app.yml` are no longer cancelled by a later push; only a
+  pull request's newer push replaces its run. Packaging runs alongside verify
+  rather than after it. A release still requires the whole run to succeed.
+- **Drift.** The same workflow runs hourly and on demand, and after each
+  automatic publication. It fails when `main` has held a change that ships for
+  more than 60 minutes without a release. It also fails when the latest preview
+  lacks either installer or `SHA256SUMS.txt`, or the download website does not
+  offer it. It never publishes anything. GitHub runs the hourly schedule late:
+  on 2026-10-11 and 12 it ran three to five hours apart.
 
 The READMEs name no version, size or digest. They point to the download website
 and the releases page, so a release does not leave them behind.
 
-Publishing automatically after `main`'s CI succeeds, with a generated website
-manifest, is the planned next step. Until then the steps after merge are an
-agent's or maintainer's job under the authorization above.
+The owner's authorization above still covers the steps after a merge: download
+the published files anonymously, check them against `SHA256SUMS.txt`, and record
+the release. Neither the automatic nor the hand path signs, notarizes or makes a
+non-preview release.
 
 ## In-app updates
 
