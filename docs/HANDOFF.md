@@ -1,5 +1,17 @@
 # irori continuation handoff
 
+Published 2026-10-12: **0.2.1** ([#217](https://github.com/DeL-TaiseiOzaki/irori/pull/217),
+less work behind the same screens: composer typing, irori mode streaming, one
+bridge subscription for the renderer's listeners; nothing on screen changes)
+merged at the owner's request as `5235b15`. It is published as
+[v0.2.1-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.1-preview.1)
+by release run `38206579080` from main's successful CI run `38205671421`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,206,848 bytes,
+  Mac 141,844,720 bytes and `irori-0.2.1-full.nupkg` 175,376,329 bytes.
+  The website manifest now offers 0.2.1.
+- Not profiled. Not tried with real CLIs, on Windows or on macOS.
+
 Published 2026-10-12: **0.2.0** ([#216](https://github.com/DeL-TaiseiOzaki/irori/pull/216),
 a vault's knowledge folder can be its root, [ADR 035](decisions/035-knowledge-at-the-vault-root.md))
 merged at the owner's request as `23d9748`. The owner chose this release to
