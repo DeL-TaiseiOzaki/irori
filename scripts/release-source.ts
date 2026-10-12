@@ -128,7 +128,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       process.exitCode = 2;
     }
   } catch (error) {
-    console.log(`::error::${error instanceof Error ? error.message : String(error)}`);
+    // stderr, so the reason still shows when a shell captures stdout (`run=$(... find ...)`).
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }
 }

@@ -73,7 +73,13 @@ jobs:
           fi
           run=$MAIN_RUN
           if [ -z "$run" ]; then
-            run=$(node scripts/release-source.ts find "$COMMIT")
+            # The push arrives seconds after the merge, sometimes before GitHub links the merge
+            # commit to its pull request. Ask again briefly; failing that, main's run publishes.
+            for _ in 1 2 3; do
+              run=$(node scripts/release-source.ts find "$COMMIT") || run=
+              [ -n "$run" ] && break
+              sleep 10
+            done
             if [ -z "$run" ] || ! node scripts/release-source.ts resolve "$run"; then
               echo "No pull request run packaged $COMMIT's tree; main's own run will publish $TAG." >> "$GITHUB_STEP_SUMMARY"
               exit 0
