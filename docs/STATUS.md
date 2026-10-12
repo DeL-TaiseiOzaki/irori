@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Lighter without UI change, 2026-10-12 (**0.1.100**): the owner asked for safe
+Lighter without UI change, 2026-10-12 (**0.1.101**): the owner asked for safe
 speed-ups that change nothing on screen. Three code-reading audits (renderer,
 host, agents) and an independent risk review chose these:
 - App reads the vault composer's draft without subscribing (`useDraft(..., { watch: false })`),
