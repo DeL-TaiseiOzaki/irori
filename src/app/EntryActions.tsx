@@ -8,6 +8,7 @@ import { Icon, type IconName } from './Icon';
 import { t } from '../domain/i18n';
 import { parentPath } from '../domain/paths';
 import { useAction } from './useAction';
+import type { Brought } from './dropped';
 
 const host = window.irori;
 export const entryActions = ['rename', 'move', 'delete'] as const;
@@ -80,8 +81,11 @@ export function linkNotice(update: LinkUpdate) {
 /** What the explorer does, handed down to its rows by the application. */
 export interface Explorer {
   create(directory: string, kind: CreateKind): void;
-  /** Copies files from elsewhere into `directory`; without files, the person picks them. */
-  bringIn(directory: string, files?: File[], skipped?: number): void;
+  /**
+   * Copies files and folders from elsewhere into `directory`, as they are read;
+   * without them, the person picks files.
+   */
+  bringIn(directory: string, items?: Promise<Brought[]>): void;
   act(entry: Entry, action: EntryAction): void;
   /** Moves an entry into `directory`, keeping its name: a drag and drop. */
   moveInto(entry: Entry, directory: string): void;
