@@ -1,6 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
-English first, 2026-10-12 (**0.2.6**, not yet published): the owner asked for
+Published 2026-10-12: **0.2.6** ([#226](https://github.com/DeL-TaiseiOzaki/irori/pull/226),
+a new device starts in English) merged at the owner's request as `dc4315b`.
+`publish.yml` published it by itself from the pull request's run `38263387209`,
+whose test merge had `dc4315b`'s tree (run `38265505690`: release, page with a
+generated manifest, drift in step). This is the first automatic use of that path.
+- Merge 14:47:40 UTC, release public 14:48:59 (1:19), page deployed 14:50:11
+  (2:31).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,213,504 bytes,
+  Mac 141,850,724 bytes and `irori-0.2.6-full.nupkg` 175,381,461 bytes.
+- Not tried on Windows or macOS.
+
+English first, 2026-10-12 (**0.2.6**, published): the owner asked for
 English as the default interface language ([ADR 011](decisions/011-interface-language.md)).
 - A new device's record defaults to `en` (`src/host/settings.ts`,
   `src/app/device-settings.ts`). An installation with a saved language keeps

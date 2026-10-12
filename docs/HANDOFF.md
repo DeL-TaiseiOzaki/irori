@@ -18,6 +18,10 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-10-12: **0.2.6** ([#226](https://github.com/DeL-TaiseiOzaki/irori/pull/226),
+a new device starts in English) as `dc4315b`, published by `publish.yml` alone
+from the pull request's run: merge to page 2:31. Downloads verified. See STATUS.
+
 Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222))
 as `e76f209`, the first preview `publish.yml` published by itself (run
 `38249205721`, after main's CI): merge to page 9:41. The push's own run failed
