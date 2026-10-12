@@ -1,5 +1,20 @@
 # irori continuation handoff
 
+Published 2026-10-12: **0.2.0** ([#216](https://github.com/DeL-TaiseiOzaki/irori/pull/216),
+a vault's knowledge folder can be its root, [ADR 035](decisions/035-knowledge-at-the-vault-root.md))
+merged at the owner's request as `23d9748`. The owner chose this release to
+close the 0.1 series, so it carries 0.2.0 instead of 0.1.100. It is published
+as [v0.2.0-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.0-preview.1)
+by release run `38203575869` from main's successful CI run `38202689943`
+(verify plus Linux, Windows and macOS packages).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,207,872 bytes,
+  Mac 141,845,358 bytes and `irori-0.2.0-full.nupkg` 175,376,634 bytes.
+  The website manifest now offers 0.2.0.
+- irori-templete #16 (its bundle at the repository root) was merged after
+  the release as `3d56655`.
+- [#218](https://github.com/DeL-TaiseiOzaki/irori/pull/218) retook the README,
+  website and Open Graph screenshots on 0.2.0.
+
 Published 2026-10-12: **0.1.99** ([#214](https://github.com/DeL-TaiseiOzaki/irori/pull/214),
 irori agent threads side by side in irori mode and kept per workspace, a
 stopped thread takes the next instruction, [ADR 034](decisions/034-irori-mode-threads.md))
