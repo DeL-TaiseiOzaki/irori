@@ -1,5 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Copy path from every row, 2026-10-13 (**0.2.10**, not yet published; built on 0.2.9,
+PR #232): the owner asked for a right click on any file of any layer to copy its path,
+as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), amendment).
+- `ExplorerItems` (`src/app/EntryActions.tsx`) takes an optional explorer and orders
+  open / create / rename-move-delete / copy path / show; `Tree` gives every row the
+  menu and the ⋯ button. `SchemaList` rows with a file get it too.
+- HostAPI `copyEntryPath` writes the full or vault-relative path with Electron's
+  `clipboard`; it and `revealEntry` resolve the shared and irori agent Schema folders.
+- Verified by `explorer-ui-smoke` (clipboard read back) and the CLI test desktop.
+  Not tried on Windows or macOS.
+
 Two vaults side by side, 2026-10-13 (**0.2.9**, not yet published; built on 0.2.8's
 workspace tabs, PR #230): the owner asked to open several vaults and drag files
 between their knowledge ([ADR 038](decisions/038-vaults-side-by-side.md)). The owner

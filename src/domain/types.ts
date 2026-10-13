@@ -539,6 +539,11 @@ export interface HostAPI {
    * the system trash.
    */
   trashEntry(scopeId: string, path: string): Promise<void>;
+  /**
+   * Puts a file's or folder's path on the clipboard, as a file manager's menu does:
+   * the full path on this computer, or the path from the vault's root with `/`.
+   */
+  copyEntryPath(scopeId: string, path: string, absolute: boolean): Promise<void>;
   /** Shows a file or folder of the vault in the system file manager. */
   revealEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;

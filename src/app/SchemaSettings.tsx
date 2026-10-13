@@ -17,7 +17,9 @@ import {
   type HookEntry,
   type SchemaSettings,
 } from '../domain/schema-settings';
+import { ContextMenu } from '@base-ui/react/context-menu';
 import { Dialog } from './Dialog';
+import { ExplorerItems } from './EntryActions';
 import { errorText } from './ErrorMessage';
 import { Icon, type IconName } from './Icon';
 import { Crumbs } from './NoteBar';
@@ -105,7 +107,15 @@ export function SchemaList({
   const broken = skills.problems
     .map((problem) => ({ name: problem.directory.split('/')[2], message: problem.message }))
     .filter((problem) => problem.name);
-  type Item = { key: string; label: string; title?: string; badge?: string; file?: string };
+  /** `path` is the file behind a row, for its right-click menu; `file` opens in place of settings. */
+  type Item = {
+    key: string;
+    label: string;
+    title?: string;
+    badge?: string;
+    file?: string;
+    path?: string;
+  };
   const groups: { kind: SchemaKind; items: Item[]; error?: string; note?: string }[] = [
     {
       kind: 'instructions',
@@ -113,6 +123,7 @@ export function SchemaList({
         key: file,
         label: instructionsLabel(file),
         title: file,
+        path: file,
       })),
       note: settings.incomplete
         ? t('上限到達・一部未確認', 'Limit reached, some unchecked')
@@ -125,12 +136,14 @@ export function SchemaList({
           key: skill.name,
           label: skill.name,
           title: skill.description,
+          path: `${skillsRoot}/${skill.name}/${skillFile}`,
         })),
         ...broken.map((problem) => ({
           key: problem.name,
           label: problem.name,
           title: problem.message,
           badge: t('要確認', 'Check'),
+          path: `${skillsRoot}/${problem.name}`,
         })),
         ...skills.retired.map((skill) => ({
           key: skill.name,
@@ -138,6 +151,7 @@ export function SchemaList({
           title: skill.reason,
           badge: t('退役', 'Retired'),
           file: skill.path,
+          path: skill.path,
         })),
       ].sort((left, right) => left.label.localeCompare(right.label)),
     },
@@ -147,6 +161,7 @@ export function SchemaList({
         key: file,
         label: baseName(file),
         title: file,
+        path: file,
       })),
     },
     {
@@ -195,9 +210,11 @@ export function SchemaList({
             )}
             {group.items.map((item) => {
               const current = selected?.kind === group.kind && selected.key === item.key;
-              return (
+              const key = `${item.key}-${item.badge ?? ''}`;
+              const path = item.path;
+              const row = (
                 <button
-                  key={`${item.key}-${item.badge ?? ''}`}
+                  key={key}
                   className={`tree-row ${current ? 'selected' : ''}`}
                   aria-current={current ? 'page' : undefined}
                   title={item.title}
@@ -217,6 +234,36 @@ export function SchemaList({
                   <span className="filename">{item.label}</span>
                   {item.badge && <span className="badge">{item.badge}</span>}
                 </button>
+              );
+              // A file behind a row has the file manager's menu, as rows of the other layers do.
+              return path ? (
+                <ContextMenu.Root key={key}>
+                  <ContextMenu.Trigger render={row} />
+                  <ContextMenu.Portal>
+                    <ContextMenu.Positioner>
+                      <ContextMenu.Popup className="menu">
+                        <ExplorerItems
+                          scopeId={scopeId}
+                          path={path}
+                          onOpen={
+                            /\.md$/i.test(path)
+                              ? () =>
+                                  onOpenFile({
+                                    path,
+                                    name: baseName(path),
+                                    directory: false,
+                                    layer: 'schema',
+                                    note: true,
+                                  })
+                              : undefined
+                          }
+                        />
+                      </ContextMenu.Popup>
+                    </ContextMenu.Positioner>
+                  </ContextMenu.Portal>
+                </ContextMenu.Root>
+              ) : (
+                row
               );
             })}
             {group.note && <small className="tree-empty">{group.note}</small>}

@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  safeStorage,
+  shell,
+} from 'electron';
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
@@ -823,8 +832,23 @@ app
         changeVault(scopeId, organizing(), () =>
           changed(toScopeId, () => moveToVault(scopeId, from, toScopeId, directory)),
         ),
+      copyEntryPath: async (scopeId, target, absolute) => {
+        const parts = target.split('/').filter(Boolean);
+        if (parts.some((part) => part === '.' || part === '..'))
+          throw Error(t('vault の中のパスではありません。', 'Not a path inside the vault.'));
+        // The shared Schema and the irori agent's keep their files outside any vault.
+        const root = (await schemaFolder(scopeId)).root;
+        clipboard.writeText(absolute ? path.join(root, ...parts) : parts.join('/'));
+      },
       revealEntry: async (scopeId, target) =>
-        shell.showItemInFolder(await files.resolve(scopeId, target, true)),
+        shell.showItemInFolder(
+          scopeId === sharedSchemaId || you.rootOf(scopeId)
+            ? path.join(
+                (await schemaFolder(scopeId)).root,
+                ...target.split('/').filter((part) => part && part !== '..'),
+              )
+            : await files.resolve(scopeId, target, true),
+        ),
       addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),

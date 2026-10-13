@@ -119,6 +119,17 @@ try {
   await expect(menuItem('名前を変更')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
+  // Every row copies its path, as a file manager's menu does: in full, or from the vault.
+  const clipboardText = () => app.evaluate(({ clipboard }) => clipboard.readText());
+  await row(knowledge, 'topics').click({ button: 'right' });
+  await expect(menuItem('開く')).toHaveCount(0);
+  await menuItem('相対パスをコピー').click();
+  await expect.poll(clipboardText).toBe('Knowledge_Base/topics');
+  await row(knowledge, 'data.csv').click({ button: 'right' });
+  await expect(menuItem('開く')).toBeVisible();
+  await menuItem('パスをコピー').click();
+  await expect.poll(clipboardText).toBe(path.join(root, 'Knowledge_Base', 'data.csv'));
+
   // A connected folder takes folders too, and files brought in from elsewhere.
   await expect(row(contents, '共有')).toBeVisible();
   await row(contents, '共有').click({ button: 'right' });
