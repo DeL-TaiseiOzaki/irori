@@ -21,6 +21,48 @@ test('Viewer formats are named by extension and never overlap the editor', () =>
   assert.ok(!opensInIrori('archive.zip'));
 });
 
+test('Code and other text files open in the editor as in VS Code; known binary formats do not (ADR 041)', async (t) => {
+  for (const name of [
+    'main.py',
+    'lib.rs',
+    'App.tsx',
+    'run.sh',
+    'Makefile',
+    '.gitignore',
+    'a.ipynb',
+    'q.sql',
+  ])
+    assert.ok(opensInIrori(name), name);
+  for (const name of [
+    'old.doc',
+    'old.ppt',
+    'movie.mp4',
+    'font.woff2',
+    'app.exe',
+    'data.sqlite',
+    '.DS_Store',
+  ])
+    assert.ok(!opensInIrori(name), name);
+  const base = await mkdtemp(path.join(tmpdir(), 'irori-code-'));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  // A code file is text for the editor.
+  await writeFile(path.join(base, 'main.py'), 'print("こんにちは")\n');
+  const code = await readDocument(path.join(base, 'main.py'), 'scope', 'main.py');
+  assert.equal(code.text, 'print("こんにちは")\n');
+  // Bytes that are not UTF-8 text, under a name that could be text, are refused;
+  // the window then hands the file to its application.
+  await writeFile(path.join(base, 'blob.dat'), Buffer.from([0xff, 0xfe, 0x00, 0x81]));
+  await assert.rejects(readDocument(path.join(base, 'blob.dat'), 'scope', 'blob.dat'));
+  await writeFile(path.join(base, 'nul.txt2'), 'a\0b');
+  await assert.rejects(readDocument(path.join(base, 'nul.txt2'), 'scope', 'nul.txt2'), /Binary/);
+  // A known binary format is not read at all.
+  await writeFile(path.join(base, 'archive.zip'), 'PK');
+  await assert.rejects(
+    readDocument(path.join(base, 'archive.zip'), 'scope', 'archive.zip'),
+    /external application/,
+  );
+});
+
 test('A viewer file opens as a view-only document whose version follows the file', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-viewers-'));
   t.after(() => rm(base, { recursive: true, force: true }));

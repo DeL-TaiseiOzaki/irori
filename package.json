@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -55,6 +55,7 @@
     "docx-preview": "0.4.1",
     "electron-squirrel-startup": "1.0.1",
     "eventsource-parser": "4.1.0",
+    "jszip": "3.10.2",
     "lucide-react": "1.46.0",
     "motion": "13.4.0",
     "node-pty": "1.1.0",
@@ -90,6 +91,7 @@
     "@types/react-dom": "19.3.0",
     "@types/which": "3.0.4",
     "@types/write-file-atomic": "4.0.3",
+    "@xmldom/xmldom": "0.9.12",
     "electron": "44.3.0",
     "esbuild": "0.28.2",
     "fflate": "0.8.3",

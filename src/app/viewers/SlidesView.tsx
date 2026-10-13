@@ -3,6 +3,7 @@ import { pptxToHtml } from '@jvmr/pptx-to-html';
 import { t } from '../../domain/i18n';
 import type { ViewProps } from './common';
 import { followLinks, safeFragment } from './safe-dom';
+import { normalizeDeck } from './pptx-normalize';
 
 /**
  * A PowerPoint deck as a column of slides. The converter lays each slide out at the
@@ -16,34 +17,41 @@ export default function SlidesView({ bytes, zoom, width, onInfo, onLink }: ViewP
     let live = true;
     setSlides(undefined);
     setError('');
-    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    pptxToHtml(buffer as ArrayBuffer, { scaleToFit: true, letterbox: true }).then(
-      (html) => {
-        if (!live) return;
-        setSlides(
-          html.map((markup) => {
-            // The deck's size is the inner slide's; the letterbox around it is discarded.
-            const size = /class="slide" style="[^"]*?width: ([\d.]+)px; height: ([\d.]+)px/.exec(
-              markup,
-            );
-            return {
-              html: markup,
-              width: Number(size?.[1]) || 960,
-              height: Number(size?.[2]) || 540,
-            };
-          }),
-        );
-        onInfo(t(`${html.length} 枚のスライド`, `${html.length} slides`));
-      },
-      (reason: Error) =>
-        live &&
-        setError(
-          t(
-            `PowerPoint を読めませんでした: ${reason.message}`,
-            `Could not read the PowerPoint file: ${reason.message}`,
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    // What a slide inherits is written out first; a deck that cannot be is drawn as it is.
+    normalizeDeck(buffer)
+      .catch(() => buffer)
+      .then((deck) => pptxToHtml(deck, { scaleToFit: true, letterbox: true }))
+      .then(
+        (html) => {
+          if (!live) return;
+          setSlides(
+            html.map((markup) => {
+              // The deck's size is the inner slide's; the letterbox around it is discarded.
+              const size = /class="slide" style="[^"]*?width: ([\d.]+)px; height: ([\d.]+)px/.exec(
+                markup,
+              );
+              return {
+                html: markup,
+                width: Number(size?.[1]) || 960,
+                height: Number(size?.[2]) || 540,
+              };
+            }),
+          );
+          onInfo(t(`${html.length} 枚のスライド`, `${html.length} slides`));
+        },
+        (reason: Error) =>
+          live &&
+          setError(
+            t(
+              `PowerPoint を読めませんでした: ${reason.message}`,
+              `Could not read the PowerPoint file: ${reason.message}`,
+            ),
           ),
-        ),
-    );
+      );
     return () => {
       live = false;
     };
@@ -58,6 +66,8 @@ export default function SlidesView({ bytes, zoom, width, onInfo, onLink }: ViewP
         box-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 8px 24px rgba(24, 26, 30, 0.12); }
       .frame > .slide { position: absolute !important; left: 0 !important; top: 0 !important;
         transform-origin: top left !important; overflow: hidden; }
+      /* PowerPoint lets text run past its box rather than cutting it, at single spacing. */
+      .slide div[style*="pre-wrap"] { overflow: visible !important; line-height: 1.2; }
       .number { font: 12px/1 system-ui, sans-serif; color: #646a73; margin-top: -12px; }`;
     const deck = document.createElement('div');
     deck.className = 'deck';

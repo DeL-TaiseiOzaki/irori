@@ -20,13 +20,13 @@ drops styles, charts and images when it writes a workbook, no maintained
 JavaScript library edits an existing `.pptx`, and the full office suites that
 embed in a page (OnlyOffice, Collabora) are AGPL.
 
-| Format | Extensions | Library | Output |
-| --- | --- | --- | --- |
-| PDF | `.pdf` | `pdfjs-dist` | Canvas per page with a selectable text layer, drawn when near the viewport |
-| Word | `.docx` | `docx-preview` | DOM built with `createElement`, paged, in a shadow root |
-| PowerPoint | `.pptx` | `@jvmr/pptx-to-html` | One HTML string per slide, scaled by irori, in a shadow root |
-| Spreadsheet | `.xlsx` `.xlsm` `.xls` `.ods` | `xlsx` (SheetJS) | Displayed cell text (`sheet_to_json` with `raw: false`) in irori's own table |
-| Image | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.svg` `.bmp` `.avif` | — | `<img>` from a data URL |
+| Format      | Extensions                                                 | Library              | Output                                                                       |
+| ----------- | ---------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| PDF         | `.pdf`                                                     | `pdfjs-dist`         | Canvas per page with a selectable text layer, drawn when near the viewport   |
+| Word        | `.docx`                                                    | `docx-preview`       | DOM built with `createElement`, paged, in a shadow root                      |
+| PowerPoint  | `.pptx`                                                    | `@jvmr/pptx-to-html` | One HTML string per slide, scaled by irori, in a shadow root                 |
+| Spreadsheet | `.xlsx` `.xlsm` `.xls` `.ods`                              | `xlsx` (SheetJS)     | Displayed cell text (`sheet_to_json` with `raw: false`) in irori's own table |
+| Image       | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.svg` `.bmp` `.avif` | —                    | `<img>` from a data URL                                                      |
 
 Older binary Office formats (`.doc`, `.ppt`) still open in the external application.
 
@@ -61,6 +61,17 @@ Older binary Office formats (`.doc`, `.ppt`) still open in the external applicat
   in a package's subfolder that the bundle loaded from, which is how pdf.js's
   `cmaps/`, `standard_fonts/` (Foxit, Liberation) and `wasm/` (OpenJPEG, JBIG2,
   QCMS) licences reach `dist/third-party-notices.txt`.
+- **What a slide inherits.** `pptx-to-html` reads each slide shape on its own:
+  text with no size is 44 pt bold in a title, a placeholder without a position
+  takes only the layout's, insets are zero, and a shape's fill is the first
+  `solidFill` anywhere in its properties, its outline's included. Before it runs,
+  `src/app/viewers/pptx-normalize.ts` writes into a copy of each slide what
+  PowerPoint works out from the layout, master and theme: position, anchor,
+  insets, each level's size, weight, colour, font and alignment, and
+  `normAutofit`'s scale. It gives every shape a fill the converter reads as
+  PowerPoint draws it (none for `noFill`, the style's when there is no fill of
+  its own, a gradient's first colour). The view lets text run past its box, at
+  1.2 line spacing, as PowerPoint does. A run still takes its box's last size.
 - **Fidelity.** These are previews, not Office. Word layout follows
   `docx-preview` (fonts embedded in the document are not applied inside the
   shadow root); PowerPoint covers text, pictures, tables, basic shapes and common

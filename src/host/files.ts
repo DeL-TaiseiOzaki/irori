@@ -45,7 +45,13 @@ import {
 } from '../domain/layers';
 import { frontmatterBlock } from '../domain/graph-index';
 import { t } from '../domain/i18n';
-import { textFileByteLimit, textFilePattern, viewerByteLimit, viewerKind } from '../domain/viewers';
+import {
+  binaryFilePattern,
+  textFileByteLimit,
+  textFilePattern,
+  viewerByteLimit,
+  viewerKind,
+} from '../domain/viewers';
 const relative = z
   .string()
   .min(1)
@@ -93,7 +99,9 @@ export async function readTextDocument(
   scopeId: string,
   rel: string,
 ): Promise<Document> {
-  if (!textFilePattern.test(rel)) throw Error('Use the external application for this file format');
+  // Any file but a known binary format may be text; its bytes decide (ADR 041).
+  if (viewerKind(rel) || binaryFilePattern.test(rel))
+    throw Error('Use the external application for this file format');
   if ((await fs.stat(filename)).size > textFileByteLimit)
     throw Error('The text editor supports files up to 2 MiB');
   const bytes = await fs.readFile(filename);
