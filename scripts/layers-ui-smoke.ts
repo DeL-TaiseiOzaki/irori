@@ -95,7 +95,7 @@ try {
   await expect(knowledge.getByRole('button', { name: 'memo', exact: true })).toHaveCount(1);
   await expect(knowledge.getByRole('button', { name: /AGENTS/ })).toHaveCount(0);
   // An unconfigured Drive alias is visible without a mount, in the brain's Contents only.
-  await expect(contents.getByRole('button', { name: /調査 資料/ })).toHaveCount(1);
+  await expect(contents.locator('.tree-row', { hasText: '調査 資料' })).toHaveCount(1);
   await expect(contents.getByText('未接続')).toBeVisible();
   // The Schema section lists settings; its files stay one toggle away.
   await expect(schema.getByRole('group', { name: 'Schema の指示' })).toContainText('AGENTS.md');

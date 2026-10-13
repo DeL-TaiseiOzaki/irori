@@ -31,6 +31,7 @@ for (const name of ['Product', 'Research']) {
 const product = await files.register(roots[0], 'Product', 'team');
 const research = await files.register(roots[1], 'Research', 'personal');
 await new WorkspaceService(files).save('Lab', [product.scopeId, research.scopeId]);
+await new WorkspaceService(files).save('Side', [research.scopeId]);
 const bin = path.join(base, 'bin');
 await mkdir(bin);
 await writeFile(
@@ -87,12 +88,31 @@ try {
   await expect(rail.getByRole('button', { name: 'Product・AI 許可待ち' })).toBeVisible();
   await expect(page.locator('.status-bar')).toContainText('実行中 2');
   await expect(page.locator('.status-bar')).toContainText('許可待ち 1');
-  // Home stays reachable while an AI runs in any brain; it asks before stopping them.
-  await page.getByRole('button', { name: 'ワークスペースを選択' }).click();
-  const goHome = page.getByRole('dialog', { name: 'ホームに戻る' });
-  await expect(goHome).toContainText('実行中のエージェントを停止します。');
-  await goHome.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  await expect(goHome).toHaveCount(0);
+  // Home stays reachable while an AI runs in any brain: it opens another workspace as a
+  // tab, and the AIs of the one left go on.
+  const tabs = page.getByRole('navigation', { name: 'ワークスペース' });
+  await rail.getByRole('button', { name: 'ワークスペースを選択' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(tabs.getByRole('button', { name: 'Lab・許可待ち' })).toBeVisible();
+  await page.locator('.workspace-card').filter({ hasText: 'Side' }).click();
+  await expect(tabs.getByRole('button', { name: /^Side(・|$)/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(rail.getByRole('button', { name: /^Product/ })).toHaveCount(0);
+  await expect(rail.getByRole('button', { name: 'Research・AI 実行中' })).toBeVisible();
+  // Closing Lab would stop Product's AI, which no other tab has open: it asks first.
+  await tabs.getByRole('button', { name: 'Lab を閉じる' }).click();
+  const closeLab = page.getByRole('dialog', { name: 'Lab を閉じる' });
+  await expect(closeLab).toContainText('実行中のエージェントを停止します。');
+  await closeLab.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await expect(closeLab).toHaveCount(0);
+  await tabs.getByRole('button', { name: 'Lab・許可待ち' }).click();
+  await expect(rail.getByRole('button', { name: 'Product・AI 許可待ち' })).toBeVisible();
+  await expect(page.locator('.brain-names strong')).toHaveText('Research');
+  // Side shares its only vault with Lab, so it closes without stopping anything.
+  await tabs.getByRole('button', { name: 'Side を閉じる' }).click();
+  await expect(tabs.getByRole('button', { name: /^Side(・|$)/ })).toHaveCount(0);
   await expect(rail.getByRole('button', { name: 'Research・AI 実行中' })).toBeVisible();
 
   // Back in Product, the request is still answerable after the switch.

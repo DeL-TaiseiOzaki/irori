@@ -17,6 +17,58 @@ are Knowledge and Contents ([ADR 039](decisions/039-what-a-vault-agent-is-told.m
   preamble had preceded it on every run with the command.
 - Verified by `npm run build` and `npm test`. No real CLI was run.
 
+Copy path from every row, 2026-10-13 (**0.2.10**, not yet published; built on 0.2.9,
+PR #232): the owner asked for a right click on any file of any layer to copy its path,
+as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), amendment).
+- `ExplorerItems` (`src/app/EntryActions.tsx`) takes an optional explorer and orders
+  open / create / rename-move-delete / copy path / show; `Tree` gives every row the
+  menu and the ⋯ button. `SchemaList` rows with a file get it too.
+- HostAPI `copyEntryPath` writes the full or vault-relative path with Electron's
+  `clipboard`; it and `revealEntry` resolve the shared and irori agent Schema folders.
+- Verified by `explorer-ui-smoke` (clipboard read back) and the CLI test desktop.
+  Not tried on Windows or macOS.
+
+Two vaults side by side, 2026-10-13 (**0.2.9**, not yet published; built on 0.2.8's
+workspace tabs, PR #230): the owner asked to open several vaults and drag files
+between their knowledge ([ADR 038](decisions/038-vaults-side-by-side.md)). The owner
+chose a horizontal split and asking before a move that breaks links.
+- `SideBrainPanel` (`src/app/BrainPanel.tsx`) shows the vault beside: knowledge and
+  contents trees with the same explorer. `main.tsx` keeps it in `side`, trades it
+  with the vault on show when that one is chosen, and remembers it per tab.
+- `Tree` accepts a knowledge entry from the other vault (`Explorer.moveFrom`).
+  `moveFromVault` asks `vaultMoveLinks` (`brokenLinks` in `src/domain/vault-move.ts`)
+  and shows the dialog when links would break; `carryToVault` calls `moveToVault`.
+- The host's `FileService.moveAcross` renames (or copies and trashes between
+  volumes), copies a note's managed images and moves kept drafts;
+  `moveFolderComments`/`moveNoteComments` take the destination vault.
+- Not carried: material IDs and person-line records. `irori move` stays in one vault.
+- Verified by `tests/vault-move.test.ts`, `vault-split-ui-smoke` and a pass on the CLI
+  test desktop (a linked note: dialog with one broken link, then moved). Not tried on
+  Windows, macOS or between volumes.
+
+Workspaces as tabs, 2026-10-13 (**0.2.8**, not yet published): the owner asked to
+open several workspaces at once, tab-like ([ADR 037](decisions/037-workspace-tabs.md)).
+The owner chose a strip along the window's top and Home as the new-tab page.
+- `src/app/WorkspaceTabs.tsx` draws the strip above `.app-body` and above the
+  start screen while tabs are open; `src/domain/workspace-tabs.ts` keeps their
+  order (`openTab`, `closeTab`, `replaceTab`) and the vaults only one tab has
+  (`onlyIn`).
+- `openWorkspace` remembers where the tab on show was left (`tabViews`: level,
+  Overview view, vault, note) and restores the tab it opens. It no longer
+  disconnects the previous workspace's clouds; closing a tab releases those of
+  vaults no other tab has.
+- Home (`leaveWorkspace`) shows the start screen without cancelling runs.
+  `leave` handles Home, a switch and a close; the dialog (`leaving`) asks while a
+  terminal of the tab on show is open, and before a close cancels runs: vault
+  scopes only that tab has, and the irori agent's running conversations of that
+  workspace (`agentConversations(you, workspace)` then `cancel(you, id)`).
+- The status bar's workspace button is gone. The start screen disables removing a
+  workspace open as a tab and a vault one of them has.
+- Verified by `tests/workspace-tabs.test.ts` and `overview-ui-smoke` (a second
+  tab while agents run and wait, a refused close, a close that stops nothing),
+  plus a manual pass on the CLI test desktop (a note restored after switching).
+  Not tried on Windows or macOS.
+
 Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
 "Not added, over 100 MiB" dropping a large deck into contents and asked for
 no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).

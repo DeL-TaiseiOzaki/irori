@@ -2,6 +2,13 @@ import { classify, isPropertyPage } from '../domain/scopes';
 import { layerFolder, movedPath } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
+import { WorkspaceTabs } from './WorkspaceTabs';
+import {
+  closeTab as closeWorkspaceTab,
+  onlyIn,
+  openTab,
+  replaceTab,
+} from '../domain/workspace-tabs';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
   EntryDialog,
@@ -156,7 +163,7 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useStableFunctions } from './useStableFunctions';
 import { anyRevision, bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
-import { BrainPanel, type BrainMode } from './BrainPanel';
+import { BrainPanel, SideBrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
@@ -187,6 +194,20 @@ function navigationNotice(target: Navigation, found: boolean) {
     );
   return t(`${what}を特定できませんでした。`, `Could not locate the ${what}.`);
 }
+/** Where a workspace tab was left, to come back to when it is on show again. */
+type TabView = {
+  level: 'overview' | 'routines' | 'brain' | 'you';
+  overviewView: OverviewView;
+  scopeId?: string;
+  doc?: { scopeId: string; path: string };
+  /** The vault beside, when one was open (ADR 038). */
+  side?: string;
+};
+/** What leaving the workspace on show, or closing a tab, waits on the person for. */
+type Leaving =
+  | { kind: 'home' }
+  | { kind: 'switch'; profile: WorkspaceProfile }
+  | { kind: 'close'; profile: WorkspaceProfile; scopes: string[]; conversations: string[] };
 /** A run in progress: its space, and its conversation once the host has placed it. */
 type LiveRun = { scopeId: string; conversationId?: string };
 /** The AI chosen for each brain; a brain not chosen yet starts with the last choice. */
@@ -518,6 +539,12 @@ function App() {
   }>();
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
+  // The workspaces open as tabs, and where each was left: its level, vault and note.
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceProfile[]>([]);
+  const tabViews = useRef<Record<string, TabView>>({});
+  useEffect(() => {
+    if (workspace) setWorkspaceTabs((all) => replaceTab(all, workspace));
+  }, [workspace]);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
   // Every Schema from the settings: the shared one, the irori agent's and each vault's.
@@ -582,8 +609,9 @@ function App() {
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   // irori mode's own terminal, in the irori agent's folder; a vault's opens in its stage.
   const [iroriTerminal, setIroriTerminal] = useState(false);
-  // Going home asks first while agents or terminals still run.
-  const [askHome, setAskHome] = useState(false),
+  // Leaving the workspace on show asks first while its terminals are open; closing a
+  // tab asks while its agents run. Agents of a tab left open go on running.
+  const [leaving, setLeaving] = useState<Leaving>(),
     [goingHome, setGoingHome] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
@@ -796,6 +824,48 @@ function App() {
     { enabled: !!active && !startup, refresh: revision, interval: 5000 },
   );
   const connections = connectionsRead.data ?? noConnections;
+  // A second vault beside the first, to carry files between them (ADR 038).
+  const [side, setSide] = useState<string>();
+  const sideSpace =
+    side && side !== active?.scopeId
+      ? workspaceSpaces.find((space) => space.scopeId === side)
+      : undefined;
+  const sideRevision = scopeRevision(revisions, sideSpace?.scopeId);
+  const sideRootsRead = useResource(
+    () => host.entries(sideSpace!.scopeId, ''),
+    [sideSpace?.scopeId],
+    { enabled: !!sideSpace && !startup, refresh: sideRevision },
+  );
+  const sideRoots = useMemo<Listing | undefined>(
+    () =>
+      sideRootsRead.data || sideRootsRead.error
+        ? { entries: sideRootsRead.data ?? noEntries, error: sideRootsRead.error }
+        : undefined,
+    [sideRootsRead.data, sideRootsRead.error],
+  );
+  const sideConnectionsRead = useResource(
+    () => host.cloudConnections(sideSpace!.scopeId),
+    [sideSpace?.scopeId],
+    { enabled: !!sideSpace && !startup, refresh: sideRevision, interval: 5000 },
+  );
+  const sideConnections = sideConnectionsRead.data ?? noConnections;
+  // The vault beside coming on show trades places with the one that was.
+  const shownBefore = useRef<string>(undefined);
+  useEffect(() => {
+    const before = shownBefore.current;
+    shownBefore.current = active?.scopeId;
+    if (active && side === active.scopeId)
+      setSide(before && before !== active.scopeId ? before : undefined);
+  }, [active?.scopeId]);
+  // A move across vaults waits for the person while links would break.
+  const [vaultMove, setVaultMove] = useState<{
+    from: Space;
+    entry: Entry;
+    to: Space;
+    directory: string;
+    links: number;
+    incomplete: boolean;
+  }>();
   const defaultNoteDirectory =
     notesDeclared?.newNoteDirectory ?? defaultNoteDirectoryOf(active ?? {});
   // The first dock column shows this draft; the app only writes and flushes it.
@@ -1163,6 +1233,7 @@ function App() {
     await refreshSpaces();
     const profiles = await host.workspaces();
     setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
+    renewTabs(profiles);
     setVaultAgent(currentVaultAgent());
     setYourChoice(currentYourAi());
   }
@@ -1215,7 +1286,9 @@ function App() {
         const joined = event.workspace;
         void refreshSpaces()
           .then(() => {
-            if (joined) setWorkspace((open) => (open?.id === joined.id ? joined : open));
+            if (!joined) return;
+            setWorkspace((open) => (open?.id === joined.id ? joined : open));
+            setWorkspaceTabs((all) => replaceTab(all, joined));
           })
           .catch(report);
       } else if (event.type === 'agent') {
@@ -1495,34 +1568,54 @@ function App() {
     while (await sendNextQueued(scopeId));
     setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: true }));
   }
+  /** Opens a workspace as a tab, or brings its tab on show where it was left. */
   async function openWorkspace(profile: WorkspaceProfile) {
     if (gitBusy) return;
+    // The tab on show remembers where it was left.
+    if (workspace && workspaceTabs.some((tab) => tab.id === workspace.id))
+      tabViews.current[workspace.id] = {
+        level,
+        overviewView,
+        scopeId: active?.scopeId,
+        doc: doc && !doc.cloud ? { scopeId: doc.scopeId, path: doc.path } : undefined,
+        side: sideSpace?.scopeId,
+      };
+    const before = workspaceTabs.find((tab) => tab.id === profile.id);
+    const left = tabViews.current[profile.id];
     setBrainMode('files');
     setGitReview(false);
     setSources({});
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+    const shown = available.find((space) => space.scopeId === left?.scopeId) ?? available[0];
+    setWorkspaceTabs((all) => openTab(all, profile, workspace?.id));
     setWorkspace(profile);
     setScene(undefined);
-    setLevel('brain');
-    setActive(available[0]);
+    levelNow.current = left?.level ?? 'brain';
+    setLevel(left?.level ?? 'brain');
+    setOverviewView(left?.overviewView ?? 'map');
+    setView('note');
+    setSide(left?.side);
+    setActive(shown);
+    current.current = { doc: undefined, buffer: '', external: undefined };
     setDoc(undefined);
     setBuffer('');
     setExternal(undefined);
     setStartup(false);
     setConnecting(true);
     try {
-      // The folders of vaults this workspace leaves are disconnected; its own are connected.
-      const nextIds = available.map((space) => space.scopeId);
-      for (const previousId of workspace?.scopeIds ?? []) {
-        if (!nextIds.includes(previousId) && spaces.some((space) => space.scopeId === previousId))
-          for (const connection of await host.cloudConnections(previousId).catch((error) => {
-            report(error);
-            return [];
-          }))
-            if (connection.state === 'mounted' || connection.state === 'error')
-              await host.disconnectCloud(previousId, connection.mountId).catch(report);
+      // The note the tab was left on opens again, if it is still there.
+      if (left?.doc && left.doc.scopeId === shown?.scopeId) {
+        const note = await host.read(left.doc.scopeId, left.doc.path).catch(() => undefined);
+        if (note && !current.current.doc) load(note);
       }
-      for (const id of nextIds)
+      // Vaults an edit took out of this workspace let go of their folders, unless
+      // another tab has them; the workspace's own are connected.
+      if (before)
+        await release(
+          before.scopeIds.filter((id) => !profile.scopeIds.includes(id)),
+          workspaceTabs.filter((tab) => tab.id !== profile.id),
+        );
+      for (const id of available.map((space) => space.scopeId))
         for (const connection of await host.cloudConnections(id).catch((error) => {
           report(error);
           return [];
@@ -1544,6 +1637,60 @@ function App() {
       bump();
     }
   }
+  /** Disconnects the folders of vaults that no open tab, `others`, has. */
+  async function release(scopeIds: string[], others: WorkspaceProfile[]) {
+    const kept = new Set(others.flatMap((tab) => tab.scopeIds));
+    for (const id of scopeIds) {
+      if (kept.has(id) || !spaces.some((space) => space.scopeId === id)) continue;
+      for (const connection of await host.cloudConnections(id).catch((error) => {
+        report(error);
+        return [];
+      }))
+        if (connection.state === 'mounted' || connection.state === 'error')
+          await host.disconnectCloud(id, connection.mountId).catch(report);
+    }
+  }
+  /** The open tabs take their workspaces' newest profiles; a workspace no longer saved stays as it was. */
+  function renewTabs(profiles: WorkspaceProfile[]) {
+    setWorkspaceTabs((all) =>
+      all.map((tab) => profiles.find((profile) => profile.id === tab.id) ?? tab),
+    );
+  }
+  /**
+   * A drop from one vault's knowledge into another's (ADR 038): links between what
+   * moves and what stays break, so the person agrees first when there are any.
+   */
+  async function moveFromVault(fromScopeId: string, entry: Entry, to: Space, directory: string) {
+    const from = spaces.find((space) => space.scopeId === fromScopeId);
+    if (!from || gitBusy || fromScopeId === to.scopeId) return;
+    try {
+      if (!(await composer.flush()) || !(await save())) return;
+      const { links, incomplete } = await host.vaultMoveLinks(fromScopeId, entry.path);
+      const move = { from, entry, to, directory, links, incomplete };
+      if (links || incomplete) setVaultMove(move);
+      else await carryToVault(move);
+    } catch (error) {
+      report(error);
+    }
+  }
+  async function carryToVault(move: { from: Space; entry: Entry; to: Space; directory: string }) {
+    setVaultMove(undefined);
+    try {
+      const moved = await organize(() =>
+        host.moveToVault(move.from.scopeId, move.entry.path, move.to.scopeId, move.directory),
+      );
+      await entryChanged({
+        scopeId: move.from.scopeId,
+        toScopeId: move.to.scopeId,
+        action: 'move',
+        from: move.entry.path,
+        to: moved.entry.path,
+        notice: moved.notice,
+      });
+    } catch (error) {
+      report(error);
+    }
+  }
   function showConnections(target: CloudRoot) {
     setConnectionTarget(target);
     setConnectionsOpen(true);
@@ -1557,13 +1704,16 @@ function App() {
     const follow = (ref: SourceRef): SourceRef | undefined =>
       change.action === 'delete'
         ? undefined
-        : { scopeId: ref.scopeId, path: change.to + ref.path.slice(change.from.length) };
+        : {
+            scopeId: change.toScopeId ?? ref.scopeId,
+            path: change.to + ref.path.slice(change.from.length),
+          };
     const open = current.current.doc;
     if (open && under(open)) {
       const next = follow(open);
       const reopened =
         next &&
-        (await host.read(open.scopeId, next.path).catch((error) => {
+        (await host.read(next.scopeId, next.path).catch((error) => {
           report(error);
           return undefined;
         }));
@@ -1583,6 +1733,7 @@ function App() {
       }),
     );
     bump(change.scopeId);
+    if (change.action !== 'delete' && change.toScopeId) bump(change.toScopeId);
     setStatus(
       change.action === 'delete'
         ? t('削除しました', 'Deleted')
@@ -1680,8 +1831,8 @@ function App() {
   // a layout per configuration, and a set that is only partly rendered would be
   // written under one name and looked for under another.
   const islandPanes = useMemo(
-    () => (panel ? ['brain', 'stage', 'assistant'] : ['brain', 'stage']),
-    [panel],
+    () => ['brain', ...(sideSpace ? ['side'] : []), 'stage', ...(panel ? ['assistant'] : [])],
+    [panel, !!sideSpace],
   );
   const documentPanes = useMemo(
     () => (terminalSpace ? ['document', 'terminal'] : ['document']),
@@ -1798,6 +1949,8 @@ function App() {
     resetRequests,
     display,
     leaveWorkspace,
+    showTab,
+    closeWorkspace: (profile: WorkspaceProfile) => void closeWorkspace(profile),
     showOverview,
     showRoutines: () => goToLevel('routines'),
     enterBrain: (space: Space) => void enterBrain(space),
@@ -1885,6 +2038,14 @@ function App() {
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
       setEntryAction({ space, entry, action }),
+    moveFrom: (space: Space, fromScopeId: string, entry: Entry, directory: string) =>
+      void moveFromVault(fromScopeId, entry, space, directory),
+    openSide: () => {
+      const other = workspaceSpaces.find((space) => space.scopeId !== active?.scopeId);
+      if (other) setSide(other.scopeId);
+    },
+    chooseSide: (space: Space) => setSide(space.scopeId),
+    closeSide: () => setSide(undefined),
     moveInto: (space: Space, entry: Entry, directory: string) =>
       void organize(async () => {
         const moved = await host.moveEntry(
@@ -1971,9 +2132,30 @@ function App() {
         bringIn: (directory, items) => act.bringIn(active, directory, items),
         act: (entry, action) => act.entryAction(active, entry, action),
         moveInto: (entry, directory) => act.moveInto(active, entry, directory),
+        moveFrom: (scopeId, entry, directory) => act.moveFrom(active, scopeId, entry, directory),
         reveal: (path) => act.reveal(active, path),
       },
     [active, act],
+  );
+  // The explorer of the vault beside, doing the same in its own vault.
+  const sideExplorer = useMemo<Explorer | undefined>(
+    () =>
+      sideSpace && {
+        create: (directory, kind) => act.createIn(sideSpace, directory, kind),
+        bringIn: (directory, items) => act.bringIn(sideSpace, directory, items),
+        act: (entry, action) => act.entryAction(sideSpace, entry, action),
+        moveInto: (entry, directory) => act.moveInto(sideSpace, entry, directory),
+        moveFrom: (scopeId, entry, directory) => act.moveFrom(sideSpace, scopeId, entry, directory),
+        reveal: (path) => act.reveal(sideSpace, path),
+      },
+    [sideSpace, act],
+  );
+  const sideChoices = useMemo(
+    () =>
+      workspaceSpaces.filter(
+        (space) => space.scopeId !== active?.scopeId && space.scopeId !== sideSpace?.scopeId,
+      ),
+    [workspaceSpaces, active?.scopeId, sideSpace?.scopeId],
   );
   const hidden = level !== 'brain';
   const dockShared = useMemo<DockShared>(
@@ -2147,26 +2329,73 @@ function App() {
     goToLevel('brain', options.origin);
     if (options.ai) openDock(vaultAgent ? 'vault' : 'irori');
   }
-  // Home is reachable from anywhere: what still runs is stopped once the person agrees.
+  // Home is reachable from anywhere: it shows the start screen, where another workspace
+  // opens as a tab. Agents go on running; open terminals close once the person agrees.
   function leaveWorkspace() {
     if (gitBusy || connecting || goingHome) return;
-    if (anyRunning || terminalSpace || iroriTerminal) setAskHome(true);
-    else void goHome();
+    if (terminalSpace || iroriTerminal) setLeaving({ kind: 'home' });
+    else void leave({ kind: 'home' });
   }
-  async function goHome() {
+  /** Brings another tab on show; from the start screen, at once. */
+  function showTab(profile: WorkspaceProfile) {
+    if (gitBusy || connecting || goingHome || sending) return;
+    if (startup) void openWorkspace(profile);
+    else if (profile.id === workspace?.id) return;
+    else if (terminalSpace || iroriTerminal) setLeaving({ kind: 'switch', profile });
+    else void leave({ kind: 'switch', profile });
+  }
+  /**
+   * Closes a tab. Its agents stop: the runs of vaults no other tab has open and the
+   * irori agent's conversations of that workspace. The person agrees first when any
+   * of them runs, or when a terminal of the tab on show is open.
+   */
+  async function closeWorkspace(profile: WorkspaceProfile) {
+    if (gitBusy || connecting || goingHome || sending) return;
+    try {
+      const scopes = onlyIn(workspaceTabs, profile.id).filter((id) => runningScopes.includes(id));
+      const conversations =
+        you?.state === 'ready' && runningScopes.includes(you.id)
+          ? (await host.agentConversations(you.id, profile.id)).flatMap((row) =>
+              !isDamaged(row) && row.running ? [row.id] : [],
+            )
+          : [];
+      const shown = !startup && profile.id === workspace?.id;
+      const step: Leaving = { kind: 'close', profile, scopes, conversations };
+      if (scopes.length || conversations.length || (shown && (terminalSpace || iroriTerminal)))
+        setLeaving(step);
+      else await leave(step);
+    } catch (error) {
+      report(error);
+    }
+  }
+  /** Leaves the workspace on show for home or another tab, or closes a tab. */
+  async function leave(step: Leaving) {
     setGoingHome(true);
     try {
-      if (!(await save())) {
-        setAskHome(false);
-        report(t('ノートが未保存です。', 'The note is unsaved.'));
-        return;
+      const shown = !startup && (step.kind !== 'close' || step.profile.id === workspace?.id);
+      if (shown) {
+        if (!(await composer.flush()) || !(await save())) {
+          setLeaving(undefined);
+          report(t('ノートが未保存です。', 'The note is unsaved.'));
+          return;
+        }
+        setTerminalSpace(undefined);
+        setIroriTerminal(false);
+        await flushDrafts();
       }
-      await Promise.all(runningScopes.map((scopeId) => host.cancel(scopeId)));
-      setTerminalSpace(undefined);
-      setIroriTerminal(false);
-      await flushDrafts();
-      setAskHome(false);
-      setStartup(true);
+      setLeaving(undefined);
+      if (step.kind === 'switch') return void (await openWorkspace(step.profile));
+      if (step.kind === 'home') return setStartup(true);
+      await Promise.all([
+        ...step.scopes.map((scopeId) => host.cancel(scopeId)),
+        ...step.conversations.map((id) => host.cancel(you!.id, id)),
+      ]);
+      const { tabs, next } = closeWorkspaceTab(workspaceTabs, step.profile.id, workspace?.id);
+      setWorkspaceTabs(tabs);
+      await release(step.profile.scopeIds, tabs);
+      if (shown && next) await openWorkspace(next);
+      else if (shown) setStartup(true);
+      delete tabViews.current[step.profile.id];
     } catch (error) {
       report(error);
     } finally {
@@ -2193,16 +2422,82 @@ function App() {
       if (saved) setView('records');
     });
   }
+  const tabStrip = (
+    <WorkspaceTabs
+      tabs={workspaceTabs}
+      shown={startup ? undefined : workspace?.id}
+      running={runningScopes}
+      waiting={waitingScopes}
+      disabled={connecting || gitBusy || goingHome}
+      onShow={act.showTab}
+      onClose={act.closeWorkspace}
+      onAdd={act.leaveWorkspace}
+    />
+  );
+  const stopping =
+    leaving?.kind === 'close' && !!(leaving.scopes.length || leaving.conversations.length);
+  const closingTerminals =
+    !!(terminalSpace || iroriTerminal) &&
+    !startup &&
+    (leaving?.kind !== 'close' || leaving.profile.id === workspace?.id);
+  const leavingTitle =
+    leaving?.kind === 'close'
+      ? t(`${leaving.profile.name} を閉じる`, `Close ${leaving.profile.name}`)
+      : leaving?.kind === 'switch'
+        ? t('ワークスペースを切り替える', 'Switch workspace')
+        : t('ホームに戻る', 'Go home');
+  const leavingDialog = leaving && (
+    <Dialog label={leavingTitle} busy={goingHome} onClose={() => setLeaving(undefined)}>
+      <form
+        className="modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void leave(leaving);
+        }}
+      >
+        <h2>{leavingTitle}</h2>
+        <p>
+          {stopping && closingTerminals
+            ? t(
+                '実行中のエージェントを停止し、ターミナルを閉じます。',
+                'The running agents stop and the terminals close.',
+              )
+            : stopping
+              ? t('実行中のエージェントを停止します。', 'The running agents stop.')
+              : t('ターミナルを閉じます。', 'The terminals close.')}
+        </p>
+        <div className="actions">
+          <button type="button" disabled={goingHome} onClick={() => setLeaving(undefined)}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button className="primary" disabled={goingHome}>
+            {leaving.kind === 'close'
+              ? stopping
+                ? t('停止して閉じる', 'Stop and close')
+                : t('閉じる', 'Close')
+              : leaving.kind === 'switch'
+                ? t('閉じて切り替える', 'Close and switch')
+                : t('閉じて戻る', 'Close and go home')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
   if (startup)
     return (
-      <Startup
-        spaces={spaces}
-        refresh={refreshSpaces}
-        vaultAgent={vaultAgent}
-        onVaultAgent={act.chooseVault}
-        onRestored={act.environmentRestored}
-        onOpen={(profile) => void openWorkspace(profile)}
-      />
+      <div className={workspaceTabs.length ? 'app app-start' : 'app-start'}>
+        {workspaceTabs.length > 0 && tabStrip}
+        <Startup
+          spaces={spaces}
+          refresh={refreshSpaces}
+          vaultAgent={vaultAgent}
+          onVaultAgent={act.chooseVault}
+          onRestored={act.environmentRestored}
+          onOpen={(profile) => void openWorkspace(profile)}
+          open={workspaceTabs}
+        />
+        {leavingDialog}
+      </div>
     );
   return (
     <div
@@ -2211,6 +2506,7 @@ function App() {
       <a className="skip-to-editor" href="#editor-main">
         {t('編集領域へ移動', 'Skip to editor')}
       </a>
+      {tabStrip}
       <div className="app-body">
         <Rail
           spaces={workspaceSpaces}
@@ -2344,6 +2640,7 @@ function App() {
                 onSearch={act.searchHere}
                 explorer={explorer}
                 schema={schemaList}
+                onSplit={workspaceSpaces.length > 1 && !sideSpace ? act.openSide : undefined}
               >
                 {gitPanel}
               </BrainPanel>
@@ -2366,6 +2663,34 @@ function App() {
             className="island-handle"
             aria-label={t('vault パネルの幅', 'vault panel width')}
           />
+          {sideSpace && (
+            <>
+              <Pane id="side" className="brain-pane" defaultSize={260} minSize={200} maxSize={440}>
+                <SideBrainPanel
+                  space={sideSpace}
+                  choices={sideChoices}
+                  roots={sideRoots}
+                  revision={sideRevision}
+                  selected={doc}
+                  connections={sideConnections}
+                  locked={
+                    gitBusy ||
+                    connecting ||
+                    runningScopes.includes(sideSpace.scopeId) ||
+                    heldByYou(sideSpace.scopeId)
+                  }
+                  explorer={sideExplorer}
+                  onOpen={act.openEntry}
+                  onChoose={act.chooseSide}
+                  onClose={act.closeSide}
+                />
+              </Pane>
+              <PaneSeparator
+                className="island-handle"
+                aria-label={t('横の vault パネルの幅', 'Width of the vault beside')}
+              />
+            </>
+          )}
           <Pane
             id="stage"
             className="stage-pane"
@@ -3016,52 +3341,48 @@ function App() {
         )}
       </div>
       <StatusBar
-        workspace={workspace?.name ?? t('ワークスペース', 'Workspace')}
         space={active}
         git={gitRead.data}
         running={runningScopes.length}
         waiting={openRequestCount}
         status={status}
-        workspaceDisabled={connecting || gitBusy}
         terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
         terminalDisabled={
           iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
         }
-        onWorkspace={act.leaveWorkspace}
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}
       />
-      {askHome && (
+      {leavingDialog}
+      {vaultMove && (
         <Dialog
-          label={t('ホームに戻る', 'Go home')}
-          busy={goingHome}
-          onClose={() => setAskHome(false)}
+          label={t(`${vaultMove.to.name} へ移動`, `Move to ${vaultMove.to.name}`)}
+          onClose={() => setVaultMove(undefined)}
         >
           <form
             className="modal"
             onSubmit={(event) => {
               event.preventDefault();
-              void goHome();
+              void carryToVault(vaultMove);
             }}
           >
-            <h2>{t('ホームに戻る', 'Go home')}</h2>
+            <h2>{t(`${vaultMove.to.name} へ移動`, `Move to ${vaultMove.to.name}`)}</h2>
             <p>
-              {anyRunning && (terminalSpace || iroriTerminal)
+              {vaultMove.incomplete
                 ? t(
-                    '実行中のエージェントを停止し、ターミナルを閉じます。',
-                    'The running agents stop and the terminals close.',
+                    `${vaultMove.entry.name} を ${vaultMove.from.name} から移すと、リンクが切れる可能性があります。`,
+                    `Moving ${vaultMove.entry.name} out of ${vaultMove.from.name} may break links.`,
                   )
-                : anyRunning
-                  ? t('実行中のエージェントを停止します。', 'The running agents stop.')
-                  : t('ターミナルを閉じます。', 'The terminals close.')}
+                : t(
+                    `${vaultMove.entry.name} を ${vaultMove.from.name} から移すと、${vaultMove.links} 件のリンクが切れます。`,
+                    `Moving ${vaultMove.entry.name} out of ${vaultMove.from.name} breaks ${vaultMove.links} links.`,
+                  )}
             </p>
             <div className="actions">
-              <button type="button" disabled={goingHome} onClick={() => setAskHome(false)}>
+              <button type="button" onClick={() => setVaultMove(undefined)}>
                 {t('キャンセル', 'Cancel')}
               </button>
-              <button className="primary" disabled={goingHome}>
-                {t('停止して戻る', 'Stop and go home')}
-              </button>
+              <button className="primary">{t('移動', 'Move')}</button>
             </div>
           </form>
         </Dialog>
@@ -3092,6 +3413,7 @@ function App() {
               const next = profiles.find((profile) => profile.id === workspace?.id);
               setSpaces(list);
               if (next) setWorkspace(next);
+              renewTabs(profiles);
               // The next vault of the workspace comes on show.
               setActive(
                 (next?.scopeIds ?? []).flatMap((id) =>
