@@ -8,12 +8,15 @@
 import type { BrainAgent, SubAgentCli } from '../src/domain/you';
 import { commentsDirectory } from '../src/domain/comments';
 import { handedConnectedFolders } from './connected-folders';
+import { handedWorkFolders } from './work-folder';
 
 type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
   /** Its knowledge folder, `.` for the vault's root, and its contents folders. */
   layers?: { knowledge: string; contents: string[] };
   /** Folders connected in its contents, as paths inside the vault. */
   linked?: string[];
+  /** The folder its agents work in, an absolute path. */
+  work?: string;
 };
 
 /** The words that start a request to the irori agent: the vaults handed to it. */
@@ -45,6 +48,11 @@ const linkedNote = (brains: Handed[]) => {
   const first = brains.find((brain) => brain.linked?.length)?.linked?.[0];
   return first ? [handedConnectedFolders(first)] : [];
 };
+const workItem = (brain: Handed) =>
+  brain.work ? `, work folder ${JSON.stringify(brain.work)}` : '';
+/** Where work on a vault keeps its scratch, said only when a handed vault has a work folder. */
+const workNote = (brains: Handed[]) =>
+  brains.some((brain) => brain.work) ? [handedWorkFolders] : [];
 const commentCount = (count = 0) =>
   count ? `, ${count} comment${count === 1 ? '' : 's'} from people` : '';
 /** Where a handed vault keeps people's comments, said only when one has any. */
@@ -61,10 +69,11 @@ const handedPreamble = (brains: Handed[], comments: number[], worker: string, ha
     handedHeader,
     ...brains.map(
       (brain, index) =>
-        `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, ${worker} "${brain.agent}"${layerList(brain)}${linkedList(brain)}${commentCount(comments[index])}`,
+        `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, ${worker} "${brain.agent}"${layerList(brain)}${linkedList(brain)}${workItem(brain)}${commentCount(comments[index])}`,
     ),
     ...handing,
     ...linkedNote(brains),
+    ...workNote(brains),
     ...commentsNote(comments),
   ].join('\n');
 

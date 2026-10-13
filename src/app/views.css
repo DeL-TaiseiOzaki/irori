@@ -1267,6 +1267,20 @@ button.home-row:hover {
   opacity: 0;
   cursor: pointer;
 }
+.brain-sheet-work {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.brain-sheet-work small[role='alert'] {
+  font-size: 12px;
+  color: var(--del-ink);
+}
+.brain-sheet-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .brain-sheet-layers h3 {
   margin: 0 0 12px;
   font-size: 14px;

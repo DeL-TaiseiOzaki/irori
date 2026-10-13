@@ -1672,7 +1672,7 @@ function App() {
         report(error);
         return [];
       }))
-        if (connection.state === 'mounted' || connection.state === 'error')
+        if (['mounted', 'waiting', 'error'].includes(connection.state))
           await host.disconnectCloud(id, connection.mountId).catch(report);
     }
   }

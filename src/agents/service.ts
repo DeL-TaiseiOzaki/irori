@@ -1,4 +1,5 @@
 import { KnowledgeStore } from '../knowledge/store';
+import { within } from '../domain/scopes';
 import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
 import type { RunRecord } from '../domain/knowledge';
@@ -136,6 +137,8 @@ type Run = {
   holder?: string;
   /** A routine's agent step: a new native session that is never kept. */
   step?: StepRun;
+  /** Work folders outside the run's own folder, which its agents may change too. */
+  work?: string[];
   access: AgentAccess;
   queuedId?: string;
   recorded?: boolean;
@@ -265,6 +268,8 @@ export class AgentService {
    * ran in, and where the request came from). Without it the command is not offered.
    */
   setup?: (argv: string[], cwd: string, context: SetupContext) => Promise<string>;
+  /** The folder a vault's agents work in, made first when it is the default. Without it none is named. */
+  workFolder?: (scopeId: string) => Promise<string>;
   /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
   openUrl?: (url: string) => Promise<void>;
   private requests = new Map<
@@ -801,9 +806,22 @@ export class AgentService {
       ...(run.intro && { intro: run.intro }),
     });
   }
-  /** A vault agent's introduction and the line that stands for it (ADR 039). */
-  private async vaultIntro(scopeId: string, commands: boolean) {
+  /** The folder a vault's agents work in, made when it is the default; none when it cannot be. */
+  private async work(scopeId: string) {
+    return this.workFolder?.(scopeId).catch((error) => {
+      console.warn('Work folder unavailable', String(error));
+      return undefined;
+    });
+  }
+  /**
+   * A vault agent's introduction and the line that stands for it (ADR 039). A
+   * work folder outside the vault is one the run may change too.
+   */
+  private async vaultIntro(scopeId: string, commands: boolean, run: Run) {
     const vault = this.files.get(scopeId);
+    const work = await this.work(scopeId);
+    const inside = work !== undefined && within(vault.root, work);
+    if (work && !inside) run.work = [work];
     const instructions = await fs
       .stat(path.join(vault.root, 'AGENTS.md'))
       .then((stat) => stat.isFile())
@@ -815,6 +833,9 @@ export class AgentService {
           instructions,
           // Searches that walk the vault skip the links its connected folders appear through.
           linked: this.files.cloud?.linkedPaths?.(scopeId),
+          work:
+            work &&
+            (inside ? `${path.relative(vault.root, work).split(path.sep).join('/')}/` : work),
         },
         commands,
       ),
@@ -899,21 +920,25 @@ export class AgentService {
       }
       if (you && input.brains?.length) {
         const names = brainAgentNames(this.files.list());
-        const brains = input.brains.map((scopeId) => {
-          const brain = this.files.get(scopeId);
-          return {
-            scopeId: brain.scopeId,
-            name: brain.name,
-            category: brain.category && categoryName(brain.category),
-            agent: names.get(brain.scopeId)!,
-            root: brain.root,
-            layers: {
-              knowledge: shownFolder(knowledgeFolder(brain)),
-              contents: brain.contents,
-            },
-            linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
-          };
-        });
+        const brains = await Promise.all(
+          input.brains.map(async (scopeId) => {
+            const brain = this.files.get(scopeId);
+            return {
+              scopeId: brain.scopeId,
+              name: brain.name,
+              category: brain.category && categoryName(brain.category),
+              agent: names.get(brain.scopeId)!,
+              root: brain.root,
+              layers: {
+                knowledge: shownFolder(knowledgeFolder(brain)),
+                contents: brain.contents,
+              },
+              linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
+              work: await this.work(brain.scopeId),
+            };
+          }),
+        );
+        run.work = brains.flatMap((brain) => (brain.work ? [brain.work] : []));
         const comments = await Promise.all(
           brains.map((brain) =>
             commentsCount(this.files, brain.scopeId).then(
@@ -948,7 +973,7 @@ export class AgentService {
         ? commands
           ? { words: iroriCommandPreamble, pointer: iroriCommandPointer }
           : undefined
-        : await this.vaultIntro(input.scopeId, commands);
+        : await this.vaultIntro(input.scopeId, commands, run);
       const introAt = intro ? promptParts.push('') - 1 : -1;
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
@@ -1430,7 +1455,7 @@ export class AgentService {
     );
     run.rpc = rpc;
     await initializeCodex(rpc);
-    const folders = this.localFolders(run);
+    const folders = [...this.localFolders(run), ...(run.work ?? [])];
     const params = {
       cwd,
       approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
@@ -1697,11 +1722,16 @@ export class AgentService {
         includePartialMessages: true,
         resume: session,
         ...(model && { model }),
-        ...((delegation || run.step || this.localFolders(run).length || attachedFolders.length) && {
+        ...((delegation ||
+          run.step ||
+          this.localFolders(run).length ||
+          run.work?.length ||
+          attachedFolders.length) && {
           additionalDirectories: [
             ...(delegation?.brains.map((brain) => brain.root) ?? []),
             ...(run.step?.directories ?? []),
             ...this.localFolders(run),
+            ...(run.work ?? []),
             ...attachedFolders,
           ],
         }),

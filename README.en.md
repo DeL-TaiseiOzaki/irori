@@ -81,12 +81,13 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - Permissions follow each CLI's settings. A vault agent starts in full access where the CLI offers it; switch to standard (the CLI's settings, asking when needed) at any time.
 - Each vault and the irori agent keep any number of whole conversations on this PC, with **新しい会話** and a **履歴** list (rename, pin, archive, delete). Instructions can be queued while an agent works, and survive a restart ([CONVERSATIONS](docs/CONVERSATIONS.md)).
 - Attach files to an instruction (paperclip, drop, or paste an image); agents see images as pictures. The microphone starts the system's dictation. An agent's questions show as choices ([ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)).
+- Each vault has a work folder where its agents keep scratch files, intermediate results and trial scripts: `.irori/work` in the vault (ignored by Git) unless you choose another under **作業フォルダ** in the vault's settings ([ADR 042](docs/decisions/042-waiting-folders-and-work-folders.md)).
 - A file path in a reply is a link: click it and the file opens on the page, at its line when one is given. Paths in inline code and the file links Claude Code and Codex write both work.
 - **Routines**: open **Routines** in the left rail, between irori mode and the vaults, to configure JavaScript, manage secrets, and run a job you defined with one button. A routine is a folder with `routine.yaml` (in the irori agent's `routines/` or a vault's `.irori/routines/`) that lists programs to run and instructions for agents, in order. irori shows its files before the first run and after any change ([ROUTINES](docs/ROUTINES.md)).
 
 **Materials**
 - PDF, Word (.docx), PowerPoint (.pptx), spreadsheets such as Excel (.xlsx/.xlsm/.xls/.ods) and images open in the window, without switching apps. They are view only; edit them in their own app.
-- Connect a folder that Google Drive, Dropbox, Box, iCloud or OneDrive keeps in sync as a vault's Contents. irori and the vault agent can both edit it. For Google Drive, use [Google Drive for desktop](https://www.google.com/drive/download/).
+- Connect a folder that Google Drive, Dropbox, Box, iCloud or OneDrive keeps in sync as a vault's Contents. irori and the vault agent can both edit it. For Google Drive, use [Google Drive for desktop](https://www.google.com/drive/download/). A folder whose drive gets ready after irori starts connects by itself once it appears.
 
 **Records and tools**
 - The **Changes** tab shows diffs, commits and history. irori never force-overwrites and never stashes on its own.

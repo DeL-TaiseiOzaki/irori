@@ -199,6 +199,9 @@ export const hostArguments = {
   copyEntryPath: z.tuple([id, path, z.boolean()]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
+  workFolder: z.tuple([id]),
+  setWorkFolder: z.tuple([id, path.min(1).nullable()]),
+  openWorkFolder: z.tuple([id]),
   register: z.tuple([path, name, categoryText]),
   createSpace: z.tuple([
     z.object({

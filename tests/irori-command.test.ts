@@ -26,6 +26,7 @@ import { AgentSetup } from '../src/host/agent-setup';
 import { addNoteComment, resolveNoteComment } from '../src/host/comments';
 import { AgentService } from '../src/agents/service';
 import { CloudService } from '../src/cloud/service';
+import { WorkFolders } from '../src/host/work-folders';
 import { GitService } from '../src/git/service';
 import { GitProcess } from '../src/git/process';
 import type { AgentEvent, WorkspaceProfile } from '../src/domain/types';
@@ -312,6 +313,7 @@ async function device(t: TestContext) {
     git: service,
     workspaces,
     cloud,
+    work: new WorkFolders(files),
     defaultParent: async () => parent,
     announce: (change) => announced.push(change),
     home: path.join(base, 'home'),
@@ -434,6 +436,40 @@ test('connect links a folder into the named vault’s contents', async (t) => {
   await assert.rejects(setup.run(['connect', 'Research', drive], base), /No vault is named/);
   const busy = new AgentSetup({ ...deps, running: () => true });
   await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
+});
+
+test('work chooses where a vault’s agents work, and list names it and a folder it waits for', async (t) => {
+  const { base, files, setup } = await device(t);
+  const root = path.join(base, 'Notes');
+  await mkdir(root);
+  await files.register(root, 'Notes', 'personal');
+  const fallback = path.join(root, '.irori', 'work');
+  assert.match(
+    await setup.run(['list'], base),
+    new RegExp(`work folder ${JSON.stringify(JSON.stringify(fallback)).slice(1, -1)}`),
+  );
+  const elsewhere = path.join(base, 'Scratch');
+  await mkdir(elsewhere);
+  assert.match(
+    await setup.run(['work', 'Notes', 'Scratch'], base),
+    /The agents of the vault "Notes" work in ".*Scratch" on this computer\./,
+  );
+  assert.match(await setup.run(['list'], base), /work folder ".*Scratch"/);
+  assert.match(
+    await setup.run(['work', 'Notes', '--default'], base),
+    /\.irori\/work, which Git ignores/,
+  );
+  await assert.rejects(
+    setup.run(['work', 'Notes'], base),
+    /a vault and a folder, or a vault and --default/,
+  );
+  await assert.rejects(setup.run(['work', 'Notes', root], base), /重なる|overlap/);
+  // A connected folder whose drive is not mounted yet waits rather than failing.
+  const drive = path.join(base, 'Drive');
+  await mkdir(drive);
+  await setup.run(['connect', 'Notes', drive, '--name', 'Later'], base);
+  await rm(drive, { recursive: true });
+  assert.match(await setup.run(['list'], base), /contents\/Later \(waiting for its folder\)/);
 });
 
 test('layer knowledge . moves the knowledge folder to the vault’s root and back', async (t) => {

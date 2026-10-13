@@ -14,6 +14,7 @@ import {
   callRefused,
   iroriCommandHelp,
   layerChosen,
+  workFolderChosen,
   noteMoved,
   noteTrashed,
   routineList,
@@ -50,6 +51,7 @@ import type { FileService } from './files';
 import { inspectRepository, type WorkspaceService } from './workspaces';
 import { githubRepository } from '../domain/git';
 import { renameLayerFolder } from './layer-folders';
+import type { WorkFolders } from './work-folders';
 
 /** What the `irori` command reaches in the host. */
 export interface AgentSetupHost {
@@ -60,6 +62,8 @@ export interface AgentSetupHost {
     CloudService,
     'addLocal' | 'connect' | 'connections' | 'disconnect' | 'edit' | 'suspend' | 'resume'
   >;
+  /** The folder each vault's agents work in. */
+  work?: Pick<WorkFolders, 'folder' | 'choose'>;
   /** Where new vaults go when the command names no parent folder. */
   defaultParent: () => Promise<string>;
   /** Registers through the host's own guards and starts watching the vault. */
@@ -194,6 +198,8 @@ export class AgentSetup {
         return this.set(command, cwd, context);
       case 'layer':
         return this.layer(command, cwd, context);
+      case 'work':
+        return this.work(command, cwd, context);
       case 'workspace':
         return this.saveWorkspace(command, cwd, context);
       case 'remove':
@@ -238,6 +244,7 @@ export class AgentSetup {
             readOnly: item.access === 'read-only',
           }),
         ),
+        ...(this.host.work && { work: (await this.host.work.folder(space.scopeId)).path }),
       });
     const names = (scopeIds: string[]) =>
       scopeIds.map((id) => spaces.find((space) => space.scopeId === id)?.name ?? 'unavailable');
@@ -564,6 +571,19 @@ export class AgentSetup {
         },
       }),
     });
+  }
+  private async work(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'work' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    const space = this.vault(command.vault, cwd, context.vault);
+    if (!this.host.work) throw Error('irori cannot choose work folders here.');
+    const chosen = await this.host.work.choose(
+      space.scopeId,
+      command.folder === undefined ? null : this.folder(cwd, command.folder),
+    );
+    return workFolderChosen(space.name, chosen);
   }
   private async layer(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'layer' }>,

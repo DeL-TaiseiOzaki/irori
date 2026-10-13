@@ -67,8 +67,8 @@ links, not [[wiki links]].`
 
 irori list
   The vaults on this computer: name, folder, GitHub repository, category,
-  knowledge and contents folders, connected folders, and whether they are in
-  this workspace. Then the workspaces, and where new vaults go.
+  knowledge and contents folders, connected folders, the folder their agents
+  work in, and whether they are in this workspace. Then the workspaces, and where new vaults go.
 
 irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <vault name>] [--category <category>]
   Clones the repository into a new folder and registers it as a vault in
@@ -133,6 +133,13 @@ irori connect <vault> <folder> [--name <name in contents>] [--read-only]
 irori disconnect <vault> <name in contents>
   Takes a connected folder out of the vault's contents. The folder itself
   is not touched.
+
+irori work <vault> <folder>
+irori work <vault> --default
+  Chooses the folder where the vault's agents keep scratch files,
+  intermediate results, downloads and trial scripts, on this computer: an
+  existing folder, not another vault's. --default goes back to .irori/work
+  in the vault, which Git ignores.
 
 irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
   Changes the vault's name, its category, the names its Knowledge and
@@ -223,6 +230,8 @@ export interface ListedVault {
   knowledge?: string;
   contents?: string[];
   connections?: { name: string; contentsRoot: string; state: string; readOnly: boolean }[];
+  /** The folder its agents work in. */
+  work?: string;
 }
 
 /** `irori list`. */
@@ -263,8 +272,12 @@ const line = (workspace: string | undefined) => (item: ListedVault) => {
     item.contents?.length && `contents ${item.contents.map((c) => JSON.stringify(c)).join(', ')}`,
     item.connections?.length &&
       `connected ${item.connections
-        .map((c) => `${c.contentsRoot}/${c.name} (${c.state}${c.readOnly ? ', read-only' : ''})`)
+        .map(
+          (c) =>
+            `${c.contentsRoot}/${c.name} (${c.state === 'waiting' ? 'waiting for its folder' : c.state}${c.readOnly ? ', read-only' : ''})`,
+        )
         .join(', ')}`,
+    item.work && `work folder ${JSON.stringify(item.work)}`,
   ].filter(Boolean);
   return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
 };
@@ -315,6 +328,16 @@ export function vaultChanged(vault: {
       ].filter(Boolean)
     : [];
   return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
+}
+
+/** `irori work`: where the vault's agents work now. */
+export function workFolderChosen(
+  vault: string,
+  folder: { path: string; chosen: boolean; missing?: string },
+) {
+  return folder.chosen
+    ? `The agents of the vault "${vault}" work in ${JSON.stringify(folder.path)} on this computer.`
+    : `The agents of the vault "${vault}" work in ${JSON.stringify(folder.path)}, the vault's .irori/work, which Git ignores.`;
 }
 
 /** `irori layer`: the folder a layer now has, and what could not be carried over. */

@@ -16,6 +16,7 @@ function states(): Record<CloudConnection['state'], string> {
     unconfigured: t('フォルダ未選択', 'No folder chosen'),
     disconnected: t('未接続', 'Not connected'),
     connecting: t('接続中', 'Connecting'),
+    waiting: t('フォルダを待っています', 'Waiting for the folder'),
     mounted: t('接続済み', 'Connected'),
     error: t('接続エラー', 'Connection error'),
     retired: t('終了', 'Ended'),
@@ -377,7 +378,9 @@ export function Connections({
                           : t('編集を許可', 'Allow editing')}
                       </button>
                       <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
-                        {(connection.state === 'mounted' || connection.state === 'error') && (
+                        {(connection.state === 'mounted' ||
+                          connection.state === 'waiting' ||
+                          connection.state === 'error') && (
                           <Menu.Item
                             disabled={disabled}
                             onClick={() =>

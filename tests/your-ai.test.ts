@@ -64,6 +64,21 @@ test('your AI writes in its own folder, and a brain changes only through its sub
   assert.equal(writeDecision(delegation, 'general-purpose', '/kb/product/a.md').allow, false);
   assert.equal(writeDecision(delegation, 'general-purpose', 'notes.md').allow, true);
   assert.equal(writeDecision(delegation, undefined, '/etc/passwd').allow, false);
+  // A vault's work folder is scratch: your AI and every agent may write there.
+  const working: Delegation = {
+    ...delegation,
+    brains: [
+      { ...delegation.brains[0], work: '/kb/product/.irori/work' },
+      { ...delegation.brains[1], work: '/home/me/Documents/research work' },
+    ],
+  };
+  assert.equal(writeDecision(working, undefined, '/kb/product/.irori/work/try.py').allow, true);
+  assert.equal(writeDecision(working, undefined, '/kb/product/a.md').allow, false);
+  assert.equal(
+    writeDecision(working, 'vault-research', '/home/me/Documents/research work/x.csv').allow,
+    true,
+  );
+  assert.equal(writeDecision(working, 'vault-research', '/home/me/Documents/x.csv').allow, false);
 });
 
 test('the preamble names each vault, its folder and its sub-agent, per CLI', () => {

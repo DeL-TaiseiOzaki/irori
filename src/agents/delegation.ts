@@ -9,7 +9,8 @@ import { within } from '../domain/scopes';
 export interface Delegation {
   /** Your AI's folder, its working directory. */
   you: string;
-  brains: { scopeId: string; name: string; agent: string; root: string }[];
+  /** `work`: the folder work on that brain keeps its scratch in, when it has one. */
+  brains: { scopeId: string; name: string; agent: string; root: string; work?: string }[];
 }
 
 export type Decision = { allow: true } | { allow: false; reason: string };
@@ -29,7 +30,8 @@ export function brainOfPath(delegation: Delegation, file: string) {
  * Where a file tool may write. Your AI keeps to its own folder; a brain's
  * sub-agent keeps to its brain; any other agent (a built-in one, or one a brain
  * defines for itself) keeps to your AI's folder. Work in a brain therefore goes
- * through that brain's sub-agent, which has read the brain's Schema.
+ * through that brain's sub-agent, which has read the brain's Schema. A brain's
+ * work folder, scratch rather than the brain's material, is open to them all.
  */
 export function writeDecision(
   delegation: Delegation,
@@ -37,6 +39,8 @@ export function writeDecision(
   file: string,
 ): Decision {
   const absolute = path.resolve(delegation.you, file);
+  if (delegation.brains.some((item) => item.work && within(item.work, absolute)))
+    return { allow: true };
   const brain = brainOfAgent(delegation, agentType);
   if (brain)
     return within(brain.root, absolute)
