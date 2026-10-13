@@ -48,6 +48,11 @@ export function entryNameError(name: string): string | undefined {
     );
   return undefined;
 }
+/**
+ * A file brought in crosses to the host in pieces of at most this size, so a
+ * file of any size comes in without being held in memory whole.
+ */
+export const broughtChunkBytes = 16 * 1024 * 1024;
 export const nameKey = (name: string) => name.normalize('NFC').toLowerCase();
 export const mountName = z
   .string()

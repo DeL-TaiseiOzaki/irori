@@ -15,9 +15,9 @@ import { tmpdir } from 'node:os';
 import { draftFile, FileService } from '../src/host/files';
 import { carryMove } from '../src/host/layer-folders';
 import { addNoteComment, readNoteComments } from '../src/host/comments';
-import { freeName } from '../src/host/entries';
+import { appendUpload, discardUpload, freeName } from '../src/host/entries';
 import { hostArguments } from '../src/domain/host-requests';
-import { viewerByteLimit } from '../src/domain/viewers';
+import { broughtChunkBytes } from '../src/domain/connections';
 import { connectedFixture, connectionRoot } from './fixtures/cloud';
 
 async function fixture(t: TestContext) {
@@ -119,6 +119,54 @@ test('A file brought in keeps its bytes and takes a free name beside one it woul
     files.createEntry(id, 'Knowledge_Base', { kind: 'folder', name: '資料' }),
     /同じ名前/,
   );
+});
+
+test('A file of any size comes in piece by piece, and one not written whole is removed', async (t) => {
+  const { files, id, root } = await fixture(t);
+  await mkdir(path.join(root, 'Knowledge_Base'));
+  const whole = new Uint8Array(10).map((_, index) => index);
+  const made = await files.createEntry(id, 'Knowledge_Base', {
+    kind: 'file',
+    name: 'deck.pptx',
+    bytes: whole.slice(0, 4),
+    size: whole.length,
+  });
+  assert.equal(made.name, 'deck.pptx');
+  assert.ok(made.upload);
+  // The name is held while the rest comes, so a second copy keeps both.
+  const second = await files.createEntry(id, 'Knowledge_Base', {
+    kind: 'file',
+    name: 'deck.pptx',
+    bytes: whole.slice(0, 4),
+    size: whole.length,
+  });
+  assert.equal(second.name, 'deck 2.pptx');
+  await appendUpload(made.upload, whole.slice(4, 8));
+  await appendUpload(made.upload, whole.slice(8));
+  assert.deepEqual(
+    new Uint8Array(await readFile(path.join(root, 'Knowledge_Base', 'deck.pptx'))),
+    whole,
+  );
+  // A completed file takes no more pieces.
+  await assert.rejects(appendUpload(made.upload, whole.slice(0, 1)), /gone|見つかりません/);
+  // A piece past the announced size, or a discarded copy, leaves nothing behind.
+  await assert.rejects(appendUpload(second.upload!, whole), /size|大きさ/);
+  const third = await files.createEntry(id, 'Knowledge_Base', {
+    kind: 'file',
+    name: 'deck.pptx',
+    bytes: whole.slice(0, 4),
+    size: whole.length,
+  });
+  await discardUpload(third.upload!);
+  assert.deepEqual((await readdir(path.join(root, 'Knowledge_Base'))).sort(), ['deck.pptx']);
+  // A file that fits its first piece is written at once.
+  const small = await files.createEntry(id, 'Knowledge_Base', {
+    kind: 'file',
+    name: 'memo.txt',
+    bytes: whole,
+    size: whole.length,
+  });
+  assert.equal(small.upload, undefined);
 });
 
 test('Moving a knowledge folder carries the links, comments, drafts and note places that name it', async (t) => {
@@ -288,14 +336,46 @@ test('The renderer reaches the explorer only through validated requests', () => 
       .success,
     false,
   );
+  // A file of any size crosses in pieces; no single piece is larger than the limit.
   assert.equal(
     hostArguments.createEntry.safeParse([
       id,
       '',
-      { kind: 'file', name: 'big.bin', bytes: new Uint8Array(viewerByteLimit + 1) },
+      { kind: 'file', name: 'big.bin', bytes: new Uint8Array(broughtChunkBytes + 1) },
     ]).success,
     false,
   );
+  assert.equal(
+    hostArguments.createEntry.safeParse([
+      id,
+      '',
+      { kind: 'file', name: 'big.bin', bytes: new Uint8Array(1), size: 2 ** 40 },
+    ]).success,
+    true,
+  );
+  for (const size of [0, 1.5, -1])
+    assert.equal(
+      hostArguments.createEntry.safeParse([
+        id,
+        '',
+        { kind: 'file', name: 'big.bin', bytes: new Uint8Array(1), size },
+      ]).success,
+      false,
+    );
+  assert.equal(
+    hostArguments.createEntry.safeParse([id, '', { kind: 'file', name: 'big.bin', size: 2 }])
+      .success,
+    false,
+  );
+  assert.equal(
+    hostArguments.appendEntry.safeParse([id, new Uint8Array(broughtChunkBytes)]).success,
+    true,
+  );
+  assert.equal(
+    hostArguments.appendEntry.safeParse([id, new Uint8Array(broughtChunkBytes + 1)]).success,
+    false,
+  );
+  assert.equal(hostArguments.discardEntry.safeParse(['not an id']).success, false);
   assert.equal(hostArguments.moveEntry.safeParse([id, '', 'a']).success, false);
   assert.equal(hostArguments.trashEntry.safeParse([id, '']).success, false);
 });

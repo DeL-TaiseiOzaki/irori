@@ -149,6 +149,24 @@ try {
     .toEqual(['a 2.txt', 'a.txt', 'b.csv']);
   expect(await readFile(path.join(shared, '2026', 'a.txt'), 'utf8')).toBe('before');
   await expect(page.getByRole('contentinfo')).toContainText('2 件のファイルを追加');
+  // A file of any size comes in whole, past the 100 MiB once refused. The page
+  // builds the same bytes as the check below.
+  const large = 120 * 1024 * 1024 + 3;
+  await row(contents, '2026').evaluate((target, size) => {
+    const bytes = new Uint8Array(size);
+    for (let index = 0; index < size; index++) bytes[index] = (index * 7) % 251;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], 'deck.pptx'));
+    target.dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }),
+    );
+  }, large);
+  await expect(page.getByRole('contentinfo')).toContainText('1 件のファイルを追加', {
+    timeout: 60_000,
+  });
+  const copied = await readFile(path.join(shared, '2026', 'deck.pptx'));
+  expect(copied.length).toBe(large);
+  expect(copied.every((byte, index) => byte === (index * 7) % 251)).toBe(true);
   await row(contents, '共有').click({ button: 'right' });
   const chooser = page.waitForEvent('filechooser');
   await menuItem('ファイルを追加…').click();
@@ -179,6 +197,7 @@ try {
           'the knowledge folder itself offers no rename',
           'a connected folder takes a new folder and files brought in from elsewhere',
           'a closed folder opens under a drag; dropped files keep both on a taken name',
+          'a dropped file over 100 MiB comes in whole',
         ],
         errors,
       },

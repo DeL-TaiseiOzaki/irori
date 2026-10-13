@@ -927,7 +927,7 @@ export class CloudService {
     return this.mutate(async () => {
       const folder = await this.resolve(scopeId, directory);
       await this.assertWritable(scopeId, directory);
-      const name = await writeNewEntry(folder, entry);
+      const { name, upload } = await writeNewEntry(folder, entry);
       return {
         path: `${directory}/${name}`,
         name,
@@ -935,6 +935,7 @@ export class CloudService {
         layer: 'contents',
         note: entry.kind === 'file' && /\.md$/i.test(name),
         writable: true,
+        ...(upload && { upload }),
       };
     });
   }

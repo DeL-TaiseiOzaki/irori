@@ -86,7 +86,8 @@ import type {
 import { agentIds } from '../domain/types';
 import type { AgentSkill, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
-import { opensInIrori, viewerByteLimit } from '../domain/viewers';
+import { opensInIrori } from '../domain/viewers';
+import { broughtChunkBytes } from '../domain/connections';
 import { broughtFileLimit, broughtFiles, TooManyFiles, type Brought } from './dropped';
 const PageEditor = lazy(() =>
   import('./PageEditor').then((module) => ({ default: module.PageEditor })),
@@ -1614,11 +1615,42 @@ function App() {
   /**
    * Copies files and folders from the file manager into a folder of the vault,
    * under free names, with the folders' contents in the folders made for them.
+   * A file of any size crosses to the host piece by piece.
    */
   async function bringIn(space: Space, directory: string, items: Brought[]) {
     const total = broughtFiles(items);
     let added = 0;
-    const refused: string[] = [];
+    const piece = async (file: File, start: number) => {
+      const end = Math.min(file.size, start + broughtChunkBytes);
+      const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer());
+      // A file that shrank while it was read would leave its copy short.
+      if (bytes.length !== end - start)
+        throw Error(t(`${file.name} の大きさが変わりました。`, `${file.name} changed size.`));
+      return bytes;
+    };
+    const copy = async (folder: string, name: string, file: File) => {
+      const made = await host.createEntry(space.scopeId, folder, {
+        kind: 'file',
+        name,
+        bytes: await piece(file, 0),
+        size: file.size,
+      });
+      if (!made.upload) return;
+      try {
+        for (let start = broughtChunkBytes; start < file.size; start += broughtChunkBytes) {
+          setStatus(
+            t(
+              `追加中… ${name} ${Math.floor((start / file.size) * 100)}%`,
+              `Adding… ${name} ${Math.floor((start / file.size) * 100)}%`,
+            ),
+          );
+          await host.appendEntry(made.upload, await piece(file, start));
+        }
+      } catch (error) {
+        await host.discardEntry(made.upload).catch(() => {});
+        throw error;
+      }
+    };
     const place = async (folder: string, list: Brought[]) => {
       for (const item of list) {
         if (!('file' in item)) {
@@ -1628,13 +1660,8 @@ function App() {
             brought: true,
           });
           await place(made.path, item.entries);
-        } else if (item.file.size > viewerByteLimit) refused.push(item.name);
-        else {
-          await host.createEntry(space.scopeId, folder, {
-            kind: 'file',
-            name: item.name,
-            bytes: new Uint8Array(await item.file.arrayBuffer()),
-          });
+        } else {
+          await copy(folder, item.name, item.file);
           added++;
           if (total > 1) setStatus(t(`追加中… ${added}/${total}`, `Adding… ${added}/${total}`));
         }
@@ -1645,18 +1672,7 @@ function App() {
     } finally {
       bump(space.scopeId);
     }
-    setStatus(
-      [
-        added && t(`${added} 件のファイルを追加`, `Added ${added} files`),
-        refused.length &&
-          t(
-            `100 MiB を超えるため追加しなかったファイル: ${refused.join('、')}`,
-            `Not added, over 100 MiB: ${refused.join(', ')}`,
-          ),
-      ]
-        .filter(Boolean)
-        .join(' · '),
-    );
+    setStatus(added ? t(`${added} 件のファイルを追加`, `Added ${added} files`) : '');
   }
   // Pane sizes are the user's, not the stylesheet's: the group remembers each
   // layout per set of visible panes.

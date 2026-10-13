@@ -1135,13 +1135,17 @@ export class FileService {
       this.entryName(entry.name);
       if (directory) this.knowledgeEntry(id, `${directory}/${entry.name}`);
       else this.knowledgeEntry(id, entry.name);
-      const name = await writeNewEntry(await this.knowledgeFolderOf(id, directory), entry);
+      const { name, upload } = await writeNewEntry(
+        await this.knowledgeFolderOf(id, directory),
+        entry,
+      );
       return {
         path: directory ? `${directory}/${name}` : name,
         name,
         directory: entry.kind === 'folder',
         layer: 'Knowledge_Base',
         note: entry.kind === 'file' && /\.md$/i.test(name),
+        ...(upload && { upload }),
       };
     });
   }

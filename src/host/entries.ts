@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { entryNameError, nameKey } from '../domain/connections';
@@ -40,11 +41,22 @@ export async function freeName(parent: string, name: string) {
   throw taken();
 }
 
+/** Brought-in files still being written, by the id `appendUpload` takes. */
+const uploads = new Map<
+  string,
+  { filename: string; handle: FileHandle; left: number; writing?: boolean }
+>();
+
 /**
  * Writes a new file or folder into the existing folder `parent` and returns the
  * name it took. A brought-in entry takes a free name; a new one refuses a taken name.
+ * A brought-in file larger than its first piece stays open for the rest under
+ * the returned `upload`.
  */
-export async function writeNewEntry(parent: string, entry: NewEntry) {
+export async function writeNewEntry(
+  parent: string,
+  entry: NewEntry,
+): Promise<{ name: string; upload?: string }> {
   const problem = entryNameError(entry.name);
   if (problem) throw Error(problem);
   if (!(await fs.stat(parent)).isDirectory())
@@ -55,12 +67,54 @@ export async function writeNewEntry(parent: string, entry: NewEntry) {
   const filename = path.join(parent, name);
   try {
     if (entry.kind === 'folder') await fs.mkdir(filename);
-    else await fs.writeFile(filename, entry.bytes ?? '', { flag: 'wx' });
+    else if (entry.bytes && entry.size !== undefined && entry.size > entry.bytes.length) {
+      const handle = await fs.open(filename, 'wx');
+      const upload = randomUUID();
+      uploads.set(upload, { filename, handle, left: entry.size });
+      await appendUpload(upload, entry.bytes);
+      return { name, upload };
+    } else await fs.writeFile(filename, entry.bytes ?? '', { flag: 'wx' });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw taken();
     throw error;
   }
-  return name;
+  return { name };
+}
+
+/**
+ * Writes the next piece of a brought-in file. The piece that fills the size
+ * announced completes it; a piece past that size removes the file.
+ */
+export async function appendUpload(upload: string, bytes: Uint8Array) {
+  const open = uploads.get(upload);
+  if (!open || open.writing)
+    throw Error(t('追加中のファイルが見つかりません。', 'The file being added is gone.'));
+  if (bytes.length > open.left) {
+    await discardUpload(upload);
+    throw Error(t('ファイルの大きさが変わりました。', 'The file changed size.'));
+  }
+  open.writing = true;
+  try {
+    // A handle's writeFile writes on from its position, all of the bytes.
+    await open.handle.writeFile(bytes);
+  } catch (error) {
+    await discardUpload(upload);
+    throw error;
+  }
+  open.writing = false;
+  open.left -= bytes.length;
+  if (open.left) return;
+  uploads.delete(upload);
+  await open.handle.close();
+}
+
+/** Removes a brought-in file that was not written whole. */
+export async function discardUpload(upload: string) {
+  const open = uploads.get(upload);
+  if (!open) return;
+  uploads.delete(upload);
+  await open.handle.close().catch(() => {});
+  await fs.rm(open.filename, { force: true });
 }
 
 /**

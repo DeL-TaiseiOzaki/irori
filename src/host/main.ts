@@ -12,6 +12,7 @@ import { SearchService } from './search';
 import { resolveLink } from './links';
 import { referringLinks, relink } from './relink';
 import { carryMove, renameLayerFolder } from './layer-folders';
+import { appendUpload, discardUpload } from './entries';
 import { classify } from '../domain/scopes';
 import { DraftService } from './drafts';
 import { writeExclusive } from './local-json';
@@ -753,6 +754,8 @@ app
               : files.createEntry(scopeId, directory, entry),
           ),
         ),
+      appendEntry: (upload, bytes) => changeFiles(() => appendUpload(upload, bytes)),
+      discardEntry: (upload) => discardUpload(upload),
       moveEntry: (scopeId, from, to) =>
         classify(files.get(scopeId), from) === 'contents'
           ? changeFiles(() =>

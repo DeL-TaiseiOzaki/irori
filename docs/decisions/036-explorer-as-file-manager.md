@@ -33,9 +33,9 @@ Explorer or Finder does. Until 0.2.1:
    a contents folder is neither moved nor deleted.
 3. **Never replace.** A new file or folder refuses a name its folder holds in
    any case or normalization. A file brought in instead takes the first free
-   `name 2.ext`, as Finder keeps both; so does a brought-in folder. Files up to
-   100 MiB, and up to 2,000 files in one drop, are brought in through irori;
-   more through the file manager.
+   `name 2.ext`, as Finder keeps both; so does a brought-in folder. Up to 2,000
+   files in one drop are brought in through irori; more through the file
+   manager. A file of any size comes in (0.2.7; until then, up to 100 MiB).
 4. **A move in Knowledge carries what names its paths.** A note that stays a
    note moves as before (`moveNoteCarrying`). Any other file or folder moves as
    it is, then `carryMove` — shared with the layer folder rename — rewrites the
@@ -54,7 +54,10 @@ Explorer or Finder does. Until 0.2.1:
 
 - Organizing a vault no longer needs Finder or a terminal, and links survive
   folder moves made in irori.
-- A file brought in crosses the IPC bridge whole; 100 MiB bounds it.
+- A file brought in crosses the IPC bridge in pieces of at most 16 MiB
+  (`appendEntry`), so its size has no bound and the renderer holds one piece at
+  a time. The host takes the free name with the first piece; a piece that fails
+  removes the partial file. Closing irori in the middle of a copy leaves it short.
 - Not tried on Windows or macOS: their trash, Finder or Explorer reveal and
   drops from the system file manager are verified only through the Linux
   Electron smoke and its synthetic drop.
