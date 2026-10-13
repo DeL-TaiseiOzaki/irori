@@ -257,6 +257,7 @@ export const hostArguments = {
   openExternal: z.tuple([id, path]),
   agents: z.tuple([]),
   agentModels: z.tuple([z.enum(agentIds)]),
+  agentCommands: z.tuple([id, z.enum(agentIds)]),
   agentConversations: z.tuple([id, id.optional()]),
   agentConversation: z.tuple([id, z.enum(agentIds), id.optional(), id.optional()]),
   createConversation: z.tuple([id, z.enum(agentIds), id.optional()]),

@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import type { Query, SettingSource } from '@anthropic-ai/claude-agent-sdk';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { AgentId, AgentModel, AgentModels } from '../domain/types';
 import { agentModel } from '../domain/conversation';
@@ -12,7 +13,7 @@ const deadline = 30000;
 const valid = (id: string) => agentModel.safeParse(id).success;
 const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, '');
 const timedOut = () =>
-  t('モデル一覧の取得がタイムアウトしました。', 'Reading the model list timed out.');
+  t('CLI からの一覧の取得がタイムアウトしました。', 'Reading the list from the CLI timed out.');
 
 /** `opencode models`: one `provider/model` per line. */
 export function parseOpenCodeModels(output: string): AgentModel[] {
@@ -47,15 +48,25 @@ const listing = (command: string, args: string[]) =>
     failed: (code, stderr) => stderr.trim() || `${command} exited (${code})`,
   });
 
-/** Codex's `model/list` through its app server, following each page; hidden models are left out. */
-async function codexModels(): Promise<AgentModel[]> {
-  const child = codexServer(homedir());
+/** Codex's app server in `cwd`, asked by `read` and closed after it; nothing runs. */
+export async function askCodex<T>(cwd: string, read: (rpc: Rpc) => Promise<T>): Promise<T> {
+  const child = codexServer(cwd);
   const rpc = new Rpc(child, (message) => {
     // Nothing runs, so nothing may be asked; refuse rather than approve.
     if (message.id !== undefined && message.method) refuseCodex(rpc, message, 'Not supported');
   });
   try {
     await initializeCodex(rpc);
+    return await read(rpc);
+  } finally {
+    rpc.fail(Error('Codex read'));
+    await killTree(child).catch(() => {});
+  }
+}
+
+/** Codex's `model/list` through its app server, following each page; hidden models are left out. */
+function codexModels(): Promise<AgentModel[]> {
+  return askCodex(homedir(), async (rpc) => {
     const models: AgentModel[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < 20; page++) {
@@ -74,10 +85,7 @@ async function codexModels(): Promise<AgentModel[]> {
       if (!cursor) break;
     }
     return models;
-  } finally {
-    rpc.fail(Error('Model list read'));
-    await killTree(child).catch(() => {});
-  }
+  });
 }
 
 /** Claude Code's aliases, when the installed CLI cannot be asked. */
@@ -87,10 +95,14 @@ export const claudeAliases: AgentModel[] = ['fable', 'opus', 'sonnet', 'haiku'].
 }));
 
 /**
- * Claude Code's `supportedModels()`, asked of a session that is never sent a
- * message: its input never yields, so no turn starts and no model is called.
+ * A Claude Code session in `cwd` that is never sent a message, asked by `read`:
+ * its input never yields, so no turn starts and no model is called.
  */
-async function claudeModels(): Promise<AgentModel[]> {
+export async function askClaude<T>(
+  cwd: string,
+  settingSources: SettingSource[],
+  read: (session: Query) => Promise<T>,
+): Promise<T> {
   const { query } = await import('@anthropic-ai/claude-agent-sdk');
   let release!: () => void;
   const idle = new Promise<void>((resolve) => {
@@ -104,16 +116,16 @@ async function claudeModels(): Promise<AgentModel[]> {
   const session = query({
     prompt: nothing(),
     options: {
-      cwd: homedir(),
+      cwd,
       pathToClaudeCodeExecutable: 'claude',
       env: agentEnv(),
-      settingSources: ['user'],
+      settingSources,
       abortController: abort,
       spawnClaudeCodeProcess: (options) =>
         (child = launch(
           options.command,
           options.args,
-          options.cwd ?? homedir(),
+          options.cwd ?? cwd,
           options.env,
         )) as ChildProcessWithoutNullStreams,
     },
@@ -127,22 +139,12 @@ async function claudeModels(): Promise<AgentModel[]> {
   })();
   let timer: NodeJS.Timeout | undefined;
   try {
-    const list = await Promise.race([
-      session.supportedModels(),
+    return await Promise.race([
+      read(session),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(Error(timedOut())), deadline);
       }),
     ]);
-    // Its "default" row is the CLI's default, offered separately; the row it resolves to is marked.
-    const preset = list.find((model) => model.value === 'default');
-    return list
-      .filter((model) => model.value !== 'default' && valid(model.value))
-      .map((model) => ({
-        id: model.value,
-        label: model.displayName || model.value,
-        ...(preset?.resolvedModel &&
-          model.resolvedModel === preset.resolvedModel && { default: true }),
-      }));
   } finally {
     clearTimeout(timer);
     release();
@@ -152,6 +154,21 @@ async function claudeModels(): Promise<AgentModel[]> {
     // Closed like every other spawn: with whatever the CLI started.
     if (child) await killTree(child).catch(() => {});
   }
+}
+
+/** Claude Code's `supportedModels()`. */
+async function claudeModels(): Promise<AgentModel[]> {
+  const list = await askClaude(homedir(), ['user'], (session) => session.supportedModels());
+  // Its "default" row is the CLI's default, offered separately; the row it resolves to is marked.
+  const preset = list.find((model) => model.value === 'default');
+  return list
+    .filter((model) => model.value !== 'default' && valid(model.value))
+    .map((model) => ({
+      id: model.value,
+      label: model.displayName || model.value,
+      ...(preset?.resolvedModel &&
+        model.resolvedModel === preset.resolvedModel && { default: true }),
+    }));
 }
 
 async function list(agent: AgentId): Promise<AgentModel[]> {

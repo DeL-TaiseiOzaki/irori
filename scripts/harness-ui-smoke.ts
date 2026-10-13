@@ -42,6 +42,22 @@ for (const id of ['pi', 'opencode', 'hermes'])
     `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
     { mode: 0o700 },
   );
+// Codex's app server, enough to list its skills for the composer's commands (ADR 040).
+await writeFile(
+  path.join(bin, 'codex'),
+  `#!/usr/bin/env node
+if (process.argv.includes('--version')) { console.log('codex-cli 9.9.9'); process.exit(0); }
+const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
+require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+  const m = JSON.parse(line);
+  if (!m.method || m.id === undefined) return;
+  send({ id: m.id, result: m.method === 'skills/list'
+    ? { data: [{ cwd: '', errors: [], skills: [{ name: 'weekly', description: 'Writes the weekly review.', path: '/skills/weekly/SKILL.md', enabled: true }] }] }
+    : {} });
+});
+`,
+  { mode: 0o700 },
+);
 await chooseJapanese(files.dataDir);
 const env = {
   ...process.env,
@@ -326,6 +342,28 @@ try {
           .session.access,
     )
     .toBe('default');
+  // Typing `/` offers the CLI's commands and skills; a choice fills the box (ADR 040).
+  await page.getByLabel('エージェント', { exact: true }).selectOption('codex');
+  const instruction = page.getByLabel('エージェントへの指示');
+  await instruction.fill('/');
+  const commands = page.getByRole('listbox', { name: 'コマンド' });
+  await expect(commands.getByRole('option')).toHaveText([
+    /\/compact/,
+    /\/review/,
+    /\/weekly.*スキル.*Writes the weekly review\./,
+  ]);
+  await page.screenshot({ path: 'test-results/irori-command-menu.png' });
+  await instruction.fill('/we');
+  await expect(commands.getByRole('option')).toHaveCount(1);
+  await instruction.press('Enter');
+  await expect(instruction).toHaveValue('/weekly ');
+  await expect(commands).toHaveCount(0);
+  await instruction.fill('/re');
+  await expect(commands.getByRole('option')).toHaveCount(1);
+  await instruction.press('Escape');
+  await expect(commands).toHaveCount(0);
+  await expect(instruction).toHaveValue('/re');
+  await instruction.fill('');
   // The model pill lists what the installed CLI prints, and the choice reaches it.
   const fixtureLog = async () =>
     (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))

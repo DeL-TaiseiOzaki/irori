@@ -29,6 +29,7 @@ import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
 import { ModelCatalog } from './models';
+import { CommandCatalog, codexSkills, commandWords } from './commands';
 import { personLinesBridge } from './person-lines';
 import { handOffTaskLimit, iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
@@ -154,6 +155,10 @@ type Run = {
   shared?: string;
   /** The digest of the introduction this run gave in full or stood for (ADR 039). */
   intro?: string;
+  /** The person's own words, which Codex takes apart for its commands and skills (ADR 040). */
+  words?: string;
+  /** The words are a CLI's command, `/name`, and went alone. */
+  command?: boolean;
   /** The title a new conversation for this run takes instead of its first line. */
   title?: string;
   accepted: Promise<void>;
@@ -177,8 +182,6 @@ type Run = {
 };
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
-/** Words that are a CLI's command: `/name`, alone or with arguments, not a path. */
-const cliCommand = (words: string) => /^\/[\w:-]+(\s|$)/.test(words);
 const digest = (words: string) => createHash('sha256').update(words).digest('hex');
 /** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
 const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
@@ -253,6 +256,7 @@ export class AgentService {
   /** Files the person attaches to instructions. */
   readonly attachments: AttachmentStore;
   private catalog = new ModelCatalog();
+  private commandCatalog = new CommandCatalog();
   // Brains handed to the irori agent's runs in progress, with the runs that hold
   // them. A brain is busy while a sub-agent may be working in its checkout.
   private delegated = new Map<string, Set<string>>();
@@ -491,6 +495,10 @@ export class AgentService {
   /** The models the installed CLI offers, read once per CLI version. */
   models(agent: AgentId) {
     return this.catalog.models(agent);
+  }
+  /** What the installed CLI runs as `/name` in this owner's folder (ADR 040). */
+  commands(scopeId: string, agent: AgentId) {
+    return this.commandCatalog.commands(agent, this.root(scopeId));
   }
   async available(): Promise<AgentInfo[]> {
     return Promise.all(
@@ -1053,7 +1061,9 @@ export class AgentService {
       if (run.cancelled) return;
       // A CLI's own command (`/compact`, a Pi extension's) works only as the
       // whole request, so nothing irori adds goes before it, and nothing counts as heard.
-      const command = !selectedSkill && !run.attached?.length && cliCommand(input.prompt);
+      const command = !selectedSkill && !run.attached?.length && commandWords.test(input.prompt);
+      run.words = input.prompt;
+      run.command = command;
       if (intro && !command) {
         run.intro = digest(intro.words);
         promptParts[introAt] = saved && heardIntro === run.intro ? intro.pointer : intro.words;
@@ -1374,10 +1384,16 @@ export class AgentService {
         const p = m.params ?? {};
         if (!ownCodexNotice(run, p)) return;
         if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
+        // A review's findings are its answer, said when it leaves review mode.
+        if (m.method === 'item/completed' && p.item?.type === 'exitedReviewMode') {
+          if (typeof p.item.review === 'string') this.event(run, 'text', p.item.review);
+          return;
+        }
         if (
           m.method === 'item/started' &&
-          p.item?.type !== 'agentMessage' &&
-          p.item?.type !== 'userMessage'
+          !['agentMessage', 'userMessage', 'enteredReviewMode', 'exitedReviewMode'].includes(
+            p.item?.type,
+          )
         )
           this.event(run, 'tool', p.item?.type ?? 'tool', {
             details: JSON.stringify(
@@ -1400,6 +1416,7 @@ export class AgentService {
             { details: JSON.stringify(p.item), call: p.item.id, result: true },
           );
         if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
+        if (m.method === 'thread/compacted') run.finish?.();
         if (m.method === 'turn/completed') {
           if (p.turn?.status === 'failed')
             failure = Error(p.turn.error?.message ?? 'Codex turn failed');
@@ -1432,13 +1449,57 @@ export class AgentService {
     run.threadId = thread.thread.id;
     await this.saveSession(run, thread.thread.id);
     if (run.cancelled) return;
+    // Codex's app server takes its commands as methods and its skills as items,
+    // never as `/name` in a turn's text (ADR 040).
+    const words = run.command ? commandWords.exec(run.words ?? '') : null;
+    const name = words?.[1];
+    const rest = words?.[2]?.trim() ?? '';
+    if (name === 'compact') {
+      if (!session) {
+        this.event(
+          run,
+          'status',
+          t('まだ要約する会話がありません。', 'There is no conversation to summarize yet.'),
+        );
+        return;
+      }
+      await rpc.request('thread/compact/start', { threadId: run.threadId });
+      await completion;
+      if (failure) throw failure;
+      return;
+    }
+    if (name === 'review') {
+      const review = await rpc.request('review/start', {
+        threadId: run.threadId,
+        delivery: 'inline',
+        target: rest ? { type: 'custom', instructions: rest } : { type: 'uncommittedChanges' },
+      });
+      run.turnId = review?.turn?.id;
+      await completion;
+      if (failure) throw failure;
+      return;
+    }
+    // A skill named as `/name`, or as `$name` in the words, goes as an item beside
+    // the text, as Codex's own composer sends it.
+    const named = new Set(
+      [...(run.words ?? '').matchAll(/(?:^|\s)\$([\w:-]+)/g)].map((match) => match[1]),
+    );
+    if (name) named.add(name);
+    const skills = named.size
+      ? (await codexSkills(rpc, cwd).catch(() => [])).filter((skill) => named.has(skill.name))
+      : [];
+    const text =
+      name && skills.some((skill) => skill.name === name)
+        ? `$${name}${rest ? ` ${rest}` : ''}`
+        : prompt;
     const turn = await rpc.request('turn/start', {
       threadId: run.threadId,
       input: [
         ...(run.attached ?? [])
           .filter((file) => file.image)
           .map((file) => ({ type: 'localImage', path: file.path })),
-        { type: 'text', text: prompt, text_elements: [] },
+        ...skills.map((skill) => ({ type: 'skill', name: skill.name, path: skill.path })),
+        { type: 'text', text, text_elements: [] },
       ],
       ...(model && { model }),
     });

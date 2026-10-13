@@ -820,6 +820,7 @@
   font-size: 12px;
 }
 .composer-box {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -832,6 +833,56 @@
 .composer-box:hover,
 .composer-box:focus-within {
   border-color: var(--hair-3);
+}
+/* The CLI's commands, offered above the box while a request is `/` and a name (ADR 040). */
+.command-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--tx);
+  box-shadow: var(--pop);
+  font-size: 12.5px;
+}
+.command-menu [role='option'] {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: default;
+}
+.command-menu [aria-selected='true'] {
+  background: var(--raised-2);
+}
+.command-menu .command-name {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.command-menu .command-hint,
+.command-menu .command-tag {
+  color: var(--tx-3);
+  white-space: nowrap;
+}
+.command-menu .command-description {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-2);
+}
+.command-menu .command-menu-note {
+  padding: 6px 10px;
+  color: var(--tx-3);
 }
 .composer-context {
   display: flex;

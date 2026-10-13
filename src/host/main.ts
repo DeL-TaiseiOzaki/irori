@@ -972,6 +972,7 @@ app
         changeFiles(() => removeNoteComment(files, id, p, commentId)),
       agents: () => agents.available(),
       agentModels: (agent) => agents.models(agent),
+      agentCommands: (scopeId, agent) => agents.commands(scopeId, agent),
       agentConversations: (scopeId, workspaceId) => agents.conversationList(scopeId, workspaceId),
       agentConversation: (...args) => agents.conversation(...args),
       createConversation: (...args) => agents.createConversation(...args),

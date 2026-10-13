@@ -38,6 +38,7 @@ import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
 import { aiStateWords, sendOnEnter } from './display';
+import { useCommandMenu } from './CommandMenu';
 import {
   AttachButton,
   ComposerAttachments,
@@ -300,6 +301,7 @@ export function AgentColumn({
   const followConversation = useRef(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const attachments = useAttachments(report);
+  const commandMenu = useCommandMenu({ scopeId, agent, prompt, setPrompt, field: textarea });
   // Something to send: words, or files alone.
   const sendable = !!prompt.trim() || (attachments.refs.length > 0 && !attachments.pending);
 
@@ -1119,6 +1121,7 @@ export function AgentColumn({
             )}
           </div>
           <ComposerAttachments attachments={attachments} />
+          {commandMenu.menu}
           <textarea
             ref={textarea}
             aria-label={
@@ -1136,8 +1139,11 @@ export function AgentColumn({
             disabled={!ready || !composer.ready || sending}
             maxLength={promptLimit}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={sendOnEnter(() => void start())}
+            onKeyDown={(event) => {
+              if (!commandMenu.onKeyDown(event)) sendOnEnter(() => void start())(event);
+            }}
             onPaste={attachments.onPaste}
+            {...commandMenu.field}
           />
           <div className="composer-actions">
             <div className="composer-selects">
