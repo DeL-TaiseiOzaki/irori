@@ -2,6 +2,13 @@ import { classify, isPropertyPage } from '../domain/scopes';
 import { layerFolder, movedPath } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
+import { WorkspaceTabs } from './WorkspaceTabs';
+import {
+  closeTab as closeWorkspaceTab,
+  onlyIn,
+  openTab,
+  replaceTab,
+} from '../domain/workspace-tabs';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
   EntryDialog,
@@ -187,6 +194,18 @@ function navigationNotice(target: Navigation, found: boolean) {
     );
   return t(`${what}を特定できませんでした。`, `Could not locate the ${what}.`);
 }
+/** Where a workspace tab was left, to come back to when it is on show again. */
+type TabView = {
+  level: 'overview' | 'routines' | 'brain' | 'you';
+  overviewView: OverviewView;
+  scopeId?: string;
+  doc?: { scopeId: string; path: string };
+};
+/** What leaving the workspace on show, or closing a tab, waits on the person for. */
+type Leaving =
+  | { kind: 'home' }
+  | { kind: 'switch'; profile: WorkspaceProfile }
+  | { kind: 'close'; profile: WorkspaceProfile; scopes: string[]; conversations: string[] };
 /** A run in progress: its space, and its conversation once the host has placed it. */
 type LiveRun = { scopeId: string; conversationId?: string };
 /** The AI chosen for each brain; a brain not chosen yet starts with the last choice. */
@@ -518,6 +537,12 @@ function App() {
   }>();
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
+  // The workspaces open as tabs, and where each was left: its level, vault and note.
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceProfile[]>([]);
+  const tabViews = useRef<Record<string, TabView>>({});
+  useEffect(() => {
+    if (workspace) setWorkspaceTabs((all) => replaceTab(all, workspace));
+  }, [workspace]);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
   // Every Schema from the settings: the shared one, the irori agent's and each vault's.
@@ -582,8 +607,9 @@ function App() {
   const [terminalSpace, setTerminalSpace] = useState<Space>();
   // irori mode's own terminal, in the irori agent's folder; a vault's opens in its stage.
   const [iroriTerminal, setIroriTerminal] = useState(false);
-  // Going home asks first while agents or terminals still run.
-  const [askHome, setAskHome] = useState(false),
+  // Leaving the workspace on show asks first while its terminals are open; closing a
+  // tab asks while its agents run. Agents of a tab left open go on running.
+  const [leaving, setLeaving] = useState<Leaving>(),
     [goingHome, setGoingHome] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]),
     [active, setActive] = useState<Space>(),
@@ -1163,6 +1189,7 @@ function App() {
     await refreshSpaces();
     const profiles = await host.workspaces();
     setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
+    renewTabs(profiles);
     setVaultAgent(currentVaultAgent());
     setYourChoice(currentYourAi());
   }
@@ -1215,7 +1242,9 @@ function App() {
         const joined = event.workspace;
         void refreshSpaces()
           .then(() => {
-            if (joined) setWorkspace((open) => (open?.id === joined.id ? joined : open));
+            if (!joined) return;
+            setWorkspace((open) => (open?.id === joined.id ? joined : open));
+            setWorkspaceTabs((all) => replaceTab(all, joined));
           })
           .catch(report);
       } else if (event.type === 'agent') {
@@ -1495,34 +1524,52 @@ function App() {
     while (await sendNextQueued(scopeId));
     setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: true }));
   }
+  /** Opens a workspace as a tab, or brings its tab on show where it was left. */
   async function openWorkspace(profile: WorkspaceProfile) {
     if (gitBusy) return;
+    // The tab on show remembers where it was left.
+    if (workspace && workspaceTabs.some((tab) => tab.id === workspace.id))
+      tabViews.current[workspace.id] = {
+        level,
+        overviewView,
+        scopeId: active?.scopeId,
+        doc: doc && !doc.cloud ? { scopeId: doc.scopeId, path: doc.path } : undefined,
+      };
+    const before = workspaceTabs.find((tab) => tab.id === profile.id);
+    const left = tabViews.current[profile.id];
     setBrainMode('files');
     setGitReview(false);
     setSources({});
     const available = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+    const shown = available.find((space) => space.scopeId === left?.scopeId) ?? available[0];
+    setWorkspaceTabs((all) => openTab(all, profile, workspace?.id));
     setWorkspace(profile);
     setScene(undefined);
-    setLevel('brain');
-    setActive(available[0]);
+    levelNow.current = left?.level ?? 'brain';
+    setLevel(left?.level ?? 'brain');
+    setOverviewView(left?.overviewView ?? 'map');
+    setView('note');
+    setActive(shown);
+    current.current = { doc: undefined, buffer: '', external: undefined };
     setDoc(undefined);
     setBuffer('');
     setExternal(undefined);
     setStartup(false);
     setConnecting(true);
     try {
-      // The folders of vaults this workspace leaves are disconnected; its own are connected.
-      const nextIds = available.map((space) => space.scopeId);
-      for (const previousId of workspace?.scopeIds ?? []) {
-        if (!nextIds.includes(previousId) && spaces.some((space) => space.scopeId === previousId))
-          for (const connection of await host.cloudConnections(previousId).catch((error) => {
-            report(error);
-            return [];
-          }))
-            if (connection.state === 'mounted' || connection.state === 'error')
-              await host.disconnectCloud(previousId, connection.mountId).catch(report);
+      // The note the tab was left on opens again, if it is still there.
+      if (left?.doc && left.doc.scopeId === shown?.scopeId) {
+        const note = await host.read(left.doc.scopeId, left.doc.path).catch(() => undefined);
+        if (note && !current.current.doc) load(note);
       }
-      for (const id of nextIds)
+      // Vaults an edit took out of this workspace let go of their folders, unless
+      // another tab has them; the workspace's own are connected.
+      if (before)
+        await release(
+          before.scopeIds.filter((id) => !profile.scopeIds.includes(id)),
+          workspaceTabs.filter((tab) => tab.id !== profile.id),
+        );
+      for (const id of available.map((space) => space.scopeId))
         for (const connection of await host.cloudConnections(id).catch((error) => {
           report(error);
           return [];
@@ -1543,6 +1590,25 @@ function App() {
       setConnecting(false);
       bump();
     }
+  }
+  /** Disconnects the folders of vaults that no open tab, `others`, has. */
+  async function release(scopeIds: string[], others: WorkspaceProfile[]) {
+    const kept = new Set(others.flatMap((tab) => tab.scopeIds));
+    for (const id of scopeIds) {
+      if (kept.has(id) || !spaces.some((space) => space.scopeId === id)) continue;
+      for (const connection of await host.cloudConnections(id).catch((error) => {
+        report(error);
+        return [];
+      }))
+        if (connection.state === 'mounted' || connection.state === 'error')
+          await host.disconnectCloud(id, connection.mountId).catch(report);
+    }
+  }
+  /** The open tabs take their workspaces' newest profiles; a workspace no longer saved stays as it was. */
+  function renewTabs(profiles: WorkspaceProfile[]) {
+    setWorkspaceTabs((all) =>
+      all.map((tab) => profiles.find((profile) => profile.id === tab.id) ?? tab),
+    );
   }
   function showConnections(target: CloudRoot) {
     setConnectionTarget(target);
@@ -1798,6 +1864,8 @@ function App() {
     resetRequests,
     display,
     leaveWorkspace,
+    showTab,
+    closeWorkspace: (profile: WorkspaceProfile) => void closeWorkspace(profile),
     showOverview,
     showRoutines: () => goToLevel('routines'),
     enterBrain: (space: Space) => void enterBrain(space),
@@ -2147,26 +2215,73 @@ function App() {
     goToLevel('brain', options.origin);
     if (options.ai) openDock(vaultAgent ? 'vault' : 'irori');
   }
-  // Home is reachable from anywhere: what still runs is stopped once the person agrees.
+  // Home is reachable from anywhere: it shows the start screen, where another workspace
+  // opens as a tab. Agents go on running; open terminals close once the person agrees.
   function leaveWorkspace() {
     if (gitBusy || connecting || goingHome) return;
-    if (anyRunning || terminalSpace || iroriTerminal) setAskHome(true);
-    else void goHome();
+    if (terminalSpace || iroriTerminal) setLeaving({ kind: 'home' });
+    else void leave({ kind: 'home' });
   }
-  async function goHome() {
+  /** Brings another tab on show; from the start screen, at once. */
+  function showTab(profile: WorkspaceProfile) {
+    if (gitBusy || connecting || goingHome || sending) return;
+    if (startup) void openWorkspace(profile);
+    else if (profile.id === workspace?.id) return;
+    else if (terminalSpace || iroriTerminal) setLeaving({ kind: 'switch', profile });
+    else void leave({ kind: 'switch', profile });
+  }
+  /**
+   * Closes a tab. Its agents stop: the runs of vaults no other tab has open and the
+   * irori agent's conversations of that workspace. The person agrees first when any
+   * of them runs, or when a terminal of the tab on show is open.
+   */
+  async function closeWorkspace(profile: WorkspaceProfile) {
+    if (gitBusy || connecting || goingHome || sending) return;
+    try {
+      const scopes = onlyIn(workspaceTabs, profile.id).filter((id) => runningScopes.includes(id));
+      const conversations =
+        you?.state === 'ready' && runningScopes.includes(you.id)
+          ? (await host.agentConversations(you.id, profile.id)).flatMap((row) =>
+              !isDamaged(row) && row.running ? [row.id] : [],
+            )
+          : [];
+      const shown = !startup && profile.id === workspace?.id;
+      const step: Leaving = { kind: 'close', profile, scopes, conversations };
+      if (scopes.length || conversations.length || (shown && (terminalSpace || iroriTerminal)))
+        setLeaving(step);
+      else await leave(step);
+    } catch (error) {
+      report(error);
+    }
+  }
+  /** Leaves the workspace on show for home or another tab, or closes a tab. */
+  async function leave(step: Leaving) {
     setGoingHome(true);
     try {
-      if (!(await save())) {
-        setAskHome(false);
-        report(t('ノートが未保存です。', 'The note is unsaved.'));
-        return;
+      const shown = !startup && (step.kind !== 'close' || step.profile.id === workspace?.id);
+      if (shown) {
+        if (!(await composer.flush()) || !(await save())) {
+          setLeaving(undefined);
+          report(t('ノートが未保存です。', 'The note is unsaved.'));
+          return;
+        }
+        setTerminalSpace(undefined);
+        setIroriTerminal(false);
+        await flushDrafts();
       }
-      await Promise.all(runningScopes.map((scopeId) => host.cancel(scopeId)));
-      setTerminalSpace(undefined);
-      setIroriTerminal(false);
-      await flushDrafts();
-      setAskHome(false);
-      setStartup(true);
+      setLeaving(undefined);
+      if (step.kind === 'switch') return void (await openWorkspace(step.profile));
+      if (step.kind === 'home') return setStartup(true);
+      await Promise.all([
+        ...step.scopes.map((scopeId) => host.cancel(scopeId)),
+        ...step.conversations.map((id) => host.cancel(you!.id, id)),
+      ]);
+      const { tabs, next } = closeWorkspaceTab(workspaceTabs, step.profile.id, workspace?.id);
+      setWorkspaceTabs(tabs);
+      await release(step.profile.scopeIds, tabs);
+      if (shown && next) await openWorkspace(next);
+      else if (shown) setStartup(true);
+      delete tabViews.current[step.profile.id];
     } catch (error) {
       report(error);
     } finally {
@@ -2193,16 +2308,82 @@ function App() {
       if (saved) setView('records');
     });
   }
+  const tabStrip = (
+    <WorkspaceTabs
+      tabs={workspaceTabs}
+      shown={startup ? undefined : workspace?.id}
+      running={runningScopes}
+      waiting={waitingScopes}
+      disabled={connecting || gitBusy || goingHome}
+      onShow={act.showTab}
+      onClose={act.closeWorkspace}
+      onAdd={act.leaveWorkspace}
+    />
+  );
+  const stopping =
+    leaving?.kind === 'close' && !!(leaving.scopes.length || leaving.conversations.length);
+  const closingTerminals =
+    !!(terminalSpace || iroriTerminal) &&
+    !startup &&
+    (leaving?.kind !== 'close' || leaving.profile.id === workspace?.id);
+  const leavingTitle =
+    leaving?.kind === 'close'
+      ? t(`${leaving.profile.name} を閉じる`, `Close ${leaving.profile.name}`)
+      : leaving?.kind === 'switch'
+        ? t('ワークスペースを切り替える', 'Switch workspace')
+        : t('ホームに戻る', 'Go home');
+  const leavingDialog = leaving && (
+    <Dialog label={leavingTitle} busy={goingHome} onClose={() => setLeaving(undefined)}>
+      <form
+        className="modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void leave(leaving);
+        }}
+      >
+        <h2>{leavingTitle}</h2>
+        <p>
+          {stopping && closingTerminals
+            ? t(
+                '実行中のエージェントを停止し、ターミナルを閉じます。',
+                'The running agents stop and the terminals close.',
+              )
+            : stopping
+              ? t('実行中のエージェントを停止します。', 'The running agents stop.')
+              : t('ターミナルを閉じます。', 'The terminals close.')}
+        </p>
+        <div className="actions">
+          <button type="button" disabled={goingHome} onClick={() => setLeaving(undefined)}>
+            {t('キャンセル', 'Cancel')}
+          </button>
+          <button className="primary" disabled={goingHome}>
+            {leaving.kind === 'close'
+              ? stopping
+                ? t('停止して閉じる', 'Stop and close')
+                : t('閉じる', 'Close')
+              : leaving.kind === 'switch'
+                ? t('閉じて切り替える', 'Close and switch')
+                : t('閉じて戻る', 'Close and go home')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
   if (startup)
     return (
-      <Startup
-        spaces={spaces}
-        refresh={refreshSpaces}
-        vaultAgent={vaultAgent}
-        onVaultAgent={act.chooseVault}
-        onRestored={act.environmentRestored}
-        onOpen={(profile) => void openWorkspace(profile)}
-      />
+      <div className={workspaceTabs.length ? 'app app-start' : 'app-start'}>
+        {workspaceTabs.length > 0 && tabStrip}
+        <Startup
+          spaces={spaces}
+          refresh={refreshSpaces}
+          vaultAgent={vaultAgent}
+          onVaultAgent={act.chooseVault}
+          onRestored={act.environmentRestored}
+          onOpen={(profile) => void openWorkspace(profile)}
+          open={workspaceTabs}
+        />
+        {leavingDialog}
+      </div>
     );
   return (
     <div
@@ -2211,6 +2392,7 @@ function App() {
       <a className="skip-to-editor" href="#editor-main">
         {t('編集領域へ移動', 'Skip to editor')}
       </a>
+      {tabStrip}
       <div className="app-body">
         <Rail
           spaces={workspaceSpaces}
@@ -3016,56 +3198,19 @@ function App() {
         )}
       </div>
       <StatusBar
-        workspace={workspace?.name ?? t('ワークスペース', 'Workspace')}
         space={active}
         git={gitRead.data}
         running={runningScopes.length}
         waiting={openRequestCount}
         status={status}
-        workspaceDisabled={connecting || gitBusy}
         terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
         terminalDisabled={
           iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
         }
-        onWorkspace={act.leaveWorkspace}
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}
       />
-      {askHome && (
-        <Dialog
-          label={t('ホームに戻る', 'Go home')}
-          busy={goingHome}
-          onClose={() => setAskHome(false)}
-        >
-          <form
-            className="modal"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void goHome();
-            }}
-          >
-            <h2>{t('ホームに戻る', 'Go home')}</h2>
-            <p>
-              {anyRunning && (terminalSpace || iroriTerminal)
-                ? t(
-                    '実行中のエージェントを停止し、ターミナルを閉じます。',
-                    'The running agents stop and the terminals close.',
-                  )
-                : anyRunning
-                  ? t('実行中のエージェントを停止します。', 'The running agents stop.')
-                  : t('ターミナルを閉じます。', 'The terminals close.')}
-            </p>
-            <div className="actions">
-              <button type="button" disabled={goingHome} onClick={() => setAskHome(false)}>
-                {t('キャンセル', 'Cancel')}
-              </button>
-              <button className="primary" disabled={goingHome}>
-                {t('停止して戻る', 'Stop and go home')}
-              </button>
-            </div>
-          </form>
-        </Dialog>
-      )}
+      {leavingDialog}
       {connectionsOpen && connectionTarget && (
         <Connections
           key={connectionTarget.scopeId}
@@ -3092,6 +3237,7 @@ function App() {
               const next = profiles.find((profile) => profile.id === workspace?.id);
               setSpaces(list);
               if (next) setWorkspace(next);
+              renewTabs(profiles);
               // The next vault of the workspace comes on show.
               setActive(
                 (next?.scopeIds ?? []).flatMap((id) =>

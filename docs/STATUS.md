@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Workspaces as tabs, 2026-10-13 (**0.2.8**, not yet published): the owner asked to
+open several workspaces at once, tab-like ([ADR 037](decisions/037-workspace-tabs.md)).
+The owner chose a strip along the window's top and Home as the new-tab page.
+- `src/app/WorkspaceTabs.tsx` draws the strip above `.app-body` and above the
+  start screen while tabs are open; `src/domain/workspace-tabs.ts` keeps their
+  order (`openTab`, `closeTab`, `replaceTab`) and the vaults only one tab has
+  (`onlyIn`).
+- `openWorkspace` remembers where the tab on show was left (`tabViews`: level,
+  Overview view, vault, note) and restores the tab it opens. It no longer
+  disconnects the previous workspace's clouds; closing a tab releases those of
+  vaults no other tab has.
+- Home (`leaveWorkspace`) shows the start screen without cancelling runs.
+  `leave` handles Home, a switch and a close; the dialog (`leaving`) asks while a
+  terminal of the tab on show is open, and before a close cancels runs: vault
+  scopes only that tab has, and the irori agent's running conversations of that
+  workspace (`agentConversations(you, workspace)` then `cancel(you, id)`).
+- The status bar's workspace button is gone. The start screen disables removing a
+  workspace open as a tab and a vault one of them has.
+- Verified by `tests/workspace-tabs.test.ts` and `overview-ui-smoke` (a second
+  tab while agents run and wait, a refused close, a close that stops nothing),
+  plus a manual pass on the CLI test desktop (a note restored after switching).
+  Not tried on Windows or macOS.
+
 Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
 "Not added, over 100 MiB" dropping a large deck into contents and asked for
 no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
