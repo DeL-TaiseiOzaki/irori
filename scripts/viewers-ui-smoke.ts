@@ -11,8 +11,21 @@ const base = await mkdtemp(path.join(tmpdir(), 'irori viewers UI '));
 const root = path.join(base, 'Materials KB');
 await mkdir(path.join(root, 'materials'), { recursive: true });
 const fixtures = path.resolve('tests/fixtures/viewers');
-for (const name of ['sample.pdf', 'sample.docx', 'sample.pptx', 'sample.xlsx', 'picture.png'])
+for (const name of [
+  'sample.pdf',
+  'sample.docx',
+  'sample.pptx',
+  'inherited.pptx',
+  'sample.xlsx',
+  'picture.png',
+])
   await copyFile(path.join(fixtures, name), path.join(root, 'materials', name));
+// Code opens in the editor as in VS Code; bytes that are not text go to their application.
+await writeFile(
+  path.join(root, 'materials', 'hello.py'),
+  'def hello():\n    return "こんにちは"\n',
+);
+await writeFile(path.join(root, 'materials', 'blob.dat'), Buffer.from([0xff, 0xfe, 0x00, 0x81]));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
 await files.register(root, '資料のKB', 'personal');
@@ -94,6 +107,30 @@ try {
   expect(Math.abs(slideBox.width / slideBox.height - 4 / 3)).toBeLessThan(0.02);
   await page.screenshot({ path: 'test-results/irori-viewer-slides.png' });
 
+  // A template's title takes the master's size and is not cut at its box; a box
+  // with an outline and no fill stays empty, one with its style's fill is filled.
+  await page.getByRole('button', { name: 'inherited.pptx', exact: true }).click();
+  await expect(bar).toContainText('1 枚のスライド');
+  const inherited = deck.locator('section.frame').first();
+  const title = inherited.locator('div', { hasText: /^社会実装$/ }).last();
+  const titleStyle = await title.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      size: Math.round(parseFloat(style.fontSize) * 100) / 100,
+      weight: style.fontWeight,
+      overflow: style.overflow,
+    };
+  });
+  expect(titleStyle).toEqual({ size: 37.33, weight: '400', overflow: 'visible' });
+  const fills = await inherited.evaluate((frame) =>
+    [...frame.querySelectorAll<HTMLElement>('.slide > div')]
+      .filter((node) => /border:\s*\d+px solid/.test(node.getAttribute('style') ?? ''))
+      .map((node) => [node.style.left, getComputedStyle(node).backgroundColor]),
+  );
+  expect(fills).toContainEqual(['960px', 'rgba(0, 0, 0, 0)']);
+  expect(fills.find(([left]) => left === '96px')?.[1]).not.toMatch(/^rgba?\(0, 0, 0(, 1)?\)$/);
+  await page.screenshot({ path: 'test-results/irori-viewer-slides-inherited.png' });
+
   // Spreadsheet: displayed values, a merge, paging and the second sheet.
   await page.getByRole('button', { name: 'sample.xlsx', exact: true }).click();
   await expect(bar).toContainText('2 シート');
@@ -109,6 +146,17 @@ try {
   await page.screenshot({ path: 'test-results/irori-viewer-sheet.png' });
   await sheet.getByRole('tab', { name: 'メモ' }).click();
   await expect(sheet.locator('tbody')).toContainText('二枚目のシート');
+
+  // A code file opens in the editor, highlighted by its language.
+  await page.getByRole('button', { name: 'hello.py', exact: true }).click();
+  const code = page.locator('.cm-content').first();
+  await expect(code).toContainText('def hello():');
+  await expect(code.locator('span', { hasText: /^def$/ })).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/irori-code-file.png' });
+  // Bytes that are not text go to their application, without an error.
+  await page.getByRole('button', { name: 'blob.dat', exact: true }).click();
+  await expect(code).toContainText('def hello():');
+  await expect(page.getByRole('alert')).toHaveCount(0);
 
   // An image, and the way out to the external application.
   await page.getByRole('button', { name: 'picture.png', exact: true }).click();
@@ -129,7 +177,7 @@ try {
   expect(alerts).toEqual([]);
   expect(errors).toEqual([]);
   console.log(
-    'Viewers UI passed: Japanese PDF with a bundled CMap and its text layer, zoom, Word pages and links, slides, sheet values, merges, paging and sheets, an image reloaded after a change, and no script or unsafe link carried into the page. No provider calls.',
+    'Viewers UI passed: Japanese PDF with a bundled CMap and its text layer, zoom, Word pages and links, slides (a template title at its master size, an outlined box left unfilled), a Python file in the editor, sheet values, merges, paging and sheets, an image reloaded after a change, and no script or unsafe link carried into the page. No provider calls.',
   );
 } finally {
   await app.close();

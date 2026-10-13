@@ -93,7 +93,7 @@ import type {
 import { agentIds } from '../domain/types';
 import type { AgentSkill, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
-import { opensInIrori } from '../domain/viewers';
+import { opensInIrori, textFilePattern, viewerKind } from '../domain/viewers';
 import { broughtChunkBytes } from '../domain/connections';
 import { broughtFileLimit, broughtFiles, TooManyFiles, type Brought } from './dropped';
 const PageEditor = lazy(() =>
@@ -1467,8 +1467,14 @@ function App() {
         setError(t('送信中は vault を切り替えられません。', "Can't switch vaults while sending."));
         return false;
       }
-      if (opensInIrori(entry.path)) {
-        const next = await host.read(space.scopeId, entry.path);
+      // Any file may be text; one whose bytes are not, or are too many, goes to its application.
+      const next = opensInIrori(entry.path)
+        ? await host.read(space.scopeId, entry.path).catch((error) => {
+            if (textFilePattern.test(entry.path) || viewerKind(entry.path)) throw error;
+            return undefined;
+          })
+        : undefined;
+      if (next) {
         setActive(space);
         show(next, navigation);
       } else await host.openExternal(space.scopeId, entry.path);

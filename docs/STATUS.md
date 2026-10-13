@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Slides and code files, 2026-10-13 (**0.2.13**, not yet published): the owner
+showed a template deck whose titles were cut off and a box drawn solid black,
+and asked that `.py` and other files VS Code opens open in irori
+([ADR 041](decisions/041-code-and-text-files.md)).
+- `normalizeDeck` (`src/app/viewers/pptx-normalize.ts`) writes into a copy of
+  each slide what it inherits from its layout, master and theme, and mends
+  fills, before `pptx-to-html` reads it ([viewer libraries](libraries/file-viewers.md)).
+  `SlidesView` lets text overflow its box at 1.2 spacing. `jszip` is now a
+  direct dependency, `@xmldom/xmldom` a dev one for `tests/pptx-normalize.test.ts`.
+- `opensInIrori` opens every file but a viewer format or `binaryFilePattern`;
+  `readTextDocument` checks the bytes; `open` in `src/app/main.tsx` hands a file
+  that is not text to its application.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`viewers-ui-smoke` with `tests/fixtures/viewers/inherited.pptx` and a `.py`).
+  The owner's deck was not available; its symptoms were rebuilt in the fixture.
+
 The CLI's own commands, 2026-10-13 (**0.2.12**, not yet published): the owner
 asked that Claude Code's and Codex's commands and skills work through irori and
 that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-skills.md)).
