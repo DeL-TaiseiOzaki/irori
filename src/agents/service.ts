@@ -59,7 +59,7 @@ import { DeviceIdentity } from '../host/device';
 import {
   brainsCommandPreamble,
   iroriCommandPreamble,
-  vaultCommandPreamble,
+  iroriCommandPointer,
   brainsPreamble,
   commentsPointer,
   commentsSummary,
@@ -69,11 +69,12 @@ import {
   promptWithSkill,
   questionDeclined,
   selectedNote,
-  connectedFolders,
   selectedSources,
   attachedFiles,
   sharedSchema,
   sharedSchemaPointer,
+  vaultIntro,
+  vaultIntroPointer,
 } from '../../prompts';
 import { commentsCount, readNoteComments } from '../host/comments';
 import { findSkill, noSkill } from '../host/skills';
@@ -82,6 +83,7 @@ import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
 import { brainAgentNames, hasSubAgents } from '../domain/you';
 import { categoryName } from '../domain/brains';
+import { knowledgeFolder, shownFolder } from '../domain/layers';
 import {
   brainOfAgent,
   brainOfPath,
@@ -150,6 +152,8 @@ type Run = {
   root?: string;
   /** The digest of the shared Schema this run's request gave in full or pointed at. */
   shared?: string;
+  /** The digest of the introduction this run gave in full or stood for (ADR 038). */
+  intro?: string;
   /** The title a new conversation for this run takes instead of its first line. */
   title?: string;
   accepted: Promise<void>;
@@ -173,6 +177,9 @@ type Run = {
 };
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
+/** Words that are a CLI's command: `/name`, alone or with arguments, not a path. */
+const cliCommand = (words: string) => /^\/[\w:-]+(\s|$)/.test(words);
+const digest = (words: string) => createHash('sha256').update(words).digest('hex');
 /** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
 const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
 const alreadyRunning = () =>
@@ -783,7 +790,28 @@ export class AgentService {
       access: run.access,
       root: run.root,
       ...(run.shared && { shared: run.shared }),
+      ...(run.intro && { intro: run.intro }),
     });
+  }
+  /** A vault agent's introduction and the line that stands for it (ADR 038). */
+  private async vaultIntro(scopeId: string, commands: boolean) {
+    const vault = this.files.get(scopeId);
+    const instructions = await fs
+      .stat(path.join(vault.root, 'AGENTS.md'))
+      .then((stat) => stat.isFile())
+      .catch(() => false);
+    return {
+      words: vaultIntro(
+        {
+          ...vault,
+          instructions,
+          // Searches that walk the vault skip the links its connected folders appear through.
+          linked: this.files.cloud?.linkedPaths?.(scopeId),
+        },
+        commands,
+      ),
+      pointer: vaultIntroPointer(vault.name, commands),
+    };
   }
   private async execute(run: Run, input: StartRun) {
     let outcome: AgentEvent['outcome'] = 'completed';
@@ -871,6 +899,10 @@ export class AgentService {
             category: brain.category && categoryName(brain.category),
             agent: names.get(brain.scopeId)!,
             root: brain.root,
+            layers: {
+              knowledge: shownFolder(knowledgeFolder(brain)),
+              contents: brain.contents,
+            },
             linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
           };
         });
@@ -900,11 +932,16 @@ export class AgentService {
           promptParts.push(brainsPreamble(brains, cli, comments));
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
-      if (run.commands && this.setup)
-        promptParts.push(you ? iroriCommandPreamble : vaultCommandPreamble(space.name));
-      // Searches that walk the vault skip the links its connected folders appear through.
-      const linked = you ? [] : (this.files.cloud?.linkedPaths?.(input.scopeId) ?? []);
-      if (linked.length) promptParts.push(connectedFolders(linked));
+      // What irori is, how the vault is laid out and the `irori` command: whole on
+      // a session's first request or after a change, otherwise one line (ADR 038).
+      // Its place is kept here; which form goes in is known once the session is.
+      const commands = !!(run.commands && this.setup);
+      const intro = you
+        ? commands
+          ? { words: iroriCommandPreamble, pointer: iroriCommandPointer }
+          : undefined
+        : await this.vaultIntro(input.scopeId, commands);
+      const introAt = intro ? promptParts.push('') - 1 : -1;
       if (input.notePath) {
         await this.files.resolve(input.scopeId, input.notePath);
         promptParts.push(selectedNote(input.notePath));
@@ -978,8 +1015,6 @@ export class AgentService {
         );
       }
       promptParts.push(input.prompt);
-      let prompt = promptParts.join('\n\n');
-      if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       // A native session continues only on the device, checkout and access mode it
       // was made with (ADR 017 D7). Native sessions can retain approvals, so a
       // policy change starts a fresh one in the same conversation (ADR 009). A
@@ -987,11 +1022,13 @@ export class AgentService {
       run.root = rootDigest(space.root);
       let saved: string | undefined;
       let heard: string | undefined;
+      let heardIntro: string | undefined;
       if (!run.step) {
         const { entry, elsewhere } = await this.conversations.native(run.conversationId!);
         if (entry && entry.root === run.root && entry.access === run.access) {
           saved = entry.handle;
           heard = entry.shared;
+          heardIntro = entry.intro;
         } else if (entry || elsewhere)
           this.event(
             run,
@@ -1014,6 +1051,15 @@ export class AgentService {
       }
       resuming = !!saved;
       if (run.cancelled) return;
+      // A CLI's own command (`/compact`, a Pi extension's) works only as the
+      // whole request, so nothing irori adds goes before it, and nothing counts as heard.
+      const command = !selectedSkill && !run.attached?.length && cliCommand(input.prompt);
+      if (intro && !command) {
+        run.intro = digest(intro.words);
+        promptParts[introAt] = saved && heardIntro === run.intro ? intro.pointer : intro.words;
+      }
+      let prompt = command ? input.prompt : promptParts.join('\n\n');
+      if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       // The shared Schema leads every request: whole unless this session already
       // heard it as it is now, then as one line (ADR 027).
       const shared = await this.you?.shared().catch((error) => {
@@ -1027,9 +1073,9 @@ export class AgentService {
         );
         return undefined;
       });
-      if (shared) {
+      if (shared && !command) {
         const words = sharedSchema(shared, !!run.delegation && hasSubAgents(input.agent));
-        run.shared = createHash('sha256').update(words).digest('hex');
+        run.shared = digest(words);
         prompt = `${saved && heard === run.shared ? sharedSchemaPointer(shared) : words}\n\n${prompt}`;
       }
       if (saved)
@@ -1109,13 +1155,19 @@ export class AgentService {
         else await runHermes(context);
       }
       // A resumed session's handle is not saved again, so what it heard of the
-      // shared Schema is recorded here, on whatever handle it now has.
-      if (run.shared && run.shared !== heard && !run.step && !run.cancelled) {
+      // shared Schema and the introduction is recorded here, on whatever handle
+      // it now has.
+      if (
+        ((run.shared && run.shared !== heard) || (run.intro && run.intro !== heardIntro)) &&
+        !run.step &&
+        !run.cancelled
+      ) {
         const { entry } = await this.conversations.native(run.conversationId!);
-        if (entry && entry.shared !== run.shared)
+        if (entry && (entry.shared !== run.shared || entry.intro !== run.intro))
           await this.conversations.saveNative(run.conversationId!, {
             ...entry,
-            shared: run.shared,
+            ...(run.shared && { shared: run.shared }),
+            ...(run.intro && { intro: run.intro }),
           });
       }
     } catch (e) {

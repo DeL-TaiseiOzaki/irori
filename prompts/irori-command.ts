@@ -3,35 +3,36 @@
  * irori — register and arrange vaults (the irori agent), and move notes,
  * comment, update indexes and set up its own vault (either agent, ADR 031).
  *
- * Sent: a preamble before the person's words on every irori agent and vault
- * agent request when the command is on the run's PATH; the help and the
- * reports as the command's output, read by the agent in its shell.
+ * Sent: a preamble before the person's words when the command is on the
+ * run's PATH, whole on a native session's first request and as one line
+ * after it (ADR 038); the help and the reports as the command's output, read
+ * by the agent in its shell.
  * Channel: the request text, and the command's standard output.
  */
 
 import { brainColors, brainGlyphs } from '../src/domain/brains';
 
-/** Said on every irori agent request that has the command. */
+/**
+ * The irori agent's `irori` command, said on a session's first request that has
+ * it; later requests in that session get `iroriCommandPointer` (ADR 038).
+ */
 export const iroriCommandPreamble = [
-  "irori: the `irori` command is on your PATH for this request. With it you do what the person does in irori's dialogs to set vaults up: `irori list` shows the vaults, their layers, connected folders and the workspaces; `irori clone`, `irori create` and `irori add` register vaults in the workspace this request came from; `irori connect` and `irori disconnect` link a folder into a vault's contents and take it out; `irori set` names a vault, its category and its layers; `irori layer` chooses its knowledge and contents folders; `irori workspace` makes or changes a workspace; `irori remove` takes a vault off this computer. `irori routines` checks the routines as irori reads them, and `irori run <routine>` starts one the person has asked you to run. Run `irori help` for the options.",
-  "Use it when the person asks you to set up, move in from another tool, or reorganize their vaults, or to write a routine; your folder's .agents/skills holds procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
-  "Inside a vault, use irori rather than the shell where irori keeps things in step: `irori move` for a note, file or folder of knowledge (links into it, its comments and records follow; `mv` breaks them), `irori trash` instead of deleting a note, `irori comment` and `irori resolve` for comments, and `irori index` after pages change. Hand such work to the vault's agent as usual; its own `irori` command does the same.",
+  "irori: the `irori` command is on your PATH. With it you do what the person does in irori to set up vaults, workspaces and routines: `irori list` shows the vaults, their layers, connected folders and the workspaces, `irori routines` the routines as irori reads them, and `irori help` gives every form. Your folder's .agents/skills holds the procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
+  "Inside a vault, `irori move` and `irori trash` keep links, comments and records in step where `mv` and `rm` break them; hand such work to the vault's agent, whose own `irori` command does the same.",
   "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
 
-/** Said on every vault agent request that has the command (ADR 031). */
-export function vaultCommandPreamble(vault: string) {
-  return [
-    `irori: the \`irori\` command is on your PATH for this request. It does in irori what the person does there, for this vault, "${vault}", only. Use it rather than the shell where irori keeps things in step:`,
-    '- `irori move <path> <new path or folder>` moves or renames a note, file or folder of knowledge; links into it, its comments and its records follow. `mv` breaks them.',
-    "- `irori trash <note>` puts a note in irori's trash, where the person can restore it, instead of deleting it.",
-    '- `irori comment <file> "<text>" [--quote <passage>]` leaves a comment for the person; `irori resolve <file> <id>` removes one once it is dealt with and the person agreed. Comments are in .irori/comments/<file>.json.',
-    '- `irori index` writes the graph index and folder indexes after pages change, when the knowledge folder is an OKF bundle.',
-    '- `irori set . --name/--category/--color/--icon/--knowledge-label/--contents-label`, `irori layer . knowledge|contents <folder> [--also]`, `irori connect . <folder>` and `irori disconnect . <name>` change this vault as its settings do; `irori list` shows it and `irori routines` checks its routines in .irori/routines/.',
-    "Through files, as the person does in irori: frontmatter is a page's properties, with their types and fields declared in .property/property.json when the knowledge folder is an OKF bundle; today's note and the new-note folder are in .irori/notes.json; routines are .irori/routines/<name>/routine.yaml; this vault's instructions and skills are AGENTS.md and .agents/skills/<name>/SKILL.md. Links irori follows are relative Markdown links, not [[wiki links]].",
-    "Registering, grouping and removing vaults and starting routines are the irori agent's; the person asks it in irori mode. A secret's value, a routine's first review, accounts, updates and agent permissions stay with the person. Run `irori help` for the options.",
-  ].join('\n');
-}
+/** The line a session that already heard `iroriCommandPreamble` gets instead. */
+export const iroriCommandPointer =
+  'irori: the `irori` command given earlier in this session is still on your PATH; `irori help` gives every form.';
+
+/**
+ * A vault agent's `irori` command, the end of its introduction
+ * (`vaultIntro`, ADR 031, ADR 038): what it must know before it moves or
+ * removes anything. The rest is in `irori help`.
+ */
+export const vaultCommandPreamble =
+  'The `irori` command is on your PATH and acts on this vault alone. Move or rename a note, file or folder with `irori move` and remove a note with `irori trash`: `mv` and `rm` break the links into it and its comments. Leave a comment for the person with `irori comment`. `irori help` lists the rest, and where irori keeps properties, notes and routines.';
 
 /** Why `irori call` is refused: a vault agent's, or a run that hands work to sub-agents. */
 export function callRefused(vaultAgent: boolean) {
@@ -50,7 +51,17 @@ note to irori's trash.${
 
 You are a vault agent: every form reaches your own vault alone, named by
 its name or "." from its folder. clone, create, add, workspace, remove, run
-and call are the irori agent's.`
+and call are the irori agent's; the person asks it in irori mode. A secret's
+value, a routine's first review, accounts, updates and agent permissions
+stay with the person.
+
+Through files, as the person does in irori: frontmatter is a page's
+properties, with their types and fields declared in .property/property.json
+when the knowledge folder is an OKF bundle; today's note and the new-note
+folder are in .irori/notes.json; routines are
+.irori/routines/<name>/routine.yaml; comments are
+.irori/comments/<file>.json. Links irori follows are relative Markdown
+links, not [[wiki links]].`
       : ''
   }
 

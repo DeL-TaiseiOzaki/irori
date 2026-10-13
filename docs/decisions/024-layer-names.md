@@ -2,7 +2,8 @@
 
 Date: 2026-10-05. Status: owner request; implemented for 0.1.70.
 Decision 3 extended by [ADR 035](035-knowledge-at-the-vault-root.md): the
-knowledge folder may be the vault's root.
+knowledge folder may be the vault's root. Decision 9 superseded by
+[ADR 038](038-what-a-vault-agent-is-told.md): agents are told the layer folders.
 
 ## Context
 

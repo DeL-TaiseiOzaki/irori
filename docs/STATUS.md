@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+What a vault agent is told, 2026-10-13 (**0.2.9**, not yet published): the
+owner found the `irori` command's 2,000-character preamble on every request
+wasteful and asked that the vault agent be told what irori is and which folders
+are Knowledge and Contents ([ADR 038](decisions/038-what-a-vault-agent-is-told.md)).
+- `vaultIntro` (`prompts/vault-intro.ts`) replaces `vaultCommandPreamble` and the
+  separate connected-folders part; `vaultCommandPreamble` is now its short last
+  paragraph. The service keeps its place in the request and chooses the whole
+  text or `vaultIntroPointer` once the native session is known
+  (`native[device].intro`, a digest like the shared Schema's).
+- `iroriCommandPreamble` is shorter and has `iroriCommandPointer`; the handed
+  vaults' lines name their knowledge and contents folders.
+- `irori help` for a vault agent took over the file places the preamble listed.
+- `cliCommand` (`src/agents/service.ts`): a request of the form `/name …` goes
+  alone, so a CLI's own command (`/compact`, a Pi extension's) works; the old
+  preamble had preceded it on every run with the command.
+- Verified by `npm run build` and `npm test`. No real CLI was run.
+
 Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
 "Not added, over 100 MiB" dropping a large deck into contents and asked for
 no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).

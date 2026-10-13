@@ -192,7 +192,9 @@ test(
     assert.equal(mine.at(-1)?.outcome, 'completed', JSON.stringify(mine));
     // The vault agent ran in its own vault, on the same CLI, recorded in its scope.
     const handedPrompt = (await log(product.root)).find((call) => call.type === 'prompt').message;
-    assert.match(handedPrompt, /^irori: the irori agent handed you this task\./);
+    // The vault's introduction, then the task (ADR 038).
+    assert.match(handedPrompt, /^irori: you are the agent of the "Product" vault/);
+    assert.match(handedPrompt, /\n\nirori: the irori agent handed you this task\./);
     assert.ok(handedPrompt.endsWith('\n\nTidy the notes.'));
     // The hand-off is a conversation of the vault's own, apart from the person's,
     // titled with the task and naming the irori agent's conversation it came from.
@@ -214,7 +216,12 @@ test(
       'the irori agent’s conversation names the vault its hand-off reached',
     );
     assert.ok(
-      conversation.events.some((event) => event.role === 'user' && event.text === handedPrompt),
+      conversation.events.some(
+        (event) =>
+          event.role === 'user' &&
+          handedPrompt.endsWith(`\n\n${event.text}`) &&
+          event.text.startsWith('irori: the irori agent handed you'),
+      ),
     );
     assert.ok(
       conversation.events.some((event) => event.type === 'done' && event.outcome === 'completed'),

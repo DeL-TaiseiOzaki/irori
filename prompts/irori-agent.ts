@@ -10,6 +10,8 @@ import { commentsDirectory } from '../src/domain/comments';
 import { handedConnectedFolders } from './connected-folders';
 
 type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
+  /** Its knowledge folder, `.` for the vault's root, and its contents folders. */
+  layers?: { knowledge: string; contents: string[] };
   /** Folders connected in its contents, as paths inside the vault. */
   linked?: string[];
 };
@@ -28,6 +30,12 @@ const handOff: Record<SubAgentCli, string> = {
     "Hand work in a vault to that vault's sub-agent with the task tool, naming that sub-agent. Do not change a vault's files yourself.",
 };
 
+const layerList = ({ layers }: Handed) =>
+  layers
+    ? `, knowledge ${JSON.stringify(layers.knowledge)}, contents ${
+        layers.contents.map((item) => JSON.stringify(item)).join(', ') || 'none'
+      }`
+    : '';
 const linkedList = (brain: Handed) =>
   brain.linked?.length
     ? `, connected folders ${brain.linked.map((item) => JSON.stringify(item)).join(', ')}`
@@ -53,7 +61,7 @@ const handedPreamble = (brains: Handed[], comments: number[], worker: string, ha
     handedHeader,
     ...brains.map(
       (brain, index) =>
-        `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, ${worker} "${brain.agent}"${linkedList(brain)}${commentCount(comments[index])}`,
+        `- ${brain.name}${brain.category ? ` (${brain.category})` : ''}: folder ${JSON.stringify(brain.root)}, ${worker} "${brain.agent}"${layerList(brain)}${linkedList(brain)}${commentCount(comments[index])}`,
     ),
     ...handing,
     ...linkedNote(brains),

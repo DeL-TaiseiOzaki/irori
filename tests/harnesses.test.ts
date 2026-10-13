@@ -196,6 +196,7 @@ test(
     const { execute } = await setup(t);
     const result = await execute('pi', '/fixture');
     assert.equal(result.events.at(-1)?.outcome, 'completed');
+    // The fixture runs it only as the whole request: nothing irori adds went before it.
     assert.equal(result.events.filter((e) => e.type === 'text').length, 0);
   },
 );
@@ -590,7 +591,8 @@ test(
     assert.match(await readFile(path.join(root, 'note.md'), 'utf8'), /Fixture Hermes edit/);
     // The prompt travels on stdin, never on the command line.
     const [call] = await hermes();
-    assert.equal(call.prompt, 'ordinary request');
+    // After the vault's introduction (ADR 038).
+    assert.ok(call.prompt.endsWith('\n\nordinary request'), call.prompt);
     assert.deepEqual(call.args, ['chat', '--query-file', '-', '--format', 'stream-json']);
     assert.equal(
       (await latestConversation(files.dataDir, space.scopeId, 'hermes')).native?.handle,
