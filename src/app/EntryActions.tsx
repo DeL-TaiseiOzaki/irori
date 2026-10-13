@@ -103,21 +103,29 @@ export interface Explorer {
 }
 
 /**
- * The explorer's menu items for a folder (`folder`), an entry (`entry`), or both:
- * what goes into the folder, what changes the entry, and the file manager.
+ * A file manager's menu for a row or a folder's empty space, in the order
+ * Finder and Explorer keep: open, what goes into the folder (`folder`), what
+ * changes the entry (`entry`), its path, and the file manager. Without an
+ * explorer — a read-only layer, or one that waits — only the path and the file
+ * manager remain beside opening.
  */
 export function ExplorerItems({
   explorer,
+  scopeId,
   folder,
   entry,
   path,
+  onOpen,
 }: {
-  explorer: Explorer;
+  explorer?: Explorer;
+  scopeId: string;
   /** The folder new entries go into, when they may. */
   folder?: string;
   /** The entry that may be renamed, moved and deleted. */
   entry?: Entry;
   path: string;
+  /** Opens the row's file. */
+  onOpen?: () => void;
 }) {
   const item = (key: string, icon: IconName, label: ReactNode, run: () => void) => (
     <Menu.Item key={key} onClick={run}>
@@ -125,38 +133,44 @@ export function ExplorerItems({
       {label}
     </Menu.Item>
   );
-  return (
-    <>
-      {folder !== undefined && (
-        <>
-          {(['note', 'file', 'folder'] as const).map((kind) =>
-            item(kind, createIcons[kind], createLabel(kind), () => explorer.create(folder, kind)),
-          )}
-          {item('bring', 'upload', t('ファイルを追加…', 'Add files…'), () =>
-            explorer.bringIn(folder),
-          )}
-          <Menu.Separator className="menu-separator" />
-        </>
-      )}
-      {entry && (
-        <>
-          {entryActions.map((action) =>
-            item(
-              action,
-              action === 'delete' ? 'trash' : action === 'move' ? 'move' : 'penLine',
-              actionLabel(action),
-              () => explorer.act(entry, action),
-            ),
-          )}
-          <Menu.Separator className="menu-separator" />
-        </>
-      )}
-      {item('reveal', 'folderOpen', revealLabel(), () => explorer.reveal(path))}
-    </>
-  );
+  const copy = (absolute: boolean) =>
+    void host.copyEntryPath(scopeId, path, absolute).catch(() => {});
+  const groups = [
+    onOpen && [item('open', 'file', t('開く', 'Open'), onOpen)],
+    explorer &&
+      folder !== undefined && [
+        ...(['note', 'file', 'folder'] as const).map((kind) =>
+          item(kind, createIcons[kind], createLabel(kind), () => explorer.create(folder, kind)),
+        ),
+        item('bring', 'upload', t('ファイルを追加…', 'Add files…'), () => explorer.bringIn(folder)),
+      ],
+    explorer &&
+      entry &&
+      entryActions.map((action) =>
+        item(
+          action,
+          action === 'delete' ? 'trash' : action === 'move' ? 'move' : 'penLine',
+          actionLabel(action),
+          () => explorer.act(entry, action),
+        ),
+      ),
+    [
+      item('copy-path', 'link', t('パスをコピー', 'Copy path'), () => copy(true)),
+      item('copy-relative', 'link', t('相対パスをコピー', 'Copy relative path'), () => copy(false)),
+    ],
+    [
+      item('reveal', 'folderOpen', revealLabel(), () =>
+        explorer ? explorer.reveal(path) : void host.revealEntry(scopeId, path).catch(() => {}),
+      ),
+    ],
+  ].filter((group) => !!group);
+  return groups.flatMap((group, index) => [
+    ...(index ? [<Menu.Separator key={`separator-${index}`} className="menu-separator" />] : []),
+    ...group,
+  ]);
 }
 
-/** The row menu of a file or folder the explorer may change. */
+/** The row menu of a file or folder: the same items as its right click. */
 export function EntryMenu({ entry, children }: { entry: Entry; children: ReactNode }) {
   const label = t(`${entry.name} の操作`, `Actions for ${entry.name}`);
   return (

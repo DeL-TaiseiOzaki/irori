@@ -191,7 +191,13 @@ export function Tree({
   };
   const levelMenu = menu && (
     <ExplorerItems
-      explorer={here!}
+      explorer={here}
+      scopeId={space.scopeId}
+      onOpen={
+        menu.entry && !menu.entry.directory && !menu.entry.blocked
+          ? () => onOpen(space, menu.entry!)
+          : undefined
+      }
       folder={
         menu.entry
           ? menu.entry.directory && editable(menu.entry)
@@ -215,15 +221,8 @@ export function Tree({
         onContextMenuCapture={(event) => {
           const row = (event.target as HTMLElement).closest<HTMLElement>('[data-entry]');
           const entry = row && entries.find((item) => item.path === row.dataset.entry);
-          pendingMenu.current = !explorer
-            ? undefined
-            : entry
-              ? editable(entry)
-                ? { entry }
-                : undefined
-              : writable
-                ? {}
-                : undefined;
+          // Every row has a menu, as in a file manager; the empty space where entries may be made.
+          pendingMenu.current = entry ? { entry } : explorer && writable ? {} : undefined;
         }}
         onDragOver={(event) => {
           if (writable) dragOver(event, directory);
@@ -335,16 +334,18 @@ export function Tree({
                   <DriveBadge connection={connection} />
                 )}
               </button>
-              {editable(entry) && (
-                <EntryMenu entry={entry}>
-                  <ExplorerItems
-                    explorer={here!}
-                    folder={entry.directory ? entry.path : undefined}
-                    entry={movable(entry) ? entry : undefined}
-                    path={entry.path}
-                  />
-                </EntryMenu>
-              )}
+              <EntryMenu entry={entry}>
+                <ExplorerItems
+                  explorer={here}
+                  scopeId={space.scopeId}
+                  onOpen={
+                    !entry.directory && !entry.blocked ? () => onOpen(space, entry) : undefined
+                  }
+                  folder={entry.directory && editable(entry) ? entry.path : undefined}
+                  entry={movable(entry) ? entry : undefined}
+                  path={entry.path}
+                />
+              </EntryMenu>
               {entry.directory && isOpen && !entry.blocked && (
                 <Tree
                   space={space}

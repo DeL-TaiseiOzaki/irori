@@ -196,6 +196,7 @@ export const hostArguments = {
   vaultMoveLinks: z.tuple([id, path.min(1)]),
   moveToVault: z.tuple([id, path.min(1), id, path]),
   revealEntry: z.tuple([id, path]),
+  copyEntryPath: z.tuple([id, path, z.boolean()]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
   register: z.tuple([path, name, categoryText]),

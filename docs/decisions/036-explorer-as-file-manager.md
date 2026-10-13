@@ -61,3 +61,15 @@ Explorer or Finder does. Until 0.2.1:
 - Not tried on Windows or macOS: their trash, Finder or Explorer reveal and
   drops from the system file manager are verified only through the Linux
   Electron smoke and its synthetic drop.
+
+## Amendment, 2026-10-13 (0.2.10)
+
+The owner asked for a right click on any file of any layer to copy its path, as
+in Explorer or Finder. Every row of the vault panels now has the menu, and so do
+the Schema settings' instruction, skill and rule rows. Its order follows the file
+managers: **Open** (files), what may be made in a folder, **Rename**, **Move** and
+**Delete** where the layer allows them, **Copy path** and **Copy relative path**,
+then **Show in Finder**. Rows that cannot change keep only open, copy and show.
+`copyEntryPath` writes the path from the main process (`clipboard`): the full path
+under the vault's root (or the shared or irori agent Schema folder), or the path
+from that root with `/`.
