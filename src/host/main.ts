@@ -38,10 +38,12 @@ import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { readOntology } from './ontology';
 import { GraphIndexService } from './graph-index';
+import { brokenLinks } from '../domain/vault-move';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readPageProperties } from './properties';
 import {
   addNoteComment,
+  moveFolderComments,
   moveNoteComments,
   readNoteComments,
   removeNoteComment,
@@ -514,6 +516,56 @@ app
         ...(carried.notices.length ? { notice: carried.notices.join(' ') } : {}),
       };
     }
+    /**
+     * The links a move of `rel` into another vault would break (ADR 038), from
+     * the vault's Markdown in knowledge; `incomplete` past 5,000 notes.
+     */
+    async function vaultMoveLinks(scopeId: string, rel: string) {
+      const notes: { path: string; text: string }[] = [];
+      const folders = [''];
+      let incomplete = false;
+      for (let at = 0; at < folders.length && !incomplete; at++)
+        for (const entry of await files.entries(scopeId, folders[at])) {
+          if (entry.blocked || entry.layer !== 'Knowledge_Base') continue;
+          if (entry.directory) folders.push(entry.path);
+          else if (entry.note) {
+            if (notes.length >= 5000) {
+              incomplete = true;
+              break;
+            }
+            const doc = await files.read(scopeId, entry.path).catch(() => undefined);
+            if (doc && !doc.viewer) notes.push({ path: entry.path, text: doc.text });
+          }
+        }
+      return { links: brokenLinks(notes, rel), incomplete };
+    }
+    /** Moves a file or folder of knowledge into another vault's, with its comments (ADR 038). */
+    async function moveToVault(
+      scopeId: string,
+      from: string,
+      toScopeId: string,
+      directory: string,
+    ) {
+      if (agents.busy(toScopeId)) throw Error(organizing());
+      const { entry } = await files.moveAcross(scopeId, from, toScopeId, directory, (filename) =>
+        shell.trashItem(filename),
+      );
+      const kept = await moveFolderComments(
+        files,
+        scopeId,
+        { from, to: entry.path },
+        toScopeId,
+      ).catch(() => [from]);
+      return {
+        entry,
+        ...(kept.length && {
+          notice: t(
+            `${kept.length} 件のファイルのコメントを移せませんでした。`,
+            `Comments on ${kept.length} files could not be moved.`,
+          ),
+        }),
+      };
+    }
     /** Deletes a file or folder of knowledge: a note to irori's deleted notes, the rest to the system trash. */
     async function trashKnowledgeEntry(scopeId: string, target: string) {
       if (await isNote(scopeId, target)) {
@@ -766,6 +818,11 @@ app
         classify(files.get(scopeId), target) === 'contents'
           ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
           : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
+      vaultMoveLinks: (scopeId, target) => vaultMoveLinks(scopeId, target),
+      moveToVault: (scopeId, from, toScopeId, directory) =>
+        changeVault(scopeId, organizing(), () =>
+          changed(toScopeId, () => moveToVault(scopeId, from, toScopeId, directory)),
+        ),
       revealEntry: async (scopeId, target) =>
         shell.showItemInFolder(await files.resolve(scopeId, target, true)),
       addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),

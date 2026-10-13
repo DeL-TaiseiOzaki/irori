@@ -428,3 +428,27 @@ kbd {
 .brain-files[hidden] {
   display: none;
 }
+
+/* The vault beside (ADR 038): its sections follow one another and scroll together. */
+.side-sections {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 10px;
+}
+.side-panel .brain-section {
+  flex: none;
+}
+.side-panel .section-body {
+  overflow: visible;
+}
+.side-panel .section-toggle:hover {
+  background: none;
+}
+.side-panel .brain-home-link {
+  flex: 1;
+  min-width: 0;
+}
+.side-panel span.brain-home-link:hover .brain-names strong {
+  text-decoration: none;
+}

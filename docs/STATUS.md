@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Two vaults side by side, 2026-10-13 (**0.2.9**, not yet published; built on 0.2.8's
+workspace tabs, PR #230): the owner asked to open several vaults and drag files
+between their knowledge ([ADR 038](decisions/038-vaults-side-by-side.md)). The owner
+chose a horizontal split and asking before a move that breaks links.
+- `SideBrainPanel` (`src/app/BrainPanel.tsx`) shows the vault beside: knowledge and
+  contents trees with the same explorer. `main.tsx` keeps it in `side`, trades it
+  with the vault on show when that one is chosen, and remembers it per tab.
+- `Tree` accepts a knowledge entry from the other vault (`Explorer.moveFrom`).
+  `moveFromVault` asks `vaultMoveLinks` (`brokenLinks` in `src/domain/vault-move.ts`)
+  and shows the dialog when links would break; `carryToVault` calls `moveToVault`.
+- The host's `FileService.moveAcross` renames (or copies and trashes between
+  volumes), copies a note's managed images and moves kept drafts;
+  `moveFolderComments`/`moveNoteComments` take the destination vault.
+- Not carried: material IDs and person-line records. `irori move` stays in one vault.
+- Verified by `tests/vault-move.test.ts`, `vault-split-ui-smoke` and a pass on the CLI
+  test desktop (a linked note: dialog with one broken link, then moved). Not tried on
+  Windows, macOS or between volumes.
+
 Workspaces as tabs, 2026-10-13 (**0.2.8**, not yet published): the owner asked to
 open several workspaces at once, tab-like ([ADR 037](decisions/037-workspace-tabs.md)).
 The owner chose a strip along the window's top and Home as the new-tab page.

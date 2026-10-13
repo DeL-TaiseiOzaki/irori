@@ -17,7 +17,15 @@ export type EntryAction = (typeof entryActions)[number];
 export type CreateKind = 'note' | 'file' | 'folder';
 /** What an action did, so the application can follow with its open document and references. */
 export type EntryChange =
-  | { scopeId: string; action: 'rename' | 'move'; from: string; to: string; notice?: string }
+  | {
+      scopeId: string;
+      action: 'rename' | 'move';
+      from: string;
+      to: string;
+      notice?: string;
+      /** The vault it moved into, when another (ADR 038). */
+      toScopeId?: string;
+    }
   | { scopeId: string; action: 'delete'; from: string };
 /** The vault an entry belongs to, as the dialogs need it. */
 export interface EntrySpace {
@@ -89,6 +97,8 @@ export interface Explorer {
   act(entry: Entry, action: EntryAction): void;
   /** Moves an entry into `directory`, keeping its name: a drag and drop. */
   moveInto(entry: Entry, directory: string): void;
+  /** Moves an entry of another vault's knowledge into `directory`: a drop across vaults. */
+  moveFrom?(scopeId: string, entry: Entry, directory: string): void;
   reveal(path: string): void;
 }
 

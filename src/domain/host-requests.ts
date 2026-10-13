@@ -193,6 +193,8 @@ export const hostArguments = {
   discardEntry: z.tuple([id]),
   moveEntry: z.tuple([id, path.min(1), path.min(1)]),
   trashEntry: z.tuple([id, path.min(1)]),
+  vaultMoveLinks: z.tuple([id, path.min(1)]),
+  moveToVault: z.tuple([id, path.min(1), id, path]),
   revealEntry: z.tuple([id, path]),
   spaces: z.tuple([]),
   chooseFolder: z.tuple([]),
