@@ -337,8 +337,9 @@ try {
   expect(registered).toMatchObject({ code: 0 });
   expect(registered.stdout).toContain('Registered the vault "Notes"');
   expect(registered.stdout).toContain('Added it to this workspace');
-  expect((await piLog()).filter((entry) => entry.type === 'prompt')[1].message).toContain(
-    'the `irori` command is on your PATH',
+  // Whole on the session's first request, one line after it (ADR 039).
+  expect((await piLog()).filter((entry) => entry.type === 'prompt')[1].message).toMatch(
+    /the `irori` command (is|given earlier in this session is still) on your PATH/,
   );
   await expect(rail.getByRole('button', { name: /^Notes/ })).toBeVisible();
   await expect(map.getByRole('button', { name: 'Notes を開く' })).toBeVisible();

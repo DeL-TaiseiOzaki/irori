@@ -99,6 +99,11 @@ export const conversationMeta = z.looseObject({
         .string()
         .regex(/^[0-9a-f]{64}$/)
         .optional(),
+      /** The digest of irori's introduction the session last heard in full (ADR 039). */
+      intro: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
     }),
   ),
 });

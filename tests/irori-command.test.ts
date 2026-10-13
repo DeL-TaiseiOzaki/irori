@@ -840,11 +840,13 @@ test(
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
+    // Its introduction names the vault and ends with the command (ADR 039).
+    const introduced = asked.find((call) => call.type === 'prompt').message as string;
     assert.ok(
-      asked
-        .find((call) => call.type === 'prompt')
-        .message.startsWith(vaultCommandPreamble('Research')),
+      introduced.startsWith('irori: you are the agent of the "Research" vault'),
+      introduced,
     );
+    assert.ok(introduced.includes(`${vaultCommandPreamble}\n\nLook.`), introduced);
     const listed = asked.find((call) => call.type === 'command');
     assert.equal(listed.code, 0, listed.stderr);
     assert.match(listed.stdout, /^Your vault:\n- Research: folder /);

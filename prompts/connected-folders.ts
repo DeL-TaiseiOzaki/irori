@@ -1,8 +1,8 @@
 /**
  * The folders connected in a vault's contents (ADR 019, ADR 023).
  *
- * Sent: before the person's words, on a vault agent's request while the
- * vault has connected folders; the irori agent hears them per handed vault.
+ * Sent: in a vault agent's introduction (`vaultIntro`) while the vault has
+ * connected folders; the irori agent hears them per handed vault.
  * Channel: the request text.
  */
 
@@ -13,7 +13,7 @@ const linkedNote = (example: string) =>
 /** A vault agent's connected folders, as paths inside its vault. */
 export function connectedFolders(paths: string[]) {
   return [
-    `irori: connected folders in this vault's contents: ${paths.map((item) => JSON.stringify(item)).join(', ')}.`,
+    `Connected folders in Contents: ${paths.map((item) => JSON.stringify(item)).join(', ')}.`,
     linkedNote(paths[0]),
   ].join(' ');
 }

@@ -19,7 +19,7 @@ import { SearchService } from '../src/host/search';
 import { SchemaSettingsService } from '../src/host/schema-settings';
 import { AgentService } from '../src/agents/service';
 import { sharedSchemaId } from '../src/domain/you';
-import { sharedSchema, sharedSchemaPointer } from '../prompts';
+import { sharedSchema, sharedSchemaPointer, vaultIntro, vaultIntroPointer } from '../prompts';
 import type { AgentEvent, StartRun } from '../src/domain/types';
 
 const fixtureOptions = {
@@ -185,9 +185,11 @@ test(
       await done;
       return events;
     };
-    // Without the irori agent there is no shared Schema: the request is the person's words.
+    // Without the irori agent there is no shared Schema: the request is the
+    // vault's introduction and the person's words.
     assert.equal((await execute('first words')).at(-1)?.outcome, 'completed');
-    assert.equal((await prompts()).at(-1), 'first words');
+    const introduction = vaultIntro({ ...space, instructions: false }, false);
+    assert.equal((await prompts()).at(-1), `${introduction}\n\nfirst words`);
     await you.create();
     await settings.write(sharedSchemaId, 'AGENTS.md', 'Write dates as YYYY-MM-DD.\n', null);
     await settings.write(
@@ -202,16 +204,24 @@ test(
     assert.match(second, /^irori: the shared Schema/);
     assert.match(second, /Write dates as YYYY-MM-DD\./);
     assert.match(second, /- weekly: Writes the weekly review\./);
-    assert.ok(second.endsWith('\n\nsecond words'));
+    // The session heard the unchanged introduction, so it gets one line for it.
+    assert.ok(second.endsWith(`\n\n${vaultIntroPointer('Fixture', false)}\n\nsecond words`));
     // The same session, the same shared Schema: one line.
     await execute('third words');
     const third = (await prompts()).at(-1)!;
-    assert.equal(third, `${sharedSchemaPointer((await you.shared())!)}\n\nthird words`);
-    // A change is heard whole again.
+    assert.equal(
+      third,
+      `${sharedSchemaPointer((await you.shared())!)}\n\n${vaultIntroPointer('Fixture', false)}\n\nthird words`,
+    );
+    // A change is heard whole again: the shared Schema's, and the vault's own
+    // (here, its AGENTS.md appearing) in its introduction.
+    await writeFile(path.join(kb, 'AGENTS.md'), '# Fixture\n');
     const agents = await settings.read(sharedSchemaId, 'AGENTS.md');
     await settings.write(sharedSchemaId, 'AGENTS.md', 'Write times in UTC.\n', agents.hash);
     await execute('fourth words');
-    assert.match((await prompts()).at(-1)!, /<shared-instructions>\nWrite times in UTC\.\n/);
+    const fourth = (await prompts()).at(-1)!;
+    assert.match(fourth, /<shared-instructions>\nWrite times in UTC\.\n/);
+    assert.match(fourth, /AGENTS\.md is this vault's instructions/);
     // A skill the vault lacks is found in the shared Schema, and says so.
     const events = await execute('fifth words', { skill: 'weekly' });
     assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
