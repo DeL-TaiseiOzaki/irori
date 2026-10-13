@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
+Files of any size, 2026-10-13 (**0.2.7**, published): the owner hit
 "Not added, over 100 MiB" dropping a large deck into contents and asked for
 no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - `bringIn` (`src/app/main.tsx`) sends the first 16 MiB with `createEntry`
@@ -13,6 +13,14 @@ no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - A copy interrupted by quitting irori leaves a short file.
 - Verified by `npm run build`, `npm test` and `explorer-ui-smoke` (a 120 MiB
   drop, compared byte for byte) on Linux. Not tried on Windows or macOS.
+- Published 2026-10-13 at the owner's request: [#228](https://github.com/DeL-TaiseiOzaki/irori/pull/228)
+  merged as `0e81a6a` at 01:03:37 UTC. The push's `publish.yml` run
+  `38330300610` reused the pull request's packages (run `38329622851`):
+  [v0.2.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.7-preview.1)
+  public 01:06:17 (2:40), page 01:07:20 (3:43), drift green 01:07:30.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,214,528 bytes,
+  Mac 141,849,476 bytes and `irori-0.2.7-full.nupkg` 175,383,346 bytes; the
+  live page offers the 0.2.7 installers.
 
 English first, 2026-10-12 (**0.2.6**, not yet published): the owner asked for
 English as the default interface language ([ADR 011](decisions/011-interface-language.md)).
