@@ -1,6 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Copy path from every row, 2026-10-13 (**0.2.10**, not yet published; built on 0.2.9,
+Published 2026-10-13: **0.2.8**, **0.2.9** and **0.2.10**, merged one after another at
+the owner's request ([#230](https://github.com/DeL-TaiseiOzaki/irori/pull/230) as `8ab51db`,
+[#232](https://github.com/DeL-TaiseiOzaki/irori/pull/232) as `eeda029`,
+[#233](https://github.com/DeL-TaiseiOzaki/irori/pull/233) as `5d09515`). #232 and #233 were
+stacked on the previous branch and retargeted to `main` before their merges; each merge
+waited for the previous preview to be published. `publish.yml` published every one by
+itself, each with its drift check in step:
+
+| Version | Merge (UTC) | Release public | Page deployed | Run |
+| --- | --- | --- | --- | --- |
+| [0.2.8](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.8-preview.1) | 02:43:19 | 02:44:36 (1:17) | 02:46:38 (3:19) | `38338238425` |
+| [0.2.9](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.9-preview.1) | 02:47:17 | 02:48:41 (1:24) | 02:50:39 (3:22) | `38338563070` |
+| [0.2.10](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.10-preview.1) | 02:51:54 | 02:53:50 (1:56) | 02:55:00 (3:06) | `38338929783` |
+
+- Anonymous downloads matched `SHA256SUMS.txt` for all three. Windows / Mac /
+  `full.nupkg` bytes: 0.2.8 176,215,040 / 141,847,532 / 175,385,009; 0.2.9
+  176,216,064 / 141,827,755 / 175,385,071; 0.2.10 176,217,600 / 141,817,525 / 175,386,791.
+  The page offers 0.2.10.
+- Open [#231](https://github.com/DeL-TaiseiOzaki/irori/pull/231) also numbered itself 0.2.9
+  and ADR 038; it needs a later version and ADR number before its merge.
+- Not tried on Windows or macOS.
+
+Copy path from every row, 2026-10-13 (**0.2.10**, published; built on 0.2.9,
 PR #232): the owner asked for a right click on any file of any layer to copy its path,
 as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), amendment).
 - `ExplorerItems` (`src/app/EntryActions.tsx`) takes an optional explorer and orders
@@ -11,7 +33,7 @@ as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), 
 - Verified by `explorer-ui-smoke` (clipboard read back) and the CLI test desktop.
   Not tried on Windows or macOS.
 
-Two vaults side by side, 2026-10-13 (**0.2.9**, not yet published; built on 0.2.8's
+Two vaults side by side, 2026-10-13 (**0.2.9**, published; built on 0.2.8's
 workspace tabs, PR #230): the owner asked to open several vaults and drag files
 between their knowledge ([ADR 038](decisions/038-vaults-side-by-side.md)). The owner
 chose a horizontal split and asking before a move that breaks links.
@@ -29,7 +51,7 @@ chose a horizontal split and asking before a move that breaks links.
   test desktop (a linked note: dialog with one broken link, then moved). Not tried on
   Windows, macOS or between volumes.
 
-Workspaces as tabs, 2026-10-13 (**0.2.8**, not yet published): the owner asked to
+Workspaces as tabs, 2026-10-13 (**0.2.8**, published): the owner asked to
 open several workspaces at once, tab-like ([ADR 037](decisions/037-workspace-tabs.md)).
 The owner chose a strip along the window's top and Home as the new-tab page.
 - `src/app/WorkspaceTabs.tsx` draws the strip above `.app-body` and above the
