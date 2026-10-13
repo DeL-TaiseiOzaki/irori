@@ -16,7 +16,7 @@ import { githubOwnerPattern, validRepositoryName } from './git';
 import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
-import { viewerByteLimit } from './viewers';
+import { broughtChunkBytes } from './connections';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -24,6 +24,7 @@ const id = z.uuid(),
 const name = z.string().min(1).max(120),
   entryName = z.string().min(1).max(255),
   version = z.string().regex(/^[a-f0-9]{64}$/);
+const broughtChunk = z.instanceof(Uint8Array).refine((value) => value.length <= broughtChunkBytes);
 const document = z.object({ scopeId: id, path, text, hash: version });
 // A submodule's folder from the vault's root; the host checks it is one.
 const repository = z
@@ -177,14 +178,19 @@ export const hostArguments = {
         .object({
           kind: z.literal('file'),
           name: entryName,
-          bytes: z
-            .instanceof(Uint8Array)
-            .refine((value) => value.length <= viewerByteLimit)
-            .optional(),
+          bytes: broughtChunk.optional(),
+          size: z.number().int().max(Number.MAX_SAFE_INTEGER).optional(),
         })
-        .strict(),
+        .strict()
+        // A size larger than the first piece announces the pieces `appendEntry` takes.
+        .refine(
+          (entry) =>
+            entry.size === undefined || (!!entry.bytes && entry.size >= entry.bytes.length),
+        ),
     ]),
   ]),
+  appendEntry: z.tuple([id, broughtChunk]),
+  discardEntry: z.tuple([id]),
   moveEntry: z.tuple([id, path.min(1), path.min(1)]),
   trashEntry: z.tuple([id, path.min(1)]),
   revealEntry: z.tuple([id, path]),

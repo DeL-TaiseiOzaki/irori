@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
+"Not added, over 100 MiB" dropping a large deck into contents and asked for
+no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
+- `bringIn` (`src/app/main.tsx`) sends the first 16 MiB with `createEntry`
+  (`size` announces the rest) and the remaining pieces with `appendEntry`;
+  `discardEntry` removes a copy that failed. The host keeps the file open
+  under a random id (`src/host/entries.ts`) and closes it when the announced
+  size is written; a piece past it removes the file.
+- The 100 MiB viewer limit (`viewerByteLimit`) is unchanged: it bounds what
+  irori itself shows, not what a vault holds. The 2,000-file drop limit stays.
+- A copy interrupted by quitting irori leaves a short file.
+- Verified by `npm run build`, `npm test` and `explorer-ui-smoke` (a 120 MiB
+  drop, compared byte for byte) on Linux. Not tried on Windows or macOS.
+
 English first, 2026-10-12 (**0.2.6**, not yet published): the owner asked for
 English as the default interface language ([ADR 011](decisions/011-interface-language.md)).
 - A new device's record defaults to `en` (`src/host/settings.ts`,

@@ -76,6 +76,8 @@ export interface Entry {
   connection?: boolean;
   /** The connection is a folder on this device (every connection since 0.1.67). */
   local?: boolean;
+  /** A brought-in file still being written: `appendEntry` takes its other pieces. */
+  upload?: string;
 }
 /**
  * A file or folder the explorer adds. A file with `bytes`, or a folder with
@@ -85,7 +87,13 @@ export interface Entry {
  */
 export type NewEntry =
   | { kind: 'folder'; name: string; brought?: boolean }
-  | { kind: 'file'; name: string; bytes?: Uint8Array };
+  | {
+      kind: 'file';
+      name: string;
+      bytes?: Uint8Array;
+      /** The whole size of a brought-in file larger than `bytes`, its first piece. */
+      size?: number;
+    };
 /** Where a moved file or folder is now and, in knowledge, what followed it. */
 export interface EntryMove {
   entry: Entry;
@@ -498,6 +506,10 @@ export interface HostAPI {
    * editable connected folder, as a file manager does. Never replaces an entry.
    */
   createEntry(scopeId: string, directory: string, entry: NewEntry): Promise<Entry>;
+  /** Writes the next piece of a brought-in file; the last one completes it. */
+  appendEntry(upload: string, bytes: Uint8Array): Promise<void>;
+  /** Removes a brought-in file that could not be written whole. */
+  discardEntry(upload: string): Promise<void>;
   /**
    * Renames or moves a file or folder of the vault's knowledge, or inside one
    * editable connected folder. `to` is the full new path; an existing entry is
