@@ -30,6 +30,7 @@ import { useDraft } from './useDraft';
 import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
 import { AgentLog } from './AgentLog';
+import { PathBase, PathOpenerContext, type PathOpener } from './path-links';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
@@ -95,6 +96,8 @@ export interface DockShared {
   tabRevisions: Record<string, number>;
   /** The brain's islands are off show (the Overview, routines or the irori agent's Schema is). */
   hidden: boolean;
+  /** Where a path in a reply opens: a file of a vault in the workspace, on the stage. */
+  paths: PathOpener;
 }
 
 /**
@@ -971,12 +974,16 @@ export function AgentColumn({
             </div>
           </div>
         )}
-        <AgentLog
-          events={events}
-          activeRun={shownRunning ? events.at(-1)?.runId : undefined}
-          brains={handedSpaces}
-          onError={report}
-        />
+        <PathOpenerContext.Provider value={shared.paths}>
+          <PathBase.Provider value={space?.scopeId}>
+            <AgentLog
+              events={events}
+              activeRun={shownRunning ? events.at(-1)?.runId : undefined}
+              brains={handedSpaces}
+              onError={report}
+            />
+          </PathBase.Provider>
+        </PathOpenerContext.Provider>
       </div>
       <div className="composer">
         {queued.length > 0 && (

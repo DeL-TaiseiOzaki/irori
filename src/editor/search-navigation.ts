@@ -120,3 +120,21 @@ export function nearest(source: string, positions: number[], line?: number) {
     Math.abs(lineAt(source, at) - line) < Math.abs(lineAt(source, best) - line) ? at : best,
   );
 }
+
+/**
+ * Where a line a reply pointed at is selected: its text, past the Markdown
+ * marks a rich view does not show (`## `, `- [ ] `, `> `) and up to the first
+ * inline mark, so the rendered page finds the same words. Undefined for a
+ * line that is blank or not there.
+ */
+export function lineTarget(text: string, line: number, rich: boolean): SearchTarget | undefined {
+  const written = text.split('\n')[line - 1]?.replace(/\r$/, '');
+  if (written === undefined) return undefined;
+  const start = rich
+    ? (/^\s*(?:(?:#{1,6}|>|[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)*/.exec(written)?.[0].length ?? 0)
+    : 0;
+  const rest = written.slice(start);
+  const query = (rich ? rest.split(/[*_`[\]<>|\\~]/)[0] : rest).trim();
+  if (!query) return undefined;
+  return { query, line, preview: '', column: written.indexOf(query, start) };
+}

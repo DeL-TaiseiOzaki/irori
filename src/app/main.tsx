@@ -23,7 +23,9 @@ import {
   type EntrySpace,
   type Explorer,
 } from './EntryActions';
-import type { SearchTarget } from '../editor/search-navigation';
+import { lineTarget, type SearchTarget } from '../editor/search-navigation';
+import type { PathTarget } from '../domain/path-links';
+import type { PathOpener } from './path-links';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { type Conversation, isDamaged } from '../domain/conversation';
 import { defaultAgentAccess } from '../domain/agent-access';
@@ -183,9 +185,16 @@ import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
 import { categoryChoices } from '../domain/brains';
 const host = window.irori;
-/** A backlink points at a link on the line, a search hit at matching text; the notice says which. */
-type Navigation = SearchTarget & { link?: boolean };
+/**
+ * A backlink points at a link on the line, a search hit at matching text and a
+ * path in an agent's reply at a whole line; the notice says which.
+ */
+type Navigation = SearchTarget & { link?: boolean; pointed?: boolean };
 function navigationNotice(target: Navigation, found: boolean) {
+  if (target.pointed)
+    return found
+      ? t(`${target.line} 行目を選択しました。`, `Selected line ${target.line}.`)
+      : t(`${target.line} 行目を特定できませんでした。`, `Could not locate line ${target.line}.`);
   const what = t(target.link ? 'リンク' : '一致箇所', target.link ? 'link' : 'matching text');
   if (found)
     return t(
@@ -1454,7 +1463,17 @@ function App() {
     }
     return true;
   }
-  async function open(space: Space, entry: Entry, navigation?: Navigation) {
+  /**
+   * Shows a file on the stage. One irori cannot show goes to its application,
+   * or, for a path an agent's reply named, only to its folder: a reply never
+   * gets to launch a program. `navigation` may be worked out from the file read.
+   */
+  async function open(
+    space: Space,
+    entry: Entry,
+    navigation?: Navigation | ((doc: Document) => Navigation | undefined),
+    elsewhere: 'launch' | 'reveal' = 'launch',
+  ) {
     if (gitBusy) return false;
     try {
       if (!(await composer.flush())) return false;
@@ -1476,8 +1495,9 @@ function App() {
         : undefined;
       if (next) {
         setActive(space);
-        show(next, navigation);
-      } else await host.openExternal(space.scopeId, entry.path);
+        show(next, typeof navigation === 'function' ? navigation(next) : navigation);
+      } else if (elsewhere === 'reveal') await host.revealEntry(space.scopeId, entry.path);
+      else await host.openExternal(space.scopeId, entry.path);
       return true;
     } catch (e) {
       report(e);
@@ -1991,6 +2011,22 @@ function App() {
         });
     },
     openEntry: (space: Space, entry: Entry) => void open(space, entry),
+    openPath: (target: PathTarget) => {
+      const space = workspaceSpaces.find((item) => item.scopeId === target.scopeId);
+      if (!space) return;
+      const rich = /\.md$/i.test(target.path);
+      void open(
+        space,
+        fileEntry(target.path, classify(space, target.path)),
+        target.line
+          ? (doc) => {
+              const at = lineTarget(doc.text, target.line!, rich);
+              return at && { ...at, pointed: true };
+            }
+          : undefined,
+        'reveal',
+      );
+    },
     refreshBrain: () => bump(active?.scopeId),
     showHome: () => setView('home'),
     openDaily,
@@ -2130,6 +2166,11 @@ function App() {
     setColumnStatus,
     setHanded,
   });
+  // A reply's paths open on this stage; a relative one from the irori agent is read in the vault on show.
+  const pathOpener = useMemo<PathOpener>(
+    () => ({ roots: workspaceSpaces, fallback: active?.scopeId, open: act.openPath }),
+    [workspaceSpaces, active?.scopeId, act],
+  );
   // The explorer of the vault on show; its rows keep it while the vault stays.
   const explorer = useMemo<Explorer | undefined>(
     () =>
@@ -2187,6 +2228,7 @@ function App() {
       queueSignal,
       tabRevisions,
       hidden,
+      paths: pathOpener,
     }),
     [
       infos,
@@ -2204,6 +2246,7 @@ function App() {
       queueSignal,
       tabRevisions,
       hidden,
+      pathOpener,
     ],
   );
   // irori mode's columns are on show where the Overview and the routines page are.

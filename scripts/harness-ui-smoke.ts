@@ -269,6 +269,16 @@ try {
     await page.getByRole('link', { name: '危険', exact: true }).getAttribute('href'),
   ).not.toMatch(/javascript/i);
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
+  // A path in a reply opens on the stage, at the line it names, as Claude Code
+  // and Codex do in VS Code; inline code naming a vault's file does too.
+  const pathLinks = page.locator('.message-markdown .path-link');
+  await expect(pathLinks).toHaveCount(2);
+  await pathLinks.filter({ hasText: 'second.md' }).click();
+  await expect(page.locator('.ProseMirror')).toContainText('Other note');
+  await expect(page.getByText('1 行目を選択しました。', { exact: true })).toBeVisible();
+  await pathLinks.filter({ hasText: 'note.md' }).first().click();
+  await expect(page.locator('.ProseMirror')).toContainText('Harness fixture');
+  await page.screenshot({ path: 'test-results/irori-path-links.png' });
   // Files go with an instruction, picked or pasted as an image; Pi is shown the picture.
   await page.locator('.composer input[type=file]').setInputFiles({
     name: 'notes.txt',
