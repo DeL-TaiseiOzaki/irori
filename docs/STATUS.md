@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The CLI's own commands, 2026-10-13 (**0.2.12**, not yet published): the owner
+asked that Claude Code's and Codex's commands and skills work through irori and
+that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-skills.md)).
+- `agentCommands` (`src/agents/commands.ts`, `CommandCatalog`): Claude Code's
+  `supportedCommands()` from a session sent no message (`askClaude`, shared with
+  the model list), Codex's `skills/list` (`askCodex`) after `compact` and
+  `review`. Kept a minute per CLI version and folder.
+- `useCommandMenu` (`src/app/CommandMenu.tsx`) shows the list above the box
+  while the request is `/` and a name.
+- `codex()` in `src/agents/service.ts`: `/compact` → `thread/compact/start`,
+  `/review` → `review/start` inline (the `exitedReviewMode` text is the answer),
+  a listed skill as `/name` or `$name` → a `skill` input item.
+- Verified by `npm run build`, `npm test` (`tests/cli-commands.test.ts`) and
+  `npm run test:ui` (`harness-ui-smoke` opens the list). No real CLI was run.
+
 What a vault agent is told, 2026-10-13 (**0.2.11**, not yet published): the
 owner found the `irori` command's 2,000-character preamble on every request
 wasteful and asked that the vault agent be told what irori is and which folders

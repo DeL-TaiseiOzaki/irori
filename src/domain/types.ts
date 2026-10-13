@@ -202,6 +202,16 @@ export interface AgentModels {
   /** Why the list could not be read. */
   error?: string;
 }
+/** A command or skill the CLI runs when a request starts with `/name` (ADR 039). */
+export interface AgentCommand {
+  /** Without the leading slash. */
+  name: string;
+  description: string;
+  /** What follows the name, as the CLI describes it (`<file>`). */
+  hint?: string;
+  /** A skill, rather than one of the CLI's commands. */
+  skill?: boolean;
+}
 export interface AgentSession {
   state: 'empty' | 'saved' | 'unavailable';
   access?: AgentAccess;
@@ -617,6 +627,12 @@ export interface HostAPI {
   agents(): Promise<AgentInfo[]>;
   /** The models the installed CLI offers, read from the CLI and kept per version. Never generates text. */
   agentModels(agent: AgentId): Promise<AgentModels>;
+  /**
+   * The commands and skills the installed CLI offers in this owner's folder,
+   * typed as `/name` (ADR 039). Read from the CLI, never generating text; empty
+   * for a CLI that lists none.
+   */
+  agentCommands(scopeId: string, agent: AgentId): Promise<AgentCommand[]>;
   /**
    * The owner's conversations (a vault's or the irori agent's), pinned first, then
    * by last update. `workspaceId` picks the irori agent's history of that workspace;
