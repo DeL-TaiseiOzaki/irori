@@ -1,6 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The CLI's own commands, 2026-10-13 (**0.2.12**, not yet published): the owner
+Published 2026-10-13: **0.2.11** and **0.2.12**, merged at the owner's request
+([#231](https://github.com/DeL-TaiseiOzaki/irori/pull/231) as `2cdc79d` at 03:33:34 UTC,
+[#235](https://github.com/DeL-TaiseiOzaki/irori/pull/235) as `e39970a` at 03:33:58).
+#235 was stacked on #231 and retargeted to `main`; it was merged without waiting for
+0.2.11 to be published. `publish.yml` published each from its push run:
+
+| Version | Release public | Run |
+| --- | --- | --- |
+| [0.2.11](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.11-preview.1) | 03:34:54 (1:20) | `38342284860` |
+| [0.2.12](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.12-preview.1) | 03:37:24 (3:26) | `38342316518` |
+
+- Anonymous downloads matched `SHA256SUMS.txt` for both. Windows / Mac / `full.nupkg`
+  bytes: 0.2.11 176,216,064 / 141,818,426 / 175,385,674; 0.2.12 176,221,184 /
+  141,828,270 / 175,390,260. The page offers 0.2.12.
+- The fallback run after main CI of `2cdc79d` (`38343290611`) failed at `decide`:
+  `v0.2.12-preview.1` was already the latest tag and is not on that commit. Nothing
+  was left unpublished; it is what merging the next PR before the previous preview
+  is out leaves behind.
+- Not tried on Windows or macOS, or with a real CLI.
+
+The CLI's own commands, 2026-10-13 (**0.2.12**, published): the owner
 asked that Claude Code's and Codex's commands and skills work through irori and
 that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-skills.md)).
 - `agentCommands` (`src/agents/commands.ts`, `CommandCatalog`): Claude Code's
@@ -15,7 +35,7 @@ that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-sk
 - Verified by `npm run build`, `npm test` (`tests/cli-commands.test.ts`) and
   `npm run test:ui` (`harness-ui-smoke` opens the list). No real CLI was run.
 
-What a vault agent is told, 2026-10-13 (**0.2.11**, not yet published): the
+What a vault agent is told, 2026-10-13 (**0.2.11**, published): the
 owner found the `irori` command's 2,000-character preamble on every request
 wasteful and asked that the vault agent be told what irori is and which folders
 are Knowledge and Contents ([ADR 039](decisions/039-what-a-vault-agent-is-told.md)).
