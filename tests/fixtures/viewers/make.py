@@ -98,6 +98,42 @@ slide.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(5), Inches(1.5), I
 deck.save(here / 'sample.pptx')
 
 
+def inherited_deck():
+    """A 16:9 deck whose title takes its size, anchor and place from the layout and
+    master, as a company template's does, and a box with an outline and no fill."""
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.oxml.ns import qn as pqn
+
+    deck = Presentation()
+    deck.slide_width, deck.slide_height = Inches(13.333), Inches(7.5)
+    master = deck.slide_master
+    title_style = master.element.find(pqn('p:txStyles')).find(pqn('p:titleStyle'))
+    rpr = title_style.find(pqn('a:lvl1pPr')).find(pqn('a:defRPr'))
+    rpr.set('sz', '2800')
+    rpr.set('b', '0')
+    layout = deck.slide_layouts[0]
+    for ph in layout.placeholders:
+        if ph.placeholder_format.type is not None and ph.placeholder_format.idx == 0:
+            ph.left, ph.top, ph.width, ph.height = Inches(1), Inches(2.6), Inches(11), Inches(0.6)
+            body = ph.element.find(pqn('p:txBody'))
+            body.find(pqn('a:bodyPr')).set('anchor', 'b')
+            lst = body.find(pqn('a:lstStyle'))
+            for child in list(lst):
+                lst.remove(child)
+    slide = deck.slides.add_slide(layout)
+    slide.shapes.title.text = '社会実装'
+    slide.placeholders[1].text = '尾崎 大晟'
+    box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(10), Inches(5.5), Inches(2), Inches(0.8))
+    box.fill.background()
+    box.line.color.rgb = RGBColor(0, 0, 0)
+    filled = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(5.5), Inches(2), Inches(0.8))
+    filled.line.color.rgb = RGBColor(0, 0, 0)
+    deck.save(here / 'inherited.pptx')
+
+
+inherited_deck()
+
+
 def hyperlink(paragraph, url, text):
     part = paragraph.part
     rel = part.relate_to(url, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
