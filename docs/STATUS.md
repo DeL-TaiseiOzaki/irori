@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-13: **0.2.14**, merged at the owner's request
+([#238](https://github.com/DeL-TaiseiOzaki/irori/pull/238) as `df40849` at 13:59:38 UTC).
+`publish.yml` published it from its push run `38409559282`; the release was public at
+14:01:11 (1:33).
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,227,328 / 141,840,480 / 175,395,288. The page offers 0.2.14.
+
+Paths in a reply open the file, 2026-10-13 (**0.2.14**, published): the owner
+asked that a path a vault agent or the irori agent writes be a link that opens
+the file on the page, as Claude Code and Codex do in VS Code.
+- `writtenPath` and `locatePath` (`src/domain/path-links.ts`) read inline code
+  and link destinations (`a.md#L12`, `/abs/a.md:12`, `file://`, Windows paths)
+  and find the vault file. A relative path is read from the writing vault (a
+  report's, from its vault; the irori agent's, from the vault on show); an
+  absolute one from the innermost vault holding it. Inline code without a
+  folder links only for knowledge-base extensions.
+- `AgentMarkdown` renders them as `.path-link` buttons; `openPath` in
+  `src/app/main.tsx` opens them and selects the line (`lineTarget`). A file
+  irori cannot show is revealed in its folder, never launched.
+- Verified by `npm run build`, `npm test` (`tests/path-links.test.ts`) and
+  `npm run test:ui` (`harness-ui-smoke` clicks an inline-code path and an
+  absolute link with a line). Not tried with a real CLI's reply, on Windows or
+  on macOS.
+
 Slides and code files, 2026-10-13 (**0.2.13**, not yet published): the owner
 showed a template deck whose titles were cut off and a box drawn solid black,
 and asked that `.py` and other files VS Code opens open in irori
