@@ -9,6 +9,110 @@
   background: var(--bg);
   color: var(--tx);
 }
+/* The open workspaces along the window's top, one on show (a browser's tabs). */
+.workspace-tabs {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 0 12px;
+  background: var(--bg);
+  color: var(--tx-3);
+  font-size: 12.5px;
+}
+.workspace-tab-list {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.workspace-tab {
+  height: 30px;
+  min-width: 0;
+  max-width: 220px;
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  border-radius: 9px 9px 0 0;
+  transition: background-color 160ms ease;
+}
+.workspace-tab:hover {
+  background: var(--panel);
+}
+.workspace-tab[data-current] {
+  background: var(--raised);
+  color: var(--tx);
+}
+.workspace-tabs button.workspace-tab-name {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px 0 12px;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font-weight: 500;
+}
+.workspace-tab-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-tab-ai {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ember);
+}
+.workspace-tab-ai[data-ai='waiting'] {
+  animation: irori-halo 2.2s ease-out infinite;
+}
+.workspace-tabs button.workspace-tab-close,
+.workspace-tabs button.workspace-tab-add {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin-right: 5px;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+}
+.workspace-tabs button.workspace-tab-close {
+  opacity: 0;
+}
+.workspace-tab:hover .workspace-tab-close,
+.workspace-tab[data-current] .workspace-tab-close,
+.workspace-tabs button.workspace-tab-close:focus-visible {
+  opacity: 1;
+}
+.workspace-tabs button.workspace-tab-add {
+  width: 26px;
+  height: 26px;
+  margin: 0 0 2px 2px;
+  border-radius: 8px;
+}
+.workspace-tabs button.workspace-tab-close:hover:not(:disabled),
+.workspace-tabs button.workspace-tab-add:hover:not(:disabled),
+.workspace-tabs button.workspace-tab-add[aria-pressed='true'] {
+  background: var(--raised-2);
+  color: var(--tx);
+}
+/* The start screen under the tabs takes the window's rest. */
+.app.app-start > .start {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
 .app-body {
   flex: 1;
   min-height: 0;
@@ -436,7 +540,7 @@
   background: var(--raised);
   color: var(--tx);
 }
-.status-item:first-child {
+.status-item:not(.plain):first-child {
   margin-left: -8px;
 }
 .status-item.plain {

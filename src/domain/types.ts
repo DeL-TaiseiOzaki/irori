@@ -528,11 +528,32 @@ export interface HostAPI {
    */
   moveEntry(scopeId: string, from: string, to: string): Promise<EntryMove>;
   /**
+   * How many links a move of a file or folder of knowledge into another vault
+   * would break: links never cross vaults (ADR 038).
+   */
+  vaultMoveLinks(scopeId: string, path: string): Promise<{ links: number; incomplete: boolean }>;
+  /**
+   * Moves a file or folder of the vault's knowledge into `directory` of another
+   * vault's knowledge, keeping its name or taking a free one. A note's managed
+   * images are copied with it and its comments follow; links to and from it break.
+   */
+  moveToVault(
+    scopeId: string,
+    path: string,
+    toScopeId: string,
+    directory: string,
+  ): Promise<EntryMove>;
+  /**
    * Deletes a file or folder of the vault's knowledge or of an editable connected
    * folder. A note of knowledge goes to irori's deleted notes; anything else to
    * the system trash.
    */
   trashEntry(scopeId: string, path: string): Promise<void>;
+  /**
+   * Puts a file's or folder's path on the clipboard, as a file manager's menu does:
+   * the full path on this computer, or the path from the vault's root with `/`.
+   */
+  copyEntryPath(scopeId: string, path: string, absolute: boolean): Promise<void>;
   /** Shows a file or folder of the vault in the system file manager. */
   revealEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;

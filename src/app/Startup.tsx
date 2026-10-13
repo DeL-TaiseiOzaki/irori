@@ -463,6 +463,7 @@ export function Startup({
   onVaultAgent,
   onRestored,
   onOpen,
+  open = [],
 }: {
   spaces: Space[];
   refresh: () => Promise<void>;
@@ -471,6 +472,8 @@ export function Startup({
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   onOpen: (workspace: WorkspaceProfile) => void;
+  /** The workspaces open as tabs: they and their vaults are not removed while open. */
+  open?: WorkspaceProfile[];
 }) {
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
     [selected, setSelected] = useState<string[]>([]);
@@ -508,6 +511,8 @@ export function Startup({
   }
   const toggle = (id: string, on: boolean) =>
     setSelected((value) => (on ? [...value, id] : value.filter((item) => item !== id)));
+  const inTab = (id: string) => open.some((tab) => tab.id === id),
+    vaultInTab = (scopeId: string) => open.some((tab) => tab.scopeIds.includes(scopeId));
   const unavailable = profiles
     .find((profile) => profile.id === editing)
     ?.scopeIds.filter((id) => !spaces.some((space) => space.scopeId === id));
@@ -590,7 +595,7 @@ export function Startup({
                   </button>
                   <button
                     className="start-icon-button"
-                    disabled={busy}
+                    disabled={busy || inTab(profile.id)}
                     title={t('登録を削除', 'Remove registration')}
                     aria-label={t(
                       `${profile.name} の登録を削除`,
@@ -642,7 +647,7 @@ export function Startup({
                 <button
                   type="button"
                   className="start-chip-remove"
-                  disabled={busy}
+                  disabled={busy || vaultInTab(space.scopeId)}
                   title={t('vault を削除', 'Remove vault')}
                   aria-label={t(`${space.name} を削除`, `Remove ${space.name}`)}
                   onClick={(event) => {

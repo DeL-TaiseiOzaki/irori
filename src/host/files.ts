@@ -18,7 +18,9 @@ import {
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, NewEntry, Space, SpaceChange } from '../domain/types';
 import { entryNameError } from '../domain/connections';
-import { renameEntry, writeNewEntry } from './entries';
+import { freeName, renameEntry, writeNewEntry } from './entries';
+import { carriedImage } from '../domain/vault-move';
+import { internalLinks } from '../domain/note-links';
 import { brainLook, categoryText, iconImagePath } from '../domain/brains';
 import {
   imagesForNoteMove,
@@ -1198,6 +1200,107 @@ export class FileService {
               draftFile(this.dataDir, id, movedPath({ from, to }, file)!),
             )
             .catch(() => {});
+      return {
+        entry: {
+          path: to,
+          name,
+          directory: info.isDirectory(),
+          layer: 'Knowledge_Base',
+          note: info.isFile() && /\.md$/i.test(name),
+        },
+        files: moved,
+      };
+    });
+  }
+  /**
+   * Moves a file or folder of one vault's knowledge into `directory` of another
+   * vault's knowledge (ADR 038). It keeps its name, or takes the first free one;
+   * nothing is replaced. A note's managed images are copied beside it. Between
+   * volumes the entry is copied and the original goes to `trash`. Returns the
+   * moved files by their paths before the move, for the caller to carry what
+   * names them.
+   */
+  async moveAcross(
+    id: string,
+    from: string,
+    toId: string,
+    directory: string,
+    trash: (filename: string) => Promise<void>,
+  ): Promise<{ entry: Entry; files: string[] }> {
+    return this.queue.run(async () => {
+      if (id === toId) throw Error('The same vault');
+      const space = this.knowledgeEntry(id, from);
+      const parentOf = (scope: string, rel: string) => {
+        const folder = path.posix.dirname(rel);
+        return this.knowledgeFolderOf(scope, folder === '.' ? '' : folder);
+      };
+      const actual = path.join(await parentOf(id, from), path.posix.basename(from));
+      const info = await fs.lstat(actual);
+      if (info.isSymbolicLink())
+        throw Error(
+          t(
+            'alias / シンボリックリンクは移動できません。',
+            'Aliases and symbolic links cannot be moved.',
+          ),
+        );
+      if (info.isDirectory()) this.holdsNoBoundary(space, from);
+      const target = await this.knowledgeFolderOf(toId, directory);
+      const name = await freeName(target, path.posix.basename(from));
+      const to = directory ? `${directory}/${name}` : name;
+      this.knowledgeEntry(toId, to);
+      const destination = path.join(target, name);
+      const moved = info.isDirectory() ? await this.walk(actual, from) : [from];
+      // The managed images a note shows go with it; a missing one was broken already.
+      if (info.isFile() && /\.md$/i.test(from)) {
+        const text = await fs.readFile(actual, 'utf8');
+        const folder = path.posix.dirname(from) === '.' ? '' : path.posix.dirname(from);
+        const images = [
+          ...new Set(internalLinks(text, from).filter((link) => carriedImage(from, link))),
+        ];
+        for (const image of images) {
+          const asset = image.slice(folder ? folder.length + 1 : 0);
+          const bytes = await fs
+            .readFile(path.join(await parentOf(id, image), path.posix.basename(image)))
+            .catch(() => undefined);
+          if (!bytes) continue;
+          const assets = path.posix.dirname(directory ? `${directory}/${asset}` : asset);
+          await this.noteDirectory(toId, assets, true);
+          const copy = path.join(target, asset);
+          try {
+            await fs.writeFile(copy, bytes, { flag: 'wx' });
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+            // Managed images are named by their contents, so the one there is the same.
+            if (hash(await fs.readFile(copy)) !== hash(bytes))
+              throw Error(
+                t(
+                  '移動先の画像と内容が一致しません。',
+                  'The image at the destination has different contents.',
+                ),
+              );
+          }
+        }
+      }
+      try {
+        await fs.rename(actual, destination);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+        await fs.cp(actual, destination, {
+          recursive: true,
+          errorOnExist: true,
+          force: false,
+          verbatimSymlinks: true,
+        });
+        await trash(actual);
+      }
+      // A kept draft follows its file.
+      for (const file of moved)
+        await fs
+          .rename(
+            draftFile(this.dataDir, id, file),
+            draftFile(this.dataDir, toId, movedPath({ from, to }, file)!),
+          )
+          .catch(() => {});
       return {
         entry: {
           path: to,

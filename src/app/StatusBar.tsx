@@ -8,45 +8,34 @@ import { Icon } from './Icon';
 import { useLanguage } from './useLanguage';
 
 /**
- * The workspace, the brain on show with its branch, the AI
- * across brains, the terminal and the version, along the window's foot.
+ * The brain on show with its branch, the AI across brains, the terminal and the version, along the window's foot.
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const StatusBar = memo(function StatusBar({
-  workspace,
   space,
   git,
   running,
   waiting,
   status,
-  workspaceDisabled,
   terminalOpen,
   terminalDisabled,
-  onWorkspace,
   onAi,
   onTerminal,
 }: {
-  workspace: string;
   space?: Space;
   git?: GitStatus;
   running: number;
   waiting: number;
   /** The latest message about the workspace, such as a save or a move. */
   status: string;
-  workspaceDisabled: boolean;
   terminalOpen: boolean;
   terminalDisabled: boolean;
-  onWorkspace: () => void;
   onAi: () => void;
   onTerminal: () => void;
 }) {
   useLanguage();
   return (
     <footer className="status-bar chrome">
-      <button className="status-item" disabled={workspaceDisabled} onClick={onWorkspace}>
-        <Icon name="grid" size={13} />
-        {workspace}
-      </button>
       {space && (
         <span className="status-item plain">
           <BrainTile space={space} size={15} radius={4} />
