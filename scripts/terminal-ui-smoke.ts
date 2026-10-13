@@ -116,7 +116,7 @@ try {
   await toggle.click();
   await expect(irori.locator('.terminal-state')).toHaveText('実行中');
   await home.click();
-  await goHome.getByRole('button', { name: '停止して戻る', exact: true }).click();
+  await goHome.getByRole('button', { name: '閉じて戻る', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
   console.log(
     'Terminal UI passed: detected native shell, actual keyboard input/Japanese file, resize, stop/reopen, irori mode drawer and cleanup. No model inference.',
