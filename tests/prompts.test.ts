@@ -78,6 +78,22 @@ test("A vault agent's introduction names its layers' folders and points at AGENT
     /^- Knowledge: "Knowledge_Base\/"[\s\S]*^- Contents: no folder yet\./m,
   );
   assert.match(prompts.vaultIntroPointer('Lab', true), /`irori list` shows the layers again/);
+  // Where it keeps scratch work: never the system's temporary folder.
+  const working = prompts.vaultIntro({ ...vault, work: '.irori/work/' }, false);
+  assert.match(working, /^Work folder: "\.irori\/work\/"\. Keep scratch files, .*%TEMP%/m);
+  assert.doesNotMatch(text, /Work folder/);
+  const handed = prompts.brainsPreamble(
+    [
+      { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', work: '/kb/lab/.irori/work' },
+      { name: 'Notes', agent: 'vault-notes', root: '/kb/notes', work: 'D:\\work\\notes' },
+    ],
+    'codex',
+  );
+  assert.match(
+    handed,
+    /- Lab: folder "\/kb\/lab", sub-agent "vault-lab", work folder "\/kb\/lab\/\.irori\/work"/,
+  );
+  assert.equal(handed.match(/temporary folder/g)?.length, 1);
   // The irori agent hears each handed vault's layers on its line.
   assert.match(
     prompts.brainsPreamble(

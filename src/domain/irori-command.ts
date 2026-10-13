@@ -44,6 +44,7 @@ export type IroriCommand =
       look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
     }
   | { kind: 'layer'; vault: string; layer: NamedLayer; folder: string; also: boolean }
+  | { kind: 'work'; vault: string; folder?: string }
   | { kind: 'workspace'; name: string; vaults: string[]; leave: boolean }
   | { kind: 'remove'; vault: string; trash: boolean }
   | { kind: 'run'; routine: string; vault?: string }
@@ -64,6 +65,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   disconnect: [],
   set: ['name', 'category', 'knowledge-label', 'contents-label', 'color', 'icon'],
   layer: ['also'],
+  work: ['default'],
   workspace: ['leave'],
   remove: ['trash'],
   run: ['vault'],
@@ -73,7 +75,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   resolve: [],
   index: [],
 };
-const flags = new Set(['read-only', 'also', 'leave', 'trash']);
+const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
 const positional: Record<keyof typeof options, [count: number, words: string]> = {
   clone: [1, 'one repository'],
@@ -83,6 +85,7 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   disconnect: [2, 'a vault and the name of a connected folder'],
   set: [1, 'one vault'],
   layer: [3, 'a vault, knowledge or contents, and a folder'],
+  work: [2, 'a vault and a folder, or a vault and --default'],
   workspace: [1, 'a workspace name and then vaults'],
   remove: [1, 'one vault'],
   run: [1, 'one routine'],
@@ -148,7 +151,9 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       ? !words.length
       : kind === 'index'
         ? words.length > count
-        : words.length !== count
+        : kind === 'work'
+          ? words.length !== (values.default === true ? 1 : 2)
+          : words.length !== count
   )
     throw Error(`"irori ${kind}" takes ${wanted}. Run "irori help".`);
   const text = (key: string) => values[key] as string | undefined;
@@ -248,6 +253,8 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       if (also && layer !== 'contents') throw Error('--also is for contents only.');
       return { kind, vault: words[0], layer, folder: words[2], also };
     }
+    case 'work':
+      return { kind, vault: words[0], ...(words[1] !== undefined && { folder: words[1] }) };
     case 'workspace':
       return {
         kind,

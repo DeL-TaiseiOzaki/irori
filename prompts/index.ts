@@ -6,6 +6,7 @@ export * from './vault-agent';
 export * from './vault-intro';
 export * from './note';
 export * from './connected-folders';
+export * from './work-folder';
 export * from './person-lines';
 export * from './comments';
 export * from './sources';

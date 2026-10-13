@@ -150,6 +150,27 @@ try {
   await expect(sheet.getByRole('checkbox', { name: 'vault のルート' })).toBeChecked();
   await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
 
+  // The work folder: .irori/work in the vault, or one chosen on this device (ADR 042).
+  await open();
+  const work = sheet.getByRole('region', { name: '作業フォルダ' });
+  await expect(work).toContainText(path.join(roots[0], '.irori', 'work'));
+  await expect(work.getByRole('button', { name: '既定に戻す' })).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  const scratch = path.join(base, 'Scratch');
+  await mkdir(scratch);
+  await writeFile(
+    path.join(files.dataDir, 'work-folders.json'),
+    JSON.stringify({ [product.scopeId]: scratch }),
+  );
+  await open();
+  await expect(work).toContainText(scratch);
+  await work.getByRole('button', { name: '既定に戻す' }).click();
+  await expect(work).toContainText(path.join(roots[0], '.irori', 'work'));
+  expect(JSON.parse(await readFile(path.join(files.dataDir, 'work-folders.json'), 'utf8'))).toEqual(
+    {},
+  );
+  await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
+
   // An image, kept in .irori and shown on the rail.
   await open();
   await sheet.getByRole('radio', { name: '画像', exact: true }).check();

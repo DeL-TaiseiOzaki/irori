@@ -345,8 +345,10 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
    irori adds its own preamble to each step.
 7. Run \`irori routines\` and fix the routine until it reports ready, or names
    only what the person adds on this device (JavaScript, a secret, a command).
-   You may try a program step yourself with \`IRORI_WORK\` set to a scratch
-   folder; do not start the agent steps.
+   You may try a program step yourself with \`IRORI_WORK\` set to a new
+   folder inside the vault's work folder (\`irori list\` names it), or inside
+   your own folder for your own routine; never the system's temporary folder.
+   Do not start the agent steps.
 8. Tell the person the routine's name, what each step does, any secret to
    enter, and to press 実行 on the routines page. The first run shows its
    files for them to review.

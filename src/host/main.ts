@@ -39,6 +39,7 @@ import { migrateToVault } from './vault-rename';
 import { brainAgentNames, sharedSchemaId } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
+import { WorkFolders } from './work-folders';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { GitHubCli } from '../git/github';
@@ -181,6 +182,13 @@ app
       undefined,
       github,
     );
+    // A folder waited for or lost is linked again by itself only as a person's
+    // connect would be: not while a run or Git operation works in the vault.
+    cloud.mayLink = (scopeId) => !agents.busy(scopeId) && !git.busy;
+    cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
+    // Where each vault's agents keep their scratch, rather than the system's temporary folder.
+    const work = new WorkFolders(files);
+    agents.workFolder = (scopeId) => work.prepare(scopeId);
     // Secrets are sealed with the OS-held key. A source run may stand in a reversible
     // store for the UI smoke, whose display has no keychain; a packaged app never does.
     const secrets = new SecretStore(
@@ -304,6 +312,7 @@ app
       git,
       workspaces,
       cloud,
+      work,
       defaultParent,
       register: registerWatched,
       // As the settings and explorer do, but the irori agent's own hold on a vault does not count.
@@ -396,6 +405,8 @@ app
       },
     });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // A drive or sync app often gets ready while irori is in the background.
+    window.on('focus', () => void cloud.retry(undefined, true));
     // A reloaded/crashed renderer cannot keep controlling its old sessions.
     const stopRendererSessions = () => {
       void terminals.closeAll();
@@ -853,6 +864,12 @@ app
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => files.list(),
+      workFolder: (scopeId) => work.folder(scopeId),
+      setWorkFolder: (scopeId, folder) => work.choose(scopeId, folder),
+      openWorkFolder: async (scopeId) => {
+        const error = await shell.openPath(await work.prepare(scopeId));
+        if (error) throw Error(error);
+      },
       chooseFolder: async () => {
         const choice = await dialog.showOpenDialog(window!, {
           properties: ['openDirectory'],

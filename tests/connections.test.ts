@@ -31,14 +31,14 @@ import {
   writeRetired,
 } from './fixtures/cloud';
 
-test('A lost link marks the connection, and an explicit reconnect restores it', async (t) => {
-  const { cloud, space, connection, entry, target } = await connectedFixture(t);
+test('A lost link is linked again when the connections are read, and reported until then', async (t) => {
+  const { cloud, space, entry, target } = await connectedFixture(t);
   await unlink(entry);
-  const [lost] = await cloud.connections(space.scopeId);
-  assert.equal(lost.state, 'error');
-  assert.match(lost.detail!, /接続が失われました/);
-  assert.match((await cloud.rootEntries(space.scopeId, 'contents'))![0].blocked!, /接続が失われ/);
-  await cloud.connect(space.scopeId, connection.mountId);
+  // Read alone, the connection shows as lost and nothing is reached through it.
+  const [lost] = (await cloud.rootEntries(space.scopeId, 'contents'))!;
+  assert.match(lost.blocked!, /接続が失われ/);
+  await assert.rejects(cloud.resolve(space.scopeId, `${lost.path}/note.md`), /見つかりません/);
+  // Reading the connections links the folder again at its place in contents.
   assert.equal((await cloud.connections(space.scopeId))[0].state, 'mounted');
   assert.equal(await readlink(entry), target);
   assert.equal((await cloud.rootEntries(space.scopeId, 'contents'))![0].blocked, undefined);

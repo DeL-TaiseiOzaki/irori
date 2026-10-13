@@ -65,6 +65,18 @@ const retiredError = () =>
       'Connecting to Google Drive directly has ended. Switch to a folder on this computer.',
     ),
   );
+/**
+ * The chosen folder is not there: a drive not mounted yet, or a sync app still
+ * starting. Such a connection waits for it instead of failing.
+ */
+class FolderMissing extends Error {}
+/**
+ * How long a waiting connection waits before it looks for its folder again, at
+ * first and at most, and how often looking at it checks again (`nudge`).
+ */
+export type WaitTiming = { first: number; longest: number; nudge: number };
+const waitTiming: WaitTiming = { first: 5_000, longest: 120_000, nudge: 2_000 };
+type Waiting = { scopeId: string; mountId: string; delay: number; tried: number; due: number };
 type Mounted = {
   attachment: LocalAttachment;
   /** Where the connection appears: `contents/<name>` in its vault. */
@@ -92,11 +104,19 @@ export class CloudService {
   // Each owner's root, as last read, so writability can be answered without I/O.
   private roots = new Map<string, string>();
   private states = new Map<string, { state: CloudConnection['state']; detail?: string }>();
+  /** Connections waiting for their folder to appear, looked for again with a growing delay. */
+  private waiting = new Map<string, Waiting>();
+  private timer?: ReturnType<typeof setTimeout>;
   private stopping = false;
+  /** Whether a vault's folders may be linked now; no run or Git operation works in it. */
+  mayLink?: (scopeId: string) => boolean;
+  /** A waiting or lost folder was linked again without anyone asking. */
+  onLinked?: (scopeId: string) => void;
   constructor(
     private files: CloudStorage,
     /** Moves a local folder's file to the system trash; without it, nothing local is deleted. */
     private trash?: (filename: string) => Promise<void>,
+    private timing = waitTiming,
   ) {}
   get busy() {
     return this.queue.busy;
@@ -167,14 +187,23 @@ export class CloudService {
     }
     return records;
   }
-  /** Folders on this device, then retired Drive connections waiting to be switched. */
+  /**
+   * Folders on this device, then retired Drive connections waiting to be switched.
+   * A folder this vault waits for, or one whose link no longer checks out, is
+   * looked for again first, so the screen and `irori list` show it as it now is.
+   */
   async connections(scopeId: string): Promise<CloudConnection[]> {
+    await this.retry((item) => item.scopeId === scopeId, true);
+    return this.list(scopeId, true);
+  }
+  /** `relink`: a mounted folder whose link no longer checks out is linked again. Never from inside the queue. */
+  private async list(scopeId: string, relink: boolean): Promise<CloudConnection[]> {
     const local = await this.localDeclarations(scopeId);
     return [
       ...(await Promise.all(
         local.map(async (record) => {
           const key = this.key(scopeId, record.mountId);
-          await this.refresh(key);
+          await this.refresh(key, relink);
           const binding = await this.localBinding(scopeId, record.mountId);
           const current = this.mounted.get(key);
           return {
@@ -196,23 +225,142 @@ export class CloudService {
       })),
     ];
   }
-  /** Marks a mounted connection lost when its mount or link no longer checks out. */
-  private async refresh(key: string) {
+  /**
+   * Checks a mounted connection's link and folder. When they no longer check out,
+   * for example because a sync app mounted its drive again and the folder got a
+   * new identity, the folder is linked again (`relink`); until then, or when
+   * that is not allowed now, the connection shows as lost.
+   */
+  private async refresh(key: string, relink: boolean) {
     const mounted = this.mounted.get(key);
     if (!mounted) return;
     try {
       await this.assertLinked(mounted);
       if (this.mounted.get(key) === mounted) this.states.set(key, { state: 'mounted' });
+      return;
     } catch {
-      if (this.mounted.get(key) === mounted)
-        this.states.set(key, {
-          state: 'error',
-          detail: t(
-            '接続が失われました。再接続してください。',
-            'The connection was lost. Connect again.',
-          ),
-        });
+      if (this.mounted.get(key) !== mounted) return;
+      this.states.set(key, {
+        state: 'error',
+        detail: t(
+          '接続が失われました。再接続してください。',
+          'The connection was lost. Connect again.',
+        ),
+      });
     }
+    const { scopeId } = mounted.attachment;
+    if (!relink || this.stopping || this.mayLink?.(scopeId) === false) return;
+    const linked = await this.mutate(() => this.relink(key, mounted)).catch(() => false);
+    if (linked) this.onLinked?.(scopeId);
+  }
+  /**
+   * Links a mounted connection again to the folder its binding names now. irori's
+   * own link, unchanged since irori made it, is removed first when it leads to the
+   * folder as it was then rather than as it is now; anything else at `contents/<name>`
+   * stays, and the connection then shows the error. A folder not there at all waits.
+   */
+  private async relink(key: string, mounted: Mounted) {
+    if (this.mounted.get(key) !== mounted) return false;
+    try {
+      await this.assertLinked(mounted);
+      this.states.set(key, { state: 'mounted' });
+      return false;
+    } catch {
+      this.mounted.delete(key);
+    }
+    const record = mounted.attachment;
+    const binding = await this.localBinding(record.scopeId, record.mountId);
+    const target = binding && (await this.localTarget(binding.path).catch(() => undefined));
+    const link = await fs.lstat(mounted.entry).catch(() => undefined);
+    if (
+      target &&
+      target !== mounted.target &&
+      link?.isSymbolicLink() &&
+      link.dev === mounted.link.device &&
+      link.ino === mounted.link.inode
+    )
+      await this.unlink(record, mounted.target);
+    await this.link(record).catch(() => {});
+    return this.mounted.has(key);
+  }
+  /** Waits for a connection's folder: looks again after a delay that doubles each time, up to a limit. */
+  private wait(key: string, scopeId: string, mountId: string) {
+    const before = this.waiting.get(key);
+    const delay = before ? Math.min(before.delay * 2, this.timing.longest) : this.timing.first;
+    const now = Date.now();
+    this.waiting.set(key, { scopeId, mountId, delay, tried: now, due: now + delay });
+    this.states.set(key, {
+      state: 'waiting',
+      detail: t(
+        'フォルダを待っています。ドライブや同期アプリの準備ができると自動で接続します。',
+        'Waiting for the folder. It connects by itself once its drive or sync app is ready.',
+      ),
+    });
+    this.schedule();
+  }
+  private stopWaiting(key: string) {
+    if (this.waiting.delete(key)) this.schedule();
+  }
+  private schedule() {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    if (this.stopping || !this.waiting.size) return;
+    const due = Math.min(...[...this.waiting.values()].map((item) => item.due));
+    this.timer = setTimeout(
+      () => void this.retry((item) => item.due <= Date.now()),
+      Math.max(0, due - Date.now()),
+    );
+    this.timer.unref?.();
+  }
+  /**
+   * Looks again for the folders of the waiting connections `pick` chooses, and
+   * links those that are there. Called when their delay is up and, with `nudge`,
+   * when someone looks at them: the screen, `irori list` or the window coming
+   * back to the front. A folder still missing is found so without the queue, so
+   * waiting never makes irori busy.
+   */
+  async retry(pick: (item: Waiting) => boolean = () => true, nudge = false) {
+    const now = Date.now();
+    const keys = [...this.waiting]
+      .filter(([, item]) => pick(item) && (!nudge || now - item.tried >= this.timing.nudge))
+      .map(([key]) => key);
+    const linked = new Set<string>();
+    for (const key of keys) {
+      const item = this.waiting.get(key);
+      if (!item || this.stopping) break;
+      if (this.mayLink?.(item.scopeId) === false) {
+        // A run or Git operation works in the vault: looked for after it, at the same pace.
+        this.waiting.set(key, { ...item, due: now + item.delay });
+        continue;
+      }
+      const binding = await this.localBinding(item.scopeId, item.mountId).catch(() => undefined);
+      const there =
+        binding &&
+        (await fs.stat(binding.path).then(
+          (info) => info.isDirectory(),
+          () => false,
+        ));
+      if (binding && !there) {
+        this.wait(key, item.scopeId, item.mountId);
+        continue;
+      }
+      await this.mutate(async () => {
+        if (this.waiting.get(key) !== item) return;
+        const record = (await this.localDeclarations(item.scopeId)).find(
+          (entry) => entry.mountId === item.mountId,
+        );
+        if (!record || !binding) {
+          // Unregistered, or its folder unchosen, since it began to wait.
+          this.stopWaiting(key);
+          this.states.delete(key);
+          return;
+        }
+        await this.link(record).catch(() => {});
+        if (this.mounted.has(key)) linked.add(item.scopeId);
+      }).catch(() => {});
+    }
+    this.schedule();
+    for (const scopeId of linked) this.onLinked?.(scopeId);
   }
   private async parent(record: Pick<Attachment, 'scopeId' | 'contentsRoot'>, create = false) {
     const space = await this.files.get(record.scopeId);
@@ -340,7 +488,7 @@ export class CloudService {
         root: space.root,
         path: target,
       });
-      this.states.delete(this.key(scopeId, mountId));
+      this.forget(this.key(scopeId, mountId));
     });
   }
   /** Renames a folder connection, or unregisters a connection of either kind when no name is given. */
@@ -362,7 +510,7 @@ export class CloudService {
       if (!record) throw Error('Unknown cloud connection');
       if (name !== undefined) throw retiredError();
       await this.forgetRetired(record);
-      this.states.delete(key);
+      this.forget(key);
     });
   }
   async localDeclarations(scopeId: string): Promise<LocalAttachment[]> {
@@ -439,8 +587,9 @@ export class CloudService {
    * it would appear inside another's contents, and irori's data is not material.
    */
   private async localTarget(chosen: string) {
-    const missing = () => Error(t('フォルダが見つかりません。', 'The folder was not found.'));
-    if (!path.isAbsolute(chosen)) throw missing();
+    const message = t('フォルダが見つかりません。', 'The folder was not found.');
+    const missing = () => new FolderMissing(message);
+    if (!path.isAbsolute(chosen)) throw Error(message);
     let target: string;
     try {
       target = await fs.realpath(chosen);
@@ -452,7 +601,7 @@ export class CloudService {
     const info = await fs.lstat(target).catch(() => {
       throw missing();
     });
-    if (!info.isDirectory() || info.isSymbolicLink()) throw missing();
+    if (!info.isDirectory() || info.isSymbolicLink()) throw Error(message);
     const overlaps = (a: string, b: string) => within(a, b) || within(b, a);
     for (const root of [
       ...(await this.files.list()).map((item) => item.root),
@@ -510,7 +659,7 @@ export class CloudService {
         root: space.root,
         path: target,
       });
-      return (await this.connections(record.scopeId)).find(
+      return (await this.list(record.scopeId, false)).find(
         (item) => item.mountId === record.mountId,
       )!;
     });
@@ -544,7 +693,7 @@ export class CloudService {
           records,
           records.map((item) => (item.mountId === mountId ? { ...item, folderName } : item)),
         );
-      this.states.delete(key);
+      this.forget(key);
     });
   }
   private async writeLocal(scopeId: string, before: LocalAttachment[], after: LocalAttachment[]) {
@@ -579,7 +728,12 @@ export class CloudService {
       ),
     );
     if (!replacement) await fs.rm(this.localBindingFile(scopeId, mountId), { force: true });
-    this.states.delete(this.key(scopeId, mountId));
+    this.forget(this.key(scopeId, mountId));
+  }
+  /** Forgets a connection's state, and stops waiting for its folder. */
+  private forget(key: string) {
+    this.states.delete(key);
+    this.stopWaiting(key);
   }
   private async setLocalAccess(record: LocalAttachment, access: CloudAccess) {
     if (record.access === access) return;
@@ -608,7 +762,8 @@ export class CloudService {
   /**
    * Shows a local folder at `contents/<name>` through a link (a junction on Windows),
    * so the person's tools and CLI agents find it there. irori itself reaches it only
-   * through `locate`, which checks the link and the folder first.
+   * through `locate`, which checks the link and the folder first. A folder that is
+   * not there yet is waited for (`retry`) rather than reported as an error.
    */
   private async link(record: LocalAttachment) {
     const { scopeId, mountId } = record;
@@ -655,8 +810,11 @@ export class CloudService {
       await this.assertLinked(mounted);
       this.mounted.set(key, mounted);
       this.states.set(key, { state: 'mounted' });
+      this.stopWaiting(key);
     } catch (error) {
       if (made) await fs.unlink(made).catch(() => {});
+      if (error instanceof FolderMissing) return this.wait(key, scopeId, mountId);
+      this.stopWaiting(key);
       this.states.set(key, { state: 'error', detail: (error as Error).message });
       throw error;
     }
@@ -723,14 +881,17 @@ export class CloudService {
     return this.mutate(() => this.unmount(scopeId, mountId));
   }
   /**
-   * Disconnects every connected folder of a vault before its contents folder is
-   * renamed (ADR 024), and returns which were connected, for `resume` to link again.
+   * Disconnects every connected or waiting folder of a vault before its contents
+   * folder is renamed (ADR 024), and returns which they were, for `resume` to link again.
    */
   suspend(scopeId: string) {
     return this.mutate(async () => {
-      const ids = [...this.mounted.values()]
-        .filter((item) => item.attachment.scopeId === scopeId)
-        .map((item) => item.attachment.mountId);
+      const ids = [
+        ...[...this.mounted.values()].map((item) => item.attachment),
+        ...this.waiting.values(),
+      ]
+        .filter((item) => item.scopeId === scopeId)
+        .map((item) => item.mountId);
       for (const mountId of ids) await this.unmount(scopeId, mountId);
       return ids;
     });
@@ -958,6 +1119,13 @@ export class CloudService {
     if (mounted) {
       await this.unlink(mounted.attachment, mounted.target);
       this.mounted.delete(key);
+    } else if (this.waiting.has(key)) {
+      // A link left from before it began to wait goes too, as a disconnect would take it.
+      this.stopWaiting(key);
+      const record = (await this.localDeclarations(scopeId)).find(
+        (item) => item.mountId === mountId,
+      );
+      if (record) await this.dropStaleLink(record);
     }
     this.states.set(key, { state: 'disconnected' });
   }
@@ -991,7 +1159,7 @@ export class CloudService {
   async rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined> {
     const space = await this.files.get(scopeId);
     if (!space.contents.includes(rel)) return;
-    const entries: Entry[] = (await this.connections(scopeId))
+    const entries: Entry[] = (await this.list(scopeId, false))
       .filter((record) => record.contentsRoot === rel)
       .map((record) => ({
         path: `${rel}/${record.name}`,
@@ -1022,6 +1190,7 @@ export class CloudService {
   }
   async close() {
     this.stopping = true;
+    this.schedule();
     try {
       await this.queue.idle();
       for (const mounted of this.mounted.values())

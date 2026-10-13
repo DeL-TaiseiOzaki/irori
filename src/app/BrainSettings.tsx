@@ -30,8 +30,9 @@ import { baseName } from '../domain/paths';
 import { BrainTile, glyphs } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
-import { errorText } from './ErrorMessage';
+import { ErrorMessage, errorText } from './ErrorMessage';
 import { useAction } from './useAction';
+import { useResource } from './useResource';
 
 const host = window.irori;
 type IconKind = 'glyph' | 'text' | 'image';
@@ -493,6 +494,7 @@ export function BrainSettings({
               ))}
             </div>
           </section>
+          <WorkFolderSection space={space} />
           <section className="brain-sheet-icons">
             <div className="brain-sheet-row">
               <h3>{t('アイコン', 'Icon')}</h3>
@@ -618,5 +620,77 @@ export function BrainSettings({
         </footer>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * Where the vault's agents keep scratch files, intermediate results and trial
+ * scripts on this device: `.irori/work` in the vault unless another folder is
+ * chosen. A change applies at once, as a connection's does.
+ */
+function WorkFolderSection({ space }: { space: Space }) {
+  const [revision, setRevision] = useState(0);
+  const folder = useResource(() => host.workFolder(space.scopeId), [space.scopeId], {
+    refresh: revision,
+  });
+  const { busy, error, run } = useAction();
+  const change = (operation: () => Promise<unknown>) =>
+    run(async () => {
+      await operation();
+      setRevision((value) => value + 1);
+    });
+  const current = folder.data;
+  return (
+    <section className="brain-sheet-work" aria-label={t('作業フォルダ', 'Work folder')}>
+      <div className="brain-sheet-row">
+        <h3>{t('作業フォルダ', 'Work folder')}</h3>
+        <span className="brain-sheet-path mono" title={current?.path}>
+          {current?.path ?? ''}
+        </span>
+      </div>
+      {current?.missing && (
+        <small role="alert">
+          {t(
+            `${current.missing} が見つからないため、既定のフォルダを使っています。`,
+            `${current.missing} is not there, so the default folder is used.`,
+          )}
+        </small>
+      )}
+      <div className="brain-sheet-work-actions">
+        <button
+          type="button"
+          className="stage-text-button framed"
+          disabled={busy || !current}
+          onClick={() => void run(() => host.openWorkFolder(space.scopeId))}
+        >
+          <Icon name="folder" size={15} />
+          {t('開く', 'Open')}
+        </button>
+        <button
+          type="button"
+          className="stage-text-button framed"
+          disabled={busy}
+          onClick={() =>
+            void change(async () => {
+              const chosen = await host.chooseFolder();
+              if (chosen) await host.setWorkFolder(space.scopeId, chosen);
+            })
+          }
+        >
+          {t('フォルダを選ぶ', 'Choose a folder')}
+        </button>
+        {current?.chosen && (
+          <button
+            type="button"
+            className="stage-text-button framed"
+            disabled={busy}
+            onClick={() => void change(() => host.setWorkFolder(space.scopeId, null))}
+          >
+            {t('既定に戻す', 'Use the default')}
+          </button>
+        )}
+      </div>
+      {(error || folder.error) && <ErrorMessage text={error || folder.error!} />}
+    </section>
   );
 }

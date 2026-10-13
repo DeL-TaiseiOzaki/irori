@@ -12,7 +12,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
-import { CloudService } from '../src/cloud/service';
+import { CloudService, type WaitTiming } from '../src/cloud/service';
 import { fixture, retiredDeclaration, writeRetired } from './fixtures/cloud';
 
 /** A vault with a folder outside it, standing for one a sync app keeps on this device. */
@@ -122,16 +122,24 @@ test('A replaced link or folder is refused, and links inside the folder are not 
   const inner = await files.entries(space.scopeId, 'contents/Research');
   assert(inner.find((item) => item.name === 'escape')?.blocked);
   await assert.rejects(files.read(space.scopeId, 'contents/Research/escape/secret.md'), /alias/);
-  // The folder moved and another took its place: nothing is read from the newcomer.
+  // The folder moved and another took its place: nothing is read from the newcomer
+  // until the connection is checked and linked again to the folder now at its path,
+  // as a sync app's drive mounted again gives its folders new identities.
   await rename(folder, `${folder}-moved`);
   await mkdir(folder);
   await writeFile(path.join(folder, 'note.md'), 'newcomer');
   await assert.rejects(files.read(space.scopeId, 'contents/Research/note.md'), /識別情報/);
-  assert.equal((await cloud.connections(space.scopeId))[0].state, 'error');
-  // The link was replaced: it is left alone on disconnect.
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'mounted');
+  assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).text, 'newcomer');
+  // The link was replaced: it is not linked again, and is left alone on disconnect.
   const entry = path.join(space.root, 'contents', 'Research');
   await rm(entry);
   await symlink(outside, entry);
+  const [replaced] = await cloud.connections(space.scopeId);
+  assert.equal(replaced.state, 'error');
+  assert.match(replaced.detail!, /同じ名前/);
+  assert.deepEqual(cloud.localFolders(space.scopeId), []);
+  assert.equal(await readlink(entry), outside);
   await cloud.disconnect(space.scopeId, mountId);
   assert.equal(await readlink(entry), outside);
   await assert.rejects(cloud.connect(space.scopeId, mountId), /同じ名前/);
@@ -189,4 +197,162 @@ test('Another device binds its own folder, and deletion uses the system trash', 
   await writeFile(path.join(elsewhere, 'kept.md'), 'kept');
   await assert.rejects(plain.deleteEntry(space.scopeId, 'contents/Research/kept.md'), /ごみ箱/);
   assert.deepEqual(await readdir(elsewhere), ['kept.md']);
+});
+
+/** A service that waits a few milliseconds, as irori waits seconds, for a folder. */
+function waiting(files: any, timing: Partial<WaitTiming> = {}) {
+  const linked: string[] = [];
+  const cloud = new CloudService(files, undefined, {
+    first: 60_000,
+    longest: 60_000,
+    nudge: 0,
+    ...timing,
+  });
+  cloud.onLinked = (scopeId) => linked.push(scopeId);
+  files.cloud = cloud;
+  return { cloud, linked };
+}
+
+test('A folder not there yet is waited for, and linked once it appears', async (t) => {
+  const { files, space, folder } = await local(t);
+  const { cloud, linked } = waiting(files);
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  // The drive is not mounted yet when irori connects at its start.
+  const away = `${folder}-unmounted`;
+  await rename(folder, away);
+  await cloud.connect(space.scopeId, mountId);
+  const [shown] = await cloud.connections(space.scopeId);
+  assert.equal(shown.state, 'waiting');
+  assert.match(shown.detail!, /待っています/);
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
+  assert.deepEqual(cloud.localFolders(space.scopeId), []);
+  const [entry] = await files.entries(space.scopeId, 'contents');
+  assert.match(entry.blocked!, /待っています/);
+  // Nothing is made in its place while it waits.
+  await assert.rejects(lstat(path.join(space.root, 'contents', 'Research')), { code: 'ENOENT' });
+  // The drive is ready: looking at the connections links it, and agents are told.
+  await rename(away, folder);
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'mounted');
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/Research']);
+  assert.deepEqual(cloud.localFolders(space.scopeId), [folder]);
+  assert.deepEqual(linked, [space.scopeId]);
+  assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).text, '# Synced\n');
+  await cloud.close();
+});
+
+test('A waiting folder is looked for again by itself, not during a run in its vault', async (t) => {
+  const { files, space, folder } = await local(t);
+  const { cloud, linked } = waiting(files, { first: 20, longest: 40 });
+  let running = true;
+  cloud.mayLink = () => !running;
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  const away = `${folder}-unmounted`;
+  await rename(folder, away);
+  await cloud.connect(space.scopeId, mountId);
+  await rename(away, folder);
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  // A run works in the vault: the folder is linked after it, not under it.
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
+  running = false;
+  const deadline = Date.now() + 2_000;
+  while (!cloud.linkedPaths(space.scopeId).length && Date.now() < deadline)
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/Research']);
+  assert.deepEqual(linked, [space.scopeId]);
+  await cloud.close();
+});
+
+test('A connected folder that goes away waits, and comes back through its own link', async (t) => {
+  const { files, space, folder } = await local(t);
+  const { cloud } = waiting(files);
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  const entry = path.join(space.root, 'contents', 'Research');
+  const link = await lstat(entry);
+  const away = `${folder}-unmounted`;
+  await rename(folder, away);
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'waiting');
+  assert.deepEqual(cloud.localFolders(space.scopeId), []);
+  await assert.rejects(files.read(space.scopeId, 'contents/Research/note.md'), /未接続/);
+  // The drive comes back with new identities for its folders.
+  await mkdir(folder);
+  await writeFile(path.join(folder, 'note.md'), 'remounted');
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'mounted');
+  assert.equal((await lstat(entry)).ino, link.ino);
+  assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).text, 'remounted');
+  await cloud.close();
+});
+
+test('A waiting folder finds something else in its place and is not linked', async (t) => {
+  const { base, files, space, folder } = await local(t);
+  const { cloud } = waiting(files);
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  const away = `${folder}-unmounted`;
+  await rename(folder, away);
+  await cloud.connect(space.scopeId, mountId);
+  // While it waits, the person puts a folder of their own at its place in contents.
+  const own = path.join(space.root, 'contents', 'Research');
+  await mkdir(own, { recursive: true });
+  await writeFile(path.join(own, 'mine.md'), 'mine');
+  await rename(away, folder);
+  const [shown] = await cloud.connections(space.scopeId);
+  assert.equal(shown.state, 'error');
+  assert.match(shown.detail!, /同じ名前/);
+  assert.deepEqual(await readdir(own), ['mine.md']);
+  assert.deepEqual(cloud.localFolders(space.scopeId), []);
+  // A link to another folder there is left alone as well.
+  await rm(own, { recursive: true });
+  const other = path.join(base, 'Other');
+  await mkdir(other);
+  await symlink(other, own);
+  await rename(folder, away);
+  await cloud.connect(space.scopeId, mountId);
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'waiting');
+  await cloud.disconnect(space.scopeId, mountId);
+  assert.equal(await readlink(own), other);
+  await cloud.close();
+});
+
+test('Disconnecting a waiting folder stops the wait and clears only its own link', async (t) => {
+  const { files, space, folder } = await local(t);
+  const { cloud } = waiting(files, { first: 20, longest: 20 });
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  const away = `${folder}-unmounted`;
+  await rename(folder, away);
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'waiting');
+  await cloud.disconnect(space.scopeId, mountId);
+  const entry = path.join(space.root, 'contents', 'Research');
+  await assert.rejects(lstat(entry), { code: 'ENOENT' });
+  await rename(away, folder);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal((await cloud.connections(space.scopeId))[0].state, 'disconnected');
+  assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
+  assert.deepEqual(await readdir(folder), ['note.md']);
+  await cloud.close();
 });

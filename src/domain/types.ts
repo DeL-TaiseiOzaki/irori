@@ -239,6 +239,15 @@ export interface WorkspaceProfile {
   scopeIds: string[];
   groups?: VaultGroup[];
 }
+/** The folder a vault's agents work in (scratch, intermediate results, downloads). */
+export interface WorkFolder {
+  /** Where they work now, an absolute path on this device. */
+  path: string;
+  /** The person chose a folder; otherwise it is `.irori/work` in the vault. */
+  chosen: boolean;
+  /** The chosen folder, when it is not there and the default stands in for it. */
+  missing?: string;
+}
 export interface CloudRoot {
   scopeId: string;
   name: string;
@@ -282,8 +291,13 @@ export type Attachment = CloudAttachment | LocalAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
 export type CloudConnection = Attachment & ConnectionState;
 export interface ConnectionState {
-  /** `retired`: a Google Drive connection from before 0.1.67, to be switched to a folder. */
-  state: 'unconfigured' | 'disconnected' | 'connecting' | 'mounted' | 'error' | 'retired';
+  /**
+   * `waiting`: its folder is not there yet (a drive not mounted, a sync app
+   * starting); it connects by itself once it is. `retired`: a Google Drive
+   * connection from before 0.1.67, to be switched to a folder.
+   */
+  state:
+    'unconfigured' | 'disconnected' | 'connecting' | 'waiting' | 'mounted' | 'error' | 'retired';
   detail?: string;
   /** Linked so that files can be changed. */
   writable?: boolean;
@@ -558,6 +572,12 @@ export interface HostAPI {
   revealEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;
   chooseFolder(): Promise<string | null>;
+  /** The folder the vault's agents work in. */
+  workFolder(scopeId: string): Promise<WorkFolder>;
+  /** Chooses the folder the vault's agents work in on this device; `null` for the default. */
+  setWorkFolder(scopeId: string, folder: string | null): Promise<WorkFolder>;
+  /** Shows the vault's work folder in the system file manager, making the default one first. */
+  openWorkFolder(scopeId: string): Promise<void>;
   register(root: string, name: string, category: Category): Promise<Space>;
   /** Makes a new folder a Git repository and registers it as a vault. */
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
