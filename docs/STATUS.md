@@ -1,9 +1,9 @@
 # Implementation status — notes, native agents and connection onboarding
 
-What a vault agent is told, 2026-10-13 (**0.2.9**, not yet published): the
+What a vault agent is told, 2026-10-13 (**0.2.11**, not yet published): the
 owner found the `irori` command's 2,000-character preamble on every request
 wasteful and asked that the vault agent be told what irori is and which folders
-are Knowledge and Contents ([ADR 038](decisions/038-what-a-vault-agent-is-told.md)).
+are Knowledge and Contents ([ADR 039](decisions/039-what-a-vault-agent-is-told.md)).
 - `vaultIntro` (`prompts/vault-intro.ts`) replaces `vaultCommandPreamble` and the
   separate connected-folders part; `vaultCommandPreamble` is now its short last
   paragraph. The service keeps its place in the request and chooses the whole

@@ -41,7 +41,7 @@ test('Connected folders are named for agents, with how to search inside the link
   assert.doesNotMatch(prompts.brainsPreamble([brains[1]], 'claude'), /rg -L|connected folders/);
 });
 
-// A vault agent hears what irori is and where each layer is (ADR 038):
+// A vault agent hears what irori is and where each layer is (ADR 039):
 // AGENTS.md says where the rest of the Schema is, the introduction what irori changes.
 test("A vault agent's introduction names its layers' folders and points at AGENTS.md", () => {
   const vault = {

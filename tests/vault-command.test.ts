@@ -192,7 +192,7 @@ test(
     assert.equal(mine.at(-1)?.outcome, 'completed', JSON.stringify(mine));
     // The vault agent ran in its own vault, on the same CLI, recorded in its scope.
     const handedPrompt = (await log(product.root)).find((call) => call.type === 'prompt').message;
-    // The vault's introduction, then the task (ADR 038).
+    // The vault's introduction, then the task (ADR 039).
     assert.match(handedPrompt, /^irori: you are the agent of the "Product" vault/);
     assert.match(handedPrompt, /\n\nirori: the irori agent handed you this task\./);
     assert.ok(handedPrompt.endsWith('\n\nTidy the notes.'));

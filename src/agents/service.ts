@@ -152,7 +152,7 @@ type Run = {
   root?: string;
   /** The digest of the shared Schema this run's request gave in full or pointed at. */
   shared?: string;
-  /** The digest of the introduction this run gave in full or stood for (ADR 038). */
+  /** The digest of the introduction this run gave in full or stood for (ADR 039). */
   intro?: string;
   /** The title a new conversation for this run takes instead of its first line. */
   title?: string;
@@ -793,7 +793,7 @@ export class AgentService {
       ...(run.intro && { intro: run.intro }),
     });
   }
-  /** A vault agent's introduction and the line that stands for it (ADR 038). */
+  /** A vault agent's introduction and the line that stands for it (ADR 039). */
   private async vaultIntro(scopeId: string, commands: boolean) {
     const vault = this.files.get(scopeId);
     const instructions = await fs
@@ -933,7 +933,7 @@ export class AgentService {
         } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
       }
       // What irori is, how the vault is laid out and the `irori` command: whole on
-      // a session's first request or after a change, otherwise one line (ADR 038).
+      // a session's first request or after a change, otherwise one line (ADR 039).
       // Its place is kept here; which form goes in is known once the session is.
       const commands = !!(run.commands && this.setup);
       const intro = you

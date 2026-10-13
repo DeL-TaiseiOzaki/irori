@@ -840,7 +840,7 @@ test(
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-    // Its introduction names the vault and ends with the command (ADR 038).
+    // Its introduction names the vault and ends with the command (ADR 039).
     const introduced = asked.find((call) => call.type === 'prompt').message as string;
     assert.ok(
       introduced.startsWith('irori: you are the agent of the "Research" vault'),

@@ -1,7 +1,7 @@
 /**
  * What irori is to a vault agent and how its vault is laid out: where its
  * Schema starts, the folders its Knowledge and Contents layers hold, its
- * connected folders and, when the run has it, the `irori` command (ADR 038).
+ * connected folders and, when the run has it, the `irori` command (ADR 039).
  * AGENTS.md says where the rest of the Schema is; this says what irori
  * changes and AGENTS.md cannot keep current.
  *

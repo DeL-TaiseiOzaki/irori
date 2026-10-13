@@ -591,7 +591,7 @@ test(
     assert.match(await readFile(path.join(root, 'note.md'), 'utf8'), /Fixture Hermes edit/);
     // The prompt travels on stdin, never on the command line.
     const [call] = await hermes();
-    // After the vault's introduction (ADR 038).
+    // After the vault's introduction (ADR 039).
     assert.ok(call.prompt.endsWith('\n\nordinary request'), call.prompt);
     assert.deepEqual(call.args, ['chat', '--query-file', '-', '--format', 'stream-json']);
     assert.equal(

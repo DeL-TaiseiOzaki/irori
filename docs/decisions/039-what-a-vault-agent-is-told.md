@@ -1,6 +1,6 @@
-# 038 — What a vault agent is told about irori and its vault
+# 039 — What a vault agent is told about irori and its vault
 
-Date: 2026-10-13. Status: owner decision; implemented for 0.2.9.
+Date: 2026-10-13. Status: owner decision; implemented for 0.2.11.
 Supersedes [ADR 024](024-layer-names.md) decision 9 ("agents are told nothing
 new") and changes how often [ADR 031](031-agents-use-what-irori-does.md)'s
 command preamble is said. Applies [ADR 027](027-shared-schema.md) decision 5

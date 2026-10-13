@@ -5,7 +5,7 @@
  *
  * Sent: a preamble before the person's words when the command is on the
  * run's PATH, whole on a native session's first request and as one line
- * after it (ADR 038); the help and the reports as the command's output, read
+ * after it (ADR 039); the help and the reports as the command's output, read
  * by the agent in its shell.
  * Channel: the request text, and the command's standard output.
  */
@@ -14,7 +14,7 @@ import { brainColors, brainGlyphs } from '../src/domain/brains';
 
 /**
  * The irori agent's `irori` command, said on a session's first request that has
- * it; later requests in that session get `iroriCommandPointer` (ADR 038).
+ * it; later requests in that session get `iroriCommandPointer` (ADR 039).
  */
 export const iroriCommandPreamble = [
   "irori: the `irori` command is on your PATH. With it you do what the person does in irori to set up vaults, workspaces and routines: `irori list` shows the vaults, their layers, connected folders and the workspaces, `irori routines` the routines as irori reads them, and `irori help` gives every form. Your folder's .agents/skills holds the procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
@@ -28,7 +28,7 @@ export const iroriCommandPointer =
 
 /**
  * A vault agent's `irori` command, the end of its introduction
- * (`vaultIntro`, ADR 031, ADR 038): what it must know before it moves or
+ * (`vaultIntro`, ADR 031, ADR 039): what it must know before it moves or
  * removes anything. The rest is in `irori help`.
  */
 export const vaultCommandPreamble =

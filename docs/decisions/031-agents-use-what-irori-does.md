@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Status: owner decision; implemented for 0.1.95. Extends
 [ADR 025](025-irori-agent-setup.md) and [ADR 030](030-moving-in-with-the-irori-agent.md).
-[ADR 038](038-what-a-vault-agent-is-told.md) says the command preamble whole
+[ADR 039](039-what-a-vault-agent-is-told.md) says the command preamble whole
 once per session and leaves its details to `irori help`.
 
 ## Context
