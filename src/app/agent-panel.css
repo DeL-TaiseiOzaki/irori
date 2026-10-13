@@ -1194,6 +1194,16 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
+/* A path the reply names opens on the stage; in inline code it is underlined the same. */
+.path-link code {
+  text-decoration: inherit;
+  text-decoration-color: inherit;
+  text-underline-offset: inherit;
+}
+.path-link:hover,
+.path-link:hover code {
+  text-decoration-color: var(--tx-2);
+}
 .message-link-error {
   margin: 6px 0 0;
   color: var(--danger-on-nav);

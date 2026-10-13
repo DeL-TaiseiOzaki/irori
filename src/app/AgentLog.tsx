@@ -14,6 +14,7 @@ import { t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { BrainTile } from './BrainTile';
 import { useLanguage } from './useLanguage';
+import { PathBase } from './path-links';
 
 const host = window.irori;
 // A reply is Markdown, but its renderer is the heaviest thing a session that
@@ -413,7 +414,9 @@ const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain
           ? t(`${brain.name} agent から`, `From the ${brain.name} agent`)
           : t('報告', 'Report')}
       </span>
-      <AgentMarkdown text={event.text} />
+      <PathBase.Provider value={event.delegate?.scopeId}>
+        <AgentMarkdown text={event.text} />
+      </PathBase.Provider>
     </div>
   );
 });
