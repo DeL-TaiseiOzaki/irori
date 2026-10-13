@@ -1,5 +1,33 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-14: **0.2.15**, merged at the owner's request
+([#240](https://github.com/DeL-TaiseiOzaki/irori/pull/240) as `cc03813` at 21:09:40 UTC on 10-13).
+`publish.yml` published it from its push run `38468471480`; the release was public at
+21:11:14 (1:34), and the run's website and drift jobs passed.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,229,888 / 141,855,686 / 175,398,353. The page offers 0.2.15.
+
+Waiting folders and work folders, 2026-10-14 (**0.2.15**, published): on Windows
+11 the owner's four Drive for desktop folders stayed `error` because irori
+connected them before `J:` was mounted, and an agent worked in
+`%TEMP%\irori-work` ([ADR 042](decisions/042-waiting-folders-and-work-folders.md)).
+- `CloudService` (`src/cloud/service.ts`): a folder missing at its binding's
+  path makes the connection `waiting` instead of `error`. `retry` looks again on
+  a timer (5 s doubling to 2 min), from `connections()` and on window focus
+  (`src/host/main.ts`), outside the queue, and links only when `mayLink` (no run
+  or Git operation in the vault) allows. `refresh` → `relink` links a mounted
+  connection again when its link or identity no longer checks out; something
+  else at `contents/<name>` stays and is an error.
+- `WorkFolders` (`src/host/work-folders.ts`): `.irori/work` with a `.gitignore`
+  of `*` by default, or a chosen folder kept in `work-folders.json` in irori's
+  data. Shown in the vault settings (作業フォルダ) and set with `irori work`.
+  `prompts/work-folder.ts` tells both agents; `writeDecision` lets any agent of
+  the run write in a handed vault's work folder.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`tests/local-folders.test.ts`, `tests/work-folders.test.ts`,
+  `brain-settings-ui-smoke`). Not tried on Windows with Google Drive for
+  desktop, or with a real CLI's run.
+
 Slides and code files, 2026-10-13 (**0.2.13**, not yet published): the owner
 showed a template deck whose titles were cut off and a box drawn solid black,
 and asked that `.py` and other files VS Code opens open in irori
