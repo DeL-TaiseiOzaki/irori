@@ -31,7 +31,7 @@ export function noteFilename(name: string) {
   return `${stem}.md`;
 }
 
-const managedImage = /^_assets\/image-[a-f0-9]{64}\.(?:png|jpeg|gif|webp)$/;
+export const managedImage = /^_assets\/image-[a-f0-9]{64}\.(?:png|jpeg|gif|webp)$/;
 
 /**
  * The managed images to copy beside a note that changes folder. Wiki embeds and

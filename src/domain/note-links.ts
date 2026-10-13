@@ -244,6 +244,16 @@ function* noteDestinations(text: string) {
   }
 }
 
+/** The paths inside the knowledge base that the links in `text`, read at `from`, lead to. */
+export function internalLinks(text: string, from: string): string[] {
+  const paths: string[] = [];
+  for (const { written } of noteDestinations(text)) {
+    const link = resolveNoteLink(from, unescaped(written));
+    if (link.kind === 'internal') paths.push(link.path.normalize('NFC'));
+  }
+  return paths;
+}
+
 /** How many links in `text`, read at `from`, resolve to `target`. */
 export function linkCount(text: string, from: string, target: string, foldCase = false) {
   let count = 0;

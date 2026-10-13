@@ -171,6 +171,8 @@ export async function moveFolderComments(
   files: FileService,
   scopeId: string,
   move: LayerMove,
+  /** The vault the files moved into, when another (ADR 038). */
+  toScopeId = scopeId,
 ): Promise<string[]> {
   const top = path.join(files.get(scopeId).root, '.irori', 'comments');
   const notes: string[] = [];
@@ -200,7 +202,7 @@ export async function moveFolderComments(
   for (const note of notes) {
     const next = movedPath(move, note);
     if (next === undefined) continue;
-    await moveNoteComments(files, scopeId, note, next).catch(() => kept.push(note));
+    await moveNoteComments(files, scopeId, note, next, toScopeId).catch(() => kept.push(note));
   }
   return kept;
 }
@@ -227,12 +229,14 @@ export async function moveNoteComments(
   scopeId: string,
   from: string,
   to: string,
+  /** The vault the note moved into, when another (ADR 038). */
+  toScopeId = scopeId,
 ) {
   return queue.run(async () => {
     const source = await location(files, scopeId, from, { present: false });
     const { raw, exists } = await readFile(source);
     if (!exists) return;
-    const destination = await location(files, scopeId, to, { create: true });
+    const destination = await location(files, toScopeId, to, { create: true });
     const { note: _note, comments, ...rest } = raw;
     const created = await fs.open(destination, 'wx');
     try {

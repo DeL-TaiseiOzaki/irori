@@ -163,7 +163,7 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useStableFunctions } from './useStableFunctions';
 import { anyRevision, bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
-import { BrainPanel, type BrainMode } from './BrainPanel';
+import { BrainPanel, SideBrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
@@ -200,6 +200,8 @@ type TabView = {
   overviewView: OverviewView;
   scopeId?: string;
   doc?: { scopeId: string; path: string };
+  /** The vault beside, when one was open (ADR 038). */
+  side?: string;
 };
 /** What leaving the workspace on show, or closing a tab, waits on the person for. */
 type Leaving =
@@ -822,6 +824,48 @@ function App() {
     { enabled: !!active && !startup, refresh: revision, interval: 5000 },
   );
   const connections = connectionsRead.data ?? noConnections;
+  // A second vault beside the first, to carry files between them (ADR 038).
+  const [side, setSide] = useState<string>();
+  const sideSpace =
+    side && side !== active?.scopeId
+      ? workspaceSpaces.find((space) => space.scopeId === side)
+      : undefined;
+  const sideRevision = scopeRevision(revisions, sideSpace?.scopeId);
+  const sideRootsRead = useResource(
+    () => host.entries(sideSpace!.scopeId, ''),
+    [sideSpace?.scopeId],
+    { enabled: !!sideSpace && !startup, refresh: sideRevision },
+  );
+  const sideRoots = useMemo<Listing | undefined>(
+    () =>
+      sideRootsRead.data || sideRootsRead.error
+        ? { entries: sideRootsRead.data ?? noEntries, error: sideRootsRead.error }
+        : undefined,
+    [sideRootsRead.data, sideRootsRead.error],
+  );
+  const sideConnectionsRead = useResource(
+    () => host.cloudConnections(sideSpace!.scopeId),
+    [sideSpace?.scopeId],
+    { enabled: !!sideSpace && !startup, refresh: sideRevision, interval: 5000 },
+  );
+  const sideConnections = sideConnectionsRead.data ?? noConnections;
+  // The vault beside coming on show trades places with the one that was.
+  const shownBefore = useRef<string>(undefined);
+  useEffect(() => {
+    const before = shownBefore.current;
+    shownBefore.current = active?.scopeId;
+    if (active && side === active.scopeId)
+      setSide(before && before !== active.scopeId ? before : undefined);
+  }, [active?.scopeId]);
+  // A move across vaults waits for the person while links would break.
+  const [vaultMove, setVaultMove] = useState<{
+    from: Space;
+    entry: Entry;
+    to: Space;
+    directory: string;
+    links: number;
+    incomplete: boolean;
+  }>();
   const defaultNoteDirectory =
     notesDeclared?.newNoteDirectory ?? defaultNoteDirectoryOf(active ?? {});
   // The first dock column shows this draft; the app only writes and flushes it.
@@ -1534,6 +1578,7 @@ function App() {
         overviewView,
         scopeId: active?.scopeId,
         doc: doc && !doc.cloud ? { scopeId: doc.scopeId, path: doc.path } : undefined,
+        side: sideSpace?.scopeId,
       };
     const before = workspaceTabs.find((tab) => tab.id === profile.id);
     const left = tabViews.current[profile.id];
@@ -1549,6 +1594,7 @@ function App() {
     setLevel(left?.level ?? 'brain');
     setOverviewView(left?.overviewView ?? 'map');
     setView('note');
+    setSide(left?.side);
     setActive(shown);
     current.current = { doc: undefined, buffer: '', external: undefined };
     setDoc(undefined);
@@ -1610,6 +1656,41 @@ function App() {
       all.map((tab) => profiles.find((profile) => profile.id === tab.id) ?? tab),
     );
   }
+  /**
+   * A drop from one vault's knowledge into another's (ADR 038): links between what
+   * moves and what stays break, so the person agrees first when there are any.
+   */
+  async function moveFromVault(fromScopeId: string, entry: Entry, to: Space, directory: string) {
+    const from = spaces.find((space) => space.scopeId === fromScopeId);
+    if (!from || gitBusy || fromScopeId === to.scopeId) return;
+    try {
+      if (!(await composer.flush()) || !(await save())) return;
+      const { links, incomplete } = await host.vaultMoveLinks(fromScopeId, entry.path);
+      const move = { from, entry, to, directory, links, incomplete };
+      if (links || incomplete) setVaultMove(move);
+      else await carryToVault(move);
+    } catch (error) {
+      report(error);
+    }
+  }
+  async function carryToVault(move: { from: Space; entry: Entry; to: Space; directory: string }) {
+    setVaultMove(undefined);
+    try {
+      const moved = await organize(() =>
+        host.moveToVault(move.from.scopeId, move.entry.path, move.to.scopeId, move.directory),
+      );
+      await entryChanged({
+        scopeId: move.from.scopeId,
+        toScopeId: move.to.scopeId,
+        action: 'move',
+        from: move.entry.path,
+        to: moved.entry.path,
+        notice: moved.notice,
+      });
+    } catch (error) {
+      report(error);
+    }
+  }
   function showConnections(target: CloudRoot) {
     setConnectionTarget(target);
     setConnectionsOpen(true);
@@ -1623,13 +1704,16 @@ function App() {
     const follow = (ref: SourceRef): SourceRef | undefined =>
       change.action === 'delete'
         ? undefined
-        : { scopeId: ref.scopeId, path: change.to + ref.path.slice(change.from.length) };
+        : {
+            scopeId: change.toScopeId ?? ref.scopeId,
+            path: change.to + ref.path.slice(change.from.length),
+          };
     const open = current.current.doc;
     if (open && under(open)) {
       const next = follow(open);
       const reopened =
         next &&
-        (await host.read(open.scopeId, next.path).catch((error) => {
+        (await host.read(next.scopeId, next.path).catch((error) => {
           report(error);
           return undefined;
         }));
@@ -1649,6 +1733,7 @@ function App() {
       }),
     );
     bump(change.scopeId);
+    if (change.action !== 'delete' && change.toScopeId) bump(change.toScopeId);
     setStatus(
       change.action === 'delete'
         ? t('削除しました', 'Deleted')
@@ -1746,8 +1831,8 @@ function App() {
   // a layout per configuration, and a set that is only partly rendered would be
   // written under one name and looked for under another.
   const islandPanes = useMemo(
-    () => (panel ? ['brain', 'stage', 'assistant'] : ['brain', 'stage']),
-    [panel],
+    () => ['brain', ...(sideSpace ? ['side'] : []), 'stage', ...(panel ? ['assistant'] : [])],
+    [panel, !!sideSpace],
   );
   const documentPanes = useMemo(
     () => (terminalSpace ? ['document', 'terminal'] : ['document']),
@@ -1953,6 +2038,14 @@ function App() {
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
       setEntryAction({ space, entry, action }),
+    moveFrom: (space: Space, fromScopeId: string, entry: Entry, directory: string) =>
+      void moveFromVault(fromScopeId, entry, space, directory),
+    openSide: () => {
+      const other = workspaceSpaces.find((space) => space.scopeId !== active?.scopeId);
+      if (other) setSide(other.scopeId);
+    },
+    chooseSide: (space: Space) => setSide(space.scopeId),
+    closeSide: () => setSide(undefined),
     moveInto: (space: Space, entry: Entry, directory: string) =>
       void organize(async () => {
         const moved = await host.moveEntry(
@@ -2039,9 +2132,30 @@ function App() {
         bringIn: (directory, items) => act.bringIn(active, directory, items),
         act: (entry, action) => act.entryAction(active, entry, action),
         moveInto: (entry, directory) => act.moveInto(active, entry, directory),
+        moveFrom: (scopeId, entry, directory) => act.moveFrom(active, scopeId, entry, directory),
         reveal: (path) => act.reveal(active, path),
       },
     [active, act],
+  );
+  // The explorer of the vault beside, doing the same in its own vault.
+  const sideExplorer = useMemo<Explorer | undefined>(
+    () =>
+      sideSpace && {
+        create: (directory, kind) => act.createIn(sideSpace, directory, kind),
+        bringIn: (directory, items) => act.bringIn(sideSpace, directory, items),
+        act: (entry, action) => act.entryAction(sideSpace, entry, action),
+        moveInto: (entry, directory) => act.moveInto(sideSpace, entry, directory),
+        moveFrom: (scopeId, entry, directory) => act.moveFrom(sideSpace, scopeId, entry, directory),
+        reveal: (path) => act.reveal(sideSpace, path),
+      },
+    [sideSpace, act],
+  );
+  const sideChoices = useMemo(
+    () =>
+      workspaceSpaces.filter(
+        (space) => space.scopeId !== active?.scopeId && space.scopeId !== sideSpace?.scopeId,
+      ),
+    [workspaceSpaces, active?.scopeId, sideSpace?.scopeId],
   );
   const hidden = level !== 'brain';
   const dockShared = useMemo<DockShared>(
@@ -2526,6 +2640,7 @@ function App() {
                 onSearch={act.searchHere}
                 explorer={explorer}
                 schema={schemaList}
+                onSplit={workspaceSpaces.length > 1 && !sideSpace ? act.openSide : undefined}
               >
                 {gitPanel}
               </BrainPanel>
@@ -2548,6 +2663,34 @@ function App() {
             className="island-handle"
             aria-label={t('vault パネルの幅', 'vault panel width')}
           />
+          {sideSpace && (
+            <>
+              <Pane id="side" className="brain-pane" defaultSize={260} minSize={200} maxSize={440}>
+                <SideBrainPanel
+                  space={sideSpace}
+                  choices={sideChoices}
+                  roots={sideRoots}
+                  revision={sideRevision}
+                  selected={doc}
+                  connections={sideConnections}
+                  locked={
+                    gitBusy ||
+                    connecting ||
+                    runningScopes.includes(sideSpace.scopeId) ||
+                    heldByYou(sideSpace.scopeId)
+                  }
+                  explorer={sideExplorer}
+                  onOpen={act.openEntry}
+                  onChoose={act.chooseSide}
+                  onClose={act.closeSide}
+                />
+              </Pane>
+              <PaneSeparator
+                className="island-handle"
+                aria-label={t('横の vault パネルの幅', 'Width of the vault beside')}
+              />
+            </>
+          )}
           <Pane
             id="stage"
             className="stage-pane"
@@ -3211,6 +3354,39 @@ function App() {
         onTerminal={act.toggleTerminal}
       />
       {leavingDialog}
+      {vaultMove && (
+        <Dialog
+          label={t(`${vaultMove.to.name} へ移動`, `Move to ${vaultMove.to.name}`)}
+          onClose={() => setVaultMove(undefined)}
+        >
+          <form
+            className="modal"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void carryToVault(vaultMove);
+            }}
+          >
+            <h2>{t(`${vaultMove.to.name} へ移動`, `Move to ${vaultMove.to.name}`)}</h2>
+            <p>
+              {vaultMove.incomplete
+                ? t(
+                    `${vaultMove.entry.name} を ${vaultMove.from.name} から移すと、リンクが切れる可能性があります。`,
+                    `Moving ${vaultMove.entry.name} out of ${vaultMove.from.name} may break links.`,
+                  )
+                : t(
+                    `${vaultMove.entry.name} を ${vaultMove.from.name} から移すと、${vaultMove.links} 件のリンクが切れます。`,
+                    `Moving ${vaultMove.entry.name} out of ${vaultMove.from.name} breaks ${vaultMove.links} links.`,
+                  )}
+            </p>
+            <div className="actions">
+              <button type="button" onClick={() => setVaultMove(undefined)}>
+                {t('キャンセル', 'Cancel')}
+              </button>
+              <button className="primary">{t('移動', 'Move')}</button>
+            </div>
+          </form>
+        </Dialog>
+      )}
       {connectionsOpen && connectionTarget && (
         <Connections
           key={connectionTarget.scopeId}

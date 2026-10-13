@@ -122,7 +122,13 @@ export function Tree({
   const accepts = (event: DragEvent) => {
     const types = event.dataTransfer.types;
     if (types.includes(entryDrag))
-      return dragged?.scopeId === space.scopeId && dragged.entry.layer === layer;
+      return dragged?.scopeId === space.scopeId
+        ? dragged.entry.layer === layer
+        : // Knowledge takes knowledge from the vault beside (ADR 038).
+          !!dragged &&
+            !!explorer?.moveFrom &&
+            dragged.entry.layer === 'Knowledge_Base' &&
+            layer === 'Knowledge_Base';
     return types.includes('Files');
   };
   // A closed folder held under a drag opens, so a drop can reach the folders inside.
@@ -156,10 +162,11 @@ export function Tree({
     drop.setOver(undefined);
     openLater(undefined);
     if (event.dataTransfer.types.includes(entryDrag)) {
-      const source = dragged?.entry;
+      const from = dragged;
       dragged = undefined;
-      if (!source || parentPath(source.path) === folder) return;
-      explorer.moveInto(source, folder);
+      if (!from) return;
+      if (from.scopeId !== space.scopeId) explorer.moveFrom?.(from.scopeId, from.entry, folder);
+      else if (parentPath(from.entry.path) !== folder) explorer.moveInto(from.entry, folder);
     } else {
       // The entries are taken during the drop; what they hold is read after it.
       const entries = [...event.dataTransfer.items]
@@ -407,6 +414,148 @@ const headingHeight = 36;
  * One brain: its Schema, Knowledge and Contents, and its changes. Memoised: it
  * re-renders for its own data, not for every keystroke in the editor.
  */
+/**
+ * A second vault beside the first (ADR 038): its knowledge and contents, to
+ * open files from and to carry them between the two by drag and drop. Opening a
+ * file here brings this vault to the main panel; the menu chooses another.
+ */
+export const SideBrainPanel = memo(function SideBrainPanel({
+  space,
+  choices,
+  roots,
+  revision,
+  selected,
+  connections,
+  locked,
+  explorer,
+  onOpen,
+  onChoose,
+  onClose,
+}: {
+  space: Space;
+  /** The other vaults of the workspace that may stand here instead. */
+  choices: Space[];
+  roots?: Listing;
+  revision: number;
+  selected?: Document;
+  connections: CloudConnection[];
+  /** Its own run, Git or a connection holds what would change it. */
+  locked: boolean;
+  explorer?: Explorer;
+  onOpen: (space: Space, entry: Entry) => void;
+  onChoose: (space: Space) => void;
+  onClose: () => void;
+}) {
+  useLanguage();
+  const contentRoots = roots?.entries.filter(
+    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
+  );
+  const layers = ['Knowledge_Base', 'contents'] as const;
+  const identity = (
+    <>
+      <BrainTile space={space} size={34} radius={10} />
+      <span className="brain-names side-names">
+        <strong>{space.name}</strong>
+      </span>
+    </>
+  );
+  return (
+    <section className="brain-panel side-panel chrome" aria-label={space.name}>
+      <header className="brain-header">
+        <div className="brain-identity">
+          {choices.length ? (
+            <Menu.Root modal={false}>
+              <Menu.Trigger
+                className="brain-home-link"
+                aria-label={t(`横の vault: ${space.name}`, `vault beside: ${space.name}`)}
+              >
+                {identity}
+                <Icon name="chevronDown" size={14} />
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner side="bottom" align="start" sideOffset={4}>
+                  <Menu.Popup className="menu">
+                    {choices.map((choice) => (
+                      <Menu.Item key={choice.scopeId} onClick={() => onChoose(choice)}>
+                        <BrainTile space={choice} size={16} radius={4} />
+                        {choice.name}
+                      </Menu.Item>
+                    ))}
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
+          ) : (
+            <span className="brain-home-link">{identity}</span>
+          )}
+          <button
+            className="icon-button"
+            aria-label={t('横の vault を閉じる', 'Close the vault beside')}
+            title={t('閉じる', 'Close')}
+            onClick={onClose}
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      </header>
+      <div className="side-sections">
+        {layers.map((layer) => (
+          <section
+            key={layer}
+            className={`brain-section ${layer}`}
+            aria-label={layerLabel(space, layer)}
+          >
+            <div className="section-heading">
+              <span className="section-toggle">
+                <Icon name={layerIcons[layer]} size={15} strokeWidth={1.9} className="layer-icon" />
+                <span>{layerLabel(space, layer)}</span>
+              </span>
+            </div>
+            <div className="section-body">
+              {layer === 'Knowledge_Base' ? (
+                <Tree
+                  key={knowledgeFolder(space)}
+                  space={space}
+                  layer={layer}
+                  roots={roots}
+                  revision={revision}
+                  selected={selected}
+                  onOpen={onOpen}
+                  {...(!locked && { explorer, writable: true })}
+                />
+              ) : !contentRoots ? (
+                <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
+              ) : (
+                contentRoots.map((root) => (
+                  <div key={root.path} className="contents-root">
+                    {contentRoots.length > 1 && (
+                      <span className="contents-root-name">{root.path}</span>
+                    )}
+                    {root.blocked ? (
+                      <small className="tree-empty">{root.blocked}</small>
+                    ) : (
+                      <Tree
+                        space={space}
+                        layer="contents"
+                        directory={root.path}
+                        revision={revision}
+                        selected={selected}
+                        connections={connections}
+                        onOpen={onOpen}
+                        explorer={locked ? undefined : explorer}
+                      />
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+});
+
 export const BrainPanel = memo(function BrainPanel({
   space,
   roots,
@@ -434,6 +583,7 @@ export const BrainPanel = memo(function BrainPanel({
   onSearch,
   explorer,
   schema,
+  onSplit,
   children,
 }: {
   space: Space;
@@ -475,6 +625,8 @@ export const BrainPanel = memo(function BrainPanel({
    * Absent while the vault agent is off, and the section with it.
    */
   schema?: ReactNode;
+  /** Opens another vault beside this one (ADR 038); absent when there is none to open. */
+  onSplit?: () => void;
   /** The Changes view, owned by the caller. */
   children?: ReactNode;
 }) {
@@ -610,6 +762,16 @@ export const BrainPanel = memo(function BrainPanel({
               )}
             </span>
           </button>
+          {onSplit && (
+            <button
+              className="icon-button"
+              aria-label={t('横に vault を開く', 'Open a vault beside')}
+              title={t('横に vault を開く', 'Open a vault beside')}
+              onClick={onSplit}
+            >
+              <Icon name="split" size={16} />
+            </button>
+          )}
           <Menu.Root modal={false}>
             <Menu.Trigger
               className="icon-button"
