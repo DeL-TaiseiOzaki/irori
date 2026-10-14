@@ -43,7 +43,10 @@ Only ever append.
 ```
 
 `name` must match the directory, which is lowercase letters, digits and hyphens.
-`description` is at most 400 characters and appears beside the name in the picker. Quoted and
+`description` is at most 1024 characters, the Agent Skills limit, and appears
+beside the name in the picker. A longer one does not stop the skill from
+loading: irori cuts it to 1024 characters, as Codex does in its own list, and
+marks the skill 要確認 in Schema settings with the length it found. Quoted and
 folded YAML scalars are accepted; additional metadata may be structured and,
 apart from the `roles` and `projects` keys below, is not interpreted by irori.
 The whole file is at most 16 KiB in UTF-8, and at most 50 packages are listed.
@@ -63,8 +66,9 @@ skill names a role or a project, 役割 and プロジェクト selectors appear 
 the skill selector and narrow it to the reader's own choice. A retired skill is
 named under the composer with the date and reason the KB recorded.
 
-A package that cannot be read is named under the composer rather than dropped,
-so a skill that stops appearing has a visible reason. A directory without a
+A package that cannot be read is named under the composer with the reason,
+such as `description: Invalid input: expected string, received undefined`,
+rather than dropped, so a skill that stops appearing has a visible reason. A directory without a
 `SKILL.md` is not a skill and is not an error.
 
 The list is read again when the active space changes and when a run settles,

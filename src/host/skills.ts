@@ -4,11 +4,13 @@ import { homedir } from 'node:os';
 import { z } from 'zod';
 import { parse as parseYaml } from 'yaml';
 import { reachedAsWritten, type FileService } from './files';
-import { isMissing } from './local-json';
+import { isMissing, issueSummary } from './local-json';
 import { spaceFolder, type SchemaFolder } from './schema-folder';
 import {
   audienceName,
+  characters,
   maxSkillBytes,
+  maxSkillDescription,
   maxSkills,
   retiredFile,
   retirementNotice,
@@ -31,7 +33,8 @@ const names = z
   .pipe(z.array(audienceName).max(20));
 const skillMetadata = z.looseObject({
   name: skillName,
-  description: z.string().min(1).max(400),
+  // Past the specification's limit the skill still loads; only its summary is cut.
+  description: z.string().min(1),
   metadata: z.looseObject({ roles: names.optional(), projects: names.optional() }).optional(),
 });
 const retiredMetadata = z.looseObject({
@@ -39,6 +42,16 @@ const retiredMetadata = z.looseObject({
   reason: z.string().min(1).max(400),
   replacement: skillName.optional(),
 });
+
+/** A validation failure as `key: reason`, instead of Zod's JSON. */
+function valid<T>(schema: z.ZodType<T>, value: unknown, what?: string): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  const issues = what
+    ? result.error.issues.map((issue) => ({ ...issue, path: [what, ...issue.path] }))
+    : result.error.issues;
+  throw Error(issueSummary(issues));
+}
 
 function split(text: string, what: string) {
   if (new TextEncoder().encode(text).byteLength > maxSkillBytes)
@@ -54,28 +67,38 @@ function split(text: string, what: string) {
 /** Reads one package. YAML stays on this side of the boundary; the renderer
  * only ever needs the name rule and the prompt shape. */
 export function parseSkill(directory: string, text: string): AgentSkill {
-  const name = skillName.parse(directory);
+  const name = valid(skillName, directory, 'directory');
   const { metadata: raw, body } = split(text, 'skill package');
-  const metadata = skillMetadata.parse(raw);
+  const metadata = valid(skillMetadata, raw);
   if (metadata.name !== name)
     throw Error(`Front matter name ${JSON.stringify(metadata.name)} does not match its directory`);
   if (!body) throw Error('A skill has no instructions below its front matter');
+  const length = characters(metadata.description);
+  const long = length > maxSkillDescription;
   return {
     name,
-    description: metadata.description,
+    description: long
+      ? [...metadata.description].slice(0, maxSkillDescription - 1).join('') + '…'
+      : metadata.description,
     instructions: body,
     path: `${skillsRoot}/${name}/${skillFile}`,
     roles: metadata.metadata?.roles ?? [],
     projects: metadata.metadata?.projects ?? [],
+    ...(long && {
+      notice: t(
+        `説明が ${length} 文字あります。Agent Skills の上限 ${maxSkillDescription} 文字に切って使います。`,
+        `The description is ${length} characters; irori cuts it to ${maxSkillDescription}, the Agent Skills limit.`,
+      ),
+    }),
   };
 }
 
 /** Reads a retirement marker. It must not look like a skill to any CLI: Pi loads
  * a nested `.md` under `.agents/skills` as a skill once it has a description. */
 export function parseRetired(directory: string, text: string): RetiredSkill {
-  const name = skillName.parse(directory);
+  const name = valid(skillName, directory, 'directory');
   const { metadata: raw } = split(text, 'retirement marker');
-  const metadata = retiredMetadata.parse(raw);
+  const metadata = valid(retiredMetadata, raw);
   if ('name' in metadata || 'description' in metadata)
     throw Error('A retirement marker must not declare name or description');
   return {

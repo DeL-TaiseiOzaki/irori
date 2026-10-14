@@ -4,7 +4,9 @@ import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  characters,
   maxSkillBytes,
+  maxSkillDescription,
   maxSkills,
   retirementNotice,
   skillVisible,
@@ -30,6 +32,24 @@ const body = (
 const retiredBody =
   '---\nretired: 2026-09-21\nreason: Folded into journal.\nreplacement: journal\n---\n';
 
+test('A description is read up to the Agent Skills limit, and past it the skill still loads', () => {
+  // Skills moved from another vault had 541–625 character descriptions and vanished at 400.
+  for (const length of [625, maxSkillDescription]) {
+    const skill = parseSkill('capture', body('capture', 'あ'.repeat(length)));
+    assert.equal(skill.description, 'あ'.repeat(length));
+    assert.equal(skill.notice, undefined);
+  }
+  // The limit counts characters as the specification does, not UTF-16 units.
+  const astral = parseSkill('capture', body('capture', '𝒜'.repeat(maxSkillDescription)));
+  assert.equal(astral.notice, undefined);
+
+  const long = parseSkill('capture', body('capture', 'd'.repeat(maxSkillDescription + 200)));
+  assert.equal(long.instructions, '# Steps\n\n1. Read.', 'the body is kept whole');
+  assert.equal(characters(long.description), maxSkillDescription);
+  assert.ok(long.description.endsWith('…'));
+  assert.match(long.notice ?? '', /1224/);
+});
+
 test('A skill package declares a name matching its directory, a description and instructions', () => {
   const skill = parseSkill('capture', body('capture'));
   assert.equal(skill.name, 'capture');
@@ -54,11 +74,15 @@ test('A skill package declares a name matching its directory, a description and 
     ['---\nname: capture\nname: capture\ndescription: d\n---\nB', /unique/i],
     ['---\nname: capture\ndescription:\n  nested: value\n---\nB', /description/],
     ['---\nname: capture\ndescription: d\n---\n   \n', /no instructions/],
-    [`---\nname: capture\ndescription: ${'d'.repeat(401)}\n---\nB`, /400/],
   ] as const)
     assert.throws(() => parseSkill('capture', text), reason, text.slice(0, 30));
 
-  assert.throws(() => parseSkill('Capture', body('Capture')), /lowercase/);
+  assert.throws(() => parseSkill('Capture', body('Capture')), /Error: directory: .*lowercase/);
+  assert.throws(
+    () => parseSkill('capture', '---\nname: capture\n---\nB'),
+    /^Error: description: [^[{]*$/,
+    'a failure reads as the key and its reason, not as Zod JSON',
+  );
   assert.throws(
     () => parseSkill('capture', body('capture', 'd', 'x'.repeat(maxSkillBytes))),
     /at most/,
@@ -173,6 +197,7 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
   await pkg('capture', body('capture'));
   await pkg('empty');
   await pkg('broken', '---\nname: mismatch\ndescription: d\n---\nB');
+  await pkg('long', body('long', 'd'.repeat(maxSkillDescription + 1)));
   for (let index = 0; index < maxSkills; index++)
     await pkg(`a-empty-${String(index).padStart(2, '0')}`);
   await pkg('z-last', body('z-last'));
@@ -180,13 +205,17 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
   const listing = await readSkills(files, space.scopeId);
   assert.deepEqual(
     listing.skills.map((skill) => skill.name),
-    ['capture', 'promote', 'z-last'],
+    ['capture', 'long', 'promote', 'z-last'],
     'sorted, and directories without SKILL.md do not consume the package limit',
   );
   assert.deepEqual(
     listing.problems.map((problem) => problem.directory),
     ['.agents/skills/broken'],
     'a malformed package is reported rather than silently dropped',
+  );
+  assert.equal(
+    listing.problems[0].message,
+    'Front matter name "mismatch" does not match its directory',
   );
 
   assert.equal((await requireSkill(files, space.scopeId, 'capture')).name, 'capture');
@@ -201,7 +230,7 @@ test('Skill listing is scoped to the schema layer, ordered, and reports what it 
     );
     const aliased = await readSkills(files, space.scopeId);
     assert.match(aliased.problems[0].message, /alias/);
-    assert.equal(aliased.skills.length, 3, 'an alias never becomes a skill');
+    assert.equal(aliased.skills.length, 4, 'an alias never becomes a skill');
 
     await symlink(
       path.join(root, skillsRoot, 'capture'),

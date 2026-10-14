@@ -93,7 +93,7 @@ import type {
   CloudRoot,
 } from '../domain/types';
 import { agentIds } from '../domain/types';
-import type { AgentSkill, retirementNotice } from '../domain/skills';
+import type { AgentSkill, SkillProblem, retirementNotice } from '../domain/skills';
 import type { YourAi } from '../domain/you';
 import { opensInIrori, textFilePattern, viewerKind } from '../domain/viewers';
 import { broughtChunkBytes } from '../domain/connections';
@@ -286,7 +286,7 @@ const noEntries: Entry[] = [];
 const noConnections: CloudConnection[] = [];
 const noSkills: AgentSkill[] = [];
 const noRetired: Parameters<typeof retirementNotice>[0][] = [];
-const noProblems: { directory: string; message?: string }[] = [];
+const noProblems: SkillProblem[] = [];
 const noSources: SourceRef[] = [];
 const noGroups: VaultGroup[] = [];
 
@@ -371,7 +371,7 @@ const DockColumnView = memo(function DockColumnView({
   modelChoice: Record<string, string>;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
-  skillProblems: { directory: string }[];
+  skillProblems: SkillProblem[];
   roots?: Listing;
   sources: SourceRef[];
   vaultAgent: boolean;
