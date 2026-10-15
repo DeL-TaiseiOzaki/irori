@@ -9,8 +9,9 @@ import { fakeGh, git, remote } from '../tests/fixtures/github';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The environment kept on the GitHub account (ADR 026): one device saves its
-// vaults, workspaces and preferences from the start screen's settings, before
-// opening any workspace, and a new device restores them from the start screen.
+// vaults, workspaces, preferences and the irori agent's routines (ADR 043) from
+// the start screen's settings, before opening any workspace, and a new device
+// restores them from the start screen.
 // gh is a stand-in answering from a folder.
 const base = await mkdtemp(path.join(tmpdir(), 'irori account UI '));
 const scope = {
@@ -47,6 +48,14 @@ await filesA.init();
 const research = await filesA.register(checkout, 'Research', 'personal');
 await new WorkspaceService(filesA).save('Lab', [research.scopeId]);
 await new SettingsService(filesA.dataDir).save({ theme: 'dark', language: 'ja' });
+// Both devices have an irori agent folder that is not a repository; A's has a routine.
+const routineYaml =
+  'name: 受信箱\nsteps:\n  - agent: irori\n    access: default\n    prompt: 受信箱をまとめて\n';
+await mkdir(path.join(homeA, 'irori', 'you', 'routines', 'Inbox'), { recursive: true });
+await writeFile(path.join(homeA, 'irori', 'you', 'AGENTS.md'), '# irori agent\n');
+await writeFile(path.join(homeA, 'irori', 'you', 'routines', 'Inbox', 'routine.yaml'), routineYaml);
+await mkdir(path.join(homeB, 'irori', 'you'), { recursive: true });
+await writeFile(path.join(homeB, 'irori', 'you', 'AGENTS.md'), '# irori agent\n');
 
 const launch = (data: string, home: string) => {
   const env = {
@@ -92,6 +101,9 @@ try {
   if (saved.vaults[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
     throw Error(`Unexpected saved environment: ${JSON.stringify(saved)}`);
   if (JSON.stringify(saved).includes(base)) throw Error('A device path reached GitHub');
+  const routines = JSON.parse(await fake.stored('routines.json'));
+  if (routines.routines[0]?.files[0]?.text !== routineYaml)
+    throw Error(`Unexpected saved routines: ${JSON.stringify(routines)}`);
   await app.close();
 
   // Device B starts empty and restores from the start screen, read in Japanese like device A.
@@ -105,11 +117,12 @@ try {
   await expect(sheet.getByRole('checkbox', { name: /Research/ })).toBeChecked();
   await expect(sheet).toContainText('octo/kb');
   await expect(sheet).toContainText('ワークスペース: Lab');
+  await expect(sheet.getByRole('checkbox', { name: /受信箱/ })).toBeChecked();
   await expect(sheet.locator('.restore-parent code')).toHaveText(path.join(homeB, 'irori'));
   await page.screenshot({ path: 'test-results/irori-account-restore.png' });
   await sheet.getByRole('button', { name: '復元', exact: true }).click();
   await expect(sheet.getByRole('status')).toHaveText(
-    'vault 1 件とワークスペース 1 件を取り込みました。',
+    'vault 1 件・ワークスペース 1 件・ルーティン 1 件を取り込みました。',
   );
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await sheet.getByRole('button', { name: '閉じる' }).click();
@@ -118,6 +131,11 @@ try {
   await expect(card).toContainText('Research');
   const cloned = await readFile(path.join(homeB, 'irori', 'kb', 'knowledge', 'note.md'), 'utf8');
   if (cloned !== '# Note\n') throw Error('The vault was not cloned');
+  const added = await readFile(
+    path.join(homeB, 'irori', 'you', 'routines', 'Inbox', 'routine.yaml'),
+    'utf8',
+  );
+  if (added !== routineYaml) throw Error('The routine was not added');
   await card.click();
   await expect(page.getByRole('navigation', { name: 'vault' })).toContainText('Research');
   if (errors.length) throw Error(errors.join('\n'));

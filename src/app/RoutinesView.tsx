@@ -8,7 +8,6 @@ import {
   routineKey,
   stepLabel,
   type Routine,
-  type RoutineRef,
   type RoutineReviewFile,
   type RoutineRun,
   type RoutineRunState,
@@ -17,6 +16,8 @@ import {
   type RunRoutine,
 } from '../domain/routines';
 import { AgentRequest } from './AgentLog';
+import { RoutineEditor, type EditorTarget } from './RoutineEditor';
+import { SecretDialog, SecretsDialog } from './RoutineKeys';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
@@ -337,271 +338,6 @@ function ReviewDialog({
   );
 }
 
-/** Takes a secret's value; it goes to the host and is never shown again (ADR 016 D5). */
-function SecretDialog({
-  name,
-  onClose,
-  onSaved,
-}: {
-  name: string;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [value, setValue] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const label = t(`シークレット ${name}`, `Secret ${name}`);
-  return createPortal(
-    <Dialog label={label} busy={busy} onClose={onClose}>
-      <form
-        className="modal routine-secret-form"
-        aria-label={label}
-        onSubmit={(event) => {
-          event.preventDefault();
-          setBusy(true);
-          setError('');
-          host
-            .setSecret(name, value.trim())
-            .then(() => {
-              onSaved();
-              onClose();
-            })
-            .catch((reason) => {
-              setError(errorText(reason));
-              setBusy(false);
-            });
-        }}
-      >
-        <h2 className="mono">{name}</h2>
-        <label>
-          {t('値', 'Value')}
-          <input
-            type="password"
-            aria-label={t('値', 'Value')}
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            value={value}
-            disabled={busy}
-            onChange={(event) => setValue(event.target.value)}
-          />
-        </label>
-        {error && (
-          <p className="routine-problem" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="actions">
-          <button type="button" disabled={busy} onClick={onClose}>
-            {t('キャンセル', 'Cancel')}
-          </button>
-          <button type="submit" className="primary" disabled={busy || value.trim().length < 8}>
-            {t('保存', 'Save')}
-          </button>
-        </div>
-      </form>
-    </Dialog>,
-    document.body,
-  );
-}
-
-/** Names a new routine and where it lives; irori writes a template to finish (ADR 016 stage 4). */
-function NewRoutineDialog({
-  owners,
-  onClose,
-  onCreated,
-}: {
-  owners: { id: string; name: string }[];
-  onClose: () => void;
-  onCreated: (ref: RoutineRef) => void;
-}) {
-  const [name, setName] = useState('');
-  const [owner, setOwner] = useState(owners[0]?.id ?? '');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const label = t('新しいルーティン', 'New routine');
-  return createPortal(
-    <Dialog label={label} busy={busy} onClose={onClose}>
-      <form
-        className="modal routine-new"
-        aria-label={label}
-        onSubmit={(event) => {
-          event.preventDefault();
-          setBusy(true);
-          setError('');
-          host
-            .createRoutine(owner, name.trim())
-            .then(onCreated)
-            .catch((reason) => {
-              setError(errorText(reason));
-              setBusy(false);
-            });
-        }}
-      >
-        <h2>{label}</h2>
-        <label>
-          {t('名前', 'Name')}
-          <input
-            autoFocus
-            maxLength={120}
-            value={name}
-            disabled={busy}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <label>
-          {t('置き場所', 'Location')}
-          <select value={owner} disabled={busy} onChange={(event) => setOwner(event.target.value)}>
-            {owners.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {error && (
-          <p className="routine-problem" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="actions">
-          <button type="button" disabled={busy} onClick={onClose}>
-            {t('キャンセル', 'Cancel')}
-          </button>
-          <button type="submit" className="primary" disabled={busy || !name.trim() || !owner}>
-            {t('作成', 'Create')}
-          </button>
-        </div>
-      </form>
-    </Dialog>,
-    document.body,
-  );
-}
-
-/** Edits a routine's `routine.yaml` in place; a save names the version it read. */
-function RoutineEditor({
-  routine,
-  onClose,
-  onSaved,
-}: {
-  routine: { ref: RoutineRef; name: string; path?: string };
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const source = useResource(() => host.routineSource(routine.ref), [routineKey(routine.ref)]);
-  const [text, setText] = useState<string>();
-  const [version, setVersion] = useState<string>();
-  const { busy, error: problem, setError: setProblem, run } = useAction();
-  const shown = text ?? source.data?.text ?? '';
-  const read = version ?? source.data?.version;
-  return createPortal(
-    <Dialog label={routine.name} busy={busy} onClose={onClose}>
-      <form
-        className="modal routine-editor"
-        aria-label={routine.name}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!read) return;
-          void run(async () => {
-            const saved = await host.saveRoutineSource(routine.ref, shown, read);
-            onSaved();
-            if (!saved.problem) return onClose();
-            setVersion(saved.version);
-            setProblem(saved.problem);
-          });
-        }}
-      >
-        <h2>{routine.name}</h2>
-        {routine.path && <p className="routine-path mono">{routine.path}</p>}
-        <textarea
-          className="mono"
-          aria-label="routine.yaml"
-          spellCheck={false}
-          autoFocus
-          rows={18}
-          value={shown}
-          disabled={busy || !source.data}
-          onChange={(event) => setText(event.target.value)}
-        />
-        {(source.error || problem) && (
-          <p className="routine-problem" role="alert">
-            {problem || source.error}
-          </p>
-        )}
-        <div className="actions">
-          <button type="button" disabled={busy} onClick={onClose}>
-            {/* After a save that still cannot run, the file is written: closing keeps it. */}
-            {version ? t('閉じる', 'Close') : t('キャンセル', 'Cancel')}
-          </button>
-          <button type="submit" className="primary" disabled={busy || !read}>
-            {t('保存', 'Save')}
-          </button>
-        </div>
-      </form>
-    </Dialog>,
-    document.body,
-  );
-}
-
-/** The device's secrets by name, to replace or delete; values are never shown. */
-function Secrets({
-  revision,
-  onEnter,
-  onChanged,
-}: {
-  revision: number;
-  onEnter: (name: string) => void;
-  onChanged: () => void;
-}) {
-  const list = useResource(() => host.secrets(), [], { refresh: revision });
-  const [removing, setRemoving] = useState<string>();
-  const [error, setError] = useState('');
-  const names = list.data?.names ?? [];
-  if (!names.length) return null;
-  return (
-    <section className="routine-group routine-secrets" aria-label={t('シークレット', 'Secrets')}>
-      <h2>
-        <Icon name="lock" size={13} />
-        {t('シークレット', 'Secrets')}
-      </h2>
-      {error && (
-        <p className="routine-problem" role="alert">
-          {error}
-        </p>
-      )}
-      <ul>
-        {names.map((name) => (
-          <li key={name}>
-            <span className="mono">{name}</span>
-            <span className="routine-space" />
-            {list.data?.available && (
-              <button className="panel-button" onClick={() => onEnter(name)}>
-                {t('置き換え', 'Replace')}
-              </button>
-            )}
-            <button
-              className="panel-button"
-              onClick={() => {
-                if (removing !== name) return setRemoving(name);
-                setError('');
-                host
-                  .deleteSecret(name)
-                  .then(onChanged)
-                  .catch((reason) => setError(errorText(reason)))
-                  .finally(() => setRemoving(undefined));
-              }}
-              onBlur={() => setRemoving((value) => (value === name ? undefined : value))}
-            >
-              <Icon name="trash" size={13} />
-              {removing === name ? t('削除する', 'Delete it') : t('削除', 'Delete')}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function RoutineCard({
   routine,
   live,
@@ -720,23 +456,26 @@ function RoutineCard({
 /** Where a new routine can live: the irori agent's folder once it is set up, and each vault. */
 export function routineOwners(you: YourAi | undefined, spaces: Space[]) {
   return [
-    ...(you?.state === 'ready' ? [{ id: you.id, name: 'irori agent' }] : []),
-    ...spaces.map((space) => ({ id: space.scopeId, name: space.name })),
+    ...(you?.state === 'ready'
+      ? [{ id: you.id, name: 'irori agent', kind: 'irori' as const }]
+      : []),
+    ...spaces.map((space) => ({ id: space.scopeId, name: space.name, kind: 'vault' as const })),
   ];
 }
 
 /**
  * The rail's routines page (ADR 016): the irori agent's routines and each
  * vault's, started and stopped only here. The page's header offers a new
- * routine (`creating`) and asking the irori agent to write one.
+ * routine and the device's secrets (`sheet`), and asking the irori agent to
+ * write a routine.
  */
 export function RoutinesView({
   workspaceId,
   spaces,
   you,
   revision,
-  creating,
-  onCloseCreate,
+  sheet,
+  onCloseSheet,
   choices,
   onOpenConversation,
   onError,
@@ -745,9 +484,9 @@ export function RoutinesView({
   spaces: Space[];
   you?: YourAi;
   revision: number;
-  /** The header's 新しいルーティン was pressed. */
-  creating: boolean;
-  onCloseCreate: () => void;
+  /** The header's 新しいルーティン or シークレット was pressed. */
+  sheet?: 'create' | 'secrets';
+  onCloseSheet: () => void;
   /** The CLI and model chosen in each agent's panel, for steps that name none. */
   choices: () => RunRoutine['agents'];
   onOpenConversation: (conversation: Conversation) => void;
@@ -764,8 +503,10 @@ export function RoutinesView({
   const [open, setOpen] = useState<string>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [reviewing, setReviewing] = useState<Routine>();
+  // A secret's value to enter: for its name, or `''` for a new one named in the sheet.
   const [entering, setEntering] = useState<string>();
-  const [editing, setEditing] = useState<{ ref: RoutineRef; name: string; path?: string }>();
+  const [editing, setEditing] = useState<EditorTarget>();
+  const secrets = useResource(() => host.secrets(), [], { refresh: reads });
   useEffect(
     () =>
       hostEvents.onEvent((event) => {
@@ -851,7 +592,13 @@ export function RoutinesView({
                 }
                 onEnterSecret={setEntering}
                 onEdit={() =>
-                  setEditing({ ref: routine.ref, name: routine.name, path: routine.path })
+                  setEditing({
+                    kind: 'edit',
+                    ref: routine.ref,
+                    name: routine.name,
+                    owner: routine.owner,
+                    path: routine.path,
+                  })
                 }
                 onOpenConversation={onOpenConversation}
                 onError={onError}
@@ -860,24 +607,34 @@ export function RoutinesView({
           })}
         </section>
       ))}
-      <Secrets revision={reads} onEnter={setEntering} onChanged={reread} />
-      {entering && (
-        <SecretDialog name={entering} onClose={() => setEntering(undefined)} onSaved={reread} />
+      {sheet === 'secrets' && (
+        <SecretsDialog
+          list={secrets.data}
+          routines={routines}
+          onEnter={(name) => setEntering(name ?? '')}
+          onChanged={reread}
+          onClose={onCloseSheet}
+        />
       )}
-      {creating && (
-        <NewRoutineDialog
-          owners={routineOwners(you, spaces)}
-          onClose={onCloseCreate}
-          onCreated={(ref) => {
-            onCloseCreate();
+      {(sheet === 'create' || editing) && (
+        <RoutineEditor
+          target={editing ?? { kind: 'create', owners: routineOwners(you, spaces) }}
+          vaults={spaces.map((space) => space.name)}
+          secrets={secrets.data}
+          onEnterSecret={setEntering}
+          onClose={() => (editing ? setEditing(undefined) : onCloseSheet())}
+          onSaved={(ref) => {
             reread();
             setOpen(routineKey(ref));
-            setEditing({ ref, name: ref.folder });
           }}
         />
       )}
-      {editing && (
-        <RoutineEditor routine={editing} onClose={() => setEditing(undefined)} onSaved={reread} />
+      {entering !== undefined && (
+        <SecretDialog
+          name={entering || undefined}
+          onClose={() => setEntering(undefined)}
+          onSaved={reread}
+        />
       )}
       {reviewing && (
         <ReviewDialog

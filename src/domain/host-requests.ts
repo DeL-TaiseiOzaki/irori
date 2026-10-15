@@ -24,6 +24,7 @@ const id = z.uuid(),
 const name = z.string().min(1).max(120),
   entryName = z.string().min(1).max(255),
   version = z.string().regex(/^[a-f0-9]{64}$/);
+const routineText = z.string().max(64 * 1024);
 const broughtChunk = z.instanceof(Uint8Array).refine((value) => value.length <= broughtChunkBytes);
 const document = z.object({ scopeId: id, path, text, hash: version });
 // A submodule's folder from the vault's root; the host checks it is one.
@@ -118,7 +119,12 @@ export const hostArguments = {
   saveEnvironment: z.tuple([]),
   restoreEnvironment: z.tuple([
     z
-      .object({ scopeIds: z.array(id).max(500), agent: z.boolean(), parent: path.optional() })
+      .object({
+        scopeIds: z.array(id).max(500),
+        agent: z.boolean(),
+        routines: z.array(z.string().max(200)).max(500).optional(),
+        parent: path.optional(),
+      })
       .strict(),
   ]),
   gitPublish: z.tuple([
@@ -279,9 +285,10 @@ export const hostArguments = {
   yourAiRead: z.tuple([path]),
   yourAiBrains: z.tuple([z.array(id).max(50)]),
   routines: z.tuple([id]),
-  createRoutine: z.tuple([id, name]),
+  createRoutine: z.tuple([id, name, routineText.optional()]),
   routineSource: z.tuple([routineRef]),
-  saveRoutineSource: z.tuple([routineRef, z.string().max(64 * 1024), version]),
+  revealRoutine: z.tuple([routineRef]),
+  saveRoutineSource: z.tuple([routineRef, routineText, version]),
   reviewRoutine: z.tuple([routineRef]),
   runRoutine: z.tuple([
     routineRef,
