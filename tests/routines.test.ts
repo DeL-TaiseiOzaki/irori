@@ -21,6 +21,15 @@ import {
   RoutineService,
 } from '../src/host/routines';
 import { AgentSetup } from '../src/host/agent-setup';
+import {
+  agentDraft,
+  draftFromYaml,
+  joinCommand,
+  runDraft,
+  splitCommand,
+  yamlFromDraft,
+  type StepDraft,
+} from '../src/domain/routine-file';
 import { reversibleStorage, SecretStore } from '../src/host/keystore';
 import {
   lineDiff,
@@ -123,8 +132,122 @@ steps:
   );
   assert.match(
     problem('name: A\nsteps: [{agent: vault, access: default, prompt: "  "}]\n'),
-    /prompt が正しくありません/,
+    /ステップ 1 の prompt がありません/,
   );
+  assert.match(problem('name: ""\nsteps: [{run: a.js}]\n'), /name がありません/);
+});
+
+test('the editor reads routine.yaml as a form and writes it back keeping comments', () => {
+  const text = `# Written by hand
+name: Mail triage
+steps:
+  - run: fetch.sh # the fetcher
+    secrets: [GMAIL_TOKEN]
+  - agent: irori
+    vaults: all
+    access: default # or full-access
+    prompt: |
+      Read the mail.
+`;
+  const read = draftFromYaml(text);
+  assert.ok('draft' in read, JSON.stringify(read));
+  assert.deepEqual(read.draft, {
+    name: 'Mail triage',
+    steps: [
+      { kind: 'run', file: 'fetch.sh', secrets: ['GMAIL_TOKEN'], origin: 0 },
+      {
+        kind: 'agent',
+        vaults: 'all',
+        access: 'default',
+        cli: undefined,
+        model: undefined,
+        prompt: 'Read the mail.\n',
+        origin: 1,
+      },
+    ],
+  });
+  // Unchanged, the text comes back as it was.
+  assert.equal(yamlFromDraft(read.draft, 'irori', text), text);
+  // Steps the person kept keep their comments; new ones are written plainly.
+  const [fetch, sort] = read.draft.steps;
+  const changed = yamlFromDraft(
+    {
+      name: 'Mail triage',
+      steps: [
+        { ...agentDraft(), prompt: 'First line\nsecond line', cli: 'pi' },
+        { ...sort, prompt: 'Read the mail again.\n' } as StepDraft,
+        { ...fetch, secrets: [] } as StepDraft,
+        { ...runDraft(), command: 'gh api "a b" 5', secrets: ['GH_TOKEN'] },
+      ],
+    },
+    'irori',
+    text,
+  );
+  assert.equal(
+    changed,
+    `# Written by hand
+name: Mail triage
+steps:
+  - agent: irori
+    access: default
+    cli: pi
+    prompt: |-
+      First line
+      second line
+  - agent: irori
+    vaults: all
+    access: default # or full-access
+    prompt: |
+      Read the mail again.
+  - run: fetch.sh # the fetcher
+  - run: [gh, api, a b, "5"]
+    secrets: [GH_TOKEN]
+`,
+  );
+  assert.ok('steps' in parseRoutine(changed, 'irori'));
+  // A vault's routine names its own agent and hands no vaults.
+  const vault = yamlFromDraft(
+    { name: 'New: one', steps: [{ ...agentDraft(), vaults: 'all' }] },
+    'vault',
+  );
+  assert.equal(
+    vault,
+    'name: "New: one"\nsteps:\n  - agent: vault\n    access: default\n    prompt: ""\n',
+  );
+  // What the form cannot hold is edited as text, with the reason.
+  for (const [unfit, reason] of [
+    ['name: A\nwhen: daily\nsteps: []\n', /不明なキー.*when/],
+    ['name: A\nsteps: [{run: a.js, promt: x}]\n', /不明なキー.*promt/],
+    ['name: [unclosed\n', /読めません/],
+    ['name: A\nsteps: [{agent: vault, access: everything}]\n', /access は/],
+  ] as const) {
+    const result = draftFromYaml(unfit);
+    assert.ok('problem' in result, unfit);
+    assert.match(result.problem, reason);
+  }
+  // An unfinished routine still opens: a missing access shows as standard.
+  const template = draftFromYaml('name: X\nsteps:\n  # hint\n  - agent: irori\n    prompt: |\n');
+  assert.ok('draft' in template);
+  assert.deepEqual(template.draft.steps[0], {
+    kind: 'agent',
+    vaults: undefined,
+    access: 'default',
+    cli: undefined,
+    model: undefined,
+    prompt: '',
+    origin: 0,
+  });
+  // A command line as the terminal takes it, and back.
+  assert.deepEqual(splitCommand(`gh api "a b" 'c d' e\\ f "q\\"x"  `), [
+    'gh',
+    'api',
+    'a b',
+    'c d',
+    'e f',
+    'q"x',
+  ]);
+  const argv = ['a b', 'q"x', '', 'back\\slash', 'plain'];
+  assert.deepEqual(splitCommand(joinCommand(argv)), argv);
 });
 
 test('the gate, the failure marker and the review difference are read exactly', () => {
@@ -598,8 +721,8 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
   assert.match(template, /^ {2}- agent: irori$/m);
   // The prompt is the person's to write; until then the routine cannot run.
   const made = await listed(ref);
-  assert.equal(made.problem, 'ステップ 1 の prompt が正しくありません。');
-  await assert.rejects(start(ref), /prompt が正しくありません/);
+  assert.equal(made.problem, 'ステップ 1 の prompt がありません。');
+  await assert.rejects(start(ref), /prompt がありません/);
   // A second routine of the same name gets a folder of its own; a vault's uses agent: vault.
   assert.equal((await routines.create(youId, 'Daily mail')).folder, 'Daily mail 2');
   const theirs = await routines.create(space.scopeId, 'Triage');
@@ -610,9 +733,24 @@ test('a new routine is a template the person edits until it can run', fixtureOpt
   assert.equal((await listed(theirs)).name, 'Triage');
   await assert.rejects(routines.create(youId, '   '), /120 文字以内/);
 
+  // The editor's form gives the first text itself; the size is bounded.
+  const formed = await routines.create(
+    youId,
+    'Formed',
+    'name: Formed\nsteps:\n  - run: [git, --version]\n',
+  );
+  assert.equal((await listed(formed)).problem, undefined);
+  await assert.rejects(routines.create(youId, 'Huge', 'x'.repeat(65 * 1024)), /大きすぎます/);
+  assert.equal(await routines.folder(formed), path.join(youRoot, 'routines', 'Formed'));
+
   // A save reports what still stops the routine, and a crossing edit is refused.
   const read = await routines.source(ref);
   assert.equal(read.text, template);
+  assert.deepEqual(read.files, []);
+  await writeFile(path.join(youRoot, 'routines', 'Daily mail', 'fetch.js'), '');
+  await mkdir(path.join(youRoot, 'routines', 'Daily mail', 'lib'));
+  await writeFile(path.join(youRoot, 'routines', 'Daily mail', 'lib', 'util.js'), '');
+  assert.deepEqual((await routines.source(ref)).files, ['fetch.js', 'lib/util.js']);
   const missing = await routines.saveSource(
     ref,
     'name: Daily mail\nsteps:\n  - agent: irori\n    prompt: Sort.\n',

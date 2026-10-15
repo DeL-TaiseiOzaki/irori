@@ -87,7 +87,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - 指示にはファイルを添付でき（クリップ・ドロップ・画像の貼り付け）、画像はエージェントにそのまま見せます。マイクで OS の音声入力を起動できます。エージェントからの質問は選択肢として表示されます（[ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)）。
 - vault ごとに作業フォルダがあり、エージェントは下書き・中間ファイル・試しのスクリプトをそこに置きます。既定は vault の `.irori/work`（Git の対象外）で、vault の設定の **作業フォルダ** でほかのフォルダに変えられます（[ADR 042](docs/decisions/042-waiting-folders-and-work-folders.md)）。
 - 返答に出てきたファイルのパスはリンクになり、押すとそのファイルがメインの画面で開きます（行番号があればその行）。インラインコードのパスと、Claude Code・Codex が書くファイルへのリンクのどちらも対象です。
-- **ルーティン**：左のレールの irori mode と vault の間にある **ルーティン** で、JavaScript の使用設定、シークレットの管理、決めた手順の「実行」ができます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か vault の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
+- **ルーティン**：左のレールの irori mode と vault の間にある **ルーティン** で、手順をフォームで作り、シークレットを管理し、決めた手順を「実行」できます。手順はフォルダの `routine.yaml` に保存され（irori agent の `routines/` か vault の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
 
 **資料**
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。
@@ -97,7 +97,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。
 - vault のフォルダで開く内蔵ターミナルがあります。
 - テーマ（システムに合わせる・いろり・ライト・ダーク）、Markdown のフォント、表示言語（日本語 / English）を切り替えられます。
-- **設定 → アカウント**（起動画面の **設定** からも開けます）に、irori が使う GitHub アカウント（GitHub CLI `gh` のログイン）を表示します。**環境を保存** で、GitHub にある vault・ワークスペース・表示と AI の設定を、そのアカウントの非公開リポジトリ `irori-settings` に保存します。別の PC では起動画面の **GitHub から環境を復元** で、まとめて取得できます。
+- **設定 → アカウント**（起動画面の **設定** からも開けます）に、irori が使う GitHub アカウント（GitHub CLI `gh` のログイン）を表示します。**環境を保存** で、GitHub にある vault・ワークスペース・表示と AI の設定・irori agent のルーティンを、そのアカウントの非公開リポジトリ `irori-settings` に保存します。別の PC では起動画面の **GitHub から環境を復元** で、まとめて取得できます。
 
 <div align="center">
 <img src="docs/images/readme/ja-overview.png" alt="irori mode の画面。irori agent と、チーム・組織に分かれた 3 つの vault を vault map に表示している。" width="860">

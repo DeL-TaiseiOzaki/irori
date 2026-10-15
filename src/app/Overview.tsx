@@ -722,7 +722,7 @@ export function Overview({
   const [ais, setAis] = useState<Record<string, BrainAi>>({});
   // Beside the map: your AI, or each brain's own AI.
   const [islandChoice, setIsland] = useState<'you' | 'brains'>('you');
-  const [creatingRoutine, setCreatingRoutine] = useState(false);
+  const [routineSheet, setRoutineSheet] = useState<'create' | 'secrets'>();
   const island = vaultAgent ? islandChoice : 'you';
   // The irori agent's conversations as the map follows them.
   const [yourAis, setYourAis] = useState<Record<string, BrainAi>>({});
@@ -863,10 +863,14 @@ export function Overview({
                     {t('irori agent に頼む', 'Ask the irori agent')}
                   </span>
                 </button>
+                <button className="panel-button" onClick={() => setRoutineSheet('secrets')}>
+                  <Icon name="lock" size={14} />
+                  <span className="overview-label">{t('シークレット', 'Secrets')}</span>
+                </button>
                 <button
                   className="panel-button overview-add"
                   disabled={!routineOwners(you, spaces).length}
-                  onClick={() => setCreatingRoutine(true)}
+                  onClick={() => setRoutineSheet('create')}
                 >
                   <Icon name="plus" size={14} />
                   <span className="overview-label">{t('新しいルーティン', 'New routine')}</span>
@@ -905,8 +909,8 @@ export function Overview({
               spaces={spaces}
               you={you}
               revision={scopeRevision(revisions, you?.id)}
-              creating={creatingRoutine}
-              onCloseCreate={() => setCreatingRoutine(false)}
+              sheet={routineSheet}
+              onCloseSheet={() => setRoutineSheet(undefined)}
               choices={routineChoices}
               onOpenConversation={(conversation) => {
                 if (conversation.conversationId)

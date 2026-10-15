@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { t } from '../domain/i18n';
 import { languages } from '../domain/i18n';
 import { yourAiChoice } from '../domain/conversation';
+import { routineRuntimes } from '../domain/routines';
 import {
   markdownFonts,
   themes,
@@ -15,6 +16,7 @@ import {
   environmentFile,
   environmentPreferences,
   environmentRepository,
+  routinesFile,
   type EnvironmentRestore,
   type EnvironmentState,
   type RestoreEnvironment,
@@ -25,6 +27,7 @@ import type { GitHubCli } from '../git/github';
 import type { GitService } from '../git/service';
 import type { FileService } from './files';
 import { ifPresent } from './local-json';
+import { addRoutine, packRoutines, routineHere, storedRoutines } from './environment-routines';
 import { fromSavedEnvironment } from './vault-rename';
 import { inspectRepository, workspaceProfile, type WorkspaceService } from './workspaces';
 
@@ -53,6 +56,7 @@ const stored = z.object({
       editorAssistance: z.boolean(),
       vaultAgent: z.boolean(),
       yourAi: yourAiChoice,
+      routineRuntimes: z.array(z.enum(routineRuntimes)).max(routineRuntimes.length),
     })
     .partial(),
   agent: z.object({ repository }).optional(),
@@ -149,8 +153,9 @@ export class EnvironmentService {
       );
     return { login, full, exists: !!found || create };
   }
-  private async read(full: string) {
-    const file = await this.host.github.readFile(full, environmentFile);
+  /** A file of the settings repository, checked against its schema. */
+  private async readFile<T>(full: string, name: string, schema: z.ZodType<T>) {
+    const file = await this.host.github.readFile(full, name);
     if (!file) return undefined;
     let value: unknown;
     try {
@@ -166,29 +171,36 @@ export class EnvironmentService {
           'The saved environment is from a newer irori. Update irori.',
         ),
       );
-    // An environment saved before ADR 033 names vaults hibachis.
-    const parsed = stored.safeParse(fromSavedEnvironment(value));
+    const parsed = schema.safeParse(value);
     if (!parsed.success)
-      throw Error(
-        t(
-          `${full} の ${environmentFile} を読み込めません。`,
-          `Could not read ${environmentFile} in ${full}.`,
-        ),
-      );
+      throw Error(t(`${full} の ${name} を読み込めません。`, `Could not read ${name} in ${full}.`));
     return { sha: file.sha, value: parsed.data };
+  }
+  private read(full: string) {
+    // An environment saved before ADR 033 names vaults hibachis.
+    return this.readFile(full, environmentFile, z.preprocess(fromSavedEnvironment, stored));
+  }
+  /** The irori agent's routines saved beside the environment (ADR 043). */
+  private readRoutines(full: string) {
+    return this.readFile(full, routinesFile, storedRoutines);
   }
   async state(): Promise<EnvironmentState> {
     const { login, full, exists } = await this.place(false);
     const saved = exists ? (await this.read(full))?.value : undefined;
+    const savedRoutines = saved ? ((await this.readRoutines(full))?.value.routines ?? []) : [];
     const here = await this.vaults();
     const agentHere = await this.agentRepository();
     const local = await this.local(here, agentHere);
+    const agentRoot = await this.host.agentRoot();
+    const routines = await packRoutines(agentRoot);
     return {
       account: login,
       local: {
         vaults: local.vaults.length,
         left: here.filter((item) => !item.repository).map((item) => item.space.name),
         ...(local.agent && { agent: local.agent.repository }),
+        routines: routines.routines.length,
+        routinesLeft: routines.left,
       },
       ...(saved && {
         saved: {
@@ -207,6 +219,13 @@ export class EnvironmentService {
               here: same(agentHere, saved.agent.repository),
             },
           }),
+          routines: await Promise.all(
+            savedRoutines.map(async ({ folder, name }) => ({
+              folder,
+              name,
+              here: await routineHere(agentRoot, folder),
+            })),
+          ),
         },
       }),
       parent: await this.host.defaultParent(),
@@ -215,8 +234,11 @@ export class EnvironmentService {
   /** Replaces the saved environment with this device's. */
   async save(): Promise<EnvironmentState> {
     const { full } = await this.place(true);
+    // Both files are read first, so a damaged one stops the save before either is written.
     const previous = await this.read(full);
+    const previousRoutines = await this.readRoutines(full);
     const value = await this.local();
+    const { routines } = await packRoutines(await this.host.agentRoot());
     await this.host.github.writeFile(
       full,
       environmentFile,
@@ -224,6 +246,14 @@ export class EnvironmentService {
       'Save the irori environment',
       previous?.sha,
     );
+    if (routines.length || previousRoutines)
+      await this.host.github.writeFile(
+        full,
+        routinesFile,
+        `${JSON.stringify({ schemaVersion: 1, savedAt: value.savedAt, routines }, null, 2)}\n`,
+        "Save the irori agent's routines",
+        previousRoutines?.sha,
+      );
     return this.state();
   }
   private async url(repository: string) {
@@ -252,6 +282,7 @@ export class EnvironmentService {
       restored: [],
       failed: [],
       workspaces: 0,
+      routines: [],
       agent: 'unchanged',
     };
     // A saved vault's id here: its own, or that of a checkout of the same repository.
@@ -292,6 +323,7 @@ export class EnvironmentService {
     }
     if (saved.agent && input.agent)
       result.agent = await this.restoreAgent(saved.agent.repository, result);
+    if (input.routines?.length) await this.restoreRoutines(full, input.routines, result);
     const mapped = saved.workspaces.map((profile) => {
       const scopeIds = [...new Set(profile.scopeIds.map((id) => ids.get(id) ?? id))];
       const groups = (profile.groups ?? []).map((group) => ({
@@ -303,6 +335,35 @@ export class EnvironmentService {
     result.workspaces = await this.host.workspaces.adopt(mapped);
     await this.host.settings.save(saved.preferences);
     return result;
+  }
+  /**
+   * Adds the chosen saved routines to the irori agent's folder, after it was
+   * cloned if it was. A routine folder already here is left as it is.
+   */
+  private async restoreRoutines(full: string, folders: string[], result: EnvironmentRestore) {
+    const saved = (await this.readRoutines(full))?.value.routines ?? [];
+    const root = await this.host.agentRoot();
+    const ready = await fs
+      .stat(path.join(root, 'AGENTS.md'))
+      .then((stat) => stat.isFile())
+      .catch(() => false);
+    for (const routine of saved) {
+      if (!folders.includes(routine.folder) || (await routineHere(root, routine.folder))) continue;
+      try {
+        // Files in an absent folder would keep the irori agent from being set up there.
+        if (!ready)
+          throw Error(
+            t(
+              'irori agent が用意されていないため、ルーティンを追加できません。',
+              'The irori agent is not set up, so its routines cannot be added.',
+            ),
+          );
+        await addRoutine(root, routine);
+        result.routines.push(routine.name);
+      } catch (error) {
+        result.failed.push({ name: routine.name, message: (error as Error).message });
+      }
+    }
   }
   /** Clones the irori agent's folder where it is absent or empty. */
   private async restoreAgent(repository: string, result: EnvironmentRestore) {

@@ -18,6 +18,35 @@ folder be per workspace and a vault's work folder be in its contents
   agent's screen and its setup.
 - Verified by `npm run build`, `npm test` and `npm run test:ui`. No real CLI
   was run.
+Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
+asked how a routine's secrets are set, and found making a routine poor (a name
+dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and
+ADR 016's "Stage 4 revised" ([ADR 016](decisions/016-routines.md)).
+- `RoutineEditor` (`src/app/RoutineEditor.tsx`) edits the steps as a form or
+  the text; `draftFromYaml`/`yamlFromDraft` (`src/domain/routine-file.ts`, now
+  also holding `parseRoutine`) keep kept steps' comments. `createRoutine` takes
+  the first text; `routineSource` lists the folder's files; `revealRoutine`
+  opens the folder.
+- `SecretsDialog` and `SecretDialog` (`src/app/RoutineKeys.tsx`, named without
+  the word the workspace's read rule blocks) replace the list at the page's
+  end; the header has シークレット.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`routines-ui-smoke`). Real keychains and a real CLI were not tried.
+
+Routines in the saved environment, 2026-10-15 (**0.2.17**, not yet published):
+the owner asked what **環境を保存** keeps and that routines be kept too
+([ADR 043](decisions/043-routines-in-the-environment.md)).
+- `src/host/environment-routines.ts` packs the irori agent's routine folders
+  into `routines.json` beside `environment.json` (text, base64, executable bit;
+  about 900 KB in all) and adds a saved one where its folder is absent.
+  `EnvironmentService` reads both files before writing either; the state names
+  routines left out and the saved ones with `here`. `routineRuntimes` joined
+  `environmentPreferences`.
+- `AccountSync.tsx`: the restore dialog lists the saved routines; the account
+  section names routines too large to save and saved ones a save would drop.
+- Verified by `npm run build`, `npm test` (`tests/environment.test.ts`) and
+  `npm run test:ui` (`account-ui-smoke` saves and restores a routine). Not tried
+  with a real GitHub account.
 
 Slides and code files, 2026-10-13 (**0.2.13**, not yet published): the owner
 showed a template deck whose titles were cut off and a box drawn solid black,

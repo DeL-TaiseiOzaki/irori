@@ -1049,8 +1049,12 @@ app
         return agents.startAccepted(input);
       },
       routines: (workspaceId) => routines.list(workspaceId),
-      createRoutine: (owner, name) => routines.create(owner, name),
+      createRoutine: (owner, name, text) => routines.create(owner, name, text),
       routineSource: (ref) => routines.source(ref),
+      revealRoutine: async (ref) => {
+        const error = await shell.openPath(await routines.folder(ref));
+        if (error) throw Error(error);
+      },
       saveRoutineSource: (ref, text, version) => routines.saveSource(ref, text, version),
       reviewRoutine: (ref) => routines.review(ref),
       runRoutine: (ref, input) => routines.run(ref, input),

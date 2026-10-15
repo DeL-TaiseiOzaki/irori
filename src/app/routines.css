@@ -327,6 +327,9 @@
   color: var(--ink-3);
   font-size: 12px;
 }
+.modal.routine-secrets {
+  width: min(560px, calc(100vw - 48px));
+}
 .routine-secrets ul {
   display: flex;
   flex-direction: column;
@@ -338,11 +341,39 @@
 .routine-secrets li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 8px 6px 12px;
   border: 1px solid var(--rule-soft);
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 12.5px;
+}
+.routine-secrets li.missing {
+  border-style: dashed;
+}
+.routine-secrets li.missing .mono {
+  color: var(--del-ink);
+}
+.routine-secret-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+.routine-secret-name small {
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+.routine-secrets li .panel-button,
+.routine-secrets .actions .panel-button {
+  height: 28px;
+  gap: 6px;
+}
+.routine-secrets .actions {
+  display: flex;
+  align-items: center;
 }
 .routine-secret-form h2 {
   overflow-wrap: anywhere;
@@ -352,20 +383,223 @@
   font-size: 12.5px;
 }
 
+/* The editor: the routine's steps as a form, or its routine.yaml. */
 .modal.routine-editor {
-  width: min(760px, calc(100vw - 48px));
+  width: min(780px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.modal.routine-editor h2 {
-  margin-bottom: 6px;
+.routine-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.routine-editor-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.routine-editor textarea {
+.modal .routine-editor-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  height: 40px;
+  padding: 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.routine-editor-views {
+  flex: none;
+}
+.modal .routine-editor-owner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-3);
+}
+.routine-editor-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 0;
+}
+.routine-editor-path .routine-path {
+  flex: 1;
+  min-width: 0;
+}
+.routine-draft-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routine-draft-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 11px;
+  background: var(--surface-sunken);
+}
+.routine-draft-step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.routine-draft-step-head .icon-button {
+  width: 26px;
+  height: 26px;
+}
+.routine-draft-step textarea {
   display: block;
   width: 100%;
-  margin-top: 14px;
+  min-height: 84px;
+  padding: 9px 11px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.routine-draft-options,
+.routine-draft-run,
+.routine-draft-secrets,
+.routine-draft-vaults {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.modal .routine-draft-options label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ink-3);
+}
+.modal .routine-draft-options select,
+.modal .routine-draft-options input,
+.modal .routine-editor-owner select {
+  width: auto;
+  min-width: 96px;
+  margin: 0;
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.modal .routine-draft-options input {
+  width: 160px;
+}
+.modal .routine-draft-run input {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  height: 32px;
+}
+.routine-choice {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+}
+.routine-choice button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.routine-choice button[aria-pressed='true'] {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+  color: var(--ink);
+}
+.routine-draft-secrets {
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.routine-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 4px 0 9px;
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+  color: var(--ink);
+  font-size: 12px;
+}
+.routine-chip.kept [role='img'] {
+  display: inline-flex;
+  color: var(--add-ink);
+}
+.routine-chip.missing .mono {
+  color: var(--del-ink);
+}
+.routine-chip button {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 11.5px;
+}
+.routine-chip .routine-chip-remove {
+  width: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-3);
+}
+.modal .routine-draft-secrets input {
+  width: 150px;
+  height: 26px;
+  margin: 0;
+  font-size: 12px;
+}
+.routine-draft-secrets .panel-button {
+  height: 26px;
+}
+.modal label.routine-chip {
+  margin: 0;
+  padding: 0 10px 0 8px;
+  gap: 6px;
+  cursor: pointer;
+}
+.routine-draft-add {
+  display: flex;
+  gap: 8px;
+}
+.routine-draft-add .panel-button {
+  height: 30px;
+  gap: 6px;
+}
+.routine-editor-text {
+  display: block;
+  width: 100%;
   padding: 10px 12px;
   resize: vertical;
   font-size: 12.5px;
   line-height: 1.55;
   tab-size: 2;
+}
+.routine-editor-problem {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.modal.routine-editor .actions {
+  margin-top: 4px;
 }
