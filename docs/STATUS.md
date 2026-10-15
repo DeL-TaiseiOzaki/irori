@@ -18,6 +18,7 @@ folder be per workspace and a vault's work folder be in its contents
   agent's screen and its setup.
 - Verified by `npm run build`, `npm test` and `npm run test:ui`. No real CLI
   was run.
+
 Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
 asked how a routine's secrets are set, and found making a routine poor (a name
 dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and
