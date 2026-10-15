@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentAnswers, AgentEvent, Question, Space } from '../domain/types';
 import { questionsAnswered } from '../domain/questions';
 import { MessageAttachments } from './Attachments';
@@ -406,6 +406,8 @@ const TaskList = memo(function TaskList({ tasks, brains }: { tasks: RunTask[]; b
 
 const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain?: Space }) {
   useLanguage();
+  // A vault agent's report names files in its vault; without one, the column's writer stands.
+  const writer = useContext(PathBase);
   return (
     <div className={`message report ${event.delegate?.state ?? ''}`}>
       <span className="report-from">
@@ -414,7 +416,7 @@ const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain
           ? t(`${brain.name} agent から`, `From the ${brain.name} agent`)
           : t('報告', 'Report')}
       </span>
-      <PathBase.Provider value={event.delegate?.scopeId}>
+      <PathBase.Provider value={event.delegate?.scopeId ?? writer}>
         <AgentMarkdown text={event.text} />
       </PathBase.Provider>
     </div>

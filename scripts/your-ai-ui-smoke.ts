@@ -209,11 +209,22 @@ try {
   await expect(island.locator('.message.report')).toContainText(
     'Wrote Knowledge_Base/from-your-ai.md.',
   );
-  await expect(island).toContainText('Handed the note to the Product agent.');
+  await expect(island).toContainText('Handed the note to the Product agent');
   await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText('完了');
   expect(await readFile(path.join(roots[0], 'Knowledge_Base', 'from-your-ai.md'), 'utf8')).toBe(
     '# From your AI\n',
   );
+  // The reply's paths start where the irori agent works, not in the vault last on
+  // show (ADR 044): Research was, but the vault agent's file is Product's, and the
+  // irori agent's own plan opens on its screen.
+  const replyPaths = island.locator('.message-markdown .path-link');
+  await replyPaths.filter({ hasText: 'plans/next.md' }).click();
+  await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText('# Next');
+  await page.getByRole('button', { name: 'irori mode に戻る' }).click();
+  await replyPaths.filter({ hasText: 'from-your-ai.md' }).click();
+  await expect(page.locator('.brain-names strong')).toHaveText('Product');
+  await expect(page.locator('.ProseMirror')).toContainText('From your AI');
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(map.locator('.map-pill.hand-off')).toHaveCount(0);
 
   // Your AI's own write in a brain is refused, and a background hand-off runs
@@ -347,9 +358,30 @@ try {
     (item) => item.name === 'Lab',
   );
   expect(lab?.scopeIds.length).toBe(3);
+
+  // The workspace chooses another folder for the irori agent (ADR 044): it is set
+  // up there by itself, and the default comes back with a click.
+  const chosen = path.join(base, 'Lab agent');
+  await mkdir(chosen);
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as never;
+  }, chosen);
+  await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
+  await expect(page.locator('.you-root')).toContainText(you);
+  const folderSetting = page.getByRole('region', { name: 'irori agent の作業場所' });
+  await folderSetting.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
+  await expect(island.getByRole('button', { name: 'irori agent を用意する' })).toBeVisible();
+  await expect(island.getByRole('region', { name: 'irori agent の作業場所' })).toContainText(
+    chosen,
+  );
+  expect(
+    JSON.parse(await readFile(path.join(files.dataDir, 'irori-agent-folders.json'), 'utf8')),
+  ).toEqual({ [lab!.id]: chosen });
+  await island.getByRole('button', { name: '既定に戻す', exact: true }).click();
+  await expect(composer).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, and the irori agent island widened by its handle. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

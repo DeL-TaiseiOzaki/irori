@@ -252,6 +252,8 @@ export class FileService {
     localFolders?(scopeId: string): string[];
     /** Where those folders appear, as paths inside the vault. */
     linkedPaths?(scopeId: string): string[];
+    /** Both at once: each folder's path inside the vault and its real place. */
+    linkedFolders?(scopeId: string): { path: string; target: string }[];
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];

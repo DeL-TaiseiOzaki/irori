@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { statSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +10,7 @@ import {
   subAgentDefinition,
   subAgentFiles,
   type BrainAgent,
+  type IroriAgentFolder,
   type SubAgentCli,
   type YourAi,
   type YourAiEntry,
@@ -25,6 +27,8 @@ import { findSkill, readFolderSkills } from './skills';
 const record = z
   .object({ schemaVersion: z.literal(1), id: z.uuid(), root: z.string().min(1) })
   .strict();
+/** The folder each workspace chose for the irori agent, by workspace id (ADR 044). */
+const chosenFolders = z.record(z.uuid(), z.string().min(1));
 const relative = z
   .string()
   .max(4096)
@@ -43,19 +47,29 @@ const sharedInline = 32 * 1024;
 const standardSkill = (name: string) => `.agents/skills/${name}`;
 
 /**
- * Your AI's folder on this device. Its record (an id and the folder) lives in
- * irori's data directory, not in any KB; the folder is `~/irori/you` unless the
- * record says otherwise, one per person. irori writes a starter there only when
- * the person asks, and only into an absent or empty folder.
+ * Your AI's folder on this device. Its record (an id and the default folder)
+ * lives in irori's data directory, not in any KB; the default folder is
+ * `~/irori/you` unless the record says otherwise. A workspace may choose
+ * another folder for the irori agent (ADR 044): its runs, its Schema and the
+ * screens shown while that workspace is open use it. The shared Schema, the
+ * irori agent's routines and the saved environment stay in the default folder.
+ * irori writes a starter only when the person asks, and only into an absent or
+ * empty folder.
  */
 export class YourAiService {
   private value?: z.infer<typeof record>;
+  private chosen: Record<string, string> = {};
+  /** The workspace open in the window: the screens and the terminal use its folder. */
+  private shown?: string;
   constructor(
     private dataDir: string,
     private home = os.homedir(),
   ) {}
   private get filename() {
     return path.join(this.dataDir, 'your-ai.json');
+  }
+  private get choicesFile() {
+    return path.join(this.dataDir, 'irori-agent-folders.json');
   }
   /** Reads the record, making one with a new id and the default folder the first time. */
   async load() {
@@ -70,15 +84,102 @@ export class YourAiService {
           }
         : record.parse(stored);
     if (stored === undefined) await writeLocalJson(this.filename, value);
+    const choices = chosenFolders.safeParse(
+      await readLocalJson(this.choicesFile, {}).catch(() => ({})),
+    );
+    this.chosen = choices.success ? choices.data : {};
     this.value = value;
     return value;
   }
-  /** Your AI's folder when `scopeId` is its id; the agent service asks once the record is loaded. */
-  rootOf(scopeId: string) {
-    return this.value?.id === scopeId ? this.value.root : undefined;
+  /** Which workspace the window shows, for the folder the screens and the terminal use. */
+  show(workspaceId: string | null) {
+    this.shown = workspaceId ?? undefined;
   }
-  async status(): Promise<YourAi> {
-    const { id, root } = await this.load();
+  /**
+   * The irori agent's folder for a workspace, the one on show without one. A
+   * chosen folder that is not there, such as one on a drive not mounted yet,
+   * gives way to the default meanwhile, as a vault's work folder does.
+   */
+  folderOf(workspaceId = this.shown): IroriAgentFolder {
+    const fallback = this.value?.root ?? path.join(this.home, 'irori', 'you');
+    const chosen = workspaceId ? this.chosen[workspaceId] : undefined;
+    if (!chosen) return { path: fallback, chosen: false };
+    let there = false;
+    try {
+      there = statSync(chosen).isDirectory();
+    } catch {
+      /* not there */
+    }
+    return there
+      ? { path: chosen, chosen: true }
+      : { path: fallback, chosen: true, missing: chosen };
+  }
+  /**
+   * Your AI's folder when `scopeId` is its id, for `workspaceId` or the workspace
+   * on show; the agent service asks once the record is loaded.
+   */
+  rootOf(scopeId: string, workspaceId?: string) {
+    return this.value?.id === scopeId ? this.folderOf(workspaceId).path : undefined;
+  }
+  /** The folder the record names: the shared Schema, routines and the environment live there. */
+  private async defaultFolder() {
+    return (await this.load()).root;
+  }
+  private async root(workspaceId?: string) {
+    await this.load();
+    return this.folderOf(workspaceId).path;
+  }
+  /**
+   * Chooses the irori agent's folder for a workspace, or the default again with
+   * `null` or the default itself. It must be a folder that exists, apart from
+   * every vault, irori's data and any other irori agent folder (a folder inside
+   * another would read that one's instructions too). Nothing is made or moved.
+   */
+  async choose(workspaceId: string, chosen: string | null, vaultRoots: string[]) {
+    const fallback = await this.defaultFolder();
+    const records = { ...this.chosen };
+    const missing = () => Error(t('フォルダが見つかりません。', 'The folder was not found.'));
+    let target: string | undefined;
+    if (chosen !== null) {
+      if (!path.isAbsolute(chosen)) throw missing();
+      target = await fs.realpath(chosen).catch(() => {
+        throw missing();
+      });
+      if (!(await fs.stat(target)).isDirectory()) throw missing();
+    }
+    const real = async (folder: string) => fs.realpath(folder).catch(() => folder);
+    if (target === undefined || target === (await real(fallback))) delete records[workspaceId];
+    else {
+      const refuse = () =>
+        Error(
+          t(
+            'irori agent のフォルダには、vault や irori のデータ、ほかの irori agent のフォルダと重なるフォルダは選べません。',
+            "The irori agent's folder cannot overlap a vault, irori's data or another irori agent folder.",
+          ),
+        );
+      const overlaps = (folder: string) => within(folder, target!) || within(target!, folder);
+      if (overlaps(await real(this.dataDir))) throw refuse();
+      for (const root of vaultRoots) if (overlaps(await real(root))) throw refuse();
+      const others = [
+        fallback,
+        ...Object.entries(records)
+          .filter(([id]) => id !== workspaceId)
+          .map(([, folder]) => folder),
+      ];
+      for (const other of others) {
+        const folder = await real(other);
+        if (folder !== target && overlaps(folder)) throw refuse();
+      }
+      records[workspaceId] = target;
+    }
+    await writeLocalJson(this.choicesFile, records);
+    this.chosen = records;
+    return this.folderOf(workspaceId);
+  }
+  async status(workspaceId?: string): Promise<YourAi> {
+    const { id } = await this.load();
+    const folder = this.folderOf(workspaceId);
+    const root = folder.path;
     const ready = await fs
       .stat(path.join(root, 'AGENTS.md'))
       .then((stat) => stat.isFile())
@@ -88,7 +189,14 @@ export class YourAiService {
       for (const name of Object.keys(iroriAgentSkills))
         if (!(await fs.lstat(path.join(root, standardSkill(name))).catch(() => undefined)))
           missingSkills.push(name);
-    return { id, root, state: ready ? 'ready' : 'missing', missingSkills };
+    return {
+      id,
+      root,
+      state: ready ? 'ready' : 'missing',
+      missingSkills,
+      chosen: folder.chosen,
+      ...(folder.missing && { missing: folder.missing }),
+    };
   }
   async create(): Promise<YourAi> {
     const current = await this.status();
@@ -107,7 +215,7 @@ export class YourAiService {
       await fs.writeFile(file, text, { flag: 'wx' });
     }
     await fs.mkdir(path.join(current.root, '.claude', 'agents'), { recursive: true });
-    await this.writeSkills();
+    await this.writeSkills(current.root);
     return this.status();
   }
   /**
@@ -118,24 +226,22 @@ export class YourAiService {
   async addStandardSkills(): Promise<YourAi> {
     if ((await this.status()).state !== 'ready')
       throw Error(t('irori agent を用意してください。', 'Set up the irori agent first.'));
-    await this.writeSkills();
+    await this.writeSkills(await this.root());
     return this.status();
   }
-  private async writeSkills() {
-    const { root } = await this.load();
+  private async writeSkills(root: string) {
     for (const [name, text] of Object.entries(iroriAgentSkills)) {
       const rel = standardSkill(name);
       if (await fs.lstat(path.join(root, rel)).catch(() => undefined)) continue;
-      await this.folders(`${rel}/SKILL.md`);
+      await this.folders(root, `${rel}/SKILL.md`);
       await fs.writeFile(path.join(root, rel, 'SKILL.md'), text, { flag: 'wx' });
     }
   }
   /**
-   * Makes the folders on the way to `rel` inside the irori agent's folder; a
-   * link or a file in their place stops the write.
+   * Makes the folders on the way to `rel` inside an irori agent folder; a link
+   * or a file in their place stops the write.
    */
-  private async folders(rel: string) {
-    const { root } = await this.load();
+  private async folders(root: string, rel: string) {
     relative.parse(rel);
     let dir = root;
     for (const part of rel.split('/').slice(0, -1)) {
@@ -156,8 +262,8 @@ export class YourAiService {
         throw Error(`${dir} is not a folder inside the irori agent’s folder`);
     }
   }
-  private async resolve(rel: string) {
-    const { root } = await this.load();
+  private async resolve(rel: string, root?: string) {
+    root ??= await this.root();
     relative.parse(rel);
     const requested = path.resolve(root, rel);
     if (!within(root, requested)) throw Error('Path is outside the irori agent’s folder');
@@ -167,8 +273,8 @@ export class YourAiService {
     return actual;
   }
   /** One folder's entries, folders first, links marked. */
-  private async listing(rel: string) {
-    const dir = await this.resolve(rel);
+  private async listing(rel: string, root?: string) {
+    const dir = await this.resolve(rel, root);
     const found = (await fs.readdir(dir, { withFileTypes: true })).filter(
       (entry) => !['.git', 'node_modules'].includes(entry.name),
     );
@@ -192,20 +298,28 @@ export class YourAiService {
    * The folder as the Schema settings see it: its real path, instructions only
    * at the root, and every path confined to it with no alias leaving it.
    */
-  async schemaFolder(): Promise<SchemaFolder> {
-    const root = await fs.realpath((await this.load()).root);
+  async schemaFolder(workspaceId?: string): Promise<SchemaFolder> {
+    const folder = await this.root(workspaceId);
+    const root = await fs.realpath(folder);
     return {
       root,
       knowledge: false,
       layer: () => 'schema',
       entries: async (rel) =>
-        (await this.listing(rel)).map(({ link, ...entry }) => ({
+        (await this.listing(rel, folder)).map(({ link, ...entry }) => ({
           ...entry,
           blocked: link ? t('リンクは開けません', 'Links cannot be opened') : undefined,
         })),
-      resolve: (rel) => this.resolve(rel),
-      read: async (rel) => (await this.read(rel)).text,
+      resolve: (rel) => this.resolve(rel, folder),
+      read: async (rel) => (await this.read(rel, folder)).text,
     };
+  }
+  /** Whether the default folder is set up: the shared Schema is kept there. */
+  private async homeReady() {
+    return fs
+      .stat(path.join(await this.defaultFolder(), 'AGENTS.md'))
+      .then((stat) => stat.isFile())
+      .catch(() => false);
   }
   /**
    * The shared Schema as the settings see it (ADR 027): its own folder inside
@@ -213,17 +327,23 @@ export class YourAiService {
    * Only instructions at its root and skill packages are settings there.
    */
   async sharedFolder(): Promise<SchemaFolder> {
-    if ((await this.status()).state !== 'ready')
-      throw Error(t('irori agent を用意してください。', 'Set up the irori agent first.'));
-    await this.folders(`${sharedSchemaFolder}/${instructionsFile}`);
+    if (!(await this.homeReady()))
+      throw Error(
+        t(
+          '既定のフォルダで irori agent を用意してください。',
+          'Set up the irori agent in its default folder first.',
+        ),
+      );
+    await this.folders(await this.defaultFolder(), `${sharedSchemaFolder}/${instructionsFile}`);
     return this.sharedSchema();
   }
   /** The shared Schema's folder without making it; reading a missing one finds nothing. */
   private async sharedSchema(): Promise<SchemaFolder> {
     const inside = (rel: string) => (rel ? `${sharedSchemaFolder}/${rel}` : sharedSchemaFolder);
-    const root = path.join(await fs.realpath((await this.load()).root), sharedSchemaFolder);
+    const home = await this.defaultFolder();
+    const root = path.join(await fs.realpath(home), sharedSchemaFolder);
     const resolve = async (rel: string) => {
-      const actual = await this.resolve(inside(rel));
+      const actual = await this.resolve(inside(rel), home);
       if (!within(root, actual)) throw Error('Path alias leaves the shared Schema');
       return actual;
     };
@@ -234,7 +354,7 @@ export class YourAiService {
       layer: () => 'schema',
       entries: async (rel) => {
         await resolve(rel);
-        return (await this.listing(inside(rel))).map(({ link, path: entry, ...rest }) => ({
+        return (await this.listing(inside(rel), home)).map(({ link, path: entry, ...rest }) => ({
           ...rest,
           path: entry.slice(sharedSchemaFolder.length + 1),
           blocked: link ? t('リンクは開けません', 'Links cannot be opened') : undefined,
@@ -252,7 +372,7 @@ export class YourAiService {
    * is not set up or the shared Schema holds neither instructions nor skills.
    */
   async shared(): Promise<SharedSchemaPrompt | undefined> {
-    if ((await this.status()).state !== 'ready') return undefined;
+    if (!(await this.homeReady())) return undefined;
     const folder = await this.sharedSchema();
     const text = (await ifPresent(folder.read(instructionsFile)))?.trim();
     const skills = (await ifPresent(readFolderSkills(folder)))?.skills ?? [];
@@ -272,19 +392,19 @@ export class YourAiService {
   }
   /** A shared skill by name, for a request that picked one its own Schema lacks. */
   async sharedSkill(name: string): Promise<AgentSkill | undefined> {
-    if ((await this.status()).state !== 'ready') return undefined;
+    if (!(await this.homeReady())) return undefined;
     const folder = await this.sharedSchema();
     const skill = await ifPresent(findSkill(folder, name));
     return skill && { ...skill, path: path.join(folder.root, skill.path), shared: true };
   }
-  async read(rel: string) {
+  async read(rel: string, root?: string) {
     const { id } = await this.load();
-    const doc = await readTextDocument(await this.resolve(rel), id, rel);
+    const doc = await readTextDocument(await this.resolve(rel, root), id, rel);
     return { path: doc.path, text: doc.text };
   }
   /** The definition files each named sub-agent has in the folder, for every CLI that loads them. */
   async definitions(agents: string[]) {
-    const { root } = await this.load();
+    const root = await this.root();
     const found = new Map<string, BrainAgent['definitions']>();
     for (const agent of agents) {
       const files: BrainAgent['definitions'] = [];
@@ -309,13 +429,17 @@ export class YourAiService {
    * the person may have edited it. Folders on the way are made inside the
    * folder only; a link or file in their place stops the write.
    */
-  async writeDefinitions(cli: SubAgentCli, brains: Pick<BrainAgent, 'name' | 'agent' | 'root'>[]) {
-    const { root } = await this.load();
-    const shared = path.join(root, sharedSchemaFolder);
+  async writeDefinitions(
+    cli: SubAgentCli,
+    brains: Pick<BrainAgent, 'name' | 'agent' | 'root'>[],
+    workspaceId?: string,
+  ) {
+    const root = await this.root(workspaceId);
+    const shared = path.join(await this.defaultFolder(), sharedSchemaFolder);
     const written: string[] = [];
     for (const brain of brains) {
       const rel = subAgentFiles[cli](brain.agent);
-      await this.folders(rel);
+      await this.folders(root, rel);
       try {
         await fs.writeFile(path.join(root, rel), subAgentDefinition(cli, brain, shared), {
           flag: 'wx',

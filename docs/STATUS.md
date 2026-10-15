@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-15: **0.2.19**, merged at the owner's request
+([#245](https://github.com/DeL-TaiseiOzaki/irori/pull/245) as `0f7e242` at 09:24:19 UTC).
+`publish.yml` published it from its push run `38712688678`; the release was public at
+09:25:38 (1:19) and the page deployed at 09:27:47 (3:28), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,243,712 / 141,901,369 / 175,411,535. The page offers 0.2.19.
+- Not tried on Windows or macOS, or with a real CLI's run.
+
+Where agents work, 2026-10-15 (**0.2.19**, published): the owner saw a
+reply's path open another file or "not found", and asked that the irori agent's
+folder be per workspace and a vault's work folder be in its contents
+([ADR 044](decisions/044-where-agents-work.md)).
+- `YourAiService` (`src/host/you.ts`) keeps `irori-agent-folders.json`;
+  `folderOf`/`rootOf(id, workspace)` give the workspace's folder, `show` the one
+  the window shows. Runs pass `input.workspace` (`src/agents/service.ts`); the
+  shared Schema, routines and the environment use the default folder.
+- `AgentPaths` (`src/host/agent-paths.ts`) answers `agentPathRoots` and
+  `locateAgentPath`: candidates from `pathCandidates` (`src/domain/path-links.ts`),
+  then a bounded search by name. `AgentMarkdown` asks it on click and offers
+  several matches. `PathBase` of the irori column is its own id.
+- `WorkFolders` (`src/host/work-folders.ts`) defaults to `<contents>/work`
+  and moves `.irori/work` there.
+- `IroriAgentFolderSection` (`src/app/IroriAgentFolder.tsx`) on the irori
+  agent's screen and its setup.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`. No real CLI
+  was run.
+
 Routines from a form, 2026-10-15 (**0.2.18**, published as
 [v0.2.18-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.18-preview.1)
 by `publish.yml` run `38708411192` from the merge `c1ae19d`, 3:43 after it): the owner

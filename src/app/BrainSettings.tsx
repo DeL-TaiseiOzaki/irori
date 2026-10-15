@@ -625,7 +625,7 @@ export function BrainSettings({
 
 /**
  * Where the vault's agents keep scratch files, intermediate results and trial
- * scripts on this device: `.irori/work` in the vault unless another folder is
+ * scripts on this device: `work` in the vault's contents unless another folder is
  * chosen. A change applies at once, as a connection's does.
  */
 function WorkFolderSection({ space }: { space: Space }) {

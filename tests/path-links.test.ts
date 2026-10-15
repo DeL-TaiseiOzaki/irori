@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { locatePath, writtenPath } from '../src/domain/path-links';
+import { endsWithWritten, locatePath, pathCandidates, writtenPath } from '../src/domain/path-links';
 import { lineTarget, sourceMatch } from '../src/editor/search-navigation';
 
 const roots = [
@@ -35,6 +35,13 @@ test('link destinations name files with the line Claude Code or Codex points at'
     line: 2,
   });
   assert.deepEqual(writtenPath('wiki/a.md#heading', 'href'), { path: 'wiki/a.md' });
+  // A name without a folder, with its line, is not a scheme such as `agents.md:`.
+  assert.deepEqual(writtenPath('AGENTS.md:12', 'href'), { path: 'AGENTS.md', line: 12 });
+  assert.deepEqual(writtenPath('README.md:3:5', 'href'), {
+    path: 'README.md',
+    line: 3,
+    column: 5,
+  });
 });
 
 test('web addresses and other schemes are not paths', () => {
@@ -59,6 +66,8 @@ test('inline code is a path only when it reads as a file', () => {
     path: 'journal/2026-10-13.md',
   });
   assert.deepEqual(writtenPath('src/foo.custom', 'code'), { path: 'src/foo.custom' });
+  assert.deepEqual(writtenPath('AGENTS.md:12', 'code'), { path: 'AGENTS.md', line: 12 });
+  assert.deepEqual(writtenPath('index.md:3-9', 'code'), { path: 'index.md', line: 3 });
   for (const value of [
     'npm run build',
     'irori.app',
@@ -130,4 +139,51 @@ test('a pointed line is selected by its words, past the marks a rich view hides'
   assert.equal(whole.query, '- [ ] Buy **milk** today');
   const match = sourceMatch(text, whole)!;
   assert.equal(text.slice(match.from, match.to), whole.query);
+});
+
+test("a relative path is looked for where its writer works, then in the workspace's other folders", () => {
+  const folders = [
+    { scopeId: 'a', root: '/home/me/vaults/notes' },
+    { scopeId: 'b', root: '/home/me/vaults/notes-work' },
+    { scopeId: 'you', root: '/home/me/irori/you' },
+    // A connected folder's real place stands for its path inside its vault.
+    { scopeId: 'a', root: '/home/me/Drive/Shared', prefix: 'contents/Drive' },
+  ];
+  // The irori agent's own plan, though vault `a` is on show.
+  assert.deepEqual(pathCandidates('plans/today.md', folders, 'you'), [
+    { scopeId: 'you', path: 'plans/today.md' },
+    { scopeId: 'a', path: 'plans/today.md' },
+    { scopeId: 'b', path: 'plans/today.md' },
+  ]);
+  // A vault agent's report, relayed by the irori agent.
+  assert.deepEqual(pathCandidates('wiki/x.md', folders, 'b')[0], {
+    scopeId: 'b',
+    path: 'wiki/x.md',
+  });
+  // A diff's `b/` comes off after the path as written.
+  const diff = pathCandidates('b/wiki/x.md', folders, 'a');
+  assert.deepEqual(diff[0], { scopeId: 'a', path: 'b/wiki/x.md' });
+  assert.ok(diff.some((found) => found.scopeId === 'a' && found.path === 'wiki/x.md'));
+  // An absolute path in a connected folder's real place is that folder in its vault.
+  assert.deepEqual(pathCandidates('/home/me/Drive/Shared/q3/plan.pdf', folders), [
+    { scopeId: 'a', path: 'contents/Drive/q3/plan.pdf' },
+  ]);
+  assert.deepEqual(pathCandidates('/home/me/irori/you/plans/today.md', folders), [
+    { scopeId: 'you', path: 'plans/today.md' },
+  ]);
+  assert.deepEqual(pathCandidates('/etc/hosts', folders), []);
+  // A relative path is never read from a connected folder's real place.
+  assert.ok(
+    pathCandidates('q3/plan.pdf', folders).every(
+      (found) => !found.path.startsWith('contents/Drive'),
+    ),
+  );
+});
+
+test('a name, or the tail of a path, matches a file whose path ends with it', () => {
+  assert.equal(endsWithWritten('wiki/topic.md', 'topic.md'), true);
+  assert.equal(endsWithWritten('knowledge/wiki/topic.md', 'wiki/topic.md'), true);
+  assert.equal(endsWithWritten('topic.md', './topic.md'), true);
+  assert.equal(endsWithWritten('wiki/my-topic.md', 'topic.md'), false);
+  assert.equal(endsWithWritten('wiki/topic.md', '../topic.md'), false);
 });

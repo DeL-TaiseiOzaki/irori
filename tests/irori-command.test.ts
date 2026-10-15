@@ -443,7 +443,7 @@ test('work chooses where a vault’s agents work, and list names it and a folder
   const root = path.join(base, 'Notes');
   await mkdir(root);
   await files.register(root, 'Notes', 'personal');
-  const fallback = path.join(root, '.irori', 'work');
+  const fallback = path.join(root, 'contents', 'work');
   assert.match(
     await setup.run(['list'], base),
     new RegExp(`work folder ${JSON.stringify(JSON.stringify(fallback)).slice(1, -1)}`),
@@ -457,7 +457,7 @@ test('work chooses where a vault’s agents work, and list names it and a folder
   assert.match(await setup.run(['list'], base), /work folder ".*Scratch"/);
   assert.match(
     await setup.run(['work', 'Notes', '--default'], base),
-    /\.irori\/work, which Git ignores/,
+    /work folder in the vault's contents, which Git ignores/,
   );
   await assert.rejects(
     setup.run(['work', 'Notes'], base),

@@ -861,6 +861,18 @@ export class CloudService {
       .map((item) => `${item.attachment.contentsRoot}/${item.attachment.name}`)
       .sort();
   }
+  /**
+   * Each connected folder of a vault: its path inside the vault and its real
+   * place on this device, for a path an agent wrote by the latter (ADR 044).
+   */
+  linkedFolders(scopeId: string) {
+    return [...this.mounted.values()]
+      .filter((item) => item.attachment.scopeId === scopeId)
+      .map((item) => ({
+        path: `${item.attachment.contentsRoot}/${item.attachment.name}`,
+        target: item.target,
+      }));
+  }
   /** The local folders connected in a vault, for CLI agents to be allowed into. */
   localFolders(scopeId: string) {
     return [...this.mounted.values()]
