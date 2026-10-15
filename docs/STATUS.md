@@ -1,5 +1,22 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-15: **0.2.20**, merged at the owner's request
+([#242](https://github.com/DeL-TaiseiOzaki/irori/pull/242) as `3bf7f38` at 09:33:00 UTC).
+`publish.yml` published it from its push run `38713761817`; the release was public at
+09:34:16 (1:16) and the page deployed at 09:36:19 (3:19), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,245,248 / 141,902,589 / 175,413,623. The page offers 0.2.20.
+
+Long skill descriptions, 2026-10-15 (**0.2.20**, published; written as 0.2.16 and
+renumbered after 0.2.17 to 0.2.19 were published): six skills moved into the mtd
+vault were missing from the list, because `skillMetadata` refused a `description`
+past 400 characters. It now takes up to 1024, as the Agent Skills specification
+says; a skill that still fails reads as `key: reason` instead of Zod's JSON, and the
+composer names each failed package ([SKILLS](SKILLS.md), `src/domain/skills.ts`,
+`src/host/skills.ts`).
+- Verified by `npm run build`, `npm test` (`tests/skills.test.ts`) and the pull
+  request's CI.
+
 Published 2026-10-15: **0.2.19**, merged at the owner's request
 ([#245](https://github.com/DeL-TaiseiOzaki/irori/pull/245) as `0f7e242` at 09:24:19 UTC).
 `publish.yml` published it from its push run `38712688678`; the release was public at

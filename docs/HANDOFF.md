@@ -18,6 +18,11 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-10-15: **0.2.20** ([#242](https://github.com/DeL-TaiseiOzaki/irori/pull/242),
+skills with a description past 400 characters load) as `3bf7f38`, by `publish.yml`
+alone (push run `38713761817`): merge to release 1:16, to page 3:19. Downloads
+verified. See STATUS.
+
 Published 2026-10-15: **0.2.19** ([#245](https://github.com/DeL-TaiseiOzaki/irori/pull/245),
 reply paths open where their writer works, and the irori agent's folder per workspace)
 as `0f7e242`, by `publish.yml` alone (push run `38712688678`): merge to release 1:19,
