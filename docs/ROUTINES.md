@@ -63,6 +63,16 @@ The routines page's header has **新しいルーティン** and **irori agent �
   `irori routines` lists every routine as irori reads it: ready, what the
   device needs, or why it cannot run.
 
+## On another device
+
+**環境を保存** (設定 → アカウント) keeps the irori agent's routines, every
+file of each folder, in `routines.json` of the account's private
+`irori-settings` repository, and the JavaScript switch with the other
+preferences; **環境を復元** adds the chosen ones whose folder is absent
+([ADR 043](decisions/043-routines-in-the-environment.md)). A vault's routines
+travel with the vault's repository. Secrets and reviews stay on each device,
+so a restored routine is reviewed before its first run there.
+
 ## Running one
 
 The left rail's **ルーティン** / **Routines** button, between irori mode and the

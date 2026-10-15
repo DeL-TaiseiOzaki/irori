@@ -118,7 +118,12 @@ export const hostArguments = {
   saveEnvironment: z.tuple([]),
   restoreEnvironment: z.tuple([
     z
-      .object({ scopeIds: z.array(id).max(500), agent: z.boolean(), parent: path.optional() })
+      .object({
+        scopeIds: z.array(id).max(500),
+        agent: z.boolean(),
+        routines: z.array(z.string().max(200)).max(500).optional(),
+        parent: path.optional(),
+      })
       .strict(),
   ]),
   gitPublish: z.tuple([
