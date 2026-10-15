@@ -23,7 +23,7 @@ import {
   type QueuedMessage,
 } from '../domain/conversation';
 import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
-import { retirementNotice, type AgentSkill } from '../domain/skills';
+import { retirementNotice, type AgentSkill, type SkillProblem } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
 import { useDraft } from './useDraft';
@@ -167,7 +167,7 @@ export function AgentColumn({
   access: AgentAccess;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
-  skillProblems: { directory: string }[];
+  skillProblems: SkillProblem[];
   instructionFile?: string;
   /** Files sent as references with the next instruction (a vault column's). */
   sources: SourceRef[];
@@ -1274,8 +1274,8 @@ export function AgentColumn({
         {!irori && skillProblems.length > 0 && (
           <small className="muted" role="status">
             {t(
-              `読み込めないスキル: ${skillProblems.map((p) => p.directory).join('、')}`,
-              `Skills that failed to load: ${skillProblems.map((p) => p.directory).join(', ')}`,
+              `読み込めないスキル: ${skillProblems.map((p) => `${p.directory}（${p.message}）`).join('、')}`,
+              `Skills that failed to load: ${skillProblems.map((p) => `${p.directory} (${p.message})`).join(', ')}`,
             )}
           </small>
         )}

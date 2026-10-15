@@ -2,7 +2,15 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { Document, Entry, Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { baseName, parentPath } from '../domain/paths';
-import { retiredFile, skillFile, skillName, skillsRoot, type SkillListing } from '../domain/skills';
+import {
+  characters,
+  maxSkillDescription,
+  retiredFile,
+  skillFile,
+  skillName,
+  skillsRoot,
+  type SkillListing,
+} from '../domain/skills';
 import {
   attachmentPath,
   claudeSettingsFile,
@@ -135,7 +143,8 @@ export function SchemaList({
         ...skills.skills.map((skill) => ({
           key: skill.name,
           label: skill.name,
-          title: skill.description,
+          title: skill.notice ?? skill.description,
+          badge: skill.notice && t('要確認', 'Check'),
           path: `${skillsRoot}/${skill.name}/${skillFile}`,
         })),
         ...broken.map((problem) => ({
@@ -862,14 +871,20 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
     const listed = data.skills.skills.find((skill) => skill.name === target.key);
     setForm({
       name: target.key ?? '',
-      description: listed?.description ?? read?.description ?? '',
+      // A listed description past the limit is cut; the form edits the whole one.
+      description:
+        (listed?.notice ? read?.description : listed?.description) ?? read?.description ?? '',
       body: read?.body ?? '',
     });
   }, [doc]);
   if (doc === undefined || !form) return <Loading error={error} />;
   const nameValid = skillName.safeParse(form.name).success;
   const description = form.description.trim();
-  const valid = nameValid && !!description && description.length <= 400 && !!form.body.trim();
+  const valid =
+    nameValid &&
+    !!description &&
+    characters(description) <= maxSkillDescription &&
+    !!form.body.trim();
   const change = (patch: Partial<typeof form>) => setForm({ ...form, ...patch });
   return (
     <>
@@ -911,10 +926,12 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
             aria-label={t('説明', 'Description')}
             value={form.description}
             disabled={disabled}
-            maxLength={400}
+            maxLength={maxSkillDescription}
             onChange={(event) => change({ description: event.target.value })}
           />
-          <small>{t('400 文字まで', 'Up to 400 characters')}</small>
+          <small>
+            {t(`${maxSkillDescription} 文字まで`, `Up to ${maxSkillDescription} characters`)}
+          </small>
         </label>
         <TextField
           label={t('手順', 'Instructions')}

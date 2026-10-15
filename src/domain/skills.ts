@@ -8,6 +8,11 @@ export const skillFile = 'SKILL.md';
 export const retiredFile = 'RETIRED.md';
 export const maxSkills = 50;
 export const maxSkillBytes = 16 * 1024;
+/** The Agent Skills specification's limit on `description`. No CLI irori runs drops a
+ * skill past it: Codex cuts the summary there, as irori does, and Pi only warns. */
+export const maxSkillDescription = 1024;
+/** Characters as the specification counts them: code points, not UTF-16 units. */
+export const characters = (text: string) => [...text].length;
 
 export const skillName = z
   .string()
@@ -37,6 +42,8 @@ export type AgentSkill = {
   projects: string[];
   /** One of the shared Schema's skills (ADR 027), offered beside the agent's own. */
   shared?: boolean;
+  /** What irori had to change to offer the skill, such as a description cut to the limit. */
+  notice?: string;
 };
 export type RetiredSkill = {
   name: string;
