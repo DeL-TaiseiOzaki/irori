@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
+Routines from a form, 2026-10-15 (**0.2.18**, published as
+[v0.2.18-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.18-preview.1)
+by `publish.yml` run `38708411192` from the merge `c1ae19d`, 3:43 after it): the owner
 asked how a routine's secrets are set, and found making a routine poor (a name
 dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and
 ADR 016's "Stage 4 revised" ([ADR 016](decisions/016-routines.md)).

@@ -18,6 +18,12 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-10-15: **0.2.18** ([#246](https://github.com/DeL-TaiseiOzaki/irori/pull/246),
+routines made from a form and the シークレット sheet) as `c1ae19d`, by the merge's own
+`publish.yml` push run `38708411192`: merge to page 3:43. Anonymous downloads of the
+Windows installer, the Mac image and `irori-0.2.18-full.nupkg` matched `SHA256SUMS.txt`;
+the live page links the 0.2.18 installers. See STATUS.
+
 Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222))
 as `e76f209`, the first preview `publish.yml` published by itself (run
 `38249205721`, after main's CI): merge to page 9:41. The push's own run failed
