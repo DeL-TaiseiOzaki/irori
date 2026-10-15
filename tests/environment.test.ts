@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
@@ -114,7 +114,13 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
   const before = await f.a.environment.state();
   assert.equal(before.account, 'octo');
   assert.equal(before.saved, undefined);
-  assert.deepEqual(before.local, { vaults: 1, left: ['Local notes'], agent: 'octo/you' });
+  assert.deepEqual(before.local, {
+    vaults: 1,
+    left: ['Local notes'],
+    agent: 'octo/you',
+    routines: 0,
+    routinesLeft: [],
+  });
   // Looking creates nothing on the account.
   assert.ok(!(await f.fake.calls()).some((call) => call.includes('POST')));
 
@@ -156,6 +162,8 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
     [true],
   );
   assert.deepEqual(after.saved?.workspaces, ['Lab']);
+  // With no routine in the irori agent's folder, no routines file is made.
+  await assert.rejects(f.fake.stored('routines.json'));
 
   // A second save replaces the file, naming the sha it read.
   await f.a.environment.save();
@@ -187,6 +195,7 @@ test('another device restores the vaults, workspaces, preferences and irori agen
     restored: ['Research'],
     failed: [],
     workspaces: 1,
+    routines: [],
     agent: 'restored',
   });
   const restored = f.b.files.list().find((space) => space.scopeId === research.scopeId);
@@ -207,7 +216,13 @@ test('another device restores the vaults, workspaces, preferences and irori agen
 
   // Everything is here now: a second restore changes nothing.
   const again = await f.b.environment.restore({ scopeIds: [research.scopeId], agent: true });
-  assert.deepEqual(again, { restored: [], failed: [], workspaces: 0, agent: 'unchanged' });
+  assert.deepEqual(again, {
+    restored: [],
+    failed: [],
+    workspaces: 0,
+    routines: [],
+    agent: 'unchanged',
+  });
   assert.deepEqual(
     (await f.b.environment.state()).saved?.vaults.map((item) => item.here),
     [true],
@@ -238,9 +253,111 @@ test('restoring keeps what is in the way and reports it', async (t) => {
   const other = await device(f.base, 'c', f.fake.gh);
   t.after(() => other.service.close());
   const skipped = await other.environment.restore({ scopeIds: [], agent: false });
-  assert.deepEqual(skipped, { restored: [], failed: [], workspaces: 1, agent: 'unchanged' });
+  assert.deepEqual(skipped, {
+    restored: [],
+    failed: [],
+    workspaces: 1,
+    routines: [],
+    agent: 'unchanged',
+  });
   assert.equal(other.files.list().length, 0);
   assert.deepEqual((await other.workspaces.list())[0].scopeIds, [research.scopeId]);
+});
+
+/** Routines in device A's irori agent folder: a script, a binary file, and one holding a link. */
+async function routinesA(f: Awaited<ReturnType<typeof fixture>>) {
+  const dir = path.join(f.a.agentRoot, 'routines');
+  await mkdir(path.join(dir, 'Inbox', 'lib'), { recursive: true });
+  await writeFile(
+    path.join(dir, 'Inbox', 'routine.yaml'),
+    'name: 受信箱\nsteps:\n  - run: fetch.sh\n',
+  );
+  await writeFile(path.join(dir, 'Inbox', 'fetch.sh'), '#!/bin/sh\necho ok\n');
+  await chmod(path.join(dir, 'Inbox', 'fetch.sh'), 0o755);
+  await writeFile(path.join(dir, 'Inbox', 'lib', 'icon.bin'), Buffer.from([0, 255, 1, 2]));
+  await mkdir(path.join(dir, 'Linked'), { recursive: true });
+  await writeFile(path.join(dir, 'Linked', 'routine.yaml'), 'name: Linked\nsteps: []\n');
+  await symlink(path.join(f.base, 'gitconfig'), path.join(dir, 'Linked', 'config'));
+  // A folder without routine.yaml is not a routine.
+  await mkdir(path.join(dir, 'drafts'), { recursive: true });
+  await writeFile(path.join(dir, 'drafts', 'note.md'), 'draft\n');
+}
+
+test("the irori agent's routines and the routine runtimes travel with the environment", async (t) => {
+  const f = await fixture(t);
+  await deviceA(f);
+  await routinesA(f);
+  await f.a.settings.save({ routineRuntimes: ['javascript'] });
+
+  const before = await f.a.environment.state();
+  assert.equal(before.local.routines, 1);
+  // A routine holding a link is left out, as a run would refuse it.
+  assert.deepEqual(before.local.routinesLeft, ['Linked']);
+  await f.a.environment.save();
+  const saved = JSON.parse(await f.fake.stored('routines.json'));
+  assert.deepEqual(saved.routines, [
+    {
+      folder: 'Inbox',
+      name: '受信箱',
+      files: [
+        { path: 'fetch.sh', text: '#!/bin/sh\necho ok\n', executable: true },
+        { path: 'lib/icon.bin', base64: Buffer.from([0, 255, 1, 2]).toString('base64') },
+        { path: 'routine.yaml', text: 'name: 受信箱\nsteps:\n  - run: fetch.sh\n' },
+      ],
+    },
+  ]);
+  assert.ok(!JSON.stringify(saved).includes(f.base));
+  assert.deepEqual(JSON.parse(await f.fake.stored()).preferences.routineRuntimes, ['javascript']);
+
+  // Device B restores the irori agent's folder by cloning it, then adds the routine to it.
+  const state = await f.b.environment.state();
+  assert.deepEqual(state.saved?.routines, [{ folder: 'Inbox', name: '受信箱', here: false }]);
+  const result = await f.b.environment.restore({ scopeIds: [], agent: true, routines: ['Inbox'] });
+  assert.deepEqual(result.routines, ['受信箱']);
+  assert.deepEqual(result.failed, []);
+  const added = path.join(f.b.agentRoot, 'routines', 'Inbox');
+  assert.equal(await readFile(path.join(added, 'fetch.sh'), 'utf8'), '#!/bin/sh\necho ok\n');
+  assert.deepEqual([...(await readFile(path.join(added, 'lib', 'icon.bin')))], [0, 255, 1, 2]);
+  if (process.platform !== 'win32')
+    assert.ok((await stat(path.join(added, 'fetch.sh'))).mode & 0o100);
+  assert.deepEqual((await f.b.settings.read()).routineRuntimes, ['javascript']);
+  assert.deepEqual(
+    (await f.b.environment.state()).saved?.routines.map((item) => item.here),
+    [true],
+  );
+
+  // A routine folder already here is left as it is.
+  await writeFile(path.join(added, 'routine.yaml'), 'name: Mine\nsteps: []\n');
+  const again = await f.b.environment.restore({ scopeIds: [], agent: true, routines: ['Inbox'] });
+  assert.deepEqual(again.routines, []);
+  assert.equal(await readFile(path.join(added, 'routine.yaml'), 'utf8'), 'name: Mine\nsteps: []\n');
+
+  // Saving with no routines left empties the saved list instead of keeping the old one.
+  await rm(path.join(f.a.agentRoot, 'routines'), { recursive: true });
+  await f.a.environment.save();
+  assert.deepEqual(JSON.parse(await f.fake.stored('routines.json')).routines, []);
+});
+
+test('routines are not added where the irori agent is not set up', async (t) => {
+  const f = await fixture(t);
+  await deviceA(f);
+  await routinesA(f);
+  await f.a.environment.save();
+
+  const result = await f.b.environment.restore({ scopeIds: [], agent: false, routines: ['Inbox'] });
+  assert.deepEqual(result.routines, []);
+  assert.deepEqual(
+    result.failed.map((item) => item.name),
+    ['受信箱'],
+  );
+  // The folder stays absent, so the irori agent can still be set up there.
+  await assert.rejects(stat(f.b.agentRoot));
+
+  // A damaged routines file is read as an error, and never replaced by a save.
+  const file = path.join(f.fake.github, 'octo', 'irori-settings', 'routines.json');
+  await writeFile(file, '{"schemaVersion":1,"routines":[{"folder":"../x"}]}');
+  await assert.rejects(f.b.environment.state(), /Could not read routines\.json/);
+  await assert.rejects(f.a.environment.save(), /Could not read routines\.json/);
 });
 
 test('a public settings repository, a newer file and a concurrent save are refused', async (t) => {

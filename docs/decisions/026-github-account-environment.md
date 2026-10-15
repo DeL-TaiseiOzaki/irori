@@ -51,6 +51,9 @@ travels with the repository.
    beside the saved ones, and a different workspace of the same name gets a
    numbered name. The saved preferences replace this device's.
 
+[ADR 043](043-routines-in-the-environment.md) (0.2.17) adds the irori agent's
+routines, in `routines.json`, and the routine runtimes to what is kept.
+
 ## Consequences
 
 - A new device needs Git, `gh auth login` and irori; one restore brings back
