@@ -1,6 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Routines in the saved environment, 2026-10-15 (**0.2.17**, not yet published):
+Published 2026-10-15: **0.2.17**, merged at the owner's request
+([#243](https://github.com/DeL-TaiseiOzaki/irori/pull/243) as `5cbbe91` at 07:27:34 UTC).
+`publish.yml` published it from its push run `38698886612`; the release was public at
+07:30:04 (2:30), and the run's website and drift jobs passed.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,234,496 / 141,863,589 / 175,402,485. The page offers 0.2.17.
+- 0.2.16 (#242) was still open, so it needs a version above 0.2.17 to publish.
+
+Routines in the saved environment, 2026-10-15 (**0.2.17**, published):
 the owner asked what **環境を保存** keeps and that routines be kept too
 ([ADR 043](decisions/043-routines-in-the-environment.md)).
 - `src/host/environment-routines.ts` packs the irori agent's routine folders
