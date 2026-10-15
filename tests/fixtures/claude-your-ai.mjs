@@ -201,7 +201,16 @@ export function run() {
       stop_hook_active: false,
       agent_transcript_path: '',
     });
-    assistant([{ type: 'text', text: `Handed the note to the ${brain.name} agent.` }]);
+    // Paths as a reply writes them: the vault agent's, relative to its vault, and
+    // the irori agent's own plan, relative to where it works.
+    fs.mkdirSync(path.join(process.cwd(), 'plans'), { recursive: true });
+    fs.writeFileSync(path.join(process.cwd(), 'plans', 'next.md'), '# Next\n');
+    assistant([
+      {
+        type: 'text',
+        text: `Handed the note to the ${brain.name} agent: \`Knowledge_Base/from-your-ai.md\`. My plan: \`plans/next.md\`.`,
+      },
+    ]);
     result();
   }
 

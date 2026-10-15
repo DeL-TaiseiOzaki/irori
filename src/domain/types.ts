@@ -243,7 +243,7 @@ export interface WorkspaceProfile {
 export interface WorkFolder {
   /** Where they work now, an absolute path on this device. */
   path: string;
-  /** The person chose a folder; otherwise it is `.irori/work` in the vault. */
+  /** The person chose a folder; otherwise it is `work` in the vault's contents (ADR 044). */
   chosen: boolean;
   /** The chosen folder, when it is not there and the default stands in for it. */
   missing?: string;
@@ -725,6 +725,31 @@ export interface HostAPI {
     workspaceId?: string,
   ): Promise<string | null>;
   start(input: StartRun): Promise<string>;
+  /**
+   * Which workspace the window shows: the irori agent's screens, Schema settings
+   * and terminal use that workspace's folder (ADR 044).
+   */
+  showWorkspace(workspaceId: string | null): Promise<void>;
+  /** The irori agent's folder for a workspace (ADR 044). */
+  iroriAgentFolder(workspaceId: string): Promise<import('./you').IroriAgentFolder>;
+  /** Chooses it, or the default again with `null`. Nothing is made or moved. */
+  setIroriAgentFolder(
+    workspaceId: string,
+    folder: string | null,
+  ): Promise<import('./you').IroriAgentFolder>;
+  /** Opens the irori agent's folder for a workspace in the system's file manager. */
+  openIroriAgentFolder(workspaceId: string): Promise<void>;
+  /**
+   * The file a path in an agent's reply names, looked for where its writer
+   * works first, then in the workspace's other folders (ADR 044). Null when no
+   * file is there; several when only its name was written and it is in more
+   * than one place.
+   */
+  /** The folders a path in an agent's reply may land in, for a workspace (ADR 044). */
+  agentPathRoots(workspaceId?: string): Promise<import('./path-links').PathRoot[]>;
+  locateAgentPath(
+    query: import('./path-links').AgentPathQuery,
+  ): Promise<import('./path-links').PathTarget[]>;
   /** Your AI's folder and whether it is set up; its runs use `id` as their scope. */
   yourAi(): Promise<import('./you').YourAi>;
   /** Writes the starter into an absent or empty folder; never over existing files. */

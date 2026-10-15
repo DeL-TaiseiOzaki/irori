@@ -6,8 +6,16 @@ import { t } from '../domain/i18n';
 import type { Space, WorkFolder } from '../domain/types';
 import { isMissing, readLocalJson, writeLocalJson } from './local-json';
 
-/** Where a vault's agents work unless the person chose another folder: inside the vault. */
-export const defaultWorkFolder = '.irori/work';
+/**
+ * Where a vault's agents work unless the person chose another folder: `work`
+ * in the vault's (first) contents folder, where the explorer shows it (ADR 044).
+ */
+export const workFolderName = 'work';
+/** The default until 0.2.19 (ADR 042); a folder left there moves to the new place. */
+export const formerWorkFolder = '.irori/work';
+/** The default work folder's path inside a vault. */
+export const defaultWorkFolder = (space: Pick<Space, 'contents'>) =>
+  `${space.contents[0]}/${workFolderName}`;
 /** Written into the default folder so that what the agents leave there stays out of Git. */
 const ignoreAll = '# Agents work here; irori keeps it out of Git.\n*\n';
 
@@ -16,7 +24,7 @@ const recordSchema = z.record(z.string(), z.string().min(1));
 /**
  * The folder each vault's agents work in: scratch files, intermediate results,
  * downloads and trial scripts, where the person can look at them. By default it
- * is `.irori/work` in the vault; the person may choose another folder on this
+ * is `contents/work` in the vault; the person may choose another folder on this
  * device. A chosen path names the person, so it stays in irori's data, out of
  * the vault's records, as a connected folder's does.
  */
@@ -30,7 +38,8 @@ export class WorkFolders {
     return parsed.success ? parsed.data : {};
   }
   private fallback(scopeId: string) {
-    return path.join(this.files.get(scopeId).root, ...defaultWorkFolder.split('/'));
+    const space = this.files.get(scopeId);
+    return path.join(space.root, ...defaultWorkFolder(space).split('/'));
   }
   /**
    * The folder a vault's agents work in now. A chosen folder that is not there,
@@ -55,28 +64,48 @@ export class WorkFolders {
     return folder.path;
   }
   private async makeDefault(scopeId: string) {
-    let current = this.files.get(scopeId).root;
-    // Made one level at a time, so that no link leads it out of the vault.
-    for (const part of defaultWorkFolder.split('/')) {
-      current = path.join(current, part);
-      const info = await fs.lstat(current).catch((error) => {
+    const space = this.files.get(scopeId);
+    const folder = defaultWorkFolder(space);
+    const parts = folder.split('/');
+    const blocked = () =>
+      Error(
+        t(
+          `作業フォルダ ${folder} の場所にリンクやファイルがあります。`,
+          `A link or a file is where the work folder ${folder} goes.`,
+        ),
+      );
+    const look = (at: string) =>
+      fs.lstat(at).catch((error) => {
         if (!isMissing(error)) throw error;
         return undefined;
       });
+    let current = space.root;
+    // Made one level at a time, so that no link leads it out of the vault.
+    for (const part of parts.slice(0, -1)) {
+      current = path.join(current, part);
+      const info = await look(current);
       if (!info) await fs.mkdir(current);
-      else if (!info.isDirectory() || info.isSymbolicLink())
-        throw Error(
-          t(
-            `作業フォルダ ${defaultWorkFolder} の場所にリンクやファイルがあります。`,
-            `A link or a file is where the work folder ${defaultWorkFolder} goes.`,
-          ),
-        );
+      else if (!info.isDirectory() || info.isSymbolicLink()) throw blocked();
     }
-    await fs
-      .writeFile(path.join(current, '.gitignore'), ignoreAll, { flag: 'wx' })
-      .catch((error) => {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      });
+    current = path.join(current, parts.at(-1)!);
+    const info = await look(current);
+    if (info) {
+      if (!info.isDirectory() || info.isSymbolicLink()) throw blocked();
+      return;
+    }
+    // What the agents left in the former default comes along, its .gitignore with it.
+    const former = path.join(space.root, ...formerWorkFolder.split('/'));
+    const before = await look(former);
+    if (before?.isDirectory() && !before.isSymbolicLink())
+      try {
+        await fs.rename(former, current);
+        return;
+      } catch (error) {
+        console.warn('The former work folder stays where it is', String(error));
+      }
+    await fs.mkdir(current);
+    // Only a folder irori makes is kept out of Git; one the person made stays theirs.
+    await fs.writeFile(path.join(current, '.gitignore'), ignoreAll, { flag: 'wx' });
   }
   /**
    * Chooses the folder a vault's agents work in, or the default again with `null`.

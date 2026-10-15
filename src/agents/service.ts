@@ -327,9 +327,12 @@ export class AgentService {
   private isYou(scopeId: string) {
     return !!this.you?.rootOf(scopeId);
   }
-  /** The folder a run works in: a brain's root, or your AI's folder. */
-  private root(scopeId: string) {
-    return this.you?.rootOf(scopeId) ?? this.files.get(scopeId).root;
+  /**
+   * The folder a run works in: a brain's root, or the irori agent's folder for
+   * the run's workspace (ADR 044), the workspace on show without one.
+   */
+  private root(scopeId: string, workspace?: string) {
+    return this.you?.rootOf(scopeId, workspace) ?? this.files.get(scopeId).root;
   }
   /** Whose conversation it is: a vault's, or the irori agent's. */
   private owner(scopeId: string): ConversationOwner {
@@ -344,8 +347,8 @@ export class AgentService {
   runningScopes() {
     return [...new Set([...this.runs.values()].map((run) => run.binding.scopeId))];
   }
-  private binding(scopeId: string, agent: AgentId): SessionBinding {
-    return { scopeId, agent, root: this.root(scopeId) };
+  private binding(scopeId: string, agent: AgentId, workspace?: string): SessionBinding {
+    return { scopeId, agent, root: this.root(scopeId, workspace) };
   }
   /**
    * The workspace whose conversations an owner's view takes: the irori agent keeps
@@ -563,7 +566,7 @@ export class AgentService {
     });
     const run: Run = {
       id: randomUUID(),
-      binding: this.binding(input.scopeId, input.agent),
+      binding: this.binding(input.scopeId, input.agent, input.workspace),
       // A routine's step is a conversation of its own, named at once so its record can open it.
       conversationId: step ? randomUUID() : input.conversationId,
       access,
@@ -875,7 +878,7 @@ export class AgentService {
       const you = this.isYou(input.scopeId);
       const space = you
         ? {
-            root: this.root(input.scopeId),
+            root: this.root(input.scopeId, input.workspace),
             name: t('irori agent のフォルダ', "the irori agent's folder"),
           }
         : this.files.get(input.scopeId);
@@ -952,7 +955,7 @@ export class AgentService {
         if (hasSubAgents(cli)) {
           // Each vault's sub-agent is defined by irori, only where no file is:
           // the person may have edited one.
-          const written = await this.you!.writeDefinitions(cli, brains);
+          const written = await this.you!.writeDefinitions(cli, brains, input.workspace);
           if (written.length)
             this.event(
               run,
@@ -1007,7 +1010,9 @@ export class AgentService {
       // A skill the agent's own Schema lacks may be one of the shared Schema's (ADR 027).
       const selectedSkill = input.skill
         ? ((await findSkill(
-            you ? await this.you!.schemaFolder() : spaceFolder(this.files, input.scopeId),
+            you
+              ? await this.you!.schemaFolder(input.workspace)
+              : spaceFolder(this.files, input.scopeId),
             input.skill,
           )) ?? (await this.you?.sharedSkill(input.skill)))
         : undefined;

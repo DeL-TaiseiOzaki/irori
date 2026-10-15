@@ -1,5 +1,5 @@
 /**
- * The folder a vault's agents work in: `.irori/work` in the vault unless the
+ * The folder a vault's agents work in: `work` in the vault's contents unless the
  * person chose another on this device.
  *
  * Sent: in a vault agent's introduction (`vaultIntro`), and to the irori agent

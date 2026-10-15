@@ -11,7 +11,7 @@ import {
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { lstat, realpath } from 'node:fs/promises';
+import { lstat, mkdir, realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
@@ -40,6 +40,7 @@ import { brainAgentNames, sharedSchemaId } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
 import { WorkFolders } from './work-folders';
+import { AgentPaths } from './agent-paths';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { GitHubCli } from '../git/github';
@@ -188,6 +189,7 @@ app
     cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
     // Where each vault's agents keep their scratch, rather than the system's temporary folder.
     const work = new WorkFolders(files);
+    const agentPaths = new AgentPaths({ files, you, workspaces: () => workspaces.list() });
     agents.workFolder = (scopeId) => work.prepare(scopeId);
     // Secrets are sealed with the OS-held key. A source run may stand in a reversible
     // store for the UI smoke, whose display has no keychain; a packaged app never does.
@@ -1001,6 +1003,29 @@ app
       removeQueuedMessage: (...args) => agents.removeQueued(...args),
       startNextQueued: (scopeId, conversationId, workspaceId) =>
         agents.startNextQueued(scopeId, conversationId, canStartAgent, workspaceId),
+      showWorkspace: async (workspaceId) => {
+        await you.load();
+        you.show(workspaceId);
+      },
+      iroriAgentFolder: async (workspaceId) => {
+        await you.load();
+        return you.folderOf(workspaceId);
+      },
+      setIroriAgentFolder: (workspaceId, folder) =>
+        you.choose(
+          workspaceId,
+          folder,
+          files.list().map((space) => space.root),
+        ),
+      openIroriAgentFolder: async (workspaceId) => {
+        await you.load();
+        const folder = you.folderOf(workspaceId).path;
+        await mkdir(folder, { recursive: true });
+        const error = await shell.openPath(folder);
+        if (error) throw Error(error);
+      },
+      agentPathRoots: (workspaceId) => agentPaths.roots(workspaceId),
+      locateAgentPath: (query) => agentPaths.locate(query),
       yourAi: () => you.status(),
       createYourAi: () => you.create(),
       addYourAiSkills: () => you.addStandardSkills(),

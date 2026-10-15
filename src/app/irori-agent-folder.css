@@ -1,0 +1,34 @@
+/* Where the irori agent works for the workspace on show (ADR 044). */
+.agent-folder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+.agent-folder-path {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.agent-folder small[role='alert'] {
+  font-size: 12px;
+  color: var(--del-ink);
+}
+.agent-folder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.you-folder-settings .agent-folder {
+  align-items: flex-start;
+  padding: 0 14px 12px;
+}
+.you-folder-settings .agent-folder-actions {
+  justify-content: flex-start;
+}

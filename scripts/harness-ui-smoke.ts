@@ -272,10 +272,16 @@ try {
   // A path in a reply opens on the stage, at the line it names, as Claude Code
   // and Codex do in VS Code; inline code naming a vault's file does too.
   const pathLinks = page.locator('.message-markdown .path-link');
-  await expect(pathLinks).toHaveCount(2);
-  await pathLinks.filter({ hasText: 'second.md' }).click();
+  await expect(pathLinks).toHaveCount(4);
+  await pathLinks.filter({ hasText: /^second\.md$/ }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Other note');
   await expect(page.getByText('1 行目を選択しました。', { exact: true })).toBeVisible();
+  // A name with its line is a path, not a scheme `second.md:`; the host finds it (ADR 044).
+  await pathLinks.filter({ hasText: 'second.md:1' }).click();
+  await expect(page.locator('.ProseMirror')).toContainText('Other note');
+  // A file not there says so instead of opening something else.
+  await pathLinks.filter({ hasText: 'missing.md' }).click();
+  await expect(page.getByText('missing.md が見つかりません。', { exact: true })).toBeVisible();
   await pathLinks.filter({ hasText: 'note.md' }).first().click();
   await expect(page.locator('.ProseMirror')).toContainText('Harness fixture');
   await page.screenshot({ path: 'test-results/irori-path-links.png' });

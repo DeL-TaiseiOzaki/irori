@@ -536,7 +536,9 @@ test(
     // The sub-agent's own words stay with its hand-off; the reply is your AI's.
     assert.deepEqual(
       events.filter((event) => event.type === 'text').map((event) => event.text),
-      ['Handed the note to the Product agent.'],
+      [
+        'Handed the note to the Product agent: `Knowledge_Base/from-your-ai.md`. My plan: `plans/next.md`.',
+      ],
     );
     // The hand-offs are kept with the conversation.
     const saved = await service.conversation(id, 'claude');
