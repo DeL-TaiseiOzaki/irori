@@ -42,6 +42,8 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
     });
   }
   const dropped = state?.saved?.vaults.filter((item) => !item.here).length ?? 0;
+  const droppedRoutines = state?.saved?.routines.filter((item) => !item.here).length ?? 0;
+  const left = state?.local.routinesLeft ?? [];
   return (
     <section className="settings-account" aria-label={t('アカウント', 'Account')}>
       <h3>{t('アカウント', 'Account')}</h3>
@@ -56,11 +58,27 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
               ? t(`環境を保存：${when(state.saved.savedAt)}`, `Saved ${when(state.saved.savedAt)}`)
               : t('環境は保存されていません', 'No environment saved')}
           </p>
+          {droppedRoutines > 0 && (
+            <p className="account-hint">
+              {t(
+                `この端末にないルーティン ${droppedRoutines} 件は、保存すると外れます。`,
+                `Saving drops ${droppedRoutines} routine${droppedRoutines === 1 ? '' : 's'} not on this device.`,
+              )}
+            </p>
+          )}
           {dropped > 0 && (
             <p className="account-hint">
               {t(
                 `この端末にない vault ${dropped} 件は、保存すると外れます。`,
                 `Saving drops ${dropped} vault${dropped === 1 ? '' : 's'} not on this device.`,
+              )}
+            </p>
+          )}
+          {left.length > 0 && (
+            <p className="account-hint">
+              {t(
+                `大きすぎるルーティンは保存されません：${left.join('・')}`,
+                `Too large to save: ${left.join(', ')}`,
               )}
             </p>
           )}
@@ -110,6 +128,7 @@ export function RestoreEnvironment({
   const { state, error, load } = useEnvironment();
   const [selected, setSelected] = useState<string[]>(),
     [agent, setAgent] = useState(true),
+    [routines, setRoutines] = useState<string[]>(),
     [parent, setParent] = useState<string>(),
     [result, setResult] = useState<EnvironmentRestore>();
   const { busy, error: issue, run } = useAction();
@@ -118,6 +137,8 @@ export function RestoreEnvironment({
   const chosen =
     selected ?? saved?.vaults.filter((item) => !item.here).map((item) => item.scopeId) ?? [];
   const agentMissing = !!saved?.agent && !saved.agent.here;
+  const chosenRoutines =
+    routines ?? saved?.routines.filter((item) => !item.here).map((item) => item.folder) ?? [];
   async function chooseParent() {
     const folder = await host.chooseFolder();
     if (folder) setParent(folder);
@@ -127,6 +148,7 @@ export function RestoreEnvironment({
       const restored = await host.restoreEnvironment({
         scopeIds: chosen,
         agent: agentMissing && agent,
+        routines: chosenRoutines,
         ...(parent && { parent }),
       });
       await reloadDeviceSettings();
@@ -151,8 +173,8 @@ export function RestoreEnvironment({
           <div className="restore-result">
             <p role="status">
               {t(
-                `vault ${result.restored.length} 件とワークスペース ${result.workspaces} 件を取り込みました。`,
-                `Took in ${result.restored.length} vault${result.restored.length === 1 ? '' : 's'} and ${result.workspaces} workspace${result.workspaces === 1 ? '' : 's'}.`,
+                `vault ${result.restored.length} 件・ワークスペース ${result.workspaces} 件・ルーティン ${result.routines.length} 件を取り込みました。`,
+                `Took in ${result.restored.length} vault${result.restored.length === 1 ? '' : 's'}, ${result.workspaces} workspace${result.workspaces === 1 ? '' : 's'} and ${result.routines.length} routine${result.routines.length === 1 ? '' : 's'}.`,
               )}
             </p>
             {result.failed.map((item) => (
@@ -210,6 +232,31 @@ export function RestoreEnvironment({
                 </label>
               )}
             </fieldset>
+            {saved.routines.length > 0 && (
+              <fieldset className="restore-list">
+                <legend>{t('ルーティン', 'Routines')}</legend>
+                {saved.routines.map((item) => (
+                  <label key={item.folder} data-here={item.here || undefined}>
+                    <input
+                      type="checkbox"
+                      disabled={busy || item.here}
+                      checked={item.here || chosenRoutines.includes(item.folder)}
+                      onChange={(e) =>
+                        setRoutines(
+                          e.target.checked
+                            ? [...chosenRoutines, item.folder]
+                            : chosenRoutines.filter((folder) => folder !== item.folder),
+                        )
+                      }
+                    />
+                    <span>{item.name}</span>
+                    <small>
+                      {item.here ? t('この端末にあります', 'On this device') : 'irori agent'}
+                    </small>
+                  </label>
+                ))}
+              </fieldset>
+            )}
             {saved.workspaces.length > 0 && (
               <p className="restore-workspaces">
                 {t('ワークスペース', 'Workspaces')}: {saved.workspaces.join(t('・', ', '))}
