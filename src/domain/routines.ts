@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AgentAccess, AgentId } from './types';
+import { t } from './i18n';
 
 /**
  * Routines (ADR 016): jobs a person or an agent defines in a folder with
@@ -51,6 +52,13 @@ export const secretValue = z
   .min(8)
   .max(8192)
   .refine((value) => !/[\x00-\x1f\x7f]/.test(value));
+
+/** Why this device keeps no secret: its OS holds no key to seal them with. */
+export const unavailableText = () =>
+  t(
+    'この端末ではシークレットを保存できません。OS のキーチェーンが必要です。',
+    'This device cannot store secrets. It needs the OS keychain.',
+  );
 
 /** The secrets kept on this device, by name; their values never leave the host. */
 export interface SecretList {
@@ -133,6 +141,8 @@ export interface RoutineRun {
 export interface RoutineSource {
   text: string;
   version: string;
+  /** The other files of the routine's folder, which a `run` step can name. */
+  files: string[];
 }
 
 export interface Routine {

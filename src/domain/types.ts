@@ -737,8 +737,12 @@ export interface HostAPI {
   yourAiBrains(scopeIds: string[]): Promise<import('./you').BrainAgent[]>;
   /** The irori agent's routines and those of the workspace's vaults, as this device sees them. */
   routines(workspaceId: string): Promise<import('./routines').Routine[]>;
-  /** Starts a routine in the irori agent's folder or a vault, from a template to finish. */
-  createRoutine(owner: string, name: string): Promise<import('./routines').RoutineRef>;
+  /** Starts a routine in the irori agent's folder or a vault, with `text` or a template to finish. */
+  createRoutine(
+    owner: string,
+    name: string,
+    text?: string,
+  ): Promise<import('./routines').RoutineRef>;
   /** The routine's `routine.yaml`, for the person to edit. */
   routineSource(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineSource>;
   /** Saves `routine.yaml` unless it changed since `version`; says why it cannot run yet, if so. */
@@ -747,6 +751,8 @@ export interface HostAPI {
     text: string,
     version: string,
   ): Promise<{ version: string; problem?: string }>;
+  /** Shows a routine's folder in the system file manager. */
+  revealRoutine(ref: import('./routines').RoutineRef): Promise<void>;
   /** A routine's files as they are now, and what changed since the person confirmed them. */
   reviewRoutine(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineReview>;
   /** Starts a routine and returns its run's id; nothing else ever starts one. */

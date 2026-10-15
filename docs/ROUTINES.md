@@ -5,8 +5,8 @@ button: it runs programs and instructs agents, in order. It is irori's general
 way to gather what a person holds in other tools, such as mail and chat, and
 anything else that repeats. The decisions are in
 [ADR 016](decisions/016-routines.md); this page describes what stages 1
-(0.1.57), 2 (secrets, 0.1.72) and 4 (making one, 0.1.77) do. Python (stage 3)
-is not built yet.
+(0.1.57), 2 (secrets, 0.1.72) and 4 (making one, 0.1.77; the form editor and
+the secrets sheet, 0.2.18) do. Python (stage 3) is not built yet.
 
 ## A routine
 
@@ -45,17 +45,39 @@ steps:
 
 ## Making one
 
-The routines page's header has **新しいルーティン** and **irori agent に頼む**.
+The routines page's header has **irori agent に頼む**, **シークレット** and
+**新しいルーティン**.
 
-- **新しいルーティン** asks for a name and a place: the irori agent (once it is
-  set up) or a vault of the workspace. irori makes a new folder named after
-  it (characters a file system refuses become `-`; a taken name gets ` 2`,
-  ` 3`…) holding a `routine.yaml` with one agent step whose `prompt` is empty,
-  so it cannot run until the person writes it. The editor opens at once.
-- **The editor** (the pencil on a routine's row) edits `routine.yaml` in place.
-  **保存** writes it unless it changed since it was opened, then shows why the
-  routine still cannot run, if it cannot, and stays open; otherwise it closes.
-  The next **実行** reviews the change as after any other.
+- **新しいルーティン** opens the editor on a new routine: its name, its place
+  (the irori agent once it is set up, or a vault of the workspace) and one
+  agent step. **作成** makes a folder named after it (characters a file system
+  refuses become `-`; a taken name gets ` 2`, ` 3`…) holding the
+  `routine.yaml` the form wrote, even one that cannot run yet.
+- **The editor** (the pencil on a routine's row, or 新しいルーティン) shows the
+  steps as a form, with **フォーム** and **YAML** to edit the text itself.
+  - An agent step has its prompt, the vaults handed to the irori agent
+    (なし, すべて, or chosen ones), the access (標準 or フルアクセス, only those
+    the chosen CLI offers), the CLI (the panel's by default) and, with a CLI,
+    a model.
+  - A program step is a **コマンド** on `PATH` written as a terminal takes it
+    (`gh api "a b"`: spaces separate, quotes keep them) or a **ファイル** of
+    the routine's folder, offered from its files. Its secrets are chips: a
+    stored one is checked, a missing one has **値を入力**, and a name is added
+    from the stored ones or typed (letters become capitals).
+  - Steps are added (**エージェント**, **プログラム**), moved up and down and
+    deleted; at most 20.
+  - Under the steps the editor says, as the person writes, the first reason
+    the host would refuse the routine (the same reading as below). The editor
+    also shows the folder's path, and the folder icon opens it in the
+    system's file manager, where a program step's file goes.
+  - The form writes `routine.yaml` back changing only what the person changed:
+    the comments and keys of steps they kept stay. Text the form cannot show
+    (an unknown key, a value of the wrong kind, text that does not parse)
+    opens on **YAML** with the reason; a missing `access` shows as 標準 and is
+    written once saved.
+  - **保存** writes it unless it changed since it was opened, then shows why
+    the routine still cannot run, if it cannot, and stays open; otherwise it
+    closes. The next **実行** reviews the change as after any other.
 - **irori agent に頼む** switches the agent panel to the irori agent and puts
   **ルーティンを作って：** in its message box for the person to finish. The irori
   agent's standard skill `write-routine` (in `.agents/skills/`, added to an
@@ -151,12 +173,15 @@ device and given only to the `run` steps that name it. Agent steps never
 receive one. The person obtains the token or creates their own OAuth client;
 irori signs in to no provider.
 
-- **Entering.** **<NAME> を入力** on a routine's row opens a password field.
-  The value goes to the host and is never shown again. Stored names are listed
-  under **シークレット** at the end of the routines view, each with **置き換え**
-  and **削除** (pressed twice). A name is an environment variable name that is
-  not `IRORI_*`, `PATH`, `HOME` or another variable that changes how a program
-  starts. A value is one line of 8 to 8192 characters.
+- **Entering.** A value is entered in a password field, from **<NAME> を入力**
+  on a routine's row, **値を入力** on a step's chip in the editor, or the
+  header's **シークレット**. The value goes to the host and is never shown
+  again. The **シークレット** sheet lists the stored names with the routines
+  that use them, each with **置き換え** and **削除** (pressed twice), then the
+  names routines need but the device lacks, with **入力**; **追加** takes a new
+  name and its value, before any routine names it. A name is an environment
+  variable name that is not `IRORI_*`, `PATH`, `HOME` or another variable that
+  changes how a program starts. A value is one line of 8 to 8192 characters.
 - **Storage.** `secrets.json` in irori's data directory holds each value
   sealed with the key the OS keeps (Keychain on macOS, DPAPI on Windows, the
   secret service on Linux). Without such a key, as on Linux with only
@@ -209,9 +234,13 @@ Files in irori's data directory:
 
 Discovery, review, execution and records are `src/host/routines.ts`
 (`RoutineService`); the types, the difference and step labels are
-`src/domain/routines.ts`. The renderer reaches them through `HostAPI`:
-`routines(workspaceId)`, `createRoutine(owner, name)`, `routineSource(ref)`,
-`saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
+`src/domain/routines.ts`. The strict reading of `routine.yaml` (`parseRoutine`)
+and the editor's form (`draftFromYaml`, `yamlFromDraft`, `splitCommand`) are
+`src/domain/routine-file.ts`, used by the host and the renderer alike. The
+renderer reaches them through `HostAPI`:
+`routines(workspaceId)`, `createRoutine(owner, name, text?)`,
+`routineSource(ref)` (the text, its version and the folder's other files),
+`revealRoutine(ref)`, `saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
 `runRoutine(ref, { workspaceId, digest, agents })`, `stopRoutine(ref)`,
 `routineRuns(ref)`, and `routine` events carrying a run. The irori agent's
 `irori routines` reads the same list and `irori run` calls the same
@@ -241,11 +270,16 @@ line) and no saved session. Document content cannot start a routine.
   line; a `[FAILED]` report; a step waiting for the vault and **停止** during
   an agent step; an irori agent routine handing a named vault; an
   unfinished run marked unknown and not repeated; a new routine's folder
-  name and template, an edit refused after a crossing change, and
+  name and template, a new routine given its text, the folder's files for
+  the editor, an edit refused after a crossing change, and
   `irori routines` with and without a workspace; `irori run` refusing a missing
   secret, an unreviewed or changed routine, a routine step and a request from
   no workspace, preferring the irori agent's own routine over `--vault`, and
   starting a reviewed one whose secret reaches its program but not the report.
+- `tests/routines.test.ts` also reads `routine.yaml` as the form and writes it
+  back: unchanged text unchanged, kept steps' comments kept, moved, added and
+  removed steps, a vault's agent, text the form cannot show with its reason,
+  an unfinished step, and command lines split and joined.
 - `tests/irori-command.test.ts`: `irori routines` and `irori run` parsed, and the
   `write-routine` skill a valid package.
 - `tests/settings.test.ts`: `routineRuntimes` kept and bounded.
@@ -254,12 +288,16 @@ line) and no saved session. Document content cannot start a routine.
   key and keeping concurrent write-backs, hiding values that arrive in pieces,
   and the write-back reader.
 - `scripts/routines-ui-smoke.ts` in the app: an invalid routine's reason,
-  a routine made from **新しいルーティン** and saved from the editor (with a
-  reason shown while it still cannot run), **irori agent に頼む** filling the
+  a routine made from **新しいルーティン**'s form (a program step moved above an
+  agent step, the reason shown until the prompt is written, the same routine
+  as YAML), edited as text (a save that still cannot run stays open) and as a
+  form (keeping a comment), text the form cannot show opening as text, **irori agent に頼む** filling the
   message box, JavaScript added from the row and switched in 設定, the review and the difference, a run's steps,
   output, changed files and history, the gate, **停止**, a secret entered from
-  its row, listed in the review, hidden in the output, written back and
-  deleted (with the reversible test store, since the display has no keychain), an agent step's request
+  its row, listed in the review, hidden in the output, written back, listed
+  with its routine in the **シークレット** sheet and deleted there, a secret
+  added by name, and a step's secret entered and added from the editor's chips
+  (with the reversible test store, since the display has no keychain), an agent step's request
   answered in the step and its conversation opened in its vault, and an irori
   agent routine.
 - `npm run test:routines` (`scripts/routines-acceptance.ts`) runs real Claude

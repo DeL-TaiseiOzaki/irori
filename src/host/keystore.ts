@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { t } from '../domain/i18n';
-import { secretName, secretValue, type SecretList } from '../domain/routines';
+import { secretName, secretValue, unavailableText, type SecretList } from '../domain/routines';
 import { readLocalJson, writeLocalJson } from './local-json';
 
 /** Electron's `safeStorage`, given by the host once the app is ready. */
@@ -48,11 +48,7 @@ export const reversibleStorage: SecureStorage = {
   },
 };
 
-export const unavailableText = () =>
-  t(
-    'この端末ではシークレットを保存できません。OS のキーチェーンが必要です。',
-    'This device cannot store secrets. It needs the OS keychain.',
-  );
+export { unavailableText };
 
 const record = z.object({
   schemaVersion: z.literal(1),

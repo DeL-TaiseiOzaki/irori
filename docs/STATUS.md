@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
+asked how a routine's secrets are set, and found making a routine poor (a name
+dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and
+ADR 016's "Stage 4 revised" ([ADR 016](decisions/016-routines.md)).
+- `RoutineEditor` (`src/app/RoutineEditor.tsx`) edits the steps as a form or
+  the text; `draftFromYaml`/`yamlFromDraft` (`src/domain/routine-file.ts`, now
+  also holding `parseRoutine`) keep kept steps' comments. `createRoutine` takes
+  the first text; `routineSource` lists the folder's files; `revealRoutine`
+  opens the folder.
+- `SecretsDialog` and `SecretDialog` (`src/app/RoutineKeys.tsx`, named without
+  the word the workspace's read rule blocks) replace the list at the page's
+  end; the header has シークレット.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`routines-ui-smoke`). Real keychains and a real CLI were not tried.
+
 Routines in the saved environment, 2026-10-15 (**0.2.17**, not yet published):
 the owner asked what **環境を保存** keeps and that routines be kept too
 ([ADR 043](decisions/043-routines-in-the-environment.md)).
