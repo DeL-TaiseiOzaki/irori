@@ -11,7 +11,7 @@ import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Routines from their own rail entry (ADR 016): navigation, a routine made
-// from the page's template and edited there, the request to the irori agent,
+// from the page's form and edited there as a form and as text, the request to the irori agent,
 // JavaScript in the settings, the review before the first run and after a
 // change, JavaScript added from the row, a run's steps, output and changed
 // files, the nothing-to-do gate, 停止, an agent step's request answered in its
@@ -187,38 +187,80 @@ try {
   await expect(card('Broken')).toContainText('ステップ 1 の access がありません。');
   await expect(card('Broken').getByRole('button', { name: '実行' })).toBeDisabled();
 
-  // A new routine starts from a template that cannot run until its prompt is written.
+  // A new routine is made from a form of its steps, which says what still stops it.
   await page.getByRole('button', { name: '新しいルーティン', exact: true }).click();
   const create = page.getByRole('dialog', { name: '新しいルーティン' });
   await expect(create.getByRole('combobox', { name: '置き場所' })).toHaveValue(
     (await you.load()).id,
   );
   await create.getByRole('textbox', { name: '名前' }).fill('Daily mail');
+  const first = create.getByRole('listitem', { name: 'ステップ 1' });
+  await expect(first).toContainText('irori agent');
+  await expect(create).toContainText('ステップ 1 の prompt がありません。');
+  await expect(create.getByRole('button', { name: '作成', exact: true })).toBeEnabled();
+  await create
+    .getByRole('group', { name: 'ステップを追加' })
+    .getByRole('button', { name: 'プログラム', exact: true })
+    .click();
+  const second = create.getByRole('listitem', { name: 'ステップ 2' });
+  await second.getByRole('textbox', { name: 'コマンド' }).fill('git --version');
+  await second.getByRole('button', { name: 'ステップ 2を上へ' }).click();
+  await expect(first.getByRole('textbox', { name: 'コマンド' })).toHaveValue('git --version');
+  await second.getByRole('textbox', { name: 'プロンプト' }).fill('Sort the mail.');
+  await expect(create).not.toContainText('がありません');
+  await page.screenshot({ path: 'test-results/routines-new.png' });
+  // The same routine as text, and back to the form.
+  const views = create.getByRole('group', { name: '編集の表示' });
+  await views.getByRole('button', { name: 'YAML', exact: true }).click();
+  await expect(create.getByRole('textbox', { name: 'routine.yaml' })).toHaveValue(
+    'name: Daily mail\nsteps:\n  - run: [git, --version]\n  - agent: irori\n    access: default\n    prompt: Sort the mail.\n',
+  );
+  await views.getByRole('button', { name: 'フォーム', exact: true }).click();
   await create.getByRole('button', { name: '作成', exact: true }).click();
   await expect(create).toHaveCount(0);
-  const editor = page.getByRole('dialog', { name: 'Daily mail' });
-  const source = editor.getByRole('textbox', { name: 'routine.yaml' });
-  await expect(source).toHaveValue(/name: "Daily mail"\n[\s\S]*  - agent: irori\n/);
-  await page.screenshot({ path: 'test-results/routines-new.png' });
-  await editor.getByRole('button', { name: 'キャンセル', exact: true }).click();
   const daily = card('Daily mail');
-  await expect(daily).toContainText('ステップ 1 の prompt が正しくありません。');
-  await expect(daily.getByRole('button', { name: '実行' })).toBeDisabled();
-  // Edited in place: a save that still cannot run says why and stays open.
+  await expect(daily).toContainText('未確認');
+  await expect(daily).not.toContainText('無効');
+  const dailyYaml = path.join(youRoot, 'routines', 'Daily mail', 'routine.yaml');
+  expect(await readFile(dailyYaml, 'utf8')).toContain('  - run: [git, --version]\n');
+  // Edited as text in place: a save that still cannot run says why and stays open.
   await daily.getByRole('button', { name: 'Daily mail を編集' }).click();
-  await source.fill('name: Daily mail\nsteps:\n  - agent: irori\n    prompt: Sort the mail.\n');
+  const editor = page.getByRole('dialog', { name: 'Daily mail' });
+  await editor
+    .getByRole('group', { name: '編集の表示' })
+    .getByRole('button', { name: 'YAML', exact: true })
+    .click();
+  const source = editor.getByRole('textbox', { name: 'routine.yaml' });
+  await source.fill(
+    'name: Daily mail\nsteps:\n  - agent: irori # sorts\n    prompt: Sort the mail.\n',
+  );
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor.getByRole('alert')).toHaveText('ステップ 1 の access がありません。');
-  await source.fill(
-    'name: Daily mail\nsteps:\n  - agent: irori\n    access: default\n    prompt: Sort the mail.\n',
-  );
+  await expect(editor.getByRole('button', { name: '閉じる', exact: true })).toBeVisible();
+  // The form shows the missing access as standard and keeps the comment.
+  await editor
+    .getByRole('group', { name: '編集の表示' })
+    .getByRole('button', { name: 'フォーム', exact: true })
+    .click();
+  await expect(editor.getByRole('combobox', { name: 'アクセス' })).toHaveValue('default');
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).toHaveCount(0);
   await expect(daily).not.toContainText('無効');
-  await expect(daily).toContainText('未確認');
-  expect(
-    await readFile(path.join(youRoot, 'routines', 'Daily mail', 'routine.yaml'), 'utf8'),
-  ).toContain('access: default');
+  expect(await readFile(dailyYaml, 'utf8')).toBe(
+    'name: Daily mail\nsteps:\n  - agent: irori # sorts\n    prompt: Sort the mail.\n    access: default\n',
+  );
+  // Text the form cannot hold opens as text, with the reason.
+  await writeFile(dailyYaml, 'name: Daily mail\nwhen: daily\nsteps:\n  - run: [git, --version]\n');
+  await daily.getByRole('button', { name: 'Daily mail を編集' }).click();
+  await expect(editor.getByRole('alert')).toContainText('不明なキーがあります: when');
+  await expect(editor.getByRole('textbox', { name: 'routine.yaml' })).toBeVisible();
+  await editor
+    .getByRole('textbox', { name: 'routine.yaml' })
+    .fill(
+      'name: Daily mail\nsteps:\n  - agent: irori\n    access: default\n    prompt: Sort the mail.\n',
+    );
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor).toHaveCount(0);
   // Or the irori agent is asked, with the words placed for the person to finish.
   await page.getByRole('button', { name: 'irori agent に頼む', exact: true }).click();
   const instruction = page.getByRole('textbox', { name: 'irori agent への指示' });
@@ -336,8 +378,6 @@ try {
   await entry.getByRole('button', { name: '保存' }).click();
   await expect(entry).toHaveCount(0);
   await expect(token).not.toContainText('がありません');
-  const kept = view.getByRole('region', { name: 'シークレット', exact: true });
-  await expect(kept).toContainText('SLACK_TOKEN');
   await token.getByRole('button', { name: '実行' }).click();
   await expect(review).toContainText('受け取るシークレット: SLACK_TOKEN');
   await review.getByRole('button', { name: '確認して実行' }).click();
@@ -350,11 +390,43 @@ try {
   expect(Buffer.from(sealed.values.SLACK_TOKEN, 'base64').toString()).toBe(
     'test:xoxe-rotated-ui-2',
   );
-  // 削除 asks once more, and the row needs the secret again.
-  await kept.getByRole('button', { name: '削除' }).click();
-  await kept.getByRole('button', { name: '削除する' }).click();
-  await expect(kept).toHaveCount(0);
+  // The header's シークレット lists them with the routines using them; 削除 asks once more.
+  await page.getByRole('button', { name: 'シークレット', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: 'シークレット' });
+  const slack = sheet.getByRole('listitem', { name: 'SLACK_TOKEN' });
+  await expect(slack).toContainText('Token');
+  await slack.getByRole('button', { name: '削除' }).click();
+  await slack.getByRole('button', { name: '削除する' }).click();
+  // Still needed by Token, it stays listed to enter again.
+  await expect(slack.getByRole('button', { name: '入力' })).toBeVisible();
+  // A secret no routine names yet is added by its name.
+  await sheet.getByRole('button', { name: '追加' }).click();
+  const added = page.getByRole('dialog', { name: 'シークレットを追加' });
+  await added.getByRole('textbox', { name: '名前' }).fill('notion-key');
+  await expect(added.getByRole('textbox', { name: '名前' })).toHaveValue('NOTION_KEY');
+  await added.getByLabel('値').fill('secret-notion-value');
+  await added.getByRole('button', { name: '保存' }).click();
+  await expect(sheet.getByRole('listitem', { name: 'NOTION_KEY' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/routines-keys.png' });
+  await sheet.getByRole('button', { name: '閉じる' }).click();
   await expect(token).toContainText('シークレット SLACK_TOKEN がありません。');
+  // A step's secrets are chosen and entered in the editor.
+  await token.getByRole('button', { name: 'Token を編集' }).click();
+  const tokenEditor = page.getByRole('dialog', { name: 'Token' });
+  const named = tokenEditor.getByRole('group', { name: 'シークレット' });
+  await named.getByRole('button', { name: '値を入力' }).click();
+  await entry.getByLabel('値').fill('xoxb-entered-in-editor');
+  await entry.getByRole('button', { name: '保存' }).click();
+  await expect(entry).toHaveCount(0);
+  await expect(named.getByRole('img', { name: '保存済み' })).toBeVisible();
+  await named.getByRole('combobox', { name: 'シークレットの名前' }).fill('NOTION_KEY');
+  await named.getByRole('button', { name: '追加' }).click();
+  await expect(named).toContainText('NOTION_KEY');
+  await expect(named.getByRole('img', { name: '保存済み' })).toHaveCount(2);
+  await named.getByRole('button', { name: 'NOTION_KEY を外す' }).click();
+  await tokenEditor.getByRole('button', { name: 'キャンセル' }).click();
+  await expect(token).not.toContainText('がありません');
+  expect(await page.content()).not.toContain('xoxb-entered-in-editor');
 
   // An agent step's request is answered in the step, and its conversation opens.
   const ask = card('Ask');
@@ -407,7 +479,7 @@ try {
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Routines UI passed: invalid routine with its reason, a routine made from the template and edited in place, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered, hidden, written back and deleted, an agent step whose request was answered in the step and whose conversation opened in its vault, and an irori agent routine. Protocol fixture only.',
+    'Routines UI passed: invalid routine with its reason, a routine made from the form and edited as a form and as text, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered from its row and from the editor, hidden, written back, listed with its routines, added by name and deleted, an agent step whose request was answered in the step and whose conversation opened in its vault, and an irori agent routine. Protocol fixture only.',
   );
 } finally {
   // A routine or run left by a failure would hold the window open behind a confirmation.

@@ -390,6 +390,33 @@ ways of making one:
 - **The JavaScript switch** moved from the page to the settings, under
   **ルーティン**; a row that needs JavaScript still offers it.
 
+## Stage 4 revised: the form and the secrets sheet
+
+Implemented on 2026-10-15 (0.2.18). The owner asked how a routine's secrets are
+set, and found the page's way of making a routine poor: a name dialog, then
+`routine.yaml` written by hand from a commented template, its mistakes shown
+only after a save. A secret could be entered only once a routine's text named
+it, and the list of stored ones was hidden while it was empty.
+
+- **The editor is a form of the steps,** with the text one switch away. It
+  reads `routine.yaml` leniently (an empty prompt and a missing `access` open)
+  and writes it back through the YAML document, so a person's or an agent's
+  comments on the steps kept stay. Text the form cannot represent opens as text
+  with the reason, rather than being rewritten.
+- **The strict reading moved to the domain** (`src/domain/routine-file.ts`), so
+  the editor shows the host's first reason as the person writes. Checks only
+  the host can make (a missing or non-executable file) still come from a save.
+- **新しいルーティン opens that editor;** `createRoutine` takes the form's text
+  for the first `routine.yaml`. D2 is unchanged: irori still writes only a
+  folder the person makes or a `routine.yaml` the person saves.
+- **Secrets have their own sheet** in the page's header: stored names with the
+  routines using them, the names routines lack, and a new name with its value.
+  A step's secrets are chosen and entered in the editor. Values still go only
+  to the host (D5); the editor never sees one.
+- **The routine's folder opens** in the system's file manager from the editor,
+  since a program step's file has to be put there. irori still writes no other
+  file in it.
+
 ## Stages
 
 1. `routine.yaml`, discovery in both locations, D4's review, **実行** and

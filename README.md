@@ -87,7 +87,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - 指示にはファイルを添付でき（クリップ・ドロップ・画像の貼り付け）、画像はエージェントにそのまま見せます。マイクで OS の音声入力を起動できます。エージェントからの質問は選択肢として表示されます（[ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)）。
 - vault ごとに作業フォルダがあり、エージェントは下書き・中間ファイル・試しのスクリプトをそこに置きます。既定は vault の `.irori/work`（Git の対象外）で、vault の設定の **作業フォルダ** でほかのフォルダに変えられます（[ADR 042](docs/decisions/042-waiting-folders-and-work-folders.md)）。
 - 返答に出てきたファイルのパスはリンクになり、押すとそのファイルがメインの画面で開きます（行番号があればその行）。インラインコードのパスと、Claude Code・Codex が書くファイルへのリンクのどちらも対象です。
-- **ルーティン**：左のレールの irori mode と vault の間にある **ルーティン** で、JavaScript の使用設定、シークレットの管理、決めた手順の「実行」ができます。手順はフォルダの `routine.yaml` に書き（irori agent の `routines/` か vault の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
+- **ルーティン**：左のレールの irori mode と vault の間にある **ルーティン** で、手順をフォームで作り、シークレットを管理し、決めた手順を「実行」できます。手順はフォルダの `routine.yaml` に保存され（irori agent の `routines/` か vault の `.irori/routines/`）、プログラムの実行と AI エージェントへの指示を順に並べます。初めて動かすときと中身が変わったときは、ファイルを確認してから動きます（[ROUTINES](docs/ROUTINES.md)）。
 
 **資料**
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。

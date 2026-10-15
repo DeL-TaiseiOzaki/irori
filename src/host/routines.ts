@@ -2,19 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { t } from '../domain/i18n';
-import { agentAccessModes, agentIds } from '../domain/types';
+import { agentIds } from '../domain/types';
 import type { AgentId, DeviceSettings, Space, WorkspaceProfile } from '../domain/types';
 import type { GitStatus } from '../domain/git';
-import { agentModel, promptLimit } from '../domain/conversation';
 import { requireAgentAccess } from '../domain/agent-access';
 import { within } from '../domain/scopes';
 import {
   lineDiff,
   routineKey,
-  secretName,
   routineRef,
   routineRunStates,
   routineStepStates,
@@ -40,6 +37,9 @@ import { hash as sha256, utf8Text, type FileService } from './files';
 import { routineWithVaultKeys } from './vault-rename';
 import type { YourAiService } from './you';
 import { stepPreamble } from '../../prompts';
+import { parseRoutine } from '../domain/routine-file';
+
+export { parseRoutine };
 
 const yamlLimit = 64 * 1024;
 const fileLimit = 100;
@@ -55,174 +55,6 @@ const keptRuns = 20;
 const javascript = ['.js', '.mjs', '.cjs'];
 /** Files the system writes into folders it shows, never run by a routine. */
 const systemFiles = new Set(['.DS_Store']);
-
-const relativeFile = z
-  .string()
-  .min(1)
-  .max(500)
-  .refine(
-    (value) =>
-      !/[\\\0:]/.test(value) &&
-      value.split('/').every((part) => part && part !== '.' && part !== '..'),
-  );
-const commandName = z
-  .string()
-  .min(1)
-  .max(200)
-  .refine((value) => !/[\\/\0:]/.test(value) && !value.startsWith('-'));
-const runStep = z
-  .object({
-    run: z.union([
-      relativeFile,
-      z
-        .array(z.string().min(1).max(4000))
-        .min(1)
-        .max(64)
-        .refine((argv) => commandName.safeParse(argv[0]).success),
-    ]),
-    secrets: z.array(secretName).min(1).max(20).optional(),
-  })
-  .strict();
-const agentStep = z
-  .object({
-    agent: z.enum(['irori', 'vault']),
-    vaults: z
-      .union([z.literal('all'), z.array(z.string().min(1).max(120)).min(1).max(50)])
-      .optional(),
-    access: z.enum(agentAccessModes),
-    cli: z.enum(agentIds).optional(),
-    model: agentModel.optional(),
-    prompt: z
-      .string()
-      .max(promptLimit)
-      .refine((value) => !!value.trim()),
-  })
-  .strict();
-const routineFile = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    steps: z.array(z.unknown()).min(1).max(20),
-  })
-  .strict();
-
-/** A validation failure as one sentence; `step` counts from 1. */
-function issueText(issues: z.core.$ZodIssue[], step?: number) {
-  // A misspelt key also leaves the real one missing; naming the unknown one says why.
-  const issue = issues.find((item) => item.code === 'unrecognized_keys') ?? issues[0];
-  const key = issue.path.map(String).join('.');
-  const where =
-    step === undefined
-      ? key
-      : key
-        ? t(`ステップ ${step} の ${key}`, `step ${step}'s ${key}`)
-        : t(`ステップ ${step}`, `step ${step}`);
-  if (issue.code === 'unrecognized_keys') {
-    const keys = issue.keys.join(', ');
-    return step === undefined
-      ? t(
-          `routine.yaml に不明なキーがあります: ${keys}`,
-          `routine.yaml has an unknown key: ${keys}`,
-        )
-      : t(
-          `ステップ ${step} に不明なキーがあります: ${keys}`,
-          `Step ${step} has an unknown key: ${keys}`,
-        );
-  }
-  if (
-    (issue.code === 'invalid_type' || issue.code === 'invalid_value') &&
-    issue.input === undefined
-  )
-    return t(`${where} がありません。`, `${where} is missing.`);
-  if (issue.code === 'invalid_value')
-    return t(
-      `${where} は ${issue.values.join(' / ')} のどれかです。`,
-      `${where} must be ${issue.values.join(' / ')}.`,
-    );
-  return t(`${where} が正しくありません。`, `${where} is not valid.`);
-}
-
-/**
- * Reads `routine.yaml` (ADR 016 D2). A routine in the irori agent's folder
- * instructs the irori agent; one in a vault instructs that vault's agent.
- */
-export function parseRoutine(
-  text: string,
-  owner: Routine['owner'],
-): { name: string; steps: RoutineStep[] } | { problem: string; name?: string } {
-  const document = parseDocument(text, { uniqueKeys: true });
-  if (document.errors.length) {
-    const line = document.errors[0].linePos?.[0].line;
-    return {
-      problem: line
-        ? t(
-            `routine.yaml を読めません（${line} 行目）。`,
-            `routine.yaml cannot be read (line ${line}).`,
-          )
-        : t('routine.yaml を読めません。', 'routine.yaml cannot be read.'),
-    };
-  }
-  let value: unknown;
-  try {
-    value = document.toJS({ maxAliasCount: 50 });
-  } catch {
-    return { problem: t('routine.yaml を読めません。', 'routine.yaml cannot be read.') };
-  }
-  const top = routineFile.safeParse(value, { reportInput: true });
-  if (!top.success) return { problem: issueText(top.error.issues) };
-  const { name } = top.data;
-  const steps: RoutineStep[] = [];
-  for (const [index, raw] of top.data.steps.entries()) {
-    const n = index + 1;
-    const fields = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : undefined;
-    if (!fields || Object.hasOwn(fields, 'run') === Object.hasOwn(fields, 'agent'))
-      return {
-        name,
-        problem: t(
-          `ステップ ${n} には run か agent のどちらかを書きます。`,
-          `Step ${n} needs either run or agent.`,
-        ),
-      };
-    if (Object.hasOwn(fields, 'run')) {
-      const step = runStep.safeParse(fields, { reportInput: true });
-      if (!step.success) return { name, problem: issueText(step.error.issues, n) };
-      steps.push({ kind: 'run', ...step.data });
-      continue;
-    }
-    const step = agentStep.safeParse(fields, { reportInput: true });
-    if (!step.success) return { name, problem: issueText(step.error.issues, n) };
-    const { agent, vaults, access, cli } = step.data;
-    if (agent !== (owner === 'irori' ? 'irori' : 'vault'))
-      return {
-        name,
-        problem:
-          owner === 'irori'
-            ? t(
-                `ステップ ${n}: irori agent のルーティンでは agent: irori を使います。`,
-                `Step ${n}: an irori agent routine uses agent: irori.`,
-              )
-            : t(
-                `ステップ ${n}: vault のルーティンでは agent: vault を使います。`,
-                `Step ${n}: a vault's routine uses agent: vault.`,
-              ),
-      };
-    if (vaults && agent !== 'irori')
-      return {
-        name,
-        problem: t(
-          `ステップ ${n}: vaults は agent: irori に書きます。`,
-          `Step ${n}: vaults belongs to agent: irori.`,
-        ),
-      };
-    if (cli)
-      try {
-        requireAgentAccess(cli, access);
-      } catch (error) {
-        return { name, problem: t(`ステップ ${n}: `, `Step ${n}: `) + (error as Error).message };
-      }
-    steps.push({ kind: 'agent', ...step.data });
-  }
-  return { name, steps };
-}
 
 /** A folder name for a new routine: its name without what a file system refuses. */
 export function routineFolderName(name: string) {
@@ -723,14 +555,17 @@ export class RoutineService {
   /**
    * Starts a routine for the person: a new folder in the owner's routines with
    * a `routine.yaml` whose prompt is still to be written, so it cannot run yet.
-   * irori writes only a folder that did not exist.
+   * irori writes only a folder that did not exist. The editor's form gives
+   * the first `routine.yaml` itself.
    */
-  async create(ownerId: string, name: string): Promise<RoutineRef> {
+  async create(ownerId: string, name: string, text?: string): Promise<RoutineRef> {
     const title = name.trim();
     if (!title || title.length > 120)
       throw Error(
         t('名前を 120 文字以内で入力してください。', 'Enter a name of up to 120 characters.'),
       );
+    if (text !== undefined && Buffer.byteLength(text) > yamlLimit)
+      throw Error(t('routine.yaml が大きすぎます。', 'routine.yaml is too large.'));
     const owner = await this.owner(ownerId);
     if (owner.kind === 'irori' && (await this.host.you.status()).state !== 'ready')
       throw Error(t('irori agent が用意されていません。', 'The irori agent is not set up.'));
@@ -750,18 +585,27 @@ export class RoutineService {
       }
       await fs.writeFile(
         path.join(owner.dir, folder, 'routine.yaml'),
-        routineTemplate(title, owner.kind),
+        text ?? routineTemplate(title, owner.kind),
         { flag: 'wx' },
       );
       return { owner: owner.id, folder };
     }
     throw Error(t('同じ名前のルーティンが多すぎます。', 'Too many routines share this name.'));
   }
-  /** The routine's `routine.yaml` and its version, for the person to edit. */
+  /** The routine's `routine.yaml` and its version, and the files beside it, for the person to edit. */
   async source(ref: RoutineRef): Promise<RoutineSource> {
     const file = await this.yamlFile(ref);
     const text = await fs.readFile(file, 'utf8');
-    return { text, version: sha256(text) };
+    // A folder irori cannot run from still opens; its reason shows on the routine's row.
+    const files = await this.read(path.dirname(file)).then(
+      (read) => read.files.map((item) => item.path).filter((item) => item !== 'routine.yaml'),
+      () => [],
+    );
+    return { text, version: sha256(text), files };
+  }
+  /** The routine's folder, to show in the system file manager. */
+  async folder(ref: RoutineRef) {
+    return path.dirname(await this.yamlFile(ref));
   }
   /**
    * Saves the person's `routine.yaml`, unless it changed since `version` was
