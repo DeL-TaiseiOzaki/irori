@@ -18,6 +18,40 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-10-15: **0.2.20** ([#242](https://github.com/DeL-TaiseiOzaki/irori/pull/242),
+skills with a description past 400 characters load) as `3bf7f38`, by `publish.yml`
+alone (push run `38713761817`): merge to release 1:16, to page 3:19. Downloads
+verified. See STATUS.
+
+Published 2026-10-15: **0.2.19** ([#245](https://github.com/DeL-TaiseiOzaki/irori/pull/245),
+reply paths open where their writer works, and the irori agent's folder per workspace)
+as `0f7e242`, by `publish.yml` alone (push run `38712688678`): merge to release 1:19,
+to page 3:28. Downloads verified. See STATUS.
+
+Published 2026-10-15: **0.2.18** ([#246](https://github.com/DeL-TaiseiOzaki/irori/pull/246),
+routines made from a form and the シークレット sheet) as `c1ae19d`, by the merge's own
+`publish.yml` push run `38708411192`: merge to page 3:43. Anonymous downloads of the
+Windows installer, the Mac image and `irori-0.2.18-full.nupkg` matched `SHA256SUMS.txt`;
+the live page links the 0.2.18 installers. See STATUS.
+
+Published 2026-10-15: **0.2.17** ([#243](https://github.com/DeL-TaiseiOzaki/irori/pull/243),
+the saved environment carries the irori agent's routines) as `5cbbe91`, by
+`publish.yml` alone (push run `38698886612`): merge to release 2:30. Downloads
+verified. #242 (0.2.16) must be renumbered above 0.2.17. See STATUS.
+
+Published 2026-10-14: **0.2.15** ([#240](https://github.com/DeL-TaiseiOzaki/irori/pull/240),
+connected folders wait for their drive, and each vault has a work folder) as
+`cc03813`, by `publish.yml` alone (push run `38468471480`): merge to release
+1:34. Downloads verified. See STATUS.
+
+Published 2026-10-13: **0.2.14** ([#238](https://github.com/DeL-TaiseiOzaki/irori/pull/238),
+paths in an agent's reply open the file) as `df40849`, by `publish.yml` alone
+(push run `38409559282`): merge to release 1:33. Downloads verified. See STATUS.
+
+Published 2026-10-12: **0.2.6** ([#226](https://github.com/DeL-TaiseiOzaki/irori/pull/226),
+a new device starts in English) as `dc4315b`, published by `publish.yml` alone
+from the pull request's run: merge to page 2:31. Downloads verified. See STATUS.
+
 Published 2026-10-12: **0.2.5** ([#222](https://github.com/DeL-TaiseiOzaki/irori/pull/222))
 as `e76f209`, the first preview `publish.yml` published by itself (run
 `38249205721`, after main's CI): merge to page 9:41. The push's own run failed
