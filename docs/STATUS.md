@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
+Routines from a form, 2026-10-15 (**0.2.18**, published as
+[v0.2.18-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.18-preview.1)
+by `publish.yml` run `38708411192` from the merge `c1ae19d`, 3:43 after it): the owner
 asked how a routine's secrets are set, and found making a routine poor (a name
 dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and
 ADR 016's "Stage 4 revised" ([ADR 016](decisions/016-routines.md)).
@@ -15,7 +17,15 @@ ADR 016's "Stage 4 revised" ([ADR 016](decisions/016-routines.md)).
 - Verified by `npm run build`, `npm test` and `npm run test:ui`
   (`routines-ui-smoke`). Real keychains and a real CLI were not tried.
 
-Routines in the saved environment, 2026-10-15 (**0.2.17**, not yet published):
+Published 2026-10-15: **0.2.17**, merged at the owner's request
+([#243](https://github.com/DeL-TaiseiOzaki/irori/pull/243) as `5cbbe91` at 07:27:34 UTC).
+`publish.yml` published it from its push run `38698886612`; the release was public at
+07:30:04 (2:30), and the run's website and drift jobs passed.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,234,496 / 141,863,589 / 175,402,485. The page offers 0.2.17.
+- 0.2.16 (#242) was still open, so it needs a version above 0.2.17 to publish.
+
+Routines in the saved environment, 2026-10-15 (**0.2.17**, published):
 the owner asked what **環境を保存** keeps and that routines be kept too
 ([ADR 043](decisions/043-routines-in-the-environment.md)).
 - `src/host/environment-routines.ts` packs the irori agent's routine folders
@@ -30,7 +40,70 @@ the owner asked what **環境を保存** keeps and that routines be kept too
   `npm run test:ui` (`account-ui-smoke` saves and restores a routine). Not tried
   with a real GitHub account.
 
-Slides and code files, 2026-10-13 (**0.2.13**, not yet published): the owner
+Published 2026-10-14: **0.2.15**, merged at the owner's request
+([#240](https://github.com/DeL-TaiseiOzaki/irori/pull/240) as `cc03813` at 21:09:40 UTC on 10-13).
+`publish.yml` published it from its push run `38468471480`; the release was public at
+21:11:14 (1:34), and the run's website and drift jobs passed.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,229,888 / 141,855,686 / 175,398,353. The page offers 0.2.15.
+
+Waiting folders and work folders, 2026-10-14 (**0.2.15**, published): on Windows
+11 the owner's four Drive for desktop folders stayed `error` because irori
+connected them before `J:` was mounted, and an agent worked in
+`%TEMP%\irori-work` ([ADR 042](decisions/042-waiting-folders-and-work-folders.md)).
+- `CloudService` (`src/cloud/service.ts`): a folder missing at its binding's
+  path makes the connection `waiting` instead of `error`. `retry` looks again on
+  a timer (5 s doubling to 2 min), from `connections()` and on window focus
+  (`src/host/main.ts`), outside the queue, and links only when `mayLink` (no run
+  or Git operation in the vault) allows. `refresh` → `relink` links a mounted
+  connection again when its link or identity no longer checks out; something
+  else at `contents/<name>` stays and is an error.
+- `WorkFolders` (`src/host/work-folders.ts`): `.irori/work` with a `.gitignore`
+  of `*` by default, or a chosen folder kept in `work-folders.json` in irori's
+  data. Shown in the vault settings (作業フォルダ) and set with `irori work`.
+  `prompts/work-folder.ts` tells both agents; `writeDecision` lets any agent of
+  the run write in a handed vault's work folder.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`tests/local-folders.test.ts`, `tests/work-folders.test.ts`,
+  `brain-settings-ui-smoke`). Not tried on Windows with Google Drive for
+  desktop, or with a real CLI's run.
+
+Published 2026-10-13: **0.2.14**, merged at the owner's request
+([#238](https://github.com/DeL-TaiseiOzaki/irori/pull/238) as `df40849` at 13:59:38 UTC).
+`publish.yml` published it from its push run `38409559282`; the release was public at
+14:01:11 (1:33).
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,227,328 / 141,840,480 / 175,395,288. The page offers 0.2.14.
+
+Paths in a reply open the file, 2026-10-13 (**0.2.14**, published): the owner
+asked that a path a vault agent or the irori agent writes be a link that opens
+the file on the page, as Claude Code and Codex do in VS Code.
+- `writtenPath` and `locatePath` (`src/domain/path-links.ts`) read inline code
+  and link destinations (`a.md#L12`, `/abs/a.md:12`, `file://`, Windows paths)
+  and find the vault file. A relative path is read from the writing vault (a
+  report's, from its vault; the irori agent's, from the vault on show); an
+  absolute one from the innermost vault holding it. Inline code without a
+  folder links only for knowledge-base extensions.
+- `AgentMarkdown` renders them as `.path-link` buttons; `openPath` in
+  `src/app/main.tsx` opens them and selects the line (`lineTarget`). A file
+  irori cannot show is revealed in its folder, never launched.
+- Verified by `npm run build`, `npm test` (`tests/path-links.test.ts`) and
+  `npm run test:ui` (`harness-ui-smoke` clicks an inline-code path and an
+  absolute link with a line). Not tried with a real CLI's reply, on Windows or
+  on macOS.
+
+Published 2026-10-13: **0.2.13**, merged at the owner's request
+([#237](https://github.com/DeL-TaiseiOzaki/irori/pull/237) as `e61279f` at 05:07:27 UTC).
+`publish.yml` published it from its push run `38349806817`; the release was public at
+05:08:39 (1:12).
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,224,768 / 141,835,500 / 175,393,072. The page offers 0.2.13.
+- `main`'s CI run `38349806570` first ended cancelled: every UI smoke passed, then
+  `website-smoke` stopped after its documentation check and the `verify` job hit its
+  20-minute limit. Rerunning the failed job passed. The website was not changed by #237.
+- Not tried with the owner's deck, on Windows or on macOS.
+
+Slides and code files, 2026-10-13 (**0.2.13**, published): the owner
 showed a template deck whose titles were cut off and a box drawn solid black,
 and asked that `.py` and other files VS Code opens open in irori
 ([ADR 041](decisions/041-code-and-text-files.md)).
@@ -46,7 +119,27 @@ and asked that `.py` and other files VS Code opens open in irori
   (`viewers-ui-smoke` with `tests/fixtures/viewers/inherited.pptx` and a `.py`).
   The owner's deck was not available; its symptoms were rebuilt in the fixture.
 
-The CLI's own commands, 2026-10-13 (**0.2.12**, not yet published): the owner
+Published 2026-10-13: **0.2.11** and **0.2.12**, merged at the owner's request
+([#231](https://github.com/DeL-TaiseiOzaki/irori/pull/231) as `2cdc79d` at 03:33:34 UTC,
+[#235](https://github.com/DeL-TaiseiOzaki/irori/pull/235) as `e39970a` at 03:33:58).
+#235 was stacked on #231 and retargeted to `main`; it was merged without waiting for
+0.2.11 to be published. `publish.yml` published each from its push run:
+
+| Version | Release public | Run |
+| --- | --- | --- |
+| [0.2.11](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.11-preview.1) | 03:34:54 (1:20) | `38342284860` |
+| [0.2.12](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.12-preview.1) | 03:37:24 (3:26) | `38342316518` |
+
+- Anonymous downloads matched `SHA256SUMS.txt` for both. Windows / Mac / `full.nupkg`
+  bytes: 0.2.11 176,216,064 / 141,818,426 / 175,385,674; 0.2.12 176,221,184 /
+  141,828,270 / 175,390,260. The page offers 0.2.12.
+- The fallback run after main CI of `2cdc79d` (`38343290611`) failed at `decide`:
+  `v0.2.12-preview.1` was already the latest tag and is not on that commit. Nothing
+  was left unpublished; it is what merging the next PR before the previous preview
+  is out leaves behind.
+- Not tried on Windows or macOS, or with a real CLI.
+
+The CLI's own commands, 2026-10-13 (**0.2.12**, published): the owner
 asked that Claude Code's and Codex's commands and skills work through irori and
 that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-skills.md)).
 - `agentCommands` (`src/agents/commands.ts`, `CommandCatalog`): Claude Code's
@@ -61,7 +154,7 @@ that the composer offer them on `/` ([ADR 040](decisions/040-cli-commands-and-sk
 - Verified by `npm run build`, `npm test` (`tests/cli-commands.test.ts`) and
   `npm run test:ui` (`harness-ui-smoke` opens the list). No real CLI was run.
 
-What a vault agent is told, 2026-10-13 (**0.2.11**, not yet published): the
+What a vault agent is told, 2026-10-13 (**0.2.11**, published): the
 owner found the `irori` command's 2,000-character preamble on every request
 wasteful and asked that the vault agent be told what irori is and which folders
 are Knowledge and Contents ([ADR 039](decisions/039-what-a-vault-agent-is-told.md)).
@@ -78,7 +171,29 @@ are Knowledge and Contents ([ADR 039](decisions/039-what-a-vault-agent-is-told.m
   preamble had preceded it on every run with the command.
 - Verified by `npm run build` and `npm test`. No real CLI was run.
 
-Copy path from every row, 2026-10-13 (**0.2.10**, not yet published; built on 0.2.9,
+Published 2026-10-13: **0.2.8**, **0.2.9** and **0.2.10**, merged one after another at
+the owner's request ([#230](https://github.com/DeL-TaiseiOzaki/irori/pull/230) as `8ab51db`,
+[#232](https://github.com/DeL-TaiseiOzaki/irori/pull/232) as `eeda029`,
+[#233](https://github.com/DeL-TaiseiOzaki/irori/pull/233) as `5d09515`). #232 and #233 were
+stacked on the previous branch and retargeted to `main` before their merges; each merge
+waited for the previous preview to be published. `publish.yml` published every one by
+itself, each with its drift check in step:
+
+| Version | Merge (UTC) | Release public | Page deployed | Run |
+| --- | --- | --- | --- | --- |
+| [0.2.8](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.8-preview.1) | 02:43:19 | 02:44:36 (1:17) | 02:46:38 (3:19) | `38338238425` |
+| [0.2.9](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.9-preview.1) | 02:47:17 | 02:48:41 (1:24) | 02:50:39 (3:22) | `38338563070` |
+| [0.2.10](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.10-preview.1) | 02:51:54 | 02:53:50 (1:56) | 02:55:00 (3:06) | `38338929783` |
+
+- Anonymous downloads matched `SHA256SUMS.txt` for all three. Windows / Mac /
+  `full.nupkg` bytes: 0.2.8 176,215,040 / 141,847,532 / 175,385,009; 0.2.9
+  176,216,064 / 141,827,755 / 175,385,071; 0.2.10 176,217,600 / 141,817,525 / 175,386,791.
+  The page offers 0.2.10.
+- Open [#231](https://github.com/DeL-TaiseiOzaki/irori/pull/231) also numbered itself 0.2.9
+  and ADR 038; it needs a later version and ADR number before its merge.
+- Not tried on Windows or macOS.
+
+Copy path from every row, 2026-10-13 (**0.2.10**, published; built on 0.2.9,
 PR #232): the owner asked for a right click on any file of any layer to copy its path,
 as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), amendment).
 - `ExplorerItems` (`src/app/EntryActions.tsx`) takes an optional explorer and orders
@@ -89,7 +204,7 @@ as in Explorer or Finder ([ADR 036](decisions/036-explorer-as-file-manager.md), 
 - Verified by `explorer-ui-smoke` (clipboard read back) and the CLI test desktop.
   Not tried on Windows or macOS.
 
-Two vaults side by side, 2026-10-13 (**0.2.9**, not yet published; built on 0.2.8's
+Two vaults side by side, 2026-10-13 (**0.2.9**, published; built on 0.2.8's
 workspace tabs, PR #230): the owner asked to open several vaults and drag files
 between their knowledge ([ADR 038](decisions/038-vaults-side-by-side.md)). The owner
 chose a horizontal split and asking before a move that breaks links.
@@ -107,7 +222,7 @@ chose a horizontal split and asking before a move that breaks links.
   test desktop (a linked note: dialog with one broken link, then moved). Not tried on
   Windows, macOS or between volumes.
 
-Workspaces as tabs, 2026-10-13 (**0.2.8**, not yet published): the owner asked to
+Workspaces as tabs, 2026-10-13 (**0.2.8**, published): the owner asked to
 open several workspaces at once, tab-like ([ADR 037](decisions/037-workspace-tabs.md)).
 The owner chose a strip along the window's top and Home as the new-tab page.
 - `src/app/WorkspaceTabs.tsx` draws the strip above `.app-body` and above the
@@ -130,7 +245,7 @@ The owner chose a strip along the window's top and Home as the new-tab page.
   plus a manual pass on the CLI test desktop (a note restored after switching).
   Not tried on Windows or macOS.
 
-Files of any size, 2026-10-13 (**0.2.7**, not yet published): the owner hit
+Files of any size, 2026-10-13 (**0.2.7**, published): the owner hit
 "Not added, over 100 MiB" dropping a large deck into contents and asked for
 no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - `bringIn` (`src/app/main.tsx`) sends the first 16 MiB with `createEntry`
@@ -143,8 +258,27 @@ no size limit ([ADR 036](decisions/036-explorer-as-file-manager.md)).
 - A copy interrupted by quitting irori leaves a short file.
 - Verified by `npm run build`, `npm test` and `explorer-ui-smoke` (a 120 MiB
   drop, compared byte for byte) on Linux. Not tried on Windows or macOS.
+- Published 2026-10-13 at the owner's request: [#228](https://github.com/DeL-TaiseiOzaki/irori/pull/228)
+  merged as `0e81a6a` at 01:03:37 UTC. The push's `publish.yml` run
+  `38330300610` reused the pull request's packages (run `38329622851`):
+  [v0.2.7-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.7-preview.1)
+  public 01:06:17 (2:40), page 01:07:20 (3:43), drift green 01:07:30.
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,214,528 bytes,
+  Mac 141,849,476 bytes and `irori-0.2.7-full.nupkg` 175,383,346 bytes; the
+  live page offers the 0.2.7 installers.
 
-English first, 2026-10-12 (**0.2.6**, not yet published): the owner asked for
+Published 2026-10-12: **0.2.6** ([#226](https://github.com/DeL-TaiseiOzaki/irori/pull/226),
+a new device starts in English) merged at the owner's request as `dc4315b`.
+`publish.yml` published it by itself from the pull request's run `38263387209`,
+whose test merge had `dc4315b`'s tree (run `38265505690`: release, page with a
+generated manifest, drift in step). This is the first automatic use of that path.
+- Merge 14:47:40 UTC, release public 14:48:59 (1:19), page deployed 14:50:11
+  (2:31).
+- Anonymous downloads matched `SHA256SUMS.txt`: Windows 176,213,504 bytes,
+  Mac 141,850,724 bytes and `irori-0.2.6-full.nupkg` 175,381,461 bytes.
+- Not tried on Windows or macOS.
+
+English first, 2026-10-12 (**0.2.6**, published): the owner asked for
 English as the default interface language ([ADR 011](decisions/011-interface-language.md)).
 - A new device's record defaults to `en` (`src/host/settings.ts`,
   `src/app/device-settings.ts`). An installation with a saved language keeps
