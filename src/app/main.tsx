@@ -307,6 +307,8 @@ interface DockActions {
   splitColumn: (after: DockColumn) => void;
   closeColumn: (column: DockColumn) => void;
   createYou: () => Promise<void>;
+  /** The workspace chose another folder for the irori agent, or the default again. */
+  youFolderChanged: () => void;
   /** Opens the irori agent's screen: its folder, Schema and the vaults' sub-agents. */
   showYou: () => void;
   setShown: Dispatch<SetStateAction<Record<string, Tab>>>;
@@ -507,6 +509,7 @@ const DockColumnView = memo(function DockColumnView({
         )
       }
       onCreateYou={act.createYou}
+      onYouFolderChanged={act.youFolderChanged}
       onStarted={act.setHanded}
     />
   );
@@ -1007,6 +1010,14 @@ function App() {
   const [youRevision, setYouRevision] = useState(0);
   const youRead = useResource(() => host.yourAi(), [], { refresh: youRevision });
   const you = youRead.data;
+  // A file of the irori agent's folder a reply named, shown on its screen.
+  const [youPointed, setYouPointed] = useState<{ path: string; n: number }>();
+  // A folder chosen for the workspace that is not set up yet leaves its screen for the setup.
+  useEffect(() => {
+    if (level === 'you' && you?.state === 'missing') goToLevel('overview');
+    // A file pointed at is shown once; the screen opened again starts at its instructions.
+    if (level !== 'you' && youPointed) setYouPointed(undefined);
+  });
   const yourAiRunning = !!you && runningScopes.includes(you.id);
   // The shared Schema's skills join each vault's own in its composer; its own,
   // retired ones among them, win (ADR 027).
@@ -1159,6 +1170,13 @@ function App() {
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
   const report = useCallback((e: unknown) => setError(errorText(e)), []);
+  // The irori agent's folder is the workspace's (ADR 044): the host reads the one
+  // on show for its screens, its Schema settings and its terminal.
+  useEffect(() => {
+    void host
+      .showWorkspace(workspace?.id ?? null)
+      .then(() => setYouRevision((value) => value + 1), report);
+  }, [workspace?.id, report]);
   /** Counts a change in one vault, or in every one of them when none is named. */
   const bump = useCallback(
     (scopeId?: string) => setRevisions((all) => bumpRevision(all, scopeId)),
@@ -2012,6 +2030,12 @@ function App() {
     },
     openEntry: (space: Space, entry: Entry) => void open(space, entry),
     openPath: (target: PathTarget) => {
+      if (you && target.scopeId === you.id) {
+        if (you.state !== 'ready') return;
+        setYouPointed((value) => ({ path: target.path, n: (value?.n ?? 0) + 1 }));
+        goToLevel('you');
+        return;
+      }
       const space = workspaceSpaces.find((item) => item.scopeId === target.scopeId);
       if (!space) return;
       const rich = /\.md$/i.test(target.path);
@@ -2153,6 +2177,7 @@ function App() {
       await host.createYourAi();
       setYouRevision((value) => value + 1);
     },
+    youFolderChanged: () => setYouRevision((value) => value + 1),
     showYou: () => {
       if (you?.state === 'ready') goToLevel('you');
     },
@@ -2166,10 +2191,25 @@ function App() {
     setColumnStatus,
     setHanded,
   });
-  // A reply's paths open on this stage; a relative one from the irori agent is read in the vault on show.
+  // A reply's paths open on this stage, or the irori agent's files on its screen. The
+  // folders they may be in are the workspace's vaults, their connected folders and the
+  // irori agent's folder; a relative path starts where its writer works (ADR 044).
+  const pathRoots = useResource(
+    () => host.agentPathRoots(workspace?.id),
+    [workspace?.id, workspaceScopeIds.join(), you?.root],
+    { enabled: !!workspace },
+  );
   const pathOpener = useMemo<PathOpener>(
-    () => ({ roots: workspaceSpaces, fallback: active?.scopeId, open: act.openPath }),
-    [workspaceSpaces, active?.scopeId, act],
+    () => ({
+      roots: pathRoots.data ?? workspaceSpaces,
+      workspaceId: workspace?.id,
+      name: (scopeId) =>
+        scopeId === you?.id
+          ? 'irori agent'
+          : (workspaceSpaces.find((space) => space.scopeId === scopeId)?.name ?? ''),
+      open: act.openPath,
+    }),
+    [pathRoots.data, workspaceSpaces, workspace?.id, you?.id, act],
   );
   // The explorer of the vault on show; its rows keep it while the vault stays.
   const explorer = useMemo<Explorer | undefined>(
@@ -2638,6 +2678,9 @@ function App() {
         {level === 'you' && workspace && you?.state === 'ready' && (
           <YourAiScreen
             you={you}
+            workspaceId={workspace.id}
+            pointed={youPointed}
+            onFolderChanged={() => setYouRevision((value) => value + 1)}
             agent={yourChoice.agent}
             spaces={workspaceSpaces}
             running={yourAiRunning}

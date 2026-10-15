@@ -31,6 +31,7 @@ import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
 import { AgentLog } from './AgentLog';
 import { PathBase, PathOpenerContext, type PathOpener } from './path-links';
+import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
@@ -143,6 +144,7 @@ export function AgentColumn({
   onClose,
   onStatus,
   onCreateYou,
+  onYouFolderChanged,
   onStarted,
 }: {
   column: DockColumn;
@@ -198,6 +200,8 @@ export function AgentColumn({
   /** What the window needs to know: a send under way, and the queue's length. */
   onStatus: (status: { sending: boolean; queued: number }) => void;
   onCreateYou: () => Promise<void>;
+  /** The workspace chose another folder for the irori agent, or the default again. */
+  onYouFolderChanged: () => void;
   /** An irori column's run began with these vaults handed to it. */
   onStarted?: (brains: string[]) => void;
 }) {
@@ -867,7 +871,11 @@ export function AgentColumn({
       {irori && !you && <p className="hint">{t('読み込み中…', 'Loading…')}</p>}
       {irori && you?.state === 'missing' && (
         <div className="your-ai-setup">
-          <p className="mono your-ai-path">{you.root}</p>
+          {workspaceId ? (
+            <IroriAgentFolderSection workspaceId={workspaceId} onChanged={onYouFolderChanged} />
+          ) : (
+            <p className="mono your-ai-path">{you.root}</p>
+          )}
           <button
             className="ember-button"
             disabled={sending}
@@ -975,7 +983,7 @@ export function AgentColumn({
           </div>
         )}
         <PathOpenerContext.Provider value={shared.paths}>
-          <PathBase.Provider value={space?.scopeId}>
+          <PathBase.Provider value={space?.scopeId ?? you?.id}>
             <AgentLog
               events={events}
               activeRun={shownRunning ? events.at(-1)?.runId : undefined}

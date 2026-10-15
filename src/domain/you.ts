@@ -15,6 +15,20 @@ export interface YourAi {
   state: 'missing' | 'ready';
   /** The standard skills whose folder the ready folder lacks. */
   missingSkills: string[];
+  /** The workspace on show chose this folder; otherwise it is the default (ADR 044). */
+  chosen?: boolean;
+  /** The chosen folder, when it is not there and the default stands in for it. */
+  missing?: string;
+}
+
+/** The folder the irori agent works in for one workspace (ADR 044). */
+export interface IroriAgentFolder {
+  /** Where it works now, an absolute path on this device. */
+  path: string;
+  /** The workspace chose a folder; otherwise it is the default, `~/irori/you`. */
+  chosen: boolean;
+  /** The chosen folder, when it is not there and the default stands in for it. */
+  missing?: string;
 }
 
 /**
