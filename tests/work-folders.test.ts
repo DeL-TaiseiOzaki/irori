@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
@@ -20,9 +29,9 @@ async function device(t: any) {
   return { base, files, lab, other, work: new WorkFolders(files) };
 }
 
-test("A vault's agents work in .irori/work, which Git ignores, until another folder is chosen", async (t) => {
+test("A vault's agents work in contents/work, which Git ignores, until another folder is chosen", async (t) => {
   const { base, files, lab, other, work } = await device(t);
-  const fallback = path.join(lab.root, '.irori', 'work');
+  const fallback = path.join(lab.root, ...lab.contents[0].split('/'), 'work');
   assert.deepEqual(await work.folder(lab.scopeId), { path: fallback, chosen: false });
   // Nothing is made until a run or the person needs it.
   await assert.rejects(lstat(fallback), { code: 'ENOENT' });
@@ -70,7 +79,27 @@ test('A work folder overlapping a vault or irori data, or not there, is refused'
   // A link where the default goes is not followed out of the vault.
   const outside = path.join(base, 'Outside');
   await mkdir(outside);
-  await symlink(outside, path.join(lab.root, '.irori', 'work'));
+  await mkdir(path.join(lab.root, lab.contents[0]), { recursive: true });
+  await symlink(outside, path.join(lab.root, lab.contents[0], 'work'));
   await assert.rejects(work.prepare(lab.scopeId), /リンクやファイル/);
   await assert.rejects(lstat(path.join(outside, '.gitignore')), { code: 'ENOENT' });
+});
+
+test('What the agents left in .irori/work moves to contents/work; a folder the person made stays theirs', async (t) => {
+  const { lab, other, work } = await device(t);
+  const former = path.join(lab.root, '.irori', 'work');
+  await mkdir(path.join(former, 'task-1'), { recursive: true });
+  await writeFile(path.join(former, '.gitignore'), '*\n');
+  await writeFile(path.join(former, 'task-1', 'draft.md'), 'draft');
+  const moved = await work.prepare(lab.scopeId);
+  assert.equal(moved, path.join(lab.root, lab.contents[0], 'work'));
+  assert.equal(await readFile(path.join(moved, 'task-1', 'draft.md'), 'utf8'), 'draft');
+  assert.match(await readFile(path.join(moved, '.gitignore'), 'utf8'), /^\*$/m);
+  await assert.rejects(lstat(former), { code: 'ENOENT' });
+  // A `work` folder the person made in contents is used as it is, its Git left alone.
+  const theirs = path.join(other.root, other.contents[0], 'work');
+  await mkdir(theirs, { recursive: true });
+  await writeFile(path.join(theirs, 'mine.md'), 'mine');
+  assert.equal(await work.prepare(other.scopeId), theirs);
+  await assert.rejects(lstat(path.join(theirs, '.gitignore')), { code: 'ENOENT' });
 });

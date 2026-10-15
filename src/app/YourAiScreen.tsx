@@ -6,6 +6,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { Icon } from './Icon';
+import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { useResource } from './useResource';
 import './you.css';
 
@@ -215,6 +216,9 @@ function Definition({ file, reads }: { file: BrainAgent['definitions'][number]; 
  */
 export function YourAiScreen({
   you,
+  workspaceId,
+  pointed,
+  onFolderChanged,
   agent,
   spaces,
   running,
@@ -223,6 +227,11 @@ export function YourAiScreen({
   onAddSkills,
 }: {
   you: YourAi;
+  /** The workspace on show, whose folder the irori agent works in (ADR 044). */
+  workspaceId: string;
+  /** A file of the folder a reply named, to show; `n` counts each request. */
+  pointed?: { path: string; n: number };
+  onFolderChanged: () => void;
   /** The CLI your AI runs on. */
   agent: AgentId;
   spaces: Space[];
@@ -280,6 +289,16 @@ export function YourAiScreen({
     const owner = owners.get(path);
     if (owner) setPicked(owner.scopeId);
   };
+  // A path in a reply opens its file with the folders on its way open.
+  useEffect(() => {
+    if (!pointed) return;
+    const parts = pointed.path.split('/').slice(0, -1);
+    const folders = parts.map((_, index) => parts.slice(0, index + 1).join('/'));
+    setSchemaFiles(true);
+    setOpen((value) => [...new Set([...value, ...folders])]);
+    setTarget(undefined);
+    setFile(pointed.path);
+  }, [pointed]);
   return (
     <div className="your-ai-screen">
       <section
@@ -311,6 +330,13 @@ export function YourAiScreen({
             </span>
           </div>
         </header>
+        <div className="you-folder-settings">
+          <IroriAgentFolderSection
+            workspaceId={workspaceId}
+            showPath={false}
+            onChanged={onFolderChanged}
+          />
+        </div>
         <div className="you-tree-section">
           <div className="you-tree-heading">
             <h2>

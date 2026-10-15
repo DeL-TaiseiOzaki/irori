@@ -278,6 +278,20 @@ export const hostArguments = {
   removeQueuedMessage: z.tuple([id, id]),
   startNextQueued: z.tuple([id, id.optional(), id.optional()]),
   start: z.tuple([startInput]),
+  showWorkspace: z.tuple([id.nullable()]),
+  iroriAgentFolder: z.tuple([id]),
+  setIroriAgentFolder: z.tuple([id, path.min(1).nullable()]),
+  openIroriAgentFolder: z.tuple([id]),
+  agentPathRoots: z.tuple([id.optional()]),
+  locateAgentPath: z.tuple([
+    z
+      .object({
+        path: path.min(1),
+        from: id.optional(),
+        workspaceId: id.optional(),
+      })
+      .strict(),
+  ]),
   yourAi: z.tuple([]),
   createYourAi: z.tuple([]),
   addYourAiSkills: z.tuple([]),

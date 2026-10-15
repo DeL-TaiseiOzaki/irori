@@ -12,10 +12,24 @@ export interface WrittenPath {
   line?: number;
   column?: number;
 }
-/** A vault a written path may land in: its id and its folder on this device. */
+/**
+ * A folder a written path may land in: a vault's, the irori agent's, or a
+ * connected folder's real place, which `prefix` names inside its vault
+ * (`contents/<name>`).
+ */
 export interface PathRoot {
   scopeId: string;
   root: string;
+  prefix?: string;
+}
+/** A path from an agent's reply, to be found on this device (ADR 044). */
+export interface AgentPathQuery {
+  /** As written, line and column taken off. */
+  path: string;
+  /** Whose agent wrote it: a vault's, or the irori agent's id. */
+  from?: string;
+  /** The workspace whose folders it may be in. */
+  workspaceId?: string;
 }
 /** A file of a vault, as `/` separated path inside it, and where in it. */
 export interface PathTarget {
@@ -26,6 +40,8 @@ export interface PathTarget {
 }
 
 const urlScheme = /^[a-z][a-z0-9+.-]*:/i;
+// `AGENTS.md:12` reads as a scheme `agents.md:`; a file's name with a line is not one.
+const namedLine = /^[^/:]+\.[a-z][a-z0-9_-]{0,9}:\d+(?::\d+)?(?:-\d+(?::\d+)?)?(?:#.*)?$/i;
 const drive = /^[a-z]:\//i;
 // `:42`, `:42:7`, `:42-51` (Codex, compilers) or `#L42`, `#L42C7`, `#L42-L51` (GitHub, VS Code).
 const lineSuffix = /:(\d+)(?::(\d+))?(?:-\d+(?::\d+)?)?$/;
@@ -66,7 +82,7 @@ export function writtenPath(value: string, kind: 'href' | 'code'): WrittenPath |
     kind = 'href';
   } else {
     raw = raw.replace(/\\/g, '/');
-    if (urlScheme.test(raw) && !drive.test(raw)) return undefined;
+    if (urlScheme.test(raw) && !drive.test(raw) && !namedLine.test(raw)) return undefined;
     const hash = raw.indexOf('#');
     if (hash !== -1) {
       fragment = raw.slice(hash + 1);
@@ -103,7 +119,7 @@ export function writtenPath(value: string, kind: 'href' | 'code'): WrittenPath |
   return { path: raw, ...(line && { line }), ...(column && { column }) };
 }
 
-function isAbsolute(path: string) {
+export function isAbsolute(path: string) {
   return path.startsWith('/') || drive.test(path);
 }
 
@@ -139,13 +155,14 @@ export function locatePath(
   if (!whole) return undefined;
   let found: PathTarget | undefined;
   let longest = -1;
-  for (const { scopeId, root } of roots) {
+  for (const { scopeId, root, prefix } of roots) {
     const folder = root.replace(/\\/g, '/').replace(/\/+$/, '');
     // A Windows path names the same file in either case.
     const fold = drive.test(folder) ? (s: string) => s.toLowerCase() : (s: string) => s;
     if (folder.length <= longest || !fold(whole).startsWith(`${fold(folder)}/`)) continue;
     longest = folder.length;
-    found = { scopeId, path: whole.slice(folder.length + 1) };
+    const inside = whole.slice(folder.length + 1);
+    found = { scopeId, path: prefix ? `${prefix}/${inside}` : inside };
   }
   if (!found) return undefined;
   return {
@@ -153,4 +170,46 @@ export function locatePath(
     ...(written.line && { line: written.line }),
     ...(written.column && { column: written.column }),
   };
+}
+
+/**
+ * Where a written path may be, most likely first (ADR 044): an absolute path in
+ * the folder that holds it; a relative one from its writer's folder, then from
+ * every other folder of the workspace, then without the `a/` or `b/` a diff
+ * puts before it. Whether a file is there is the host's to check.
+ */
+export function pathCandidates(path: string, roots: PathRoot[], from?: string): PathTarget[] {
+  if (isAbsolute(path)) {
+    const found = locatePath({ path }, roots);
+    return found ? [found] : [];
+  }
+  // A connected folder's real place is reached through its vault, not as a start.
+  const starts = roots.filter((root) => !root.prefix);
+  const order = [
+    ...starts.filter((root) => root.scopeId === from),
+    ...starts.filter((root) => root.scopeId !== from),
+  ];
+  const written = [path, ...(/^[ab]\/./.test(path) ? [path.slice(2)] : [])];
+  const seen = new Set<string>();
+  const found: PathTarget[] = [];
+  for (const each of written)
+    for (const root of order) {
+      const target = locatePath({ path: each }, starts, root.scopeId);
+      const key = target && `${target.scopeId}\0${target.path}`;
+      if (!target || seen.has(key!)) continue;
+      seen.add(key!);
+      found.push(target);
+    }
+  return found;
+}
+
+/**
+ * Whether a file's path inside its folder ends with what was written, as a
+ * bare name or the tail of a path (`topic.md`, `wiki/topic.md`), for a reply
+ * that named a file without its whole path.
+ */
+export function endsWithWritten(path: string, written: string) {
+  const tail = written.replace(/^(?:\.\/)+/, '');
+  if (!tail || tail.split('/').some((part) => part === '..' || part === '.')) return false;
+  return path === tail || path.endsWith(`/${tail}`);
 }

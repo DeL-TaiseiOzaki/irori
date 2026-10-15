@@ -87,6 +87,7 @@ export function run(kind) {
     const markdownReply =
       '### 手順\n\n1. \`note.md\` を開く\n2. 見出しを追加\n\n[公開ページ](https://example.com/irori)\n\n[危険](javascript:alert(1))\n\n' +
       `[second.md](${encodeURI(path.join(process.cwd(), 'second.md'))}:1)\n\n` +
+      'A name with its line, \`second.md:1\`, and one that is not there, \`missing.md\`.\n\n' +
       '\`\`\`ts\nconst ok = true;\n\`\`\`\n';
     const complete = (error = false, text = '日本語\u2028の応答') => {
       send({ type: 'message_start', message: { role: 'assistant' } });

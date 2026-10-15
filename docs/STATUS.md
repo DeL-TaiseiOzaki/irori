@@ -1,5 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Where agents work, 2026-10-15 (**0.2.19**, not yet published): the owner saw a
+reply's path open another file or "not found", and asked that the irori agent's
+folder be per workspace and a vault's work folder be in its contents
+([ADR 044](decisions/044-where-agents-work.md)).
+- `YourAiService` (`src/host/you.ts`) keeps `irori-agent-folders.json`;
+  `folderOf`/`rootOf(id, workspace)` give the workspace's folder, `show` the one
+  the window shows. Runs pass `input.workspace` (`src/agents/service.ts`); the
+  shared Schema, routines and the environment use the default folder.
+- `AgentPaths` (`src/host/agent-paths.ts`) answers `agentPathRoots` and
+  `locateAgentPath`: candidates from `pathCandidates` (`src/domain/path-links.ts`),
+  then a bounded search by name. `AgentMarkdown` asks it on click and offers
+  several matches. `PathBase` of the irori column is its own id.
+- `WorkFolders` (`src/host/work-folders.ts`) defaults to `<contents>/work`
+  and moves `.irori/work` there.
+- `IroriAgentFolderSection` (`src/app/IroriAgentFolder.tsx`) on the irori
+  agent's screen and its setup.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`. No real CLI
+  was run.
+
 Routines from a form, 2026-10-15 (**0.2.18**, not yet published): the owner
 asked how a routine's secrets are set, and found making a routine poor (a name
 dialog, then `routine.yaml` by hand). See [ROUTINES](ROUTINES.md#making-one) and

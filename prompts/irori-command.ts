@@ -138,8 +138,8 @@ irori work <vault> <folder>
 irori work <vault> --default
   Chooses the folder where the vault's agents keep scratch files,
   intermediate results, downloads and trial scripts, on this computer: an
-  existing folder, not another vault's. --default goes back to .irori/work
-  in the vault, which Git ignores.
+  existing folder, not another vault's. --default goes back to work in the
+  vault's contents, which Git ignores.
 
 irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
   Changes the vault's name, its category, the names its Knowledge and
@@ -337,7 +337,7 @@ export function workFolderChosen(
 ) {
   return folder.chosen
     ? `The agents of the vault "${vault}" work in ${JSON.stringify(folder.path)} on this computer.`
-    : `The agents of the vault "${vault}" work in ${JSON.stringify(folder.path)}, the vault's .irori/work, which Git ignores.`;
+    : `The agents of the vault "${vault}" work in ${JSON.stringify(folder.path)}, the work folder in the vault's contents, which Git ignores.`;
 }
 
 /** `irori layer`: the folder a layer now has, and what could not be carried over. */
