@@ -7,6 +7,7 @@ import { yourAiChoice } from '../domain/conversation';
 import { routineRuntimes } from '../domain/routines';
 import {
   markdownFonts,
+  pageMargins,
   themes,
   type Category,
   type DeviceSettings,
@@ -53,6 +54,7 @@ const stored = z.object({
       theme: z.enum(themes),
       language: z.enum(languages),
       markdownFont: z.enum(markdownFonts),
+      pageMargins: z.enum(pageMargins),
       editorAssistance: z.boolean(),
       vaultAgent: z.boolean(),
       yourAi: yourAiChoice,

@@ -18,6 +18,7 @@ export const environmentPreferences = [
   'theme',
   'language',
   'markdownFont',
+  'pageMargins',
   'editorAssistance',
   'vaultAgent',
   'yourAi',
