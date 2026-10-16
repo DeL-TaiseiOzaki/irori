@@ -11,6 +11,7 @@ import {
   type RoutineReviewFile,
   type RoutineRun,
   type RoutineRunState,
+  type RoutineRuntime,
   type RoutineStep,
   type RoutineStepRun,
   type RunRoutine,
@@ -359,7 +360,7 @@ function RoutineCard({
   onToggle: () => void;
   onRun: () => void;
   onStop: () => void;
-  onAddRuntime: () => void;
+  onAddRuntime: (runtime: RoutineRuntime) => Promise<unknown>;
   onEnterSecret: (name: string) => void;
   onEdit: () => void;
   onOpenConversation: (conversation: Conversation) => void;
@@ -367,6 +368,8 @@ function RoutineCard({
 }) {
   const running = live?.state === 'running' || (!!routine.running && !live);
   const last = live ?? routine.last;
+  // Python is downloaded, which can take a while; the button waits with it.
+  const adding = useAction();
   return (
     <article className={`routine ${running ? 'running' : ''}`} aria-label={routine.name}>
       <header className="routine-head">
@@ -422,10 +425,18 @@ function RoutineCard({
       {!routine.problem && routine.needs && (
         <p className="routine-needs">
           {routine.needs.text}
-          {routine.needs.runtime === 'javascript' && (
-            <button className="panel-button" onClick={onAddRuntime}>
+          {routine.needs.runtime && (
+            <button
+              className="panel-button"
+              disabled={adding.busy}
+              onClick={() => void adding.run(() => onAddRuntime(routine.needs!.runtime!))}
+            >
               <Icon name="plus" size={13} />
-              {t('JavaScript を追加', 'Add JavaScript')}
+              {routine.needs.runtime === 'python'
+                ? adding.busy
+                  ? t('Python を追加中…', 'Adding Python…')
+                  : t('Python を追加', 'Add Python')
+                : t('JavaScript を追加', 'Add JavaScript')}
             </button>
           )}
           {routine.needs.secrets?.map((name) => (
@@ -527,7 +538,7 @@ export function RoutinesView({
     reread();
   }
   const act = (routine: Routine, action: () => Promise<void>) =>
-    void action().catch((error) =>
+    action().catch((error) =>
       setErrors((all) => ({ ...all, [routineKey(routine.ref)]: errorText(error) })),
     );
   const groups = [
@@ -582,10 +593,11 @@ export function RoutinesView({
                     : setReviewing(routine)
                 }
                 onStop={() => act(routine, () => host.stopRoutine(routine.ref))}
-                onAddRuntime={() =>
+                onAddRuntime={(runtime) =>
                   act(routine, async () => {
+                    if (runtime === 'python') await host.installPython();
                     await chooseRoutineRuntimes([
-                      ...new Set([...currentRoutineRuntimes(), 'javascript' as const]),
+                      ...new Set([...currentRoutineRuntimes(), runtime]),
                     ]);
                     reread();
                   })

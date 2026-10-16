@@ -63,6 +63,7 @@ import {
 import { readFolderSkills, readSkillReach, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
+import { PythonRuntime } from './python-runtime';
 import { reversibleStorage, SecretStore } from './keystore';
 import { AgentSetup } from './agent-setup';
 import { removeSpace } from './remove-space';
@@ -210,6 +211,8 @@ app
         ? reversibleStorage
         : safeStorage,
     );
+    // Python for routines is uv in irori's data, downloaded only when the person adds it.
+    const python = new PythonRuntime({ dataDir: files.dataDir });
     // Routines run only when the person presses 実行; their records stay on this device.
     const routines = new RoutineService({
       dataDir: files.dataDir,
@@ -223,6 +226,7 @@ app
       canStart: canStartAgent,
       emit: (run) => emit({ type: 'routine', run }),
       runtime: process.execPath,
+      python,
     });
     await routines
       .init()
@@ -1075,6 +1079,9 @@ app
       runRoutine: (ref, input) => routines.run(ref, input),
       stopRoutine: (ref) => routines.stop(ref),
       routineRuns: (ref) => routines.runs(ref),
+      installPython: async () => {
+        await python.install();
+      },
       secrets: () => secrets.list(),
       setSecret: (name, value) => secrets.set(name, value),
       deleteSecret: (name) => secrets.delete(name),

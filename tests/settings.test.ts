@@ -161,9 +161,9 @@ test('the runtimes routines may use are added by the person and kept on the devi
   await settings.save({ routineRuntimes: [] });
   assert.deepEqual((await settings.read()).routineRuntimes, []);
   const save = hostArguments.saveDeviceSettings;
-  assert.equal(save.safeParse([{ routineRuntimes: ['javascript'] }]).success, true);
-  // Python needs a download that irori does not make yet (ADR 016 stage 3).
-  for (const runtimes of [['python'], ['node'], ['javascript', 'javascript']])
+  for (const runtimes of [['javascript'], ['python'], ['javascript', 'python']])
+    assert.equal(save.safeParse([{ routineRuntimes: runtimes }]).success, true, String(runtimes));
+  for (const runtimes of [['node'], ['javascript', 'javascript'], ['python', 'python']])
     assert.equal(save.safeParse([{ routineRuntimes: runtimes }]).success, false, String(runtimes));
 });
 

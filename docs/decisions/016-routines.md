@@ -308,8 +308,7 @@ decisions above left open:
 - **While a routine runs,** Git operations wait, as they do for an agent run,
   and closing irori asks before stopping it.
 - **JavaScript** is added by a device setting (`routineRuntimes`), from the
-  routine's row or the settings; Python's download will be stage 3's `HostAPI`
-  method.
+  routine's row or the settings; Python's download is `installPython` (stage 3).
 - **The change record** compares each hibachi's Git status before and after,
   and the content of paths changed at both ends. Git status leaves out a
   hibachi's contents folders and hibachis that are not Git repositories, so
@@ -417,13 +416,33 @@ it, and the list of stored ones was hidden while it was empty.
   since a program step's file has to be put there. irori still writes no other
   file in it.
 
+## Stage 3 as built
+
+Implemented on 2026-10-16 (0.2.23), as D3 describes.
+
+- **uv is pinned,** version 0.12.21, by each archive's size and SHA-256 as
+  GitHub lists them for macOS, Linux and Windows on x64 and arm64
+  (`src/host/python-runtime.ts`). `installPython` downloads the device's
+  archive over HTTPS, refuses one that differs, and keeps only the `uv`
+  executable in `<irori data>/runtimes/uv/<version>/`. A newer uv is a source
+  change with new digests.
+- **A `.py` step** runs as `uv run --no-project --script <file>` in the
+  owner's working folder: the script's PEP 723 block is its only description,
+  and a project around it is ignored. uv's Python and cache stay under
+  `<irori data>/runtimes/`; it uses only Python it manages and reads none of the
+  person's uv configuration.
+- **What the device needs** is both the setting and uv on disk, since a restored
+  environment (ADR 043) can carry the setting to a device without the download.
+  The row's **Python を追加** and the settings' **Python** both download first and
+  then turn the setting on. Turning it off leaves the download in place.
+
 ## Stages
 
 1. `routine.yaml`, discovery in both locations, D4's review, **実行** and
    **停止**, `run` steps with the JavaScript runtime and `PATH` commands, agent
    steps, D7 and D8. Done in 0.1.57.
 2. D5's secrets, with write-back. Done in 0.1.72.
-3. The Python runtime.
+3. The Python runtime. Done in 0.2.23.
 4. A skill in the irori agent's starter that tells it how to write a routine,
    and a check it can run before asking the person to run one. Done in 0.1.77,
    with making and editing a routine on the routines page.
