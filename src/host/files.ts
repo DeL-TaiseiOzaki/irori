@@ -254,6 +254,8 @@ export class FileService {
     linkedPaths?(scopeId: string): string[];
     /** Both at once: each folder's path inside the vault and its real place. */
     linkedFolders?(scopeId: string): { path: string; target: string }[];
+    /** The vault's work folder, as it shows in contents and where it is (ADR 045). */
+    workPlace?(scopeId: string): Promise<{ path: string; target: string } | undefined>;
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];

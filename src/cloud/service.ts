@@ -26,6 +26,7 @@ import type {
   Entry,
   LocalAttachment,
   NewEntry,
+  WorkFolder,
 } from '../domain/types';
 import { t } from '../domain/i18n';
 
@@ -92,6 +93,13 @@ type Mounted = {
   writable: boolean;
 };
 /**
+ * A folder shown in contents whose files may be read and changed there: a
+ * connection, or the vault's work folder (ADR 045).
+ */
+type Place = Pick<Mounted, 'entry' | 'target' | 'writable'>;
+/** The name the vault's work folder shows under in its first contents folder. */
+const workName = 'work';
+/**
  * The folders in a vault's contents. Each is a folder on this device, often one
  * a sync app (Drive for desktop, Dropbox, Box, iCloud, OneDrive) keeps, shown at
  * `contents/<name>` through a link (ADR 019). Google Drive connections irori made
@@ -112,6 +120,10 @@ export class CloudService {
   mayLink?: (scopeId: string) => boolean;
   /** A waiting or lost folder was linked again without anyone asking. */
   onLinked?: (scopeId: string) => void;
+  /** Where a vault's agents work (ADR 044), shown as `<contents>/work` (ADR 045). */
+  workFolder?: (scopeId: string) => Promise<WorkFolder>;
+  // Each vault's work folder as last looked at, so writability can be answered without I/O.
+  private works = new Map<string, Place | undefined>();
   constructor(
     private files: CloudStorage,
     /** Moves a local folder's file to the system trash; without it, nothing local is deleted. */
@@ -942,9 +954,62 @@ export class CloudService {
     const root = this.roots.get(scopeId);
     if (!root) return false;
     const target = path.join(root, rel);
-    return [...this.mounted.values()].some(
-      (item) => item.attachment.scopeId === scopeId && item.writable && within(item.entry, target),
+    return this.places(scopeId).some((item) => item.writable && within(item.entry, target));
+  }
+  /** The vault's connected folders and its work folder, as last looked at. */
+  private places(scopeId: string): Place[] {
+    const work = this.works.get(scopeId);
+    return [
+      ...[...this.mounted.values()].filter((item) => item.attachment.scopeId === scopeId),
+      ...(work ? [work] : []),
+    ];
+  }
+  /**
+   * The vault's work folder as it shows in contents: `work` in its first contents
+   * folder, holding the files of the folder its agents work in, which is that
+   * folder itself by default or the one the person chose (ADR 045). None while
+   * the folder is not there, while a connection has the name, or when the chosen
+   * folder already shows in the vault or one of its connections.
+   */
+  private async work(scopeId: string): Promise<Place | undefined> {
+    const place = await this.findWork(scopeId).catch(() => undefined);
+    this.works.set(scopeId, place);
+    return place;
+  }
+  private async findWork(scopeId: string): Promise<Place | undefined> {
+    if (!this.workFolder) return;
+    const space = await this.files.get(scopeId);
+    const contentsRoot = space.contents[0];
+    if (!contentsRoot) return;
+    const taken = (await this.list(scopeId, false)).some(
+      (record) =>
+        record.contentsRoot === contentsRoot && nameKey(record.name) === nameKey(workName),
     );
+    if (taken) return;
+    const target = (await this.workFolder(scopeId)).path;
+    const info = await fs.lstat(target).catch(() => undefined);
+    if (!info?.isDirectory() || info.isSymbolicLink()) return;
+    const parent = await this.parent({ scopeId, contentsRoot });
+    const entry = path.join(space.root, ...contentsRoot.split('/'), workName);
+    if (target === entry) return parent ? { entry, target, writable: true } : undefined;
+    if (
+      within(space.root, target) ||
+      [...this.mounted.values()].some(
+        (item) => item.attachment.scopeId === scopeId && within(item.target, target),
+      )
+    )
+      return;
+    return { entry, target, writable: true };
+  }
+  /**
+   * The vault's work folder as a path inside the vault and its real place, for a
+   * path an agent wrote by the latter (ADR 045).
+   */
+  async workPlace(scopeId: string) {
+    const work = await this.work(scopeId);
+    if (!work) return undefined;
+    const root = await this.rootOf(scopeId);
+    return { path: path.relative(root, work.entry).split(path.sep).join('/'), target: work.target };
   }
   private async assertWritable(scopeId: string, rel: string) {
     await this.rootOf(scopeId);
@@ -1012,9 +1077,7 @@ export class CloudService {
   private async editable(scopeId: string, rel: string) {
     const actual = await this.resolve(scopeId, rel);
     await this.assertWritable(scopeId, rel);
-    const mounted = [...this.mounted.values()].find(
-      (item) => item.attachment.scopeId === scopeId && within(item.target, actual),
-    )!;
+    const mounted = this.places(scopeId).find((item) => within(item.target, actual))!;
     if (actual === mounted.target) throw connectionFolderError();
     return { actual, mounted };
   }
@@ -1148,18 +1211,22 @@ export class CloudService {
   private async locate(scopeId: string, rel: string) {
     assertCloudPath(rel);
     const target = path.join(await this.rootOf(scopeId), rel);
-    const entry = [...this.mounted.values()].find(
+    const mounted = [...this.mounted.values()].find(
       (item) => item.attachment.scopeId === scopeId && within(item.entry, target),
     );
+    const work = mounted ? undefined : await this.work(scopeId);
+    const entry: Place | undefined =
+      mounted ?? (work && within(work.entry, target) ? work : undefined);
     if (!entry)
       throw Error(t('クラウドフォルダは未接続です。', 'The cloud folder is not connected.'));
-    await this.assertLinked(entry);
+    if (mounted) await this.assertLinked(mounted);
     // The mount point's identity is verified above; below it no component may be
     // a link, checked one component at a time as parent() does above it. realpath
     // cannot be used: on Windows a WinFsp volume mounted on a folder has no DOS
     // name, so GetFinalPathNameByHandleW fails and Node reports UNKNOWN for every
     // path inside the mount.
-    // A local folder's link is followed only here, to the folder verified above.
+    // A local folder's link is followed only here, to the folder verified above;
+    // the work folder was checked to be a folder, not a link, as it was looked at.
     let actual = entry.target;
     for (const part of path.relative(entry.entry, target).split(path.sep).filter(Boolean)) {
       actual = path.join(actual, part);
@@ -1185,6 +1252,18 @@ export class CloudService {
         connection: true,
         ...(record.provider === 'local' ? { local: true } : {}),
       }));
+    // The work folder shows as a connection does: opened and changed, never renamed as an entry.
+    if (rel === space.contents[0] && (await this.work(scopeId)))
+      entries.push({
+        path: `${rel}/${workName}`,
+        name: workName,
+        directory: true,
+        layer: 'contents',
+        note: false,
+        writable: true,
+        connection: true,
+        local: true,
+      });
     const parent = await this.parent({ scopeId, contentsRoot: rel });
     if (parent)
       for (const item of await fs.readdir(parent, { withFileTypes: true })) {
