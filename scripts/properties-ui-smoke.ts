@@ -97,6 +97,41 @@ try {
   // Opening a page and doing nothing leaves its bytes alone.
   expect(await onDisk('proposal.md')).toBe(proposalHead + proposalBody);
 
+  // Smaller side margins widen the page; the properties stay aligned with the body.
+  const pageEdges = () =>
+    page.evaluate(() => {
+      // Where each one's content starts: its box plus its own left padding.
+      const [text, properties] = ['.ProseMirror', '.page-properties'].map((selector) => {
+        const element = document.querySelector(selector)!;
+        return (
+          element.getBoundingClientRect().left + parseFloat(getComputedStyle(element).paddingLeft)
+        );
+      });
+      return {
+        stage: document.querySelector('.document-scroll')!.clientWidth,
+        width: document.querySelector('.document-editor')!.getBoundingClientRect().width,
+        text,
+        properties,
+      };
+    });
+  const chooseMargins = async (name: string) => {
+    await page.getByRole('button', { name: /^設定（/ }).click();
+    await page.getByRole('group', { name: '左右の余白' }).getByRole('radio', { name }).check();
+    await page.keyboard.press('Escape');
+  };
+  const standard = await pageEdges();
+  expect(standard.width).toBeLessThanOrEqual(696);
+  await chooseMargins('最小');
+  await expect
+    .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).pageMargins)
+    .toBe('minimal');
+  const minimal = await pageEdges();
+  expect(minimal.width).toBeCloseTo(minimal.stage, 0);
+  expect(minimal.text).toBeLessThan(standard.text);
+  expect(minimal.properties - minimal.text).toBeCloseTo(standard.properties - standard.text, 0);
+  await chooseMargins('標準');
+  await expect.poll(async () => (await pageEdges()).width).toBeCloseTo(standard.width, 0);
+
   // A select and a tag change one line each; the save names the person.
   await properties.getByLabel('状態', { exact: true }).selectOption('draft');
   const tagInput = properties.locator('.properties-chips input');

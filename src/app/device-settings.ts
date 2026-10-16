@@ -13,6 +13,7 @@ let current: DeviceSettings = {
   theme: 'system',
   language: 'en',
   markdownFont: 'sans',
+  pageMargins: 'standard',
   editorAssistance: true,
   vaultAgent: false,
   layouts: {},
@@ -112,6 +113,15 @@ export function applyMarkdownFont(font: DeviceSettings['markdownFont'] = current
   document.documentElement.dataset.markdownFont = font;
 }
 
+export function currentPageMargins() {
+  return current.pageMargins;
+}
+
+/** Applies the side margins only to a note's page through CSS. */
+export function applyPageMargins(margins: DeviceSettings['pageMargins'] = current.pageMargins) {
+  document.documentElement.dataset.pageMargins = margins;
+}
+
 /** Keeps a system choice in step with the desktop while it is the choice. */
 export function watchSystemTheme() {
   const media = systemDark();
@@ -130,6 +140,10 @@ export function chooseTheme(theme: DeviceSettings['theme']) {
 
 export function chooseMarkdownFont(markdownFont: DeviceSettings['markdownFont']) {
   return save({ markdownFont }, (shown) => applyMarkdownFont(shown.markdownFont));
+}
+
+export function choosePageMargins(pageMargins: DeviceSettings['pageMargins']) {
+  return save({ pageMargins }, (shown) => applyPageMargins(shown.pageMargins));
 }
 
 /** The reader's role and project for one KB; a KB without a choice is not narrowed. */
@@ -174,6 +188,7 @@ export async function reloadDeviceSettings() {
   current = await host.deviceSettings();
   applyTheme();
   applyMarkdownFont();
+  applyPageMargins();
   applyLanguage();
   return current;
 }

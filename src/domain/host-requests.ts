@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentIds, markdownFonts, themes } from './types';
+import { agentIds, markdownFonts, pageMargins, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
 import { agentModel, startInput, yourAiChoice } from './conversation';
@@ -62,6 +62,7 @@ export const hostArguments = {
       theme: z.enum(themes).optional(),
       language: z.enum(languages).optional(),
       markdownFont: z.enum(markdownFonts).optional(),
+      pageMargins: z.enum(pageMargins).optional(),
       editorAssistance: z.boolean().optional(),
       vaultAgent: z.boolean().optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.
