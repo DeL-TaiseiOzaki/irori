@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The work folder in contents, 2026-10-16 (**0.2.21**, not merged): the owner saw
+`work` as 未接続 in Contents and links into it not open. 0.2.19 put the default
+work folder at `<contents>/work`, where only registered connections open
+([ADR 045](decisions/045-work-folder-in-contents.md)).
+- `CloudService` (`src/cloud/service.ts`) takes `workFolder` from `WorkFolders`;
+  `work`/`findWork` give the folder as a `Place` beside the mounted ones, used by
+  `locate`, `writable`, `editable` and `rootEntries`; `workPlace` gives its real
+  place to `AgentPaths`, which also searches a chosen folder outside the vault
+  by name. `locatePath` compares a folder's name in NFC when it does not match
+  as written.
+- Verified by `npm run build`, `npm test` (`tests/work-folder-contents.test.ts`,
+  `tests/path-links.test.ts`) and `npm run test:ui`. Not tried on macOS.
+
 Published 2026-10-15: **0.2.20**, merged at the owner's request
 ([#242](https://github.com/DeL-TaiseiOzaki/irori/pull/242) as `3bf7f38` at 09:33:00 UTC).
 `publish.yml` published it from its push run `38713761817`; the release was public at

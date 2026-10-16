@@ -1,6 +1,7 @@
 # 044 — The irori agent works in its workspace's folder; reply paths start where their writer works
 
-Date: 2026-10-15. Status: owner request; implemented for 0.2.19.
+Date: 2026-10-15. Status: owner request; implemented for 0.2.19. Decision 5
+corrected by [ADR 045](045-work-folder-in-contents.md).
 Extends [ADR 042](042-waiting-folders-and-work-folders.md) (work folders) and
 the path links of 0.2.14. Keeps [ADR 027](027-shared-schema.md) (the shared
 Schema) and [ADR 017](017-conversation-history.md) D4 (the irori agent's history

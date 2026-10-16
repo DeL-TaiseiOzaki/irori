@@ -13,9 +13,9 @@ export interface WrittenPath {
   column?: number;
 }
 /**
- * A folder a written path may land in: a vault's, the irori agent's, or a
- * connected folder's real place, which `prefix` names inside its vault
- * (`contents/<name>`).
+ * A folder a written path may land in: a vault's, the irori agent's, or the
+ * real place of a connected folder or a work folder, which `prefix` names
+ * inside its vault (`contents/<name>`).
  */
 export interface PathRoot {
   scopeId: string;
@@ -159,9 +159,15 @@ export function locatePath(
     const folder = root.replace(/\\/g, '/').replace(/\/+$/, '');
     // A Windows path names the same file in either case.
     const fold = drive.test(folder) ? (s: string) => s.toLowerCase() : (s: string) => s;
-    if (folder.length <= longest || !fold(whole).startsWith(`${fold(folder)}/`)) continue;
+    if (folder.length <= longest) continue;
+    // macOS may give a folder's name decomposed (ド as ト and ゛) where a reply has
+    // it composed; then both are read composed, which its file system takes as well.
+    const [as, under] = fold(whole).startsWith(`${fold(folder)}/`)
+      ? [whole, folder]
+      : [whole.normalize('NFC'), folder.normalize('NFC')];
+    if (!fold(as).startsWith(`${fold(under)}/`)) continue;
     longest = folder.length;
-    const inside = whole.slice(folder.length + 1);
+    const inside = as.slice(under.length + 1);
     found = { scopeId, path: prefix ? `${prefix}/${inside}` : inside };
   }
   if (!found) return undefined;
