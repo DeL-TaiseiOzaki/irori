@@ -190,7 +190,18 @@ app
     // Where each vault's agents keep their scratch, rather than the system's temporary folder.
     const work = new WorkFolders(files);
     const agentPaths = new AgentPaths({ files, you, workspaces: () => workspaces.list() });
-    agents.workFolder = (scopeId) => work.prepare(scopeId);
+    cloud.workFolder = (scopeId) => work.folder(scopeId);
+    agents.workFolder = async (scopeId) => {
+      // Contents is not watched: the explorer is told when the first run makes the folder.
+      const before = (await work.folder(scopeId)).path;
+      const there = await lstat(before).then(
+        () => true,
+        () => false,
+      );
+      const folder = await work.prepare(scopeId);
+      if (!there) emit({ type: 'files', scopeId });
+      return folder;
+    };
     // Secrets are sealed with the OS-held key. A source run may stand in a reversible
     // store for the UI smoke, whose display has no keychain; a packaged app never does.
     const secrets = new SecretStore(
@@ -867,7 +878,11 @@ app
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => files.list(),
       workFolder: (scopeId) => work.folder(scopeId),
-      setWorkFolder: (scopeId, folder) => work.choose(scopeId, folder),
+      setWorkFolder: async (scopeId, folder) => {
+        const chosen = await work.choose(scopeId, folder);
+        emit({ type: 'files', scopeId });
+        return chosen;
+      },
       openWorkFolder: async (scopeId) => {
         const error = await shell.openPath(await work.prepare(scopeId));
         if (error) throw Error(error);

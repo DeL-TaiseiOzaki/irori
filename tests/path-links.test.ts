@@ -112,6 +112,18 @@ test('a relative path is read from the writing vault, an absolute one from any v
   });
 });
 
+test('a folder named decomposed, as macOS may give it, takes a path written composed', () => {
+  const drive = '/Users/me/Library/CloudStorage/GoogleDrive-me/マイドライブ'.normalize('NFD');
+  const linked = [{ scopeId: 'a', root: drive, prefix: 'contents/team' }];
+  assert.deepEqual(
+    locatePath(
+      { path: '/Users/me/Library/CloudStorage/GoogleDrive-me/マイドライブ/資料.pptx' },
+      linked,
+    ),
+    { scopeId: 'a', path: 'contents/team/資料.pptx' },
+  );
+});
+
 test('paths outside every vault, or relative without a vault, lead nowhere', () => {
   assert.equal(locatePath({ path: '/etc/passwd' }, roots), undefined);
   assert.equal(locatePath({ path: '/home/me/vaults/notes' }, roots), undefined);

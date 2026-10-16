@@ -17,8 +17,9 @@ const skipped = new Set(['.git', 'node_modules']);
 
 /**
  * Finds the file a path in an agent's reply names (ADR 044). The folders are
- * the workspace's vaults, the irori agent's folder for that workspace, and each
- * connected folder's real place, which stands for its path inside the vault. A
+ * the workspace's vaults, the irori agent's folder for that workspace, and the
+ * real places of each connected folder and work folder (ADR 045), which stand
+ * for their paths inside the vault. A
  * path is looked for where its writer works first; a name alone, or the tail of
  * a path, is looked for by name when no folder has it as written.
  */
@@ -28,7 +29,10 @@ export class AgentPaths {
       files: {
         list(): Space[];
         resolve(scopeId: string, rel: string): Promise<string>;
-        cloud?: { linkedFolders?(scopeId: string): { path: string; target: string }[] };
+        cloud?: {
+          linkedFolders?(scopeId: string): { path: string; target: string }[];
+          workPlace?(scopeId: string): Promise<{ path: string; target: string } | undefined>;
+        };
       };
       you: Pick<YourAiService, 'load' | 'rootOf' | 'schemaFolder'>;
       workspaces: () => Promise<WorkspaceProfile[]>;
@@ -43,16 +47,36 @@ export class AgentPaths {
   }
   /** The folders a path in a reply may land in, for a workspace or every vault without one. */
   async roots(workspaceId?: string): Promise<PathRoot[]> {
+    return (await this.folders(workspaceId)).roots;
+  }
+  /**
+   * The roots, and those a search by name walks: each vault's, the irori agent's,
+   * and a work folder chosen outside its vault, whose files no other walk reaches.
+   */
+  private async folders(workspaceId?: string) {
     const { id } = await this.deps.you.load();
     const roots: PathRoot[] = [];
+    const searched: PathRoot[] = [];
+    const cloud = this.deps.files.cloud;
     for (const space of await this.vaults(workspaceId)) {
-      roots.push({ scopeId: space.scopeId, root: space.root });
-      for (const folder of this.deps.files.cloud?.linkedFolders?.(space.scopeId) ?? [])
+      const vault = { scopeId: space.scopeId, root: space.root };
+      roots.push(vault);
+      searched.push(vault);
+      for (const folder of cloud?.linkedFolders?.(space.scopeId) ?? [])
         roots.push({ scopeId: space.scopeId, root: folder.target, prefix: folder.path });
+      const work = await cloud?.workPlace?.(space.scopeId).catch(() => undefined);
+      if (!work) continue;
+      const root = { scopeId: space.scopeId, root: work.target, prefix: work.path };
+      roots.push(root);
+      if (!work.target.startsWith(`${space.root}${path.sep}`)) searched.push(root);
     }
     const you = this.deps.you.rootOf(id, workspaceId);
-    if (you) roots.push({ scopeId: id, root: await fs.realpath(you).catch(() => you) });
-    return roots;
+    if (you) {
+      const root = { scopeId: id, root: await fs.realpath(you).catch(() => you) };
+      roots.push(root);
+      searched.push(root);
+    }
+    return { roots, searched };
   }
   /** Whether a file is there, through each folder's own guards. */
   private async exists(target: PathTarget, workspaceId: string | undefined, you: string) {
@@ -73,11 +97,10 @@ export class AgentPaths {
    */
   async locate(query: AgentPathQuery): Promise<PathTarget[]> {
     const { id } = await this.deps.you.load();
-    const roots = await this.roots(query.workspaceId);
+    const { roots, searched: starts } = await this.folders(query.workspaceId);
     for (const target of pathCandidates(query.path, roots, query.from))
       if (await this.exists(target, query.workspaceId, id)) return [target];
     if (path.isAbsolute(query.path) || /^[a-z]:[\\/]/i.test(query.path)) return [];
-    const starts = roots.filter((root) => !root.prefix);
     const order = [
       ...starts.filter((root) => root.scopeId === query.from),
       ...starts.filter((root) => root.scopeId !== query.from),
@@ -105,7 +128,10 @@ export class AgentPaths {
           // Links lead out of the folder, connected folders among them.
           if (entry.isDirectory()) queue.push(child);
           else if (entry.isFile() && tails.some((tail) => endsWithWritten(child, tail))) {
-            const target = { scopeId: root.scopeId, path: child };
+            const target = {
+              scopeId: root.scopeId,
+              path: root.prefix ? `${root.prefix}/${child}` : child,
+            };
             if (await this.exists(target, query.workspaceId, id)) found.push(target);
             if (found.length >= matchLimit) break;
           }
