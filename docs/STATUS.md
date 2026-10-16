@@ -1,6 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Side margins, 2026-10-16 (**0.2.22**):
+Published 2026-10-16: **0.2.22**, merged at the owner's request
+([#251](https://github.com/DeL-TaiseiOzaki/irori/pull/251) as `1418e1c` at 04:04:28 UTC).
+`publish.yml` published it from its push run `38848711279`; the release was public at
+04:05:46 (1:18) and the page deployed at 04:06:52 (2:24), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,242,688 / 141,926,080 / 175,412,623. The page offers 0.2.22.
+
+Side margins, 2026-10-16 (**0.2.22**, published):
 the owner asked for less room at a note's sides. Settings has 左右の余白
 (`pageMargins` in the device record and the saved environment): Standard keeps
 the 696px reading column, Small widens it to 1000px, Minimal fills the stage and
