@@ -135,10 +135,24 @@ try {
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'クラウド接続' });
-  // Choosing a folder is the only way to connect one: there is no Drive sign-in.
+  // A folder on this computer or a GitHub repository (ADR 046): there is no Drive sign-in.
   await expect(dialog.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toBeVisible();
-  for (const name of ['Google Drive', 'このコンピューター', 'アカウントを追加'])
+  for (const name of ['Google Drive', 'アカウントを追加'])
     await expect(dialog.getByRole('button', { name, exact: true })).toHaveCount(0);
+  const github = dialog.getByRole('button', { name: 'GitHub', exact: true });
+  await github.click();
+  await expect(github).toHaveAttribute('aria-pressed', 'true');
+  const cloneHere = dialog.getByRole('button', { name: '保存先を選ぶ', exact: true });
+  const ownClone = dialog.getByRole('button', { name: '手元のクローンを選ぶ', exact: true });
+  await expect(cloneHere).toBeDisabled();
+  await dialog.getByLabel('URL').fill('https://gitlab.com/owner/project');
+  await expect(dialog.getByRole('alert')).toContainText('GitHub の HTTPS または SSH');
+  await expect(ownClone).toBeDisabled();
+  await dialog.getByLabel('URL').fill('git@github.com:owner/project.git');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(cloneHere).toBeEnabled();
+  await expect(ownClone).toBeEnabled();
+  await dialog.getByRole('button', { name: 'このコンピューター', exact: true }).click();
   await expect(dialog.locator('.account-row, .folder-row')).toHaveCount(0);
   const cards = dialog.locator('.connection-card');
   await expect(cards).toHaveCount(2);

@@ -26,6 +26,7 @@ import { AgentSetup } from '../src/host/agent-setup';
 import { addNoteComment, resolveNoteComment } from '../src/host/comments';
 import { AgentService } from '../src/agents/service';
 import { CloudService } from '../src/cloud/service';
+import { RepositoryGit } from '../src/cloud/repositories';
 import { WorkFolders } from '../src/host/work-folders';
 import { GitService } from '../src/git/service';
 import { GitProcess } from '../src/git/process';
@@ -180,6 +181,38 @@ test('the command reads its forms, options and owner/name shorthand', () => {
   assert.throws(() => parseIroriCommand(['add', 'a', 'b']), /takes one folder/);
   assert.throws(() => parseIroriCommand(['connect', 'a']), /a vault and a folder/);
   assert.throws(() => parseIroriCommand(['connect', 'a', 'b', '--read-only=yes']), /no value/);
+  // A GitHub URL connects a repository, read-only unless --editable (ADR 046).
+  const repo = 'https://github.com/octo/app.git';
+  assert.deepEqual(
+    parseIroriCommand(['connect', 'Notes', repo, '--into', '~/Code', '--branch', 'dev']),
+    {
+      kind: 'connect',
+      vault: 'Notes',
+      folder: repo,
+      readOnly: true,
+      repository: { into: '~/Code', branch: 'dev' },
+    },
+  );
+  assert.deepEqual(
+    parseIroriCommand(['connect', 'Notes', repo, '--existing', '~/app', '--editable']),
+    {
+      kind: 'connect',
+      vault: 'Notes',
+      folder: repo,
+      readOnly: false,
+      repository: { existing: '~/app' },
+    },
+  );
+  assert.throws(() => parseIroriCommand(['connect', 'a', '~/Drive', '--into', 'x']), /--into/);
+  assert.throws(() => parseIroriCommand(['connect', 'a', repo, '--read-only']), /--editable/);
+  assert.throws(
+    () => parseIroriCommand(['connect', 'a', repo, '--into', 'x', '--existing', 'y']),
+    /not both/,
+  );
+  assert.throws(
+    () => parseIroriCommand(['connect', 'a', repo, '--into', 'x', '--branch', '-x']),
+    /not a branch name/,
+  );
   // A preset's name in either language is the preset; any other name is the KB's own.
   assert.deepEqual(parseIroriCommand(['add', 'a', '--category', 'チーム']), {
     kind: 'add',
@@ -436,6 +469,43 @@ test('connect links a folder into the named vault’s contents', async (t) => {
   await assert.rejects(setup.run(['connect', 'Research', drive], base), /No vault is named/);
   const busy = new AgentSetup({ ...deps, running: () => true });
   await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
+});
+
+test('connect clones a GitHub repository into contents, and clones it again for its record elsewhere', async (t) => {
+  const { base, files, setup, deps } = await device(t);
+  (deps.cloud as CloudService).repositories = new RepositoryGit(
+    new GitProcess('git', async () => undefined),
+    ['https', 'ssh', 'file'],
+  );
+  const root = path.join(base, 'Notes');
+  await mkdir(root);
+  const notes = await files.register(root, 'Notes', 'personal');
+  const url = 'https://github.com/octo/kb.git';
+  await assert.rejects(setup.run(['connect', 'Notes', url], base), /--into <folder>/);
+  const code = path.join(base, 'Code');
+  await mkdir(code);
+  const report = await setup.run(['connect', 'Notes', url, '--into', code], base);
+  assert.match(report, /Cloned GitHub octo\/kb into .*Code.*kb.* as contents\/kb, read-only/);
+  const link = path.join(root, 'contents', 'kb');
+  assert.equal(await readlink(link), path.join(code, 'kb'));
+  assert.match(
+    await setup.run(['list'], base),
+    /contents\/kb \(GitHub octo\/kb, mounted, read-only\)/,
+  );
+  await assert.rejects(
+    setup.run(['connect', 'Notes', url, '--into', code], base),
+    /already shows this repository as contents\/kb/,
+  );
+  // Another computer has the record but no clone: the same command clones it for that record.
+  const [record] = await deps.cloud.connections(notes.scopeId);
+  await deps.cloud.disconnect(notes.scopeId, record.mountId);
+  await rm(path.join(files.dataDir, 'local-bindings', `${notes.scopeId}-${record.mountId}.json`));
+  assert.match(await setup.run(['list'], base), /GitHub octo\/kb, not cloned on this computer/);
+  const elsewhere = path.join(base, 'Elsewhere');
+  await mkdir(elsewhere);
+  await setup.run(['connect', 'Notes', url, '--into', elsewhere], base);
+  assert.equal(await readlink(link), path.join(elsewhere, 'kb'));
+  assert.equal((await deps.cloud.connections(notes.scopeId)).length, 1);
 });
 
 test('work chooses where a vault’s agents work, and list names it and a folder it waits for', async (t) => {

@@ -130,6 +130,16 @@ irori connect <vault> <folder> [--name <name in contents>] [--read-only]
   OneDrive or Dropbox syncs, into the vault's contents. The vault is named
   as in \`irori list\` or by its folder.
 
+irori connect <vault> <GitHub URL> --into <folder> [--branch <branch>]
+irori connect <vault> <GitHub URL> --existing <clone>
+    [--name <name in contents>] [--editable]
+  Shows a GitHub repository in the vault's contents, read-only unless
+  --editable. --into clones it into a new folder inside that folder;
+  --existing uses a clone already on this computer. Ask the person where the
+  clone goes. The vault records the URL, so on another computer the same
+  command clones it for that record. To bring it up to date, run git pull in
+  the clone.
+
 irori disconnect <vault> <name in contents>
   Takes a connected folder out of the vault's contents. The folder itself
   is not touched.
@@ -229,7 +239,14 @@ export interface ListedVault {
   category?: string;
   knowledge?: string;
   contents?: string[];
-  connections?: { name: string; contentsRoot: string; state: string; readOnly: boolean }[];
+  connections?: {
+    name: string;
+    contentsRoot: string;
+    state: string;
+    readOnly: boolean;
+    /** A GitHub repository's owner/name (ADR 046). */
+    repository?: string;
+  }[];
   /** The folder its agents work in. */
   work?: string;
 }
@@ -274,7 +291,7 @@ const line = (workspace: string | undefined) => (item: ListedVault) => {
       `connected ${item.connections
         .map(
           (c) =>
-            `${c.contentsRoot}/${c.name} (${c.state === 'waiting' ? 'waiting for its folder' : c.state}${c.readOnly ? ', read-only' : ''})`,
+            `${c.contentsRoot}/${c.name} (${c.repository ? `GitHub ${c.repository}, ` : ''}${c.state === 'waiting' ? 'waiting for its folder' : c.repository && c.state === 'unconfigured' ? 'not cloned on this computer' : c.state}${c.readOnly ? ', read-only' : ''})`,
         )
         .join(', ')}`,
     item.work && `work folder ${JSON.stringify(item.work)}`,
@@ -304,6 +321,21 @@ export function folderConnected(
   connection: { name: string; contentsRoot: string; readOnly: boolean; folder: string },
 ) {
   return `Connected ${JSON.stringify(connection.folder)} to the vault "${vault}" as ${connection.contentsRoot}/${connection.name}${connection.readOnly ? ', read-only' : ''}. Agents see it through a link: name that path, or use rg -L.`;
+}
+
+/** `irori connect` with a GitHub repository. */
+export function repositoryConnected(
+  vault: string,
+  connection: {
+    name: string;
+    contentsRoot: string;
+    readOnly: boolean;
+    repository: string;
+    folder: string;
+    cloned: boolean;
+  },
+) {
+  return `${connection.cloned ? 'Cloned' : 'Connected the clone of'} GitHub ${connection.repository} ${connection.cloned ? 'into' : 'at'} ${JSON.stringify(connection.folder)} and showed it in the vault "${vault}" as ${connection.contentsRoot}/${connection.name}${connection.readOnly ? ', read-only' : ''}. Agents see it through a link: name that path, or use rg -L.`;
 }
 
 /** `irori disconnect`. */

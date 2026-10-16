@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { t } from './i18n';
+import { githubCloneURL, isBranchName } from './git';
 
 // A name must be usable on every file system irori mounts on: Windows refuses
 // these characters and names, and drops a trailing dot or space.
@@ -80,6 +81,26 @@ export const localDeclaration = z
     mountId: z.uuid(),
     scopeId: z.uuid(),
     provider: z.literal('local'),
+    folderName: z.string().max(1024),
+    contentsRoot: z.string().min(1).max(4096),
+    name: mountName,
+    access: z.enum(['read-only', 'read-write']),
+  })
+  .strict();
+/**
+ * A GitHub repository in contents (ADR 046). The vault records where it comes
+ * from; each device keeps its own clone, whose path is kept per device as a
+ * local folder's is. A separate file, `.irori/repositories.json`, so that builds
+ * whose folder record is strict keep reading `.irori/local-folders.json`.
+ */
+export const repositoryDeclaration = z
+  .object({
+    schemaVersion: z.literal(1),
+    mountId: z.uuid(),
+    scopeId: z.uuid(),
+    provider: z.literal('github'),
+    url: z.string().max(400).refine(githubCloneURL, 'GitHub HTTPS or SSH URL required'),
+    branch: z.string().refine(isBranchName, 'Invalid branch name').optional(),
     folderName: z.string().max(1024),
     contentsRoot: z.string().min(1).max(4096),
     name: mountName,

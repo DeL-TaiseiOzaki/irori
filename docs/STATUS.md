@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+GitHub repositories in contents, 2026-10-16 (**0.2.24**, pull request open):
+[ADR 046](decisions/046-github-repositories-in-contents.md). The connection
+dialog's **GitHub** source clones a repository where the person chooses, or
+takes a clone already there, and links it at `contents/<name>`.
+- `.irori/repositories.json` records the URL and branch (`repositoryDeclaration`);
+  `CloudService` reads it with `local-folders.json` as one list of folder
+  connections and writes each file only when its records change.
+- `RepositoryGit` (`src/cloud/repositories.ts`) clones with `--filter=blob:none`
+  over HTTPS/SSH only, checks that a chosen folder's `origin` is the same
+  repository, and runs 最新にする (`updateRepository`): fetch, then fast-forward,
+  refused with the reason when the clone has changes or commits of its own.
+- `irori connect <vault> <GitHub URL> --into|--existing` does the same for agents;
+  `irori list` names the repository and whether it is cloned here.
+- Verified by `npm run build`, `npm test` (`tests/repository-connections.test.ts`
+  against a local repository standing for github.com through `insteadOf`;
+  `tests/irori-command.test.ts`) and `npm run test:ui`. Not tried against
+  github.com itself or on macOS or Windows.
+
 Published 2026-10-16: **0.2.23**, merged at the owner's request
 ([#253](https://github.com/DeL-TaiseiOzaki/irori/pull/253) as `84a94f1` at 08:32:25 UTC).
 `publish.yml` published it from its push run `38874373532`; the release was public at

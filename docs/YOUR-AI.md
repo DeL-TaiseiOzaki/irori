@@ -170,6 +170,10 @@ agent sets up the person's vaults.
   knowledge|contents <folder> [--also]`, `irori workspace <name> [<vault>...]
   [--leave]` and `irori remove <vault> [--trash]`. `irori list` also shows each
   vault's category, layer folders and connected folders, and the workspaces.
+- Since 0.2.24 ([ADR 046](decisions/046-github-repositories-in-contents.md))
+  `irori connect <vault> <GitHub URL> --into <folder>` (or `--existing
+  <clone>`, with `--branch` and `--editable`) shows a GitHub repository in
+  contents, cloning it for a record this device has not cloned yet.
 - Since 0.1.95 ([ADR 031](decisions/031-agents-use-what-irori-does.md)) the
   note forms `irori move <note> <path or folder>`, `irori trash <note>`,
   `irori comment <file> <text> [--quote] [--line]`, `irori resolve <file> <id>`
