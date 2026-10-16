@@ -1,9 +1,9 @@
 /* Page properties sit where the literal frontmatter block was, aligned with the
    body text of the editor below them (ADR 015). */
 .page-properties {
-  max-width: 696px;
+  max-width: var(--page-width);
   margin: 0 auto;
-  padding: 40px 48px 8px;
+  padding: 40px calc(48px + var(--page-gutter)) 8px;
   color: var(--ink);
   font-family: var(--font-ui);
 }
