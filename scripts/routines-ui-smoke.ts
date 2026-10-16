@@ -13,7 +13,7 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 // Routines from their own rail entry (ADR 016): navigation, a routine made
 // from the page's form and edited there as a form and as text, the request to the irori agent,
 // JavaScript in the settings, the review before the first run and after a
-// change, JavaScript added from the row, a run's steps, output and changed
+// change, JavaScript added from the row, Python offered without downloading it, a run's steps, output and changed
 // files, the nothing-to-do gate, 停止, an agent step's request answered in its
 // step, and its conversation. A secret is entered from its row, hidden in the
 // output, written back and deleted; the display has no keychain, so the app
@@ -69,6 +69,10 @@ await routine(path.join(routines, 'quiet'), {
 await routine(path.join(routines, 'long'), {
   'routine.yaml': 'name: Long\nsteps:\n  - run: wait.js\n',
   'wait.js': `console.log('waiting');\nsetTimeout(() => {}, 60000);\n`,
+});
+await routine(path.join(routines, 'summary'), {
+  'routine.yaml': 'name: Summary\nsteps:\n  - run: summarize.py\n',
+  'summarize.py': 'print("summary")\n',
 });
 await routine(path.join(routines, 'ask'), {
   'routine.yaml':
@@ -300,6 +304,16 @@ try {
     .toEqual(['javascript']);
   await page.keyboard.press('Escape');
   await expect(collect).not.toContainText('JavaScript が必要です。', poll);
+  // Python is offered from its row and the settings; adding it downloads uv, which
+  // tests/python-runtime.test.ts covers, so the smoke does not press it.
+  const summary = card('Summary');
+  await expect(summary).toContainText('Python が必要です。');
+  await expect(summary.getByRole('button', { name: 'Python を追加' })).toBeEnabled();
+  await settings.click();
+  await expect(
+    page.getByRole('group', { name: 'ルーティン' }).getByRole('checkbox', { name: 'Python' }),
+  ).not.toBeChecked();
+  await page.keyboard.press('Escape');
 
   // The first 実行 shows every file and runs only after the confirmation.
   await collect.getByRole('button', { name: '実行' }).click();

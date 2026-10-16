@@ -26,6 +26,7 @@ import {
   type Theme,
 } from '../domain/types';
 import { languages, t, type Language } from '../domain/i18n';
+import type { RoutineRuntime } from '../domain/routines';
 
 const host = window.irori;
 
@@ -96,17 +97,12 @@ function Choices<T extends string>({
 
 /**
  * The runtimes routines may use on this device (ADR 016 D3). Read when the
- * settings open, since a routine's row can add JavaScript too.
+ * settings open, since a routine's row can add them too. Python downloads uv
+ * first; turning it off keeps the download.
  */
 function RoutineRuntimes({ onError }: { onError: (error: unknown) => void }) {
-  const [javascript, choose] = useChoice(
-    () => currentRoutineRuntimes().includes('javascript'),
-    (on: boolean) => {
-      const others = currentRoutineRuntimes().filter((runtime) => runtime !== 'javascript');
-      return chooseRoutineRuntimes(on ? [...others, 'javascript'] : others);
-    },
-    onError,
-  );
+  const [javascript, choose] = useRuntime('javascript', onError);
+  const [python, choosePython] = useRuntime('python', onError);
   return (
     <fieldset className="settings-choices routine-runtimes">
       <legend>{t('ルーティン', 'Routines')}</legend>
@@ -120,8 +116,29 @@ function RoutineRuntimes({ onError }: { onError: (error: unknown) => void }) {
           <Icon name="code" size={15} />
           <span>JavaScript</span>
         </label>
+        <label className="settings-choice" data-checked={python}>
+          <input
+            type="checkbox"
+            checked={python}
+            onChange={(event) => choosePython(event.target.checked)}
+          />
+          <Icon name="code" size={15} />
+          <span>Python</span>
+        </label>
       </div>
     </fieldset>
+  );
+}
+
+function useRuntime(name: RoutineRuntime, onError: (error: unknown) => void) {
+  return useChoice(
+    () => currentRoutineRuntimes().includes(name),
+    async (on: boolean) => {
+      if (on && name === 'python') await host.installPython();
+      const others = currentRoutineRuntimes().filter((item) => item !== name);
+      return chooseRoutineRuntimes(on ? [...others, name] : others);
+    },
+    onError,
   );
 }
 

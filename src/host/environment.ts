@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { t } from '../domain/i18n';
 import { languages } from '../domain/i18n';
 import { yourAiChoice } from '../domain/conversation';
-import { routineRuntimes } from '../domain/routines';
+import { routineRuntimeList } from '../domain/routines';
 import {
   markdownFonts,
   pageMargins,
@@ -58,7 +58,7 @@ const stored = z.object({
       editorAssistance: z.boolean(),
       vaultAgent: z.boolean(),
       yourAi: yourAiChoice,
-      routineRuntimes: z.array(z.enum(routineRuntimes)).max(routineRuntimes.length),
+      routineRuntimes: routineRuntimeList,
     })
     .partial(),
   agent: z.object({ repository }).optional(),

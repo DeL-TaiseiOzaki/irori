@@ -5,8 +5,8 @@ button: it runs programs and instructs agents, in order. It is irori's general
 way to gather what a person holds in other tools, such as mail and chat, and
 anything else that repeats. The decisions are in
 [ADR 016](decisions/016-routines.md); this page describes what stages 1
-(0.1.57), 2 (secrets, 0.1.72) and 4 (making one, 0.1.77; the form editor and
-the secrets sheet, 0.2.18) do. Python (stage 3) is not built yet.
+(0.1.57), 2 (secrets, 0.1.72), 3 (Python, 0.2.23) and 4 (making one, 0.1.77;
+the form editor and the secrets sheet, 0.2.18) do.
 
 ## A routine
 
@@ -123,10 +123,29 @@ again every five seconds and whenever a vault's files change.
 - **What a device needs** is named in the row before a run: **JavaScript が必要です。**
   with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in
   設定 under ルーティン), `<command> が見つかりません。` for a missing `PATH`
-  command, **Python はまだ使えません。** for `.py`, and
+  command, **Python が必要です。** with **Python を追加** for `.py` (also in
+  設定 under ルーティン; it downloads uv, so the button waits), and
   **シークレット <NAME> がありません。** with **<NAME> を入力** for a secret not
   stored yet. On a device whose OS keeps no key, the row says
   **この端末ではシークレットを保存できません。OS のキーチェーンが必要です。**
+
+## Python
+
+- **Python を追加** downloads uv 0.12.21 from its GitHub release over HTTPS into
+  `<irori data>/runtimes/uv/<version>/`. The archive's size and SHA-256 for each
+  of the six targets are pinned in `src/host/python-runtime.ts`; a download that
+  differs is refused and nothing is kept. Nothing is installed system-wide.
+- A `.py` step runs as `uv run --no-project --script <file>`, so a
+  `pyproject.toml` in the vault is ignored and the script's own
+  [inline metadata](https://peps.python.org/pep-0723/) names its packages and
+  Python version. uv keeps Python (`UV_PYTHON_INSTALL_DIR`) and packages
+  (`UV_CACHE_DIR`) under `<irori data>/runtimes/`, uses only Python it manages
+  (`UV_PYTHON_PREFERENCE=only-managed`), reads no `uv.toml` of the person's
+  (`UV_NO_CONFIG`), and drops an active `VIRTUAL_ENV`. The first run of a
+  script fetches Python, which shows in the step's output.
+- Choosing Python in the settings is not enough on its own: a device whose
+  environment was restored with Python chosen still offers **Python を追加**
+  until uv is there. Turning Python off keeps the download.
 
 ## Steps
 
@@ -260,7 +279,8 @@ line) and no saved session. Document content cannot start a routine.
   difference after a change and a refused run with an old digest; steps in order
   sharing `IRORI_WORK`, `IRORI_STATE` kept across runs, the work folder removed;
   links and missing files; the nothing-to-do gate, a failing step and **停止**
-  (the program ended); what a device lacks (JavaScript, Python, a missing
+  (the program ended); what a device lacks (JavaScript, Python chosen or
+  downloaded, a missing
   secret, a device without a keychain, a missing command) and a `#!` program;
   secrets given only to the steps naming them, hidden in output and kept
   records, written back for later steps, and a refused or unfinished
@@ -310,8 +330,10 @@ line) and no saved session. Document content cannot start a routine.
 
 ## Limits
 
-- No Python, no skill telling the irori agent how to write routines, no timed
-  runs.
+- No timed runs.
+- Python was run through the real uv on Linux only; the macOS and Windows
+  archives are pinned from GitHub's listing but were not downloaded on those
+  systems. A script's packages come from PyPI on its first run.
 - A secret given to a step is readable by other processes of the same user
   while the step runs. A value printed before the step writes it back shows in
   the live output until the step ends; the kept record hides it.

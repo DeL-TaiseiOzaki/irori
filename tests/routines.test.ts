@@ -2,7 +2,17 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  copyFile,
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +29,9 @@ import {
   parseRoutine,
   routineFolderName,
   RoutineService,
+  type RoutineHost,
 } from '../src/host/routines';
+import { PythonRuntime, uvVersion } from '../src/host/python-runtime';
 import { AgentSetup } from '../src/host/agent-setup';
 import {
   agentDraft,
@@ -332,6 +344,7 @@ async function setup(t: TestContext, { javascript = true, keychain = true } = {}
     secrets,
     canStart: () => {},
     emit: (run: RoutineRun) => emitted.push(structuredClone(run)),
+    python: undefined as RoutineHost['python'],
   };
   const routines = new RoutineService(host);
   await routines.init();
@@ -595,7 +608,9 @@ test(
   'what a device lacks is named before a run: JavaScript, Python, secrets and PATH commands',
   fixtureOptions,
   async (t) => {
-    const { routine, listed, start, ended, settings } = await setup(t, { javascript: false });
+    const { routine, listed, start, ended, settings, host, base } = await setup(t, {
+      javascript: false,
+    });
     const js = await routine('js', {
       'routine.yaml': 'name: JS\nsteps: [{run: a.mjs}]\n',
       'a.mjs': 'console.log("ok");\n',
@@ -612,7 +627,30 @@ test(
       'routine.yaml': 'name: Py\nsteps: [{run: fetch.py}]\n',
       'fetch.py': 'print(1)\n',
     });
-    assert.equal((await listed(py)).needs?.text, 'Python はまだ使えません。');
+    const needsPython = { text: 'Python が必要です。', runtime: 'python' };
+    assert.deepEqual((await listed(py)).needs, needsPython);
+    await assert.rejects(start(py), /Python が必要です/);
+    // Chosen in the settings is not enough: uv must be on this device, as a restored
+    // environment can name Python before it is downloaded.
+    await settings.save({ routineRuntimes: ['javascript', 'python'] });
+    host.python = { uv: async () => undefined, env: () => ({}) };
+    assert.deepEqual((await listed(py)).needs, needsPython);
+    // uv runs the script by itself, outside any project, with irori's own folders.
+    const uv = path.join(base, 'fake uv');
+    await writeFile(
+      uv,
+      '#!/bin/sh\necho "$1 $2 $3 $(basename "$4") $UV_CACHE_DIR ${VIRTUAL_ENV:-none}"\n',
+      { mode: 0o700 },
+    );
+    host.python = { uv: async () => uv, env: () => ({ UV_CACHE_DIR: 'cache' }) };
+    process.env.VIRTUAL_ENV = path.join(base, 'venv');
+    t.after(() => {
+      delete process.env.VIRTUAL_ENV;
+    });
+    assert.equal((await listed(py)).needs, undefined);
+    const pyRun = await ended(py, await start(py));
+    assert.equal(pyRun.state, 'succeeded', JSON.stringify(pyRun));
+    assert.equal(pyRun.steps[0].output, 'run --no-project --script fetch.py cache none\n');
     const secret = await routine('secret', {
       'routine.yaml': 'name: S\nsteps: [{run: [echo, hi], secrets: [TOKEN]}]\n',
     });
@@ -1079,5 +1117,40 @@ test(
     assert.equal(existsSync(path.join(files.dataDir, 'routines', 'work', 'left-behind')), false);
     await new Promise((resolve) => setTimeout(resolve, 200));
     assert.equal((await next.runs(ref)).length, 1);
+  },
+);
+
+test(
+  'a .py step runs through the real uv, with Python kept in irori data',
+  { ...fixtureOptions, skip: !process.env.IRORI_TEST_UV_PATH && 'set IRORI_TEST_UV_PATH to a uv' },
+  async (t) => {
+    const { routine, start, ended, settings, host, files, listed } = await setup(t);
+    const python = new PythonRuntime({ dataDir: files.dataDir });
+    const uv = path.join(files.dataDir, 'runtimes', 'uv', uvVersion, 'uv');
+    await mkdir(path.dirname(uv), { recursive: true });
+    await copyFile(process.env.IRORI_TEST_UV_PATH!, uv);
+    await chmod(uv, 0o755);
+    host.python = python;
+    await settings.save({ routineRuntimes: ['python'] });
+    const py = await routine('py', {
+      'routine.yaml': 'name: Py\nsteps: [{run: fetch.py}]\n',
+      'fetch.py': [
+        '# /// script',
+        '# requires-python = ">=3.10"',
+        '# dependencies = []',
+        '# ///',
+        'import os, pathlib',
+        'pathlib.Path(os.environ["IRORI_STATE"], "seen").write_text("yes")',
+        'print("from", pathlib.Path.cwd().name)',
+        'print(\'{"continue": false}\')',
+        '',
+      ].join('\n'),
+    });
+    const run = await ended(py, await start(py));
+    assert.equal(run.state, 'nothing', JSON.stringify(run));
+    assert.match(run.steps[0].output, /from Product 日本語\n/);
+    assert.ok(existsSync(path.join(files.dataDir, 'runtimes', 'python')));
+    // uv wrote nothing into the routine's folder, so its review still holds.
+    assert.equal((await listed(py)).review, 'reviewed');
   },
 );

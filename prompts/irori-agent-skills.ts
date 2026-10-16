@@ -332,8 +332,10 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
    \`cli\` and \`model\`. Up to 20 steps; the folder holds at most 100 files,
    5 MiB in all, and no links.
 4. Programs. \`.js\`, \`.mjs\` and \`.cjs\` run with irori's own Node; prefer
-   them, since nothing needs installing. Any other file needs a \`#!\` line and
-   the executable bit; Python is not available yet. Every step gets
+   them, since nothing needs installing. \`.py\` runs through uv once the person
+   adds Python in irori; declare its packages in the script itself (PEP 723,
+   a \`# /// script\` block with \`dependencies\`). Any other file needs a
+   \`#!\` line and the executable bit. Every step gets
    \`IRORI_WORK\` (this run's folder, shared by its steps), \`IRORI_STATE\`
    (kept between runs, for a cursor) and \`IRORI_ROUTINE\` (the routine's
    folder). A program that finds nothing to do prints \`{"continue": false}\`
