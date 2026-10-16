@@ -6,6 +6,7 @@ import {
   commentResolved,
   folderConnected,
   folderDisconnected,
+  repositoryConnected,
   vaultChanged,
   vaultList,
   vaultRegistered,
@@ -49,7 +50,7 @@ import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
 import type { FileService } from './files';
 import { inspectRepository, type WorkspaceService } from './workspaces';
-import { githubRepository } from '../domain/git';
+import { githubRepository, repositoryFolder } from '../domain/git';
 import { renameLayerFolder } from './layer-folders';
 import type { WorkFolders } from './work-folders';
 
@@ -60,7 +61,16 @@ export interface AgentSetupHost {
   workspaces: Pick<WorkspaceService, 'list' | 'update'> & Partial<Pick<WorkspaceService, 'forget'>>;
   cloud: Pick<
     CloudService,
-    'addLocal' | 'connect' | 'connections' | 'disconnect' | 'edit' | 'suspend' | 'resume'
+    | 'addLocal'
+    | 'addRepository'
+    | 'bindLocal'
+    | 'cloneRepository'
+    | 'connect'
+    | 'connections'
+    | 'disconnect'
+    | 'edit'
+    | 'suspend'
+    | 'resume'
   >;
   /** The folder each vault's agents work in. */
   work?: Pick<WorkFolders, 'folder' | 'choose'>;
@@ -242,6 +252,7 @@ export class AgentSetup {
             contentsRoot: item.contentsRoot,
             state: item.state,
             readOnly: item.access === 'read-only',
+            ...(item.provider === 'github' && { repository: githubRepository(item.url) }),
           }),
         ),
         ...(this.host.work && { work: (await this.host.work.folder(space.scopeId)).path }),
@@ -479,6 +490,7 @@ export class AgentSetup {
       throw Error(
         `The vault "${space.name}" has its own agent running. Connect the folder after that run finishes.`,
       );
+    if (command.repository) return this.connectRepository(space, command, cwd);
     const folder = this.folder(cwd, command.folder);
     const contentsRoot = space.contents[0];
     const connection = await this.host.cloud.addLocal({
@@ -498,6 +510,65 @@ export class AgentSetup {
       contentsRoot,
       readOnly: command.readOnly,
       folder,
+    });
+  }
+  /**
+   * Shows a GitHub repository in the vault's contents (ADR 046), from a clone
+   * irori makes in `--into` or an existing one. A repository the vault already
+   * records but this computer has no clone of is cloned for that record.
+   */
+  private async connectRepository(
+    space: Space,
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'connect' }>,
+    cwd: string,
+  ) {
+    const { into, existing, branch } = command.repository!;
+    if (!into && !existing)
+      throw Error(
+        'Say where the clone goes with --into <folder>, or name a clone already on this computer with --existing <folder>. Ask the person which they want.',
+      );
+    const folder = this.folder(cwd, (into ?? existing)!);
+    const wanted = githubRepository(command.folder)!.toLowerCase();
+    const recorded = (await this.host.cloud.connections(space.scopeId)).find(
+      (item) => item.provider === 'github' && githubRepository(item.url)?.toLowerCase() === wanted,
+    );
+    if (recorded && recorded.state !== 'unconfigured')
+      throw Error(
+        `The vault "${space.name}" already shows this repository as ${recorded.contentsRoot}/${recorded.name}. Run "irori list" for its state.`,
+      );
+    let connection = recorded;
+    try {
+      if (connection && into)
+        await this.host.cloud.cloneRepository(space.scopeId, connection.mountId, folder);
+      else if (connection)
+        await this.host.cloud.bindLocal(space.scopeId, connection.mountId, folder);
+      else
+        connection = await this.host.cloud.addRepository({
+          scopeId: space.scopeId,
+          url: command.folder,
+          ...(branch && { branch }),
+          folder,
+          existing: !into,
+          contentsRoot: space.contents[0],
+          name: command.name ?? repositoryFolder(command.folder),
+          access: command.readOnly ? 'read-only' : 'read-write',
+        });
+      await this.host.cloud.connect(space.scopeId, connection.mountId);
+    } finally {
+      this.host.announce?.({ scopeId: space.scopeId });
+    }
+    const clone = (await this.host.cloud.connections(space.scopeId)).find(
+      (item) => item.mountId === connection!.mountId,
+    );
+    return repositoryConnected(space.name, {
+      name: connection.name,
+      contentsRoot: connection.contentsRoot,
+      readOnly: connection.access === 'read-only',
+      repository: githubRepository(command.folder)!,
+      folder: into
+        ? path.join(folder, clone?.folderName ?? repositoryFolder(command.folder))
+        : folder,
+      cloned: !!into,
     });
   }
   /** Refuses a change to a vault while its own agent works there. */

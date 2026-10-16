@@ -76,6 +76,8 @@ export interface Entry {
   connection?: boolean;
   /** The connection is a folder on this device (every connection since 0.1.67). */
   local?: boolean;
+  /** The connection is a GitHub repository's clone (ADR 046). */
+  repository?: boolean;
   /** A brought-in file still being written: `appendEntry` takes its other pieces. */
   upload?: string;
 }
@@ -287,7 +289,28 @@ export interface LocalAttachment {
   name: string;
   access: CloudAccess;
 }
-export type Attachment = CloudAttachment | LocalAttachment;
+/**
+ * A GitHub repository shown in contents (ADR 046): the vault records its URL,
+ * and each device links its own clone, chosen or made there, as a local folder.
+ */
+export interface RepositoryAttachment {
+  schemaVersion: 1;
+  mountId: string;
+  scopeId: string;
+  provider: 'github';
+  /** The clone URL, GitHub over HTTPS or SSH. */
+  url: string;
+  /** The branch a clone irori makes checks out; the remote's default without it. */
+  branch?: string;
+  /** The clone folder's own name on the device that chose it last, for display. */
+  folderName: string;
+  contentsRoot: string;
+  name: string;
+  access: CloudAccess;
+}
+/** A connection whose files are a folder on this device. */
+export type FolderAttachment = LocalAttachment | RepositoryAttachment;
+export type Attachment = CloudAttachment | FolderAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
 export type CloudConnection = Attachment & ConnectionState;
 export interface ConnectionState {
@@ -301,6 +324,27 @@ export interface ConnectionState {
   detail?: string;
   /** Linked so that files can be changed. */
   writable?: boolean;
+}
+/**
+ * A GitHub repository to show in contents: `folder` is an existing clone of it
+ * (`existing`), or the folder in which irori clones it into a new folder named
+ * after the repository.
+ */
+export interface AddRepository {
+  scopeId: string;
+  url: string;
+  branch?: string;
+  folder: string;
+  existing: boolean;
+  contentsRoot: string;
+  name: string;
+  access?: CloudAccess;
+}
+/** What 最新にする did to a repository's clone. */
+export interface RepositoryUpdate {
+  branch: string;
+  /** Commits the branch moved forward by; 0 when it was already up to date. */
+  commits: number;
 }
 export interface AddLocalFolder {
   scopeId: string;
@@ -517,6 +561,12 @@ export interface HostAPI {
   disconnectCloud(scopeId: string, mountId: string): Promise<void>;
   /** Registers a folder on this device in contents, shown there through a link. */
   addLocalFolder(input: AddLocalFolder): Promise<CloudConnection>;
+  /** Registers a GitHub repository in contents, cloning it first unless `existing`. */
+  addRepository(input: AddRepository): Promise<CloudConnection>;
+  /** Clones a registered repository on this device, into a new folder inside `parent`. */
+  cloneRepository(scopeId: string, mountId: string, parent: string): Promise<void>;
+  /** Fetches a repository's clone and moves its branch forward when nothing stands in the way. */
+  updateRepository(scopeId: string, mountId: string): Promise<RepositoryUpdate>;
   /** Chooses the folder a local connection uses on this device. */
   bindLocalFolder(scopeId: string, mountId: string, path: string): Promise<void>;
   /** Switches a retired Google Drive connection to a folder on this device, keeping its name. */

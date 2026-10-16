@@ -9,7 +9,10 @@ import {
   localDeclaration,
   mountNameError,
   nameKey,
+  repositoryDeclaration,
 } from '../domain/connections';
+import { githubCloneURL, isBranchName, repositoryFolder } from '../domain/git';
+import type { RepositoryGit } from './repositories';
 import { owner, within } from '../domain/scopes';
 import { isMissing, readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, editableText, hash, readDocument } from '../host/files';
@@ -18,14 +21,17 @@ import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type {
   AddLocalFolder,
+  AddRepository,
   Attachment,
   CloudAccess,
   CloudAttachment,
   CloudConnection,
   Document,
   Entry,
-  LocalAttachment,
+  FolderAttachment,
   NewEntry,
+  RepositoryAttachment,
+  RepositoryUpdate,
   WorkFolder,
 } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -79,7 +85,7 @@ export type WaitTiming = { first: number; longest: number; nudge: number };
 const waitTiming: WaitTiming = { first: 5_000, longest: 120_000, nudge: 2_000 };
 type Waiting = { scopeId: string; mountId: string; delay: number; tried: number; due: number };
 type Mounted = {
-  attachment: LocalAttachment;
+  attachment: FolderAttachment;
   /** Where the connection appears: `contents/<name>` in its vault. */
   entry: string;
   /** Where its files are: the chosen local folder. */
@@ -122,6 +128,10 @@ export class CloudService {
   onLinked?: (scopeId: string) => void;
   /** Where a vault's agents work (ADR 044), shown as `<contents>/work` (ADR 045). */
   workFolder?: (scopeId: string) => Promise<WorkFolder>;
+  /** Clones and updates GitHub repositories in contents (ADR 046). */
+  repositories?: Pick<RepositoryGit, 'clone' | 'check' | 'update'>;
+  /** Repository connections being cloned or updated now, outside the queue. */
+  private fetching = new Set<string>();
   // Each vault's work folder as last looked at, so writability can be answered without I/O.
   private works = new Map<string, Place | undefined>();
   constructor(
@@ -218,11 +228,13 @@ export class CloudService {
           await this.refresh(key, relink);
           const binding = await this.localBinding(scopeId, record.mountId);
           const current = this.mounted.get(key);
+          const known = this.states.get(key);
           return {
             ...record,
-            ...(this.states.get(key) ?? {
-              state: binding ? ('disconnected' as const) : ('unconfigured' as const),
-            }),
+            // Disconnected from a folder this device no longer names: none is chosen here.
+            ...(known && (binding || known.state !== 'disconnected')
+              ? known
+              : { state: binding ? ('disconnected' as const) : ('unconfigured' as const) }),
             ...(current ? { writable: current.writable } : {}),
           };
         }),
@@ -490,10 +502,7 @@ export class CloudService {
       if (records.some((item) => item.mountId === mountId))
         throw Error('Duplicate cloud connection identity');
       await this.forgetRetired(record);
-      await writeLocalJson(await this.metadataFile(scopeId, 'local-folders.json'), [
-        ...records,
-        local,
-      ]);
+      await this.writeLocal(scopeId, records, [...records, local]);
       await writeLocalJson(this.localBindingFile(scopeId, mountId), {
         scopeId,
         mountId,
@@ -525,23 +534,41 @@ export class CloudService {
       this.forget(key);
     });
   }
-  async localDeclarations(scopeId: string): Promise<LocalAttachment[]> {
+  /**
+   * The vault's connections whose files are a folder on this device: folders
+   * (`.irori/local-folders.json`), then GitHub repositories (`.irori/repositories.json`).
+   */
+  async localDeclarations(scopeId: string): Promise<FolderAttachment[]> {
     const space = await this.files.get(scopeId);
-    let records: LocalAttachment[];
-    try {
-      records = z
-        .array(localDeclaration)
-        .max(100)
-        .parse(await readLocalJson(await this.metadataFile(scopeId, 'local-folders.json'), []));
-    } catch (error) {
-      if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
-      throw Error(
+    const read = async <T extends FolderAttachment>(
+      file: string,
+      schema: z.ZodType<T>,
+      unreadable: () => string,
+    ) => {
+      try {
+        return z
+          .array(schema)
+          .max(100)
+          .parse(await readLocalJson(await this.metadataFile(scopeId, file), []));
+      } catch (error) {
+        if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
+        throw Error(unreadable());
+      }
+    };
+    const records: FolderAttachment[] = [
+      ...(await read('local-folders.json', localDeclaration, () =>
         t(
           `「${space.name}」のフォルダ接続の記録（.irori/local-folders.json）を読み取れません。`,
           `Cannot read the folder connection record (.irori/local-folders.json) of "${space.name}".`,
         ),
-      );
-    }
+      )),
+      ...(await read('repositories.json', repositoryDeclaration, () =>
+        t(
+          `「${space.name}」のリポジトリ接続の記録（.irori/repositories.json）を読み取れません。`,
+          `Cannot read the repository connection record (.irori/repositories.json) of "${space.name}".`,
+        ),
+      )),
+    ];
     const ids = new Set<string>();
     const paths = new Set<string>();
     for (const record of records) {
@@ -614,13 +641,21 @@ export class CloudService {
       throw missing();
     });
     if (!info.isDirectory() || info.isSymbolicLink()) throw Error(message);
-    const overlaps = (a: string, b: string) => within(a, b) || within(b, a);
+    await this.assertApart(target, true);
+    return target;
+  }
+  /**
+   * Refuses a folder inside a vault or irori's own data and, with `holding`, one
+   * that holds either.
+   */
+  private async assertApart(target: string, holding: boolean) {
+    const overlaps = (root: string) => within(root, target) || (holding && within(target, root));
     for (const root of [
       ...(await this.files.list()).map((item) => item.root),
       this.files.dataDir,
     ]) {
       const actual = await fs.realpath(root).catch(() => root);
-      if (overlaps(root, target) || overlaps(actual, target))
+      if (overlaps(root) || overlaps(actual))
         throw Error(
           t(
             'vault や irori のデータと重なるフォルダは選べません。',
@@ -628,7 +663,6 @@ export class CloudService {
           ),
         );
     }
-    return target;
   }
   /** Registers a folder on this device; it appears in contents once connected. */
   addLocal(input: AddLocalFolder) {
@@ -661,10 +695,7 @@ export class CloudService {
       });
       await this.assertNameFree(record);
       await this.checkVacant(record);
-      await writeLocalJson(await this.metadataFile(input.scopeId, 'local-folders.json'), [
-        ...records,
-        record,
-      ]);
+      await this.writeLocal(input.scopeId, records, [...records, record]);
       await writeLocalJson(this.localBindingFile(record.scopeId, record.mountId), {
         scopeId: record.scopeId,
         mountId: record.mountId,
@@ -675,6 +706,162 @@ export class CloudService {
         (item) => item.mountId === record.mountId,
       )!;
     });
+  }
+  private repositoryGit() {
+    if (!this.repositories)
+      throw Error(t('リポジトリを取得できません。', 'Repositories cannot be fetched here.'));
+    return this.repositories;
+  }
+  /**
+   * Registers a GitHub repository in contents (ADR 046). Its clone on this device
+   * is the folder the person chose (`existing`), or a new one irori clones inside
+   * it. The clone happens outside the queue, since it may take minutes; the record
+   * is checked again before it is written, and a clone that cannot be registered stays.
+   */
+  async addRepository(input: AddRepository) {
+    const git = this.repositoryGit();
+    if (!githubCloneURL(input.url))
+      throw Error(
+        t(
+          'GitHub の HTTPS または SSH のリポジトリ URL を入力してください。',
+          'Enter a GitHub HTTPS or SSH repository URL.',
+        ),
+      );
+    if (input.branch !== undefined && !isBranchName(input.branch))
+      throw Error(t('ブランチ名を確認してください。', 'Check the branch name.'));
+    const record = await this.mutate(async () => {
+      const error = mountNameError(input.name);
+      if (error) throw Error(error);
+      const space = await this.files.get(input.scopeId);
+      if (!space.contents.includes(input.contentsRoot))
+        throw Error(
+          t('contentsの登録先を選択してください。', 'Choose where in contents to register it.'),
+        );
+      const records = await this.localDeclarations(input.scopeId);
+      if (records.length >= 100)
+        throw Error(
+          t(
+            '接続先は1スペースにつき100件まで登録できます。',
+            'Each space can register up to 100 connections.',
+          ),
+        );
+      const record: RepositoryAttachment = repositoryDeclaration.parse({
+        schemaVersion: 1,
+        mountId: randomUUID(),
+        scopeId: input.scopeId,
+        provider: 'github',
+        url: input.url,
+        ...(input.branch && { branch: input.branch }),
+        folderName: repositoryFolder(input.url),
+        contentsRoot: input.contentsRoot,
+        name: input.name,
+        access: input.access ?? 'read-only',
+      });
+      await this.assertNameFree(record);
+      await this.checkVacant(record);
+      return record;
+    });
+    let target: string;
+    if (input.existing) {
+      target = await this.localTarget(input.folder);
+      await git.check(target, record.url);
+    } else target = await this.cloneInto(input.folder, record);
+    return this.mutate(async () => {
+      const space = await this.files.get(input.scopeId);
+      const records = await this.localDeclarations(input.scopeId);
+      const final = { ...record, folderName: path.basename(target) || target };
+      await this.assertNameFree(final);
+      await this.checkVacant(final);
+      await this.writeLocal(input.scopeId, records, [...records, final]);
+      await writeLocalJson(this.localBindingFile(final.scopeId, final.mountId), {
+        scopeId: final.scopeId,
+        mountId: final.mountId,
+        root: space.root,
+        path: target,
+      });
+      return (await this.list(final.scopeId, false)).find(
+        (item) => item.mountId === final.mountId,
+      )!;
+    });
+  }
+  /**
+   * Clones a repository into a new folder inside `parent`, named after the
+   * repository. The folder must not lie in a vault or irori's data; a folder of
+   * that name already there is refused, since it may be a clone to choose instead.
+   */
+  private async cloneInto(parent: string, record: RepositoryAttachment) {
+    const git = this.repositoryGit();
+    const message = t('フォルダが見つかりません。', 'The folder was not found.');
+    if (!path.isAbsolute(parent)) throw Error(message);
+    const folder = await fs.realpath(parent).catch(() => {
+      throw Error(message);
+    });
+    if (!(await fs.stat(folder)).isDirectory()) throw Error(message);
+    await this.assertApart(folder, false);
+    const destination = path.join(folder, repositoryFolder(record.url));
+    const key = this.key(record.scopeId, record.mountId);
+    try {
+      await fs.mkdir(destination);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      throw Error(
+        t(
+          `${destination} がすでにあります。クローンなら「手元のクローンを選ぶ」で選んでください。`,
+          `${destination} already exists. If it is a clone, choose it with "Choose a clone".`,
+        ),
+      );
+    }
+    this.fetching.add(key);
+    try {
+      await git.clone(record.url, record.branch, destination);
+    } catch (error) {
+      // Git empties a folder it could not clone into; one left with files is kept.
+      await fs.rmdir(destination).catch(() => {});
+      throw error;
+    } finally {
+      this.fetching.delete(key);
+    }
+    return this.localTarget(destination);
+  }
+  /**
+   * Clones a registered repository on this device, as another device's record
+   * asks, and uses that clone for it here.
+   */
+  async cloneRepository(scopeId: string, mountId: string, parent: string) {
+    const record = await this.repository(scopeId, mountId);
+    if (this.mounted.has(this.key(scopeId, mountId)))
+      throw Error(
+        t('接続を解除してからフォルダを選び直してください。', 'Disconnect before choosing again.'),
+      );
+    const target = await this.cloneInto(parent, record);
+    await this.bindLocal(scopeId, mountId, target);
+  }
+  private async repository(scopeId: string, mountId: string) {
+    const record = (await this.localDeclarations(scopeId)).find((item) => item.mountId === mountId);
+    if (record?.provider !== 'github') throw Error('Unknown repository connection');
+    return record;
+  }
+  /**
+   * Brings a repository's clone up to date: fetches, and moves its branch forward
+   * when nothing stands in the way (最新にする). Outside the queue, as a clone is.
+   */
+  async updateRepository(scopeId: string, mountId: string): Promise<RepositoryUpdate> {
+    const git = this.repositoryGit();
+    const record = await this.repository(scopeId, mountId);
+    const binding = await this.localBinding(scopeId, mountId);
+    if (!binding)
+      throw Error(t('この端末のフォルダを選んでください。', 'Choose the folder on this device.'));
+    const key = this.key(scopeId, mountId);
+    if (this.fetching.has(key))
+      throw Error(t('このリポジトリは取得中です。', 'This repository is being fetched.'));
+    this.fetching.add(key);
+    try {
+      const target = await this.localTarget(binding.path);
+      await git.check(target, record.url);
+      return await git.update(target);
+    } finally {
+      this.fetching.delete(key);
+    }
   }
   /** Chooses the folder a local connection uses on this device, for example after a move. */
   bindLocal(scopeId: string, mountId: string, chosen: string) {
@@ -691,6 +878,7 @@ export class CloudService {
       const record = records.find((item) => item.mountId === mountId);
       if (!record) throw Error('Unknown cloud connection');
       const target = await this.localTarget(chosen);
+      if (record.provider === 'github') await this.repositoryGit().check(target, record.url);
       await this.dropStaleLink(record);
       await writeLocalJson(this.localBindingFile(scopeId, mountId), {
         scopeId,
@@ -708,7 +896,11 @@ export class CloudService {
       this.forget(key);
     });
   }
-  private async writeLocal(scopeId: string, before: LocalAttachment[], after: LocalAttachment[]) {
+  /**
+   * Writes the folder connections, each kind to its own file and only when it
+   * changed, so a vault without repositories gets no `.irori/repositories.json`.
+   */
+  private async writeLocal(scopeId: string, before: FolderAttachment[], after: FolderAttachment[]) {
     if (JSON.stringify(await this.localDeclarations(scopeId)) !== JSON.stringify(before))
       throw Error(
         t(
@@ -716,13 +908,21 @@ export class CloudService {
           'The connection information changed outside irori. Reload it.',
         ),
       );
-    await writeLocalJson(await this.metadataFile(scopeId, 'local-folders.json'), after);
+    for (const [file, provider] of [
+      ['local-folders.json', 'local'],
+      ['repositories.json', 'github'],
+    ] as const) {
+      const kept = (records: FolderAttachment[]) =>
+        records.filter((record) => record.provider === provider);
+      if (JSON.stringify(kept(before)) !== JSON.stringify(kept(after)))
+        await writeLocalJson(await this.metadataFile(scopeId, file), kept(after));
+    }
   }
   /** Renames a local connection, or unregisters it when no name is given. It must not be connected. */
-  private async editLocal(record: LocalAttachment, name?: string) {
+  private async editLocal(record: FolderAttachment, name?: string) {
     const { scopeId, mountId } = record;
     const records = await this.localDeclarations(scopeId);
-    let replacement: LocalAttachment | undefined;
+    let replacement: FolderAttachment | undefined;
     if (name !== undefined) {
       const error = mountNameError(name);
       if (error) throw Error(error);
@@ -747,7 +947,7 @@ export class CloudService {
     this.states.delete(key);
     this.stopWaiting(key);
   }
-  private async setLocalAccess(record: LocalAttachment, access: CloudAccess) {
+  private async setLocalAccess(record: FolderAttachment, access: CloudAccess) {
     if (record.access === access) return;
     const { scopeId, mountId } = record;
     const wasMounted = this.mounted.has(this.key(scopeId, mountId));
@@ -777,7 +977,7 @@ export class CloudService {
    * through `locate`, which checks the link and the folder first. A folder that is
    * not there yet is waited for (`retry`) rather than reported as an error.
    */
-  private async link(record: LocalAttachment) {
+  private async link(record: FolderAttachment) {
     const { scopeId, mountId } = record;
     const key = this.key(scopeId, mountId);
     const current = this.mounted.get(key);
@@ -853,7 +1053,7 @@ export class CloudService {
       throw changed();
   }
   /** Removes irori's link to a local folder; anything that replaced it stays. */
-  private async unlink(record: LocalAttachment, target: string) {
+  private async unlink(record: FolderAttachment, target: string) {
     const entry = path.join((await this.parent(record))!, record.name);
     const info = await fs.lstat(entry).catch((error) => {
       if (!isMissing(error)) throw error;
@@ -862,7 +1062,7 @@ export class CloudService {
     if (info?.isSymbolicLink() && (await this.pointsTo(entry, target))) await fs.unlink(entry);
   }
   /** Removes a link a stop without disconnecting left behind, before a rename or removal. */
-  private async dropStaleLink(record: LocalAttachment) {
+  private async dropStaleLink(record: FolderAttachment) {
     const binding = await this.localBinding(record.scopeId, record.mountId);
     if (binding && (await this.parent(record))) await this.unlink(record, binding.path);
   }
@@ -885,10 +1085,10 @@ export class CloudService {
         target: item.target,
       }));
   }
-  /** The local folders connected in a vault, for CLI agents to be allowed into. */
+  /** The local folders and repository clones connected in a vault, for CLI agents to be allowed into. */
   localFolders(scopeId: string) {
     return [...this.mounted.values()]
-      .filter((item) => item.attachment.scopeId === scopeId && item.attachment.provider === 'local')
+      .filter((item) => item.attachment.scopeId === scopeId)
       .map((item) => item.target);
   }
   connect(scopeId: string, mountId: string) {
@@ -1250,7 +1450,8 @@ export class CloudService {
           record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
         ...(record.state === 'mounted' && record.writable ? { writable: true } : {}),
         connection: true,
-        ...(record.provider === 'local' ? { local: true } : {}),
+        ...(record.provider !== 'google-drive' ? { local: true } : {}),
+        ...(record.provider === 'github' ? { repository: true } : {}),
       }));
     // The work folder shows as a connection does: opened and changed, never renamed as an entry.
     if (rel === space.contents[0] && (await this.work(scopeId)))

@@ -39,6 +39,7 @@ import { migrateToVault } from './vault-rename';
 import { brainAgentNames, sharedSchemaId } from '../domain/you';
 import { AuthorshipStore } from '../knowledge/authorship';
 import { CloudService } from '../cloud/service';
+import { RepositoryGit } from '../cloud/repositories';
 import { WorkFolders } from './work-folders';
 import { AgentPaths } from './agent-paths';
 import { WorkspaceService, inspectRepository } from './workspaces';
@@ -136,6 +137,8 @@ app
     const workspaces = new WorkspaceService(files);
     // Folders on this device in contents (ADR 019); Drive is reached through its own app (ADR 023).
     const cloud = new CloudService(files, (filename) => shell.trashItem(filename));
+    // GitHub repositories in contents, cloned on this device (ADR 046).
+    cloud.repositories = new RepositoryGit();
     files.cloud = cloud;
     const images = new ImageService(files, cloud);
     const knowledge = new KnowledgeStore(files.dataDir, (ref) =>
@@ -878,6 +881,9 @@ app
             : await files.resolve(scopeId, target, true),
         ),
       addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
+      addRepository: (input) => changeCloud(input.scopeId, () => cloud.addRepository(input)),
+      cloneRepository: (...args) => changeCloud(args[0], () => cloud.cloneRepository(...args)),
+      updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => files.list(),
