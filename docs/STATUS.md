@@ -1,6 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
-GitHub repositories in contents, 2026-10-16 (**0.2.24**, pull request open):
+Published 2026-10-16: **0.2.24**, merged at the owner's request
+([#255](https://github.com/DeL-TaiseiOzaki/irori/pull/255) as `9155142` at 09:23:28 UTC).
+`publish.yml` published it from its push run `38880128620`; the release was public at
+09:24:47 (1:19) and the page deployed at 09:25:51 (2:23), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,672,256 / 142,283,880 / 175,843,077. The page offers 0.2.24.
+
+GitHub repositories in contents, 2026-10-16 (**0.2.24**, published):
 [ADR 046](decisions/046-github-repositories-in-contents.md). The connection
 dialog's **GitHub** source clones a repository where the person chooses, or
 takes a clone already there, and links it at `contents/<name>`.
