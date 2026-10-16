@@ -793,6 +793,8 @@ export interface HostAPI {
   stopRoutine(ref: import('./routines').RoutineRef): Promise<void>;
   /** The routine's runs kept on this device, newest first. */
   routineRuns(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineRun[]>;
+  /** Downloads uv for `.py` routine steps into irori's data, unless it is there already. */
+  installPython(): Promise<void>;
   /** The secrets kept on this device, by name only. */
   secrets(): Promise<import('./routines').SecretList>;
   /** Stores or replaces a secret; its value never comes back. */
