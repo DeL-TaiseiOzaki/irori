@@ -21,7 +21,14 @@ left unbuilt. A `.py` step runs through uv, which **Python を追加** (the row)
   before. An environment saved with Python chosen names a runtime 0.2.22 and
   earlier do not know, so those refuse to restore it.
 
-Side margins, 2026-10-16 (**0.2.22**):
+Published 2026-10-16: **0.2.22**, merged at the owner's request
+([#251](https://github.com/DeL-TaiseiOzaki/irori/pull/251) as `1418e1c` at 04:04:28 UTC).
+`publish.yml` published it from its push run `38848711279`; the release was public at
+04:05:46 (1:18) and the page deployed at 04:06:52 (2:24), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,242,688 / 141,926,080 / 175,412,623. The page offers 0.2.22.
+
+Side margins, 2026-10-16 (**0.2.22**, published):
 the owner asked for less room at a note's sides. Settings has 左右の余白
 (`pageMargins` in the device record and the saved environment): Standard keeps
 the 696px reading column, Small widens it to 1000px, Minimal fills the stage and
@@ -31,7 +38,15 @@ keeps a 36px gutter for the editor's block handle. `--page-width` and
   `npm run test:ui` (`scripts/properties-ui-smoke.ts` measures the page and the
   properties' alignment). Not tried on macOS or Windows.
 
-The work folder in contents, 2026-10-16 (**0.2.21**, not merged): the owner saw
+Published 2026-10-16: **0.2.21**, merged at the owner's request
+([#249](https://github.com/DeL-TaiseiOzaki/irori/pull/249) as `c017608` at 03:38:32 UTC).
+`publish.yml` published it from its push run `38846531830`; the release was public at
+03:40:03 (1:31) and the page deployed at 03:41:56 (3:24), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,242,688 / 141,915,342 / 175,412,830. The page offers 0.2.21.
+- Not tried on Windows or macOS, or with a real CLI's run.
+
+The work folder in contents, 2026-10-16 (**0.2.21**, published): the owner saw
 `work` as 未接続 in Contents and links into it not open. 0.2.19 put the default
 work folder at `<contents>/work`, where only registered connections open
 ([ADR 045](decisions/045-work-folder-in-contents.md)).
