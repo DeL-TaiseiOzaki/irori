@@ -1,6 +1,13 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Python for routines, 2026-10-16 (**0.2.23**): ADR 016 stage 3, the last stage
+Published 2026-10-16: **0.2.23**, merged at the owner's request
+([#253](https://github.com/DeL-TaiseiOzaki/irori/pull/253) as `84a94f1` at 08:32:25 UTC).
+`publish.yml` published it from its push run `38874373532`; the release was public at
+08:33:40 (1:15) and the page deployed at 08:35:51 (3:26), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,667,136 / 142,300,772 / 175,837,267. The page offers 0.2.23.
+
+Python for routines, 2026-10-16 (**0.2.23**, published): ADR 016 stage 3, the last stage
 left unbuilt. A `.py` step runs through uv, which **Python を追加** (the row) or
 **Python** (設定 → ルーティン) downloads into irori's data
 ([ROUTINES](ROUTINES.md#python), ADR 016 "Stage 3 as built").
