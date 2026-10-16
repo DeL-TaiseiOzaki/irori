@@ -750,7 +750,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
-.settings-choices.markdown-font > div {
+.settings-choices.markdown-font > div,
+.settings-choices.page-margins > div {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .settings-choice {

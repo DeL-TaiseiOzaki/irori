@@ -5,12 +5,13 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { SettingsService } from '../src/host/settings';
 import { hostArguments } from '../src/domain/host-requests';
-import { markdownFonts, nativeThemeSource } from '../src/domain/types';
+import { markdownFonts, nativeThemeSource, pageMargins } from '../src/domain/types';
 
 const defaults = {
   theme: 'system',
   language: 'en',
   markdownFont: 'sans',
+  pageMargins: 'standard',
   editorAssistance: true,
   vaultAgent: false,
   layouts: {},
@@ -106,6 +107,19 @@ test('the vault agent is off until the person turns it on, and stays as chosen',
   await settings.save({ vaultAgent: false });
   assert.equal((await new SettingsService(dir).read()).vaultAgent, false);
   assert.equal(hostArguments.saveDeviceSettings.safeParse([{ vaultAgent: 'on' }]).success, false);
+});
+
+test('side margins stay as chosen, and a record without them keeps the reading column', async () => {
+  const { dir, settings } = await service();
+  await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ theme: 'dark' }));
+  assert.equal((await settings.read()).pageMargins, 'standard');
+  await settings.save({ pageMargins: 'minimal' });
+  await settings.save({ markdownFont: 'mono' });
+  assert.equal((await new SettingsService(dir).read()).pageMargins, 'minimal');
+  const save = hostArguments.saveDeviceSettings;
+  for (const margins of pageMargins)
+    assert.equal(save.safeParse([{ pageMargins: margins }]).success, true);
+  assert.equal(save.safeParse([{ pageMargins: 'none' }]).success, false);
 });
 
 test("the reader's role and project are kept per KB on the device, not in the KB", async () => {
