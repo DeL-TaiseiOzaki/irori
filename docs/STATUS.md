@@ -1,5 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Python for routines, 2026-10-16 (**0.2.23**): ADR 016 stage 3, the last stage
+left unbuilt. A `.py` step runs through uv, which **Python を追加** (the row) or
+**Python** (設定 → ルーティン) downloads into irori's data
+([ROUTINES](ROUTINES.md#python), ADR 016 "Stage 3 as built").
+- `PythonRuntime` (`src/host/python-runtime.ts`) pins uv 0.12.21 by each
+  target's archive size and SHA-256, downloads over HTTPS only and keeps the
+  executable in `<data>/runtimes/uv/<version>/`; `installPython` is its
+  `HostAPI` method. `RoutineService` needs both the setting and uv on disk, and
+  runs `uv run --no-project --script` with uv's folders under `<data>/runtimes/`.
+- The irori agent's `write-routine` skill says `.py` runs once Python is added;
+  a skill folder already written keeps its text, as for every standard skill.
+- Verified by `npm run build`, `npm test` (`tests/python-runtime.test.ts`;
+  `tests/routines.test.ts` with `IRORI_TEST_UV_PATH` set ran a PEP 723 script
+  through the real uv, which fetched CPython into the data folder) and
+  `npm run test:ui` (`scripts/routines-ui-smoke.ts` sees the row and the
+  switch; it does not download). The real download from GitHub was checked on
+  Linux x64 only. Not tried on macOS or Windows.
+- `routineRuntimeList` now refuses a runtime named twice, which `max(1)` did
+  before. An environment saved with Python chosen names a runtime 0.2.22 and
+  earlier do not know, so those refuse to restore it.
+
 Side margins, 2026-10-16 (**0.2.22**):
 the owner asked for less room at a note's sides. Settings has 左右の余白
 (`pageMargins` in the device record and the saved environment): Standard keeps

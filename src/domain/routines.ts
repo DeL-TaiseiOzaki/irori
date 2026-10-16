@@ -19,9 +19,14 @@ export const routineFolder = z
 export const routineRef = z.object({ owner: z.uuid(), folder: routineFolder }).strict();
 export type RoutineRef = z.infer<typeof routineRef>;
 
-/** Runtimes a person adds on this device; `.py` waits for Python (ADR 016 stage 3). */
-export const routineRuntimes = ['javascript'] as const;
+/** Runtimes a person adds on this device (ADR 016 D3). */
+export const routineRuntimes = ['javascript', 'python'] as const;
 export type RoutineRuntime = (typeof routineRuntimes)[number];
+/** The runtimes a renderer or a saved environment may name: each at most once. */
+export const routineRuntimeList = z
+  .array(z.enum(routineRuntimes))
+  .max(routineRuntimes.length)
+  .refine((list) => new Set(list).size === list.length);
 
 /** Names a secret cannot take: they would change how irori or the program starts. */
 const reservedNames = [

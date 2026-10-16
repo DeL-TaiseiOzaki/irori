@@ -261,6 +261,8 @@ export interface RoutineHost {
   emit: (run: RoutineRun) => void;
   /** Runs `.js` files: irori's own executable as Node. */
   runtime?: string;
+  /** Runs `.py` files through uv, once the person added Python (D3). */
+  python?: { uv(): Promise<string | undefined>; env(): Record<string, string> };
 }
 
 /**
@@ -466,8 +468,11 @@ export class RoutineService {
             text: t('JavaScript が必要です。', 'Needs JavaScript.'),
             runtime: 'javascript' as const,
           };
-        if (extension === '.py')
-          return { text: t('Python はまだ使えません。', 'Python is not available yet.') };
+        if (
+          extension === '.py' &&
+          !(settings.routineRuntimes.includes('python') && (await this.host.python?.uv()))
+        )
+          return { text: t('Python が必要です。', 'Needs Python.'), runtime: 'python' as const };
         continue;
       }
       if (step.agent !== 'irori') continue;
@@ -924,7 +929,7 @@ export class RoutineService {
       record.detail = record.detail ? `${record.detail} · ${refused}` : refused;
     }
   }
-  private spawn(
+  private async spawn(
     active: Active,
     step: Extract<RoutineStep, { kind: 'run' }>,
     record: RoutineStepRun,
@@ -940,6 +945,14 @@ export class RoutineService {
         command = this.host.runtime ?? process.execPath;
         args = [file];
         env.ELECTRON_RUN_AS_NODE = '1';
+      } else if (path.extname(file).toLowerCase() === '.py') {
+        // uv reads the script's own dependencies (PEP 723) and ignores any project around it.
+        const uv = await this.host.python?.uv();
+        if (!uv) throw Error(t('Python が必要です。', 'Needs Python.'));
+        command = uv;
+        args = ['run', '--no-project', '--script', file];
+        Object.assign(env, this.host.python!.env());
+        delete env.VIRTUAL_ENV;
       } else {
         command = file;
         args = [];

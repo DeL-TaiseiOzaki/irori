@@ -13,7 +13,7 @@ import { skillAudience, skillName } from './skills';
 import { brainLook, categoryText } from './brains';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
-import { routineRef, routineRuntimes, secretName, secretValue } from './routines';
+import { routineRef, routineRuntimeList, secretName, secretValue } from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
@@ -69,7 +69,7 @@ export const hostArguments = {
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
       yourAi: yourAiChoice.optional(),
-      routineRuntimes: z.array(z.enum(routineRuntimes)).max(routineRuntimes.length).optional(),
+      routineRuntimes: routineRuntimeList.optional(),
     }),
   ]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
@@ -317,6 +317,7 @@ export const hostArguments = {
   ]),
   stopRoutine: z.tuple([routineRef]),
   routineRuns: z.tuple([routineRef]),
+  installPython: z.tuple([]),
   secrets: z.tuple([]),
   setSecret: z.tuple([secretName, secretValue]),
   deleteSecret: z.tuple([secretName]),
