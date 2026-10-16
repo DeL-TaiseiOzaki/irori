@@ -339,9 +339,9 @@ button.save-state > i {
   overscroll-behavior: contain;
 }
 .document-editor {
-  max-width: 696px;
+  max-width: var(--page-width);
   margin: 0 auto;
-  padding: 40px 0 90px;
+  padding: 40px var(--page-gutter) 90px;
   min-height: 100%;
 }
 .image-errors {

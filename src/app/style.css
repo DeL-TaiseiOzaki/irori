@@ -30,6 +30,20 @@
 :root[data-markdown-font='mono'] {
   --markdown-font: var(--markdown-font-mono);
 }
+/* A note's page is a reading column unless the reader asks for less room at its
+   sides. The gutter keeps the editor's block handle inside the stage when the
+   page reaches the stage's edges. */
+:root {
+  --page-width: 696px;
+  --page-gutter: 0px;
+}
+:root[data-page-margins='small'] {
+  --page-width: 1000px;
+}
+:root[data-page-margins='minimal'] {
+  --page-width: none;
+  --page-gutter: 36px;
+}
 /* Element defaults carry no specificity (:where), so every component class wins
    over them. They are the stage's look; the chrome sets its own below. */
 :where(*, *::before, *::after) {

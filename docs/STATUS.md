@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Side margins, 2026-10-16 (**0.2.22**):
+the owner asked for less room at a note's sides. Settings has 左右の余白
+(`pageMargins` in the device record and the saved environment): Standard keeps
+the 696px reading column, Small widens it to 1000px, Minimal fills the stage and
+keeps a 36px gutter for the editor's block handle. `--page-width` and
+`--page-gutter` (`src/app/style.css`) set both the editor and the properties.
+- Verified by `npm run build`, `npm test` (`tests/settings.test.ts`) and
+  `npm run test:ui` (`scripts/properties-ui-smoke.ts` measures the page and the
+  properties' alignment). Not tried on macOS or Windows.
+
 Published 2026-10-16: **0.2.21**, merged at the owner's request
 ([#249](https://github.com/DeL-TaiseiOzaki/irori/pull/249) as `c017608` at 03:38:32 UTC).
 `publish.yml` published it from its push run `38846531830`; the release was public at

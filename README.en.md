@@ -92,7 +92,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 **Records and tools**
 - The **Changes** tab shows diffs, commits and history. irori never force-overwrites and never stashes on its own.
 - A built-in terminal opens in the vault's folder.
-- Switch the theme (Match system, Hearth, Light, Dark), the Markdown font and the interface language (日本語 / English).
+- Switch the theme (Match system, Hearth, Light, Dark), the Markdown font, a note's side margins (Standard, Small, Minimal) and the interface language (日本語 / English).
 
 <div align="center">
 <img src="docs/images/readme/en-overview.png" alt="irori mode: the irori agent beside three vaults grouped by team and organization on a map." width="860">
