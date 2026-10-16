@@ -355,6 +355,9 @@ export interface StartRun {
 }
 export const markdownFonts = ['system', 'sans', 'rounded', 'serif', 'textbook', 'mono'] as const;
 export type MarkdownFont = (typeof markdownFonts)[number];
+/** How much room a note leaves at its sides: a reading column, a wider one, or the stage's width. */
+export const pageMargins = ['standard', 'small', 'minimal'] as const;
+export type PageMargins = (typeof pageMargins)[number];
 /** Hearth is graphite chrome with a paper stage; system picks hearth or dark with the desktop. */
 export const themes = ['system', 'hearth', 'light', 'dark'] as const;
 export type Theme = (typeof themes)[number];
@@ -367,6 +370,7 @@ export interface DeviceSettings {
   /** The interface language; Japanese unless the reader chose otherwise. */
   language: import('./i18n').Language;
   markdownFont: MarkdownFont;
+  pageMargins: PageMargins;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
   /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */

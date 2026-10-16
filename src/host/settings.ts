@@ -2,7 +2,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
-import { markdownFonts, themes, type DeviceSettings } from '../domain/types';
+import { markdownFonts, pageMargins, themes, type DeviceSettings } from '../domain/types';
 import { yourAiChoice } from '../domain/conversation';
 import { skillAudience } from '../domain/skills';
 import { languages } from '../domain/i18n';
@@ -12,6 +12,7 @@ const settings = z.object({
   theme: z.enum(themes).default('system'),
   language: z.enum(languages).default('en'),
   markdownFont: z.enum(markdownFonts).default('sans'),
+  pageMargins: z.enum(pageMargins).default('standard'),
   editorAssistance: z.boolean().default(true),
   vaultAgent: z.boolean().default(false),
   // The pane library owns this format; it is stored as written and bounded.
@@ -45,6 +46,7 @@ export class SettingsService {
       const next = settings.parse({
         theme: patch.theme ?? current.theme,
         markdownFont: patch.markdownFont ?? current.markdownFont,
+        pageMargins: patch.pageMargins ?? current.pageMargins,
         language: patch.language ?? current.language,
         editorAssistance: patch.editorAssistance ?? current.editorAssistance,
         vaultAgent: patch.vaultAgent ?? current.vaultAgent,

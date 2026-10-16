@@ -8,14 +8,23 @@ import { useLanguage } from './useLanguage';
 import {
   chooseLanguage,
   chooseMarkdownFont,
+  choosePageMargins,
   chooseRoutineRuntimes,
   chooseTheme,
   currentLanguageChoice,
   currentMarkdownFont,
+  currentPageMargins,
   currentRoutineRuntimes,
   currentTheme,
 } from './device-settings';
-import { markdownFonts, themes, type MarkdownFont, type Theme } from '../domain/types';
+import {
+  markdownFonts,
+  pageMargins,
+  themes,
+  type MarkdownFont,
+  type PageMargins,
+  type Theme,
+} from '../domain/types';
 import { languages, t, type Language } from '../domain/i18n';
 
 const host = window.irori;
@@ -35,6 +44,12 @@ const fontLabels: Record<MarkdownFont, () => string> = {
   serif: () => t('明朝', 'Serif'),
   textbook: () => t('教科書体', 'Textbook'),
   mono: () => t('等幅', 'Monospace'),
+};
+
+const marginLabels: Record<PageMargins, () => string> = {
+  standard: () => t('標準', 'Standard'),
+  small: () => t('小', 'Small'),
+  minimal: () => t('最小', 'Minimal'),
 };
 
 // Each language is named in itself, so it can be found whichever is showing.
@@ -156,6 +171,7 @@ export function Settings({
     [restoring, setRestoring] = useState(false);
   const [theme, chooseThemeValue] = useChoice(currentTheme, chooseTheme, onError);
   const [font, chooseFont] = useChoice(currentMarkdownFont, chooseMarkdownFont, onError);
+  const [margins, chooseMargins] = useChoice(currentPageMargins, choosePageMargins, onError);
   const [language, chooseLanguageValue, setLanguage] = useChoice<Language>(
     currentLanguageChoice,
     chooseLanguage,
@@ -217,6 +233,14 @@ export function Settings({
                   </span>
                 )}
                 onChange={chooseFont}
+              />
+              <Choices
+                legend={t('左右の余白', 'Side margins')}
+                name="page-margins"
+                value={margins}
+                options={pageMargins}
+                label={(option) => marginLabels[option]()}
+                onChange={chooseMargins}
               />
               <Choices
                 legend={t('言語', 'Language')}

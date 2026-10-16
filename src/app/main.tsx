@@ -41,6 +41,7 @@ import { Menu } from '@base-ui/react/menu';
 import {
   applyLanguage,
   applyMarkdownFont,
+  applyPageMargins,
   applyTheme,
   chooseEditorAssistance,
   chooseVaultAgent,
@@ -3836,6 +3837,7 @@ watchSystemTheme();
 void loadDeviceSettings().finally(() => {
   applyTheme();
   applyMarkdownFont();
+  applyPageMargins();
   applyLanguage();
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary FallbackComponent={AppCrash}>
