@@ -315,7 +315,13 @@ export function Tree({
                 )}
                 <Icon
                   name={
-                    entry.connection && !entry.local ? 'cloud' : entry.directory ? 'folder' : 'file'
+                    entry.repository
+                      ? 'branch'
+                      : entry.connection && !entry.local
+                        ? 'cloud'
+                        : entry.directory
+                          ? 'folder'
+                          : 'file'
                   }
                   size={15}
                   className={`tree-icon ${entry.connection ? 'drive' : ''}`}

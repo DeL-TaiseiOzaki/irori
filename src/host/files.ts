@@ -829,7 +829,7 @@ export class FileService {
   /** The connection records whose folders appear in `previous`, rewritten to appear in `next`. */
   private async contentsRecords(directory: string, previous: string, next: string) {
     const out: { filename: string; original: string; next: string }[] = [];
-    for (const name of ['local-folders.json', 'cloud-mounts.json']) {
+    for (const name of ['local-folders.json', 'repositories.json', 'cloud-mounts.json']) {
       const filename = path.join(directory, name);
       const stat = await fs.lstat(filename).catch((error) => {
         if (!isMissing(error)) throw error;
