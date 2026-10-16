@@ -25,7 +25,7 @@ import type {
   GitSubmodules,
   AddSubmodule,
 } from '../domain/git';
-import { githubRepository, gitRepository, gitScope } from '../domain/git';
+import { githubCloneURL, githubRepository, gitRepository, gitScope } from '../domain/git';
 import { GitError, GitProcess } from './process';
 import { GitHubCli } from './github';
 import { t } from '../domain/i18n';
@@ -48,14 +48,7 @@ import {
  */
 type Repo = Space & { prefix: string; space: Space };
 const main = (space: Space): Repo => ({ ...space, prefix: '', space });
-/** A GitHub repository over HTTPS or SSH, the only remotes irori clones from. */
-export function githubCloneURL(url: string) {
-  return (
-    !!githubRepository(url) &&
-    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/.test(url) &&
-    !/[?#\s]/.test(url)
-  );
-}
+export { githubCloneURL };
 const cloneURLRequired = () =>
   Error(
     t(

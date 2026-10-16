@@ -8,6 +8,7 @@ import {
 } from './brains';
 import { commentBodyLimit, commentQuoteLimit } from './comments';
 import type { Category } from './types';
+import { githubCloneURL, isBranchName } from './git';
 import type { NamedLayer } from './layers';
 
 /**
@@ -33,7 +34,15 @@ export type IroriCommand =
     }
   | { kind: 'create'; folder: string; parent?: string; name?: string; category?: Category }
   | { kind: 'add'; folder: string; name?: string; category?: Category }
-  | { kind: 'connect'; vault: string; folder: string; name?: string; readOnly: boolean }
+  | {
+      kind: 'connect';
+      vault: string;
+      folder: string;
+      name?: string;
+      readOnly: boolean;
+      /** `folder` is a GitHub repository's URL (ADR 046). */
+      repository?: { into?: string; existing?: string; branch?: string };
+    }
   | { kind: 'disconnect'; vault: string; name: string }
   | {
       kind: 'set';
@@ -61,7 +70,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   clone: ['folder', 'parent', 'name', 'category'],
   create: ['parent', 'name', 'category'],
   add: ['name', 'category'],
-  connect: ['name', 'read-only'],
+  connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
   set: ['name', 'category', 'knowledge-label', 'contents-label', 'color', 'icon'],
   layer: ['also'],
@@ -75,7 +84,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   resolve: [],
   index: [],
 };
-const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default']);
+const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default', 'editable']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
 const positional: Record<keyof typeof options, [count: number, words: string]> = {
   clone: [1, 'one repository'],
@@ -184,14 +193,40 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
       };
     case 'add':
       return { kind, folder: words[0], ...common };
-    case 'connect':
+    case 'connect': {
+      const name = text('name') && { name: text('name')!.trim() };
+      if (!githubCloneURL(words[1])) {
+        const stray = ['into', 'existing', 'branch', 'editable'].find((key) => key in values);
+        if (stray) throw Error(`--${stray} is for a GitHub repository's URL. Run "irori help".`);
+        return {
+          kind,
+          vault: words[0],
+          folder: words[1],
+          ...name,
+          readOnly: values['read-only'] === true,
+        };
+      }
+      if (values['read-only'])
+        throw Error('A repository connects read-only unless --editable is given.');
+      if ('into' in values && 'existing' in values)
+        throw Error('Give --into or --existing, not both.');
+      if ('existing' in values && 'branch' in values)
+        throw Error('--branch is for a clone irori makes with --into.');
+      if (text('branch') && !isBranchName(text('branch')!))
+        throw Error('--branch is not a branch name.');
       return {
         kind,
         vault: words[0],
         folder: words[1],
-        ...(text('name') && { name: text('name')!.trim() }),
-        readOnly: values['read-only'] === true,
+        ...name,
+        readOnly: values.editable !== true,
+        repository: {
+          ...(text('into') && { into: text('into') }),
+          ...(text('existing') && { existing: text('existing') }),
+          ...(text('branch') && { branch: text('branch') }),
+        },
       };
+    }
     case 'disconnect':
       return { kind, vault: words[0], name: words[1] };
     case 'set': {

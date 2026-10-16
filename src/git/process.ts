@@ -123,7 +123,14 @@ export function githubCredentialConfig(gh: string) {
   ];
 }
 
-type RunOptions = { input?: string; network?: boolean; codes?: number[]; inspection?: boolean };
+type RunOptions = {
+  input?: string;
+  network?: boolean;
+  codes?: number[];
+  inspection?: boolean;
+  /** How long the operation may take, in milliseconds, instead of the default for its kind. */
+  timeout?: number;
+};
 type ProcessSlots = {
   limit: number;
   running: number;
@@ -225,7 +232,7 @@ export class GitProcess {
       };
       const timer = setTimeout(
         () => stop(Error(t('Git 操作が時間切れになりました。', 'The Git operation timed out.'))),
-        options.inspection ? 8000 : options.network ? 90000 : 30000,
+        options.timeout ?? (options.inspection ? 8000 : options.network ? 90000 : 30000),
       );
       child.stdout?.on('data', (bytes: Buffer) => {
         size += bytes.length;

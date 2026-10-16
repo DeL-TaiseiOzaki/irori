@@ -1,3 +1,18 @@
+/** A GitHub repository over HTTPS or SSH, the only remotes irori clones from. */
+export function githubCloneURL(url: string) {
+  return (
+    !!githubRepository(url) &&
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/.test(url) &&
+    !/[?#\s]/.test(url)
+  );
+}
+/**
+ * A branch name irori passes to Git: a plain ref name that cannot be read as an
+ * option or a revision range.
+ */
+export function isBranchName(name: string) {
+  return /^[A-Za-z0-9._/-]{1,200}$/.test(name) && !/^[-/.]|\.\.|\/\/|\/\.|[/.]$|\.lock$/.test(name);
+}
 export interface GitChange {
   path: string;
   index: string;

@@ -716,3 +716,6 @@
   font-size: 12px;
   color: var(--ink-2);
 }
+.connect-sheet .connect-field.repository-branch {
+  flex: 0 0 132px;
+}
