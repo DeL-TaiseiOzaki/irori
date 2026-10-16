@@ -1,6 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The work folder in contents, 2026-10-16 (**0.2.21**, not merged): the owner saw
+Published 2026-10-16: **0.2.21**, merged at the owner's request
+([#249](https://github.com/DeL-TaiseiOzaki/irori/pull/249) as `c017608` at 03:38:32 UTC).
+`publish.yml` published it from its push run `38846531830`; the release was public at
+03:40:03 (1:31) and the page deployed at 03:41:56 (3:24), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,242,688 / 141,915,342 / 175,412,830. The page offers 0.2.21.
+- Not tried on Windows or macOS, or with a real CLI's run.
+
+The work folder in contents, 2026-10-16 (**0.2.21**, published): the owner saw
 `work` as 未接続 in Contents and links into it not open. 0.2.19 put the default
 work folder at `<contents>/work`, where only registered connections open
 ([ADR 045](decisions/045-work-folder-in-contents.md)).
