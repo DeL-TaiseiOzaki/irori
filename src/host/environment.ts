@@ -14,6 +14,7 @@ import {
   type Space,
 } from '../domain/types';
 import {
+  agentFilesFile,
   environmentFile,
   environmentPreferences,
   environmentRepository,
@@ -31,6 +32,13 @@ import type { FileService } from './files';
 import { ifPresent } from './local-json';
 import { addRoutine, packRoutines, routineHere, storedRoutines } from './environment-routines';
 import { openKeys, sealedKeys, sealKeys } from './environment-keys';
+import {
+  agentFileHere,
+  agentReady,
+  packAgentFiles,
+  restoreAgentFiles,
+  storedAgentFiles,
+} from './environment-agent';
 import type { SecretStore } from './keystore';
 import { fromSavedEnvironment } from './vault-rename';
 import { inspectRepository, workspaceProfile, type WorkspaceService } from './workspaces';
@@ -191,6 +199,10 @@ export class EnvironmentService {
   private readRoutines(full: string) {
     return this.readFile(full, routinesFile, storedRoutines);
   }
+  /** The irori agent's own files saved beside the environment (ADR 048). */
+  private readAgentFiles(full: string) {
+    return this.readFile(full, agentFilesFile, storedAgentFiles);
+  }
   /** The routine secrets saved beside the environment, still sealed (ADR 047). */
   private readKeys(full: string) {
     return this.readFile(full, keysFile, sealedKeys);
@@ -200,12 +212,17 @@ export class EnvironmentService {
     const saved = exists ? (await this.read(full))?.value : undefined;
     const savedRoutines = saved ? ((await this.readRoutines(full))?.value.routines ?? []) : [];
     const savedKeys = saved ? (await this.readKeys(full))?.value.names : undefined;
+    const savedFiles = saved ? (await this.readAgentFiles(full))?.value.files : undefined;
     const keys = await this.host.secrets.list();
     const here = await this.vaults();
     const agentHere = await this.agentRepository();
     const local = await this.local(here, agentHere);
     const agentRoot = await this.host.agentRoot();
     const routines = await packRoutines(agentRoot);
+    const files = await packAgentFiles(agentRoot);
+    let missing = 0;
+    for (const file of savedFiles ?? [])
+      if (!(await agentFileHere(agentRoot, file.path))) missing++;
     return {
       account: login,
       local: {
@@ -214,6 +231,8 @@ export class EnvironmentService {
         ...(local.agent && { agent: local.agent.repository }),
         routines: routines.routines.length,
         routinesLeft: routines.left,
+        agentFiles: files.files.length,
+        agentFilesLeft: files.left,
         secrets: keys.names,
         secretsAvailable: keys.available,
       },
@@ -241,6 +260,7 @@ export class EnvironmentService {
               here: await routineHere(agentRoot, folder),
             })),
           ),
+          ...(savedFiles && { agentFiles: { files: savedFiles.length, missing } }),
           ...(savedKeys && {
             secrets: savedKeys.map((name) => ({ name, here: keys.names.includes(name) })),
           }),
@@ -252,7 +272,8 @@ export class EnvironmentService {
   /**
    * Replaces the saved environment with this device's. With a passphrase the
    * saved secrets are replaced by this device's, sealed with it; without one
-   * the saved secrets stay as they are.
+   * the saved secrets stay as they are. The irori agent's saved files stay as
+   * they are where it is not set up here.
    */
   async save(passphrase?: string): Promise<EnvironmentState> {
     const { full } = await this.place(true);
@@ -260,8 +281,11 @@ export class EnvironmentService {
     const previous = await this.read(full);
     const previousRoutines = await this.readRoutines(full);
     const previousKeys = passphrase === undefined ? undefined : await this.readKeys(full);
+    const previousFiles = await this.readAgentFiles(full);
     const value = await this.local();
-    const { routines } = await packRoutines(await this.host.agentRoot());
+    const agentRoot = await this.host.agentRoot();
+    const { routines } = await packRoutines(agentRoot);
+    const { files } = await packAgentFiles(agentRoot);
     // Opened with the device's key and sealed again in memory, before anything is written.
     const keys =
       passphrase === undefined
@@ -285,6 +309,14 @@ export class EnvironmentService {
         `${JSON.stringify({ schemaVersion: 1, savedAt: value.savedAt, routines }, null, 2)}\n`,
         "Save the irori agent's routines",
         previousRoutines?.sha,
+      );
+    if (files.length)
+      await this.host.github.writeFile(
+        full,
+        agentFilesFile,
+        `${JSON.stringify({ schemaVersion: 1, savedAt: value.savedAt, files }, null, 2)}\n`,
+        "Save the irori agent's files",
+        previousFiles?.sha,
       );
     if (keys)
       await this.host.github.writeFile(
@@ -321,6 +353,8 @@ export class EnvironmentService {
       failed: [],
       workspaces: 0,
       routines: [],
+      agentFiles: [],
+      agentFilesKept: [],
       secrets: [],
       agent: 'unchanged',
     };
@@ -366,6 +400,8 @@ export class EnvironmentService {
     }
     if (saved.agent && input.agent)
       result.agent = await this.restoreAgent(saved.agent.repository, result);
+    // Its files before its routines, which need it set up.
+    if (input.agentFiles && result.agent !== 'failed') await this.restoreFiles(full, result);
     if (input.routines?.length) await this.restoreRoutines(full, input.routines, result);
     const mapped = saved.workspaces.map((profile) => {
       const scopeIds = [...new Set(profile.scopeIds.map((id) => ids.get(id) ?? id))];
@@ -406,6 +442,18 @@ export class EnvironmentService {
     if (Object.keys(added).length) await this.host.secrets.update(added);
     return Object.keys(added);
   }
+  /** Adds the irori agent's saved files this device lacks, after its folder was cloned if it was. */
+  private async restoreFiles(full: string, result: EnvironmentRestore) {
+    const saved = (await this.readAgentFiles(full))?.value.files ?? [];
+    if (!saved.length) return;
+    try {
+      const { added, kept } = await restoreAgentFiles(await this.host.agentRoot(), saved);
+      result.agentFiles = added;
+      result.agentFilesKept = kept;
+    } catch (error) {
+      result.failed.push({ name: 'irori agent', message: (error as Error).message });
+    }
+  }
   /**
    * Adds the chosen saved routines to the irori agent's folder, after it was
    * cloned if it was. A routine folder already here is left as it is.
@@ -413,10 +461,7 @@ export class EnvironmentService {
   private async restoreRoutines(full: string, folders: string[], result: EnvironmentRestore) {
     const saved = (await this.readRoutines(full))?.value.routines ?? [];
     const root = await this.host.agentRoot();
-    const ready = await fs
-      .stat(path.join(root, 'AGENTS.md'))
-      .then((stat) => stat.isFile())
-      .catch(() => false);
+    const ready = await agentReady(root);
     for (const routine of saved) {
       if (!folders.includes(routine.folder) || (await routineHere(root, routine.folder))) continue;
       try {

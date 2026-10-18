@@ -95,7 +95,11 @@ export function run() {
           .filter((name) => name.endsWith('.md'))
           .map((name) => name.slice(0, -'.md'.length))
       : [];
-    log({ prompt, brains, loaded, mode });
+    // Settings given on the command line, such as the shared Schema's hooks.
+    const settings = process.argv.includes('--settings')
+      ? process.argv[process.argv.indexOf('--settings') + 1]
+      : undefined;
+    log({ prompt, brains, loaded, mode, ...(settings && { settings }) });
     send({
       type: 'system',
       subtype: 'init',

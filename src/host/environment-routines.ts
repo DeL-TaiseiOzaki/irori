@@ -18,9 +18,9 @@ const fileBudget = 900 * 1024;
 const filesPerRoutine = 100;
 const depthLimit = 8;
 /** Files the system writes into folders it shows. */
-const systemFiles = new Set(['.DS_Store']);
+export const systemFiles = new Set(['.DS_Store']);
 
-const relativeFile = z
+export const relativeFile = z
   .string()
   .min(1)
   .max(500)
@@ -29,7 +29,7 @@ const relativeFile = z
       !/[\\\0:]/.test(value) &&
       value.split('/').every((part) => part && part !== '.' && part !== '..'),
   );
-const storedFile = z.union([
+export const storedFile = z.union([
   z.object({ path: relativeFile, text: z.string(), executable: z.boolean().optional() }).strict(),
   z.object({ path: relativeFile, base64: z.base64(), executable: z.boolean().optional() }).strict(),
 ]);

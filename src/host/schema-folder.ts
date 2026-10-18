@@ -1,7 +1,6 @@
 import type { Entry, Layer } from '../domain/types';
 import { classify } from '../domain/scopes';
 import type { FileService } from './files';
-import type { SettingKind } from '../domain/schema-settings';
 
 /**
  * A folder whose Schema the settings read and write: a vault's checkout, or
@@ -17,8 +16,6 @@ export interface SchemaFolder {
    * The irori agent's folder has instructions only at its root.
    */
   knowledge: boolean;
-  /** The settings it takes, when not all: the shared Schema has instructions and skills only. */
-  settings?: SettingKind[];
   layer(relative: string): Layer;
   /** One folder's entries; a link is listed as blocked. */
   entries(relative: string): Promise<Pick<Entry, 'path' | 'name' | 'directory' | 'blocked'>[]>;

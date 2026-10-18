@@ -13,6 +13,7 @@ import { GitHubCli } from '../src/git/github';
 import { GitProcess } from '../src/git/process';
 import { setLanguage } from '../src/domain/i18n';
 import { fakeGh, git, remote } from './fixtures/github';
+import { iroriAgentSkills, yourAiStarter } from '../prompts';
 
 // Messages are matched in English.
 setLanguage('en');
@@ -124,6 +125,8 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
     agent: 'octo/you',
     routines: 0,
     routinesLeft: [],
+    agentFiles: 1,
+    agentFilesLeft: [],
     secrets: [],
     secretsAvailable: true,
   });
@@ -174,7 +177,10 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
   // A second save replaces the file, naming the sha it read.
   await f.a.environment.save();
   const puts = (await f.fake.calls()).filter((call) => call.includes('PUT'));
-  assert.equal(puts.length, 2);
+  // Each save writes the environment and the irori agent's files.
+  assert.equal(puts.filter((call) => call.includes('environment.json')).length, 2);
+  assert.equal(puts.filter((call) => call.includes('irori-agent.json')).length, 2);
+  assert.equal(puts.length, 4);
   assert.equal((await f.fake.calls()).filter((call) => call.includes('POST')).length, 1);
 });
 
@@ -202,6 +208,8 @@ test('another device restores the vaults, workspaces, preferences and irori agen
     failed: [],
     workspaces: 1,
     routines: [],
+    agentFiles: [],
+    agentFilesKept: [],
     secrets: [],
     agent: 'restored',
   });
@@ -228,6 +236,8 @@ test('another device restores the vaults, workspaces, preferences and irori agen
     failed: [],
     workspaces: 0,
     routines: [],
+    agentFiles: [],
+    agentFilesKept: [],
     secrets: [],
     agent: 'unchanged',
   });
@@ -266,6 +276,8 @@ test('restoring keeps what is in the way and reports it', async (t) => {
     failed: [],
     workspaces: 1,
     routines: [],
+    agentFiles: [],
+    agentFilesKept: [],
     secrets: [],
     agent: 'unchanged',
   });
@@ -367,6 +379,127 @@ test('routines are not added where the irori agent is not set up', async (t) => 
   await writeFile(file, '{"schemaVersion":1,"routines":[{"folder":"../x"}]}');
   await assert.rejects(f.b.environment.state(), /Could not read routines\.json/);
   await assert.rejects(f.a.environment.save(), /Could not read routines\.json/);
+});
+
+/** Writes files into a folder, making the folders on the way. */
+async function put(root: string, files: Record<string, string | Buffer>) {
+  for (const [rel, content] of Object.entries(files)) {
+    await mkdir(path.dirname(path.join(root, rel)), { recursive: true });
+    await writeFile(path.join(root, rel), content);
+  }
+}
+
+test("the irori agent's files and the shared Schema travel without a repository", async (t) => {
+  const f = await fixture(t);
+  // Device A's irori agent folder is not a repository.
+  await put(f.a.agentRoot, {
+    'AGENTS.md': '# My irori agent\n',
+    '.agents/skills/irori-setup/SKILL.md':
+      '---\nname: irori-setup\ndescription: Mine.\n---\n\nMine.\n',
+    '.claude/rules/dates.md': 'Use YYYY-MM-DD.\n',
+    '.irori/shared/AGENTS.md': '# Shared\n',
+    '.irori/shared/.claude/rules/tone.md': 'Be brief.\n',
+    '.irori/shared/.claude/settings.json': '{"hooks":{}}\n',
+    'notes/plan.md': '# Plan\n',
+    'bin/run.sh': '#!/bin/sh\necho ok\n',
+    'assets/icon.bin': Buffer.from([0, 255, 1, 2]),
+    // Past GitHub's limit for one file of the settings repository.
+    'notes/big.txt': 'z'.repeat(950 * 1024),
+    // Written for this device alone, or kept apart: these do not travel.
+    '.claude/agents/vault-research.md': `---\nname: vault-research\n---\n\n${f.base}\n`,
+    '.claude/settings.local.json': '{}\n',
+    'node_modules/x/index.js': '',
+    'routines/Inbox/routine.yaml': 'name: Inbox\nsteps: []\n',
+  });
+  await chmod(path.join(f.a.agentRoot, 'bin', 'run.sh'), 0o755);
+  await symlink(path.join(f.base, 'gitconfig'), path.join(f.a.agentRoot, 'link.md'));
+
+  const before = await f.a.environment.state();
+  assert.equal(before.local.agent, undefined);
+  assert.equal(before.local.agentFiles, 9);
+  assert.deepEqual(before.local.agentFilesLeft, ['link.md', 'notes/big.txt']);
+  await f.a.environment.save();
+  const stored = JSON.parse(await f.fake.stored('irori-agent.json'));
+  assert.deepEqual(
+    stored.files.map((file: { path: string }) => file.path),
+    [
+      '.agents/skills/irori-setup/SKILL.md',
+      '.claude/rules/dates.md',
+      '.irori/shared/.claude/rules/tone.md',
+      '.irori/shared/.claude/settings.json',
+      '.irori/shared/AGENTS.md',
+      'AGENTS.md',
+      'assets/icon.bin',
+      'bin/run.sh',
+      'notes/plan.md',
+    ],
+  );
+  assert.ok(!JSON.stringify(stored).includes(f.base));
+
+  // Device B set its irori agent up with the starter, and wrote a plan of its own.
+  for (const [rel, text] of Object.entries(yourAiStarter))
+    await put(f.b.agentRoot, { [rel]: text });
+  for (const [name, text] of Object.entries(iroriAgentSkills))
+    await put(f.b.agentRoot, { [`.agents/skills/${name}/SKILL.md`]: text });
+  await put(f.b.agentRoot, { 'notes/plan.md': '# Their plan\n' });
+  const state = await f.b.environment.state();
+  assert.deepEqual(state.saved?.agentFiles, { files: 9, missing: 6 });
+
+  const result = await f.b.environment.restore({ scopeIds: [], agent: false, agentFiles: true });
+  assert.deepEqual(result.failed, []);
+  // What irori set up and nobody changed gives way; the person's own file stays.
+  assert.deepEqual(result.agentFiles.sort(), [
+    '.agents/skills/irori-setup/SKILL.md',
+    '.claude/rules/dates.md',
+    '.irori/shared/.claude/rules/tone.md',
+    '.irori/shared/.claude/settings.json',
+    '.irori/shared/AGENTS.md',
+    'AGENTS.md',
+    'assets/icon.bin',
+    'bin/run.sh',
+  ]);
+  assert.deepEqual(result.agentFilesKept, ['notes/plan.md']);
+  assert.equal(await readFile(path.join(f.b.agentRoot, 'AGENTS.md'), 'utf8'), '# My irori agent\n');
+  assert.equal(
+    await readFile(
+      path.join(f.b.agentRoot, '.irori', 'shared', '.claude', 'rules', 'tone.md'),
+      'utf8',
+    ),
+    'Be brief.\n',
+  );
+  assert.equal(
+    await readFile(path.join(f.b.agentRoot, 'notes', 'plan.md'), 'utf8'),
+    '# Their plan\n',
+  );
+  assert.deepEqual(
+    [...(await readFile(path.join(f.b.agentRoot, 'assets', 'icon.bin')))],
+    [0, 255, 1, 2],
+  );
+  if (process.platform !== 'win32')
+    assert.ok((await stat(path.join(f.b.agentRoot, 'bin', 'run.sh'))).mode & 0o100);
+  assert.deepEqual((await f.b.environment.state()).saved?.agentFiles, { files: 9, missing: 0 });
+
+  // A device without the irori agent gets the whole folder, AGENTS.md included.
+  const c = await device(f.base, 'c', f.fake.gh);
+  t.after(() => c.service.close());
+  const fresh = await c.environment.restore({ scopeIds: [], agent: false, agentFiles: true });
+  assert.equal(fresh.agentFiles.length, 9);
+  assert.equal(await readFile(path.join(c.agentRoot, 'AGENTS.md'), 'utf8'), '# My irori agent\n');
+
+  // A folder holding other files but no irori agent is not written into.
+  const d = await device(f.base, 'd', f.fake.gh);
+  t.after(() => d.service.close());
+  await put(d.agentRoot, { 'mine.md': 'mine\n' });
+  const blocked = await d.environment.restore({ scopeIds: [], agent: false, agentFiles: true });
+  assert.deepEqual(
+    blocked.failed.map((item) => item.name),
+    ['irori agent'],
+  );
+  await assert.rejects(stat(path.join(d.agentRoot, 'AGENTS.md')));
+
+  // Saving from a device without the irori agent keeps the saved files.
+  await d.environment.save();
+  assert.equal(JSON.parse(await f.fake.stored('irori-agent.json')).files.length, 9);
 });
 
 test('routine secrets travel sealed with a passphrase, never as their values', async (t) => {

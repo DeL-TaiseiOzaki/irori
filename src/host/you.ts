@@ -17,7 +17,13 @@ import {
 } from '../domain/you';
 import { iroriAgentSkills, yourAiStarter, type SharedSchemaPrompt } from '../../prompts';
 import { within } from '../domain/scopes';
-import { instructionsFile } from '../domain/schema-settings';
+import {
+  claudeSettingsFile,
+  instructionsFile,
+  readHooks,
+  ruleFileName,
+  rulesRoot,
+} from '../domain/schema-settings';
 import type { AgentSkill } from '../domain/skills';
 import { readTextDocument } from './files';
 import { ifPresent, isMissing, readLocalJson, writeLocalJson } from './local-json';
@@ -40,7 +46,7 @@ const relative = z
         value.split('/').every((part) => part && part !== '.' && part !== '..')),
   );
 
-/** Shared instructions longer than this are read from their file, not sent with each request. */
+/** Shared instructions and rules longer than this are read from their files, not sent with each request. */
 const sharedInline = 32 * 1024;
 
 /** Where a standard skill's package is in the irori agent's folder. */
@@ -324,7 +330,8 @@ export class YourAiService {
   /**
    * The shared Schema as the settings see it (ADR 027): its own folder inside
    * the irori agent's, made when first asked for, with the same confinement.
-   * Only instructions at its root and skill packages are settings there.
+   * Its settings are the irori agent's: instructions at its root, skill
+   * packages, rules and hooks (ADR 048).
    */
   async sharedFolder(): Promise<SchemaFolder> {
     if (!(await this.homeReady()))
@@ -350,7 +357,6 @@ export class YourAiService {
     return {
       root,
       knowledge: false,
-      settings: ['instructions', 'skill'],
       layer: () => 'schema',
       entries: async (rel) => {
         await resolve(rel);
@@ -369,26 +375,51 @@ export class YourAiService {
   }
   /**
    * The shared Schema as agents are told it, or undefined when the irori agent
-   * is not set up or the shared Schema holds neither instructions nor skills.
+   * is not set up or the shared Schema holds no instructions, rules or skills.
+   * Its hooks are not words: `sharedHooks` gives them to Claude Code.
    */
   async shared(): Promise<SharedSchemaPrompt | undefined> {
     if (!(await this.homeReady())) return undefined;
     const folder = await this.sharedSchema();
     const text = (await ifPresent(folder.read(instructionsFile)))?.trim();
     const skills = (await ifPresent(readFolderSkills(folder)))?.skills ?? [];
-    if (!text && !skills.length) return undefined;
+    const rules: { file: string; text: string }[] = [];
+    for (const entry of (await ifPresent(folder.entries(rulesRoot))) ?? []) {
+      if (entry.directory || entry.blocked || !ruleFileName(entry.name)) continue;
+      const rule = (await ifPresent(folder.read(entry.path)))?.trim();
+      if (rule) rules.push({ file: path.join(folder.root, entry.path), text: rule });
+    }
+    rules.sort((a, b) => a.file.localeCompare(b.file));
+    if (!text && !skills.length && !rules.length) return undefined;
     const long = !!text && Buffer.byteLength(text, 'utf8') > sharedInline;
+    // The rules go whole while they fit beside the instructions sent; otherwise by their files.
+    const room = sharedInline - (text && !long ? Buffer.byteLength(text, 'utf8') : 0);
+    const inline =
+      rules.reduce((size, rule) => size + Buffer.byteLength(rule.text, 'utf8'), 0) <= room;
     return {
       root: folder.root,
       file: path.join(folder.root, instructionsFile),
       ...(text && !long && { instructions: text }),
       ...(long && { long }),
+      rules: rules.map((rule) => (inline ? rule : { file: rule.file })),
       skills: skills.map((skill) => ({
         name: skill.name,
         description: skill.description,
         path: path.join(folder.root, skill.path),
       })),
     };
+  }
+  /**
+   * The shared Schema's hooks in Claude Code's settings shape, for every Claude
+   * Code run beside that folder's own (ADR 048); undefined when there are none.
+   * Hooks not in Claude Code's shape are refused, as the settings refuse them.
+   */
+  async sharedHooks(): Promise<Record<string, unknown> | undefined> {
+    if (!(await this.homeReady())) return undefined;
+    const folder = await this.sharedSchema();
+    const text = await ifPresent(folder.read(claudeSettingsFile));
+    if (!text?.trim() || !readHooks(text).length) return undefined;
+    return (JSON.parse(text) as { hooks: Record<string, unknown> }).hooks;
   }
   /** A shared skill by name, for a request that picked one its own Schema lacks. */
   async sharedSkill(name: string): Promise<AgentSkill | undefined> {

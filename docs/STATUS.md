@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The shared Schema's settings and the irori agent's files, 2026-10-18 (**0.2.26**,
+pull request open): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
+The shared Schema takes rules and hooks like the other Schemas, and **環境を保存**
+saves the irori agent's files with the shared Schema.
+- `YourAiService.shared()` adds the shared rules to the request words for every CLI;
+  `sharedHooks()` gives the shared `hooks` to each Claude Code run as the SDK's
+  `settings`. `SchemaFolder.settings` is gone: the shared folder takes every kind.
+- `src/host/environment-agent.ts` packs the default irori agent folder into
+  `irori-settings/irori-agent.json` (shared Schema, then Schema, then the rest,
+  within 900 KB; no `.git`, `node_modules`, `routines/`, vault sub-agent
+  definitions, `settings.local.json` or links) and restores absent files, replacing
+  only files still as irori's starter wrote them. `restoreEnvironment`'s
+  `agentFiles` is the `HostAPI` addition.
+- Verified by `npm run build`, `npm test` (`tests/environment.test.ts`,
+  `tests/shared-schema.test.ts`, `tests/your-ai.test.ts` with the Claude protocol
+  fixture) and `npm run test:ui`. Not tried with a real Claude Code running a shared
+  hook.
+
 Routine secrets in the saved environment, 2026-10-18 (**0.2.25**, pull request open):
 [ADR 047](decisions/047-routine-secrets-in-the-environment.md). With a passphrase,
 **環境を保存** also saves this device's routine secrets, sealed with it.
