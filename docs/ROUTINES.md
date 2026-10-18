@@ -78,6 +78,11 @@ The routines page's header has **irori agent に頼む**, **シークレット**
   - **保存** writes it unless it changed since it was opened, then shows why
     the routine still cannot run, if it cannot, and stays open; otherwise it
     closes. The next **実行** reviews the change as after any other.
+  - **削除**, pressed a second time (**削除する**), moves the routine's folder
+    to the system trash and forgets its review, runs and `IRORI_STATE` on this
+    device, so a routine made later in the same folder starts unreviewed and
+    without history. A running routine is not deleted, nor a folder that is a
+    link or leaves its owner's.
 - **irori agent に頼む** switches the agent panel to the irori agent and puts
   **ルーティンを作って：** in its message box for the person to finish. The irori
   agent's standard skill `write-routine` (in `.agents/skills/`, added to an
@@ -264,7 +269,7 @@ and the editor's form (`draftFromYaml`, `yamlFromDraft`, `splitCommand`) are
 renderer reaches them through `HostAPI`:
 `routines(workspaceId)`, `createRoutine(owner, name, text?)`,
 `routineSource(ref)` (the text, its version and the folder's other files),
-`revealRoutine(ref)`, `saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
+`revealRoutine(ref)`, `deleteRoutine(ref)`, `saveRoutineSource(ref, text, version)`, `reviewRoutine(ref)`,
 `runRoutine(ref, { workspaceId, digest, agents })`, `stopRoutine(ref)`,
 `routineRuns(ref)`, and `routine` events carrying a run. The irori agent's
 `irori routines` reads the same list and `irori run` calls the same
@@ -296,7 +301,8 @@ line) and no saved session. Document content cannot start a routine.
   an agent step; an irori agent routine handing a named vault; an
   unfinished run marked unknown and not repeated; a new routine's folder
   name and template, a new routine given its text, the folder's files for
-  the editor, an edit refused after a crossing change, and
+  the editor, an edit refused after a crossing change, a deletion (refused
+  while running and for a link; the trash, the records and the state), and
   `irori routines` with and without a workspace; `irori run` refusing a missing
   secret, an unreviewed or changed routine, a routine step and a request from
   no workspace, preferring the irori agent's own routine over `--vault`, and

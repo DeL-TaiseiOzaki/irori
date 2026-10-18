@@ -1,5 +1,6 @@
 import { _electron as electron, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -190,6 +191,16 @@ try {
   await expect(card('Broken')).toContainText('無効');
   await expect(card('Broken')).toContainText('ステップ 1 の access がありません。');
   await expect(card('Broken').getByRole('button', { name: '実行' })).toBeDisabled();
+  // 削除 in its editor, pressed twice, moves the folder to the trash.
+  await card('Broken').getByRole('button', { name: 'Broken を編集' }).click();
+  const broken = page.getByRole('dialog', { name: 'Broken' });
+  await broken.getByRole('button', { name: '削除', exact: true }).click();
+  expect(existsSync(path.join(routines, 'broken'))).toBe(true);
+  await page.screenshot({ path: 'test-results/routines-delete.png' });
+  await broken.getByRole('button', { name: '削除する', exact: true }).click();
+  await expect(broken).toHaveCount(0);
+  await expect(card('Broken')).toHaveCount(0);
+  expect(existsSync(path.join(routines, 'broken'))).toBe(false);
 
   // A new routine is made from a form of its steps, which says what still stops it.
   await page.getByRole('button', { name: '新しいルーティン', exact: true }).click();
@@ -493,7 +504,7 @@ try {
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Routines UI passed: invalid routine with its reason, a routine made from the form and edited as a form and as text, the irori agent asked, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered from its row and from the editor, hidden, written back, listed with its routines, added by name and deleted, an agent step whose request was answered in the step and whose conversation opened in its vault, and an irori agent routine. Protocol fixture only.',
+    'Routines UI passed: invalid routine with its reason, a routine made from the form and edited as a form and as text, the irori agent asked, a routine deleted from its editor, JavaScript added from the row and switched in the settings, the review before the first run and the difference after a change, steps with output and changed files, history, the nothing-to-do gate, 停止, a secret entered from its row and from the editor, hidden, written back, listed with its routines, added by name and deleted, an agent step whose request was answered in the step and whose conversation opened in its vault, and an irori agent routine. Protocol fixture only.',
   );
 } finally {
   // A routine or run left by a failure would hold the window open behind a confirmation.

@@ -9,6 +9,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -911,6 +912,68 @@ test(
       run('Post'),
       /More than one routine is named "Post": folder "post" \(yours\), folder "post 2" \(yours\)/,
     );
+  },
+);
+
+test(
+  'a deleted routine goes to the trash with its review, runs and state',
+  fixtureOptions,
+  async (t) => {
+    const { routines, routine, listed, start, ended, workspace, root, base, files } =
+      await setup(t);
+    const trashed: string[] = [];
+    const bin = path.join(base, 'Trash');
+    await mkdir(bin);
+    const trash = async (folder: string) => {
+      trashed.push(folder);
+      await rename(folder, path.join(bin, path.basename(folder)));
+    };
+    const contents = {
+      'routine.yaml': 'name: Collect\nsteps:\n  - run: fetch.js\n',
+      'fetch.js': `require('node:fs').writeFileSync(require('node:path').join(process.env.IRORI_STATE, 'kept'), '1');\nconsole.log('waiting');\nsetTimeout(() => {}, 60000);\n`,
+    };
+    const ref = await routine('collect', contents);
+    const id = await start(ref);
+    await until(
+      async () => (await routines.runs(ref))[0]?.steps[0].output.includes('waiting'),
+      'the step to print',
+    );
+    // A running routine stays.
+    await assert.rejects(routines.remove(ref, trash), /実行中/);
+    assert.deepEqual(trashed, []);
+    await routines.stop(ref);
+    await ended(ref, id);
+
+    const folder = path.join(root, '.irori', 'routines', 'collect');
+    await routines.remove(ref, trash);
+    assert.deepEqual(trashed, [folder]);
+    assert.equal(existsSync(folder), false);
+    assert.equal(existsSync(path.join(bin, 'collect', 'routine.yaml')), true);
+    const data = path.join(files.dataDir, 'routines');
+    assert.deepEqual(await readdir(path.join(data, 'state')), []);
+    assert.deepEqual(await readdir(path.join(data, 'runs')), []);
+    assert.deepEqual(await readdir(path.join(data, 'reviews')), []);
+    assert.equal(
+      (await routines.list(workspace.id)).some((item) => item.ref.folder === 'collect'),
+      false,
+    );
+    // A routine later made in the same folder knows nothing of the deleted one.
+    await routine('collect', contents);
+    assert.equal((await listed(ref)).review, 'unreviewed');
+    assert.equal((await listed(ref)).last, undefined);
+    assert.deepEqual(await routines.runs(ref), []);
+    await rm(folder, { recursive: true });
+
+    // Only a routine folder of its own owner is deleted: a link or a missing folder is refused.
+    const outside = path.join(base, 'outside');
+    await mkdir(outside);
+    await writeFile(path.join(outside, 'routine.yaml'), 'name: Out\nsteps:\n  - run: x.js\n');
+    await symlink(outside, folder);
+    await assert.rejects(routines.remove(ref, trash), /リンクは使えません/);
+    await rm(folder);
+    await assert.rejects(routines.remove(ref, trash), /ENOENT/);
+    assert.deepEqual(trashed, [folder]);
+    assert.equal(existsSync(path.join(outside, 'routine.yaml')), true);
   },
 );
 
