@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { closeTab, onlyIn, openTab, replaceTab } from '../src/domain/workspace-tabs';
+import { closeTab, onlyIn, openTab, replaceTab, WindowTabs } from '../src/domain/workspace-tabs';
 import type { WorkspaceProfile } from '../src/domain/types';
 
 const tab = (id: string, scopeIds: string[] = [id]): WorkspaceProfile => ({
@@ -44,4 +44,26 @@ test('Only the vaults no other tab has are the closing tab’s own', () => {
   assert.deepEqual(onlyIn(tabs, 'b'), []);
   assert.deepEqual(onlyIn(tabs, 'c'), ['q']);
   assert.deepEqual(onlyIn(tabs, 'gone'), []);
+});
+
+test('A window has alone only what no other window has open', () => {
+  const windows = new WindowTabs();
+  windows.set(1, [tab('a', ['v1', 'v2']), tab('b', ['v3'])]);
+  windows.set(2, [tab('b', ['v3']), tab('c', ['v2', 'v4'])]);
+  assert.deepEqual(windows.elsewhere(1), [
+    { id: 'b', scopeIds: ['v3'] },
+    { id: 'c', scopeIds: ['v2', 'v4'] },
+  ]);
+  assert.deepEqual(windows.only(1), { workspaces: ['a'], scopeIds: ['v1'] });
+  windows.forget(2);
+  assert.deepEqual(windows.only(1), { workspaces: ['a', 'b'], scopeIds: ['v1', 'v2', 'v3'] });
+  assert.deepEqual(windows.only(3), { workspaces: [], scopeIds: [] });
+  windows.set(3, [tab('a', ['v5'])]);
+  assert.deepEqual(
+    windows.elsewhere(2),
+    [{ id: 'a', scopeIds: ['v1', 'v2', 'v5'] }, tab('b', ['v3'])].map(({ id, scopeIds }) => ({
+      id,
+      scopeIds,
+    })),
+  );
 });

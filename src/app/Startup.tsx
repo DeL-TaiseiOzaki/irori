@@ -3,6 +3,7 @@ import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
 import type { Category, Space, WorkspaceProfile } from '../domain/types';
+import type { OpenTab } from '../domain/workspace-tabs';
 import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
 import { appIcon, appVersion } from './branding';
 import { BrainTile } from './BrainTile';
@@ -472,8 +473,8 @@ export function Startup({
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   onOpen: (workspace: WorkspaceProfile) => void;
-  /** The workspaces open as tabs: they and their vaults are not removed while open. */
-  open?: WorkspaceProfile[];
+  /** The workspaces open as tabs, in any window: they and their vaults are not removed while open. */
+  open?: OpenTab[];
 }) {
   const [profiles, setProfiles] = useState<WorkspaceProfile[]>([]),
     [selected, setSelected] = useState<string[]>([]);

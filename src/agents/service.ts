@@ -483,7 +483,8 @@ export class AgentService {
         ? this.conversations.workspaceOf(conversationId)
         : this.historyOf(scopeId, workspace),
     );
-    if (!next) return null;
+    // Another window may have started it while the queue was read (ADR 051).
+    if (!next || this.conversationRun(next.conversationId)) return null;
     canStart();
     return this.startAccepted(
       { ...next.item, scopeId, agent: next.agent, conversationId: next.conversationId },
