@@ -78,7 +78,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 
 **AI エージェント**
 - 右側の AI パネルには会話を何列でも並べられ、幅も自由に広げられます。本文を隠してエージェントだけを表示することもできます。
-- **vault agent**（各 vault の AI、オプション）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その vault の Schema を読み込んだ状態で起動します。複数の vault agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。
+- **vault agent**（各 vault の AI、オプション）：Claude Code・Codex・OpenCode・Pi・Hermes Agent を、その vault の Schema を読み込んだ状態で起動します。複数の vault agent を同時に動かせます。モデルは、入っている CLI が示す一覧から選べます（Hermes Agent は名前を入力）。思考量も、そのモデルが受け付ける段階から選べます（OpenCode は variant 名を入力、Hermes Agent は対象外）。
 - **irori agent**（旧「あなたの AI」）：irori mode で、vault をまたぐ仕事を頼めます。どの CLI でも動きます。依頼を vault ごとに分け、各 vault の agent に渡します。Claude Code・Codex・OpenCode では irori が定義するサブエージェント（`vault-<名前>`）、Pi と Hermes Agent では `irori call` を使います。結果はまとめて報告します。vault agent と同じくフルアクセスで始まり、自分の Schema も同じ設定画面で編集できます。
 - **irori の操作をエージェントにも**：irori agent と vault agent は `irori` コマンドで、ノートの移動（リンクやコメントも追従）・ゴミ箱・コメント・索引の更新・vault の設定を、画面と同じように行えます。vault agent が扱えるのは自分の vault だけです。
 - **ほかのツールから移る**：Obsidian・orca・エディタなどを使っていた場合は、irori agent に「移りたい」と頼んでください。Obsidian の vault やフォルダを調べ、どれを vault・Knowledge・Contents にするか、Git やワークスペースをどうするかを聞き取ってから、計画どおりに設定します。
