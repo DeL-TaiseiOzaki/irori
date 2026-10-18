@@ -63,6 +63,8 @@ is to make sure `AGENTS.md` is read, and to say what it cannot keep current.
 6. **irori does not convert Schema between CLIs.** `AGENTS.md` is the index
    of the Schema. Hooks stay Claude Code's: an agent reading
    `.claude/settings.json` does not run them.
+   *Revised for skills by [ADR 049](049-skills-for-claude-code.md) (0.2.33):
+   irori gives Claude Code the `.agents/skills` as links outside the vault.*
 
 7. **A CLI's own command goes alone.** Words of the form `/name` (with or
    without arguments, not a path) are the CLI's command, such as `/compact` or

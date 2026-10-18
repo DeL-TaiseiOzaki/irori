@@ -141,7 +141,9 @@ try {
   await page.locator('.agent-panel').getByRole('button', { name: '到達確認' }).click();
   const reach = page.getByRole('dialog', { name: 'スキルの到達' });
   await expect(reach).toContainText('Claude Code');
-  await expect(reach).toContainText('読まない。同名が ~/.claude/skills にあり、そちらだけを読む');
+  await expect(reach).toContainText(
+    'irori が渡す。同名が ~/.claude/skills にあり、そちらが優先される',
+  );
   await expect(reach).toContainText('退役した名前が ~/.agents/skills に残っている');
   await expect(reach).toContainText('信頼済みなら読む');
   expect(await reach.textContent()).not.toContain(home);

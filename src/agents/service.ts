@@ -79,7 +79,14 @@ import {
   vaultIntroPointer,
 } from '../../prompts';
 import { commentsCount, readNoteComments } from '../host/comments';
-import { findSkill, noSkill } from '../host/skills';
+import { findSkill, noSkill, readFolderSkills } from '../host/skills';
+import {
+  claudeSkillNames,
+  linkClaudeSkills,
+  pruneClaudeSkills,
+  unlinkClaudeSkills,
+  type LinkedSkill,
+} from './claude-skills';
 import { spaceFolder } from '../host/schema-folder';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
@@ -180,6 +187,8 @@ type Run = {
   /** For your AI: the environment with the `irori` command, and its closing. */
   env?: NodeJS.ProcessEnv;
   commands?: () => void;
+  /** For Claude Code: the folder of links to the skills it does not find itself (ADR 049). */
+  claudeSkills?: string;
   closed: Promise<void>;
   close: () => void;
 };
@@ -290,6 +299,7 @@ export class AgentService {
     this.device = new DeviceIdentity(files.dataDir);
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
+    void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, this.device, () => {
       for (const run of [...this.runs.values()]) {
@@ -846,6 +856,51 @@ export class AgentService {
       pointer: vaultIntroPointer(vault.name, commands),
     };
   }
+  /**
+   * Gives Claude Code the skills it does not find itself: those of the folder's
+   * `.agents/skills`, then the shared Schema's, as links in a folder it is given
+   * (ADR 049). A name the folder's `.claude/skills` holds is Claude Code's own.
+   * A failure leaves the skills to the words, as before, and says so.
+   */
+  private async linkSkills(
+    run: Run,
+    input: StartRun,
+    you: boolean,
+    root: string,
+    shared: Awaited<ReturnType<YourAiService['shared']>>,
+  ) {
+    try {
+      const folder = you
+        ? await this.you!.schemaFolder(input.workspace)
+        : spaceFolder(this.files, input.scopeId);
+      const own = await readFolderSkills(folder);
+      const skills: LinkedSkill[] = [
+        ...own.skills.map((skill) => ({
+          name: skill.name,
+          folder: path.dirname(path.join(folder.root, skill.path)),
+        })),
+        ...(shared?.skills ?? []).map((skill) => ({
+          name: skill.name,
+          folder: path.dirname(skill.path),
+        })),
+      ];
+      // A retired name stays retired: the shared skill of that name does not stand in.
+      const skip = new Set([
+        ...(await claudeSkillNames(root)),
+        ...own.retired.map((skill) => skill.name),
+      ]);
+      run.claudeSkills = await linkClaudeSkills(this.files.dataDir, run.id, skills, skip);
+    } catch (error) {
+      this.event(
+        run,
+        'status',
+        t(
+          `スキルを Claude Code に渡せませんでした: ${String(error)}`,
+          `Could not give the skills to Claude Code: ${String(error)}`,
+        ),
+      );
+    }
+  }
   private async execute(run: Run, input: StartRun) {
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
@@ -1114,6 +1169,7 @@ export class AgentService {
         );
         return undefined;
       });
+      if (input.agent === 'claude') await this.linkSkills(run, input, you, space.root, shared);
       if (shared && !command) {
         const words = sharedSchema(shared, !!run.delegation && hasSubAgents(input.agent));
         run.shared = digest(words);
@@ -1223,6 +1279,7 @@ export class AgentService {
       if (run.child) await killTree(run.child).catch(() => {});
       run.bridge?.();
       run.commands?.();
+      if (run.claudeSkills) await unlinkClaudeSkills(this.files.dataDir, run.id).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       // Words the CLI wrote while being stopped arrived after the flush above; with
       // the process gone and its stream closed, these are the last.
@@ -1747,8 +1804,10 @@ export class AgentService {
           run.step ||
           this.localFolders(run).length ||
           run.work?.length ||
+          run.claudeSkills ||
           attachedFolders.length) && {
           additionalDirectories: [
+            ...(run.claudeSkills ? [run.claudeSkills] : []),
             ...(delegation?.brains.map((brain) => brain.root) ?? []),
             ...(run.step?.directories ?? []),
             ...this.localFolders(run),
