@@ -132,8 +132,8 @@ export interface SetupContext {
   by?: string;
   /** The workspace the request was sent in, which new vaults join. */
   workspaceId?: string;
-  /** The CLI and model the request runs on, for the agent steps of a routine it starts. */
-  agent?: { agent: AgentId; model?: string };
+  /** The CLI, model and thinking level the request runs on, for the agent steps of a routine it starts. */
+  agent?: { agent: AgentId; model?: string; effort?: string };
   /** The request is an agent step of a routine, which starts none (D6). */
   inRoutine?: boolean;
 }

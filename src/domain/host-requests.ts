@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { agentIds, markdownFonts, pageMargins, themes } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
-import { agentModel, startInput, yourAiChoice } from './conversation';
+import { agentEffort, agentModel, startInput, yourAiChoice } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
@@ -331,7 +331,14 @@ export const hostArguments = {
       .object({
         workspaceId: id,
         digest: version.optional(),
-        agents: z.record(id, z.object({ agent: z.enum(agentIds), model: agentModel.optional() })),
+        agents: z.record(
+          id,
+          z.object({
+            agent: z.enum(agentIds),
+            model: agentModel.optional(),
+            effort: agentEffort.optional(),
+          }),
+        ),
       })
       .strict(),
   ]),

@@ -218,6 +218,8 @@ export async function runPi(ctx: NativeContext) {
           mimeType: file.image,
         })),
     );
+    // Pi keeps the level in the session; one chosen goes before each prompt.
+    if (ctx.effort) await rpc.request('set_thinking_level', { level: ctx.effort });
     await rpc.request('prompt', { message: ctx.prompt, ...(images.length && { images }) });
     if (!sawAgentStart) {
       const current = await rpc.request('get_state');

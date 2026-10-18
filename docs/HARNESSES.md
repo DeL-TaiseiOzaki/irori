@@ -44,6 +44,24 @@ CLI resumes a saved conversation under another model, so a model change keeps
 the conversation. The choice is kept per brain and CLI for the window's life, and
 travels with queued instructions.
 
+Thinking level, 2026-10-18 (0.2.29): beside the model pill, an effort pill
+("思考量: 既定" passes none) offers the levels the CLI gives for the chosen model,
+read with the same `agentModels` list. Codex's `model/list` names each model's
+`supportedReasoningEfforts` and `defaultReasoningEffort`, and the level goes as
+`effort` on `turn/start`. Claude Code's `supportedModels()` names
+`supportedEffortLevels` for a model with `supportsEffort` (none for one without),
+and the level goes as the SDK's `effort` (`--effort`); when the list cannot be
+read, `low`–`max` are offered. Pi takes `off`/`minimal`/`low`/`medium`/`high`/`xhigh`
+for every model, sent as RPC `set_thinking_level` before each `prompt`.
+OpenCode's levels are each model's variants in its own configuration, so one is
+typed in and sent as the prompt's `variant`. Hermes Agent's `hermes chat` has no
+level option, so no pill is shown and none is passed. A level must match
+`^[A-Za-z0-9][\w-]{0,39}$`; one the newly chosen model does not take goes back to
+the default. It is kept like the model (the irori agent's on the device), goes to
+routine agent steps that use the panel's model, and to `irori call` hand-offs.
+Codex 0.160.0's schema and Claude Agent SDK 0.3.269's types were read here; Pi,
+OpenCode and Hermes are checked against fixtures only.
+
 Run lifetime, 2026-09-27: runs end on completion, a stop or the CLI's exit; the
 ten-minute (thirty for your AI) deadline is gone. Pi's `prompt` reply, which an
 extension command can hold while the person answers its dialogs, has no deadline
