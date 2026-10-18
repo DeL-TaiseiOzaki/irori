@@ -16,7 +16,7 @@ import type {
   QuestionOption,
   StartRun,
 } from '../domain/types';
-import type { HookInput, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { HookInput, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
 import {
@@ -1714,6 +1714,18 @@ export class AgentService {
       };
     };
     const attachedFolders = (run.attached ?? []).map((file) => path.dirname(file.path));
+    // The shared Schema's hooks run beside the folder's own (ADR 048).
+    const sharedHooks = await this.you?.sharedHooks().catch((error) => {
+      this.event(
+        run,
+        'status',
+        t(
+          `共通 Schema のフックを読めませんでした: ${String(error)}`,
+          `Could not read the shared Schema's hooks: ${String(error)}`,
+        ),
+      );
+      return undefined;
+    });
     const response = query({
       prompt: images.length ? message() : prompt,
       options: {
@@ -1721,6 +1733,7 @@ export class AgentService {
         pathToClaudeCodeExecutable: 'claude',
         env: runEnv(run),
         settingSources: ['user', 'project', 'local'],
+        ...(sharedHooks && { settings: { hooks: sharedHooks } as Settings }),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
         allowDangerouslySkipPermissions: run.access === 'full-access',

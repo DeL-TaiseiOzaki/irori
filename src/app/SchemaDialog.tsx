@@ -88,7 +88,6 @@ export function SchemaDialog({
             <SchemaList
               key={owner}
               scopeId={owner}
-              common={common}
               revision={revision}
               selected={target}
               locked={locked(owner)}

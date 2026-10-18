@@ -21,10 +21,23 @@ const when = (iso: string) =>
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/** A few paths, and how many more there are. */
+const someOf = (paths: string[]) =>
+  paths.length > 3
+    ? t(
+        `${paths.slice(0, 3).join('・')} ほか ${paths.length - 3} 件`,
+        `${paths.slice(0, 3).join(', ')} and ${paths.length - 3} more`,
+      )
+    : paths.join(t('・', ', '));
+
 /** What a restore added, secrets named only when there were some. */
-function tookIn({ restored, workspaces, routines, secrets }: EnvironmentRestore) {
+function tookIn({ restored, workspaces, routines, agentFiles, secrets }: EnvironmentRestore) {
   const ja = [`vault ${restored.length} 件`, `ワークスペース ${workspaces} 件`];
   const en = [count(restored.length, 'vault'), count(workspaces, 'workspace')];
+  if (agentFiles.length) {
+    ja.push(`irori agent のファイル ${agentFiles.length} 件`);
+    en.push(count(agentFiles.length, 'irori agent file'));
+  }
   ja.push(`ルーティン ${routines.length} 件`);
   en.push(count(routines.length, 'routine'));
   if (secrets.length) {
@@ -72,6 +85,7 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
   const dropped = state?.saved?.vaults.filter((item) => !item.here).length ?? 0;
   const droppedRoutines = state?.saved?.routines.filter((item) => !item.here).length ?? 0;
   const left = state?.local.routinesLeft ?? [];
+  const filesLeft = state?.local.agentFilesLeft ?? [];
   return (
     <section className="settings-account" aria-label={t('アカウント', 'Account')}>
       <h3>{t('アカウント', 'Account')}</h3>
@@ -107,6 +121,14 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
               {t(
                 `大きすぎるルーティンは保存されません：${left.join('・')}`,
                 `Too large to save: ${left.join(', ')}`,
+              )}
+            </p>
+          )}
+          {filesLeft.length > 0 && (
+            <p className="account-hint">
+              {t(
+                `保存されない irori agent のファイル：${someOf(filesLeft)}`,
+                `irori agent files not saved: ${someOf(filesLeft)}`,
               )}
             </p>
           )}
@@ -187,6 +209,7 @@ export function RestoreEnvironment({
   const [selected, setSelected] = useState<string[]>(),
     [agent, setAgent] = useState(true),
     [routines, setRoutines] = useState<string[]>(),
+    [files, setFiles] = useState(true),
     [keys, setKeys] = useState<string[]>(),
     [passphrase, setPassphrase] = useState(''),
     [parent, setParent] = useState<string>(),
@@ -197,6 +220,7 @@ export function RestoreEnvironment({
   const chosen =
     selected ?? saved?.vaults.filter((item) => !item.here).map((item) => item.scopeId) ?? [];
   const agentMissing = !!saved?.agent && !saved.agent.here;
+  const filesMissing = !!saved?.agentFiles?.missing;
   const chosenRoutines =
     routines ?? saved?.routines.filter((item) => !item.here).map((item) => item.folder) ?? [];
   const keysAvailable = !!state?.local.secretsAvailable;
@@ -214,6 +238,7 @@ export function RestoreEnvironment({
         scopeIds: chosen,
         agent: agentMissing && agent,
         routines: chosenRoutines,
+        agentFiles: filesMissing && files,
         ...(needsPassphrase && { secrets: chosenKeys, passphrase }),
         ...(parent && { parent }),
       });
@@ -238,6 +263,14 @@ export function RestoreEnvironment({
         {result ? (
           <div className="restore-result">
             <p role="status">{tookIn(result)}</p>
+            {result.agentFilesKept.length > 0 && (
+              <p className="account-hint">
+                {t(
+                  `この端末のものを残したファイル：${someOf(result.agentFilesKept)}`,
+                  `Kept this device's files: ${someOf(result.agentFilesKept)}`,
+                )}
+              </p>
+            )}
             {result.failed.map((item) => (
               <ErrorMessage key={item.name} text={`${item.name}: ${item.message}`} />
             ))}
@@ -289,6 +322,22 @@ export function RestoreEnvironment({
                     {saved.agent.here
                       ? t('この端末にあります', 'On this device')
                       : saved.agent.repository}
+                  </small>
+                </label>
+              )}
+              {saved.agentFiles && (
+                <label data-here={!filesMissing || undefined}>
+                  <input
+                    type="checkbox"
+                    disabled={busy || !filesMissing}
+                    checked={!filesMissing || files}
+                    onChange={(e) => setFiles(e.target.checked)}
+                  />
+                  <span>{t('irori agent のファイル', 'irori agent files')}</span>
+                  <small>
+                    {filesMissing
+                      ? t(`${saved.agentFiles.missing} 件`, count(saved.agentFiles.missing, 'file'))
+                      : t('この端末にあります', 'On this device')}
                   </small>
                 </label>
               )}

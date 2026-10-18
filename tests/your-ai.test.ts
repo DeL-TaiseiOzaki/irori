@@ -109,7 +109,7 @@ test('each CLI gets a definition it can load, with the vault and its Schema', ()
   // The shared Schema every agent follows, and which Schema wins (ADR 027).
   assert.match(
     claude,
-    /\/me\/\.irori\/shared\/AGENTS\.md and the skills in\s+\/me\/\.irori\/shared\/\.agents\/skills/,
+    /\/me\/\.irori\/shared\/AGENTS\.md, the rules in \/me\/\.irori\/shared\/\.claude\/rules and the\s+skills in \/me\/\.irori\/shared\/\.agents\/skills/,
   );
   assert.match(claude, /the vault's wins/);
   const opencode = subAgentDefinition('opencode', brain, '/me/.irori/shared');
@@ -576,6 +576,27 @@ test(
     assert.ok(log.some((entry) => entry.written === true));
     assert.equal(events.filter((event) => event.type === 'permission').length, 0);
     assert.equal(events.at(-1)?.outcome, 'completed');
+  },
+);
+
+test(
+  'Claude Code runs with the shared Schema’s hooks beside the folder’s own (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { root, run, fixtureLog } = await delegation(t);
+    await run('Write a decision note.');
+    // Without shared hooks no settings are added.
+    assert.equal((await fixtureLog())[0].settings, undefined);
+    const hooks = {
+      Stop: [{ hooks: [{ type: 'command', command: 'echo stopped', timeout: 5 }] }],
+    };
+    const settings = path.join(root, '.irori', 'shared', '.claude', 'settings.json');
+    await mkdir(path.dirname(settings), { recursive: true });
+    await writeFile(settings, JSON.stringify({ hooks, model: 'not-shared' }));
+    await run('Write a decision note.');
+    const launched = (await fixtureLog()).filter((entry) => entry.prompt !== undefined).at(-1);
+    // Only the hooks are carried: the shared Schema sets nothing else of Claude Code's.
+    assert.deepEqual(JSON.parse(launched.settings), { hooks });
   },
 );
 

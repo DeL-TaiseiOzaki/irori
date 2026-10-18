@@ -55,6 +55,9 @@ const routineYaml =
 await mkdir(path.join(homeA, 'irori', 'you', 'routines', 'Inbox'), { recursive: true });
 await writeFile(path.join(homeA, 'irori', 'you', 'AGENTS.md'), '# irori agent\n');
 await writeFile(path.join(homeA, 'irori', 'you', 'routines', 'Inbox', 'routine.yaml'), routineYaml);
+// A's shared Schema is a file B lacks (ADR 048).
+await mkdir(path.join(homeA, 'irori', 'you', '.irori', 'shared'), { recursive: true });
+await writeFile(path.join(homeA, 'irori', 'you', '.irori', 'shared', 'AGENTS.md'), 'Be brief.\n');
 await mkdir(path.join(homeB, 'irori', 'you'), { recursive: true });
 // The reversible store stands in for the OS key on a display without a keychain.
 const token = 'xoxb-account-smoke-0123456789';
@@ -119,6 +122,12 @@ try {
   const routines = JSON.parse(await fake.stored('routines.json'));
   if (routines.routines[0]?.files[0]?.text !== routineYaml)
     throw Error(`Unexpected saved routines: ${JSON.stringify(routines)}`);
+  const agentFiles = JSON.parse(await fake.stored('irori-agent.json'));
+  if (
+    agentFiles.files.map((file: { path: string }) => file.path).join() !==
+    '.irori/shared/AGENTS.md,AGENTS.md'
+  )
+    throw Error(`Unexpected saved irori agent files: ${JSON.stringify(agentFiles)}`);
   const keys = await fake.stored('routine-keys.json');
   if (JSON.parse(keys).names?.join() !== 'SLACK_TOKEN')
     throw Error(`Unexpected saved secrets: ${keys}`);
@@ -138,6 +147,11 @@ try {
   await expect(sheet).toContainText('octo/kb');
   await expect(sheet).toContainText('ワークスペース: Lab');
   await expect(sheet.getByRole('checkbox', { name: /受信箱/ })).toBeChecked();
+  // B's AGENTS.md is the same; only the shared Schema is missing.
+  await expect(sheet.getByRole('checkbox', { name: /irori agent のファイル/ })).toBeChecked();
+  await expect(sheet.locator('label').filter({ hasText: 'irori agent のファイル' })).toContainText(
+    '1 件',
+  );
   await expect(sheet.getByRole('checkbox', { name: /SLACK_TOKEN/ })).toBeChecked();
   const restoreButton = sheet.getByRole('button', { name: '復元', exact: true });
   await expect(restoreButton).toBeDisabled();
@@ -150,7 +164,7 @@ try {
   await page.screenshot({ path: 'test-results/irori-account-restore.png' });
   await restoreButton.click();
   await expect(sheet.getByRole('status')).toHaveText(
-    'vault 1 件・ワークスペース 1 件・ルーティン 1 件・シークレット 1 件を取り込みました。',
+    'vault 1 件・ワークスペース 1 件・irori agent のファイル 1 件・ルーティン 1 件・シークレット 1 件を取り込みました。',
   );
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await sheet.getByRole('button', { name: '閉じる' }).click();
@@ -164,6 +178,11 @@ try {
     'utf8',
   );
   if (added !== routineYaml) throw Error('The routine was not added');
+  const sharedB = await readFile(
+    path.join(homeB, 'irori', 'you', '.irori', 'shared', 'AGENTS.md'),
+    'utf8',
+  );
+  if (sharedB !== 'Be brief.\n') throw Error('The shared Schema was not restored');
   const keptB = JSON.parse(await readFile(path.join(base, 'device-b', 'secrets.json'), 'utf8'));
   if (keptB.values.SLACK_TOKEN !== sealedHere(token))
     throw Error('The secret was not sealed on device B');
