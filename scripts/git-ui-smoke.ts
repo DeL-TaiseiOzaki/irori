@@ -459,8 +459,11 @@ try {
   git(peer, 'commit', '-m', 'Peer competing change');
   git(peer, 'push');
   await writeFile(path.join(root, 'memo.md'), '# Local 日本語\n');
+  // The vault's count follows a commit made outside irori, without Refresh (#268).
+  await expect(gitView).toHaveAccessibleName(/^変更\s*1$/);
   git(root, 'add', '.');
   git(root, 'commit', '-m', 'Local competing change');
+  await expect(gitView).toHaveAccessibleName(/^変更$/);
   await panel.getByRole('button', { name: '更新', exact: true }).click();
   await panel.getByLabel('その他の Git 操作').click();
   await expect(panel.getByRole('menuitem', { name: 'Fetch', exact: true })).toBeEnabled();
@@ -805,6 +808,7 @@ try {
           'row and bulk stage/unstage and direct local commit through reviewed file list',
           'partial staging commits the index and preserves later worktree edits',
           'per-space history isolation',
+          "the vault's Changes count follows a commit made outside irori without Refresh",
           'explicit single-branch push to disposable bare remote',
           'fetch and divergent receive refusal',
           'native merge, both conflict versions, manual resolution and merge commit',

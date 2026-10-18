@@ -109,6 +109,31 @@ try {
   ).toBe(1);
   await page.screenshot({ path: 'test-results/irori-vault-split.png' });
 
+  // The note on the page goes with it to the other vault, with no error for the
+  // place it left (#267).
+  await row(side(page), 'quiet').click();
+  await expect(main(page).locator('.brain-names strong')).toHaveText('Home');
+  await expect(page.locator('.ProseMirror h1')).toHaveText('Quiet');
+  // The note's new place resolves slowly, as on a busy desktop, so a check of its
+  // old place would finish first.
+  await app.evaluate(
+    async (_, file) => {
+      const fs = process.getBuiltinModule('node:fs/promises');
+      const realpath = fs.realpath;
+      fs.realpath = (async (...args: Parameters<typeof realpath>) => {
+        if (String(args[0]) === file) await new Promise((resolve) => setTimeout(resolve, 400));
+        return realpath(...args);
+      }) as typeof realpath;
+    },
+    knowledge('Paper', 'quiet.md'),
+  );
+  await row(main(page), 'quiet').dragTo(row(side(page), 'Knowledge_Base'));
+  await expect(row(side(page), 'quiet')).toBeVisible();
+  expect(await exists(knowledge('Paper', 'quiet.md'))).toBe(true);
+  await expect(page.locator('.ProseMirror h1')).toHaveText('Quiet');
+  await page.waitForTimeout(1000);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+
   await side(page).getByRole('button', { name: '横の vault を閉じる' }).click();
   await expect(side(page)).toHaveCount(0);
   await expect(main(page).getByRole('button', { name: '横に vault を開く' })).toBeVisible();
@@ -117,5 +142,5 @@ try {
 }
 expect(errors).toEqual([]);
 console.log(
-  'Vault split UI passed: opened beside, swapped from its menu, notes dragged both ways, a link-breaking move asked and cancelled, its image carried, and the panels traded on open.',
+  'Vault split UI passed: opened beside, swapped from its menu, notes dragged both ways, a link-breaking move asked and cancelled, its image carried, the panels traded on open, and the open note followed to the other vault without an error.',
 );
