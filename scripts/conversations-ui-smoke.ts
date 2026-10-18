@@ -91,7 +91,13 @@ await writeFile(
         details: JSON.stringify({ path: `note-${step}.md` }),
         call: `call-${n}-${step}`,
       })),
-      { runId: run, type: 'text' as const, text: `返事 ${n + 1}` },
+      // The last reply ends with a footnote, whose visually hidden heading sits
+      // far below the window's bottom.
+      {
+        runId: run,
+        type: 'text' as const,
+        text: n === 97 ? `返事 ${n + 1}[^1]\n\n[^1]: 脚注` : `返事 ${n + 1}`,
+      },
       { runId: run, type: 'done' as const, text: '完了', outcome: 'completed' as const },
     ];
     return lines.map((line) => jsonLine(storedLine(line, longAt))).join('');
@@ -246,6 +252,11 @@ try {
   await expect(history(page)).toHaveCount(0);
   await expect(panel(page).locator('.message.user')).toHaveCount(98);
   await expect(panel(page).locator('.message.user').first()).toHaveText('長い会話 1');
+  // A long log's footnote does not make the window itself scroll.
+  await expect(panel(page).locator('[data-footnotes]')).toHaveCount(1);
+  expect(
+    await page.evaluate(() => document.scrollingElement!.scrollHeight - window.innerHeight),
+  ).toBe(0);
   const steps = panel(page).locator('details.step');
   await expect(steps).toHaveCount(105);
   // The last step of the first run's group: its first steps leave with the window.
@@ -310,7 +321,7 @@ try {
         'delete',
       ],
       restart: 'kept',
-      longLog: 'nodes kept while the window slides',
+      longLog: 'nodes kept while the window slides; a footnote leaves the window unscrolled',
       iroriAgent: 'separate history',
     }),
   );
