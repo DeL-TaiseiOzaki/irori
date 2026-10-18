@@ -25,8 +25,8 @@ export interface SharedSchemaPrompt {
   skills: { name: string; description: string; path: string }[];
 }
 
-/** The shared Schema in full. `handsOff`: the agent hands work to file-defined sub-agents. */
-export function sharedSchema(shared: SharedSchemaPrompt, handsOff: boolean) {
+/** The shared Schema in full. */
+export function sharedSchema(shared: SharedSchemaPrompt) {
   const parts = [
     `irori: the shared Schema, which every agent in irori follows beside the Schema of the folder it works in. Where the two differ, that folder's Schema wins. The shared Schema's folder is ${shared.root}.`,
   ];
@@ -54,10 +54,6 @@ export function sharedSchema(shared: SharedSchemaPrompt, handsOff: boolean) {
       `Shared skills. Read a skill's SKILL.md when the task matches it:\n${shared.skills
         .map((skill) => `- ${skill.name}: ${skill.description} (${skill.path})`)
         .join('\n')}`,
-    );
-  if (handsOff)
-    parts.push(
-      `When you hand work to a vault's sub-agent, tell it to follow the shared Schema too: ${shared.file}${shared.rules.length ? ', the shared rules' : ''} and the shared skills above.`,
     );
   return parts.join('\n\n');
 }

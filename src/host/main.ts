@@ -1046,14 +1046,12 @@ app
       yourAiBrains: async (scopeIds) => {
         const names = brainAgentNames(files.list());
         const brains = scopeIds.map((scopeId) => files.get(scopeId));
-        const definitions = await you.definitions(brains.map((brain) => names.get(brain.scopeId)!));
         return brains.map((brain) => ({
           scopeId: brain.scopeId,
           name: brain.name,
           category: brain.category,
           agent: names.get(brain.scopeId)!,
           root: brain.root,
-          definitions: definitions.get(names.get(brain.scopeId)!) ?? [],
         }));
       },
       start: (input) => {

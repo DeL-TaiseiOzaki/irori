@@ -22,6 +22,7 @@ Two kinds of package ship. The packages the host process loads at run time trave
 | OpenCode SDK, eventsource-parser | MIT, each package LICENSE; the SDK is loaded in the host on demand |
 | write-file-atomic | ISC, node_modules/write-file-atomic/LICENSE.md; signal-exit retains its ISC license |
 | yaml | ISC, node_modules/yaml/LICENSE; used for standards-compatible skill front matter and has no runtime dependencies |
+| smol-toml | BSD-3-Clause, node_modules/smol-toml/LICENSE; reads Codex's sub-agent definitions (`.codex/agents/*.toml`) and has no runtime dependencies |
 | Claude Agent SDK | `SEE LICENSE IN README.md`; node_modules/@anthropic-ai/claude-agent-sdk/README.md and linked provider terms. Do not describe it as MIT. The controller runs the user's separately installed unmodified Claude Code executable. The SDK's optional `claude-agent-sdk-<platform>` packages, each carrying a complete Claude Code binary under Anthropic's own terms, are removed while packaging: irori never resolves them, so no Claude Code executable is redistributed. |
 | Node.js development runtime | node_modules/node/node_modules/node-bin-setup and platform binary distribution notices; development dependency, not an independently chosen irori binary-redistribution license |
 | TypeScript, Vite, esbuild, tsx, Playwright and types | Development dependencies; preserve each upstream license when distributing relevant files |

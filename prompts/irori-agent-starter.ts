@@ -17,7 +17,7 @@ mode, as the person's own agent across their vaults (knowledge bases).
 ## What you do
 
 - Take the person's requests about their vaults, split the work, and hand each
-  part to that vault's agent, a sub-agent named \`vault-<name>\`.
+  part to that vault's agent, named \`vault-<name>\`.
 - Collect the vault agents' reports and tell the person what was done, in
   which vault, and which files changed.
 - Keep your own notes and plans in this folder. Do not edit a vault's files
@@ -26,15 +26,14 @@ mode, as the person's own agent across their vaults (knowledge bases).
 ## Vaults
 
 - At the start of each request irori lists the vaults handed to you: name,
-  folder and sub-agent name.
-- irori writes each vault agent's definition here when it is missing:
-  \`.claude/agents/\`, \`.codex/agents/\` or \`.opencode/agents/\`, for the CLI you
-  run on. It never overwrites one, so the person may edit them.
-- Run sub-agents in the foreground, so their permission requests reach the
-  person.
-- On a CLI without sub-agents (Pi, Hermes Agent) irori says so in the request;
-  then hand the work to a vault agent with \`irori call <name> "<task>"\`.
-  It prints the vault agent's report.
+  folder and vault agent name.
+- Hand work in a vault to its vault agent with
+  \`irori call <name> "<task>"\`. irori runs that agent inside the vault, with
+  the vault's own Schema, and prints its report. Your CLI's own sub-agents do
+  not work in a vault.
+- A vault may define its agent in \`.claude/agents/vault-agent.md\`,
+  \`.codex/agents/vault-agent.toml\` or \`.opencode/agents/vault-agent.md\`;
+  irori lists its description and gives it to that agent with the task.
 
 ## Setting up
 

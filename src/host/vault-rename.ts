@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { iroriAgentSkills } from '../../prompts';
-import { subAgentFiles } from '../domain/you';
 import { isMissing, readLocalJson, writeLocalJson } from './local-json';
 
 /**
@@ -135,8 +134,8 @@ const renamedSkills: Record<string, string> = {
  * A definition or skill whose new name is taken already is left as it is.
  */
 async function agentFolder(root: string) {
-  for (const file of Object.values(subAgentFiles)) {
-    const sample = file('x');
+  // Where irori wrote the definitions before 0.2.34, which no longer writes them (ADR 050).
+  for (const sample of ['.claude/agents/x.md', '.codex/agents/x.toml', '.opencode/agents/x.md']) {
     const dir = path.join(root, path.dirname(sample));
     const extension = path.extname(sample);
     for (const entry of await entries(dir)) {
