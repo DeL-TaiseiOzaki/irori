@@ -15,7 +15,9 @@ The owner then asked for a Schema shared by every kind of agent irori runs,
 and chose:
 
 - to keep it inside the irori agent's folder, so it travels with that folder's
-  repository and with the account's environment (ADR 026);
+  repository and with the account's environment (ADR 026; in practice only
+  from [ADR 048](048-shared-schema-settings-and-irori-agent-files.md), which
+  saves the folder's files there);
 - to share instructions and skills;
 - to set it from the settings screen rather than by preparing files, with
   irori saving it as Schema files in that folder, as Obsidian keeps a vault's
@@ -34,6 +36,9 @@ and chose:
    and are not shared; the host refuses them in that folder
    (`SchemaFolder.settings`). Its `AGENTS.md` can be emptied but not deleted, as
    the irori agent's own.
+   *Revised by [ADR 048](048-shared-schema-settings-and-irori-agent-files.md)
+   (0.2.26): rules and hooks are shared too; the rules go to every agent as
+   words, the hooks to Claude Code as settings.*
 3. **Settings → Schema opens every Schema.** One dialog lists the shared
    Schema (共通), the irori agent and, while hibachi agents are on (ADR 021),
    each hibachi of the workspace, and edits the chosen one with the existing

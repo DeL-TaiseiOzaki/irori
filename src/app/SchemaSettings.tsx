@@ -84,7 +84,6 @@ const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${f
 /** The Schema section as settings: what the agent reads, grouped by what it is. */
 export function SchemaList({
   scopeId,
-  common = false,
   revision,
   selected,
   locked,
@@ -92,8 +91,6 @@ export function SchemaList({
   onOpenFile,
 }: {
   scopeId: string;
-  /** The shared Schema (ADR 027): instructions and skills only. */
-  common?: boolean;
   revision: number;
   selected?: SchemaTarget;
   locked: boolean;
@@ -185,99 +182,97 @@ export function SchemaList({
   ];
   return (
     <div className="schema-list">
-      {groups
-        .filter((group) => !common || group.kind === 'instructions' || group.kind === 'skill')
-        .map((group) => (
-          <div
-            key={group.kind}
-            className="schema-group"
-            role="group"
-            aria-label={t(
-              `Schema の${kinds[group.kind].name()}`,
-              `Schema ${kinds[group.kind].name().toLowerCase()}`,
-            )}
-          >
-            <div className="schema-group-heading">
-              <span>{kinds[group.kind].name()}</span>
-              <button
-                className="section-action"
-                aria-label={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
-                title={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
-                disabled={locked || (group.kind === 'hook' && !!group.error)}
-                onClick={() => onSelect({ kind: group.kind })}
-              >
-                <Icon name="plus" size={13} />
-              </button>
-            </div>
-            {group.error && (
-              <small className="tree-error" role="alert">
-                {group.error}
-              </small>
-            )}
-            {!group.items.length && !group.error && (
-              <small className="tree-empty">{t('まだありません', 'None yet')}</small>
-            )}
-            {group.items.map((item) => {
-              const current = selected?.kind === group.kind && selected.key === item.key;
-              const key = `${item.key}-${item.badge ?? ''}`;
-              const path = item.path;
-              const row = (
-                <button
-                  key={key}
-                  className={`tree-row ${current ? 'selected' : ''}`}
-                  aria-current={current ? 'page' : undefined}
-                  title={item.title}
-                  onClick={() =>
-                    item.file
-                      ? onOpenFile({
-                          path: item.file,
-                          name: retiredFile,
-                          directory: false,
-                          layer: 'schema',
-                          note: true,
-                        })
-                      : onSelect({ kind: group.kind, key: item.key })
-                  }
-                >
-                  <Icon name={kinds[group.kind].icon} size={15} className="tree-icon" />
-                  <span className="filename">{item.label}</span>
-                  {item.badge && <span className="badge">{item.badge}</span>}
-                </button>
-              );
-              // A file behind a row has the file manager's menu, as rows of the other layers do.
-              return path ? (
-                <ContextMenu.Root key={key}>
-                  <ContextMenu.Trigger render={row} />
-                  <ContextMenu.Portal>
-                    <ContextMenu.Positioner>
-                      <ContextMenu.Popup className="menu">
-                        <ExplorerItems
-                          scopeId={scopeId}
-                          path={path}
-                          onOpen={
-                            /\.md$/i.test(path)
-                              ? () =>
-                                  onOpenFile({
-                                    path,
-                                    name: baseName(path),
-                                    directory: false,
-                                    layer: 'schema',
-                                    note: true,
-                                  })
-                              : undefined
-                          }
-                        />
-                      </ContextMenu.Popup>
-                    </ContextMenu.Positioner>
-                  </ContextMenu.Portal>
-                </ContextMenu.Root>
-              ) : (
-                row
-              );
-            })}
-            {group.note && <small className="tree-empty">{group.note}</small>}
+      {groups.map((group) => (
+        <div
+          key={group.kind}
+          className="schema-group"
+          role="group"
+          aria-label={t(
+            `Schema の${kinds[group.kind].name()}`,
+            `Schema ${kinds[group.kind].name().toLowerCase()}`,
+          )}
+        >
+          <div className="schema-group-heading">
+            <span>{kinds[group.kind].name()}</span>
+            <button
+              className="section-action"
+              aria-label={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
+              title={t(`${kinds[group.kind].one()}を追加`, `Add ${kinds[group.kind].one()}`)}
+              disabled={locked || (group.kind === 'hook' && !!group.error)}
+              onClick={() => onSelect({ kind: group.kind })}
+            >
+              <Icon name="plus" size={13} />
+            </button>
           </div>
-        ))}
+          {group.error && (
+            <small className="tree-error" role="alert">
+              {group.error}
+            </small>
+          )}
+          {!group.items.length && !group.error && (
+            <small className="tree-empty">{t('まだありません', 'None yet')}</small>
+          )}
+          {group.items.map((item) => {
+            const current = selected?.kind === group.kind && selected.key === item.key;
+            const key = `${item.key}-${item.badge ?? ''}`;
+            const path = item.path;
+            const row = (
+              <button
+                key={key}
+                className={`tree-row ${current ? 'selected' : ''}`}
+                aria-current={current ? 'page' : undefined}
+                title={item.title}
+                onClick={() =>
+                  item.file
+                    ? onOpenFile({
+                        path: item.file,
+                        name: retiredFile,
+                        directory: false,
+                        layer: 'schema',
+                        note: true,
+                      })
+                    : onSelect({ kind: group.kind, key: item.key })
+                }
+              >
+                <Icon name={kinds[group.kind].icon} size={15} className="tree-icon" />
+                <span className="filename">{item.label}</span>
+                {item.badge && <span className="badge">{item.badge}</span>}
+              </button>
+            );
+            // A file behind a row has the file manager's menu, as rows of the other layers do.
+            return path ? (
+              <ContextMenu.Root key={key}>
+                <ContextMenu.Trigger render={row} />
+                <ContextMenu.Portal>
+                  <ContextMenu.Positioner>
+                    <ContextMenu.Popup className="menu">
+                      <ExplorerItems
+                        scopeId={scopeId}
+                        path={path}
+                        onOpen={
+                          /\.md$/i.test(path)
+                            ? () =>
+                                onOpenFile({
+                                  path,
+                                  name: baseName(path),
+                                  directory: false,
+                                  layer: 'schema',
+                                  note: true,
+                                })
+                            : undefined
+                        }
+                      />
+                    </ContextMenu.Popup>
+                  </ContextMenu.Positioner>
+                </ContextMenu.Portal>
+              </ContextMenu.Root>
+            ) : (
+              row
+            );
+          })}
+          {group.note && <small className="tree-empty">{group.note}</small>}
+        </div>
+      ))}
     </div>
   );
 }

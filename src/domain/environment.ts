@@ -4,7 +4,8 @@ import type { DeviceSettings } from './types';
  * A device's environment kept on the person's GitHub account (ADR 026): the
  * vaults that live on GitHub, the workspaces that combine them, the display
  * and agent preferences, the irori agent's folder when it is a repository,
- * and the irori agent's routines (ADR 043). It is files in a private
+ * the irori agent's routines (ADR 043) and its own files, the shared Schema
+ * among them (ADR 048). It is files in a private
  * repository of that account, written and read with the GitHub CLI's sign-in;
  * notes and credentials never go there.
  */
@@ -12,6 +13,8 @@ export const environmentRepository = 'irori-settings';
 export const environmentFile = 'environment.json';
 /** The irori agent's routine folders, beside the environment. */
 export const routinesFile = 'routines.json';
+/** The irori agent's own files: its Schema, the shared Schema and the rest (ADR 048). */
+export const agentFilesFile = 'irori-agent.json';
 /** The routine secrets, sealed with the person's passphrase (ADR 047). */
 export const keysFile = 'routine-keys.json';
 /** The passphrase that seals the saved secrets; GitHub never sees it. */
@@ -64,6 +67,10 @@ export interface EnvironmentState {
     routines: number;
     /** The names of routines left out because they do not fit. */
     routinesLeft: string[];
+    /** How many of the irori agent's files would be saved; none where it is not set up. */
+    agentFiles: number;
+    /** The paths of its files left out: links, and what does not fit. */
+    agentFilesLeft: string[];
     /** The names of this device's secrets, saved only with a passphrase. */
     secrets: string[];
     /** Whether this device can keep secrets (ADR 016 D5). */
@@ -76,6 +83,8 @@ export interface EnvironmentState {
     workspaces: string[];
     agent?: { repository: string; here: boolean };
     routines: EnvironmentRoutine[];
+    /** The irori agent's saved files, and how many of them this device lacks. */
+    agentFiles?: { files: number; missing: number };
     /** The saved secrets' names, absent when none were saved. */
     secrets?: { name: string; here: boolean }[];
   };
@@ -90,6 +99,8 @@ export interface RestoreEnvironment {
   agent: boolean;
   /** The folders of the saved routines to add here; ones this device has are skipped. */
   routines?: string[];
+  /** Add the irori agent's saved files that this device lacks. */
+  agentFiles?: boolean;
   /** The names of the saved secrets to add here; ones this device has are skipped. */
   secrets?: string[];
   /** The passphrase the secrets were saved with. */
@@ -106,6 +117,10 @@ export interface EnvironmentRestore {
   workspaces: number;
   /** The names of the routines added to the irori agent's folder. */
   routines: string[];
+  /** The irori agent's files written here. */
+  agentFiles: string[];
+  /** Its saved files left out because a different one is here. */
+  agentFilesKept: string[];
   /** The names of the secrets added to this device. */
   secrets: string[];
   agent: 'restored' | 'unchanged' | 'failed';

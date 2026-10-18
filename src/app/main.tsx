@@ -1264,6 +1264,8 @@ function App() {
     renewTabs(profiles);
     setVaultAgent(currentVaultAgent());
     setYourChoice(currentYourAi());
+    // A restore may have cloned the irori agent's folder or written its files.
+    setYouRevision((value) => value + 1);
   }
   async function reconcile() {
     const generation = ++reconciliation.current;

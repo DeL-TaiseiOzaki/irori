@@ -126,6 +126,7 @@ export const hostArguments = {
         scopeIds: z.array(id).max(500),
         agent: z.boolean(),
         routines: z.array(z.string().max(200)).max(500).optional(),
+        agentFiles: z.boolean().optional(),
         secrets: z.array(z.string().max(64)).max(1000).optional(),
         passphrase: passphrase.optional(),
         parent: path.optional(),

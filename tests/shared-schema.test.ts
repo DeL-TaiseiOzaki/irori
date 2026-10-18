@@ -72,19 +72,29 @@ test('the shared Schema is written through the settings into the irori agent’s
   // The irori agent's own instructions are untouched, and its own listing stays its own.
   assert.doesNotMatch(await readFile(path.join(root, 'AGENTS.md'), 'utf8'), /YYYY-MM-DD/);
   assert.deepEqual((await settings.list(sharedSchemaId)).instructions, ['AGENTS.md']);
-  // Instructions and skills only: Claude Code's rules and hooks are not shared.
-  await assert.rejects(
-    settings.write(sharedSchemaId, '.claude/rules/tone.md', 'Be brief.\n', null),
-    /cannot be changed|変更できません/,
+  // The irori agent's settings: rules and hooks too (ADR 048).
+  await settings.write(sharedSchemaId, '.claude/rules/tone.md', 'Be brief.\n', null);
+  assert.equal(await you.sharedHooks(), undefined);
+  const hooks = {
+    PostToolUse: [{ matcher: 'Write', hooks: [{ type: 'command', command: 'echo written' }] }],
+  };
+  await settings.write(sharedSchemaId, '.claude/settings.json', JSON.stringify({ hooks }), null);
+  const listed = await settings.list(sharedSchemaId);
+  assert.deepEqual(listed.rules, ['.claude/rules/tone.md']);
+  assert.equal(listed.claudeSettings, true);
+  assert.equal(
+    await readFile(path.join(shared, '.claude', 'rules', 'tone.md'), 'utf8'),
+    'Be brief.\n',
   );
-  await assert.rejects(
-    settings.write(sharedSchemaId, '.claude/settings.json', '{}\n', null),
-    /cannot be changed|変更できません/,
-  );
-  // What agents are told: the instructions and each skill with its file.
+  // Its hooks go to Claude Code as they are written.
+  assert.deepEqual(await you.sharedHooks(), hooks);
+  // What agents are told: the instructions, each rule and each skill with its file.
   const told = await you.shared();
   assert.equal(told?.root, path.join(await realpath(root), '.irori', 'shared'));
   assert.equal(told?.instructions, '# Shared\n\nWrite dates as YYYY-MM-DD.');
+  assert.deepEqual(told?.rules, [
+    { file: path.join(told!.root, '.claude', 'rules', 'tone.md'), text: 'Be brief.' },
+  ]);
   assert.deepEqual(told?.skills, [
     {
       name: 'weekly',
@@ -99,6 +109,36 @@ test('the shared Schema is written through the settings into the irori agent’s
   assert.equal(long?.instructions, undefined);
   assert.equal(long?.long, true);
   assert.match(sharedSchema(long!, false), /Read the shared instructions at .+AGENTS\.md first/);
+  // Rules that do not fit beside the instructions are pointed at too.
+  await settings.write(
+    sharedSchemaId,
+    'AGENTS.md',
+    'x'.repeat(20 * 1024),
+    (await settings.read(sharedSchemaId, 'AGENTS.md')).hash,
+  );
+  await settings.write(sharedSchemaId, '.claude/rules/long.md', 'y'.repeat(20 * 1024), null);
+  const crowded = await you.shared();
+  assert.equal(crowded?.instructions?.length, 20 * 1024);
+  assert.deepEqual(
+    crowded?.rules.map((rule) => [path.basename(rule.file), rule.text]),
+    [
+      ['long.md', undefined],
+      ['tone.md', undefined],
+    ],
+  );
+  assert.match(
+    sharedSchema(crowded!, false),
+    /Read the shared rules first[^\n]*\n- .+long\.md\n- .+tone\.md/,
+  );
+  // Hooks not in Claude Code's shape are refused rather than guessed.
+  const current = await settings.read(sharedSchemaId, '.claude/settings.json');
+  await settings.write(
+    sharedSchemaId,
+    '.claude/settings.json',
+    '{"hooks":{"Stop":{}}}',
+    current.hash,
+  );
+  await assert.rejects(you.sharedHooks(), /not in Claude Code's shape/);
   // No alias leads out of the shared folder.
   const outside = path.join(base, 'outside');
   await mkdir(outside);
@@ -121,6 +161,7 @@ test('the shared Schema says which Schema wins, and tells the irori agent to pas
     root: '/me/.irori/shared',
     file: '/me/.irori/shared/AGENTS.md',
     instructions: 'Write dates as YYYY-MM-DD.',
+    rules: [{ file: '/me/.irori/shared/.claude/rules/tone.md', text: 'Be brief.' }],
     skills: [{ name: 'weekly', description: 'Weekly review.', path: '/me/s/weekly/SKILL.md' }],
   };
   const text = sharedSchema(shared, false);
@@ -128,8 +169,16 @@ test('the shared Schema says which Schema wins, and tells the irori agent to pas
   assert.match(text, /that folder's Schema wins/);
   assert.match(text, /<shared-instructions>\nWrite dates as YYYY-MM-DD\.\n<\/shared-instructions>/);
   assert.match(text, /- weekly: Weekly review\. \(\/me\/s\/weekly\/SKILL\.md\)/);
+  assert.match(
+    text,
+    /Shared rules\.[^\n]*\n<shared-rule file="\/me\/\.irori\/shared\/\.claude\/rules\/tone\.md">\nBe brief\.\n<\/shared-rule>/,
+  );
   assert.doesNotMatch(text, /sub-agent/);
-  assert.match(sharedSchema(shared, true), /hand work to a vault's sub-agent, tell it to follow/);
+  assert.match(
+    sharedSchema(shared, true),
+    /hand work to a vault's sub-agent, tell it to follow the shared Schema too: \/me\/\.irori\/shared\/AGENTS\.md, the shared rules and the shared skills/,
+  );
+  assert.doesNotMatch(sharedSchema({ ...shared, rules: [] }, false), /rule/);
   assert.match(
     sharedSchemaPointer(shared),
     /still applies, unchanged\. Its folder is \/me\/\.irori\/shared\./,
@@ -192,6 +241,7 @@ test(
     assert.equal((await prompts()).at(-1), `${introduction}\n\nfirst words`);
     await you.create();
     await settings.write(sharedSchemaId, 'AGENTS.md', 'Write dates as YYYY-MM-DD.\n', null);
+    await settings.write(sharedSchemaId, '.claude/rules/tone.md', 'Be brief.\n', null);
     await settings.write(
       sharedSchemaId,
       '.agents/skills/weekly/SKILL.md',
@@ -203,6 +253,8 @@ test(
     const second = (await prompts()).at(-1)!;
     assert.match(second, /^irori: the shared Schema/);
     assert.match(second, /Write dates as YYYY-MM-DD\./);
+    // Every CLI hears the shared rules, not only Claude Code.
+    assert.match(second, /<shared-rule file="[^"]+tone\.md">\nBe brief\.\n<\/shared-rule>/);
     assert.match(second, /- weekly: Writes the weekly review\./);
     // The session heard the unchanged introduction, so it gets one line for it.
     assert.ok(second.endsWith(`\n\n${vaultIntroPointer('Fixture', false)}\n\nsecond words`));
