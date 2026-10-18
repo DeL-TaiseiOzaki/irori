@@ -10,7 +10,7 @@ const host = window.irori;
 const nativeText = {
   reads: () => t('読む', 'reads it'),
   trusted: () => t('信頼済みなら読む', 'reads it if trusted'),
-  ignores: () => t('読まない', 'does not read it'),
+  irori: () => t('irori が渡す', 'irori gives it'),
 };
 const clashText = {
   'user-wins': () => t('そちらが優先される', 'that one takes priority'),
@@ -30,10 +30,7 @@ function cell(entry: SkillReachEntry, agent: AgentId) {
         )
       : '—';
   if (!copies.length) return nativeText[rule.native]();
-  const fate =
-    rule.native === 'ignores'
-      ? t('そちらだけを読む', 'only that one is read')
-      : clashText[rule.clash]();
+  const fate = clashText[rule.clash]();
   return t(
     `${nativeText[rule.native]()}。同名が ${copies.join('、')} にあり、${fate}`,
     `${nativeText[rule.native]()}; a same-named one exists in ${copies.join(', ')}, and ${fate}`,
