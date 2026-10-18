@@ -8,10 +8,10 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
-// Your AI in the Overview: set up its folder, hand work to a brain's sub-agent,
-// answer the sub-agent's request, read its report, keep your AI out of the
-// brains, hold the brains while it works, and have it write the definitions.
-// `claude` is a protocol fixture; no model runs.
+// Your AI in the Overview: set up its folder, hand work to a vault's agent with
+// `irori call` (ADR 050), answer that agent's request where your AI's are
+// answered, read its report, keep your AI out of the vaults and hold them while
+// it works. `claude` is a protocol fixture; no model runs.
 if (process.platform === 'win32') {
   console.log('Your-AI UI executable fixtures are POSIX only.');
   process.exit(0);
@@ -69,8 +69,9 @@ try {
   const page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   page.setDefaultTimeout(20000);
-  const fixtureLog = async () =>
-    (await readFile(path.join(you, 'your-ai-fixture.jsonl'), 'utf8').catch(() => ''))
+  // Each side of a hand-off logs in the folder it works in.
+  const fixtureLog = async (folder = you) =>
+    (await readFile(path.join(folder, 'your-ai-fixture.jsonl'), 'utf8').catch(() => ''))
       .trim()
       .split('\n')
       .filter(Boolean)
@@ -106,19 +107,13 @@ try {
     )
     .toContainEqual(expect.stringContaining('irori-overview'));
 
-  // Before any hand-off the Your AI screen says irori writes the definitions;
-  // one the person already wrote is kept as it is.
-  await writeFile(
-    path.join(you, '.claude', 'agents', 'vault-research.md'),
-    '---\nname: vault-research\ndescription: Edited by the person.\n---\nMine.\n',
-  );
+  // The Your AI screen names each vault's agent, the name `irori call` takes.
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
-  const definitions = page.getByRole('region', { name: 'vault agent' });
-  await expect(definitions.getByRole('button', { name: /^Product agent/ })).toContainText('未作成');
-  await expect(definitions.getByRole('button', { name: /^Research agent/ })).toContainText(
-    '定義済み',
-  );
-  await expect(definitions.getByRole('button', { name: /定義を更新させる/ })).toHaveCount(0);
+  const vaultAgents = page.getByRole('region', { name: 'vault agent' });
+  await expect(
+    vaultAgents.getByRole('listitem').filter({ hasText: 'Product agent' }),
+  ).toContainText('vault-product');
+  await expect(vaultAgents.getByRole('listitem')).toHaveCount(2);
   // A standard skill the folder lacks is offered again; the others are left as they are.
   const youFolder = page.getByRole('region', { name: 'irori agent のフォルダ' });
   const addSkills = youFolder.getByRole('button', { name: '標準スキルを追加', exact: true });
@@ -162,11 +157,11 @@ try {
   expect(await readFile(path.join(you, '.agents', 'skills', 'weekly', 'SKILL.md'), 'utf8')).toBe(
     '---\nname: weekly\ndescription: Plans the week.\n---\n\nAsk each vault.\n',
   );
-  // The folder as files, read-only, still shows the definitions.
+  // The folder as files, read-only.
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
-  await youPanel.getByRole('button', { name: 'vault-research.md' }).click();
+  await youPanel.getByRole('button', { name: 'AGENTS.md' }).click();
   await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText(
-    'Edited by the person.',
+    'irori call <name>',
   );
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
@@ -176,8 +171,8 @@ try {
   const access = island.getByLabel('エージェントのアクセス', { exact: true });
   await expect(access).toHaveValue('full-access');
   await access.selectOption('default');
-  // A request goes to your AI with the workspace's brains; it hands a note to
-  // Product's sub-agent, whose write asks the person here.
+  // A request goes to your AI with the workspace's vaults; it hands a note to
+  // Product's agent with `irori call`, whose write asks the person here.
   await composer.fill('Write a decision note.');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   const request = island.getByRole('group', { name: '許可の要求' });
@@ -204,7 +199,7 @@ try {
   await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toBeEnabled();
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
 
-  // Allowed here, the sub-agent writes in its brain and reports.
+  // Allowed here, the vault agent writes in its vault and reports.
   await request.getByRole('button', { name: '今回のみ許可' }).click();
   await expect(island.locator('.message.report')).toContainText(
     'Wrote Knowledge_Base/from-your-ai.md.',
@@ -227,53 +222,40 @@ try {
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(map.locator('.map-pill.hand-off')).toHaveCount(0);
 
-  // Your AI's own write in a brain is refused, and a background hand-off runs
-  // in the foreground so its request can reach the person.
-  await composer.fill('Try a direct write, then hand it over in the background.');
+  // Your AI's own write in a vault is refused: the work goes with `irori call`.
+  await composer.fill('Try a direct write first.');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   await island
     .getByRole('group', { name: '許可の要求' })
     .getByRole('button', { name: '今回のみ許可' })
     .click();
   await expect
-    .poll(async () => (await fixtureLog()).filter((entry) => 'written' in entry).length)
+    .poll(async () => (await fixtureLog(roots[0])).filter((entry) => 'written' in entry).length)
     .toBe(2);
   const log = await fixtureLog();
   expect(log.some((entry) => entry.direct === 'denied')).toBe(true);
-  expect(log.filter((entry) => 'background' in entry).map((entry) => entry.background)).toEqual([
-    false,
-    false,
-  ]);
   await expect(readFile(path.join(roots[0], 'direct.md'))).rejects.toThrow();
 
-  // The Your AI screen: its folder read-only, and each vault's sub-agent.
-  // irori wrote the missing definition when it handed Product over, and left
-  // the person's own one alone.
-  expect(log[0].loaded.sort()).toEqual(['vault-product', 'vault-research']);
-  expect(await readFile(path.join(you, '.claude', 'agents', 'vault-product.md'), 'utf8')).toContain(
-    'name: vault-product',
-  );
-  expect(
-    await readFile(path.join(you, '.claude', 'agents', 'vault-research.md'), 'utf8'),
-  ).toContain('Edited by the person.');
+  // The Your AI screen: its folder read-only, and each vault's agent. irori
+  // wrote no sub-agent definitions into the folder (ADR 050).
+  for (const dir of ['.claude', '.codex', '.opencode'])
+    expect(await stat(path.join(you, dir, 'agents')).catch(() => undefined)).toBeUndefined();
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
   await expect(
     page
       .getByRole('region', { name: 'Schema の設定' })
       .getByRole('textbox', { name: '指示', exact: true }),
   ).toHaveValue(/^# irori agent\n/);
-  await expect(definitions.getByRole('button', { name: /^Product agent/ })).toContainText(
-    '定義済み',
-  );
-  await definitions.getByRole('button', { name: /^Product agent/ }).click();
-  await expect(definitions.locator('.you-definition')).toContainText('name: vault-product');
+  await expect(
+    vaultAgents.getByRole('listitem').filter({ hasText: 'Research agent' }),
+  ).toContainText('vault-research');
   await page.screenshot({ path: 'test-results/irori-your-ai-screen.png' });
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   await expect(map).toBeVisible();
 
-  // Your AI on another CLI, with a model from that CLI's list: Pi loads no
-  // sub-agents, so it hands a brain to its vault agent with `irori call`
-  // on the command irori puts on its PATH (irori's own runtime run as Node). The
+  // Your AI on another CLI, with a model from that CLI's list: it hands a vault
+  // to its vault agent with `irori call` too, on the command irori puts on its
+  // PATH (irori's own runtime run as Node). The
   // vault agent runs in that brain, and its report comes back. The choice is kept.
   const cli = island.getByLabel('エージェント', { exact: true });
   await expect(cli).toHaveValue('claude');
@@ -298,7 +280,6 @@ try {
   await expect(island.getByRole('list', { name: 'vault への依頼' })).toContainText('完了');
   const sent = (await piLog()).find((entry) => entry.type === 'prompt').message as string;
   expect(sent).toContain(`folder ${JSON.stringify(roots[0])}, vault agent "vault-product"`);
-  expect(sent).toContain('You run on Pi');
   expect(sent).toContain('with `irori call` in your shell');
   expect(sent).not.toContain('AGENTS.md');
   expect(sent.endsWith('run: irori call Product "Tidy the Product notes."')).toBe(true);
@@ -381,7 +362,7 @@ try {
   await expect(composer).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a brain sub-agent with its request answered and its report, the map’s hand-off line, brains held while your AI works, your AI kept out of the brains, hand-offs in the foreground, definitions irori writes when absent, kept when edited, and shown on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, a hand-off to a vault agent with irori call, its request answered from irori mode after a view change, and its report, the map’s hand-off line, vaults held while your AI works, your AI kept out of the vaults, no definitions written and each vault agent named on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

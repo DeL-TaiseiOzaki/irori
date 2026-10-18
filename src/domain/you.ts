@@ -1,10 +1,7 @@
-import type { AgentId } from './types';
-import { subAgentPrompt } from '../../prompts';
-
 /**
  * The irori agent (formerly "your AI"): the person's own agent, run from its own
  * folder (its Schema), which hands work in each vault (a brain) to that
- * vault's agent, a sub-agent irori defines for it.
+ * vault's agent with `irori call` (ADR 050).
  */
 export interface YourAi {
   /** The id its runs, conversations and sessions are kept under. */
@@ -55,30 +52,14 @@ export interface BrainAgent {
   scopeId: string;
   name: string;
   category?: string;
-  /** The sub-agent name its definitions carry, `vault-<slug>`. */
+  /** The vault agent's name, `vault-<slug>`, as `irori call` takes it. */
   agent: string;
   root: string;
-  /** The definition files of that sub-agent in your AI's folder, one per CLI that has one. */
-  definitions: { cli: SubAgentCli; path: string }[];
-}
-
-/** The CLIs that load sub-agents from files, and so get one per brain from irori. */
-export type SubAgentCli = 'claude' | 'codex' | 'opencode';
-
-/** Where each such CLI loads a sub-agent definition from, relative to your AI's folder. */
-export const subAgentFiles: Record<SubAgentCli, (agent: string) => string> = {
-  claude: (agent) => `.claude/agents/${agent}.md`,
-  codex: (agent) => `.codex/agents/${agent}.toml`,
-  opencode: (agent) => `.opencode/agents/${agent}.md`,
-};
-
-export function hasSubAgents(agent: AgentId): agent is SubAgentCli {
-  return Object.hasOwn(subAgentFiles, agent);
 }
 
 /**
- * A stable sub-agent name for a brain: `vault-` and lowercase letters, digits
- * and hyphens as Claude Code asks, from the brain's name when it has Latin
+ * A stable vault agent name for a brain: `vault-` and lowercase letters, digits
+ * and hyphens, from the brain's name when it has Latin
  * letters, otherwise from its id. Names already taken get the id's first
  * characters.
  */
@@ -99,23 +80,4 @@ export function brainAgentNames(spaces: { scopeId: string; name: string }[]) {
     names.set(space.scopeId, name);
   }
   return names;
-}
-
-/**
- * The definition irori writes for a brain's sub-agent on one CLI, when the file
- * is absent. Values are quoted as JSON, which is valid YAML and TOML.
- */
-export function subAgentDefinition(
-  cli: SubAgentCli,
-  brain: { name: string; agent: string; root: string },
-  /** The shared Schema's folder, which every agent follows beside its own. */
-  shared: string,
-) {
-  const { description, instructions: prompt } = subAgentPrompt(brain, shared);
-  const q = JSON.stringify;
-  if (cli === 'codex')
-    return `name = ${q(brain.agent)}\ndescription = ${q(description)}\ndeveloper_instructions = ${q(prompt)}\n`;
-  if (cli === 'opencode')
-    return `---\ndescription: ${q(description)}\nmode: subagent\n---\n\n${prompt}`;
-  return `---\nname: ${brain.agent}\ndescription: ${q(description)}\ntools: Read, Write, Edit, Glob, Grep\n---\n\n${prompt}`;
 }

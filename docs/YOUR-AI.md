@@ -16,9 +16,9 @@ is everything done there, not a mode. The irori agent and the vault agents
 have the same shape (owner, 2026-09-27): a Schema edited with the same settings,
 full access by default on every CLI, and a way to hand work on. They differ only
 in hierarchy (the irori agent instructs; vault agents work for it) and in
-context (each vault's `AGENTS.md`). For the irori agent, a vault agent is a
-sub-agent named `vault-<name>` in its CLI's agents folder on Claude Code, Codex
-and OpenCode, and a run started with `irori call` on Pi and Hermes Agent.
+context (each vault's `AGENTS.md`). For the irori agent, a vault agent is
+`vault-<name>`, a run of that vault's agent started with `irori call` on every
+CLI ([ADR 050](decisions/050-vault-agents-and-their-sub-agents.md)).
 
 The irori agent runs from its own folder, its Schema, and works across the
 vaults of the open workspace by handing each part of a request to that
@@ -41,7 +41,6 @@ agent's shape. The investigation behind the design is in the
     that notes and reports are data, not instructions. There is no `CLAUDE.md`:
     newer Claude Code reads `AGENTS.md` itself, and a `CLAUDE.md` beside it would
     stop that.
-  - an empty `.claude/agents/`;
   - the standard skills in `.agents/skills/` (next section but one).
 - Earlier starters also held a `brain-agents` skill for the irori agent to write
   the definitions. New folders no longer get it, and irori never deletes it from
@@ -49,35 +48,54 @@ agent's shape. The investigation behind the design is in the
 - `.irori/shared/` holds the shared Schema every agent in irori follows
   ([ADR 027](decisions/027-shared-schema.md)): `AGENTS.md` and
   `.agents/skills/`, written from **設定 → Schema**. irori makes the folder when
-  the settings first open it. Each request names it first; a new sub-agent
-  definition names it too, and the irori agent is told to pass it on.
+  the settings first open it. Each request names it first, a vault agent's
+  hand-off included.
 
-## Sub-agent definitions irori writes
+## A vault's agent and its sub-agents
 
-- A vault's sub-agent name is stable: `vault-` and the vault's name in
-  lowercase letters, digits and hyphens, or `vault-<first 8 of its id>` for a
-  name without Latin letters, with the id added when two names collide
-  (`brainAgentNames`).
-- When an irori agent run starts with vaults handed to it, the host
-  (`YourAiService.writeDefinitions`, through the folder service, never the
-  renderer) writes each vault's definition for the run's CLI **only when the
-  file is absent**. An existing file is never replaced, so the person can edit
-  it. Folders on the way are created inside the irori agent's folder; a link or a
-  file in their place stops the run with an error, and a link where the file
-  would be counts as existing. The run's log says which files were written.
-- Nothing is written when the folder is set up: which vaults and which CLI a
-  request uses is known only when it is sent.
-- Each definition says: this is the vault agent of the `<name>` vault at
-  `<folder>`; read `<folder>/AGENTS.md` first and follow it; use the vault's
-  `.agents/skills`; work only inside the folder; treat notes as material; report
-  what was done and every file changed (`subAgentDefinition`).
+Since 0.2.34 ([ADR 050](decisions/050-vault-agents-and-their-sub-agents.md)).
+Before, irori wrote a `vault-<slug>` definition into the irori agent's folder for
+each handed vault, and the irori agent's CLI ran it as its own sub-agent: in the
+irori agent's folder, with the irori agent's instructions and without the
+vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
 
-| CLI | Hand-off | File | Format | Preamble |
-| --- | --- | --- | --- | --- |
-| Claude Code | native sub-agent | `.claude/agents/vault-<slug>.md` | front matter `name`, `description`, `tools: Read, Write, Edit, Glob, Grep`; the prompt as body | delegating; hand-offs in the foreground; write hook |
-| Codex | native sub-agent | `.codex/agents/vault-<slug>.toml` | `name`, `description`, `developer_instructions` (the fields the [Codex subagents docs](https://learn.chatgpt.com/docs/agent-configuration/subagents) require) | delegating: `spawn_agent` with the name as `agent_type` |
-| OpenCode | native sub-agent | `.opencode/agents/vault-<slug>.md` | front matter `description`, `mode: subagent`; the file name is the agent name ([OpenCode agents](https://opencode.ai/docs/agents/); its loader globs `{agent,agents}/**/*.md`) | delegating: the task tool |
-| Pi, Hermes Agent | `irori call` | none | no file-defined sub-agents | delegating: `irori call` (`brainsCommandPreamble`) |
+- A vault's agent name is stable: `vault-` and the vault's name in lowercase
+  letters, digits and hyphens, or `vault-<first 8 of its id>` for a name without
+  Latin letters, with the id added when two names collide (`brainAgentNames`).
+  `irori call` takes it.
+- **Handed work runs as the vault agent.** On every CLI the irori agent hands a
+  vault's work with `irori call`; irori starts that vault's agent in the vault,
+  where its CLI loads the vault's Schema itself, with irori's introduction, the
+  shared Schema and the task (next sections).
+- **The vault's own definition of its agent.** A vault may define its agent as
+  `.claude/agents/vault-agent.md`, `.codex/agents/vault-agent.toml` or
+  `.opencode/agents/vault-agent.md` (`vaultAgentName`); the one in the running
+  CLI's format is chosen first. Its description goes on the vault's line in the
+  irori agent's request, and its instructions go with each hand-off
+  (`handedTask`). Its model is used when the definition is in the running CLI's
+  format; otherwise the irori agent's model stands.
+- **The vault's other definitions are the vault agent's sub-agents, on any
+  CLI.** Each CLI loads only its own format: Claude Code `.claude/agents/*.md`,
+  Codex `.codex/agents/*.toml`, OpenCode `.opencode/agents/*.md`. irori reads
+  all three (`readAgentDefinitions`) and gives a CLI the ones in other formats
+  (`foreignDefinitions`), without writing into the vault:
+
+| CLI | How irori gives it the other formats |
+| --- | --- |
+| Claude Code | the Agent SDK's `agents` option (description and prompt) |
+| Codex | roles in the thread's configuration, `agents.<name>.description` and `agents.<name>.config_file`, the file in `<irori data>/codex-agents/<run>/` holding `developer_instructions`, removed when the run ends |
+| OpenCode | `agent.<name>` (`description`, `prompt`, `mode: subagent`) in `OPENCODE_CONFIG_CONTENT` |
+| Pi, Hermes Agent | none: they load no sub-agents |
+
+- A name the CLI has in its own format wins; among the others the first in the
+  order Claude Code, Codex, OpenCode. A translated definition carries its
+  description and instructions, not its model or tools. `vault-agent` is never
+  one of the vault agent's own sub-agents: Claude Code is refused
+  `Agent(vault-agent)`. A definition that does not parse is named in the run's
+  log.
+- The irori agent's folder works the same way for the irori agent's own
+  sub-agents, apart from the `vault-*` definitions earlier versions wrote there:
+  they are not given to another CLI, and Claude Code is refused them.
 
 ## A request
 
@@ -90,33 +108,25 @@ agent's shape. The investigation behind the design is in the
   for the chosen CLI until the CLI changes, like the composer's. Pi offers only
   its own settings. The owner accepts that the irori agent may read any vault.
 - irori mode sends each request with the workspace's vaults, busy or not
-  ([ADR 020](decisions/020-parallel-conversations.md)). The host resolves their folders and puts a preamble before the request
-  naming each vault and its folder.
-- On Claude Code, Codex and OpenCode the preamble (`brainsPreamble`) also names
-  each vault's sub-agent and tells the irori agent to hand the vault's work
-  to it. On Claude Code the folders are also `additionalDirectories`.
+  ([ADR 020](decisions/020-parallel-conversations.md)). The host resolves their
+  folders and puts a preamble before the request (`brainsCommandPreamble`): each
+  vault with its folder, its vault agent name, its own definition's description,
+  its layers, connected folders, work folder and comment count, then how to
+  hand it work with `irori call` and not with the CLI's own sub-agents. On
+  Claude Code the folders are also `additionalDirectories`, for reading.
 - Claude Code in full access runs in `bypassPermissions`. The write hook still
   decides every write there: the Agent SDK evaluates hooks before the permission
   mode, and "a hook deny applies even in `bypassPermissions` mode"
   ([Agent SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions)).
-  Sub-agents inherit the parent's mode, so a vault's sub-agent works without
-  asking too. In the standard mode its requests reach the person as before.
 - Codex and OpenCode have no irori write hook: the preamble tells the irori
   agent not to change a vault's files itself, but nothing enforces it.
-- Pi and Hermes Agent have no file-defined sub-agents. The preamble
-  (`brainsCommandPreamble`) names each vault, its folder and its vault agent
-  name, and tells the irori agent to hand work with `irori call` (next
-  section) and not to change a vault's files itself. It no longer tells the
-  irori agent to read a vault's `AGENTS.md`: the vault agent does that,
-  because it runs in that vault.
 - While the irori agent's run lasts, every vault handed to it is busy, as if
   its own vault agent were running: Git operations and vault settings wait.
   The person's own conversations in that vault run beside it (ADR 020).
 
-## `irori call` (Pi, Hermes Agent)
+## `irori call`
 
-- An irori agent run on Pi or Hermes Agent with vaults handed to it hands work
-  over with `irori call` on the `irori` command (next section): the same
+- An irori agent run with vaults handed to it, on any CLI, hands work over with `irori call` on the `irori` command (next section): the same
   loopback bridge, launcher and URL in `IRORI_COMMAND`. Until ADR 033 this was a
   separate `hibachi` command; a separate `vault` command would have shadowed
   HashiCorp Vault's CLI on the run's `PATH`.
@@ -126,12 +136,17 @@ agent's shape. The investigation behind the design is in the
   handed vault has it (`vaultOf`). The client waits without a deadline,
   prints the vault agent's report and exits 0; on failure it prints
   `irori: <reason>` and exits non-zero. The agent service answers `call`
-  itself (`AgentService.call`); elsewhere, on a vault agent or on a CLI with
-  file-defined sub-agents, `irori call` is refused with the reason
-  (`callRefused`).
+  itself (`AgentService.call`); a vault agent's `irori call` is refused with
+  the reason (`callRefused`). Claude Code ends a shell command after two
+  minutes by default, so the irori agent's Claude Code runs with
+  `BASH_DEFAULT_TIMEOUT_MS` and `BASH_MAX_TIMEOUT_MS` set to a day.
 - The host starts a run in that vault (`AgentService.handOff`) on the irori
-  agent's CLI and model, in `defaultAgentAccess`, with the task after a line
-  asking for a short report. The vault is held by the irori agent's run; that
+  agent's CLI, in the irori agent's access mode, with the model of the vault's
+  own definition when it is in that CLI's format and the irori agent's model
+  otherwise. The task follows a line asking for a short report and the vault's
+  own definition, when it has one. Its permission requests and questions also
+  show with the irori agent, labelled with the vault, and an answer in either
+  place reaches it. The vault is held by the irori agent's run; that
   run, and only it, may start hand-offs there. One hand-off at a time per
   irori-agent run and vault; a second is refused until the first reports.
   Stopping the hand-off stops only it. The run is an ordinary
@@ -207,23 +222,14 @@ agent sets up the person's vaults.
 ## Boundaries irori keeps
 
 - **Writes (Claude Code).** A `PreToolUse` hook decides each `Write`, `Edit`,
-  `MultiEdit` and `NotebookEdit` (`src/agents/delegation.ts`):
-  - The irori agent itself writes only in its own folder.
-  - A vault's sub-agent writes only inside its vault.
-  - Any other agent, built in or defined by a vault for itself, writes only in
-    the irori agent's folder.
-  - A refused write tells the agent to hand the work to that vault's sub-agent.
-  - `Bash` is not bounded by path. Claude Code asks the person for it as usual.
-- **Foreground hand-offs.** A sub-agent in the background cannot ask the person,
-  so Claude Code refuses its edits. A hand-off asked for in the background is
-  rewritten to run in the foreground.
-- **Attribution (Claude Code).** Each hand-off becomes events that carry `delegate` (vault,
-  hand-off and state). The events show the hand-off's start, the sub-agent's
-  steps and requests (matched through `canUseTool`'s `agentID`), and its report
-  (`task_notification`). A sub-agent's own words stay with its hand-off; the
-  reply shown is the irori agent's. Hand-offs through `irori call`
-  are attributed the same way. Codex and OpenCode sub-agent activity is not
-  attributed to a vault yet.
+  `MultiEdit` and `NotebookEdit` (`src/agents/delegation.ts`): the irori agent
+  and any sub-agent of its own write only in its own folder and the vaults' work
+  folders. A refused write in a vault says to hand the work with `irori call`.
+  `Bash` is not bounded by path. Claude Code asks the person for it as usual.
+- **Attribution.** Each hand-off becomes events of the irori agent's run that
+  carry `delegate` (vault, hand-off and state): its start, the vault agent's
+  steps and requests, and its report. The vault agent's own words stay with its
+  hand-off; the reply shown is the irori agent's.
 - **Request ends.** The host sends an event naming a request when it is
   answered, declined or cancelled. Every view stops offering it then, and not
   merely because some later event of the run arrived. Sub-agents of other vaults
@@ -237,7 +243,7 @@ agent sets up the person's vaults.
   own tabs, 履歴 and composer, kept per workspace
   ([ADR 034](decisions/034-irori-mode-threads.md)). Its log shows each run's hand-offs as a task list
   (vault, what it was asked, working / needs approval / done), each vault's
-  report, and sub-agent requests labelled with their vault.
+  report, and the vault agents' requests labelled with their vault.
 - **Map:** the irori agent's orb at the hearth. A line runs to each vault with
   a hand-off under way from any thread on show or running, with a spark moving along it unless less motion is asked
   for. The vault glows.
@@ -252,71 +258,61 @@ agent sets up the person's vaults.
   skills), ルール and フック, with the same forms, add and delete. The settings
   go through the same four `HostAPI` methods with the irori agent's id as the
   scope; they wait while the irori agent runs. The folder icon shows the folder
-  as files, read-only, including the definitions irori wrote. On the right, for
-  each vault, its sub-agent name, whether the definition for the chosen CLI
-  exists (**定義済み** / **未作成**), and every definition file it has, with its
-  CLI. A missing one says irori writes it on the first hand-off. On Pi or
-  Hermes Agent the screen names `irori call` instead.
+  as files, read-only. On the right, each vault's agent with its name, the one
+  `irori call` takes.
 
 ## Verification
 
-- `tests/your-ai.test.ts`: naming (`vault-<slug>`), the write rule, the
-  preamble for each CLI, the definition text for each CLI (the Codex TOML parsed
-  back), the folder record and starter (no `brain-agents` skill), reading only
-  inside the folder, and irori writing absent definitions: an edited one is kept,
-  a second run writes nothing, and neither a linked folder nor a link in the
-  file's place is followed out of the folder.
-- The same file runs a delegation through a Claude Code protocol fixture
-  (`tests/fixtures/claude-your-ai.mjs`), which loads `.claude/agents` like Claude
-  Code. It checks that the definitions irori wrote load, that the vaults are
-  held, the attribution of steps, requests and the report, that the irori
-  agent's own write in a vault is refused, and that hand-offs run in the
-  foreground.
-- It runs the same fixture in full access: the fixture, like Claude Code, runs
-  hooks in `bypassPermissions` and asks nothing; the irori agent's own write in
-  a vault is still refused and the sub-agent writes without a request.
-- It also runs the irori agent through protocol fixtures on Pi (the `vault`
-  command preamble, no definition written) and on OpenCode (delegating
-  preamble, `.opencode/agents/vault-product.md` written with `mode: subagent`),
-  and the Schema settings service on the irori agent's folder: only the root
-  `AGENTS.md` as instructions (never deleted), a rule, hooks and a skill written
-  and listed from its `.agents/skills`, hash conflicts, a definition file
-  refused as a setting, and a linked `.claude/rules` not followed out.
-- `tests/vault-command.test.ts`: name resolution (sub-agent name, name,
+- `tests/your-ai.test.ts`: naming (`vault-<slug>`), the write rule, the folder
+  record and starter (no `brain-agents` skill, no agents folder, `irori call` in
+  its `AGENTS.md`), reading only inside the folder, and the Schema settings
+  service on the irori agent's folder: only the root `AGENTS.md` as instructions
+  (never deleted), a rule, hooks and a skill written and listed from its
+  `.agents/skills`, hash conflicts, a definition file refused as a setting, and
+  a linked `.claude/rules` not followed out.
+- The same file runs hand-offs through a Claude Code protocol fixture
+  (`tests/fixtures/claude-your-ai.mjs`) that plays both sides: as the irori agent
+  it runs `irori call` as its Bash tool would, and as the vault agent it writes
+  in its vault. It checks that the vaults are held, that the vault agent runs in
+  its vault with the vault's introduction and the task, in the irori agent's
+  mode, the attribution of its steps, its request (forwarded to the irori agent
+  and resolved there) and its report, and that the irori agent's own write in a
+  vault is refused with `irori call` as the way. In full access both sides run
+  in `bypassPermissions` and nothing is asked. With a vault defining its agent
+  in Codex's format and sub-agents in Codex's and OpenCode's, the irori agent
+  hears the description, the vault agent the instructions (not Codex's model),
+  and Claude Code gets the two sub-agents; an earlier irori's `vault-*`
+  definition in the irori agent's folder is refused to it.
+- It also runs the irori agent through protocol fixtures on Pi and OpenCode: the
+  same `irori call` preamble, and no definition written.
+- `tests/agent-definitions.test.ts`: the three formats parsed, names, problems,
+  `foreignDefinitions`, the vault's own definition and its model, and the Codex
+  role files.
+- `tests/vault-command.test.ts`: name resolution (vault agent name, name,
   ambiguous, not handed), the command preamble, launcher quoting, and the
-  bridge through the real `vault` launcher (the test's Node as the runtime):
-  the report on stdout, the task on stdin, a refused hand-off's exit status and
-  reason, no URL or a forged token refused. Then the irori agent on Pi's
-  fixture runs `vault vault-product "..."` in its shell: the vault's own
-  Pi fixture run happens in that vault, is kept in its conversation, and its
-  words come back as the command's output and the `reported` event; a vault
-  not handed is refused; stopping the irori agent stops a hand-off in progress.
+  bridge through the real launcher (the test's Node as the runtime): the report
+  on stdout, the task on stdin, a refused hand-off's exit status and reason, no
+  URL or a forged token refused. Then the irori agent on Pi's fixture runs
+  `irori call vault-product "..."` in its shell: the vault's own Pi fixture run
+  happens in that vault, is kept in its conversation, and its words come back
+  as the command's output and the `reported` event; a vault not handed is
+  refused; stopping the irori agent stops a hand-off in progress.
 - `scripts/your-ai-ui-smoke.ts`, the Claude fixture in the app: setup, the
   access pill (full access by default; the request part selects the standard
-  mode), the screen before any hand-off (**未作成**, the person's own definition
-  kept), the Schema settings there (the instructions form first, a rule and a
-  skill added in the irori agent's folder, the folder as files), a hand-off
-  answered in irori mode with the settings locked meanwhile, the report, the
-  map's line, the held vault's panel, and the definition irori wrote shown on
-  the screen. Then on Pi a hand-off through `irori call`, run by the
-  app's own Electron as Node: its task in the irori agent's list as done, and
-  the run in Product's conversation.
-- `npm run test:your-ai` (`scripts/your-ai-acceptance.ts`) runs real Claude Code
-  2.1.280 through SDK 0.3.269. It uses the person's allowance, about $0.5 per
-  run at list prices. It passed on 2026-09-26 with hand-written definitions of
-  the same shape (names `alpha` / `beta`, not `vault-*`); it was not rerun
-  after irori began writing them:
-  - the definitions in the irori agent's `.claude/agents` load;
-  - the hand-off names the sub-agent, and its id links `SubagentStart`,
-    `task_started`, the sub-agent's messages and `task_notification`;
-  - `canUseTool` carries that id;
-  - the sub-agent follows its vault's `AGENTS.md`;
-  - the write rule keeps both a sub-agent and the irori agent out of other
-    vaults;
-  - a background request runs in the foreground, with the report before the
-    result;
-  - a resumed session still delegates.
-
+  mode), the screen with each vault's agent, the Schema settings there (the
+  instructions form first, a rule and a skill added in the irori agent's folder,
+  the folder as files), a hand-off through `irori call` answered in irori mode
+  with the settings locked meanwhile, the report, the map's line, the held
+  vault's panel, and the irori agent's own write refused. Then on Pi a hand-off
+  through `irori call`, run by the app's own Electron as Node: its task in the
+  irori agent's list as done, and the run in Product's conversation.
+- `npm run test:your-ai` (`scripts/your-ai-acceptance.ts`) runs real CLIs
+  (`IRORI_ACCEPT_CLIS`, Claude Code and Codex by default) through irori's
+  AgentService. It uses the person's allowance. The irori agent hands two vaults
+  their tasks with `irori call`; it checks that Alpha's agent follows Alpha's
+  `AGENTS.md`, that Beta's agent follows Beta's own `vault-agent` definition
+  (written in Codex's format) and uses a sub-agent defined in the other CLI's
+  format, and that nothing is written into the irori agent's folder.
 - `tests/irori-command.test.ts`: the command's forms and refusals; the
   standard skills as valid packages, written with the starter, added when
   missing without replacing an edited one, and not through a linked folder;
@@ -333,48 +329,26 @@ agent sets up the person's vaults.
 
 ## Limits
 
-- **The `irori` command is unverified on real CLIs.** Whether each CLI's shell
-  tool keeps irori's `PATH` and `IRORI_COMMAND`, and whether Codex's sandbox in
-  the standard mode allows its loopback connection, are unverified.
-
-- **Unverified on real CLIs:** the owner verifies real CLIs himself. Not run: a
-  real Claude Code irori agent in `bypassPermissions` (the hook and inheritance
-  rely on the Agent SDK documentation and the fixture); real Pi and Hermes Agent
-  running `irori call` from their shell tools (whether their tool
-  environment keeps irori's `PATH` and `IRORI_COMMAND`, and whether a tool
-  timeout of theirs cuts a long hand-off); the launcher from an installed
-  macOS or Windows app (`irori.cmd` is unexercised).
 - Claude Code refuses `bypassPermissions` as root outside a recognised sandbox;
   the irori agent then needs the standard mode, as a vault agent does.
-- A hand-off through `irori call` resumes the vault agent's saved
-  session for that CLI, and is refused while that vault has queued
-  instructions of its own.
-
-- **Unverified on real Codex and OpenCode.** No real turn was run. Whether Codex
-  loads project `.codex/agents` for the irori agent's folder, which Codex does
-  not trust, and whether the model then calls `spawn_agent` with that
-  `agent_type`, are unverified; so is OpenCode's task tool picking the
-  `.opencode/agents` sub-agent, and whether OpenCode's full-access session rules
-  reach the sub-agent's child session. If Codex ignores the file, the irori agent
-  can still work (full access) but without the vault's definition.
+- A hand-off through `irori call` resumes the vault agent's saved session for
+  that CLI, and is refused while that vault has queued instructions of its own.
+- **Long hand-offs on other CLIs.** Claude Code's shell timeout is raised for the
+  irori agent. Whether OpenCode's, Pi's or Hermes Agent's shell tool ends a long
+  `irori call` is unverified.
 - **No enforced write boundary outside Claude Code.** On Codex, OpenCode, Pi and
-  Hermes Agent the vaults' boundaries are instructions in the preamble and the
-  definitions, not a hook: in full access the CLI can write anywhere its own
-  rules allow. Since ADR 020 the busy hold no longer keeps other runs
-  out of a handed vault; it holds only irori's own changes there.
+  Hermes Agent the vaults' boundaries are instructions in the preamble, not a
+  hook: in full access the CLI can write anywhere its own rules allow. Since
+  ADR 020 the busy hold no longer keeps other runs out of a handed vault; it
+  holds only irori's own changes there.
 - On those CLIs the person-lines notice reaches Pi and OpenCode only for a
   vault's file named by its absolute path; Codex and Hermes Agent have no hook.
-- A definition names the vault's folder at the time irori wrote it. irori does
-  not rewrite it when the vault is renamed or moved; the person edits or
-  deletes the file, and irori writes a fresh one next time if it is gone.
-- A vault's sub-agent is not the vault's own vault agent. It works in the
-  irori agent's folder, loads the irori agent's settings rather than the
-  vault's `.claude/settings.json`, and reaches the vault through its folder
-  and the definition that tells it to read the vault's Schema.
-- A vault's own `.claude/agents` load too (through `additionalDirectories`), so
-  their names can collide with the irori agent's definitions.
+- `vault-*` definitions an earlier irori wrote into the irori agent's folder stay
+  there. Claude Code is refused them; Codex and OpenCode still load them from
+  that folder, and only the preamble tells the irori agent not to use them.
+- A sub-agent definition translated for another CLI loses its model and tool
+  limits; only its description and instructions carry over.
+- OpenCode's agents through `OPENCODE_CONFIG_CONTENT` are taken from OpenCode's
+  configuration documentation and a protocol fixture; no real OpenCode ran.
 - Every vault of the workspace is held for the whole run. Holding only the
   vaults a hand-off reaches is later work.
-- Claude Code's `InstructionsLoaded` hook did not fire in the acceptance run, so
-  whether a vault's `AGENTS.md` loads by itself when a sub-agent reads a file
-  there is unconfirmed. The definition tells the sub-agent to read it.

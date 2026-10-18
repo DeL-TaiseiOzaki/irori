@@ -7,11 +7,7 @@ import { z } from 'zod';
 import { t } from '../domain/i18n';
 import {
   sharedSchemaFolder,
-  subAgentDefinition,
-  subAgentFiles,
-  type BrainAgent,
   type IroriAgentFolder,
-  type SubAgentCli,
   type YourAi,
   type YourAiEntry,
 } from '../domain/you';
@@ -220,7 +216,6 @@ export class YourAiService {
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.writeFile(file, text, { flag: 'wx' });
     }
-    await fs.mkdir(path.join(current.root, '.claude', 'agents'), { recursive: true });
     await this.writeSkills(current.root);
     return this.status();
   }
@@ -432,54 +427,5 @@ export class YourAiService {
     const { id } = await this.load();
     const doc = await readTextDocument(await this.resolve(rel, root), id, rel);
     return { path: doc.path, text: doc.text };
-  }
-  /** The definition files each named sub-agent has in the folder, for every CLI that loads them. */
-  async definitions(agents: string[]) {
-    const root = await this.root();
-    const found = new Map<string, BrainAgent['definitions']>();
-    for (const agent of agents) {
-      const files: BrainAgent['definitions'] = [];
-      for (const [cli, file] of Object.entries(subAgentFiles) as [
-        SubAgentCli,
-        (agent: string) => string,
-      ][]) {
-        const rel = file(agent);
-        const present = await fs
-          .lstat(path.join(root, rel))
-          .then((stat) => stat.isFile())
-          .catch(() => false);
-        if (present) files.push({ cli, path: rel });
-      }
-      found.set(agent, files);
-    }
-    return found;
-  }
-  /**
-   * Writes the definition of each brain's sub-agent for `cli` where the file is
-   * absent, and returns the paths written. An existing file is never replaced:
-   * the person may have edited it. Folders on the way are made inside the
-   * folder only; a link or file in their place stops the write.
-   */
-  async writeDefinitions(
-    cli: SubAgentCli,
-    brains: Pick<BrainAgent, 'name' | 'agent' | 'root'>[],
-    workspaceId?: string,
-  ) {
-    const root = await this.root(workspaceId);
-    const shared = path.join(await this.defaultFolder(), sharedSchemaFolder);
-    const written: string[] = [];
-    for (const brain of brains) {
-      const rel = subAgentFiles[cli](brain.agent);
-      await this.folders(root, rel);
-      try {
-        await fs.writeFile(path.join(root, rel), subAgentDefinition(cli, brain, shared), {
-          flag: 'wx',
-        });
-        written.push(rel);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      }
-    }
-    return written;
   }
 }

@@ -60,7 +60,10 @@ and chose:
 6. **The folder's own Schema wins.** The words say the shared Schema applies
    beside the Schema of the folder the agent works in, and that the folder's
    wins where they differ.
-7. **Sub-agents hear it too.** A hibachi's sub-agent does not see its parent's
+7. *Revised by [ADR 050](050-vault-agents-and-their-sub-agents.md) (0.2.34):
+   a handed vault runs as its own vault agent, which hears the shared Schema
+   itself; irori writes no sub-agent definitions.*
+   **Sub-agents hear it too.** A hibachi's sub-agent does not see its parent's
    request, so a new definition irori writes names the shared Schema's
    `AGENTS.md` and skills, and the irori agent is told to pass the shared
    Schema on with each hand-off, which covers definitions written earlier.

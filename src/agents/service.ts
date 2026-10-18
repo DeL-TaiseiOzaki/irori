@@ -16,15 +16,10 @@ import type {
   QuestionOption,
   StartRun,
 } from '../domain/types';
-import type {
-  EffortLevel,
-  HookInput,
-  SDKUserMessage,
-  Settings,
-} from '@anthropic-ai/claude-agent-sdk';
+import type { EffortLevel, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
-import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
+import { requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
@@ -62,7 +57,6 @@ import {
   brainsCommandPreamble,
   iroriCommandPreamble,
   iroriCommandPointer,
-  brainsPreamble,
   commentsPointer,
   commentsSummary,
   handedTask,
@@ -90,11 +84,21 @@ import {
 import { spaceFolder } from '../host/schema-folder';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
-import { brainAgentNames, hasSubAgents } from '../domain/you';
+import { brainAgentNames } from '../domain/you';
+import {
+  definitionModel,
+  foreignDefinitions,
+  pruneCodexRoles,
+  readAgentDefinitions,
+  removeCodexRoles,
+  vaultAgentDefinition,
+  vaultAgentName,
+  writeCodexRoles,
+  type AgentDefinition,
+} from './agent-definitions';
 import { categoryName } from '../domain/brains';
 import { knowledgeFolder, shownFolder } from '../domain/layers';
 import {
-  brainOfAgent,
   brainOfPath,
   editedPath,
   vaultOf,
@@ -189,11 +193,19 @@ type Run = {
   commands?: () => void;
   /** For Claude Code: the folder of links to the skills it does not find itself (ADR 049). */
   claudeSkills?: string;
+  /** The folder's sub-agents this CLI does not load itself, and those it must not use (ADR 050). */
+  subAgents?: { foreign: AgentDefinition[]; refused: string[] };
+  /** For your AI: its hand-offs' requests still waiting, as its views show them (ADR 050). */
+  forwarded?: Map<string, AgentEvent>;
+  /** For Codex: the configuration that adds `subAgents.foreign` as its roles. */
+  codexRoles?: Record<string, string>;
   closed: Promise<void>;
   close: () => void;
 };
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
+/** How long Claude Code lets the irori agent's shell commands run: a hand-off takes as long as it takes. */
+const handOffShellTimeout = String(24 * 60 * 60 * 1000);
 const digest = (words: string) => createHash('sha256').update(words).digest('hex');
 /** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
 const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
@@ -300,6 +312,7 @@ export class AgentService {
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
     void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
+    void pruneCodexRoles(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, this.device, () => {
       for (const run of [...this.runs.values()]) {
@@ -432,9 +445,14 @@ export class AgentService {
     const value = await this.conversations.read(id);
     if (value.meta.owner.id !== scopeId) throw Error(notYours());
     const native = await this.conversations.native(id).catch(() => undefined);
-    const requests = [...this.requests.values()]
-      .filter(({ run }) => run.conversationId === id && run.id === value.activeRunId)
-      .map(({ event }) => event);
+    const active = value.activeRunId ? this.runs.get(value.activeRunId) : undefined;
+    const requests = [
+      ...[...this.requests.values()]
+        .filter(({ run }) => run.conversationId === id && run.id === value.activeRunId)
+        .map(({ event }) => event),
+      // A hand-off's requests show with the irori agent's run that handed it.
+      ...(active?.conversationId === id ? (active.forwarded?.values() ?? []) : []),
+    ];
     return {
       id,
       summary: this.conversations.summary(value.meta),
@@ -901,6 +919,53 @@ export class AgentService {
       );
     }
   }
+  /**
+   * The folder's sub-agent definitions in every format, so that they work on
+   * whichever CLI runs there (ADR 050). The CLI loads its own format itself;
+   * the others irori gives it: Claude Code as the SDK's agents, Codex as roles in
+   * its configuration, OpenCode as agents in its configuration content. A
+   * vault's definition of its own agent is not one of its sub-agents, and the
+   * `vault-` definitions earlier irori versions wrote into the irori agent's
+   * folder are not used: the irori agent hands a vault's work with `irori call`.
+   */
+  private async prepareSubAgents(run: Run, agent: AgentId, you: boolean, root: string) {
+    const { definitions, problems } = await readAgentDefinitions(root);
+    if (problems.length)
+      this.event(
+        run,
+        'status',
+        t(
+          `読めない sub-agent 定義があります: ${problems.map((item) => `${item.file}（${item.message}）`).join('、')}`,
+          `Some sub-agent definitions could not be read: ${problems.map((item) => `${item.file} (${item.message})`).join(', ')}`,
+        ),
+      );
+    const refused = (name: string) => (you ? name.startsWith('vault-') : name === vaultAgentName);
+    const foreign = foreignDefinitions(definitions, agent, refused);
+    const own = definitions.filter((item) => item.format === agent && refused(item.name));
+    run.subAgents = { foreign, refused: [...new Set(own.map((item) => item.name))] };
+    if (!foreign.length) return;
+    if (agent === 'codex')
+      run.codexRoles = await writeCodexRoles(this.files.dataDir, run.id, foreign);
+    if (agent === 'opencode') {
+      const env = run.env ?? agentEnv();
+      const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
+      run.env = {
+        ...env,
+        OPENCODE_CONFIG_CONTENT: JSON.stringify({
+          ...content,
+          agent: {
+            ...Object.fromEntries(
+              foreign.map((item) => [
+                item.name,
+                { description: item.description, prompt: item.instructions, mode: 'subagent' },
+              ]),
+            ),
+            ...content.agent,
+          },
+        }),
+      };
+    }
+  }
   private async execute(run: Run, input: StartRun) {
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
@@ -939,10 +1004,9 @@ export class AgentService {
           }
         : this.files.get(input.scopeId);
       const promptParts: string[] = [];
-      // Every CLI the irori agent runs on gets the `irori` command for setup work.
-      // Pi and Hermes Agent load no sub-agents from files, so on them it also
-      // hands a vault's work to its vault agent with `irori call`.
-      const calls = you && !!input.brains?.length && !hasSubAgents(input.agent);
+      // Every CLI the irori agent runs on gets the `irori` command for setup work,
+      // and hands a vault's work to its vault agent with `irori call` (ADR 050).
+      const calls = you && !!input.brains?.length;
       if (you && (this.setup || calls)) {
         const setup = this.setup;
         const commands = await iroriBridge(
@@ -962,6 +1026,14 @@ export class AgentService {
         );
         run.env = commands.env;
         run.commands = commands.close;
+        // A vault agent's hand-off can take longer than the two minutes Claude
+        // Code gives a shell command by default, and than its ten-minute ceiling.
+        if (calls && input.agent === 'claude')
+          run.env = {
+            ...run.env,
+            BASH_DEFAULT_TIMEOUT_MS: handOffShellTimeout,
+            BASH_MAX_TIMEOUT_MS: handOffShellTimeout,
+          };
       } else if (this.setup) {
         // A vault agent's command reaches its own vault alone (ADR 031).
         const setup = this.setup;
@@ -982,7 +1054,13 @@ export class AgentService {
         const brains = await Promise.all(
           input.brains.map(async (scopeId) => {
             const brain = this.files.get(scopeId);
+            // The vault's own definition of its agent tells the irori agent what it is for.
+            const own = vaultAgentDefinition(
+              (await readAgentDefinitions(brain.root)).definitions,
+              input.agent,
+            );
             return {
+              ...(own && { description: own.description }),
               scopeId: brain.scopeId,
               name: brain.name,
               category: brain.category && categoryName(brain.category),
@@ -1007,22 +1085,7 @@ export class AgentService {
           ),
         );
         run.delegation = { you: space.root, brains };
-        const cli = input.agent;
-        if (hasSubAgents(cli)) {
-          // Each vault's sub-agent is defined by irori, only where no file is:
-          // the person may have edited one.
-          const written = await this.you!.writeDefinitions(cli, brains, input.workspace);
-          if (written.length)
-            this.event(
-              run,
-              'status',
-              t(
-                `vault agent の定義を書きました: ${written.join(', ')}`,
-                `Wrote the vault agent definitions: ${written.join(', ')}`,
-              ),
-            );
-          promptParts.push(brainsPreamble(brains, cli, comments));
-        } else promptParts.push(brainsCommandPreamble(brains, agentNames[cli], comments));
+        promptParts.push(brainsCommandPreamble(brains, comments));
       }
       // What irori is, how the vault is laid out and the `irori` command: whole on
       // a session's first request or after a change, otherwise one line (ADR 039).
@@ -1170,8 +1233,9 @@ export class AgentService {
         return undefined;
       });
       if (input.agent === 'claude') await this.linkSkills(run, input, you, space.root, shared);
+      await this.prepareSubAgents(run, input.agent, you, space.root);
       if (shared && !command) {
-        const words = sharedSchema(shared, !!run.delegation && hasSubAgents(input.agent));
+        const words = sharedSchema(shared);
         run.shared = digest(words);
         prompt = `${saved && heard === run.shared ? sharedSchemaPointer(shared) : words}\n\n${prompt}`;
       }
@@ -1280,6 +1344,7 @@ export class AgentService {
       run.bridge?.();
       run.commands?.();
       if (run.claudeSkills) await unlinkClaudeSkills(this.files.dataDir, run.id).catch(() => {});
+      if (run.codexRoles) await removeCodexRoles(this.files.dataDir, run.id).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       // Words the CLI wrote while being stopped arrived after the flush above; with
       // the process gone and its stream closed, these are the last.
@@ -1380,14 +1445,22 @@ export class AgentService {
     const done = new Promise<AgentEvent['outcome']>((resolve) => {
       finished = resolve;
     });
+    // The vault's own definition of its agent goes with the task; its model is
+    // used when it is in this CLI's terms (ADR 050).
+    const own = vaultAgentDefinition(
+      (await readAgentDefinitions(brain.root)).definitions,
+      input.agent,
+    );
+    const model = definitionModel(own, input.agent) ?? input.model;
     const runId = this.start(
       {
         scopeId: brain.scopeId,
         agent: input.agent,
-        model: input.model,
+        ...(model && { model }),
         effort: input.effort,
-        access: defaultAgentAccess(input.agent),
-        prompt: handedTask(task),
+        // As the irori agent's run is: a hand-off asks the person when it asks.
+        access: holder.access,
+        prompt: handedTask(task, own),
       },
       undefined,
       holder.id,
@@ -1405,7 +1478,22 @@ export class AgentService {
           result: event.result,
           ...delegate('working'),
         });
-      else if (event.type === 'done') finished(event.outcome);
+      // The vault agent's requests are answered where the irori agent's are; the
+      // answer reaches the vault agent's run by the request's id.
+      else if (event.type === 'permission' || event.type === 'question')
+        (holder.forwarded ??= new Map()).set(
+          event.requestId!,
+          this.publish(holder, event.type, event.text, {
+            requestId: event.requestId,
+            details: event.details,
+            questions: event.questions,
+            ...delegate('working'),
+          }),
+        );
+      else if (event.type === 'status' && event.resolved) {
+        holder.forwarded?.delete(event.resolved);
+        this.publish(holder, 'status', '', { resolved: event.resolved });
+      } else if (event.type === 'done') finished(event.outcome);
     });
     const label = task.trim().split('\n')[0].slice(0, 120);
     this.event(holder, 'status', label, delegate('started'));
@@ -1512,15 +1600,21 @@ export class AgentService {
     run.rpc = rpc;
     await initializeCodex(rpc);
     const folders = [...this.localFolders(run), ...(run.work ?? [])];
+    const writable = run.access !== 'full-access' && folders.length > 0;
     const params = {
       cwd,
       approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
       approvalsReviewer: 'user',
       sandbox: run.access === 'full-access' ? 'danger-full-access' : 'workspace-write',
-      // A local folder in contents is reached through a link, outside the working
-      // directory the sandbox lets the agent change.
-      ...(run.access !== 'full-access' &&
-        folders.length && { config: { 'sandbox_workspace_write.writable_roots': folders } }),
+      ...((writable || run.codexRoles) && {
+        config: {
+          // A local folder in contents is reached through a link, outside the working
+          // directory the sandbox lets the agent change.
+          ...(writable && { 'sandbox_workspace_write.writable_roots': folders }),
+          // The folder's sub-agents in other formats, as Codex roles (ADR 050).
+          ...run.codexRoles,
+        },
+      }),
       ...(model && { model }),
     };
     const thread = await rpc.request(
@@ -1715,38 +1809,11 @@ export class AgentService {
     let sawResult = false;
     let streamed = false;
     const delegation = run.delegation;
-    // Hand-offs by the delegation's tool call, and each sub-agent's id by the
-    // hand-off it runs: every step and request of a sub-agent names its brain.
-    const tasks = new Map<string, string>();
-    const agentTasks = new Map<string, string>();
     // Each tool call's name by its id, for its result.
     const tools = new Map<string, string>();
-    const agentTypes = new Map<string, string>();
-    const delegate = (task: string | undefined, state: Delegate['state']) => {
-      const scopeId = task ? tasks.get(task) : undefined;
-      return scopeId && task ? { delegate: { scopeId, task, state } } : {};
-    };
-    // A sub-agent can ask before the message tying it to its hand-off has been
-    // read from the stream, so the question waits a moment for that tie.
-    const taskWaiters = new Map<string, (task?: string) => void>();
-    const delegateOfAgent = async (agentId?: string) => {
-      if (!agentId || !delegation) return {};
-      const task =
-        agentTasks.get(agentId) ??
-        (await new Promise<string | undefined>((resolve) => {
-          const timer = setTimeout(() => resolve(agentTasks.get(agentId)), 3000);
-          taskWaiters.set(agentId, (task) => {
-            clearTimeout(timer);
-            resolve(task);
-          });
-        }));
-      taskWaiters.delete(agentId);
-      if (task && tasks.has(task)) return delegate(task, 'working');
-      const brain = brainOfAgent(delegation, agentTypes.get(agentId));
-      return brain
-        ? { delegate: { scopeId: brain.scopeId, task: task ?? agentId, state: 'working' as const } }
-        : {};
-    };
+    // The folder's sub-agents in other formats, and those it must not use (ADR 050).
+    const subAgents = run.subAgents?.foreign ?? [];
+    const refused = run.subAgents?.refused ?? [];
     // Attached images go as pictures beside the words; without any, the words alone.
     const images = await Promise.all(
       (run.attached ?? [])
@@ -1800,6 +1867,15 @@ export class AgentService {
         resume: session,
         ...(model && { model }),
         ...(effort && { effort: effort as EffortLevel }),
+        ...(subAgents.length && {
+          agents: Object.fromEntries(
+            subAgents.map((item) => [
+              item.name,
+              { description: item.description, prompt: item.instructions },
+            ]),
+          ),
+        }),
+        ...(refused.length && { disallowedTools: refused.map((name) => `Agent(${name})`) }),
         ...((delegation ||
           run.step ||
           this.localFolders(run).length ||
@@ -1826,13 +1902,9 @@ export class AgentService {
                 async (input) => {
                   if (input.hook_event_name !== 'PreToolUse') return {};
                   // Your AI writes in its own folder; a brain's files change only
-                  // through that brain's sub-agent.
+                  // through that brain's vault agent, with `irori call`.
                   if (delegation) {
-                    const decision = writeDecision(
-                      delegation,
-                      input.agent_type,
-                      toolFile(input.tool_input) ?? '',
-                    );
+                    const decision = writeDecision(delegation, toolFile(input.tool_input) ?? '');
                     if (!decision.allow)
                       return {
                         hookSpecificOutput: {
@@ -1842,12 +1914,10 @@ export class AgentService {
                         },
                       };
                   }
-                  const file = toolFile(input.tool_input);
-                  const brain = delegation && file ? brainOfPath(delegation, file) : undefined;
                   const context = await personLinesNotice(
                     this.files,
                     this.authorship,
-                    brain?.scopeId ?? run.binding.scopeId,
+                    run.binding.scopeId,
                     input.tool_name,
                     input.tool_input,
                   ).catch(() => undefined);
@@ -1862,41 +1932,6 @@ export class AgentService {
                 },
               ],
             },
-            ...(delegation
-              ? [
-                  {
-                    // A sub-agent in the background cannot ask the person, so
-                    // its edits would be refused: hand-offs run in the foreground.
-                    matcher: 'Agent|Task',
-                    hooks: [
-                      async (input: HookInput) => {
-                        if (input.hook_event_name !== 'PreToolUse') return {};
-                        const agentInput = input.tool_input as { run_in_background?: boolean };
-                        return agentInput?.run_in_background
-                          ? {
-                              hookSpecificOutput: {
-                                hookEventName: 'PreToolUse' as const,
-                                permissionDecision: 'allow' as const,
-                                updatedInput: { ...agentInput, run_in_background: false },
-                              },
-                            }
-                          : {};
-                      },
-                    ],
-                  },
-                ]
-              : []),
-          ],
-          SubagentStart: [
-            {
-              hooks: [
-                async (input) => {
-                  if (input.hook_event_name === 'SubagentStart')
-                    agentTypes.set(input.agent_id, input.agent_type);
-                  return {};
-                },
-              ],
-            },
           ],
         },
         abortController: run.abort,
@@ -1907,7 +1942,6 @@ export class AgentService {
           return child as ChildProcessWithoutNullStreams;
         },
         canUseTool: async (tool, input, options) => {
-          const attributed = await delegateOfAgent(options.agentID);
           if (tool === 'AskUserQuestion') {
             // Claude Code always lets the person answer in words of their own.
             const questions: Question[] = (input.questions as any[]).map((q) => ({
@@ -1923,7 +1957,6 @@ export class AgentService {
               t('Claude Code からの質問', 'Question from Claude Code'),
               input,
               questions,
-              attributed,
             );
             return reply.allow
               ? {
@@ -1940,13 +1973,7 @@ export class AgentService {
                 }
               : { behavior: 'deny', message: questionDeclined };
           }
-          const reply = await this.ask(
-            run,
-            t(`${tool} の許可`, `Allow ${tool}`),
-            input,
-            undefined,
-            attributed,
-          );
+          const reply = await this.ask(run, t(`${tool} の許可`, `Allow ${tool}`), input);
           return reply.allow
             ? { behavior: 'allow', updatedInput: input }
             : { behavior: 'deny', message: permissionDenied };
@@ -1969,58 +1996,26 @@ export class AgentService {
             this.event(run, 'text', event.delta.text);
           }
         }
-        if (msg.type === 'system' && msg.subtype === 'task_started' && msg.tool_use_id) {
-          agentTasks.set(msg.task_id, msg.tool_use_id);
-          taskWaiters.get(msg.task_id)?.(msg.tool_use_id);
-        }
-        if (
-          msg.type === 'system' &&
-          msg.subtype === 'task_notification' &&
-          msg.tool_use_id &&
-          tasks.has(msg.tool_use_id)
-        )
-          this.event(
-            run,
-            'status',
-            msg.summary || noReport(),
-            delegate(msg.tool_use_id, msg.status === 'completed' ? 'reported' : 'failed'),
-          );
         if (msg.type === 'assistant')
           for (const block of msg.message.content) {
             if (block.type === 'text' && !streamed && main) this.event(run, 'text', block.text);
             if (block.type !== 'tool_use') continue;
             tools.set(block.id, block.name);
-            const input = block.input as { subagent_type?: string; description?: string };
-            const brain =
-              main && /^(Agent|Task)$/.test(block.name) && delegation
-                ? brainOfAgent(delegation, input.subagent_type)
-                : undefined;
-            if (brain) {
-              tasks.set(block.id, brain.scopeId);
-              this.event(
-                run,
-                'status',
-                input.description || brain.name,
-                delegate(block.id, 'started'),
-              );
-            } else
-              this.event(run, 'tool', block.name, {
-                details: JSON.stringify(block.input),
-                call: block.id,
-                ...(main ? {} : delegate(msg.parent_tool_use_id ?? undefined, 'working')),
-              });
+            this.event(run, 'tool', block.name, {
+              details: JSON.stringify(block.input),
+              call: block.id,
+            });
           }
         // Each tool's result comes back in the next user message; a hand-off's is its report.
         if (msg.type === 'user' && !('isReplay' in msg) && Array.isArray(msg.message.content))
           for (const block of msg.message.content) {
-            if (block.type !== 'tool_result' || tasks.has(block.tool_use_id)) continue;
+            if (block.type !== 'tool_result') continue;
             const name = tools.get(block.tool_use_id) ?? 'Tool';
             this.event(run, 'tool', t(`${name} の結果`, `${name} result`), {
               details:
                 typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
               call: block.tool_use_id,
               result: true,
-              ...(main ? {} : delegate(msg.parent_tool_use_id ?? undefined, 'working')),
             });
           }
         if (msg.type === 'result') {

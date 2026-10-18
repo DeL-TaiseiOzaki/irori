@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.2.33",
+  "version": "0.2.34",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -67,6 +67,7 @@
     "react-markdown": "10.1.0",
     "react-resizable-panels": "4.12.4",
     "remark-gfm": "4.0.1",
+    "smol-toml": "1.9.0",
     "tree-kill": "1.2.2",
     "which": "5.0.0",
     "write-file-atomic": "8.0.0",
