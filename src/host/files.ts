@@ -155,6 +155,24 @@ const unwatchedNames = new Set([
 /** Files that only keep a folder or its look, which go with a knowledge folder emptied into the root. */
 const placeholders = ['.DS_Store', '.gitkeep'];
 
+/**
+ * The vault's own `.git` entries that a commit, a checkout or a staging made
+ * elsewhere rewrites, so the changes shown follow them (#268). The rest of the
+ * repository's metadata, its objects above all, stays unwatched. irori's own
+ * status reads take no optional locks and so never write these.
+ */
+const gitState = [
+  '.git',
+  '.git/index',
+  '.git/HEAD',
+  '.git/packed-refs',
+  '.git/refs',
+  '.git/refs/heads',
+];
+function watchedGitEntry(relative: string) {
+  return gitState.includes(relative) || relative.startsWith('.git/refs/heads/');
+}
+
 /** One registration's watcher boundaries, computed outside chokidar's path callback. */
 export function watcherIgnored(space: Space, spaces: Space[]) {
   const excluded = [
@@ -166,6 +184,7 @@ export function watcherIgnored(space: Space, spaces: Space[]) {
   const knowledge = knowledgeFolder(space);
   return (filename: string) => {
     const relative = path.relative(space.root, filename).replaceAll('\\', '/');
+    if (relative === '.git' || relative.startsWith('.git/')) return !watchedGitEntry(relative);
     return (
       relative
         .split('/')

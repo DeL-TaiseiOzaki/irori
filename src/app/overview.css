@@ -716,6 +716,14 @@ button.column-row:hover {
   font-size: 13px;
   line-height: 1.7;
 }
+.your-ai-setup .your-ai-setup-error {
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--del-wash);
+  color: var(--del-ink);
+  overflow-wrap: anywhere;
+}
 .your-ai-path {
   max-width: 100%;
   overflow: hidden;

@@ -1759,16 +1759,23 @@ function App() {
   async function carryToVault(move: { from: Space; entry: Entry; to: Space; directory: string }) {
     setVaultMove(undefined);
     try {
-      const moved = await organize(() =>
-        host.moveToVault(move.from.scopeId, move.entry.path, move.to.scopeId, move.directory),
-      );
-      await entryChanged({
-        scopeId: move.from.scopeId,
-        toScopeId: move.to.scopeId,
-        action: 'move',
-        from: move.entry.path,
-        to: moved.entry.path,
-        notice: moved.notice,
+      // The open note follows inside the operation, as in a move within a vault:
+      // the check that ends it would otherwise read the note where it no longer is.
+      await organize(async () => {
+        const moved = await host.moveToVault(
+          move.from.scopeId,
+          move.entry.path,
+          move.to.scopeId,
+          move.directory,
+        );
+        await entryChanged({
+          scopeId: move.from.scopeId,
+          toScopeId: move.to.scopeId,
+          action: 'move',
+          from: move.entry.path,
+          to: moved.entry.path,
+          notice: moved.notice,
+        });
       });
     } catch (error) {
       report(error);
@@ -2635,6 +2642,10 @@ function App() {
         {leavingDialog}
       </div>
     );
+  // The stage's banners sit under its crumb bar, which these views and the levels without
+  // the stage leave out of sight.
+  const stageTop = !(gitReview || view === 'graph' || view === 'records' || view === 'schema');
+  const errorOnStage = level === 'brain' && !stageHidden && stageTop;
   return (
     <div
       className={`app ${panel ? 'panel-open' : ''} ${gitOpen ? 'source-control-open' : ''} ${terminalSpace || iroriTerminal ? 'terminal-open' : ''}`}
@@ -2845,10 +2856,7 @@ function App() {
             onResize={(size) => setStageHidden(size.inPixels < 1)}
           >
             <main id="editor-main" className="stage on-stage" tabIndex={-1} inert={stageHidden}>
-              <div
-                className="stage-top"
-                hidden={gitReview || view === 'graph' || view === 'records' || view === 'schema'}
-              >
+              <div className="stage-top" hidden={!stageTop}>
                 <header className="stage-bar">
                   {onNote && doc && docLayer ? (
                     <Crumbs
@@ -3090,7 +3098,7 @@ function App() {
                     {status}
                   </p>
                 )}
-                {error && (
+                {error && errorOnStage && (
                   <div className="error" role="alert">
                     {error}
                     <button onClick={() => setError('')}>{t('閉じる', 'Close')}</button>
@@ -3470,6 +3478,13 @@ function App() {
             </>
           )}
         </PaneGroup>
+        {/* With the stage's top out of sight, its banner shows over the window instead. */}
+        {error && !errorOnStage && (
+          <div className="error window-error" role="alert">
+            {error}
+            <button onClick={() => setError('')}>{t('閉じる', 'Close')}</button>
+          </div>
+        )}
         {iroriTerminal && you && (
           <TerminalDrawer hidden={!iroriShown}>
             <Suspense
