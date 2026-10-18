@@ -12,6 +12,10 @@ export const environmentRepository = 'irori-settings';
 export const environmentFile = 'environment.json';
 /** The irori agent's routine folders, beside the environment. */
 export const routinesFile = 'routines.json';
+/** The routine secrets, sealed with the person's passphrase (ADR 047). */
+export const keysFile = 'routine-keys.json';
+/** The passphrase that seals the saved secrets; GitHub never sees it. */
+export const passphraseLength = { min: 12, max: 1024 };
 
 /** The preferences that follow the person from device to device. */
 export const environmentPreferences = [
@@ -60,6 +64,10 @@ export interface EnvironmentState {
     routines: number;
     /** The names of routines left out because they do not fit. */
     routinesLeft: string[];
+    /** The names of this device's secrets, saved only with a passphrase. */
+    secrets: string[];
+    /** Whether this device can keep secrets (ADR 016 D5). */
+    secretsAvailable: boolean;
   };
   /** The environment saved on the account, absent before the first save. */
   saved?: {
@@ -68,6 +76,8 @@ export interface EnvironmentState {
     workspaces: string[];
     agent?: { repository: string; here: boolean };
     routines: EnvironmentRoutine[];
+    /** The saved secrets' names, absent when none were saved. */
+    secrets?: { name: string; here: boolean }[];
   };
   /** Where restored vaults are cloned unless another folder is chosen. */
   parent: string;
@@ -80,6 +90,10 @@ export interface RestoreEnvironment {
   agent: boolean;
   /** The folders of the saved routines to add here; ones this device has are skipped. */
   routines?: string[];
+  /** The names of the saved secrets to add here; ones this device has are skipped. */
+  secrets?: string[];
+  /** The passphrase the secrets were saved with. */
+  passphrase?: string;
   /** The parent folder for the clones; the default when absent. */
   parent?: string;
 }
@@ -92,5 +106,7 @@ export interface EnvironmentRestore {
   workspaces: number;
   /** The names of the routines added to the irori agent's folder. */
   routines: string[];
+  /** The names of the secrets added to this device. */
+  secrets: string[];
   agent: 'restored' | 'unchanged' | 'failed';
 }

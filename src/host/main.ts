@@ -400,6 +400,7 @@ app
       github,
       git,
       settings: { read: () => settings.read(), save: (patch) => saveSettings(patch) },
+      secrets,
       agentRoot: async () => (await you.load()).root,
       register: registerWatched,
       defaultParent,
@@ -776,7 +777,7 @@ app
       gitInit: (id) => changed(id, () => git.init(id)),
       githubAccount: () => git.githubAccount(),
       environment: () => environment.state(),
-      saveEnvironment: () => environment.save(),
+      saveEnvironment: (passphrase) => environment.save(passphrase),
       restoreEnvironment: async (input) => {
         whenIdle(
           t(

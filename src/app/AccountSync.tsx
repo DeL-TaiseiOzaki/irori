@@ -6,13 +6,34 @@ import { useAction } from './useAction';
 import { Icon } from './Icon';
 import { reloadDeviceSettings } from './device-settings';
 import { displayLocale, t } from '../domain/i18n';
-import type { EnvironmentRestore, EnvironmentState } from '../domain/environment';
+import { unavailableText } from '../domain/routines';
+import {
+  passphraseLength,
+  type EnvironmentRestore,
+  type EnvironmentState,
+} from '../domain/environment';
 import './account.css';
 
 const host = window.irori;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(displayLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** What a restore added, secrets named only when there were some. */
+function tookIn({ restored, workspaces, routines, secrets }: EnvironmentRestore) {
+  const ja = [`vault ${restored.length} 件`, `ワークスペース ${workspaces} 件`];
+  const en = [count(restored.length, 'vault'), count(workspaces, 'workspace')];
+  ja.push(`ルーティン ${routines.length} 件`);
+  en.push(count(routines.length, 'routine'));
+  if (secrets.length) {
+    ja.push(`シークレット ${secrets.length} 件`);
+    en.push(count(secrets.length, 'secret'));
+  }
+  const last = en.pop();
+  return t(`${ja.join('・')}を取り込みました。`, `Took in ${en.join(', ')} and ${last}.`);
+}
 
 /** The environment on the GitHub account, read once and again on request. */
 function useEnvironment() {
@@ -34,13 +55,20 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
   const { state, setState, error, load } = useEnvironment();
   const { busy, error: issue, run } = useAction();
   const [saved, setSaved] = useState(false);
+  const [passphrase, setPassphrase] = useState('');
   async function save() {
     await run(async () => {
       setSaved(false);
-      setState(await host.saveEnvironment());
+      setState(await host.saveEnvironment(passphrase || undefined));
+      setPassphrase('');
       setSaved(true);
     });
   }
+  const keys = state?.local.secretsAvailable ? state.local.secrets : [];
+  const shortPassphrase = !!passphrase && passphrase.length < passphraseLength.min;
+  const droppedKeys = passphrase
+    ? (state?.saved?.secrets?.filter((item) => !item.here).length ?? 0)
+    : 0;
   const dropped = state?.saved?.vaults.filter((item) => !item.here).length ?? 0;
   const droppedRoutines = state?.saved?.routines.filter((item) => !item.here).length ?? 0;
   const left = state?.local.routinesLeft ?? [];
@@ -82,8 +110,38 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
               )}
             </p>
           )}
+          {keys.length > 0 && (
+            <label className="account-passphrase">
+              <span>
+                {t(
+                  `シークレット ${keys.length} 件も保存する合言葉`,
+                  `Passphrase to save ${keys.length} secret${keys.length === 1 ? '' : 's'} too`,
+                )}
+              </span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={passphrase}
+                disabled={busy}
+                maxLength={passphraseLength.max}
+                placeholder={t(
+                  `${passphraseLength.min} 文字以上`,
+                  `${passphraseLength.min}+ characters`,
+                )}
+                onChange={(e) => setPassphrase(e.target.value)}
+              />
+            </label>
+          )}
+          {droppedKeys > 0 && (
+            <p className="account-hint">
+              {t(
+                `この端末にないシークレット ${droppedKeys} 件は、保存すると外れます。`,
+                `Saving drops ${droppedKeys} secret${droppedKeys === 1 ? '' : 's'} not on this device.`,
+              )}
+            </p>
+          )}
           <div className="account-actions">
-            <button type="button" disabled={busy} onClick={() => void save()}>
+            <button type="button" disabled={busy || shortPassphrase} onClick={() => void save()}>
               <Icon name="cloudUp" size={14} />
               {t('環境を保存', 'Save environment')}
             </button>
@@ -129,6 +187,8 @@ export function RestoreEnvironment({
   const [selected, setSelected] = useState<string[]>(),
     [agent, setAgent] = useState(true),
     [routines, setRoutines] = useState<string[]>(),
+    [keys, setKeys] = useState<string[]>(),
+    [passphrase, setPassphrase] = useState(''),
     [parent, setParent] = useState<string>(),
     [result, setResult] = useState<EnvironmentRestore>();
   const { busy, error: issue, run } = useAction();
@@ -139,6 +199,11 @@ export function RestoreEnvironment({
   const agentMissing = !!saved?.agent && !saved.agent.here;
   const chosenRoutines =
     routines ?? saved?.routines.filter((item) => !item.here).map((item) => item.folder) ?? [];
+  const keysAvailable = !!state?.local.secretsAvailable;
+  const chosenKeys = keysAvailable
+    ? (keys ?? saved?.secrets?.filter((item) => !item.here).map((item) => item.name) ?? [])
+    : [];
+  const needsPassphrase = chosenKeys.length > 0;
   async function chooseParent() {
     const folder = await host.chooseFolder();
     if (folder) setParent(folder);
@@ -149,6 +214,7 @@ export function RestoreEnvironment({
         scopeIds: chosen,
         agent: agentMissing && agent,
         routines: chosenRoutines,
+        ...(needsPassphrase && { secrets: chosenKeys, passphrase }),
         ...(parent && { parent }),
       });
       await reloadDeviceSettings();
@@ -171,12 +237,7 @@ export function RestoreEnvironment({
         <h2>{label}</h2>
         {result ? (
           <div className="restore-result">
-            <p role="status">
-              {t(
-                `vault ${result.restored.length} 件・ワークスペース ${result.workspaces} 件・ルーティン ${result.routines.length} 件を取り込みました。`,
-                `Took in ${result.restored.length} vault${result.restored.length === 1 ? '' : 's'}, ${result.workspaces} workspace${result.workspaces === 1 ? '' : 's'} and ${result.routines.length} routine${result.routines.length === 1 ? '' : 's'}.`,
-              )}
-            </p>
+            <p role="status">{tookIn(result)}</p>
             {result.failed.map((item) => (
               <ErrorMessage key={item.name} text={`${item.name}: ${item.message}`} />
             ))}
@@ -257,6 +318,46 @@ export function RestoreEnvironment({
                 ))}
               </fieldset>
             )}
+            {!!saved.secrets?.length && (
+              <fieldset className="restore-list">
+                <legend>{t('シークレット', 'Secrets')}</legend>
+                {saved.secrets.map((item) => (
+                  <label key={item.name} data-here={item.here || undefined}>
+                    <input
+                      type="checkbox"
+                      disabled={busy || item.here || !keysAvailable}
+                      checked={item.here || chosenKeys.includes(item.name)}
+                      onChange={(e) =>
+                        setKeys(
+                          e.target.checked
+                            ? [...chosenKeys, item.name]
+                            : chosenKeys.filter((name) => name !== item.name),
+                        )
+                      }
+                    />
+                    <span>{item.name}</span>
+                    {item.here && <small>{t('この端末にあります', 'On this device')}</small>}
+                  </label>
+                ))}
+                {keysAvailable ? (
+                  needsPassphrase && (
+                    <label className="restore-passphrase">
+                      <span>{t('合言葉', 'Passphrase')}</span>
+                      <input
+                        type="password"
+                        autoComplete="current-password"
+                        value={passphrase}
+                        disabled={busy}
+                        maxLength={passphraseLength.max}
+                        onChange={(e) => setPassphrase(e.target.value)}
+                      />
+                    </label>
+                  )
+                ) : (
+                  <small className="restore-unavailable">{unavailableText()}</small>
+                )}
+              </fieldset>
+            )}
             {saved.workspaces.length > 0 && (
               <p className="restore-workspaces">
                 {t('ワークスペース', 'Workspaces')}: {saved.workspaces.join(t('・', ', '))}
@@ -290,7 +391,12 @@ export function RestoreEnvironment({
               <button type="button" disabled={busy} onClick={onClose}>
                 {t('キャンセル', 'Cancel')}
               </button>
-              <ArrowFillButton type="submit" disabled={busy || !saved}>
+              <ArrowFillButton
+                type="submit"
+                disabled={
+                  busy || !saved || (needsPassphrase && passphrase.length < passphraseLength.min)
+                }
+              >
                 {t('復元', 'Restore')}
               </ArrowFillButton>
             </>

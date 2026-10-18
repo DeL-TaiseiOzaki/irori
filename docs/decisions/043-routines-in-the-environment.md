@@ -38,7 +38,9 @@ device.
    (no `AGENTS.md`), nothing is written, since files there would keep it from
    being set up; the routine is reported as failed.
 5. **Secrets and reviews stay on the device.** Secrets never go to GitHub
-   (ADR 026); a restored routine names a missing secret as before. A restored
+   (ADR 026); a restored routine names a missing secret as before.
+   *Revised by [ADR 047](047-routine-secrets-in-the-environment.md) (0.2.25):
+   secrets travel when sealed with a passphrase the person enters.* A restored
    routine is unreviewed on the new device and runs only after
    **ルーティンの確認** there (ADR 016 D4).
 
