@@ -35,7 +35,7 @@ import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
-import { ModelPicker } from './ModelPicker';
+import { EffortPicker, ModelPicker } from './ModelPicker';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
@@ -118,6 +118,7 @@ export function AgentColumn({
   tabs,
   agent,
   model,
+  effort,
   access,
   skills,
   skillsRetired,
@@ -131,6 +132,7 @@ export function AgentColumn({
   seed,
   onShowSchema,
   onModel,
+  onEffort,
   onAccess,
   onAgent,
   onPick,
@@ -164,6 +166,8 @@ export function AgentColumn({
   tabs: Tab[];
   agent: AgentId;
   model?: string;
+  /** How much the CLI thinks; its own default when absent. */
+  effort?: string;
   access: AgentAccess;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
@@ -184,6 +188,7 @@ export function AgentColumn({
   /** Opens the irori agent's screen from its mark. */
   onShowSchema?: () => void;
   onModel: (model: string) => void;
+  onEffort: (effort: string) => void;
   onAccess: (access: AgentAccess) => void;
   /** Another CLI is another conversation; `replace` lets an empty one on show give way. */
   onAgent: (agent: AgentId, replace: boolean) => void;
@@ -478,6 +483,7 @@ export function AgentColumn({
       conversationId: target?.id,
       access,
       model,
+      effort,
       prompt: message,
       ...(attachments.refs.length && { attachments: attachments.refs }),
     };
@@ -1194,6 +1200,13 @@ export function AgentColumn({
                 value={model ?? ''}
                 disabled={sending || gitBusy}
                 onChange={onModel}
+              />
+              <EffortPicker
+                agent={agent}
+                model={model ?? ''}
+                value={effort ?? ''}
+                disabled={sending || gitBusy}
+                onChange={onEffort}
               />
               {personLinesOffered && (
                 <label className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}>

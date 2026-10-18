@@ -16,7 +16,12 @@ import type {
   QuestionOption,
   StartRun,
 } from '../domain/types';
-import type { HookInput, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  EffortLevel,
+  HookInput,
+  SDKUserMessage,
+  Settings,
+} from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
 import {
@@ -898,7 +903,7 @@ export class AgentService {
                 ? Promise.reject(Error('Only "irori call" is available here.'))
                 : setup(argv, cwd, {
                     workspaceId: input.workspace,
-                    agent: { agent: input.agent, model: input.model },
+                    agent: { agent: input.agent, model: input.model, effort: input.effort },
                     inRoutine: !!run.step,
                     by: `${agentNames[input.agent]} (irori agent)`,
                   }),
@@ -1139,9 +1144,13 @@ export class AgentService {
       );
       if (input.model)
         this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
-      if (input.agent === 'codex') await this.codex(run, space.root, prompt, saved, input.model);
+      // Hermes Agent takes no level; one sent anyway is not passed on.
+      const effort = input.agent === 'hermes' ? undefined : input.effort;
+      if (effort) this.event(run, 'status', t(`思考量: ${effort}`, `Effort: ${effort}`));
+      if (input.agent === 'codex')
+        await this.codex(run, space.root, prompt, saved, input.model, effort);
       else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, saved, input.model);
+        await this.claude(run, space.root, prompt, saved, input.model, effort);
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
@@ -1179,6 +1188,7 @@ export class AgentService {
           session: saved,
           access: run.access,
           model: input.model,
+          effort,
           attached: run.attached,
           env: runEnv(run, bridge?.env ?? run.env),
           args: bridge?.args,
@@ -1342,6 +1352,7 @@ export class AgentService {
         scopeId: brain.scopeId,
         agent: input.agent,
         model: input.model,
+        effort: input.effort,
         access: defaultAgentAccess(input.agent),
         prompt: handedTask(task),
       },
@@ -1384,7 +1395,14 @@ export class AgentService {
       signal.removeEventListener('abort', stop);
     }
   }
-  private async codex(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
+  private async codex(
+    run: Run,
+    cwd: string,
+    prompt: string,
+    session?: string,
+    model?: string,
+    effort?: string,
+  ) {
     const child = codexServer(cwd, runEnv(run));
     run.child = child;
     let finished = false;
@@ -1532,6 +1550,7 @@ export class AgentService {
         { type: 'text', text, text_elements: [] },
       ],
       ...(model && { model }),
+      ...(effort && { effort }),
     });
     run.turnId = turn.turn.id;
     await completion;
@@ -1650,7 +1669,14 @@ export class AgentService {
         }
       : { action: 'decline' };
   }
-  private async claude(run: Run, cwd: string, prompt: string, session?: string, model?: string) {
+  private async claude(
+    run: Run,
+    cwd: string,
+    prompt: string,
+    session?: string,
+    model?: string,
+    effort?: string,
+  ) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
     const stderr = new Tail(6000);
     let sawResult = false;
@@ -1740,6 +1766,7 @@ export class AgentService {
         includePartialMessages: true,
         resume: session,
         ...(model && { model }),
+        ...(effort && { effort: effort as EffortLevel }),
         ...((delegation ||
           run.step ||
           this.localFolders(run).length ||

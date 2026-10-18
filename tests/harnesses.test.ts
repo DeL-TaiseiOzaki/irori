@@ -602,6 +602,8 @@ test(
     const full = await execute('hermes', 'rotate', false, {
       access: 'full-access',
       model: 'anthropic/claude-x',
+      // Hermes Agent takes no thinking level: none is passed.
+      effort: 'high',
     });
     assert.equal(full.events.at(-1)?.outcome, 'completed', JSON.stringify(full.events));
     assert.ok(
@@ -609,6 +611,7 @@ test(
     );
     // A new access mode starts a new conversation; the model and --yolo are passed.
     assert.deepEqual((await hermes()).at(-1).args.slice(5), ['-m', 'anthropic/claude-x', '--yolo']);
+    assert.ok(!full.events.some((e) => e.type === 'status' && /Effort|思考量/.test(e.text)));
     const saved = async () =>
       (await latestConversation(files.dataDir, space.scopeId, 'hermes')).native?.handle;
     assert.equal(await saved(), '20260927_120500_rotated');
@@ -668,14 +671,26 @@ test('Each CLI gets the chosen model in its own form', fixtureOptions, async (t)
   for (const agent of ['pi', 'opencode'] as const) {
     const run = await execute(agent, 'ordinary request', false, {
       model: 'anthropic/claude-fixture',
+      effort: 'high',
     });
     assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
   }
   const log = await calls();
-  assert.deepEqual(log.find((call: any) => call.route?.endsWith('/message')).body.model, {
+  const message = log.find((call: any) => call.route?.endsWith('/message'));
+  assert.deepEqual(message.body.model, {
     providerID: 'anthropic',
     modelID: 'claude-fixture',
   });
+  // The thinking level goes as OpenCode's variant, and to Pi before the prompt.
+  assert.equal(message.body.variant, 'high');
+  const pi = log.filter(
+    (call: any) => call.type === 'set_thinking_level' || call.type === 'prompt',
+  );
+  assert.deepEqual(
+    pi.map((call: any) => call.type),
+    ['set_thinking_level', 'prompt'],
+  );
+  assert.equal(pi[0].level, 'high');
   assert.deepEqual(
     log
       .filter((call: any) => call.type === 'launch')
@@ -707,11 +722,15 @@ test('Model lists are read from each installed CLI once per version', fixtureOpt
       { id: 'openrouter/vendor/model-x', label: 'openrouter/vendor/model-x' },
     ],
     custom: false,
+    // OpenCode's levels are each model's variants, named in its configuration.
+    customEffort: true,
   });
+  const pi = await catalog.models('pi');
   assert.deepEqual(
-    (await catalog.models('pi')).models.map((model) => model.id),
+    pi.models.map((model) => model.id),
     ['anthropic/claude-fixture', 'openai/gpt-fixture'],
   );
+  assert.deepEqual(pi.efforts, ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
   // The renderer may ask only for a known CLI.
   assert.equal(hostArguments.agentModels.safeParse(['hermes']).success, true);
   assert.equal(hostArguments.agentModels.safeParse(['gpt']).success, false);

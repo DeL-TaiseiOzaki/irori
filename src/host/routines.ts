@@ -1066,10 +1066,16 @@ export class RoutineService {
     const panel =
       active.input.agents[scopeId] ??
       (active.owner.kind === 'irori'
-        ? { agent: settings.yourAi.agent, model: settings.yourAi.models[settings.yourAi.agent] }
+        ? {
+            agent: settings.yourAi.agent,
+            model: settings.yourAi.models[settings.yourAi.agent],
+            effort: settings.yourAi.efforts?.[settings.yourAi.agent],
+          }
         : undefined);
     const agent = step.cli ?? panel?.agent ?? 'claude';
     const model = step.model ?? (panel?.agent === agent ? panel.model : undefined);
+    // The panel's level goes with the panel's model; a step naming its own takes the CLI's default.
+    const effort = !step.model && panel?.agent === agent ? panel.effort : undefined;
     requireAgentAccess(agent, step.access);
     const vaults = handed(step.vaults, active.workspace);
     if ('problem' in vaults) throw Error(vaults.problem);
@@ -1090,6 +1096,7 @@ export class RoutineService {
               agent,
               access: step.access,
               model,
+              effort,
               prompt: step.prompt,
               brains: vaults.scopeIds.length ? vaults.scopeIds : undefined,
               // Vaults the irori agent registers join the routine's workspace.

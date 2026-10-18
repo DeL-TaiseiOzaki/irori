@@ -391,6 +391,11 @@ try {
   await expect(modelPill).toHaveValue('');
   await expect(modelPill.locator('option', { hasText: 'openai/gpt-fixture' })).toHaveCount(1);
   await modelPill.selectOption('anthropic/claude-fixture');
+  // Beside it, the thinking level Pi takes for every model.
+  const effortPill = page.getByLabel('思考量', { exact: true });
+  await expect(effortPill).toHaveValue('');
+  await expect(effortPill.locator('option', { hasText: 'xhigh' })).toHaveCount(1);
+  await effortPill.selectOption('high');
   await page.getByLabel('エージェントへの指示').fill('model fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.user').last()).toHaveText('model fixture');
@@ -411,10 +416,15 @@ try {
       .at(-1)
       .args.slice(2, 6),
   ).toEqual(['--provider', 'anthropic', '--model', 'claude-fixture']);
+  expect(
+    (await fixtureLog()).filter((call) => call.type === 'set_thinking_level').at(-1)?.level,
+  ).toBe('high');
   // Hermes Agent lists no models: a name is typed in. It starts in full access.
   await page.getByLabel('エージェント', { exact: true }).selectOption('hermes');
   await expect(access).toHaveValue('full-access');
   await expect(modelPill).toHaveValue('');
+  // It takes no thinking level, so none is offered.
+  await expect(effortPill).toHaveCount(0);
   await modelPill.selectOption({ label: 'その他…' });
   await page.getByLabel('モデル名', { exact: true }).fill('vendor/model-x');
   await page.getByLabel('モデル名', { exact: true }).press('Enter');
@@ -454,6 +464,7 @@ try {
         checks: [
           'Pi/OpenCode panel selection',
           'model pill from the CLI list, and a typed Hermes model with its full access',
+          'thinking level pill for Pi reaching set_thinking_level, absent for Hermes',
           'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',
           'new conversation intent and cancellation preserve the composer',

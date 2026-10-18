@@ -12,10 +12,13 @@ import {
 
 /** A model name as a CLI takes it: never an option, never shell syntax. */
 export const agentModel = z.string().regex(/^\w[\w./:@[\]-]{0,199}$/);
-/** The CLI your AI runs on and the model chosen for each CLI, kept on the device. */
+/** A thinking level as a CLI names it (`high`, `xhigh`, an OpenCode variant): a plain word. */
+export const agentEffort = z.string().regex(/^[A-Za-z0-9][\w-]{0,39}$/);
+/** The CLI your AI runs on and the model and thinking level chosen for each CLI, kept on the device. */
 export const yourAiChoice = z.object({
   agent: z.enum(agentIds),
   models: z.partialRecord(z.enum(agentIds), agentModel),
+  efforts: z.partialRecord(z.enum(agentIds), agentEffort).optional(),
 });
 /** The longest instruction a person can send to an agent. */
 export const promptLimit = 32000;
@@ -28,6 +31,8 @@ export const messageInput = z.object({
   notePath: z.string().max(4096).optional(),
   access: z.enum(agentAccessModes).optional(),
   model: agentModel.optional(),
+  /** How much the CLI thinks; its own default when absent. */
+  effort: agentEffort.optional(),
   sources: z.array(sourceRef).max(20).optional(),
   skill: skillName.optional(),
   /** Tell the agent which lines of the note the person wrote or revised. */

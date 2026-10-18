@@ -196,11 +196,19 @@ export interface AgentModel {
   label: string;
   /** The CLI's own default. */
   default?: boolean;
+  /** The thinking levels this model takes, as the CLI names them; none when empty. */
+  efforts?: string[];
+  /** The level it thinks at when none is passed. */
+  defaultEffort?: string;
 }
 export interface AgentModels {
   models: AgentModel[];
   /** A model name may be typed in: the CLI gives no list, or reading it failed. */
   custom: boolean;
+  /** Thinking levels for a model that lists none of its own. */
+  efforts?: string[];
+  /** A thinking level may be typed in: the CLI names its levels per model, out of reach. */
+  customEffort?: boolean;
   /** Why the list could not be read. */
   error?: string;
 }
@@ -381,6 +389,8 @@ export interface StartRun {
   access?: AgentAccess;
   /** The CLI's model for this instruction; the CLI's own default when absent. */
   model?: string;
+  /** How much the CLI thinks for this instruction; its own default when absent. */
+  effort?: string;
   prompt: string;
   notePath?: string;
   /** The conversation to continue: one of the owner's, or an id `createConversation` gave. */
@@ -419,8 +429,12 @@ export interface DeviceSettings {
   editorAssistance: boolean;
   /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */
   vaultAgent: boolean;
-  /** The CLI your AI runs on and the model chosen for each CLI ('' or absent: the CLI's default). */
-  yourAi: { agent: AgentId; models: Partial<Record<AgentId, string>> };
+  /** The CLI your AI runs on and the model and thinking level chosen for each CLI ('' or absent: the CLI's default). */
+  yourAi: {
+    agent: AgentId;
+    models: Partial<Record<AgentId, string>>;
+    efforts?: Partial<Record<AgentId, string>>;
+  };
   /** Pane layouts per group, kept here because file-URL storage is not durable. */
   layouts: Record<string, string>;
   /** The reader's role and project per KB, which narrows that KB's skill picker. */

@@ -317,6 +317,7 @@ interface DockActions {
   setSources: Dispatch<SetStateAction<Record<string, SourceRef[]>>>;
   setColumns: Dispatch<SetStateAction<DockColumn[]>>;
   setModelChoice: Dispatch<SetStateAction<Record<string, string>>>;
+  setEffortChoice: Dispatch<SetStateAction<Record<string, string>>>;
   setAccessChoice: Dispatch<SetStateAction<Record<string, { agent: AgentId; value: AgentAccess }>>>;
   setYourAccessSelection: Dispatch<
     SetStateAction<{ agent: AgentId; value: AgentAccess } | undefined>
@@ -344,6 +345,7 @@ const DockColumnView = memo(function DockColumnView({
   yourAccess,
   accessChoice,
   modelChoice,
+  effortChoice,
   skills,
   skillsRetired,
   skillProblems,
@@ -372,6 +374,7 @@ const DockColumnView = memo(function DockColumnView({
   yourAccess: AgentAccess;
   accessChoice: Record<string, { agent: AgentId; value: AgentAccess }>;
   modelChoice: Record<string, string>;
+  effortChoice: Record<string, string>;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
   skillProblems: SkillProblem[];
@@ -439,6 +442,11 @@ const DockColumnView = memo(function DockColumnView({
       canSplit={canSplit}
       seed={seed}
       onShowSchema={isYourColumn(column.id) ? act.showYou : undefined}
+      effort={
+        irori
+          ? yourChoice.efforts?.[columnAgent] || undefined
+          : active && (effortChoice[`${active.scopeId}:${columnAgent}`] || undefined)
+      }
       onModel={(next) => {
         if (irori) {
           const models = { ...yourChoice.models };
@@ -447,6 +455,18 @@ const DockColumnView = memo(function DockColumnView({
           act.chooseYour({ ...yourChoice, models });
         } else if (active)
           act.setModelChoice((all) => ({
+            ...all,
+            [`${active.scopeId}:${columnAgent}`]: next,
+          }));
+      }}
+      onEffort={(next) => {
+        if (irori) {
+          const efforts = { ...yourChoice.efforts };
+          if (next) efforts[columnAgent] = next;
+          else delete efforts[columnAgent];
+          act.chooseYour({ ...yourChoice, efforts });
+        } else if (active)
+          act.setEffortChoice((all) => ({
             ...all,
             [`${active.scopeId}:${columnAgent}`]: next,
           }));
@@ -737,6 +757,10 @@ function App() {
   const [modelChoice, setModelChoice] = useState<Record<string, string>>({});
   const modelFor = (scopeId: string, agentId: AgentId) =>
     modelChoice[`${scopeId}:${agentId}`] || undefined;
+  // And the thinking level chosen for each CLI, beside its model; '' is the CLI's own.
+  const [effortChoice, setEffortChoice] = useState<Record<string, string>>({});
+  const effortFor = (scopeId: string, agentId: AgentId) =>
+    effortChoice[`${scopeId}:${agentId}`] || undefined;
   // Your AI's CLI and models are kept on the device.
   const [yourChoice, setYourChoice] = useState(currentYourAi);
   function chooseYour(next: typeof yourChoice) {
@@ -1567,6 +1591,7 @@ function App() {
       conversationId: value.summary?.agent === agentId || target ? value.id : undefined,
       access: defaultAgentAccess(agentId),
       model: modelFor(scopeId, agentId),
+      effort: effortFor(scopeId, agentId),
       prompt: message,
     };
     if (behind(input.conversationId, value)) {
@@ -2189,6 +2214,7 @@ function App() {
     setSources,
     setColumns,
     setModelChoice,
+    setEffortChoice,
     setAccessChoice,
     setYourAccessSelection,
     setColumnStatus,
@@ -2340,6 +2366,7 @@ function App() {
             yourAccess={yourAccess}
             accessChoice={accessChoice}
             modelChoice={modelChoice}
+            effortChoice={effortChoice}
             skills={noSkills}
             skillsRetired={noRetired}
             skillProblems={noProblems}
@@ -2663,7 +2690,11 @@ function App() {
                     const agentId = agentFor(space.scopeId);
                     return [
                       space.scopeId,
-                      { agent: agentId, model: modelFor(space.scopeId, agentId) },
+                      {
+                        agent: agentId,
+                        model: modelFor(space.scopeId, agentId),
+                        effort: effortFor(space.scopeId, agentId),
+                      },
                     ];
                   }),
                 ),
@@ -2671,6 +2702,7 @@ function App() {
                   [you.id]: {
                     agent: yourChoice.agent,
                     model: yourChoice.models[yourChoice.agent] || undefined,
+                    effort: yourChoice.efforts?.[yourChoice.agent] || undefined,
                   },
                 }),
               })}
@@ -3400,6 +3432,7 @@ function App() {
                           yourAccess={yourAccess}
                           accessChoice={accessChoice}
                           modelChoice={modelChoice}
+                          effortChoice={effortChoice}
                           skills={composerSkills}
                           skillsRetired={skillsRetired}
                           skillProblems={skillProblems}

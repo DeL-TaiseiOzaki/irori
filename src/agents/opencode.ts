@@ -340,6 +340,8 @@ export async function runOpenCode(ctx: NativeContext) {
             { type: 'text', text: ctx.prompt },
           ],
           ...(model && { model }),
+          // OpenCode's thinking levels are the model's variants.
+          ...(ctx.effort && { variant: ctx.effort }),
         },
         { fetch: async (request) => boundedResponse(await server.fetch(request, true)) },
       ),
