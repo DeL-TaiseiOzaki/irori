@@ -171,7 +171,8 @@ test(
     assert.equal(list.customEffort, undefined);
 
     const events = await execute({ agent: 'codex', model: 'gpt-a', effort: 'xhigh' });
-    assert.ok(events.some((event) => event.type === 'status' && /xhigh/.test(event.text)));
+    // The composer shows the level; the turn does not repeat it.
+    assert.ok(!events.some((event) => event.type === 'status' && /xhigh/.test(event.text)));
     await execute({ agent: 'codex' });
     const turns = (await readFile(path.join(root, 'codex-turns.jsonl'), 'utf8'))
       .trim()

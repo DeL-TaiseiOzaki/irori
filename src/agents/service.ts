@@ -24,12 +24,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
-import {
-  agentAccessDetail,
-  agentAccessLabel,
-  defaultAgentAccess,
-  requireAgentAccess,
-} from '../domain/agent-access';
+import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
@@ -1123,30 +1118,10 @@ export class AgentService {
         run.shared = digest(words);
         prompt = `${saved && heard === run.shared ? sharedSchemaPointer(shared) : words}\n\n${prompt}`;
       }
-      if (saved)
-        this.event(
-          run,
-          'status',
-          t('保存済みのセッションを引き継ぎます。', 'Continuing the saved session.'),
-        );
-      this.event(
-        run,
-        'status',
-        t(
-          `${agentNames[input.agent]} を ${space.name} で実行中`,
-          `Running ${agentNames[input.agent]} in ${space.name}`,
-        ),
-      );
-      this.event(
-        run,
-        'status',
-        `${agentAccessLabel(input.agent, run.access)}: ${agentAccessDetail(input.agent, run.access)}`,
-      );
-      if (input.model)
-        this.event(run, 'status', t(`モデル: ${input.model}`, `Model: ${input.model}`));
+      // The composer already shows the CLI, folder, access, model and level, so
+      // a turn repeats none of them; only a change of session is worth a line.
       // Hermes Agent takes no level; one sent anyway is not passed on.
       const effort = input.agent === 'hermes' ? undefined : input.effort;
-      if (effort) this.event(run, 'status', t(`思考量: ${effort}`, `Effort: ${effort}`));
       if (input.agent === 'codex')
         await this.codex(run, space.root, prompt, saved, input.model, effort);
       else if (input.agent === 'claude')
