@@ -203,8 +203,8 @@ export interface RunRoutine {
   workspaceId: string;
   /** The digest of the files the person reviewed, when the review is asked for. */
   digest?: string;
-  /** The CLI and model chosen in each agent's panel, by its scope. */
-  agents: Record<string, { agent: AgentId; model?: string }>;
+  /** The CLI, model and thinking level chosen in each agent's panel, by its scope. */
+  agents: Record<string, { agent: AgentId; model?: string; effort?: string }>;
 }
 
 export function routineKey(ref: RoutineRef) {

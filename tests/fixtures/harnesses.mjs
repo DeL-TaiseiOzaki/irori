@@ -126,6 +126,8 @@ export function run(kind) {
             pendingMessageCount: 0,
           },
         });
+      if (message.type === 'set_thinking_level')
+        send({ type: 'response', id: message.id, command: message.type, success: true });
       if (message.type === 'prompt') {
         if (!fs.existsSync(session))
           fs.writeFileSync(session, JSON.stringify({ type: 'session', cwd: process.cwd() }) + '\n');
