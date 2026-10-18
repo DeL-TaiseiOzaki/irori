@@ -29,16 +29,15 @@ test('Connected folders are named for agents, with how to search inside the link
     { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', linked: ['contents/Drive'] },
     { name: 'Notes', agent: 'vault-notes', root: '/kb/notes' },
   ];
-  const handed = prompts.brainsPreamble(brains, 'claude');
+  const handed = prompts.brainsCommandPreamble(brains);
   assert.match(
     handed,
-    /- Lab: folder "\/kb\/lab", sub-agent "vault-lab", connected folders "contents\/Drive"/,
+    /- Lab: folder "\/kb\/lab", vault agent "vault-lab", connected folders "contents\/Drive"/,
   );
-  assert.match(handed, /- Notes: folder "\/kb\/notes", sub-agent "vault-notes"$/m);
+  assert.match(handed, /- Notes: folder "\/kb\/notes", vault agent "vault-notes"$/m);
   assert.equal(handed.match(/rg -L/g)?.length, 1);
-  assert.match(prompts.brainsCommandPreamble(brains, 'Pi'), /connected folders "contents\/Drive"/);
   // Without connected folders nothing is said about them.
-  assert.doesNotMatch(prompts.brainsPreamble([brains[1]], 'claude'), /rg -L|connected folders/);
+  assert.doesNotMatch(prompts.brainsCommandPreamble([brains[1]]), /rg -L|connected folders/);
 });
 
 // A vault agent hears what irori is and where each layer is (ADR 039):
@@ -82,31 +81,51 @@ test("A vault agent's introduction names its layers' folders and points at AGENT
   const working = prompts.vaultIntro({ ...vault, work: '.irori/work/' }, false);
   assert.match(working, /^Work folder: "\.irori\/work\/"\. Keep scratch files, .*%TEMP%/m);
   assert.doesNotMatch(text, /Work folder/);
-  const handed = prompts.brainsPreamble(
-    [
-      { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', work: '/kb/lab/.irori/work' },
-      { name: 'Notes', agent: 'vault-notes', root: '/kb/notes', work: 'D:\\work\\notes' },
-    ],
-    'codex',
-  );
+  const handed = prompts.brainsCommandPreamble([
+    { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', work: '/kb/lab/.irori/work' },
+    { name: 'Notes', agent: 'vault-notes', root: '/kb/notes', work: 'D:\\work\\notes' },
+  ]);
   assert.match(
     handed,
-    /- Lab: folder "\/kb\/lab", sub-agent "vault-lab", work folder "\/kb\/lab\/\.irori\/work"/,
+    /- Lab: folder "\/kb\/lab", vault agent "vault-lab", work folder "\/kb\/lab\/\.irori\/work"/,
   );
   assert.equal(handed.match(/temporary folder/g)?.length, 1);
   // The irori agent hears each handed vault's layers on its line.
   assert.match(
-    prompts.brainsPreamble(
-      [
-        {
-          name: 'Lab',
-          agent: 'vault-lab',
-          root: '/kb/lab',
-          layers: { knowledge: '.', contents: ['contents'] },
-        },
-      ],
-      'claude',
-    ),
-    /- Lab: folder "\/kb\/lab", sub-agent "vault-lab", knowledge "\.", contents "contents"$/m,
+    prompts.brainsCommandPreamble([
+      {
+        name: 'Lab',
+        agent: 'vault-lab',
+        root: '/kb/lab',
+        layers: { knowledge: '.', contents: ['contents'] },
+      },
+    ]),
+    /- Lab: folder "\/kb\/lab", vault agent "vault-lab", knowledge "\.", contents "contents"$/m,
+  );
+});
+
+// ADR 050: every CLI hands a vault's work to its vault agent with `irori call`,
+// and a vault's own definition of its agent is told to both sides.
+test('The irori agent hands vaults with irori call on every CLI, and hears each vault agent’s own description', () => {
+  const handed = prompts.brainsCommandPreamble([
+    { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', description: 'Papers and reading notes.' },
+    { name: 'Notes', agent: 'vault-notes', root: '/kb/notes' },
+  ]);
+  assert.match(handed, /vault agent "vault-lab", its agent: "Papers and reading notes\."/);
+  assert.match(handed, /irori call <vault agent or vault name> "<task>"/);
+  assert.match(handed, /Not your CLI's own sub-agents/);
+  assert.doesNotMatch(handed, /sub-agent "|spawn_agent|task tool/);
+  // The vault agent gets the task, with the vault's definition when it has one.
+  assert.equal(
+    prompts.handedTask('Tidy the inbox.'),
+    `${prompts.handedTask('Tidy the inbox.').split('\n\n')[0]}\n\nTidy the inbox.`,
+  );
+  const defined = prompts.handedTask('Tidy the inbox.', {
+    file: '.codex/agents/vault-agent.toml',
+    instructions: 'File every note under wiki/.',
+  });
+  assert.match(
+    defined,
+    /in \.codex\/agents\/vault-agent\.toml\. Follow it:\n<vault-agent-definition>\nFile every note under wiki\/\.\n<\/vault-agent-definition>\n\nTidy the inbox\.$/,
   );
 });

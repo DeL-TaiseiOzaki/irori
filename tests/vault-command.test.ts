@@ -49,17 +49,15 @@ test('a vault is named by its sub-agent name or its own name, and only if handed
   assert.equal(vaultOf(delegation, 'vault-product-lab').scopeId, 'a');
   assert.equal(vaultOf(delegation, 'product  lab').scopeId, 'a');
   assert.equal(vaultOf(delegation, 'vault-notes-cccccccc').scopeId, 'c');
-  assert.throws(() => vaultOf(delegation, 'Notes'), /More than one vault.*sub-agent name/);
+  assert.throws(() => vaultOf(delegation, 'Notes'), /More than one vault.*vault agent name/);
   assert.throws(() => vaultOf(delegation, 'Research'), /No vault named "Research".*vault-notes/);
 });
 
 test('the command preamble names each vault agent and the command, not their Schema', () => {
-  const text = brainsCommandPreamble(
-    [{ name: 'Product', category: 'チーム', agent: 'vault-product', root: '/kb/p' }],
-    'Hermes Agent',
-  );
+  const text = brainsCommandPreamble([
+    { name: 'Product', category: 'チーム', agent: 'vault-product', root: '/kb/p' },
+  ]);
   assert.match(text, /- Product \(チーム\): folder "\/kb\/p", vault agent "vault-product"\n/);
-  assert.match(text, /You run on Hermes Agent/);
   assert.match(text, /irori call <vault agent or vault name> "<task>"/);
   assert.match(text, /Do not change a vault's files yourself/);
   assert.doesNotMatch(text, /AGENTS\.md/);

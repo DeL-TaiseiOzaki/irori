@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentId, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
-import { hasSubAgents, subAgentFiles, type BrainAgent, type YourAi } from '../domain/you';
+import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
@@ -11,13 +11,6 @@ import { useResource } from './useResource';
 import './you.css';
 
 const host = window.irori;
-/** The folder a CLI loads sub-agent definitions from, and its parent: `.claude`, `.claude/agents`. */
-function definitionFolders(agent: AgentId) {
-  if (!hasSubAgents(agent)) return [];
-  const folder = subAgentFiles[agent]('x').replace(/\/[^/]*$/, '');
-  return [folder.split('/')[0], folder];
-}
-
 /** A host error without the `Error: ` prefixes it gathers on its way to the renderer. */
 const message = (error: string) => error.replace(/^(?:Error: )+/, '');
 
@@ -30,18 +23,6 @@ function PathText({ path, className }: { path: string; className: string }) {
   );
 }
 
-/** A definition's front matter (name, description, tools), set apart from its prompt. */
-function splitFrontMatter(text: string): [string, string] {
-  const lines = text.split('\n');
-  if (lines[0].trim() !== '---') return ['', text];
-  for (let index = 1; index < lines.length; index++)
-    if (lines[index].trim() === '---') {
-      const head = lines.slice(0, index + 1).join('\n');
-      return [head, text.slice(head.length)];
-    }
-  return ['', text];
-}
-
 /** One folder of your AI's folder, read when it is opened. */
 function Folder({
   directory,
@@ -49,7 +30,6 @@ function Folder({
   reads,
   open,
   file,
-  owners,
   onToggle,
   onShow,
 }: {
@@ -58,8 +38,6 @@ function Folder({
   reads: number;
   open: string[];
   file: string;
-  /** The brain each sub-agent definition file belongs to, by its path. */
-  owners: Map<string, Space>;
   onToggle: (path: string) => void;
   onShow: (path: string) => void;
 }) {
@@ -91,7 +69,6 @@ function Folder({
       {listing.data?.map((entry) => {
         const expanded = entry.directory && open.includes(entry.path);
         const current = !entry.directory && entry.path === file;
-        const owner = entry.directory ? undefined : owners.get(entry.path);
         return (
           <div key={entry.path} className="you-tree-item">
             <button
@@ -110,15 +87,11 @@ function Folder({
               ) : (
                 <span className="you-tree-chevron" />
               )}
-              {owner ? (
-                <BrainTile space={owner} size={16} radius={5} />
-              ) : (
-                <Icon
-                  name={entry.directory ? (expanded ? 'folderOpen' : 'folder') : 'file'}
-                  size={15}
-                  className="you-tree-icon"
-                />
-              )}
+              <Icon
+                name={entry.directory ? (expanded ? 'folderOpen' : 'folder') : 'file'}
+                size={15}
+                className="you-tree-icon"
+              />
               <span className="you-tree-name">{entry.name}</span>
             </button>
             {expanded && (
@@ -128,7 +101,6 @@ function Folder({
                 reads={reads}
                 open={open}
                 file={file}
-                owners={owners}
                 onToggle={onToggle}
                 onShow={onShow}
               />
@@ -179,40 +151,10 @@ function FileView({ path, reads }: { path: string; reads: number }) {
   );
 }
 
-/** One file defining a brain's sub-agent, in a small card. */
-function Definition({ file, reads }: { file: BrainAgent['definitions'][number]; reads: number }) {
-  const read = useResource(() => host.yourAiRead(file.path), [file.path], { refresh: reads });
-  const [head, body] = file.path.endsWith('.md')
-    ? splitFrontMatter(read.data?.text ?? '')
-    : ['', read.data?.text ?? ''];
-  return (
-    <div className="you-definition">
-      <header>
-        <Icon name="file" size={13} />
-        <PathText path={file.path} className="you-definition-path" />
-        <small>{agentNames[file.cli]}</small>
-      </header>
-      {read.error ? (
-        <p className="you-definition-note error" role="alert">
-          {message(read.error)}
-        </p>
-      ) : read.data ? (
-        <pre tabIndex={0}>
-          {head && <span className="you-front">{head}</span>}
-          {body}
-        </pre>
-      ) : (
-        <p className="you-definition-note">{t('読み込み中…', 'Loading…')}</p>
-      )}
-    </div>
-  );
-}
-
 /**
  * The irori agent (your AI): its Schema settings, the same as a vault's, its
  * folder as files, read-only, and the vault agent it hands each brain's work
- * to. irori writes a missing definition when it hands that brain to the irori
- * agent, and never replaces one.
+ * to with `irori call` (ADR 050).
  */
 export function YourAiScreen({
   you,
@@ -264,20 +206,13 @@ export function YourAiScreen({
     wasRunning.current = running;
   }, [running]);
   const [file, setFile] = useState('AGENTS.md');
-  // The chosen CLI's definitions folder is open, so the definitions are in view.
-  const [open, setOpen] = useState(() => definitionFolders(agent));
-  const [picked, setPicked] = useState<string>();
+  const [open, setOpen] = useState<string[]>([]);
   const ids = spaces.map((space) => space.scopeId);
   const brains = useResource(() => host.yourAiBrains(ids), [ids.join()], {
     enabled: ids.length > 0,
     refresh: reads,
   });
   const agents = new Map((brains.data ?? []).map((brain) => [brain.scopeId, brain]));
-  const owners = new Map<string, Space>();
-  for (const space of spaces)
-    for (const file of agents.get(space.scopeId)?.definitions ?? []) owners.set(file.path, space);
-  const chosen = spaces.find((space) => space.scopeId === picked) ?? spaces[0];
-  const chosenAgent = chosen && agents.get(chosen.scopeId);
   const toggle = (path: string) =>
     setOpen((value) =>
       value.includes(path) ? value.filter((item) => item !== path) : [...value, path],
@@ -285,9 +220,6 @@ export function YourAiScreen({
   const show = (path: string) => {
     setTarget(undefined);
     setFile(path);
-    // A brain's definition also picks that brain on the right.
-    const owner = owners.get(path);
-    if (owner) setPicked(owner.scopeId);
   };
   // A path in a reply opens its file with the folders on its way open.
   useEffect(() => {
@@ -385,7 +317,6 @@ export function YourAiScreen({
                 reads={reads}
                 open={open}
                 file={target ? '' : file}
-                owners={owners}
                 onToggle={toggle}
                 onShow={show}
               />
@@ -431,35 +362,17 @@ export function YourAiScreen({
               {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
             </p>
           ) : (
-            <div className="you-brain-list">
+            <div className="you-brain-list" role="list">
               {spaces.map((space) => {
                 const brain = agents.get(space.scopeId);
                 return (
-                  <button
-                    key={space.scopeId}
-                    className="you-brain-row"
-                    aria-pressed={space.scopeId === chosen?.scopeId}
-                    onClick={() => setPicked(space.scopeId)}
-                  >
+                  <div key={space.scopeId} className="you-brain-row" role="listitem">
                     <BrainTile space={space} size={26} radius={8} />
                     <span className="you-brain-names">
                       <strong>{`${space.name} agent`}</strong>
                       <small>{brain?.agent ?? '…'}</small>
                     </span>
-                    {brain &&
-                      hasSubAgents(agent) &&
-                      (brain.definitions.some((file) => file.cli === agent) ? (
-                        <span className="you-state defined">
-                          <Icon name="checkCircle" size={12} />
-                          {t('定義済み', 'Defined')}
-                        </span>
-                      ) : (
-                        <span className="you-state">
-                          <i />
-                          {t('未作成', 'Not written yet')}
-                        </span>
-                      ))}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -469,9 +382,6 @@ export function YourAiScreen({
               {message(brains.error)}
             </p>
           )}
-          {chosenAgent?.definitions.map((file) => (
-            <Definition key={file.path} file={file} reads={reads} />
-          ))}
         </div>
         <footer className="you-update">
           <p className="you-update-state" role="status">

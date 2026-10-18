@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { handToSubAgent, outsideVault, outsideIroriAgent } from '../../prompts';
+import { handToVaultAgent, outsideIroriAgent } from '../../prompts';
 import { within } from '../domain/scopes';
 
 /**
  * What your AI may reach in one run: its own folder, and the brains handed to
- * it, each worked on by the sub-agent named after that brain.
+ * it, each worked on by its vault agent through `irori call` (ADR 050).
  */
 export interface Delegation {
   /** Your AI's folder, its working directory. */
@@ -15,11 +15,6 @@ export interface Delegation {
 
 export type Decision = { allow: true } | { allow: false; reason: string };
 
-/** The brain a sub-agent works for, by the name its definition carries. */
-export function brainOfAgent(delegation: Delegation, agentType?: string) {
-  return agentType ? delegation.brains.find((brain) => brain.agent === agentType) : undefined;
-}
-
 /** The brain a path lies in, if any. */
 export function brainOfPath(delegation: Delegation, file: string) {
   const absolute = path.resolve(delegation.you, file);
@@ -27,31 +22,18 @@ export function brainOfPath(delegation: Delegation, file: string) {
 }
 
 /**
- * Where a file tool may write. Your AI keeps to its own folder; a brain's
- * sub-agent keeps to its brain; any other agent (a built-in one, or one a brain
- * defines for itself) keeps to your AI's folder. Work in a brain therefore goes
- * through that brain's sub-agent, which has read the brain's Schema. A brain's
- * work folder, scratch rather than the brain's material, is open to them all.
+ * Where a file tool of your AI's run may write, its own sub-agents' too: its
+ * own folder, and a brain's work folder, scratch rather than the brain's
+ * material. Work in a brain goes to that brain's vault agent with
+ * `irori call`, which runs inside the brain with its Schema (ADR 050).
  */
-export function writeDecision(
-  delegation: Delegation,
-  agentType: string | undefined,
-  file: string,
-): Decision {
+export function writeDecision(delegation: Delegation, file: string): Decision {
   const absolute = path.resolve(delegation.you, file);
   if (delegation.brains.some((item) => item.work && within(item.work, absolute)))
     return { allow: true };
-  const brain = brainOfAgent(delegation, agentType);
-  if (brain)
-    return within(brain.root, absolute)
-      ? { allow: true }
-      : { allow: false, reason: outsideVault(brain) };
   if (within(delegation.you, absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);
-  return {
-    allow: false,
-    reason: target ? handToSubAgent(target) : outsideIroriAgent,
-  };
+  return { allow: false, reason: target ? handToVaultAgent(target) : outsideIroriAgent };
 }
 
 /** The first of `keys` in a tool call's input that holds a string. */
@@ -69,7 +51,7 @@ export const writeToolMatcher = 'Write|Edit|MultiEdit|NotebookEdit';
 export const writeTools = new RegExp(`^(${writeToolMatcher})$`);
 
 /**
- * The handed vault `irori call` names: by its sub-agent name, or by its
+ * The handed vault `irori call` names: by its vault agent name, or by its
  * name when only one handed vault has it. Any other is refused, with the names
  * this run may use.
  */
@@ -82,7 +64,7 @@ export function vaultOf(delegation: Delegation, name: string) {
   const names = delegation.brains.map((brain) => `${brain.agent} (${brain.name})`).join(', ');
   throw Error(
     byName.length
-      ? `More than one vault is named ${JSON.stringify(name)}. Use its sub-agent name: ${names}.`
+      ? `More than one vault is named ${JSON.stringify(name)}. Use its vault agent name: ${names}.`
       : `No vault named ${JSON.stringify(name)} was handed to this request. Use one of: ${names || 'none'}.`,
   );
 }
