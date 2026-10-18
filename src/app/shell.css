@@ -1,11 +1,15 @@
 /* The workspace shell: the rail, the islands on the graphite backdrop, the
    status bar, and the chrome's own controls and menus (ADR 014). */
 
+/* The window never scrolls. The shell is the containing block for absolutely
+   positioned descendants and clips them, so one placed far down a long column
+   (a reply's visually hidden "Footnotes" heading) cannot lengthen the page. */
 .app {
+  position: relative;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
   background: var(--bg);
   color: var(--tx);
 }
