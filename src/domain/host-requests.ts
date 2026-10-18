@@ -322,6 +322,7 @@ export const hostArguments = {
   createRoutine: z.tuple([id, name, routineText.optional()]),
   routineSource: z.tuple([routineRef]),
   revealRoutine: z.tuple([routineRef]),
+  deleteRoutine: z.tuple([routineRef]),
   saveRoutineSource: z.tuple([routineRef, routineText, version]),
   reviewRoutine: z.tuple([routineRef]),
   runRoutine: z.tuple([

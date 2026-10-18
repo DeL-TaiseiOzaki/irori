@@ -436,6 +436,7 @@ export function RoutineEditor({
   onEnterSecret,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   target: EditorTarget;
   /** The workspace's vaults, by name, for the irori agent's steps. */
@@ -444,6 +445,7 @@ export function RoutineEditor({
   onEnterSecret: (name: string) => void;
   onClose: () => void;
   onSaved: (ref: RoutineRef) => void;
+  onDeleted: (ref: RoutineRef) => void;
 }) {
   const editing = target.kind === 'edit' ? target : undefined;
   const source = useResource(
@@ -463,6 +465,8 @@ export function RoutineEditor({
   const [unfit, setUnfit] = useState('');
   const [version, setVersion] = useState<string>();
   const { busy, error, setError, run } = useAction();
+  // 削除 asks once more: the second press deletes.
+  const [removing, setRemoving] = useState(false);
   const loaded = editing ? source.data : { text: '', version: '', files: [] };
   if (loaded && base === undefined) {
     // The first render with the text decides how it opens.
@@ -677,6 +681,28 @@ export function RoutineEditor({
           problem && <p className="routine-editor-problem">{problem}</p>
         )}
         <div className="actions">
+          {editing && (
+            <>
+              <button
+                type="button"
+                className="danger"
+                disabled={busy}
+                onClick={() => {
+                  if (!removing) return setRemoving(true);
+                  void run(async () => {
+                    await host.deleteRoutine(editing.ref);
+                    onDeleted(editing.ref);
+                    onClose();
+                  }).finally(() => setRemoving(false));
+                }}
+                onBlur={() => setRemoving(false)}
+              >
+                <Icon name="trash" size={13} />
+                {removing ? t('削除する', 'Delete it') : t('削除', 'Delete')}
+              </button>
+              <span className="routine-space" />
+            </>
+          )}
           <button type="button" disabled={busy} onClick={onClose}>
             {/* After a save that still cannot run, the file is written: closing keeps it. */}
             {version ? t('閉じる', 'Close') : t('キャンセル', 'Cancel')}

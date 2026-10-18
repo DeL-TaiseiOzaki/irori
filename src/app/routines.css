@@ -603,3 +603,9 @@
 .modal.routine-editor .actions {
   margin-top: 4px;
 }
+.modal.routine-editor .actions .danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger);
+}
