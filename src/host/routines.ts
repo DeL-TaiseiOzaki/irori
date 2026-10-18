@@ -635,6 +635,28 @@ export class RoutineService {
     const owner = await this.owner(ref.owner);
     return { version: sha256(text), problem: (await this.inspect(owner, ref.folder)).problem };
   }
+  /**
+   * Deletes a routine the person chose: its folder goes to `trash`, and its
+   * review, runs and `IRORI_STATE` on this device go with it, so a later
+   * routine of the same folder starts unreviewed and without history.
+   */
+  async remove(ref: RoutineRef, trash: (folder: string) => Promise<void>) {
+    const key = routineKey(ref);
+    if (this.active.has(key) || this.starting.has(key))
+      throw Error(t('このルーティンは実行中です。', 'This routine is already running.'));
+    this.starting.add(key);
+    try {
+      await trash(path.dirname(await this.yamlFile(ref)));
+      this.records.delete(key);
+      await Promise.all([
+        fs.rm(this.reviewFile(key), { force: true }),
+        fs.rm(this.runsDir(key), { recursive: true, force: true }),
+        fs.rm(path.join(this.dir, 'state', sha256(key)), { recursive: true, force: true }),
+      ]);
+    } finally {
+      this.starting.delete(key);
+    }
+  }
   /** The routine's `routine.yaml`, refusing a link or a folder that leaves its owner's. */
   private async yamlFile(ref: RoutineRef) {
     const owner = await this.owner(ref.owner);
