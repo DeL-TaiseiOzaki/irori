@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Open issues #267–#269, 2026-10-19 (**0.2.35**, pull request open):
+- #267: `carryToVault` reloads the open note inside `organize`, as `moveInto`
+  does. Before, the `reconcile` that ends `organize` read the note's old path
+  while the move's reload was still in flight and reported ENOENT.
+- #268: `watcherIgnored` lets a vault's watcher into its own `.git` for
+  `index`, `HEAD`, `packed-refs` and `refs/heads/**` only, so a commit made
+  elsewhere emits `files` and the Changes count and Home re-read Git status.
+  irori's Git runs with `GIT_OPTIONAL_LOCKS=0`, so its status reads write none
+  of these. A vault whose `.git` is a file (a linked worktree) still needs
+  Refresh. There was no focus refresh to hide this on a real desktop.
+- #269: `AgentColumn` shows a failed setup beside its button. The window's
+  `error` banner shows over the window (`.window-error`) whenever the stage's
+  top is out of sight: irori mode, routines, the irori agent's screen, a
+  collapsed stage, and the graph, records, Schema and Git review views.
+- `vault-split-ui-smoke` joins `npm run test:ui`; it had not run in CI.
+- Verified by `npm run build`, `npm test` (`tests/watcher-host-load.test.ts`)
+  and `npm run test:ui`. The new UI steps failed on the build before the change.
+
 Vault agents and their sub-agents, 2026-10-18 (**0.2.34**, pull request open):
 [ADR 050](decisions/050-vault-agents-and-their-sub-agents.md). The irori agent
 hands every vault's work to that vault's own agent with `irori call`, on every
