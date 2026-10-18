@@ -11,7 +11,8 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 // The environment kept on the GitHub account (ADR 026): one device saves its
 // vaults, workspaces, preferences and the irori agent's routines (ADR 043) from
 // the start screen's settings, before opening any workspace, and a new device
-// restores them from the start screen.
+// restores them from the start screen. A's routine secret goes along sealed with a
+// passphrase (ADR 047) and is sealed again with B's key.
 // gh is a stand-in answering from a folder.
 const base = await mkdtemp(path.join(tmpdir(), 'irori account UI '));
 const scope = {
@@ -55,6 +56,14 @@ await mkdir(path.join(homeA, 'irori', 'you', 'routines', 'Inbox'), { recursive: 
 await writeFile(path.join(homeA, 'irori', 'you', 'AGENTS.md'), '# irori agent\n');
 await writeFile(path.join(homeA, 'irori', 'you', 'routines', 'Inbox', 'routine.yaml'), routineYaml);
 await mkdir(path.join(homeB, 'irori', 'you'), { recursive: true });
+// The reversible store stands in for the OS key on a display without a keychain.
+const token = 'xoxb-account-smoke-0123456789';
+const sealedHere = (value: string) => Buffer.from(`test:${value}`, 'utf8').toString('base64');
+await writeFile(
+  path.join(filesA.dataDir, 'secrets.json'),
+  JSON.stringify({ schemaVersion: 1, values: { SLACK_TOKEN: sealedHere(token) } }),
+);
+const passphrase = 'account smoke passphrase';
 await writeFile(path.join(homeB, 'irori', 'you', 'AGENTS.md'), '# irori agent\n');
 
 const launch = (data: string, home: string) => {
@@ -64,6 +73,7 @@ const launch = (data: string, home: string) => {
     HOME: home,
     GIT_CONFIG_GLOBAL: globalConfig,
     PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter),
+    IRORI_TEST_KEYSTORE: 'reversible',
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   return electron.launch({
@@ -88,8 +98,13 @@ try {
   await expect(account).toContainText('GitHub: octo');
   await expect(account).toContainText('環境は保存されていません');
   await expect(account.getByRole('button', { name: '復元' })).toHaveCount(0);
+  const phrase = account.getByLabel('シークレット 1 件も保存する合言葉');
+  await phrase.fill('short');
+  await expect(account.getByRole('button', { name: '環境を保存' })).toBeDisabled();
+  await phrase.fill(passphrase);
   await account.getByRole('button', { name: '環境を保存' }).click();
   await expect(account.getByRole('status')).toHaveText('保存しました。');
+  await expect(phrase).toHaveValue('');
   await expect(account).toContainText('環境を保存：');
   await page.screenshot({ path: 'test-results/irori-account-settings.png' });
   await page.keyboard.press('Escape');
@@ -104,6 +119,11 @@ try {
   const routines = JSON.parse(await fake.stored('routines.json'));
   if (routines.routines[0]?.files[0]?.text !== routineYaml)
     throw Error(`Unexpected saved routines: ${JSON.stringify(routines)}`);
+  const keys = await fake.stored('routine-keys.json');
+  if (JSON.parse(keys).names?.join() !== 'SLACK_TOKEN')
+    throw Error(`Unexpected saved secrets: ${keys}`);
+  if ([token, sealedHere(token), passphrase].some((value) => keys.includes(value)))
+    throw Error('A secret value or the passphrase reached GitHub');
   await app.close();
 
   // Device B starts empty and restores from the start screen, read in Japanese like device A.
@@ -118,11 +138,19 @@ try {
   await expect(sheet).toContainText('octo/kb');
   await expect(sheet).toContainText('ワークスペース: Lab');
   await expect(sheet.getByRole('checkbox', { name: /受信箱/ })).toBeChecked();
+  await expect(sheet.getByRole('checkbox', { name: /SLACK_TOKEN/ })).toBeChecked();
+  const restoreButton = sheet.getByRole('button', { name: '復元', exact: true });
+  await expect(restoreButton).toBeDisabled();
+  // A wrong passphrase stops the restore before anything is cloned.
+  await sheet.getByLabel('合言葉').fill('not the passphrase');
+  await restoreButton.click();
+  await expect(sheet).toContainText('合言葉が違うため、シークレットを開けません。');
+  await sheet.getByLabel('合言葉').fill(passphrase);
   await expect(sheet.locator('.restore-parent code')).toHaveText(path.join(homeB, 'irori'));
   await page.screenshot({ path: 'test-results/irori-account-restore.png' });
-  await sheet.getByRole('button', { name: '復元', exact: true }).click();
+  await restoreButton.click();
   await expect(sheet.getByRole('status')).toHaveText(
-    'vault 1 件・ワークスペース 1 件・ルーティン 1 件を取り込みました。',
+    'vault 1 件・ワークスペース 1 件・ルーティン 1 件・シークレット 1 件を取り込みました。',
   );
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await sheet.getByRole('button', { name: '閉じる' }).click();
@@ -136,6 +164,9 @@ try {
     'utf8',
   );
   if (added !== routineYaml) throw Error('The routine was not added');
+  const keptB = JSON.parse(await readFile(path.join(base, 'device-b', 'secrets.json'), 'utf8'));
+  if (keptB.values.SLACK_TOKEN !== sealedHere(token))
+    throw Error('The secret was not sealed on device B');
   await card.click();
   await expect(page.getByRole('navigation', { name: 'vault' })).toContainText('Research');
   if (errors.length) throw Error(errors.join('\n'));

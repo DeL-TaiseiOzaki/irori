@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Routine secrets in the saved environment, 2026-10-18 (**0.2.25**, pull request open):
+[ADR 047](decisions/047-routine-secrets-in-the-environment.md). With a passphrase,
+**環境を保存** also saves this device's routine secrets, sealed with it.
+- `src/host/environment-keys.ts` seals the values with scrypt (N = 2^17) and
+  AES-256-GCM, names bound as associated data; `EnvironmentService` opens them with
+  `SecretStore.values` and writes `routine-keys.json` before anything else is
+  written, and on restore opens them first and seals the chosen absent names with
+  `SecretStore.update`. `saveEnvironment(passphrase?)` and `restoreEnvironment`'s
+  `secrets`/`passphrase` are the `HostAPI` additions.
+- Verified by `npm run build`, `npm test` (`tests/environment.test.ts`) and
+  `npm run test:ui` (`scripts/account-ui-smoke.ts`, with the reversible stand-in
+  for the OS key). Not tried with a real Keychain, DPAPI or secret service.
+
 GitHub repositories in contents, 2026-10-16 (**0.2.24**, pull request open):
 [ADR 046](decisions/046-github-repositories-in-contents.md). The connection
 dialog's **GitHub** source clones a repository where the person chooses, or
