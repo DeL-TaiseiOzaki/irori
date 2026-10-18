@@ -30,6 +30,13 @@ source. The directory is still the right one, on the evidence above, but a KB's
 skills are not visible to claudian without a second copy there. irori does not write into it, generate per-runtime stubs, or change a
 native CLI's own skill configuration.
 
+Since 0.2.33, irori gives Claude Code these skills itself
+([ADR 049](decisions/049-skills-for-claude-code.md)). Each Claude Code run that
+irori starts gets a folder of links in irori's data directory,
+`.claude/skills/<name>` pointing at each skill folder. irori passes that folder
+to Claude Code as an additional directory and removes it when the run ends.
+Nothing is written into the KB.
+
 A package declares YAML front matter and instructions, following the skill shape
 described in [OpenAI's skill documentation](https://learn.chatgpt.com/docs/build-skills):
 
@@ -247,7 +254,7 @@ source states it.
 | Harness | Reads the KB's `.agents/skills` | User-scope directories it reads | Same name in both |
 | --- | --- | --- | --- |
 | Codex CLI 0.155.1 | Yes: `$CWD/.agents/skills` and every directory up to the repository root (`REPO`) | `~/.agents/skills` (`USER`); `$CODEX_HOME/skills`, `~/.codex/skills` by default, deprecated but still read | Not merged; both appear in the skill selector |
-| Claude Code 2.1.278 | No: project skills are `.claude/skills` only | `~/.claude/skills` (personal) | Personal over project; the KB copy is not read either way |
+| Claude Code 2.1.278 | No: project skills are `.claude/skills` only. Inside irori, irori links them into a folder it adds (ADR 049, checked with 2.1.295) | `~/.claude/skills` (personal) | Personal over project; with a linked skill this was not tried |
 | OpenCode 1.18.30 | Yes: `.agents/skills` from the working directory up to the git worktree | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Warns "duplicate skill name" and keeps one; which one is not documented |
 | Pi 0.86.1 documentation (0.85.1 is what irori exercised) | Yes, once the project is trusted: `.agents/skills` in the working directory and its ancestors up to the git root | `~/.agents/skills`, `~/.pi/agent/skills` | First found wins, and global is loaded before project, so the personal copy wins |
 | Hermes Agent v2026.9.24 documentation (not exercised by irori) | Yes, inside a git checkout once the project is trusted (`hermes skills trust`): `.hermes/skills` and `.agents/skills` at the project root | `~/.hermes/skills`; `~/.agents/skills` only when listed in `skills.external_dirs` | Project over local over external, so the KB copy wins |

@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Skills for Claude Code, 2026-10-18 (**0.2.33**, pull request open):
+[ADR 049](decisions/049-skills-for-claude-code.md). Claude Code now gets the
+`.agents/skills` of the run's folder and of the shared Schema.
+- `src/agents/claude-skills.ts` links each skill folder as
+  `<data>/claude-skills/<run>/.claude/skills/<name>`: a symbolic link, or a
+  junction on Windows. `AgentService.linkSkills` chooses the skills: the folder's
+  own first, then the shared Schema's, leaving out names the folder's
+  `.claude/skills` holds and retired names. It passes the folder as an
+  `additionalDirectories` entry and removes it in the run's `finally`. Leftovers
+  are pruned when the service starts.
+- `skillReachRules.claude.native` is `irori`; the `ignores` value is gone.
+- Verified by `npm run build`, `npm test` (`tests/claude-skills.test.ts`) and
+  `npm run test:ui`, and by a real Claude Code 2.1.295 (standard mode; root
+  refuses full access here). It listed and ran a vault skill and a shared skill,
+  the second time in a resumed session. Not tried on Windows.
+
 Several windows, 2026-10-18 (**0.2.32**, pull request open):
 [ADR 051](decisions/051-multiple-windows.md). **ファイル > 新しいウィンドウ**
 (Ctrl/Cmd+Shift+N, and the Dock menu on macOS) opens another window over the same host.

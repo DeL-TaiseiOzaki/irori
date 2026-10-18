@@ -6,8 +6,8 @@ import type { AgentId } from './types';
  * versions behind each row are in docs/SKILLS.md; the reach view renders this.
  */
 export type ReachRule = {
-  /** Whether the CLI itself finds the KB's `.agents/skills`. */
-  native: 'reads' | 'trusted' | 'ignores';
+  /** Whether the CLI itself finds the KB's `.agents/skills`; `irori`: irori gives them to it (ADR 049). */
+  native: 'reads' | 'trusted' | 'irori';
   /** Home-relative directories the CLI also reads. */
   user: string[];
   /** The KB skill's fate when a user-scope skill has the same name. */
@@ -15,7 +15,7 @@ export type ReachRule = {
 };
 export const skillReachRules: Record<AgentId, ReachRule> = {
   codex: { native: 'reads', user: ['~/.agents/skills', '~/.codex/skills'], clash: 'both' },
-  claude: { native: 'ignores', user: ['~/.claude/skills'], clash: 'user-wins' },
+  claude: { native: 'irori', user: ['~/.claude/skills'], clash: 'user-wins' },
   opencode: {
     native: 'reads',
     user: ['~/.agents/skills', '~/.claude/skills', '~/.config/opencode/skills'],

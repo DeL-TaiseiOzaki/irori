@@ -55,7 +55,9 @@ directory and in the window's state.
    ones from a button on the irori agent's screen, never on its own, so a skill
    the person deleted stays deleted until they ask. A present skill folder is
    never replaced.
-7. **Discovery through the instructions, not per-CLI copies.** Claude Code does
+7. *Revised by [ADR 049](049-skills-for-claude-code.md) (0.2.33): irori now
+   gives Claude Code the skills as links in a folder it adds, outside the folder.*
+   **Discovery through the instructions, not per-CLI copies.** Claude Code does
    not read `.agents/skills` ([SKILLS](../SKILLS.md#reach)). Rather than a
    second copy in `.claude/skills`, every irori agent request names the command
    and says the procedures are in the folder's `.agents/skills`; the starter
