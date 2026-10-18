@@ -835,6 +835,8 @@ export interface HostAPI {
   ): Promise<{ version: string; problem?: string }>;
   /** Shows a routine's folder in the system file manager. */
   revealRoutine(ref: import('./routines').RoutineRef): Promise<void>;
+  /** Moves a routine's folder to the system trash and forgets its review and runs on this device. */
+  deleteRoutine(ref: import('./routines').RoutineRef): Promise<void>;
   /** A routine's files as they are now, and what changed since the person confirmed them. */
   reviewRoutine(ref: import('./routines').RoutineRef): Promise<import('./routines').RoutineReview>;
   /** Starts a routine and returns its run's id; nothing else ever starts one. */

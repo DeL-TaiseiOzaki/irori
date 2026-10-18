@@ -639,6 +639,12 @@ export function RoutinesView({
             reread();
             setOpen(routineKey(ref));
           }}
+          onDeleted={(ref) => {
+            const key = routineKey(ref);
+            setOpen((value) => (value === key ? undefined : value));
+            setLive(({ [key]: _, ...rest }) => rest);
+            reread();
+          }}
         />
       )}
       {entering !== undefined && (

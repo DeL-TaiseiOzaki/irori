@@ -1081,6 +1081,7 @@ app
         const error = await shell.openPath(await routines.folder(ref));
         if (error) throw Error(error);
       },
+      deleteRoutine: (ref) => routines.remove(ref, (folder) => shell.trashItem(folder)),
       saveRoutineSource: (ref, text, version) => routines.saveSource(ref, text, version),
       reviewRoutine: (ref) => routines.review(ref),
       runRoutine: (ref, input) => routines.run(ref, input),
