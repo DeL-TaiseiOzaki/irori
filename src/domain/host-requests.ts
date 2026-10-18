@@ -17,6 +17,7 @@ import { routineRef, routineRuntimeList, secretName, secretValue } from './routi
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
+import { passphraseLength } from './environment';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -38,6 +39,7 @@ const repository = z
       !value.includes('\0') &&
       value.split('/').every((part) => part && part !== '.' && part !== '..'),
   );
+const passphrase = z.string().min(passphraseLength.min).max(passphraseLength.max);
 const target = z.union([id, z.object({ scopeId: id, repository }).strict()]);
 const cols = z.number().int().min(2).max(500),
   rows = z.number().int().min(1).max(300);
@@ -117,13 +119,15 @@ export const hostArguments = {
   gitInit: z.tuple([id]),
   githubAccount: z.tuple([]),
   environment: z.tuple([]),
-  saveEnvironment: z.tuple([]),
+  saveEnvironment: z.tuple([passphrase.optional()]),
   restoreEnvironment: z.tuple([
     z
       .object({
         scopeIds: z.array(id).max(500),
         agent: z.boolean(),
         routines: z.array(z.string().max(200)).max(500).optional(),
+        secrets: z.array(z.string().max(64)).max(1000).optional(),
+        passphrase: passphrase.optional(),
         parent: path.optional(),
       })
       .strict(),

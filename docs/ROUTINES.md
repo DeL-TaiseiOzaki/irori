@@ -92,8 +92,11 @@ file of each folder, in `routines.json` of the account's private
 `irori-settings` repository, and the JavaScript switch with the other
 preferences; **環境を復元** adds the chosen ones whose folder is absent
 ([ADR 043](decisions/043-routines-in-the-environment.md)). A vault's routines
-travel with the vault's repository. Secrets and reviews stay on each device,
-so a restored routine is reviewed before its first run there.
+travel with the vault's repository. Reviews stay on each device, so a
+restored routine is reviewed before its first run there. Secrets travel only
+when a passphrase is entered with **環境を保存**; they are then sealed with it in
+`routine-keys.json`, and **環境を復元** asks for it to add the ones this device
+lacks ([ADR 047](decisions/047-routine-secrets-in-the-environment.md)).
 
 ## Running one
 
@@ -205,6 +208,8 @@ irori signs in to no provider.
   sealed with the key the OS keeps (Keychain on macOS, DPAPI on Windows, the
   secret service on Linux). Without such a key, as on Linux with only
   `basic_text`, irori stores none and routines naming one do not run.
+  The saved environment carries them only sealed with the person's passphrase
+  ([On another device](#on-another-device)).
 - **Review.** **ルーティンの確認** lists the secrets the routine receives.
   `secrets:` is part of `routine.yaml`, so changing it needs a new review.
 - **In the step.** Each named secret is an environment variable. The step also
