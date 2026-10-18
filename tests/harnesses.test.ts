@@ -292,6 +292,8 @@ test(
       starts.filter((result) => result.status === 'fulfilled' && result.value).length,
       1,
     );
+    // Two windows asking at once: the one that comes second finds it started, not an error.
+    assert.ok(starts.every((result) => result.status === 'fulfilled'));
     await done;
     assert.equal((await calls()).filter((call: any) => call.type === 'prompt').length, 1);
     const restarted = new AgentService(files, () => {});

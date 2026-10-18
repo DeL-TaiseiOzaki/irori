@@ -44,3 +44,45 @@ export function onlyIn(tabs: WorkspaceProfile[], id: string): string[] {
   const elsewhere = new Set(tabs.filter((item) => item.id !== id).flatMap((item) => item.scopeIds));
   return tab.scopeIds.filter((scopeId) => !elsewhere.has(scopeId));
 }
+
+/** What the host keeps of a window's tab: the workspace and the vaults it shows. */
+export type OpenTab = Pick<WorkspaceProfile, 'id' | 'scopeIds'>;
+
+/**
+ * The tabs each of irori's windows has open (ADR 051). A window closes as its tabs
+ * would: what another window still has open is left running and connected.
+ */
+export class WindowTabs {
+  private open = new Map<number, OpenTab[]>();
+  set(window: number, tabs: OpenTab[]) {
+    this.open.set(window, tabs);
+  }
+  forget(window: number) {
+    this.open.delete(window);
+  }
+  /** The tabs the windows other than `window` have open, each workspace once. */
+  elsewhere(window: number): OpenTab[] {
+    const others = new Map<string, OpenTab>();
+    for (const [key, tabs] of this.open)
+      if (key !== window)
+        for (const tab of tabs) {
+          const seen = others.get(tab.id);
+          others.set(tab.id, {
+            id: tab.id,
+            scopeIds: [...new Set([...(seen?.scopeIds ?? []), ...tab.scopeIds])],
+          });
+        }
+    return [...others.values()];
+  }
+  /** What only `window` has open: closing it may stop their runs and release their clouds. */
+  only(window: number): { workspaces: string[]; scopeIds: string[] } {
+    const tabs = this.open.get(window) ?? [];
+    const others = this.elsewhere(window);
+    const workspaces = new Set(others.map((tab) => tab.id));
+    const scopeIds = new Set(others.flatMap((tab) => tab.scopeIds));
+    return {
+      workspaces: [...new Set(tabs.map((tab) => tab.id))].filter((id) => !workspaces.has(id)),
+      scopeIds: [...new Set(tabs.flatMap((tab) => tab.scopeIds))].filter((id) => !scopeIds.has(id)),
+    };
+  }
+}

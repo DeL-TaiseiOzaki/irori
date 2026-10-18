@@ -4,6 +4,7 @@ import {
   clipboard,
   dialog,
   ipcMain,
+  Menu,
   nativeTheme,
   safeStorage,
   shell,
@@ -79,8 +80,14 @@ import {
   type Space,
 } from '../domain/types';
 import type { NoteRef } from '../domain/note-operations';
+import { isDamaged } from '../domain/conversation';
+import { WindowTabs } from '../domain/workspace-tabs';
 import { startDictation } from './dictation';
-let window: BrowserWindow | undefined;
+import { SerialQueue } from './serial-queue';
+/** irori's windows (ADR 051): each keeps its own workspace tabs over the one host. */
+const windows = new Set<BrowserWindow>();
+/** The window a dialog belongs to: the one in front, else the newest. */
+const front = () => BrowserWindow.getFocusedWindow() ?? [...windows].at(-1)!;
 let closing = false;
 const watchers = new Map<string, FSWatcher>();
 if (process.platform === 'win32') app.setAppUserModelId('com.squirrel.irori.irori');
@@ -89,6 +96,7 @@ if (process.env.IRORI_DATA_DIR) app.setPath('userData', path.resolve(process.env
 const ownsDeviceData = !squirrelStartup && app.requestSingleInstanceLock();
 if (!ownsDeviceData) app.quit();
 app.on('second-instance', () => {
+  const window = [...windows].at(-1);
   if (window?.isMinimized()) window.restore();
   window?.show();
   window?.focus();
@@ -108,10 +116,12 @@ app
     const settings = new SettingsService(app.getPath('userData'));
     // The chosen theme reaches Chromium before the window exists, so the first
     // paint is already the reader's, without the renderer having to repaint.
+    let languageChanged = () => {};
     const saveSettings = async (patch: Partial<DeviceSettings>) => {
       const next = await settings.save(patch);
       nativeTheme.themeSource = nativeThemeSource(next.theme);
       setLanguage(next.language);
+      languageChanged();
       return next;
     };
     const device = await settings.read();
@@ -121,9 +131,14 @@ app
     const search = new SearchService(files);
     const graphIndex = new GraphIndexService(files, search);
     const drafts = new DraftService(files);
-    const emit = (event: HostEvent) => {
-      if (window && !window.isDestroyed()) window.webContents.send('irori:event', event);
+    /** Tells every window, or only `to`. */
+    const emit = (event: HostEvent, to?: BrowserWindow) => {
+      for (const window of to ? [to] : windows)
+        if (!window.isDestroyed()) window.webContents.send('irori:event', event);
     };
+    const tabs = new WindowTabs();
+    // A terminal is its window's: its output goes there alone once the window is known.
+    const terminalOwners = new Map<string, BrowserWindow>();
     const updates = new UpdateService({
       currentVersion: appVersion,
       platform: process.platform,
@@ -151,7 +166,11 @@ app
     );
     const terminals = new TerminalService(
       files,
-      (event) => emit({ type: 'terminal', event }),
+      (event) => {
+        const owner = terminalOwners.get(event.id);
+        if (event.type === 'exit') terminalOwners.delete(event.id);
+        emit({ type: 'terminal', event }, owner);
+      },
       (scopeId) => you.rootOf(scopeId),
     );
     // Conversations kept per space, CLI and checkout become conversations (ADR 017 D8),
@@ -409,37 +428,6 @@ app
     const entry = await realpath(path.resolve(__dirname, '../dist/index.html'));
     const icon = path.resolve(__dirname, '../assets/irori-icon.png');
     app.dock?.setIcon(icon);
-    window = new BrowserWindow({
-      width: 1440,
-      height: 940,
-      minWidth: 980,
-      minHeight: 680,
-      backgroundColor: '#faf9f6',
-      title: 'irori',
-      icon,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.cjs'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        webSecurity: true,
-      },
-    });
-    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    // A drive or sync app often gets ready while irori is in the background.
-    window.on('focus', () => void cloud.retry(undefined, true));
-    // A reloaded/crashed renderer cannot keep controlling its old sessions.
-    const stopRendererSessions = () => {
-      void terminals.closeAll();
-      void routines.stopAll();
-      void agents.cancel();
-    };
-    window.webContents.on('render-process-gone', stopRendererSessions);
-    window.webContents.on('did-start-loading', stopRendererSessions);
-    window.webContents.on('will-navigate', (event) => event.preventDefault());
-    window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
-      callback(false),
-    );
     async function changed<T>(scopeId: string, operation: () => Promise<T>) {
       try {
         return await operation();
@@ -654,7 +642,7 @@ app
       return changed(scopeId, operation);
     }
     async function openFile(filename: string) {
-      const choice = await dialog.showMessageBox(window!, {
+      const choice = await dialog.showMessageBox(front(), {
         type: 'question',
         message: t('外部アプリで開きますか？', 'Open in an external app?'),
         detail: filename,
@@ -676,10 +664,9 @@ app
       installUpdate: () => updates.install(),
       cancelUpdate: () => updates.cancel(),
       restartToUpdate: async () => {
-        // The same shutdown as closing the window; the switch happens once it is agreed.
+        // The same shutdown as closing the last window; the switch happens once it is agreed.
         if (!(await stop(() => updates.restart()))) return false;
-        closing = true;
-        window?.close();
+        closeAll();
         return true;
       },
       moveNote: (ref, destination, links) =>
@@ -705,7 +692,7 @@ app
       },
       restoreSource: async (source) => {
         const bytes = await knowledge.bytes(source);
-        const choice = await dialog.showSaveDialog(window!, {
+        const choice = await dialog.showSaveDialog(front(), {
           title: t('保持版を別ファイルに復元', 'Restore the kept copy to another file'),
           defaultPath: path.basename(source.path),
         });
@@ -719,7 +706,7 @@ app
       recoverableCloudWrites: () => leftovers.prepared(),
       unsentDriveChanges: async () => (await leftovers.unsent()).length,
       exportUnsentDriveChanges: async () => {
-        const choice = await dialog.showOpenDialog(window!, {
+        const choice = await dialog.showOpenDialog(front(), {
           title: t('保存先のフォルダ', 'Folder to save to'),
           properties: ['openDirectory', 'createDirectory'],
         });
@@ -745,7 +732,6 @@ app
       deviceSettings: () => settings.read(),
       saveDeviceSettings: (patch) => saveSettings(patch),
       terminalShells: () => terminals.available(),
-      openTerminal: (...args) => terminals.open(...args),
       writeTerminal: (...args) => terminals.write(...args),
       resizeTerminal: (...args) => terminals.resize(...args),
       acknowledgeTerminal: (...args) => terminals.acknowledge(...args),
@@ -899,7 +885,7 @@ app
         if (error) throw Error(error);
       },
       chooseFolder: async () => {
-        const choice = await dialog.showOpenDialog(window!, {
+        const choice = await dialog.showOpenDialog(front(), {
           properties: ['openDirectory'],
           title: t('KBフォルダを選択', 'Choose a KB folder'),
         });
@@ -1101,21 +1087,45 @@ app
       openAttachment: async (id) => openFile(await agents.attachments.opened(id)),
       // The field to type into has the focus already; the system's dictation types there.
       dictate: () => startDictation(),
-    } satisfies HostHandlers;
+    } satisfies Omit<HostHandlers, WindowMethod>;
+    type WindowMethod = 'openTerminal' | 'windowTabs' | 'otherWindows';
+    /** The operations as one window calls them: what it opens is its own (ADR 051). */
+    const windowHandlers = new WeakMap<BrowserWindow, HostHandlers>();
+    function handlersOf(window: BrowserWindow) {
+      const id = window.webContents.id;
+      let own = windowHandlers.get(window);
+      own ??= {
+        ...handlers,
+        openTerminal: async (...args) => {
+          const session = await terminals.open(...args);
+          terminalOwners.set(session.id, window);
+          return session;
+        },
+        windowTabs: (open) => {
+          tabs.set(id, open);
+          for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
+        },
+        otherWindows: () => tabs.elsewhere(id),
+      } satisfies HostHandlers;
+      windowHandlers.set(window, own);
+      return own;
+    }
     ipcMain.handle('irori', async (event, method: unknown, ...args: unknown[]) => {
       try {
+        const window = BrowserWindow.fromWebContents(event.sender);
         if (
-          event.sender !== window?.webContents ||
-          event.senderFrame !== window.webContents.mainFrame ||
+          !window ||
+          !windows.has(window) ||
+          event.senderFrame !== event.sender.mainFrame ||
           !(await isAppDocument(event.senderFrame.url, entry))
         )
           throw Error('Untrusted renderer');
-        return { ok: true, value: await dispatchHost(handlers, method, args) };
+        return { ok: true, value: await dispatchHost(handlersOf(window), method, args) };
       } catch (error) {
         return { ok: false, error: String(error) };
       }
     });
-    // One shutdown at a time, whether the window is closing or an update restarts irori.
+    // One shutdown at a time, whether the last window is closing or an update restarts irori.
     let stopping: Promise<boolean> | undefined;
     function stop(restart?: () => Promise<void>) {
       stopping ??= shutDown(restart).finally(() => {
@@ -1123,11 +1133,11 @@ app
       });
       return stopping;
     }
-    // Stops what the window owns before it closes. `restart` switches to a prepared update
+    // Stops what irori runs before its last window closes. `restart` switches to a prepared update
     // once the person has agreed and every draft is safe; if it fails, the window stays open.
     async function shutDown(restart?: () => Promise<void>) {
       if (git.busy) {
-        await dialog.showMessageBox(window!, {
+        await dialog.showMessageBox(front(), {
           message: restart
             ? t(
                 'Git 操作の完了後に再起動してください。',
@@ -1141,22 +1151,9 @@ app
         });
         return false;
       }
-      // The renderer persists drafts continuously; give it an explicit final opportunity.
-      try {
-        if (!window?.webContents.isCrashed())
-          await window?.webContents.executeJavaScript('window.iroriFlushDraft?.()');
-      } catch (error) {
-        if (!window?.webContents.isCrashed()) {
-          await dialog.showMessageBox(window!, {
-            type: 'error',
-            message: t('下書きを保存できませんでした。', 'Could not save the draft.'),
-            detail: String(error),
-          });
-          return false;
-        }
-      }
+      for (const window of windows) if (!(await flushDraft(window))) return false;
       if (agents.anyBusy || terminals.busy || routines.busy) {
-        const answer = await dialog.showMessageBox(window!, {
+        const answer = await dialog.showMessageBox(front(), {
           message: restart
             ? t(
                 '実行中のエージェント・ルーティン・ターミナルを停止して再起動しますか？',
@@ -1182,7 +1179,7 @@ app
         await drafts.idle();
         await agents.flush();
       } catch {
-        await dialog.showMessageBox(window!, {
+        await dialog.showMessageBox(front(), {
           type: 'error',
           message: t(
             '会話履歴を保存できませんでした。',
@@ -1197,7 +1194,7 @@ app
       try {
         await cloud.close();
       } catch (error) {
-        await dialog.showMessageBox(window!, {
+        await dialog.showMessageBox(front(), {
           type: 'error',
           message: t(
             'クラウド接続を終了できませんでした。',
@@ -1211,16 +1208,195 @@ app
       await Promise.all([...watchers.values()].map((w) => w.close()));
       return true;
     }
-    window.on('close', (event) => {
+    /** The renderer persists drafts continuously; this gives it an explicit final opportunity. */
+    async function flushDraft(window: BrowserWindow) {
+      try {
+        if (!window.webContents.isCrashed())
+          await window.webContents.executeJavaScript('window.iroriFlushDraft?.()');
+        return true;
+      } catch (error) {
+        if (window.webContents.isCrashed()) return true;
+        await dialog.showMessageBox(window, {
+          type: 'error',
+          message: t('下書きを保存できませんでした。', 'Could not save the draft.'),
+          detail: String(error),
+        });
+        return false;
+      }
+    }
+    /**
+     * What a window leaves behind when others stay open, as closing all its tabs would
+     * (ADR 037, 051): its terminals, the runs of vaults no other window has open and the
+     * irori agent's conversations of workspaces no other window has.
+     */
+    async function windowShare(window: BrowserWindow) {
+      const only = tabs.only(window.webContents.id);
+      const yours = (await you.load()).id;
+      const conversations = agents.busy(yours)
+        ? (
+            await Promise.all(
+              only.workspaces.map((workspace) => agents.conversationList(yours, workspace)),
+            )
+          ).flatMap((rows) =>
+            rows.flatMap((row) => (!isDamaged(row) && row.running ? [row.id] : [])),
+          )
+        : [];
+      return {
+        vaults: only.scopeIds,
+        running: only.scopeIds.filter((scopeId) => agents.busy(scopeId)),
+        conversations,
+        terminals: [...terminalOwners].flatMap(([id, owner]) =>
+          owner === window && terminals.isOpen(id) ? [id] : [],
+        ),
+        stop: async () => {
+          await Promise.all([
+            ...only.scopeIds.map((scopeId) => agents.cancel(scopeId)),
+            ...conversations.map((id) => agents.cancel(yours, id)),
+            ...[...terminalOwners].flatMap(([id, owner]) =>
+              owner === window ? [terminals.close(id)] : [],
+            ),
+          ]);
+          // Its vaults' cloud folders are let go unless another window has the vault.
+          for (const scopeId of only.scopeIds) {
+            if (!files.list().some((space) => space.scopeId === scopeId)) continue;
+            for (const connection of await cloud.connections(scopeId).catch(() => []))
+              if (['mounted', 'waiting', 'error'].includes(connection.state))
+                await changeCloud(scopeId, () =>
+                  cloud.disconnect(scopeId, connection.mountId),
+                ).catch((error) => console.warn('Cloud folder stayed connected', String(error)));
+          }
+        },
+      };
+    }
+    /** Closes one of several windows once the person agrees to stop what is only its own. */
+    async function closeWindow(window: BrowserWindow) {
+      if (!(await flushDraft(window))) return false;
+      const share = await windowShare(window);
+      if (share.running.length || share.conversations.length || share.terminals.length) {
+        const answer = await dialog.showMessageBox(window, {
+          message: t(
+            'このウィンドウだけで開いているエージェント・ターミナルを停止して閉じますか？',
+            'Stop the agents and terminals open only in this window and close it?',
+          ),
+          buttons: [t('戻る', 'Back'), t('停止して閉じる', 'Stop and close')],
+          cancelId: 0,
+        });
+        if (answer.response !== 1) return false;
+      }
+      await share.stop();
+      return true;
+    }
+    function closeAll() {
+      closing = true;
+      for (const window of windows) window.close();
+    }
+    // Windows close one at a time, so the last one is always known to be the last.
+    const closings = new SerialQueue();
+    const leaving = new WeakSet<BrowserWindow>();
+    app.on('before-quit', (event) => {
       if (closing) return;
+      // Quitting stops irori as closing its last window would, asking once.
       event.preventDefault();
-      void stop().then((done) => {
-        if (!done) return;
-        closing = true;
-        window?.close();
+      void closings.run(async () => {
+        if (!closing && (await stop())) closeAll();
       });
     });
-    await window.loadFile(entry);
+    function createWindow() {
+      const from = BrowserWindow.getFocusedWindow() ?? [...windows].at(-1);
+      const bounds = from && !from.isMaximized() && !from.isFullScreen() && from.getBounds();
+      const window = new BrowserWindow({
+        width: bounds ? bounds.width : 1440,
+        height: bounds ? bounds.height : 940,
+        // A new window steps down from the one it came from rather than covering it.
+        ...(bounds && { x: bounds.x + 28, y: bounds.y + 28 }),
+        minWidth: 980,
+        minHeight: 680,
+        backgroundColor: '#faf9f6',
+        title: 'irori',
+        icon,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.cjs'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          webSecurity: true,
+        },
+      });
+      const id = window.webContents.id;
+      windows.add(window);
+      window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      // A drive or sync app often gets ready while irori is in the background.
+      window.on('focus', () => void cloud.retry(undefined, true));
+      // A reloaded/crashed renderer cannot keep controlling its old sessions. Alone, it
+      // stopped everything; beside other windows, only what was its own.
+      const stopRendererSessions = () => {
+        if (windows.size <= 1) {
+          void terminals.closeAll();
+          void routines.stopAll();
+          void agents.cancel();
+        } else
+          void windowShare(window)
+            .then((share) => share.stop())
+            .catch((error) => console.warn('Window sessions could not be stopped', String(error)));
+        tabs.forget(id);
+      };
+      window.webContents.on('render-process-gone', stopRendererSessions);
+      window.webContents.on('did-start-loading', stopRendererSessions);
+      window.webContents.on('will-navigate', (event) => event.preventDefault());
+      window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
+        callback(false),
+      );
+      window.on('close', (event) => {
+        if (closing || leaving.has(window)) return;
+        event.preventDefault();
+        void closings.run(async () => {
+          if (closing || window.isDestroyed()) return;
+          if (windows.size > 1) {
+            if (!(await closeWindow(window))) return;
+            leaving.add(window);
+            window.close();
+          } else if (await stop()) closeAll();
+        });
+      });
+      window.on('closed', () => {
+        windows.delete(window);
+        tabs.forget(id);
+        for (const [terminal, owner] of terminalOwners)
+          if (owner === window) terminalOwners.delete(terminal);
+        emit({ type: 'windows' });
+      });
+      return window.loadFile(entry);
+    }
+    /** The menu, in the reader's language: File carries New Window (ADR 051). */
+    const setMenu = () => {
+      const newWindow = {
+        id: 'new-window',
+        label: t('新しいウィンドウ', 'New Window'),
+        accelerator: 'CmdOrCtrl+Shift+N',
+        click: () => void createWindow().catch((error) => console.error(error)),
+      };
+      const mac = process.platform === 'darwin';
+      Menu.setApplicationMenu(
+        Menu.buildFromTemplate([
+          ...(mac ? [{ role: 'appMenu' as const }] : []),
+          {
+            label: t('ファイル', 'File'),
+            submenu: [
+              newWindow,
+              { type: 'separator' },
+              mac ? { role: 'close' as const } : { role: 'quit' as const },
+            ],
+          },
+          { role: 'editMenu' },
+          { role: 'viewMenu' },
+          { role: 'windowMenu' },
+        ]),
+      );
+      app.dock?.setMenu(Menu.buildFromTemplate([newWindow]));
+    };
+    setMenu();
+    languageChanged = setMenu;
+    await createWindow();
     // An installed irori looks for a newer published version by itself; a development run and
     // the package smoke (IRORI_AUTOMATIC_UPDATE_CHECKS=0) only check when asked.
     if (app.isPackaged && process.env.IRORI_AUTOMATIC_UPDATE_CHECKS !== '0') updates.watch();

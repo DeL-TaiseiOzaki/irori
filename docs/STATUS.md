@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Several windows, 2026-10-18 (**0.2.32**, pull request open):
+[ADR 051](decisions/051-multiple-windows.md). **ファイル > 新しいウィンドウ**
+(Ctrl/Cmd+Shift+N, and the Dock menu on macOS) opens another window over the same host.
+- `src/host/main.ts` keeps a set of windows: `emit` goes to every window, a terminal's
+  output only to the window that opened it. Each window reports its tabs
+  (`windowTabs`, `WindowTabs` in `src/domain/workspace-tabs.ts`); closing a window
+  that is not the last stops, once agreed, its terminals and the runs of vaults and
+  irori agent workspaces only it has, and disconnects those vaults' clouds. The last
+  window, Quit (`before-quit`) and an update's restart keep the old full shutdown.
+- The renderer leaves alone what `otherWindows` reports when a tab closes or the
+  start screen removes a registration. `AgentService.startNextQueued` checks again
+  that the conversation is not running after reading its queue.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`
+  (`scripts/windows-ui-smoke.ts`). Not tried on Windows or macOS.
+
 The shared Schema's settings and the irori agent's files, 2026-10-18 (**0.2.26**,
 pull request open): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
 The shared Schema takes rules and hooks like the other Schemas, and **環境を保存**

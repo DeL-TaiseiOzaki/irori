@@ -357,6 +357,10 @@ export const hostArguments = {
   attachmentImage: z.tuple([id]),
   openAttachment: z.tuple([id]),
   dictate: z.tuple([]),
+  windowTabs: z.tuple([
+    z.array(z.object({ id, scopeIds: z.array(id).max(200) }).strict()).max(100),
+  ]),
+  otherWindows: z.tuple([]),
   respond: z.tuple([
     id,
     z.boolean(),

@@ -6,6 +6,7 @@ import { WorkspaceTabs } from './WorkspaceTabs';
 import {
   closeTab as closeWorkspaceTab,
   onlyIn,
+  type OpenTab,
   openTab,
   replaceTab,
 } from '../domain/workspace-tabs';
@@ -578,6 +579,11 @@ function App() {
   useEffect(() => {
     if (workspace) setWorkspaceTabs((all) => replaceTab(all, workspace));
   }, [workspace]);
+  // irori's other windows and their tabs (ADR 051): what they have open stays open.
+  const [otherTabs, setOtherTabs] = useState<OpenTab[]>([]);
+  useEffect(() => {
+    void host.windowTabs(workspaceTabs.map(({ id, scopeIds }) => ({ id, scopeIds }))).catch(report);
+  }, [workspaceTabs]);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
   // Every Schema from the settings: the shared one, the irori agent's and each vault's.
@@ -1331,10 +1337,13 @@ function App() {
   useEffect(() => {
     void refreshSpaces().catch(report);
     void host.agents().then(setInfos).catch(report);
+    void host.otherWindows().then(setOtherTabs).catch(report);
     return hostEvents.onEvent((event) => {
       if (event.type === 'files') {
         bump(event.scopeId);
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();
+      } else if (event.type === 'windows') {
+        void host.otherWindows().then(setOtherTabs).catch(report);
       } else if (event.type === 'vaults') {
         // The irori agent registered a vault; the workspace on show takes it in.
         const joined = event.workspace;
@@ -1709,9 +1718,11 @@ function App() {
       bump();
     }
   }
-  /** Disconnects the folders of vaults that no open tab, `others`, has. */
-  async function release(scopeIds: string[], others: WorkspaceProfile[]) {
-    const kept = new Set(others.flatMap((tab) => tab.scopeIds));
+  /** Disconnects the folders of vaults that no open tab, `others` or another window's, has. */
+  async function release(scopeIds: string[], others: OpenTab[]) {
+    const kept = new Set(
+      [...others, ...(await host.otherWindows())].flatMap((tab) => tab.scopeIds),
+    );
     for (const id of scopeIds) {
       if (kept.has(id) || !spaces.some((space) => space.scopeId === id)) continue;
       for (const connection of await host.cloudConnections(id).catch((error) => {
@@ -2471,9 +2482,15 @@ function App() {
   async function closeWorkspace(profile: WorkspaceProfile) {
     if (gitBusy || connecting || goingHome || sending) return;
     try {
-      const scopes = onlyIn(workspaceTabs, profile.id).filter((id) => runningScopes.includes(id));
+      // What another window has open goes on there.
+      const elsewhere = await host.otherWindows();
+      const scopes = onlyIn(workspaceTabs, profile.id).filter(
+        (id) => runningScopes.includes(id) && !elsewhere.some((tab) => tab.scopeIds.includes(id)),
+      );
       const conversations =
-        you?.state === 'ready' && runningScopes.includes(you.id)
+        you?.state === 'ready' &&
+        runningScopes.includes(you.id) &&
+        !elsewhere.some((tab) => tab.id === profile.id)
           ? (await host.agentConversations(you.id, profile.id)).flatMap((row) =>
               !isDamaged(row) && row.running ? [row.id] : [],
             )
@@ -2613,7 +2630,7 @@ function App() {
           onVaultAgent={act.chooseVault}
           onRestored={act.environmentRestored}
           onOpen={(profile) => void openWorkspace(profile)}
-          open={workspaceTabs}
+          open={[...workspaceTabs, ...otherTabs]}
         />
         {leavingDialog}
       </div>
