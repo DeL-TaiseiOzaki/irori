@@ -86,6 +86,16 @@ try {
   await island.getByRole('button', { name: 'irori agent を用意する' }).click();
   const composer = island.getByLabel('irori agent への指示');
   await expect(composer).toBeVisible();
+  // irori mode hides the page, so the window's errors show over it instead.
+  const large = path.join(base, 'large.bin');
+  await writeFile(large, Buffer.alloc(25 * 1024 * 1024 + 1));
+  await island.locator('.composer input[type=file]').setInputFiles(large);
+  const windowError = page.locator('.window-error');
+  await expect(windowError).toHaveAttribute('role', 'alert');
+  await expect(windowError).toContainText('large.bin は 25 MB を超えるため添付できません。');
+  await page.screenshot({ path: 'test-results/irori-window-error.png' });
+  await windowError.getByRole('button', { name: '閉じる', exact: true }).click();
+  await expect(windowError).toHaveCount(0);
   expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).toContain('# irori agent');
   // It comes with the standard skills for setting up vaults.
   expect(
@@ -343,7 +353,8 @@ try {
   // The workspace chooses another folder for the irori agent (ADR 044): it is set
   // up there by itself, and the default comes back with a click.
   const chosen = path.join(base, 'Lab agent');
-  await mkdir(chosen);
+  await mkdir(path.join(chosen, '.claude'), { recursive: true });
+  await writeFile(path.join(chosen, '.claude', 'settings.json'), '{}\n');
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as never;
   }, chosen);
@@ -355,6 +366,11 @@ try {
   await expect(island.getByRole('region', { name: 'irori agent の作業場所' })).toContainText(
     chosen,
   );
+  // A folder that already holds files is refused where the button is (#269).
+  await island.getByRole('button', { name: 'irori agent を用意する' }).click();
+  await expect(island.getByRole('alert')).toContainText(`${chosen} にはすでにファイルがあります。`);
+  await page.screenshot({ path: 'test-results/irori-agent-setup-error.png' });
+  await expect(island.getByRole('button', { name: 'irori agent を用意する' })).toBeEnabled();
   expect(
     JSON.parse(await readFile(path.join(files.dataDir, 'irori-agent-folders.json'), 'utf8')),
   ).toEqual({ [lab!.id]: chosen });
@@ -362,7 +378,7 @@ try {
   await expect(composer).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, a hand-off to a vault agent with irori call, its request answered from irori mode after a view change, and its report, the map’s hand-off line, vaults held while your AI works, your AI kept out of the vaults, no definitions written and each vault agent named on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, an error shown over the window in irori mode, a hand-off to a vault agent with irori call, its request answered from irori mode after a view change, and its report, the map’s hand-off line, vaults held while your AI works, your AI kept out of the vaults, no definitions written and each vault agent named on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace, a folder already holding files refused beside the button. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

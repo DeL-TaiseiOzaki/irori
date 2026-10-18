@@ -9,6 +9,7 @@ import { FileService, watcherIgnored, watchRegistrationChanges } from '../src/ho
 import type { Space } from '../src/domain/types';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { setTimeout as delay } from 'node:timers/promises';
+import { execFileSync } from 'node:child_process';
 
 function gate() {
   let release!: () => void;
@@ -43,9 +44,31 @@ test('Watcher boundaries exclude tool caches and nested vaults, retaining knowle
     '.turbo',
     '.cache',
   ]) {
-    assert.equal(ignored(path.join(space.root, name)), true, name);
+    // The vault's own .git is entered only for the entries that say what is committed.
+    if (name !== '.git') assert.equal(ignored(path.join(space.root, name)), true, name);
     assert.equal(ignored(path.join(space.root, 'sub', name, 'generated.md')), true, name);
   }
+  for (const relative of [
+    '.git',
+    '.git/index',
+    '.git/HEAD',
+    '.git/packed-refs',
+    '.git/refs',
+    '.git/refs/heads',
+    '.git/refs/heads/main',
+    '.git/refs/heads/topic/one',
+  ])
+    assert.equal(ignored(path.join(space.root, relative)), false, relative);
+  for (const relative of [
+    '.git/objects',
+    '.git/objects/ab/cdef',
+    '.git/index.lock',
+    '.git/logs/HEAD',
+    '.git/refs/remotes/origin/main',
+    '.git/FETCH_HEAD',
+    '.git/modules/sub/index',
+  ])
+    assert.equal(ignored(path.join(space.root, relative)), true, relative);
   for (const relative of [
     '.DS_Store',
     'sub/.DS_Store',
@@ -335,5 +358,68 @@ test(
     const seen = (events: string[]) => [...new Set(events.filter(Boolean))];
     assert.deepEqual(seen(outerEvents), ['note.md']);
     assert.deepEqual(seen(innerEvents), ['note.md']);
+  },
+);
+
+test(
+  'A commit made outside irori reaches the vault watcher through .git, without its objects',
+  { timeout: 15000 },
+  async (t) => {
+    const base = await mkdtemp(path.join(tmpdir(), 'irori-host-watch-git-'));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const root = path.join(base, 'KB');
+    await mkdir(root);
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args], {
+        cwd: root,
+        stdio: 'pipe',
+      });
+    git('init', '-q', '-b', 'main');
+    await writeFile(path.join(root, 'note.md'), '# Note\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'First');
+    const space: Space = {
+      schemaVersion: 1,
+      scopeId: randomUUID(),
+      root,
+      name: 'Repo',
+      category: 'personal',
+      contents: [],
+    };
+    const watcher = chokidar.watch(root, {
+      ignoreInitial: true,
+      depth: 6,
+      followSymlinks: false,
+      ignored: watcherIgnored(space, [space]),
+    });
+    t.after(() => watcher.close());
+    const events: string[] = [];
+    watcher.on('all', (_, filename) =>
+      events.push(path.relative(root, filename).replaceAll('\\', '/')),
+    );
+    await new Promise<void>((resolve, reject) => {
+      watcher.once('ready', resolve);
+      watcher.once('error', reject);
+    });
+    const watched = Object.keys(watcher.getWatched()).map((folder) =>
+      path.relative(root, folder).replaceAll('\\', '/'),
+    );
+    for (const relative of ['.git/objects', '.git/logs', '.git/hooks'])
+      assert.ok(!watched.includes(relative), relative);
+    await writeFile(path.join(root, 'note.md'), '# Note\n\nEdited\n');
+    for (let i = 0; i < 100 && !events.includes('note.md'); i++) await delay(50);
+    assert.ok(events.includes('note.md'));
+    events.length = 0;
+    // Only Git's own files change: the working tree already holds the edit.
+    git('add', '-A');
+    git('commit', '-q', '-m', 'Second');
+    for (let i = 0; i < 100 && !events.some((name) => name.startsWith('.git/')); i++)
+      await delay(50);
+    assert.ok(
+      events.some((name) => name === '.git/index' || name.startsWith('.git/refs/heads/')),
+      events.join(', '),
+    );
+    assert.ok(!events.some((name) => name.startsWith('.git/objects')), events.join(', '));
+    assert.ok(!events.includes('note.md'), events.join(', '));
   },
 );

@@ -260,6 +260,9 @@ export function AgentColumn({
     else draft.setText(value);
   }
   const [sending, setSending] = useState(false);
+  // Why setting up the irori agent failed, beside its button: irori mode shows no page banner.
+  const [setupError, setSetupError] = useState('');
+  useEffect(() => setSetupError(''), [you?.root]);
   const submitting = useRef(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   // The conversation's own queue: it waits for that conversation's run alone.
@@ -887,14 +890,20 @@ export function AgentColumn({
             disabled={sending}
             onClick={() => {
               setSending(true);
+              setSetupError('');
               void onCreateYou()
-                .catch(report)
+                .catch((error) => setSetupError(errorText(error)))
                 .finally(() => setSending(false));
             }}
           >
             <Icon name="sparkles" size={14} />
             {t('irori agent を用意する', 'Set up the irori agent')}
           </button>
+          {setupError && (
+            <p className="your-ai-setup-error" role="alert">
+              {setupError}
+            </p>
+          )}
         </div>
       )}
       {!irori && !space && (
