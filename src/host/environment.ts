@@ -17,6 +17,7 @@ import {
   environmentFile,
   environmentPreferences,
   environmentRepository,
+  keysFile,
   routinesFile,
   type EnvironmentRestore,
   type EnvironmentState,
@@ -29,6 +30,8 @@ import type { GitService } from '../git/service';
 import type { FileService } from './files';
 import { ifPresent } from './local-json';
 import { addRoutine, packRoutines, routineHere, storedRoutines } from './environment-routines';
+import { openKeys, sealedKeys, sealKeys } from './environment-keys';
+import type { SecretStore } from './keystore';
 import { fromSavedEnvironment } from './vault-rename';
 import { inspectRepository, workspaceProfile, type WorkspaceService } from './workspaces';
 
@@ -78,6 +81,8 @@ export interface EnvironmentHost {
     read(): Promise<DeviceSettings>;
     save(patch: Partial<DeviceSettings>): Promise<unknown>;
   };
+  /** This device's routine secrets, sealed with its OS-held key. */
+  secrets: Pick<SecretStore, 'list' | 'values' | 'update'>;
   /** The irori agent's folder on this device. */
   agentRoot: () => Promise<string>;
   /** Registers through the host's own guards and starts watching the vault. */
@@ -186,10 +191,16 @@ export class EnvironmentService {
   private readRoutines(full: string) {
     return this.readFile(full, routinesFile, storedRoutines);
   }
+  /** The routine secrets saved beside the environment, still sealed (ADR 047). */
+  private readKeys(full: string) {
+    return this.readFile(full, keysFile, sealedKeys);
+  }
   async state(): Promise<EnvironmentState> {
     const { login, full, exists } = await this.place(false);
     const saved = exists ? (await this.read(full))?.value : undefined;
     const savedRoutines = saved ? ((await this.readRoutines(full))?.value.routines ?? []) : [];
+    const savedKeys = saved ? (await this.readKeys(full))?.value.names : undefined;
+    const keys = await this.host.secrets.list();
     const here = await this.vaults();
     const agentHere = await this.agentRepository();
     const local = await this.local(here, agentHere);
@@ -203,6 +214,8 @@ export class EnvironmentService {
         ...(local.agent && { agent: local.agent.repository }),
         routines: routines.routines.length,
         routinesLeft: routines.left,
+        secrets: keys.names,
+        secretsAvailable: keys.available,
       },
       ...(saved && {
         saved: {
@@ -228,19 +241,36 @@ export class EnvironmentService {
               here: await routineHere(agentRoot, folder),
             })),
           ),
+          ...(savedKeys && {
+            secrets: savedKeys.map((name) => ({ name, here: keys.names.includes(name) })),
+          }),
         },
       }),
       parent: await this.host.defaultParent(),
     };
   }
-  /** Replaces the saved environment with this device's. */
-  async save(): Promise<EnvironmentState> {
+  /**
+   * Replaces the saved environment with this device's. With a passphrase the
+   * saved secrets are replaced by this device's, sealed with it; without one
+   * the saved secrets stay as they are.
+   */
+  async save(passphrase?: string): Promise<EnvironmentState> {
     const { full } = await this.place(true);
-    // Both files are read first, so a damaged one stops the save before either is written.
+    // Every file is read first, so a damaged one stops the save before any is written.
     const previous = await this.read(full);
     const previousRoutines = await this.readRoutines(full);
+    const previousKeys = passphrase === undefined ? undefined : await this.readKeys(full);
     const value = await this.local();
     const { routines } = await packRoutines(await this.host.agentRoot());
+    // Opened with the device's key and sealed again in memory, before anything is written.
+    const keys =
+      passphrase === undefined
+        ? undefined
+        : await sealKeys(
+            await this.host.secrets.values((await this.host.secrets.list()).names),
+            passphrase,
+            value.savedAt,
+          );
     await this.host.github.writeFile(
       full,
       environmentFile,
@@ -255,6 +285,14 @@ export class EnvironmentService {
         `${JSON.stringify({ schemaVersion: 1, savedAt: value.savedAt, routines }, null, 2)}\n`,
         "Save the irori agent's routines",
         previousRoutines?.sha,
+      );
+    if (keys)
+      await this.host.github.writeFile(
+        full,
+        keysFile,
+        `${JSON.stringify(keys, null, 2)}\n`,
+        'Save the routine secrets, sealed with a passphrase',
+        previousKeys?.sha,
       );
     return this.state();
   }
@@ -278,15 +316,18 @@ export class EnvironmentService {
           'This GitHub account has no saved environment.',
         ),
       );
-    const parent = input.parent ?? (await this.host.defaultParent());
-    await fs.mkdir(parent, { recursive: true });
     const result: EnvironmentRestore = {
       restored: [],
       failed: [],
       workspaces: 0,
       routines: [],
+      secrets: [],
       agent: 'unchanged',
     };
+    // A wrong passphrase stops the restore before anything is cloned.
+    if (input.secrets?.length) result.secrets = await this.restoreKeys(full, input);
+    const parent = input.parent ?? (await this.host.defaultParent());
+    await fs.mkdir(parent, { recursive: true });
     // A saved vault's id here: its own, or that of a checkout of the same repository.
     const ids = new Map<string, string>();
     const here = await this.vaults();
@@ -337,6 +378,33 @@ export class EnvironmentService {
     result.workspaces = await this.host.workspaces.adopt(mapped);
     await this.host.settings.save(saved.preferences);
     return result;
+  }
+  /**
+   * Opens the saved secrets with the passphrase and seals the chosen ones this
+   * device lacks with its own key. A secret already here is left as it is.
+   */
+  private async restoreKeys(full: string, input: RestoreEnvironment) {
+    const saved = (await this.readKeys(full))?.value;
+    if (!saved)
+      throw Error(
+        t(
+          'この GitHub アカウントには保存されたシークレットがありません。',
+          'This GitHub account has no saved secrets.',
+        ),
+      );
+    if (!input.passphrase)
+      throw Error(
+        t('シークレットの復元には合言葉が必要です。', 'Restoring secrets needs the passphrase.'),
+      );
+    const values = await openKeys(saved, input.passphrase);
+    const here = (await this.host.secrets.list()).names;
+    const added = Object.fromEntries(
+      Object.entries(values).filter(
+        ([name]) => input.secrets!.includes(name) && !here.includes(name),
+      ),
+    );
+    if (Object.keys(added).length) await this.host.secrets.update(added);
+    return Object.keys(added);
   }
   /**
    * Adds the chosen saved routines to the irori agent's folder, after it was

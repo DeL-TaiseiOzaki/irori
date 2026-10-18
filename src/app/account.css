@@ -19,6 +19,21 @@
   gap: 6px;
   margin-top: 8px;
 }
+.account-passphrase,
+.modal .restore-list .restore-passphrase {
+  display: grid;
+  grid-template-columns: none;
+  gap: 4px;
+  border: 0;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.restore-unavailable {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
 .restore-environment .restore-source,
 .restore-environment .restore-workspaces {
   margin: 0 0 14px;

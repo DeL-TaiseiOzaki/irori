@@ -7,6 +7,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { EnvironmentService } from '../src/host/environment';
+import { reversibleStorage, SecretStore } from '../src/host/keystore';
 import { GitService } from '../src/git/service';
 import { GitHubCli } from '../src/git/github';
 import { GitProcess } from '../src/git/process';
@@ -32,7 +33,10 @@ async function device(base: string, name: string, gh: string) {
     github,
   );
   const agentRoot = path.join(dir, 'irori', 'you');
+  // A store that protects nothing stands in for the OS key, as in the UI smokes.
+  const secrets = new SecretStore(path.join(dir, 'data', 'secrets.json'), reversibleStorage);
   const environment = new EnvironmentService({
+    secrets,
     files,
     workspaces,
     github,
@@ -44,7 +48,7 @@ async function device(base: string, name: string, gh: string) {
     appVersion: '0.0.0-test',
     now: () => new Date('2026-10-06T00:00:00.000Z'),
   });
-  return { dir, files, workspaces, settings, service, environment, agentRoot };
+  return { dir, files, workspaces, settings, service, environment, agentRoot, secrets };
 }
 
 async function fixture(t: any) {
@@ -120,6 +124,8 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
     agent: 'octo/you',
     routines: 0,
     routinesLeft: [],
+    secrets: [],
+    secretsAvailable: true,
   });
   // Looking creates nothing on the account.
   assert.ok(!(await f.fake.calls()).some((call) => call.includes('POST')));
@@ -196,6 +202,7 @@ test('another device restores the vaults, workspaces, preferences and irori agen
     failed: [],
     workspaces: 1,
     routines: [],
+    secrets: [],
     agent: 'restored',
   });
   const restored = f.b.files.list().find((space) => space.scopeId === research.scopeId);
@@ -221,6 +228,7 @@ test('another device restores the vaults, workspaces, preferences and irori agen
     failed: [],
     workspaces: 0,
     routines: [],
+    secrets: [],
     agent: 'unchanged',
   });
   assert.deepEqual(
@@ -258,6 +266,7 @@ test('restoring keeps what is in the way and reports it', async (t) => {
     failed: [],
     workspaces: 1,
     routines: [],
+    secrets: [],
     agent: 'unchanged',
   });
   assert.equal(other.files.list().length, 0);
@@ -358,6 +367,84 @@ test('routines are not added where the irori agent is not set up', async (t) => 
   await writeFile(file, '{"schemaVersion":1,"routines":[{"folder":"../x"}]}');
   await assert.rejects(f.b.environment.state(), /Could not read routines\.json/);
   await assert.rejects(f.a.environment.save(), /Could not read routines\.json/);
+});
+
+test('routine secrets travel sealed with a passphrase, never as their values', async (t) => {
+  const f = await fixture(t);
+  await deviceA(f);
+  const token = 'xoxb-1111-2222-abcdefghijkl';
+  await f.a.secrets.update({ SLACK_TOKEN: token, GMAIL_TOKEN: 'gmail-refresh-0123456789' });
+  const passphrase = 'correct horse battery';
+
+  // Without a passphrase the secrets stay on the device.
+  await f.a.environment.save();
+  assert.equal(await f.fake.stored('routine-keys.json').catch(() => undefined), undefined);
+  assert.deepEqual((await f.a.environment.state()).local.secrets, ['GMAIL_TOKEN', 'SLACK_TOKEN']);
+
+  await f.a.environment.save(passphrase);
+  const text = await f.fake.stored('routine-keys.json');
+  const sealed = JSON.parse(text);
+  assert.deepEqual(sealed.names, ['GMAIL_TOKEN', 'SLACK_TOKEN']);
+  assert.equal(sealed.cipher, 'aes-256-gcm');
+  // Neither the values, the device's own sealing nor the passphrase reach GitHub.
+  const device = JSON.parse(await readFile(path.join(f.a.dir, 'data', 'secrets.json'), 'utf8'));
+  for (const hidden of [token, 'gmail-refresh', passphrase, device.values.SLACK_TOKEN])
+    assert.ok(!text.includes(hidden));
+  for (const encoding of ['base64', 'hex'] as const)
+    assert.ok(!text.includes(Buffer.from(token).toString(encoding)));
+
+  // Device B already keeps a GMAIL_TOKEN of its own.
+  await f.b.secrets.update({ GMAIL_TOKEN: 'device-b-own-value' });
+  const state = await f.b.environment.state();
+  assert.deepEqual(state.saved?.secrets, [
+    { name: 'GMAIL_TOKEN', here: true },
+    { name: 'SLACK_TOKEN', here: false },
+  ]);
+  // A wrong passphrase stops the restore before anything is cloned.
+  await assert.rejects(
+    f.b.environment.restore({
+      scopeIds: [f.kbScope.scopeId],
+      agent: false,
+      secrets: ['SLACK_TOKEN'],
+      passphrase: 'wrong horse battery',
+    }),
+    /passphrase does not open/,
+  );
+  assert.deepEqual(f.b.files.list(), []);
+  await assert.rejects(
+    f.b.environment.restore({ scopeIds: [], agent: false, secrets: ['SLACK_TOKEN'] }),
+    /needs the passphrase/,
+  );
+
+  const result = await f.b.environment.restore({
+    scopeIds: [],
+    agent: false,
+    secrets: ['SLACK_TOKEN', 'GMAIL_TOKEN'],
+    passphrase,
+  });
+  assert.deepEqual(result.secrets, ['SLACK_TOKEN']);
+  assert.deepEqual(await f.b.secrets.values(['SLACK_TOKEN', 'GMAIL_TOKEN']), {
+    SLACK_TOKEN: token,
+    GMAIL_TOKEN: 'device-b-own-value',
+  });
+
+  // A changed name list or sealed data no longer opens.
+  const file = path.join(f.fake.github, 'octo', 'irori-settings', 'routine-keys.json');
+  await writeFile(file, JSON.stringify({ ...sealed, names: ['GMAIL_TOKEN', 'OTHER_TOKEN'] }));
+  await assert.rejects(
+    f.b.environment.restore({ scopeIds: [], agent: false, secrets: ['OTHER_TOKEN'], passphrase }),
+    /passphrase does not open/,
+  );
+  // A file asking for an unbounded key derivation is refused as damaged.
+  await writeFile(file, JSON.stringify({ ...sealed, kdf: { ...sealed.kdf, N: 2 ** 24 } }));
+  await assert.rejects(f.b.environment.state(), /Could not read routine-keys\.json/);
+
+  // Saving again with a passphrase replaces the saved set with this device's.
+  await writeFile(file, text);
+  await f.b.environment.save('another long passphrase');
+  const replaced = JSON.parse(await f.fake.stored('routine-keys.json'));
+  assert.deepEqual(replaced.names, ['GMAIL_TOKEN', 'SLACK_TOKEN']);
+  assert.notEqual(replaced.data, sealed.data);
 });
 
 test('a public settings repository, a newer file and a concurrent save are refused', async (t) => {
