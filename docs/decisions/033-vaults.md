@@ -28,7 +28,9 @@ combination of vaults, and one vault can be in several.
    `--vault`, sub-agents are `vault-<name>`, the standard skills are
    `add-vaults` and `new-vault`, and `routine.yaml` says `vaults:` and
    `agent: vault`.
-4. **A hand-off on Pi and Hermes Agent is `irori call <vault> "<task>"`.** The
+4. *Revised by [ADR 050](050-vault-agents-and-their-sub-agents.md) (0.2.34):
+   every CLI hands a vault's work with `irori call`.*
+   **A hand-off on Pi and Hermes Agent is `irori call <vault> "<task>"`.** The
    separate `hibachi` command is gone; a `vault` command would have hidden
    HashiCorp Vault's CLI on the run's `PATH`, so the hand-off joined the
    `irori` command, which every agent run already has. A vault agent, or the

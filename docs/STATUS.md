@@ -1,5 +1,31 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Vault agents and their sub-agents, 2026-10-18 (**0.2.34**, pull request open):
+[ADR 050](decisions/050-vault-agents-and-their-sub-agents.md). The irori agent
+hands every vault's work to that vault's own agent with `irori call`, on every
+CLI, and a folder's sub-agent definitions work on any CLI.
+- `AgentService.execute` gives every irori agent run with vaults the `irori call`
+  bridge and `brainsCommandPreamble`. `handOff` starts the vault agent in the
+  holder's access mode, forwards its permission and question events (and their
+  `resolved`) to the holder with `delegate`, and adds the vault's own
+  `vault-agent` definition (`handedTask`; its model only in its own CLI's format).
+- `src/agents/agent-definitions.ts` reads `.claude/agents/*.md`,
+  `.codex/agents/*.toml` (smol-toml 1.9.0) and `.opencode/agents/*.md`.
+  `prepareSubAgents` gives a run the other formats: Claude Code through the SDK's
+  `agents`, Codex through `agents.<name>.*` thread configuration with role files
+  in `<data>/codex-agents/<run>/`, OpenCode through `OPENCODE_CONFIG_CONTENT`.
+  Claude Code is refused `Agent(vault-agent)` in a vault and `Agent(vault-*)` in
+  the irori agent's folder.
+- Gone: `writeDefinitions`, `definitions`, `subAgentDefinition`, `subAgentFiles`,
+  `brainsPreamble`, native-delegation tracking in the Claude adapter, and the
+  definition cards on the irori agent's screen. The irori agent's Claude Code
+  runs get `BASH_DEFAULT_TIMEOUT_MS`/`BASH_MAX_TIMEOUT_MS` of a day.
+- Verified by `npm run build`, `npm test` (`tests/your-ai.test.ts`,
+  `tests/agent-definitions.test.ts`), `npm run test:ui`, and `npm run test:your-ai`
+  with real Claude Code 2.1.295 and Codex 0.160.0 in standard mode. Not tried:
+  OpenCode, Pi and Hermes Agent with real models, and full access on Claude Code
+  (root here).
+
 Skills for Claude Code, 2026-10-18 (**0.2.33**, pull request open):
 [ADR 049](decisions/049-skills-for-claude-code.md). Claude Code now gets the
 `.agents/skills` of the run's folder and of the shared Schema.

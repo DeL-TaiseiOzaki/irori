@@ -108,7 +108,7 @@ test('the shared Schema is written through the settings into the irori agent’s
   const long = await you.shared();
   assert.equal(long?.instructions, undefined);
   assert.equal(long?.long, true);
-  assert.match(sharedSchema(long!, false), /Read the shared instructions at .+AGENTS\.md first/);
+  assert.match(sharedSchema(long!), /Read the shared instructions at .+AGENTS\.md first/);
   // Rules that do not fit beside the instructions are pointed at too.
   await settings.write(
     sharedSchemaId,
@@ -127,7 +127,7 @@ test('the shared Schema is written through the settings into the irori agent’s
     ],
   );
   assert.match(
-    sharedSchema(crowded!, false),
+    sharedSchema(crowded!),
     /Read the shared rules first[^\n]*\n- .+long\.md\n- .+tone\.md/,
   );
   // Hooks not in Claude Code's shape are refused rather than guessed.
@@ -156,7 +156,7 @@ test('the shared Schema is written through the settings into the irori agent’s
   assert.deepEqual(await readdir(outside), []);
 });
 
-test('the shared Schema says which Schema wins, and tells the irori agent to pass it on', () => {
+test('the shared Schema says which Schema wins', () => {
   const shared = {
     root: '/me/.irori/shared',
     file: '/me/.irori/shared/AGENTS.md',
@@ -164,7 +164,7 @@ test('the shared Schema says which Schema wins, and tells the irori agent to pas
     rules: [{ file: '/me/.irori/shared/.claude/rules/tone.md', text: 'Be brief.' }],
     skills: [{ name: 'weekly', description: 'Weekly review.', path: '/me/s/weekly/SKILL.md' }],
   };
-  const text = sharedSchema(shared, false);
+  const text = sharedSchema(shared);
   assert.match(text, /every agent in irori follows/);
   assert.match(text, /that folder's Schema wins/);
   assert.match(text, /<shared-instructions>\nWrite dates as YYYY-MM-DD\.\n<\/shared-instructions>/);
@@ -173,12 +173,9 @@ test('the shared Schema says which Schema wins, and tells the irori agent to pas
     text,
     /Shared rules\.[^\n]*\n<shared-rule file="\/me\/\.irori\/shared\/\.claude\/rules\/tone\.md">\nBe brief\.\n<\/shared-rule>/,
   );
+  // A vault agent hears the shared Schema itself, so nothing is to be passed on (ADR 050).
   assert.doesNotMatch(text, /sub-agent/);
-  assert.match(
-    sharedSchema(shared, true),
-    /hand work to a vault's sub-agent, tell it to follow the shared Schema too: \/me\/\.irori\/shared\/AGENTS\.md, the shared rules and the shared skills/,
-  );
-  assert.doesNotMatch(sharedSchema({ ...shared, rules: [] }, false), /rule/);
+  assert.doesNotMatch(sharedSchema({ ...shared, rules: [] }), /rule/);
   assert.match(
     sharedSchemaPointer(shared),
     /still applies, unchanged\. Its folder is \/me\/\.irori\/shared\./,

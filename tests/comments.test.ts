@@ -12,12 +12,7 @@ import {
   removeNoteComment,
 } from '../src/host/comments';
 import { commentsFile } from '../src/domain/comments';
-import {
-  brainsCommandPreamble,
-  brainsPreamble,
-  commentsPointer,
-  commentsSummary,
-} from '../prompts';
+import { brainsCommandPreamble, commentsPointer, commentsSummary } from '../prompts';
 import { hostArguments } from '../src/domain/host-requests';
 import { nearest, positionsOf, quoteHead, sourceLineOf } from '../src/editor/search-navigation';
 
@@ -224,13 +219,13 @@ test('The irori agent hears which handed vaults carry comments and where', () =>
     { name: 'Work', agent: 'vault-work', root: '/kb/work' },
     { name: 'Home', agent: 'vault-home', root: '/kb/home' },
   ];
-  const quiet = brainsPreamble(brains, 'claude');
+  const quiet = brainsCommandPreamble(brains);
   assert.ok(!quiet.includes('comment'), quiet);
-  const told = brainsPreamble(brains, 'claude', [0, 4]);
-  assert.match(told, /sub-agent "vault-home", 4 comments from people/);
+  const told = brainsCommandPreamble(brains, [0, 4]);
+  assert.match(told, /vault agent "vault-home", 4 comments from people/);
   assert.ok(!told.includes('"vault-work", '), told);
   assert.match(told, /\.irori\/comments\/<file path>\.json/);
-  assert.match(brainsCommandPreamble(brains, 'Pi', [1, 0]), /"vault-work", 1 comment from people/);
+  assert.match(brainsCommandPreamble(brains, [1, 0]), /"vault-work", 1 comment from people/);
 });
 
 test('A selection in the rendered note finds its line in the source', () => {
