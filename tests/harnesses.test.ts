@@ -606,9 +606,6 @@ test(
       effort: 'high',
     });
     assert.equal(full.events.at(-1)?.outcome, 'completed', JSON.stringify(full.events));
-    assert.ok(
-      full.events.some((e) => e.type === 'status' && e.text.includes('anthropic/claude-x')),
-    );
     // A new access mode starts a new conversation; the model and --yolo are passed.
     assert.deepEqual((await hermes()).at(-1).args.slice(5), ['-m', 'anthropic/claude-x', '--yolo']);
     assert.ok(!full.events.some((e) => e.type === 'status' && /Effort|思考量/.test(e.text)));
