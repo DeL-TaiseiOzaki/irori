@@ -62,11 +62,11 @@ try {
   const group = (name: string) =>
     dialog.getByRole('group', { name: `Schema の${name}`, exact: true });
   const stage = dialog.getByRole('region', { name: 'Schema の設定' });
-  // Instructions and skills only: rules and hooks belong to Claude Code, not to every agent.
+  // The irori agent's settings, rules and hooks included (ADR 048).
   await expect(group('指示')).toContainText('まだありません');
   await expect(group('スキル')).toContainText('まだありません');
-  await expect(group('ルール')).toHaveCount(0);
-  await expect(group('フック')).toHaveCount(0);
+  await expect(group('ルール')).toContainText('まだありません');
+  await expect(group('フック')).toContainText('まだありません');
 
   // Written through the form; irori keeps it as a file in the irori agent's folder.
   await dialog.getByRole('button', { name: '指示を追加', exact: true }).click();
@@ -90,6 +90,12 @@ try {
   expect(await shared('.agents/skills/weekly/SKILL.md')).toBe(
     '---\nname: weekly\ndescription: Writes the weekly review.\n---\n\nCollect the week.\n',
   );
+  await dialog.getByRole('button', { name: 'ルールを追加', exact: true }).click();
+  await stage.getByRole('textbox', { name: 'ファイル名', exact: true }).fill('tone');
+  await stage.getByRole('textbox', { name: 'ルール', exact: true }).fill('Be brief.\n');
+  await stage.getByRole('button', { name: '作成', exact: true }).click();
+  await expect(group('ルール').getByRole('button', { name: 'tone.md' })).toBeVisible();
+  await expect.poll(() => shared('.claude/rules/tone.md')).toBe('Be brief.\n');
   // The irori agent's own instructions are another Schema, untouched.
   expect(await readFile(path.join(you, 'AGENTS.md'), 'utf8')).not.toContain('YYYY-MM-DD');
 
@@ -122,8 +128,8 @@ try {
       {
         checks: [
           'settings open every Schema, the shared one first',
-          'the shared Schema offers instructions and skills only',
-          'shared instructions and a shared skill written as files in the irori agent folder',
+          'the shared Schema offers instructions, skills, rules and hooks',
+          'shared instructions, a shared skill and a shared rule written as files in the irori agent folder',
           'a vault Schema edited from the same dialog',
           'the shared skill offered in a vault composer beside its own',
         ],

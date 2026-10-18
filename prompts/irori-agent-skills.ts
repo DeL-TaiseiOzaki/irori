@@ -164,8 +164,8 @@ reach you. Follow write-routine; check with \`irori routines\`.
 ## Settings the person changes
 Theme, language and fonts; turning the vault agent on; the shared Schema;
 saving the environment to GitHub (設定 → アカウント → 環境を保存), which keeps
-vaults that have a GitHub repository and the workspaces, so another computer
-can restore them.
+vaults that have a GitHub repository, the workspaces, and your folder's files
+with the shared Schema, so another computer can restore them.
 
 Check with \`irori list\` after changes. A vault you register is handed to
 you from the next request; until then reach its folder through the shell.
