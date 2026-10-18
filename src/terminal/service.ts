@@ -26,6 +26,10 @@ export class TerminalService {
   get busy() {
     return this.running.size > 0 || this.queue.busy;
   }
+  /** Whether the terminal is still running. */
+  isOpen(id: string) {
+    return this.running.has(id);
+  }
   async available() {
     return (this.shells ??= await detectShells());
   }

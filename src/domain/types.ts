@@ -381,7 +381,9 @@ export type HostEvent =
   | { type: 'update'; state: import('./updates').UpdateState }
   | { type: 'routine'; run: import('./routines').RoutineRun }
   /** The irori agent registered a vault; `workspace` is the one it joined, as saved. */
-  | { type: 'vaults'; workspace?: WorkspaceProfile };
+  | { type: 'vaults'; workspace?: WorkspaceProfile }
+  /** Another window opened or closed a workspace tab, or closed (ADR 051). */
+  | { type: 'windows' };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -885,6 +887,10 @@ export interface HostAPI {
    * Windows voice typing (Win+H). False where irori cannot start it.
    */
   dictate(): Promise<boolean>;
+  /** Tells the host which workspaces this window has open as tabs (ADR 051). */
+  windowTabs(tabs: import('./workspace-tabs').OpenTab[]): Promise<void>;
+  /** The workspaces and vaults irori's other windows have open; closing a tab leaves them be. */
+  otherWindows(): Promise<import('./workspace-tabs').OpenTab[]>;
   onEvent(callback: (event: HostEvent) => void): () => void;
 }
 declare global {
