@@ -1,7 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Published 2026-10-18: **0.2.26**, merged by the owner
+([#258](https://github.com/DeL-TaiseiOzaki/irori/pull/258) as `aab0882` at 04:32:49 UTC),
+before its pull request run had finished, so the push run published nothing. `publish.yml`
+published it from main's run, `workflow_run` `39097945691`, after #256 had also landed
+(`ffecd46`). The release (target `aab0882`) was public at 04:42:36 (9:47), and the page
+deployed at 04:43:42 (10:53), with its drift check in step.
+- Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,683,520 / 142,293,659 / 175,851,614. The page offers 0.2.26.
+
 The shared Schema's settings and the irori agent's files, 2026-10-18 (**0.2.26**,
-pull request open): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
+published): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
 The shared Schema takes rules and hooks like the other Schemas, and **環境を保存**
 saves the irori agent's files with the shared Schema.
 - `YourAiService.shared()` adds the shared rules to the request words for every CLI;
