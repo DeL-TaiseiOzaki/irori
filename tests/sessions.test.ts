@@ -108,7 +108,11 @@ test(
     assert.match(result?.details ?? '', /aggregatedOutput/);
     const second = await run();
     assert.equal(second.conversationId, first.conversationId, 'the latest conversation goes on');
-    assert.ok(second.events.some((e) => e.text === '保存済みのセッションを引き継ぎます。'));
+    // A turn repeats nothing the composer already shows (session, CLI, access, model).
+    assert.deepEqual(
+      second.events.filter((e) => e.type === 'status' && e.role !== 'user'),
+      [],
+    );
     // A change of access starts a new native session in the same conversation (ADR 009).
     const full = await run('full-access');
     assert.equal(full.conversationId, first.conversationId);
