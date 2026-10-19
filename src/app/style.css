@@ -30,6 +30,27 @@
 :root[data-markdown-font='mono'] {
   --markdown-font: var(--markdown-font-mono);
 }
+/* A note's text is 16px with paragraphs at a 1.5 line height unless the reader
+   asks otherwise; headings and the note's smaller text follow the size. */
+:root {
+  --markdown-size: 16px;
+  --markdown-line: 1.5;
+}
+:root[data-text-size='small'] {
+  --markdown-size: 14px;
+}
+:root[data-text-size='large'] {
+  --markdown-size: 18px;
+}
+:root[data-text-size='larger'] {
+  --markdown-size: 20px;
+}
+:root[data-line-spacing='compact'] {
+  --markdown-line: 1.3;
+}
+:root[data-line-spacing='relaxed'] {
+  --markdown-line: 1.9;
+}
 /* A note's page is a reading column unless the reader asks for less room at its
    sides. The gutter keeps the editor's block handle inside the stage when the
    page reaches the stage's edges. */

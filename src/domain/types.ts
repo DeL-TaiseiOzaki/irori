@@ -415,6 +415,12 @@ export type MarkdownFont = (typeof markdownFonts)[number];
 /** How much room a note leaves at its sides: a reading column, a wider one, or the stage's width. */
 export const pageMargins = ['standard', 'small', 'minimal'] as const;
 export type PageMargins = (typeof pageMargins)[number];
+/** How large a note's text is: 14, 16 (standard), 18 or 20 pixels, its headings in step. */
+export const textSizes = ['small', 'standard', 'large', 'larger'] as const;
+export type TextSize = (typeof textSizes)[number];
+/** How far apart a note's lines are. */
+export const lineSpacings = ['compact', 'standard', 'relaxed'] as const;
+export type LineSpacing = (typeof lineSpacings)[number];
 /** Hearth is graphite chrome with a paper stage; system picks hearth or dark with the desktop. */
 export const themes = ['system', 'hearth', 'light', 'dark'] as const;
 export type Theme = (typeof themes)[number];
@@ -428,6 +434,8 @@ export interface DeviceSettings {
   language: import('./i18n').Language;
   markdownFont: MarkdownFont;
   pageMargins: PageMargins;
+  textSize: TextSize;
+  lineSpacing: LineSpacing;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
   /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */

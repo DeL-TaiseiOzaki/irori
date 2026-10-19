@@ -6,8 +6,10 @@ import { languages } from '../domain/i18n';
 import { yourAiChoice } from '../domain/conversation';
 import { routineRuntimeList } from '../domain/routines';
 import {
+  lineSpacings,
   markdownFonts,
   pageMargins,
+  textSizes,
   themes,
   type Category,
   type DeviceSettings,
@@ -66,6 +68,8 @@ const stored = z.object({
       language: z.enum(languages),
       markdownFont: z.enum(markdownFonts),
       pageMargins: z.enum(pageMargins),
+      textSize: z.enum(textSizes),
+      lineSpacing: z.enum(lineSpacings),
       editorAssistance: z.boolean(),
       vaultAgent: z.boolean(),
       yourAi: yourAiChoice,
