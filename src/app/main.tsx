@@ -43,6 +43,7 @@ import {
   applyLanguage,
   applyMarkdownFont,
   applyPageMargins,
+  applyText,
   applyTheme,
   chooseEditorAssistance,
   chooseVaultAgent,
@@ -3937,6 +3938,7 @@ void loadDeviceSettings().finally(() => {
   applyTheme();
   applyMarkdownFont();
   applyPageMargins();
+  applyText();
   applyLanguage();
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary FallbackComponent={AppCrash}>

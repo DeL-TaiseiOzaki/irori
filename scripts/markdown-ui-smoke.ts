@@ -86,6 +86,52 @@ try {
   await editor.locator('.callout').scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'test-results/markdown-ui-smoke-callout.png' });
 
+  // The reader's text size and line spacing reach the note; headings follow the size.
+  const typography = () =>
+    editor.evaluate((root) =>
+      ['p', 'h1'].map((tag) => {
+        const style = getComputedStyle(root.querySelector(tag)!);
+        return [style.fontSize, style.lineHeight];
+      }),
+    );
+  const choose = async (group: string, name: string) => {
+    await page.getByRole('button', { name: /^設定（/ }).click();
+    await page
+      .getByRole('group', { name: group })
+      .getByRole('radio', { name, exact: true })
+      .check();
+    await page.keyboard.press('Escape');
+  };
+  expect(await typography()).toEqual([
+    ['16px', '24px'],
+    ['32px', '43.2px'],
+  ]);
+  const labels = () =>
+    diagram.evaluate((svg) =>
+      [...svg.querySelectorAll('foreignObject')].map((box) => {
+        const label = box.firstElementChild as HTMLElement;
+        return [label.scrollHeight, getComputedStyle(label).fontSize];
+      }),
+    );
+  const drawn = await labels();
+  await choose('文字の大きさ', '大');
+  await choose('行間', '広い');
+  await expect.poll(typography).toEqual([
+    ['18px', '34.2px'],
+    ['36px', '48.6px'],
+  ]);
+  // A diagram's labels keep the size Mermaid measured them at, so none is cut off.
+  expect(await labels()).toEqual(drawn);
+  const chosen = await page.evaluate(() => window.irori.deviceSettings());
+  expect([chosen.textSize, chosen.lineSpacing]).toEqual(['large', 'relaxed']);
+  await page.screenshot({ path: 'test-results/markdown-ui-smoke-large.png' });
+  await choose('文字の大きさ', '標準');
+  await choose('行間', '標準');
+  await expect.poll(typography).toEqual([
+    ['16px', '24px'],
+    ['32px', '43.2px'],
+  ]);
+
   // Clicking the paragraph shows its source for editing; leaving it shows the page again.
   await reference.locator('.literal-preview').click();
   await expect(reference.locator('.literal-block')).toBeVisible();
@@ -113,6 +159,7 @@ try {
           'wiki links show their labels, a callout its title',
           'a Mermaid block draws its diagram',
           'a short code block is as tall as its code',
+          "the reader's text size and line spacing reach paragraphs and headings, not a diagram's labels, and go back",
           'a click shows the source for editing; leaving shows the page; the file keeps the text',
         ],
         errors,
