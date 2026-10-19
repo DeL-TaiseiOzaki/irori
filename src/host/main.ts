@@ -545,6 +545,17 @@ app
         ...(carried.notices.length ? { notice: carried.notices.join(' ') } : {}),
       };
     }
+    /** Renames a file or folder of the Schema layer; its comments and drafts follow it. */
+    async function renameSchemaEntry(
+      scopeId: string,
+      from: string,
+      to: string,
+    ): Promise<EntryMove> {
+      const { entry, files: moved } = await files.renameSchemaEntry(scopeId, from, to);
+      if (from === to) return { entry };
+      const carried = await carryMove({ files, authorship }, scopeId, { from, to }, moved);
+      return carried.notices.length ? { entry, notice: carried.notices.join(' ') } : { entry };
+    }
     /**
      * The links a move of `rel` into another vault would break (ADR 038), from
      * the vault's Markdown in knowledge; `incomplete` past 5,000 notes.
@@ -840,7 +851,9 @@ app
           ? changeFiles(() =>
               changed(scopeId, async () => ({ entry: await cloud.moveEntry(scopeId, from, to) })),
             )
-          : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
+          : classify(files.get(scopeId), from) === 'schema'
+            ? changeVault(scopeId, organizing(), () => renameSchemaEntry(scopeId, from, to))
+            : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
       trashEntry: (scopeId, target) =>
         classify(files.get(scopeId), target) === 'contents'
           ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))

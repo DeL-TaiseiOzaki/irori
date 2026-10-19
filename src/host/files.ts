@@ -1244,6 +1244,70 @@ export class FileService {
     });
   }
   /**
+   * Renames a file or folder of the Schema layer within its folder, as the
+   * explorer does. irori's `.irori` and Git's `.git` keep their names and those
+   * of everything in them, and a name that would take the entry out of the
+   * Schema layer is refused. Returns the renamed files by their old paths.
+   */
+  async renameSchemaEntry(
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<{ entry: Entry; files: string[] }> {
+    return this.queue.run(async () => {
+      const space = this.get(id);
+      relative.parse(from);
+      relative.parse(to);
+      if (path.posix.dirname(to) !== path.posix.dirname(from))
+        throw Error(
+          t(
+            'Schema の項目は同じフォルダの中で名前だけ変えられます。',
+            'A Schema item can only be renamed within its folder.',
+          ),
+        );
+      const name = path.posix.basename(to);
+      const problem = entryNameError(name);
+      if (problem) throw Error(problem);
+      for (const rel of [from, to]) {
+        const top = rel.split('/')[0];
+        if (top === '.irori' || top === '.git')
+          throw Error(t(`${top} の中の名前は変えられません。`, `Names in ${top} cannot change.`));
+        if (classify(space, rel) !== 'schema')
+          throw Error(
+            t(
+              'この名前では Schema の外に出てしまいます。',
+              'That name would take it out of the Schema layer.',
+            ),
+          );
+      }
+      const folder = path.posix.dirname(from);
+      const parent = await this.resolve(id, folder === '.' ? '' : folder, true);
+      const actual = path.join(parent, path.posix.basename(from));
+      const info = await fs.lstat(actual);
+      const moved = info.isDirectory() ? await this.walk(actual, from) : [from];
+      await renameEntry(actual, path.join(parent, name));
+      // A kept draft follows its file.
+      if (from !== to)
+        for (const file of moved)
+          await fs
+            .rename(
+              draftFile(this.dataDir, id, file),
+              draftFile(this.dataDir, id, movedPath({ from, to }, file)!),
+            )
+            .catch(() => {});
+      return {
+        entry: {
+          path: to,
+          name,
+          directory: info.isDirectory(),
+          layer: 'schema',
+          note: info.isFile() && /\.md$/i.test(name),
+        },
+        files: moved,
+      };
+    });
+  }
+  /**
    * Moves a file or folder of one vault's knowledge into `directory` of another
    * vault's knowledge (ADR 038). It keeps its name, or takes the first free one;
    * nothing is replaced. A note's managed images are copied beside it. Between

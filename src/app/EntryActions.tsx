@@ -95,6 +95,10 @@ export interface Explorer {
    */
   bringIn(directory: string, items?: Promise<Brought[]>): void;
   act(entry: Entry, action: EntryAction): void;
+  /** Renames an entry in its folder, as its row is edited in place; throws when it cannot. */
+  rename?(entry: Entry, name: string): Promise<void>;
+  /** What may be done to an entry here; all of `entryActions` when absent. */
+  actions?: readonly EntryAction[];
   /** Moves an entry into `directory`, keeping its name: a drag and drop. */
   moveInto(entry: Entry, directory: string): void;
   /** Moves an entry of another vault's knowledge into `directory`: a drop across vaults. */
@@ -146,7 +150,7 @@ export function ExplorerItems({
       ],
     explorer &&
       entry &&
-      entryActions.map((action) =>
+      (explorer.actions ?? entryActions).map((action) =>
         item(
           action,
           action === 'delete' ? 'trash' : action === 'move' ? 'move' : 'penLine',
