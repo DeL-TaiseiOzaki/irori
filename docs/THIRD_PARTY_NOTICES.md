@@ -16,6 +16,7 @@ Two kinds of package ship. The packages the host process loads at run time trave
 | Electron | MIT, node_modules/electron/LICENSE; binary distribution LICENSE and LICENSES.chromium.html |
 | Milkdown Crepe and Milkdown packages, with their ProseMirror, remark and Vue runtime dependencies | MIT, bundled; DOMPurify (`MPL-2.0 OR Apache-2.0`) and d3-ease (`BSD-3-Clause`) are the only non-MIT/ISC entries in the notices |
 | CodeMirror and Lezer packages | MIT, bundled |
+| Mermaid 12.1.0, with its d3, dagre-d3-es, cytoscape, KaTeX, chevrotain, khroma, roughjs and elkjs dependencies | Bundled into a chunk loaded the first time a note shows a diagram. Mermaid and most of its dependencies are MIT/ISC; chevrotain is Apache-2.0, several d3 modules are BSD-3-Clause, robust-predicates is Unlicense and elkjs is EPL-2.0. elkjs is distributed unmodified, and its source is available from the elkjs project (https://github.com/kieler/elkjs). Each licence text is in the notices |
 | React Flow (`@xyflow/react` / `@xyflow/system`) and Dagre | MIT, bundled; graph projection is loaded on demand |
 | Papa Parse, Zod | MIT, package LICENSE files — the host loads both — and bundled, so also named in the notices |
 | Chokidar, cross-spawn, tree-kill | MIT, package LICENSE files |

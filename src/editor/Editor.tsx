@@ -24,6 +24,10 @@ import {
 } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
+import { mermaidPreview } from './mermaid';
+import { literalEditing, literalView } from './literal-view';
+
+type MermaidApply = Parameters<typeof mermaidPreview>[1];
 import type { NoteAuthorship } from '../domain/knowledge';
 import { EditorView, GutterMarker, gutter, ViewPlugin } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -120,6 +124,12 @@ function editorChrome() {
       noResultText: t('該当する言語がありません', 'No matching language'),
       copyText: t('コピー', 'Copy'),
       previewLabel: t('プレビュー', 'Preview'),
+      // A Mermaid block shows its diagram, as Notion does; its source is one click away.
+      renderPreview: (language: string, content: string, apply: MermaidApply) =>
+        language.toLowerCase() === 'mermaid' ? mermaidPreview(content, apply) : null,
+      previewOnlyByDefault: true,
+      previewToggleText: (previewOnly: boolean) =>
+        previewOnly ? t('編集', 'Edit') : t('図だけ表示', 'Diagram only'),
     },
     blockEdit: {
       textGroup: {
@@ -442,6 +452,8 @@ export function Editor({
         }));
       })
       .use(literalBlock)
+      .use(literalView)
+      .use(literalEditing)
       .use(preserveBlocks)
       .use(
         // The debounced Markdown listener can skip a quick save/undo back to its
