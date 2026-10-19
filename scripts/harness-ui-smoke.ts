@@ -36,7 +36,7 @@ await writeFile(path.join(root, 'note.md'), '# Harness fixture\n');
 await writeFile(path.join(root, 'second.md'), '# Other note\n');
 const bin = path.join(base, 'bin');
 await mkdir(bin);
-for (const id of ['pi', 'opencode', 'hermes'])
+for (const id of ['pi', 'opencode', 'hermes', 'agy'])
   await writeFile(
     path.join(bin, id),
     `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
@@ -442,6 +442,24 @@ try {
     (await page.evaluate((id) => window.irori.agentConversation(id, 'hermes'), space.scopeId))
       .session.state,
   ).toBe('saved');
+  // The Antigravity CLI lists its models, each naming its own level, so no level is offered.
+  await page.getByLabel('エージェント', { exact: true }).selectOption('antigravity');
+  await expect(access).toHaveValue('full-access');
+  await expect(effortPill).toHaveCount(0);
+  await modelPill.selectOption('gemini-3.8-flash-high');
+  await page.getByLabel('エージェントへの指示').fill('antigravity fixture');
+  await page.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(page.locator('.message.user').last()).toHaveText('antigravity fixture');
+  await settled('antigravity');
+  await expect(page.locator('.message.done').last()).toContainText('完了');
+  await expect(page.locator('.conversation')).toContainText('の応答');
+  const agyCall = (await fixtureLog()).filter((call) => call.kind === 'agy').at(-1);
+  expect(agyCall.prompt).toContain('antigravity fixture');
+  expect(agyCall.args.slice(7)).toEqual([
+    '--model',
+    'gemini-3.8-flash-high',
+    '--dangerously-skip-permissions',
+  ]);
   // Each CLI's conversations are in the vault's history; opening one shows its log.
   await page.getByRole('button', { name: '履歴', exact: true }).click();
   const history = page.getByRole('region', { name: '履歴' });
@@ -464,6 +482,7 @@ try {
         checks: [
           'Pi/OpenCode panel selection',
           'model pill from the CLI list, and a typed Hermes model with its full access',
+          'Antigravity CLI selection, its listed model and full access over stream-json stdin',
           'thinking level pill for Pi reaching set_thinking_level, absent for Hermes',
           'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',

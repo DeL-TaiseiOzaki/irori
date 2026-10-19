@@ -140,8 +140,8 @@ are links agents cannot read.
 
 ## Agents
 - You, the irori agent, work across vaults in irori mode and hand work in a
-  vault to its vault agent. Claude Code, Codex, OpenCode, Pi or Hermes Agent
-  installed and signed in on this computer; irori has no account of its own.
+  vault to its vault agent. Claude Code, Codex, OpenCode, Pi, Hermes Agent or
+  the Antigravity CLI installed and signed in on this computer; irori has no account of its own.
 - The vault agent (each vault's own AI, reading its Schema) is off unless
   the person turns it on in 設定 → エージェント. It has the \`irori\` command
   too, for its own vault alone: move, trash, comment, resolve, index, set,

@@ -1,7 +1,7 @@
 import type { AgentCommand, AgentId } from '../domain/types';
 import { t } from '../domain/i18n';
 import { askClaude, askCodex } from './models';
-import { version } from './process';
+import { agentCommand, version } from './process';
 import type { Rpc } from './rpc';
 
 /**
@@ -93,7 +93,7 @@ async function read(agent: AgentId, cwd: string): Promise<AgentCommand[]> {
       ...skills.map(({ name, description }) => ({ name, description, skill: true })),
     ];
   }
-  return []; // OpenCode, Pi and Hermes Agent are not asked (ADR 040).
+  return []; // OpenCode, Pi, Hermes Agent and the Antigravity CLI are not asked (ADR 040).
 }
 
 /** How long a folder's list is kept: skills may be added while irori runs. */
@@ -108,7 +108,7 @@ export class CommandCatalog {
   ) {}
   async commands(agent: AgentId, cwd: string): Promise<AgentCommand[]> {
     if (agent !== 'claude' && agent !== 'codex') return [];
-    const key = `${agent}\n${cwd}\n${await version(agent)}`;
+    const key = `${agent}\n${cwd}\n${await version(agentCommand(agent))}`;
     const kept = this.lists.get(key);
     if (kept && this.now() - kept.at < keep) return kept.list;
     const list = this.ask(agent, cwd);

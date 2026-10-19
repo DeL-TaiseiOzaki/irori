@@ -4,7 +4,7 @@ import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_pr
 import type { AgentId, AgentModel, AgentModels } from '../domain/types';
 import { agentEffort, agentModel } from '../domain/conversation';
 import { t } from '../domain/i18n';
-import { agentEnv, killTree, launch, output, version } from './process';
+import { agentCommand, agentEnv, killTree, launch, output, version } from './process';
 import { Rpc } from './rpc';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
 
@@ -44,6 +44,21 @@ export function parsePiModels(output: string): AgentModel[] {
     .map(([provider, model]) => `${provider}/${model}`)
     .filter(valid);
   return [...new Set(ids)].map((id) => ({ id, label: id }));
+}
+
+/**
+ * `agy models`: one `<model>\t<label>` per line. Each model already names its
+ * thinking level (`gemini-3.8-flash-high`), so the CLI is passed no level.
+ */
+export function parseAntigravityModels(output: string): AgentModel[] {
+  const models = new Map<string, string>();
+  for (const line of plain(output).split(/\r?\n/)) {
+    const tab = line.indexOf('\t');
+    if (tab < 0) continue;
+    const id = line.slice(0, tab).trim();
+    if (valid(id) && !models.has(id)) models.set(id, line.slice(tab + 1).trim() || id);
+  }
+  return [...models].map(([id, label]) => ({ id, label }));
 }
 
 /** What a listing command prints on success, bounded in size and time. */
@@ -201,7 +216,7 @@ function levelsOf(agent: AgentId): Pick<AgentModels, 'efforts' | 'customEffort'>
   if (agent === 'pi') return { efforts: piEfforts };
   // OpenCode names its levels as variants of each model in its own configuration.
   if (agent === 'opencode') return { customEffort: true };
-  return {}; // Codex lists them per model; Hermes Agent takes none.
+  return {}; // Codex lists them per model; Hermes Agent and the Antigravity CLI take none.
 }
 
 async function list(agent: AgentId): Promise<AgentModel[] | AgentModels> {
@@ -209,6 +224,7 @@ async function list(agent: AgentId): Promise<AgentModel[] | AgentModels> {
   if (agent === 'claude') return claudeModels();
   if (agent === 'opencode') return parseOpenCodeModels(await listing('opencode', ['models']));
   if (agent === 'pi') return parsePiModels(await listing('pi', ['--list-models']));
+  if (agent === 'antigravity') return parseAntigravityModels(await listing('agy', ['models']));
   return []; // Hermes Agent prints no machine-readable list.
 }
 
@@ -219,7 +235,7 @@ export class ModelCatalog {
   async models(agent: AgentId): Promise<AgentModels> {
     let installed: string;
     try {
-      installed = await version(agent);
+      installed = await version(agentCommand(agent));
     } catch (error) {
       return { models: [], custom: true, ...levelsOf(agent), error: String(error) };
     }

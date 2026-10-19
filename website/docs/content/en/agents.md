@@ -5,7 +5,7 @@ description: Use local CLIs to read notes, revise them, and carry out work in yo
 
 ## Choose a CLI
 
-irori runs Claude Code, Codex, OpenCode, Pi, or Hermes Agent using the CLI and authentication on your computer. Install and authenticate the CLI first.
+irori runs Claude Code, Codex, OpenCode, Pi, Hermes Agent, or the Antigravity CLI (`agy`) using the CLI and authentication on your computer. Install and authenticate the CLI first.
 
 Choose a CLI and model in the AI panel. Model options come from the installed CLI. For Hermes Agent, enter the model name.
 
