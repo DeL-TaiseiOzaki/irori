@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Text size and line spacing, 2026-10-19 (**0.2.39**, pull request open): two
+new device settings beside the side margins.
+- `textSize` (`small`, `standard`, `large`, `larger`: 14, 16, 18 and 20px) and
+  `lineSpacing` (`compact`, `standard`, `relaxed`) are stored in
+  `device-settings.json`, accepted by `saveDeviceSettings`, and saved and
+  restored with the environment. A record without them reads as `standard`.
+- `applyText` writes `data-text-size` and `data-line-spacing`.
+  `--markdown-size` sets the note's font size, so headings (em) and the literal
+  block scale with it. `--markdown-line` (1.3 / 1.5 / 1.9) replaces Crepe's 1.5
+  paragraph line height, so `standard` shows as before (measured: 16px text on
+  24px lines, 32px h1).
+- A Mermaid diagram keeps 16px text and 1.5 lines, the size Mermaid measured its
+  labels at. Without that, a larger size cut its labels off.
+- Verified by `npm run build`, `npm test` (`tests/settings.test.ts`) and
+  `npm run test:ui`. `markdown-ui-smoke` chooses 大 and 広い in Settings and
+  measures 18px on 34.2px lines and a 36px h1. It checks that the diagram's
+  labels are unchanged, and returns to 16px on 24px lines.
+
 Notion-like Markdown, 2026-10-19 (**0.2.38**, pull request open): a note shows
 Mermaid diagrams, footnotes, wiki links and callouts as a page would.
 - `src/editor/literal-view.tsx`: an `irori_literal` block shows rendered text
