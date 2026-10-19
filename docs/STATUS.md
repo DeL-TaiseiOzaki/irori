@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Antigravity CLI, 2026-10-19 (**0.2.36**, pull request open): the sixth agent
+CLI, `antigravity` (binary `agy`), for vault agents, the irori agent and
+routine steps. See [HARNESSES](HARNESSES.md).
+- `src/agents/antigravity.ts` runs one process per instruction over stream-json
+  stdin/stdout. `agentCommand` maps an agent to its executable for `version`.
+  `parseAntigravityModels` reads `agy models`; no thinking level is passed.
+  Standard access is `--mode accept-edits`, full access
+  `--dangerously-skip-permissions`. Skill reach: `.agents/skills` and
+  `~/.gemini/config/skills`.
+- Verified by `npm run build`, `npm test` (`tests/harnesses.test.ts`, protocol
+  fixture in the shape of captured agy 1.2.2 records) and `npm run test:ui`
+  (`harness-ui-smoke` selects it, picks a listed model and runs a turn). Not
+  tried: a real signed-in agy turn, resume, refused actions and Windows/macOS
+  install paths.
+
 Open issues #267–#269, 2026-10-19 (**0.2.35**, pull request open):
 - #267: `carryToVault` reloads the open note inside `organize`, as `moveInto`
   does. Before, the `reconcile` that ends `organize` read the note's old path

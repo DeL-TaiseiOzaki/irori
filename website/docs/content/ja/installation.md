@@ -30,6 +30,6 @@ Windows ARM と Intel Mac の配布版はありません。Linux では[ソー�
 
 ## Git と AI を準備する
 
-[Git](https://git-scm.com/downloads)をインストールします。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
+[Git](https://git-scm.com/downloads)をインストールします。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
 
 新しい版が出るとアプリが知らせます。**更新して再起動** で更新できます。次は[クイックスタート](quickstart.md)へ進んでください。

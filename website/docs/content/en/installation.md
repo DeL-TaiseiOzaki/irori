@@ -30,6 +30,6 @@ If macOS blocks the first launch, choose **System Settings → Privacy & Securit
 
 ## Prepare Git and AI
 
-Install [Git](https://git-scm.com/downloads). AI agents support Claude Code, Codex, OpenCode, Pi, and Hermes Agent. Install and authenticate your chosen CLI first. You do not need an irori account or an irori-specific API key.
+Install [Git](https://git-scm.com/downloads). AI agents support Claude Code, Codex, OpenCode, Pi, Hermes Agent, and the Antigravity CLI. Install and authenticate your chosen CLI first. You do not need an irori account or an irori-specific API key.
 
 The app notifies you when a new build is available. Choose **Update and restart** to install it. Continue with the [quickstart](quickstart.md).

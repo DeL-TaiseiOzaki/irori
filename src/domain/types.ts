@@ -1,4 +1,4 @@
-export const agentIds = ['codex', 'claude', 'opencode', 'pi', 'hermes'] as const;
+export const agentIds = ['codex', 'claude', 'opencode', 'pi', 'hermes', 'antigravity'] as const;
 export type AgentId = (typeof agentIds)[number];
 export const agentAccessModes = ['default', 'full-access'] as const;
 export type AgentAccess = (typeof agentAccessModes)[number];
@@ -8,6 +8,7 @@ export const agentNames: Record<AgentId, string> = {
   opencode: 'OpenCode',
   pi: 'Pi',
   hermes: 'Hermes Agent',
+  antigravity: 'Antigravity CLI',
 };
 /** The categories irori offers first, shown in the reader's language; any other name is kept as written. */
 export const presetCategories = ['personal', 'team', 'organization'] as const;

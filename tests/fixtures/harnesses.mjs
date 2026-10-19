@@ -12,13 +12,21 @@ export function run(kind) {
         ? '0.85.1 fixture'
         : kind === 'hermes'
           ? 'Hermes Agent v2026.9.24 fixture'
-          : '1.18.30 fixture',
+          : kind === 'agy'
+            ? '1.4.2'
+            : '1.18.30 fixture',
     );
     return;
   }
   // The model lists as each CLI prints them.
   if (kind === 'opencode' && process.argv[2] === 'models') {
     console.log('anthropic/claude-fixture\nopenrouter/vendor/model-x\nnot a model line');
+    return;
+  }
+  if (kind === 'agy' && process.argv[2] === 'models') {
+    console.log(
+      'gemini-3.8-flash-high\tGemini 3.8 Flash (High)\nclaude-sonnet-5-5\tClaude Sonnet 5.5',
+    );
     return;
   }
   if (kind === 'pi' && process.argv.includes('--list-models')) {
@@ -30,6 +38,7 @@ export function run(kind) {
   const log = (value) =>
     fs.appendFileSync('fixture-requests.jsonl', JSON.stringify({ kind, ...value }) + '\n');
   if (kind === 'hermes') return hermes(log);
+  if (kind === 'agy') return antigravity(log);
   // What the real CLI does with the script irori hands it: load it and run its
   // hook for an edit of note.md, here the same edit twice, with no model.
   async function hooks(message) {
@@ -373,4 +382,112 @@ async function hermes(log) {
     duration_ms: 5,
   });
   process.stderr.write(`\nsession_id: ${session}\n`);
+}
+
+// `agy --input-format stream-json --output-format stream-json`, in the shape of
+// records captured from agy 1.2.2: one `user` event in, `init`, `step_update`s
+// and one `result` out.
+async function antigravity(log) {
+  const args = process.argv.slice(2);
+  const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  let input = '';
+  for await (const chunk of process.stdin) input += chunk;
+  const message = JSON.parse(input.trim());
+  const prompt = message.message.content;
+  log({ args, prompt, event: message.event });
+  const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
+  const result = (value) =>
+    send({
+      event: 'result',
+      result: { conversation_id: id, num_turns: 1, duration_seconds: 0.1, ...value },
+    });
+  if (prompt.includes('sign in')) {
+    process.stderr.write(
+      "Error: authentication required. Run 'antigravity' to log in, then retry.\n",
+    );
+    send({
+      event: 'result',
+      result: {
+        conversation_id: '',
+        status: 'ERROR',
+        response: '',
+        error: 'authentication failed or timed out',
+      },
+    });
+    process.exit(1);
+  }
+  if (prompt.includes('crash')) process.exit(2);
+  const resumed = option('--conversation');
+  const id = resumed ?? '273b9d3e-dcbe-4711-baae-0c363553bce7';
+  if (resumed && fs.existsSync('fail-resume')) {
+    process.stderr.write(`conversation ${resumed} not found\n`);
+    result({ status: 'ERROR', response: '', error: `conversation ${resumed} not found` });
+    process.exit(1);
+  }
+  const permission = args.includes('--dangerously-skip-permissions')
+    ? 'always-proceed'
+    : 'request-review';
+  send({
+    event: 'init',
+    conversation_id: id,
+    init: {
+      model: option('--model') ?? 'gemini-3.8-flash-low',
+      cwd: process.cwd(),
+      permission_mode: permission,
+    },
+  });
+  const step = (index, value) =>
+    send({
+      event: 'step_update',
+      step_update: { conversation_id: id, step_index: index, ...value },
+    });
+  step(0, { state: 'DONE', step_type: 'user_input' });
+  const tool = { name: 'view_file', parameters: { AbsolutePath: process.cwd() + '/note.md' } };
+  step(1, { state: 'ACTIVE', step_type: 'tool', tool_name: 'view_file', tool_info: tool });
+  if (prompt.includes('hold')) return setInterval(() => {}, 1000);
+  step(1, {
+    state: 'DONE',
+    step_type: 'tool',
+    tool_name: 'view_file',
+    tool_info: { ...tool, output: '1 lines' },
+  });
+  // A sub-agent's steps carry its own conversation; its words are not the reply.
+  send({
+    event: 'step_update',
+    step_update: {
+      conversation_id: 'sub-conversation',
+      step_index: 0,
+      state: 'DONE',
+      step_type: 'agent_response',
+      text_delta: 'sub-agent words',
+    },
+  });
+  if (prompt.includes('fail')) {
+    result({ status: 'ERROR', response: '', error: 'Fixture provider error' });
+    process.exit(3);
+  }
+  const text = '日本語\u2028の応答';
+  if (prompt.includes('denied')) {
+    step(2, {
+      state: 'ERROR',
+      step_type: 'tool',
+      tool_name: 'run_command',
+      tool_info: {
+        name: 'run_command',
+        parameters: { CommandLine: 'ls' },
+        error: { type: 'TOOL_ERROR', message: 'user denied permission to run command' },
+      },
+    });
+    result({
+      status: 'SUCCESS',
+      response: '',
+      denied_actions: [{ action: 'command', display_name: 'RunCommand' }],
+    });
+    return;
+  }
+  if (!prompt.includes('final only'))
+    for (const [index, part] of ['日本語\u2028', 'の応答'].entries())
+      step(3, { state: index ? 'DONE' : 'ACTIVE', step_type: 'agent_response', text_delta: part });
+  fs.appendFileSync('note.md', '\nFixture Antigravity edit\n');
+  result({ status: 'SUCCESS', response: text });
 }

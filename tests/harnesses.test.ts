@@ -13,7 +13,12 @@ import { classify } from '../src/domain/scopes';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { addNoteComment } from '../src/host/comments';
 import { withRequests } from '../src/domain/conversation';
-import { ModelCatalog, parseOpenCodeModels, parsePiModels } from '../src/agents/models';
+import {
+  ModelCatalog,
+  parseAntigravityModels,
+  parseOpenCodeModels,
+  parsePiModels,
+} from '../src/agents/models';
 import { piModelArgs } from '../src/agents/pi';
 import { hostArguments } from '../src/domain/host-requests';
 import { openCodeModel } from '../src/agents/opencode';
@@ -32,7 +37,7 @@ async function setup(t: any) {
     process.env.PATH = old;
     await rm(base, { recursive: true, force: true });
   });
-  for (const id of ['pi', 'opencode', 'hermes'])
+  for (const id of ['pi', 'opencode', 'hermes', 'agy'])
     await writeFile(
       path.join(bin, id),
       `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
@@ -493,7 +498,7 @@ test(
       '.gitignore .irori',
       'registration writes its own scope metadata and ignores contents',
     );
-    for (const agent of ['pi', 'opencode', 'hermes'] as const) {
+    for (const agent of ['pi', 'opencode', 'hermes', 'antigravity'] as const) {
       const run = await execute(agent, 'ordinary request');
       assert.equal(run.events.at(-1)?.outcome, 'completed', JSON.stringify(run.events));
       assert.equal(await schema(), before, `${agent} left the schema layer unchanged`);
@@ -652,6 +657,103 @@ test(
   },
 );
 
+test(
+  'The Antigravity CLI streams stream-json, saves and resumes its conversation, and passes model and access (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { root, space, files, calls, execute } = await setup(t);
+    const agy = async () => (await calls()).filter((call: any) => call.kind === 'agy');
+    const first = await execute('antigravity', 'ordinary request', false, { access: 'default' });
+    assert.equal(first.events.at(-1)?.outcome, 'completed', JSON.stringify(first.events));
+    assert.equal(
+      first.events
+        .filter((e) => e.type === 'text')
+        .map((e) => e.text)
+        .join(''),
+      '日本語\u2028の応答',
+      "deltas stream, a sub-agent's words stay out, and the final text is not repeated",
+    );
+    assert.deepEqual(
+      first.events.filter((e) => e.type === 'tool').map((e) => e.text),
+      ['view_file', 'view_file'],
+    );
+    assert.match(await readFile(path.join(root, 'note.md'), 'utf8'), /Fixture Antigravity edit/);
+    // The prompt travels on stdin as one `user` event, never on the command line.
+    const [call] = await agy();
+    assert.equal(call.event, 'user');
+    assert.ok(call.prompt.endsWith('\n\nordinary request'), call.prompt);
+    assert.deepEqual(call.args, [
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--disable-slash-commands',
+      '--add-dir',
+      space.root,
+      '--mode',
+      'accept-edits',
+    ]);
+    const saved = async () =>
+      (await latestConversation(files.dataDir, space.scopeId, 'antigravity')).native?.handle;
+    assert.equal(await saved(), '273b9d3e-dcbe-4711-baae-0c363553bce7');
+
+    const full = await execute('antigravity', 'final only', false, {
+      access: 'full-access',
+      model: 'gemini-3.8-flash-high',
+      // The model names its level: none is passed.
+      effort: 'high',
+    });
+    assert.equal(full.events.at(-1)?.outcome, 'completed', JSON.stringify(full.events));
+    // A new access mode starts a new conversation; the model and the skip flag are passed.
+    assert.deepEqual((await agy()).at(-1).args.slice(7), [
+      '--model',
+      'gemini-3.8-flash-high',
+      '--dangerously-skip-permissions',
+    ]);
+    assert.deepEqual(
+      full.events.filter((e) => e.type === 'text').map((e) => e.text),
+      ['日本語\u2028の応答'],
+      'the final text stands in when no delta carried it',
+    );
+    const resumed = await execute('antigravity', 'denied', false, { access: 'full-access' });
+    assert.equal(resumed.events.at(-1)?.outcome, 'completed', JSON.stringify(resumed.events));
+    assert.deepEqual((await agy()).at(-1).args.slice(7), [
+      '--dangerously-skip-permissions',
+      '--conversation',
+      '273b9d3e-dcbe-4711-baae-0c363553bce7',
+    ]);
+    assert.ok(
+      resumed.events.some((e) => e.type === 'status' && e.text.includes('RunCommand')),
+      'what it was not allowed to do is said',
+    );
+
+    assert.equal(
+      (await execute('antigravity', 'fail', false, { access: 'full-access' })).events.at(-1)
+        ?.outcome,
+      'failed',
+    );
+    assert.equal(await saved(), '273b9d3e-dcbe-4711-baae-0c363553bce7');
+    const crashed = await execute('antigravity', 'crash', false, { access: 'full-access' });
+    assert.equal(crashed.events.at(-1)?.outcome, 'failed');
+    assert.ok(
+      crashed.events.some(
+        (e) => e.type === 'error' && /without a result|結果を返さず/.test(e.text),
+      ),
+    );
+    assert.equal(await saved(), undefined, 'a resume failing before any work sets it aside');
+    const held = await execute('antigravity', 'hold', true, { access: 'full-access' });
+    assert.equal(held.events.at(-1)?.outcome, 'cancelled');
+    await writeFile(path.join(root, 'fail-resume'), 'fixture');
+    const lost = await execute('antigravity', 'again', false, { access: 'full-access' });
+    assert.equal(lost.events.at(-1)?.outcome, 'failed');
+    assert.ok(lost.events.some((e) => e.type === 'error' && e.text.includes('not found')));
+    // Without an earlier interactive sign-in, the run says how to sign in.
+    const signIn = await execute('antigravity', 'sign in', false, { access: 'full-access' });
+    assert.equal(signIn.events.at(-1)?.outcome, 'failed');
+    assert.ok(signIn.events.some((e) => e.type === 'error' && /`agy`/.test(e.text)));
+  },
+);
+
 test('Each CLI gets the chosen model in its own form', fixtureOptions, async (t) => {
   assert.deepEqual(piModelArgs(), []);
   assert.deepEqual(piModelArgs('anthropic/claude-x'), [
@@ -735,6 +837,18 @@ test('Model lists are read from each installed CLI once per version', fixtureOpt
   assert.equal(hostArguments.agentModels.safeParse(['gpt']).success, false);
   // Hermes prints no list: a model is typed in.
   assert.deepEqual(await catalog.models('hermes'), { models: [], custom: true });
+  // `agy models` prints `<model>\t<label>`; each model names its own level.
+  assert.deepEqual(await catalog.models('antigravity'), {
+    models: [
+      { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)' },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
+    ],
+    custom: false,
+  });
+  assert.deepEqual(
+    parseAntigravityModels('Fetching available models...\nbad id!\tx\na\t\na\tAgain\n'),
+    [{ id: 'a', label: 'a' }],
+  );
   let reads = 0;
   const counted = new ModelCatalog(async () => {
     reads++;

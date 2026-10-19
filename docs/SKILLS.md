@@ -257,6 +257,7 @@ source states it.
 | Claude Code 2.1.278 | No: project skills are `.claude/skills` only. Inside irori, irori links them into a folder it adds (ADR 049, checked with 2.1.295) | `~/.claude/skills` (personal) | Personal over project; with a linked skill this was not tried |
 | OpenCode 1.18.30 | Yes: `.agents/skills` from the working directory up to the git worktree | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Warns "duplicate skill name" and keeps one; which one is not documented |
 | Pi 0.86.1 documentation (0.85.1 is what irori exercised) | Yes, once the project is trusted: `.agents/skills` in the working directory and its ancestors up to the git root | `~/.agents/skills`, `~/.pi/agent/skills` | First found wins, and global is loaded before project, so the personal copy wins |
+| Antigravity CLI 1.4.2 changelog (not exercised by irori) | Yes: `.agents/skills`, with the manifests of every `.agents/` from the working directory up to the project root | `~/.gemini/config/skills` | Not stated |
 | Hermes Agent v2026.9.24 documentation (not exercised by irori) | Yes, inside a git checkout once the project is trusted (`hermes skills trust`): `.hermes/skills` and `.agents/skills` at the project root | `~/.hermes/skills`; `~/.agents/skills` only when listed in `skills.external_dirs` | Project over local over external, so the KB copy wins |
 
 Sources, read on 2026-09-21:
@@ -288,6 +289,12 @@ Sources, read on 2026-09-21:
 - Hermes Agent: `website/docs/user-guide/features/skills.md` on `main`, read
   on 2026-09-27 ("External Skill Directories", "Project-Local Skills" and
   "Precedence": `project → local (~/.hermes/skills/) → external_dirs`).
+- Antigravity CLI: the changelog `agy changelog` prints in 1.4.2, read on
+  2026-10-19 (1.2.x: a `.agents/` directory's manifests load "from every
+  `.agents/` directory between the working directory and the project root",
+  and a directory entry loads "the same as a `.agents/skills/` folder"; global
+  customizations live in `~/.gemini/config/`, the binary naming
+  `~/.gemini/config/skills/`).
 - teamai-cli v0.24.0: `docs/usage-guide.md`, `teamai doctor` ("`Skills
   delivered to <tool>` compares the skills your role namespaces … resolve to
   against what is on disk for each installed tool: it reports a skill that was

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
 import { Tail } from './tail';
+import type { AgentId } from '../domain/types';
 export function agentEnv(source = process.env, platform = process.platform): NodeJS.ProcessEnv {
   // Preserve native provider authentication/configuration. Never inspect tokens.
   const env = { ...source };
@@ -57,6 +58,9 @@ function killNow(pid: number | undefined) {
   // Descendants first: once the group is dead, `ps` no longer ties them to it.
   for (const target of [-pid, ...descendantsOf(pid, listProcessesNow())]) signal(target, 'SIGKILL');
 }
+
+/** The executable each CLI is installed as. */
+export const agentCommand = (agent: AgentId) => (agent === 'antigravity' ? 'agy' : agent);
 
 export function launch(command: string, args: string[], cwd: string, env = agentEnv()) {
   const child = spawn(command, args, {

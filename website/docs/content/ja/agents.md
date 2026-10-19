@@ -5,7 +5,7 @@ description: 手元の CLI を使い、ノートを読んだり書き換えた�
 
 ## CLI を選ぶ
 
-irori は Claude Code・Codex・OpenCode・Pi・Hermes Agent を、パソコンに入っている CLI とその認証で動かします。先に CLI をインストールし、その CLI のログインを済ませてください。
+irori は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI（`agy`）を、パソコンに入っている CLI とその認証で動かします。先に CLI をインストールし、その CLI のログインを済ませてください。
 
 AI パネルで CLI を選び、モデルを選択します。モデルの候補はインストール済み CLI の一覧に従います。Hermes Agent のモデル名は入力します。
 
