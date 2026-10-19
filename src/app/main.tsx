@@ -173,7 +173,7 @@ import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
 import { BrainSettings } from './BrainSettings';
 import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
-import { NoteComments } from './NoteComments';
+import { NoteComments, type CommentRequest } from './NoteComments';
 import { Backlinks } from './Backlinks';
 import { Rail, type BrainAiState } from './Rail';
 import { Settings } from './Settings';
@@ -557,6 +557,8 @@ function App() {
   // An editable connected folder the next note goes into, instead of the active KB.
   const [cloudNoteTarget, setCloudNoteTarget] = useState<{ scopeId: string; directory: string }>();
   // A file or folder of knowledge or an editable connected folder being renamed, moved or deleted.
+  // The selection toolbar's request to comment beside the selected passage.
+  const [commentRequest, setCommentRequest] = useState<CommentRequest>();
   const [entryAction, setEntryAction] = useState<{
     space: EntrySpace;
     entry: Entry;
@@ -2971,6 +2973,7 @@ function App() {
                           path={doc.path}
                           revision={docRevision}
                           selection={() => editor.current?.selection()}
+                          request={commentRequest}
                           onReveal={(comment) =>
                             !!comment.quote &&
                             view === 'note' &&
@@ -3308,6 +3311,16 @@ function App() {
                               searchTarget={searchTarget}
                               authorship={authorship}
                               onFollowLink={(href) => void followLink(href)}
+                              // Only where the note bar offers comments.
+                              onComment={
+                                onNote && !doc.cloud && docSpace && /\.md$/i.test(doc.path)
+                                  ? (rect) =>
+                                      setCommentRequest((last) => ({
+                                        rect,
+                                        sequence: (last?.sequence ?? 0) + 1,
+                                      }))
+                                  : undefined
+                              }
                               onSearchResult={(found) => {
                                 if (searchTarget)
                                   setSearchNotice(navigationNotice(searchTarget, found));

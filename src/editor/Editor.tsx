@@ -24,6 +24,14 @@ import {
 } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
 import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
+import { mermaidPreview } from './mermaid';
+import { literalEditing, literalView } from './literal-view';
+
+type MermaidApply = Parameters<typeof mermaidPreview>[1];
+
+/** Lucide's message-square, as the note bar's comment button shows it. */
+const commentIcon =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>';
 import type { NoteAuthorship } from '../domain/knowledge';
 import { EditorView, GutterMarker, gutter, ViewPlugin } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -120,6 +128,12 @@ function editorChrome() {
       noResultText: t('該当する言語がありません', 'No matching language'),
       copyText: t('コピー', 'Copy'),
       previewLabel: t('プレビュー', 'Preview'),
+      // A Mermaid block shows its diagram, as Notion does; its source is one click away.
+      renderPreview: (language: string, content: string, apply: MermaidApply) =>
+        language.toLowerCase() === 'mermaid' ? mermaidPreview(content, apply) : null,
+      previewOnlyByDefault: true,
+      previewToggleText: (previewOnly: boolean) =>
+        previewOnly ? t('編集', 'Edit') : t('図だけ表示', 'Diagram only'),
     },
     blockEdit: {
       textGroup: {
@@ -203,6 +217,7 @@ export function Editor({
   onSearchResult,
   authorship,
   onFollowLink,
+  onComment,
 }: {
   text: string;
   mode: 'rich' | 'source';
@@ -218,6 +233,8 @@ export function Editor({
   onSearchResult?: (found: boolean) => void;
   authorship?: NoteAuthorship;
   onFollowLink?: (href: string) => void;
+  /** Starts a comment on the selection, which lies at `rect` in the window. */
+  onComment?: (rect: DOMRect) => void;
 }) {
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const navigation = useRef({ searchTarget, onSearchResult });
@@ -235,6 +252,8 @@ export function Editor({
   change.current = onChange;
   const follow = useRef(onFollowLink);
   follow.current = onFollowLink;
+  const commenting = useRef(onComment);
+  commenting.current = onComment;
   const initial = useRef(text);
   const snapshot = useRef(() => initial.current);
   const selecting = useRef<() => EditorSelection | undefined>(() => undefined);
@@ -367,7 +386,32 @@ export function Editor({
     const crepe = new CrepeBuilder({ root: element, defaultValue: encoding.body })
       .addFeature(cursor)
       .addFeature(listItem)
-      .addFeature(toolbarFeature)
+      .addFeature(toolbarFeature, {
+        // A comment starts where the passage is selected, beside bold and links.
+        buildToolbar: (builder) => {
+          if (!commenting.current) return;
+          builder.addGroup('irori', t('コメント', 'Comment')).addItem('comment', {
+            icon: commentIcon,
+            label: t('選択箇所にコメント', 'Comment on the selection'),
+            active: () => false,
+            onRun: (ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const { from, to } = view.state.selection;
+              const start = view.coordsAtPos(from);
+              const end = view.coordsAtPos(to);
+              const left = Math.min(start.left, end.left);
+              commenting.current?.(
+                new DOMRect(
+                  left,
+                  start.top,
+                  Math.max(1, Math.max(start.right, end.right) - left),
+                  end.bottom - start.top,
+                ),
+              );
+            },
+          });
+        },
+      })
       .addFeature(table)
       .addFeature(placeholder, chrome.placeholder)
       .addFeature(linkTooltip, chrome.linkTooltip)
@@ -442,6 +486,8 @@ export function Editor({
         }));
       })
       .use(literalBlock)
+      .use(literalView)
+      .use(literalEditing)
       .use(preserveBlocks)
       .use(
         // The debounced Markdown listener can skip a quick save/undo back to its

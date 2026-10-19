@@ -1,5 +1,34 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Notion-like Markdown, 2026-10-19 (**0.2.38**, pull request open): a note shows
+Mermaid diagrams, footnotes, wiki links and callouts as a page would.
+- `src/editor/literal-view.tsx`: an `irori_literal` block shows rendered text
+  until the cursor enters it. These are the blocks `preserveBlocks` keeps as
+  their exact text. A `literalEditing` node decoration shows the raw text while
+  the selection is inside, and a click on the preview puts the cursor there.
+  The preview is react-markdown with remark-gfm and `remarkLiteral`.
+  `remarkLiteral` renders footnote marks as `sup.footnote-mark` (references
+  without definitions too), `[^x]:` definitions with their name, `[[target|label]]`
+  and `![[embed]]` as their labels, and `> [!type] Title` as a callout. Links
+  and images do not leave the editor. Frontmatter, and a block that renders
+  nothing (raw HTML), stay as text. What is saved is unchanged.
+- `src/editor/mermaid.ts`: a `mermaid` code block's `renderPreview` draws its
+  SVG with mermaid 12.1.0, loaded on first use, at `securityLevel: 'strict'`,
+  in the `neutral` theme, or `dark` under the dark theme. Code blocks open as
+  their preview (`previewOnlyByDefault`), with **編集** for the source.
+- `.cm-editor`'s 450px minimum height no longer applies to code blocks inside a
+  note.
+- The selection toolbar (Crepe's, with bold and link) has **選択箇所にコメント**
+  wherever the note bar offers comments. `Editor`'s `onComment` hands the
+  selection's rectangle to `NoteComments` as a `CommentRequest`. The popover
+  then opens anchored there, quoting the selection, with its field focused.
+- Known and older than this change: saving a note whose last block is not a
+  paragraph adds a final line break, from the editor's trailing paragraph.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`. The new
+  `markdown-ui-smoke` covers footnote mark and definition, wiki links, callout,
+  Mermaid SVG, a short code block's height, click to edit, and the saved text.
+  `comments-ui-smoke` now comments from the selection toolbar.
+
 Rename in place, 2026-10-19 (**0.2.37**, pull request open): every layer's
 explorer renames a file or folder where its name is shown, as a file manager
 does.
