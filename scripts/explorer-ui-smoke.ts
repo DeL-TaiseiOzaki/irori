@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
+import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The explorer as a file manager: folders and files of any kind in knowledge and in a
-// connected folder, renamed, moved by dragging and deleted, with links following.
+// connected folder, renamed in place, moved by dragging and deleted, with links
+// following; Schema's files and folders renamed in place too.
 if (process.platform === 'win32') {
   console.log('Explorer UI fixture uses POSIX links; Windows remains unverified here.');
   process.exit(0);
@@ -20,6 +22,9 @@ await mkdir(path.join(root, 'Knowledge_Base/notes'), { recursive: true });
 const space = await files.register(root, '整理KB', 'personal');
 await writeFile(path.join(root, 'Knowledge_Base/notes/topic.md'), '# Topic\n');
 await writeFile(path.join(root, 'Knowledge_Base/home.md'), '# Home\n\n[topic](notes/topic.md)\n');
+await mkdir(path.join(root, '.agents/skills/draft-skill'), { recursive: true });
+await writeFile(path.join(root, '.agents/skills/draft-skill/SKILL.md'), '# Draft\n');
+await writeFile(path.join(root, 'AGENTS.md'), '# Agents\n');
 const shared = path.join(base, 'Box', '資料');
 await mkdir(shared, { recursive: true });
 await writeFile(path.join(shared, 'old.md'), '# Old\n');
@@ -31,6 +36,8 @@ await new CloudService(files).addLocal({
   access: 'read-write',
 });
 
+// The Schema layer shows with the vault agent on (ADR 021).
+await new SettingsService(files.dataDir).save({ vaultAgent: true });
 await chooseJapanese(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
@@ -55,6 +62,8 @@ try {
   const row = (region: typeof knowledge, name: string) =>
     region.getByRole('button', { name, exact: true });
   const menuItem = (name: string) => page.getByRole('menuitem', { name, exact: true });
+  // The name field a row turns into while it is renamed.
+  const nameField = (name: string) => panel.getByRole('textbox', { name: `${name} の新しい名前` });
   const disk = (relative: string) =>
     readdir(path.join(root, relative)).then((names) => names.sort());
 
@@ -73,12 +82,15 @@ try {
   await expect(row(knowledge, 'data.csv')).toBeVisible();
   expect(await disk('Knowledge_Base/notes/図表')).toEqual(['data.csv']);
 
-  // Renaming a folder from its row menu rewrites the links into it.
+  // Renaming a folder from its row menu edits its name in place and rewrites the links into it.
   await knowledge.getByRole('button', { name: 'notes の操作', exact: true }).click();
   await menuItem('名前を変更').click();
-  await page.getByRole('textbox', { name: '新しい名前' }).fill('topics');
-  await page.getByRole('button', { name: '名前を変更', exact: true }).click();
+  await expect(nameField('notes')).toBeFocused();
+  await expect(nameField('notes')).toHaveValue('notes');
+  await page.keyboard.type('topics');
+  await page.keyboard.press('Enter');
   await expect(row(knowledge, 'topics')).toBeVisible();
+  await expect(nameField('notes')).toHaveCount(0);
   await expect
     .poll(() => readFile(path.join(root, 'Knowledge_Base/home.md'), 'utf8'))
     .toBe('# Home\n\n[topic](topics/topic.md)\n');
@@ -119,16 +131,84 @@ try {
   await expect(menuItem('名前を変更')).toHaveCount(0);
   await page.keyboard.press('Escape');
 
+  // F2 edits a name in place. A file's extension stays out of the selection, so
+  // typing replaces its name alone; a note shows and keeps its title without `.md`.
+  await row(knowledge, 'data.csv').focus();
+  await page.keyboard.press('F2');
+  await expect(nameField('data.csv')).toBeFocused();
+  await page.keyboard.type('table');
+  await page.keyboard.press('Enter');
+  await expect(row(knowledge, 'table.csv')).toBeVisible();
+  await expect(row(knowledge, 'topic')).toBeVisible();
+  await row(knowledge, 'topic').focus();
+  await page.keyboard.press('F2');
+  await expect(nameField('topic.md')).toHaveValue('topic');
+  await nameField('topic.md').fill('話題');
+  await page.keyboard.press('Enter');
+  await expect(row(knowledge, '話題')).toBeVisible();
+  // Escape keeps the name; a name a file cannot have is refused beside the field.
+  await row(knowledge, 'topics').focus();
+  await page.keyboard.press('F2');
+  await nameField('topics').fill('kept');
+  await page.keyboard.press('Escape');
+  await expect(row(knowledge, 'topics')).toBeVisible();
+  await row(knowledge, 'topics').focus();
+  await page.keyboard.press('F2');
+  await nameField('topics').fill('a/b');
+  await page.keyboard.press('Enter');
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await expect(nameField('topics')).toBeVisible();
+  // A name another entry has is refused by the host, and the field stays for another try.
+  await nameField('topics').fill('table.csv');
+  await page.keyboard.press('Enter');
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(row(knowledge, 'topics')).toBeVisible();
+  expect(await disk('Knowledge_Base')).toEqual(['table.csv', 'topics']);
+  expect(await disk('Knowledge_Base/topics')).toEqual(['memo.txt', '図表', '話題.md']);
+
+  // Schema's files and folders are renamed in place too; `.irori` keeps its name.
+  const schema = panel.getByRole('region', { name: 'Schema', exact: true });
+  await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
+  await expect(row(schema, 'AGENTS.md')).toBeVisible();
+  await row(schema, 'AGENTS.md').click({ button: 'right' });
+  await menuItem('名前を変更').click();
+  await expect(nameField('AGENTS.md')).toBeFocused();
+  await page.keyboard.type('CLAUDE');
+  await page.keyboard.press('Enter');
+  await expect(row(schema, 'CLAUDE.md')).toBeVisible();
+  expect((await readdir(root)).includes('CLAUDE.md')).toBe(true);
+  // Only renaming is offered there: nothing is made, moved or deleted.
+  await row(schema, '.agents').click({ button: 'right' });
+  await expect(menuItem('名前を変更')).toBeVisible();
+  await expect(menuItem('移動')).toHaveCount(0);
+  await expect(menuItem('削除')).toHaveCount(0);
+  await expect(menuItem('新しいフォルダ')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await row(schema, '.agents').click();
+  await row(schema, 'skills').click();
+  await row(schema, 'draft-skill').focus();
+  await page.keyboard.press('F2');
+  await nameField('draft-skill').fill('review-skill');
+  await page.keyboard.press('Enter');
+  await expect(row(schema, 'review-skill')).toBeVisible();
+  expect(await readdir(path.join(root, '.agents/skills'))).toEqual(['review-skill']);
+  await row(schema, '.irori').click({ button: 'right' });
+  await expect(menuItem('パスをコピー')).toBeVisible();
+  await expect(menuItem('名前を変更')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
+
   // Every row copies its path, as a file manager's menu does: in full, or from the vault.
   const clipboardText = () => app.evaluate(({ clipboard }) => clipboard.readText());
   await row(knowledge, 'topics').click({ button: 'right' });
   await expect(menuItem('開く')).toHaveCount(0);
   await menuItem('相対パスをコピー').click();
   await expect.poll(clipboardText).toBe('Knowledge_Base/topics');
-  await row(knowledge, 'data.csv').click({ button: 'right' });
+  await row(knowledge, 'table.csv').click({ button: 'right' });
   await expect(menuItem('開く')).toBeVisible();
   await menuItem('パスをコピー').click();
-  await expect.poll(clipboardText).toBe(path.join(root, 'Knowledge_Base', 'data.csv'));
+  await expect.poll(clipboardText).toBe(path.join(root, 'Knowledge_Base', 'table.csv'));
 
   // A connected folder takes folders too, and files brought in from elsewhere.
   await expect(row(contents, '共有')).toBeVisible();
@@ -201,7 +281,10 @@ try {
       {
         checks: [
           'a right click on a knowledge folder makes a folder and a file of any kind in it',
-          'renaming a knowledge folder from its row menu rewrites the links into it',
+          'renaming a knowledge folder from its row menu edits its name in place and rewrites the links into it',
+          'F2 renames a file in place with its extension outside the selection, and a note by its title',
+          'Escape keeps the name; an invalid or taken name is refused beside the field',
+          "Schema's files and folders rename in place; .irori offers no rename, and nothing else is offered",
           'dragging a file onto a folder moves it there',
           'a file dropped from the file manager is copied into the folder',
           "a note deleted with the Delete key goes to irori's deleted notes",
