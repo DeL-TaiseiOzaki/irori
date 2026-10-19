@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import type { NoteComment } from '../domain/comments';
 import type { EditorSelection } from '../editor/Editor';
@@ -19,10 +19,19 @@ function when(at: string) {
     : date.toLocaleString(displayLocale(), { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** A request from the editor's selection toolbar to comment where the passage is. */
+export interface CommentRequest {
+  /** The selection's place in the window. */
+  rect: DOMRect;
+  /** Counts requests, so the same place asked again opens again. */
+  sequence: number;
+}
+
 /**
  * The comment button in the note's bar: how many comments the file has, and in
  * its popover the comments with a field for a new one. A new comment is about
- * the passage selected when the popover opened, or about the whole file.
+ * the passage selected when the popover opened, or about the whole file. Asked
+ * from the selection toolbar, the popover opens beside the passage instead.
  */
 export function NoteComments({
   scopeId,
@@ -30,6 +39,7 @@ export function NoteComments({
   revision,
   selection,
   onReveal,
+  request,
 }: {
   scopeId: string;
   path: string;
@@ -39,8 +49,11 @@ export function NoteComments({
   selection: () => EditorSelection | undefined;
   /** Selects a comment's passage in the editor; false when the text no longer has it. */
   onReveal: (comment: NoteComment) => boolean;
+  request?: CommentRequest;
 }) {
   const [open, setOpen] = useState(false);
+  // Where the popover opens: beside the passage when the toolbar asked, else under the button.
+  const [anchor, setAnchor] = useState<{ getBoundingClientRect: () => DOMRect }>();
   const [bump, setBump] = useState(0);
   const read = useResource(() => host.noteComments(scopeId, path), [scopeId, path], {
     refresh: revision + bump,
@@ -54,6 +67,25 @@ export function NoteComments({
   const [missing, setMissing] = useState<string>();
   const count = comments?.length ?? 0;
   const label = count ? t(`コメント ${count} 件`, `${count} comments`) : t('コメント', 'Comments');
+
+  const field = useRef<HTMLTextAreaElement>(null);
+  // Asked from the toolbar, the field takes focus once the editor has handled the press.
+  useEffect(() => {
+    if (!open || !anchor) return;
+    const frame = requestAnimationFrame(() => field.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open, anchor]);
+  const handled = useRef(request?.sequence);
+  useEffect(() => {
+    if (!request || request.sequence === handled.current) return;
+    handled.current = request.sequence;
+    const rect = request.rect;
+    setAnchor({ getBoundingClientRect: () => rect });
+    setQuote(selection());
+    setMissing(undefined);
+    setError('');
+    setOpen(true);
+  }, [request, selection, setError]);
 
   async function change(action: () => Promise<NoteComment[]>) {
     if (busy) return;
@@ -84,6 +116,7 @@ export function NoteComments({
           setQuote(selection());
           setMissing(undefined);
           setError('');
+          setAnchor(undefined);
         }
         setOpen(next);
       }}
@@ -93,7 +126,12 @@ export function NoteComments({
         {!!count && <span className="backlinks-count">{count}</span>}
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner side="bottom" align="end" sideOffset={6}>
+        <Popover.Positioner
+          side="bottom"
+          align={anchor ? 'start' : 'end'}
+          sideOffset={6}
+          {...(anchor && { anchor })}
+        >
           <Popover.Popup className="stage-popover comments-popover">
             <div className="backlinks-heading">
               <Popover.Title render={<h3 />}>{t('コメント', 'Comments')}</Popover.Title>
@@ -123,6 +161,7 @@ export function NoteComments({
                 </div>
               )}
               <textarea
+                ref={field}
                 aria-label={t('新しいコメント', 'New comment')}
                 placeholder={
                   quote

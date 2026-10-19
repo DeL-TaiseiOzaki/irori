@@ -404,6 +404,7 @@ button.save-state > i {
   text-underline-offset: 4px;
 }
 .document-editor .literal-block {
+  margin: 0;
   white-space: pre-wrap;
   font: 13px/1.7 var(--font-mono);
   background: var(--stage-2);
@@ -746,4 +747,78 @@ button.comment-quote:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Code blocks inside a note are as tall as their code; the source view keeps its height. */
+.document-editor .milkdown .cm-editor {
+  min-height: 0;
+}
+/* A literal block shows as its page would until the cursor enters it (literal-view.tsx). */
+.document-editor .literal-view:not(.literal-editing):not(.literal-raw) > .literal-block,
+.document-editor .literal-view.literal-editing > .literal-preview,
+.document-editor .literal-view.literal-raw > .literal-preview {
+  display: none;
+}
+.document-editor .literal-preview {
+  cursor: text;
+  /* The editor keeps white space; the rendered page's line breaks between elements are not text. */
+  white-space: normal;
+}
+.document-editor .literal-preview pre {
+  white-space: pre-wrap;
+}
+.document-editor .literal-preview > :first-child {
+  margin-top: 0;
+}
+.document-editor .literal-preview > :last-child {
+  margin-bottom: 0;
+}
+.document-editor .footnote-mark {
+  margin-left: 2px;
+  color: var(--ember-ink);
+  font: 600 0.68em/1 var(--font-ui);
+  vertical-align: super;
+}
+.document-editor .footnote-definition {
+  color: var(--ink-2, var(--ink));
+  font-size: 0.92em;
+}
+.document-editor .footnote-definition > .footnote-mark {
+  margin-right: 6px;
+}
+.document-editor .wiki-link,
+.document-editor .literal-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-2);
+  text-underline-offset: 4px;
+}
+.document-editor .wiki-embed::before {
+  content: '↳ ';
+  color: var(--rule-2);
+}
+.document-editor .callout {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--ember);
+  border-radius: 8px;
+  background: var(--stage-2);
+}
+.document-editor .callout .callout-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.document-editor .milkdown .preview svg {
+  max-width: 100%;
+  height: auto;
+}
+.document-editor .mermaid-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+.document-editor .milkdown .ProseMirror .callout p {
+  margin: 0;
+  padding: 2px 0;
+}
+.document-editor .milkdown .milkdown-code-block .preview-panel {
+  background: transparent;
 }
