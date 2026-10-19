@@ -23,6 +23,7 @@ export const skillReachRules: Record<AgentId, ReachRule> = {
   },
   pi: { native: 'trusted', user: ['~/.agents/skills', '~/.pi/agent/skills'], clash: 'user-wins' },
   hermes: { native: 'trusted', user: ['~/.hermes/skills'], clash: 'kb-wins' },
+  antigravity: { native: 'reads', user: ['~/.gemini/config/skills'], clash: 'unspecified' },
 };
 /** Every user-scope directory some harness reads, checked once per skill name. */
 export const userSkillRoots = [...new Set(Object.values(skillReachRules).flatMap((r) => r.user))];

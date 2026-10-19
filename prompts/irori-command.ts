@@ -38,7 +38,7 @@ export const vaultCommandPreamble =
 export function callRefused(vaultAgent: boolean) {
   return vaultAgent
     ? '"irori call" is the irori agent\'s. Ask the person to ask the irori agent in irori mode.'
-    : '"irori call" hands work over only on Pi or Hermes Agent, for vaults handed to this request. On this CLI, hand the work to the vault\'s sub-agent.';
+    : '"irori call" hands work over only on Pi, Hermes Agent or the Antigravity CLI, for vaults handed to this request. On this CLI, hand the work to the vault\'s sub-agent.';
 }
 
 /** `irori help`: every form of the command, with where new vaults go by default. */
@@ -120,9 +120,9 @@ irori run <routine> [--vault <vault>]
   --vault names a vault's. A routine's agent steps cannot start routines.
 
 irori call <vault agent or vault name> "<task>"
-  On Pi or Hermes Agent, which load no sub-agents from files, hands a task to
-  the agent of a vault handed to this request, waits until it finishes and
-  prints its report. The task may come on standard input instead. On another
+  On Pi, Hermes Agent or the Antigravity CLI, which get no sub-agents from
+  irori, hands a task to the agent of a vault handed to this request, waits
+  until it finishes and prints its report. The task may come on standard input instead. On another
   CLI, hand the work to the vault's sub-agent.
 
 irori connect <vault> <folder> [--name <name in contents>] [--read-only]

@@ -26,6 +26,38 @@ Hermes has no person-lines hook in irori. Hermes is not installed on the
 development machine: only the protocol fixture (`tests/fixtures/harnesses.mjs`)
 exercises it, and `available()` reports it untested.
 
+Antigravity CLI, 2026-10-19 (0.2.36): Google's Antigravity CLI (binary `agy`,
+installed in `~/.local/bin` by its install script) is the sixth selectable CLI.
+Each instruction runs one process: `agy --input-format stream-json
+--output-format stream-json --disable-slash-commands --add-dir <checkout>`, with
+one `{"event":"user","message":{"content":<prompt>}}` line on stdin, which is
+then closed so the CLI runs that turn and exits. The prompt is never on the
+command line. `--add-dir` makes the checkout the workspace: without it the
+CLI's tools work in its own scratch folder. `--disable-slash-commands` keeps a
+prompt starting with `/` from ending the session. `--model <id>` carries a
+chosen model and `--conversation <id>` a saved conversation. Standard access is
+`--mode accept-edits` (workspace edits; commands are refused, since a headless
+run cannot ask) and full access `--dangerously-skip-permissions`. An attached
+file's folder outside the checkout is added with another `--add-dir`. stdout
+records are `init` (`conversation_id`), `step_update` (`conversation_id`,
+`step_index`, `state`, `step_type`; `text_delta` on an `agent_response`,
+`tool_info` on a `tool`) and one `result` (`status`, `response`, `error`,
+`denied_actions`). A step of another conversation (a sub-agent's) is not shown.
+`denied_actions` become a status line naming what was left undone. A `result`
+whose `status` is not `SUCCESS`, a non-zero exit or no `result` fails the run;
+without an earlier interactive sign-in the CLI ends at once and the panel says
+to run `agy` once and sign in. Model ids come from `agy models`
+(`<id>\t<label>` lines). Each id names its thinking level, and a mismatched
+`--effort` stops the CLI, so no level is offered or passed. Sources: the
+[headless documentation](https://antigravity.google/docs/cli/headless/), the
+changelog `agy changelog` prints, `agy --help` of 1.4.2 (downloaded and checked
+against the release manifest's SHA-512; no sign-in), and records captured from
+agy 1.2.2 in [vicoa PR #74](https://github.com/vicoa-ai/vicoa/pull/74). Only the
+protocol fixture exercises a turn: without a signed-in account here, 1.4.2 was
+seen to fail sign-in at once in this mode, and nothing more. irori gives it no
+person-lines hook and no sub-agents; the irori agent hands work over with
+`irori call`.
+
 Every CLI's composer has a model pill: "CLI の既定" passes no model, or a model the
 installed CLI lists (`agentModels`, read once per CLI version and never
 generating text). Codex answers `model/list` on its app server (hidden models
@@ -101,6 +133,7 @@ Install and configure the desired native CLI on the desktop's PATH. irori also s
 | OpenCode | `opencode serve` on a private authenticated loopback port | SSE text/tools, native permission replies and single/multiple-choice questions; native session ID |
 | Pi | `pi --mode rpc` with LF-delimited JSON | Text/tools, native extension dialogs, native session file; requires Pi 0.85+ for settled-run handling |
 | Hermes Agent | `hermes chat --query-file - --format stream-json`, one process per instruction | Text/tools from JSONL; no requests (one-shot); `--resume` session id |
+| Antigravity CLI | `agy --input-format stream-json --output-format stream-json`, one process per instruction | Text/tools from JSONL; no requests (one-shot, refused actions reported); `--conversation` id |
 
 The OpenCode child gets a random server password and fixed loopback binding. The renderer receives neither credentials nor a generic HTTP/command API. The host subscribes before prompting, validates the session's checkout, filters conversation events by session, and accepts permission/question requests only for that session or verified descendants. Ordinary approval replies apply once; choosing full access explicitly changes that native session's permission rules as described above. Response completion is reconciled with streamed text; an interrupted event stream fails the run. See the official [server protocol](https://opencode.ai/docs/server/) and [permission semantics](https://opencode.ai/docs/permissions/).
 
