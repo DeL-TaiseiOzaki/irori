@@ -7,22 +7,30 @@ import { useChoice } from './useChoice';
 import { useLanguage } from './useLanguage';
 import {
   chooseLanguage,
+  chooseLineSpacing,
   chooseMarkdownFont,
   choosePageMargins,
+  chooseTextSize,
   chooseRoutineRuntimes,
   chooseTheme,
   currentLanguageChoice,
+  currentLineSpacing,
   currentMarkdownFont,
   currentPageMargins,
+  currentTextSize,
   currentRoutineRuntimes,
   currentTheme,
 } from './device-settings';
 import {
+  lineSpacings,
   markdownFonts,
   pageMargins,
+  textSizes,
   themes,
+  type LineSpacing,
   type MarkdownFont,
   type PageMargins,
+  type TextSize,
   type Theme,
 } from '../domain/types';
 import { languages, t, type Language } from '../domain/i18n';
@@ -51,6 +59,19 @@ const marginLabels: Record<PageMargins, () => string> = {
   standard: () => t('標準', 'Standard'),
   small: () => t('小', 'Small'),
   minimal: () => t('最小', 'Minimal'),
+};
+
+const sizeLabels: Record<TextSize, () => string> = {
+  small: () => t('小', 'Small'),
+  standard: () => t('標準', 'Standard'),
+  large: () => t('大', 'Large'),
+  larger: () => t('特大', 'Larger'),
+};
+
+const spacingLabels: Record<LineSpacing, () => string> = {
+  compact: () => t('詰める', 'Compact'),
+  standard: () => t('標準', 'Standard'),
+  relaxed: () => t('広い', 'Relaxed'),
 };
 
 // Each language is named in itself, so it can be found whichever is showing.
@@ -189,6 +210,8 @@ export function Settings({
   const [theme, chooseThemeValue] = useChoice(currentTheme, chooseTheme, onError);
   const [font, chooseFont] = useChoice(currentMarkdownFont, chooseMarkdownFont, onError);
   const [margins, chooseMargins] = useChoice(currentPageMargins, choosePageMargins, onError);
+  const [size, chooseSize] = useChoice(currentTextSize, chooseTextSize, onError);
+  const [spacing, chooseSpacing] = useChoice(currentLineSpacing, chooseLineSpacing, onError);
   const [language, chooseLanguageValue, setLanguage] = useChoice<Language>(
     currentLanguageChoice,
     chooseLanguage,
@@ -250,6 +273,22 @@ export function Settings({
                   </span>
                 )}
                 onChange={chooseFont}
+              />
+              <Choices
+                legend={t('文字の大きさ', 'Text size')}
+                name="text-size"
+                value={size}
+                options={textSizes}
+                label={(option) => sizeLabels[option]()}
+                onChange={chooseSize}
+              />
+              <Choices
+                legend={t('行間', 'Line spacing')}
+                name="line-spacing"
+                value={spacing}
+                options={lineSpacings}
+                label={(option) => spacingLabels[option]()}
+                onChange={chooseSpacing}
               />
               <Choices
                 legend={t('左右の余白', 'Side margins')}

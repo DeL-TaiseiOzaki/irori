@@ -5,13 +5,21 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { SettingsService } from '../src/host/settings';
 import { hostArguments } from '../src/domain/host-requests';
-import { markdownFonts, nativeThemeSource, pageMargins } from '../src/domain/types';
+import {
+  lineSpacings,
+  markdownFonts,
+  nativeThemeSource,
+  pageMargins,
+  textSizes,
+} from '../src/domain/types';
 
 const defaults = {
   theme: 'system',
   language: 'en',
   markdownFont: 'sans',
   pageMargins: 'standard',
+  textSize: 'standard',
+  lineSpacing: 'standard',
   editorAssistance: true,
   vaultAgent: false,
   layouts: {},
@@ -120,6 +128,26 @@ test('side margins stay as chosen, and a record without them keeps the reading c
   for (const margins of pageMargins)
     assert.equal(save.safeParse([{ pageMargins: margins }]).success, true);
   assert.equal(save.safeParse([{ pageMargins: 'none' }]).success, false);
+});
+
+test('text size and line spacing stay as chosen, and a record without them reads as before', async () => {
+  const { dir, settings } = await service();
+  await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ pageMargins: 'small' }));
+  assert.equal((await settings.read()).textSize, 'standard');
+  assert.equal((await settings.read()).lineSpacing, 'standard');
+  await settings.save({ textSize: 'larger' });
+  await settings.save({ lineSpacing: 'relaxed' });
+  const kept = await new SettingsService(dir).read();
+  assert.deepEqual(
+    [kept.textSize, kept.lineSpacing, kept.pageMargins],
+    ['larger', 'relaxed', 'small'],
+  );
+  const save = hostArguments.saveDeviceSettings;
+  for (const textSize of textSizes) assert.equal(save.safeParse([{ textSize }]).success, true);
+  for (const lineSpacing of lineSpacings)
+    assert.equal(save.safeParse([{ lineSpacing }]).success, true);
+  assert.equal(save.safeParse([{ textSize: '24px' }]).success, false);
+  assert.equal(save.safeParse([{ lineSpacing: 3 }]).success, false);
 });
 
 test("the reader's role and project are kept per KB on the device, not in the KB", async () => {

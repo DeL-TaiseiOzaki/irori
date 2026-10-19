@@ -14,6 +14,8 @@ let current: DeviceSettings = {
   language: 'en',
   markdownFont: 'sans',
   pageMargins: 'standard',
+  textSize: 'standard',
+  lineSpacing: 'standard',
   editorAssistance: true,
   vaultAgent: false,
   layouts: {},
@@ -122,6 +124,22 @@ export function applyPageMargins(margins: DeviceSettings['pageMargins'] = curren
   document.documentElement.dataset.pageMargins = margins;
 }
 
+export function currentTextSize() {
+  return current.textSize;
+}
+export function currentLineSpacing() {
+  return current.lineSpacing;
+}
+
+/** Applies the text size and line spacing only to a note's page through CSS. */
+export function applyText(
+  size: DeviceSettings['textSize'] = current.textSize,
+  spacing: DeviceSettings['lineSpacing'] = current.lineSpacing,
+) {
+  document.documentElement.dataset.textSize = size;
+  document.documentElement.dataset.lineSpacing = spacing;
+}
+
 /** Keeps a system choice in step with the desktop while it is the choice. */
 export function watchSystemTheme() {
   const media = systemDark();
@@ -144,6 +162,14 @@ export function chooseMarkdownFont(markdownFont: DeviceSettings['markdownFont'])
 
 export function choosePageMargins(pageMargins: DeviceSettings['pageMargins']) {
   return save({ pageMargins }, (shown) => applyPageMargins(shown.pageMargins));
+}
+
+export function chooseTextSize(textSize: DeviceSettings['textSize']) {
+  return save({ textSize }, (shown) => applyText(shown.textSize, shown.lineSpacing));
+}
+
+export function chooseLineSpacing(lineSpacing: DeviceSettings['lineSpacing']) {
+  return save({ lineSpacing }, (shown) => applyText(shown.textSize, shown.lineSpacing));
 }
 
 /** The reader's role and project for one KB; a KB without a choice is not narrowed. */
@@ -189,6 +215,7 @@ export async function reloadDeviceSettings() {
   applyTheme();
   applyMarkdownFont();
   applyPageMargins();
+  applyText();
   applyLanguage();
   return current;
 }
