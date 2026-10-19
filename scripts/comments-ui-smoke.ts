@@ -120,15 +120,38 @@ try {
   await popover.locator('button.comment-quote', { hasText: 'needs a source' }).click();
   await expect.poll(() => page.evaluate(() => getSelection()!.toString())).toBe('needs a source');
 
+  // The selection's toolbar comments where the passage is, without going to the note bar.
+  await select(page, 'A claim');
+  const toolbarComment = page.getByRole('button', { name: '選択箇所にコメント', exact: true });
+  await expect(toolbarComment).toBeVisible();
+  await toolbarComment.click();
+  await expect(popover.locator('.comment-quote.selected')).toHaveText('A claim');
+  await expect(popover.getByLabel('新しいコメント')).toBeFocused();
+  // The popover opens beside the passage, not under the note bar's button.
+  const passage = await page
+    .locator('.ProseMirror p', { hasText: 'A claim that needs a source.' })
+    .boundingBox();
+  const near = await popover.boundingBox();
+  if (!passage || !near || Math.abs(near.y - (passage.y + passage.height)) > 40)
+    throw Error(`The comment opened away from the passage: ${JSON.stringify({ passage, near })}`);
+  await popover.getByLabel('新しいコメント').fill('ここも出典を');
+  await popover.getByLabel('新しいコメント').press('ControlOrMeta+Enter');
+  await expect(popover.locator('.comment-list li')).toHaveCount(4);
+  const fourth = (await saved()).comments[3];
+  if (fourth.quote !== 'A claim' || fourth.body !== 'ここも出典を')
+    throw Error(`Unexpected toolbar comment: ${JSON.stringify(fourth)}`);
+  await page.keyboard.press('Escape');
+  await expect(popover).toHaveCount(0);
+
   // A comment changed on disk — by an agent or a pull — shows in the list.
   const onDisk = await saved();
   onDisk.comments[2].body = 'エージェントが書き換えた';
   await writeFile(commentsFile, JSON.stringify(onDisk));
-  await page.getByRole('button', { name: 'コメント 3 件', exact: true }).click();
+  await page.getByRole('button', { name: 'コメント 4 件', exact: true }).click();
   await expect(popover.getByText('エージェントが書き換えた')).toBeVisible({ timeout: 10000 });
 
   // Resolving removes a comment; the last one takes its file with it.
-  for (let left = 3; left > 0; left--) {
+  for (let left = 4; left > 0; left--) {
     await popover.getByRole('button', { name: '解決', exact: true }).first().click();
     await expect(popover.locator('.comment-list li')).toHaveCount(left - 1);
   }
@@ -141,7 +164,7 @@ try {
 
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Comments UI smoke passed: a selection quoted with its file line under frontmatter, the second of two identical paragraphs told apart, a whole-note comment, quotes selecting their passage, an on-disk change shown, and resolving down to no file.',
+    'Comments UI smoke passed: a selection quoted with its file line under frontmatter, the second of two identical paragraphs told apart, a whole-note comment, quotes selecting their passage, a comment from the selection toolbar beside the passage, an on-disk change shown, and resolving down to no file.',
   );
 } finally {
   await app.close();
