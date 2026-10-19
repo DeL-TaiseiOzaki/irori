@@ -23,13 +23,14 @@ import { requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
+import { runAntigravity } from './antigravity';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
 import { ModelCatalog } from './models';
 import { CommandCatalog, codexSkills, commandWords } from './commands';
 import { personLinesBridge } from './person-lines';
 import { handOffTaskLimit, iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
-import { agentEnv, killTree, launch, version } from './process';
+import { agentCommand, agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import { Tail } from './tail';
 import type { FileService } from '../host/files';
@@ -541,7 +542,7 @@ export class AgentService {
     return Promise.all(
       agentIds.map(async (id) => {
         try {
-          const v = await version(id);
+          const v = await version(agentCommand(id));
           return {
             id,
             version: v,
@@ -1241,8 +1242,10 @@ export class AgentService {
       }
       // The composer already shows the CLI, folder, access, model and level, so
       // a turn repeats none of them; only a change of session is worth a line.
-      // Hermes Agent takes no level; one sent anyway is not passed on.
-      const effort = input.agent === 'hermes' ? undefined : input.effort;
+      // Hermes Agent takes no level, and the Antigravity CLI's models name
+      // theirs; one sent anyway is not passed on.
+      const effort =
+        input.agent === 'hermes' || input.agent === 'antigravity' ? undefined : input.effort;
       if (input.agent === 'codex')
         await this.codex(run, space.root, prompt, saved, input.model, effort);
       else if (input.agent === 'claude')
@@ -1250,10 +1253,10 @@ export class AgentService {
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
-        // Hermes Agent offers no such hook.
+        // Hermes Agent and the Antigravity CLI get no such hook from irori.
         const delegation = run.delegation;
         const bridge =
-          input.agent === 'hermes'
+          input.agent === 'hermes' || input.agent === 'antigravity'
             ? undefined
             : await personLinesBridge(
                 this.files.dataDir,
@@ -1298,6 +1301,7 @@ export class AgentService {
         };
         if (input.agent === 'pi') await runPi(context);
         else if (input.agent === 'opencode') await runOpenCode(context);
+        else if (input.agent === 'antigravity') await runAntigravity(context);
         else await runHermes(context);
       }
       // A resumed session's handle is not saved again, so what it heard of the

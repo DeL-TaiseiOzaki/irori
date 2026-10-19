@@ -85,7 +85,7 @@ vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
 | Claude Code | the Agent SDK's `agents` option (description and prompt) |
 | Codex | roles in the thread's configuration, `agents.<name>.description` and `agents.<name>.config_file`, the file in `<irori data>/codex-agents/<run>/` holding `developer_instructions`, removed when the run ends |
 | OpenCode | `agent.<name>` (`description`, `prompt`, `mode: subagent`) in `OPENCODE_CONFIG_CONTENT` |
-| Pi, Hermes Agent | none: they load no sub-agents |
+| Pi, Hermes Agent, Antigravity CLI | none: irori gives them no sub-agents |
 
 - A name the CLI has in its own format wins; among the others the first in the
   order Claude Code, Codex, OpenCode. A translated definition carries its
