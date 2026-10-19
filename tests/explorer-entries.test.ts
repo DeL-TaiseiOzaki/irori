@@ -261,6 +261,41 @@ test('A move refuses a taken name, a folder into itself, the knowledge folder an
   );
 });
 
+test("Schema's files and folders rename in their folder; .irori, .git and other layers refuse", async (t) => {
+  const { files, id, read, exists, write } = await fixture(t);
+  await write('AGENTS.md', '# Agents\n');
+  await write('.agents/skills/draft/SKILL.md', '# Draft\n');
+  await write('.git/HEAD', 'ref: refs/heads/main\n');
+  const renamed = await files.renameSchemaEntry(id, 'AGENTS.md', 'CLAUDE.md');
+  assert.deepEqual(renamed, {
+    entry: { path: 'CLAUDE.md', name: 'CLAUDE.md', directory: false, layer: 'schema', note: true },
+    files: ['AGENTS.md'],
+  });
+  assert.equal(await read('CLAUDE.md'), '# Agents\n');
+  const folder = await files.renameSchemaEntry(id, '.agents/skills/draft', '.agents/skills/review');
+  assert.deepEqual(folder.files, ['.agents/skills/draft/SKILL.md']);
+  assert.equal(await read('.agents/skills/review/SKILL.md'), '# Draft\n');
+  // A change of case alone works; a root file whose new name is not a Schema name is refused.
+  await files.renameSchemaEntry(id, '.agents/skills/review', '.agents/skills/Review');
+  assert.equal(await exists('.agents/skills/Review/SKILL.md'), true);
+  await assert.rejects(() => files.renameSchemaEntry(id, 'CLAUDE.md', 'claude.md'), /Schema/);
+  const refused = async (from: string, to: string, pattern: RegExp) =>
+    assert.rejects(() => files.renameSchemaEntry(id, from, to), pattern);
+  await refused('.irori', '.irori-old', /\.irori/);
+  await refused('.irori/scope.json', '.irori/scope2.json', /\.irori/);
+  await refused('.git/HEAD', '.git/HEAD2', /\.git/);
+  await refused('CLAUDE.md', '.git', /\.git/);
+  // Into another folder, or out of the Schema layer, is not a rename here.
+  await refused('CLAUDE.md', '.agents/CLAUDE.md', /同じフォルダ|within its folder/);
+  await refused('CLAUDE.md', 'Knowledge_Base', /Schema/);
+  await refused('CLAUDE.md', '.a/b', /./);
+  // An existing name is never replaced.
+  await write('.other.md', '# Other\n');
+  await assert.rejects(() => files.renameSchemaEntry(id, 'CLAUDE.md', '.other.md'));
+  assert.equal(await read('.other.md'), '# Other\n');
+  assert.equal(await read('CLAUDE.md'), '# Agents\n');
+});
+
 test('Deleting from knowledge hands files and folders to the trash, never the knowledge folder', async (t) => {
   const { files, id, write, root, exists } = await fixture(t);
   await write('Knowledge_Base/old/x.txt', 'x');

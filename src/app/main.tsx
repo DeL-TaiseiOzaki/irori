@@ -2150,6 +2150,23 @@ function App() {
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
       setEntryAction({ space, entry, action }),
+    // A name edited in its row; a failure stays beside the name being edited.
+    renameEntry: (space: Space, entry: Entry, name: string) =>
+      organize(async () => {
+        const folder = parentPath(entry.path);
+        const moved = await host.moveEntry(
+          space.scopeId,
+          entry.path,
+          folder ? `${folder}/${name}` : name,
+        );
+        await entryChanged({
+          scopeId: space.scopeId,
+          action: 'rename',
+          from: entry.path,
+          to: moved.entry.path,
+          notice: movedNotice(moved),
+        });
+      }),
     moveFrom: (space: Space, fromScopeId: string, entry: Entry, directory: string) =>
       void moveFromVault(fromScopeId, entry, space, directory),
     openSide: () => {
@@ -2265,6 +2282,7 @@ function App() {
         create: (directory, kind) => act.createIn(active, directory, kind),
         bringIn: (directory, items) => act.bringIn(active, directory, items),
         act: (entry, action) => act.entryAction(active, entry, action),
+        rename: (entry, name) => act.renameEntry(active, entry, name),
         moveInto: (entry, directory) => act.moveInto(active, entry, directory),
         moveFrom: (scopeId, entry, directory) => act.moveFrom(active, scopeId, entry, directory),
         reveal: (path) => act.reveal(active, path),
@@ -2278,6 +2296,7 @@ function App() {
         create: (directory, kind) => act.createIn(sideSpace, directory, kind),
         bringIn: (directory, items) => act.bringIn(sideSpace, directory, items),
         act: (entry, action) => act.entryAction(sideSpace, entry, action),
+        rename: (entry, name) => act.renameEntry(sideSpace, entry, name),
         moveInto: (entry, directory) => act.moveInto(sideSpace, entry, directory),
         moveFrom: (scopeId, entry, directory) => act.moveFrom(sideSpace, scopeId, entry, directory),
         reveal: (path) => act.reveal(sideSpace, path),

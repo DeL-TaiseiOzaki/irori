@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Rename in place, 2026-10-19 (**0.2.37**, pull request open): every layer's
+explorer renames a file or folder where its name is shown, as a file manager
+does.
+- `Tree` (`src/app/BrainPanel.tsx`) turns a row into `RenameField` on F2 or the
+  menu's **名前を変更**. Enter or leaving the field renames, Escape keeps the
+  name. A note is edited by its title, its `.md` kept. A file's extension starts
+  outside the selection. A refusal (`entryNameError`, or the host's) shows below
+  the field, which stays focused (read-only, not disabled, while it works).
+  `Explorer.rename` runs `host.moveEntry` inside `organize` and follows with
+  `entryChanged`. The open file's **その他** menu keeps the rename dialog, and
+  move and delete keep theirs.
+- Schema's file view gets an explorer limited to `actions: ['rename']`.
+  `FileService.renameSchemaEntry` renames within the entry's folder only. It
+  refuses `.irori`, `.git` and what is in them, and a name that would leave the
+  Schema layer. `moveEntry` routes Schema paths there, and `carryMove` carries
+  comments, drafts and links.
+- Not changed: a connected folder's name (Connections) and a layer folder's
+  name (vault settings). The Schema settings' category view and the irori
+  agent's folder list do not rename in place.
+- Verified by `npm run build`, `npm test` (`tests/explorer-entries.test.ts`) and
+  `npm run test:ui` (`explorer-ui-smoke`: in-place rename by menu and F2, a
+  note's title, Escape, an invalid and a taken name, Schema files and folders,
+  `.irori` offering none).
+
 Antigravity CLI, 2026-10-19 (**0.2.36**, pull request open): the sixth agent
 CLI, `antigravity` (binary `agy`), for vault agents, the irori agent and
 routine steps. See [HARNESSES](HARNESSES.md).
