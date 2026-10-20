@@ -1841,9 +1841,10 @@ function App() {
   /**
    * Runs a change to the vault's files that the open note must not race: it is
    * saved first, and the change waits while an agent, Git or a connection works.
+   * What is only `adding` to the vault does not wait for its agents.
    */
-  async function organize<T>(operation: () => Promise<T>) {
-    if (running || sending || queuedHere || gitBusy || connecting)
+  async function organize<T>(operation: () => Promise<T>, adding = false) {
+    if ((!adding && (running || sending || queuedHere)) || gitBusy || connecting)
       throw Error(t('作業中はファイルを整理できません。', "Can't organize files while busy."));
     if (!(await save()))
       throw Error(t('開いているノートを保存してください。', 'Save the open note first.'));
@@ -1971,7 +1972,8 @@ function App() {
       ownerOf(column) === 'vault' ? sum + (columnStatus[column.id]?.queued ?? 0) : sum,
     0,
   );
-  const brainLocked = running || sending || queuedHere > 0 || connecting || heldHere;
+  const brainHeld = running || sending || queuedHere > 0 || heldHere;
+  const brainLocked = brainHeld || connecting;
   // Other brains stay open to choose while this one's AI runs.
   const switchLocked = sending || connecting;
   const anyRunning = runningScopes.length > 0;
@@ -2148,7 +2150,7 @@ function App() {
               )
             : error;
         }
-        if (read.length) await organize(() => bringIn(space, directory, read));
+        if (read.length) await organize(() => bringIn(space, directory, read), true);
       })().catch(report);
     },
     entryAction: (space: Space, entry: Entry, action: EntryAction) =>
@@ -2800,7 +2802,8 @@ function App() {
                 changes={gitRead.data?.available ? gitRead.data.changes.length : undefined}
                 selected={doc}
                 revision={revision}
-                locked={brainLocked || gitBusy}
+                locked={connecting || gitBusy}
+                held={brainHeld}
                 daily={!!notesDeclared?.daily}
                 dirty={dirty}
                 connections={connections}
@@ -2850,12 +2853,8 @@ function App() {
                   revision={sideRevision}
                   selected={doc}
                   connections={sideConnections}
-                  locked={
-                    gitBusy ||
-                    connecting ||
-                    runningScopes.includes(sideSpace.scopeId) ||
-                    heldByYou(sideSpace.scopeId)
-                  }
+                  locked={gitBusy || connecting}
+                  held={runningScopes.includes(sideSpace.scopeId) || heldByYou(sideSpace.scopeId)}
                   explorer={sideExplorer}
                   onOpen={act.openEntry}
                   onChoose={act.chooseSide}
@@ -3351,7 +3350,8 @@ function App() {
                         skills={skills}
                         schemaLayer={vaultAgent}
                         daily={!!notesDeclared?.daily}
-                        locked={brainLocked || gitBusy}
+                        locked={connecting || gitBusy}
+                        held={brainHeld}
                         revision={revision}
                         onOpen={(entry) => void open(active, entry)}
                         onDaily={openDaily}
