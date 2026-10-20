@@ -888,7 +888,11 @@ app
       trashEntry: (scopeId, target) =>
         classify(files.get(scopeId), target) === 'contents'
           ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
-          : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
+          : classify(files.get(scopeId), target) === 'schema'
+            ? changeVault(scopeId, organizing(), () =>
+                files.trashSchemaEntry(scopeId, target, (filename) => shell.trashItem(filename)),
+              )
+            : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
       vaultMoveLinks: (scopeId, target) => vaultMoveLinks(scopeId, target),
       moveToVault: (scopeId, from, toScopeId, directory) =>
         changeVault(scopeId, organizing(), () =>

@@ -1308,6 +1308,38 @@ export class FileService {
     });
   }
   /**
+   * Hands a file or folder of the Schema layer to `trash`, the system trash.
+   * irori's `.irori` and Git's `.git` stay with everything in them, and so does a
+   * folder holding the knowledge folder, contents or another vault.
+   */
+  async trashSchemaEntry(id: string, rel: string, trash: (filename: string) => Promise<void>) {
+    return this.queue.run(async () => {
+      const space = this.get(id);
+      relative.parse(rel);
+      const top = rel.split('/')[0];
+      if (top === '.irori' || top === '.git')
+        throw Error(t(`${top} の中は削除できません。`, `Nothing in ${top} can be deleted.`));
+      if (classify(space, rel) !== 'schema')
+        throw Error(t('Schema の項目を指定してください。', 'Choose an item of the Schema layer.'));
+      const folder = path.posix.dirname(rel);
+      const parent = await this.resolve(id, folder === '.' ? '' : folder, true);
+      const actual = path.join(parent, path.posix.basename(rel));
+      const info = await fs.lstat(actual);
+      if (info.isDirectory()) {
+        this.holdsNoBoundary(space, rel);
+        if (knowledgeFolder(space).startsWith(`${rel}/`))
+          throw Error(
+            t(
+              'このフォルダにはナレッジのフォルダが入っています。',
+              'This folder holds the knowledge folder.',
+            ),
+          );
+      }
+      await trash(actual);
+      if (info.isFile()) await fs.rm(draftFile(this.dataDir, id, rel), { force: true });
+    });
+  }
+  /**
    * Moves a file or folder of one vault's knowledge into `directory` of another
    * vault's knowledge (ADR 038). It keeps its name, or takes the first free one;
    * nothing is replaced. A note's managed images are copied beside it. Between

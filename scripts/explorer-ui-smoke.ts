@@ -178,11 +178,11 @@ try {
   await page.keyboard.press('Enter');
   await expect(row(schema, 'CLAUDE.md')).toBeVisible();
   expect((await readdir(root)).includes('CLAUDE.md')).toBe(true);
-  // Only renaming is offered there: nothing is made, moved or deleted.
+  // Renaming and deleting are offered there: nothing is made or moved.
   await row(schema, '.agents').click({ button: 'right' });
   await expect(menuItem('名前を変更')).toBeVisible();
+  await expect(menuItem('削除')).toBeVisible();
   await expect(menuItem('移動')).toHaveCount(0);
-  await expect(menuItem('削除')).toHaveCount(0);
   await expect(menuItem('新しいフォルダ')).toHaveCount(0);
   await expect(menuItem('コピー')).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -194,9 +194,18 @@ try {
   await page.keyboard.press('Enter');
   await expect(row(schema, 'review-skill')).toBeVisible();
   expect(await readdir(path.join(root, '.agents/skills'))).toEqual(['review-skill']);
+  // The Delete key sends a Schema folder to the system trash.
+  await row(schema, 'review-skill').focus();
+  await page.keyboard.press('Delete');
+  const schemaDeletion = page.getByRole('dialog', { name: '削除' });
+  await expect(schemaDeletion).toContainText('フォルダを中身ごとシステムのゴミ箱に移します。');
+  await schemaDeletion.getByRole('button', { name: 'ゴミ箱に移す', exact: true }).click();
+  await expect(row(schema, 'review-skill')).toHaveCount(0);
+  expect(await readdir(path.join(root, '.agents/skills'))).toEqual([]);
   await row(schema, '.irori').click({ button: 'right' });
   await expect(menuItem('パスをコピー')).toBeVisible();
   await expect(menuItem('名前を変更')).toHaveCount(0);
+  await expect(menuItem('削除')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
 
@@ -337,7 +346,7 @@ try {
           'renaming a knowledge folder from its row menu edits its name in place and rewrites the links into it',
           'F2 renames a file in place with its extension outside the selection, and a note by its title',
           'Escape keeps the name; an invalid or taken name is refused beside the field',
-          "Schema's files and folders rename in place; .irori offers no rename, and nothing else is offered",
+          "Schema's files and folders rename in place and delete to the trash; .irori offers neither",
           'dragging a file onto a folder moves it there',
           'a file dropped from the file manager is copied into the folder',
           "a note deleted with the Delete key goes to irori's deleted notes",

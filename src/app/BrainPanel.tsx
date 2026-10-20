@@ -221,14 +221,18 @@ export function Tree({
     actions.includes('move') &&
     !entry.connection &&
     !(layer === 'Knowledge_Base' && entry.path === knowledgeFolder(space));
-  // Schema's files are renamed in place, except irori's own and Git's.
+  // Schema's files are renamed in place and deleted, except irori's own and Git's.
+  const schemaItem = (entry: Entry) =>
+    layer === 'schema' && !entry.blocked && !/^\.(irori|git)(\/|$)/.test(entry.path);
   const renamable = (entry: Entry) =>
     !!explorer?.rename &&
     actions.includes('rename') &&
-    (layer === 'schema'
-      ? !entry.blocked && !/^\.(irori|git)(\/|$)/.test(entry.path)
-      : movable(entry));
-  const changeable = (entry: Entry) => movable(entry) || renamable(entry);
+    (layer === 'schema' ? schemaItem(entry) : movable(entry));
+  const deletable = (entry: Entry) =>
+    !!explorer &&
+    actions.includes('delete') &&
+    (layer === 'schema' ? schemaItem(entry) : movable(entry));
+  const changeable = (entry: Entry) => movable(entry) || renamable(entry) || deletable(entry);
   // Anything shown may be copied out, except the knowledge folder as a whole.
   const copyable = (entry: Entry) =>
     !!explorer?.clip &&
@@ -484,7 +488,7 @@ export function Tree({
                     if (
                       !action ||
                       !actions.includes(action) ||
-                      !(action === 'rename' ? renamable(entry) || movable(entry) : movable(entry))
+                      !(action === 'rename' ? renamable(entry) || movable(entry) : deletable(entry))
                     )
                       return;
                     event.preventDefault();
@@ -923,8 +927,10 @@ export const BrainPanel = memo(function BrainPanel({
               ? { explorer: held ? addingOnly(explorer) : explorer, writable: true }
               : held
                 ? {}
-                : // Schema's files and folders are only renamed here.
-                  { explorer: explorer && { ...explorer, actions: ['rename'] as const } }))}
+                : // Schema's files and folders are only renamed and deleted here.
+                  {
+                    explorer: explorer && { ...explorer, actions: ['rename', 'delete'] as const },
+                  }))}
         />
       );
     // Connected folders sit directly under the section; a second contents root names itself.
