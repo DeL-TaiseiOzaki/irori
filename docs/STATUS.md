@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Copy and paste in the explorer, folded properties, 2026-10-20 (**0.2.42**, pull
-request open):
+Copy and paste in the explorer, folded properties, Schema deletion, 2026-10-20
+(**0.2.42**, pull request open):
 - HostAPI `copyEntry(scopeId, path, toScopeId, directory)` copies a file or
   folder of knowledge or contents into a folder of knowledge or an editable
   connection, in this vault or another (`changeFiles`, so it runs beside
@@ -19,8 +19,12 @@ request open):
 - `PageProperties` folds its rows, raw YAML and actions under the title and
   description; the device setting `propertiesFolded` keeps the choice. Broken
   frontmatter stays open.
+- `trashEntry` on a Schema path goes to `FileService.trashSchemaEntry` (system
+  trash, the file's draft removed; `.irori`, `.git` and a folder holding the
+  knowledge folder, contents or another vault refused). The Schema file view
+  offers `rename` and `delete`.
 - Verified by `npm run build`, `npm test` (`tests/entry-copy.test.ts`,
-  `tests/settings.test.ts`) and `npm run test:ui` (`explorer-ui-smoke`,
+  `tests/explorer-entries.test.ts`, `tests/settings.test.ts`) and `npm run test:ui` (`explorer-ui-smoke`,
   `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
   unchecked on a device.
 

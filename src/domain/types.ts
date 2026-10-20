@@ -650,9 +650,9 @@ export interface HostAPI {
    */
   copyEntry(scopeId: string, path: string, toScopeId: string, directory: string): Promise<Entry>;
   /**
-   * Deletes a file or folder of the vault's knowledge or of an editable connected
-   * folder. A note of knowledge goes to irori's deleted notes; anything else to
-   * the system trash.
+   * Deletes a file or folder of the vault's knowledge, of its Schema layer
+   * (except `.irori` and `.git`) or of an editable connected folder. A note of
+   * knowledge goes to irori's deleted notes; anything else to the system trash.
    */
   trashEntry(scopeId: string, path: string): Promise<void>;
   /**
