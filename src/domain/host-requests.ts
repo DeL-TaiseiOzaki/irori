@@ -68,6 +68,7 @@ export const hostArguments = {
       textSize: z.enum(textSizes).optional(),
       lineSpacing: z.enum(lineSpacings).optional(),
       editorAssistance: z.boolean().optional(),
+      propertiesFolded: z.boolean().optional(),
       vaultAgent: z.boolean().optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.
       layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
@@ -220,6 +221,7 @@ export const hostArguments = {
   appendEntry: z.tuple([id, broughtChunk]),
   discardEntry: z.tuple([id]),
   moveEntry: z.tuple([id, path.min(1), path.min(1)]),
+  copyEntry: z.tuple([id, path.min(1), id, path]),
   trashEntry: z.tuple([id, path.min(1)]),
   vaultMoveLinks: z.tuple([id, path.min(1)]),
   moveToVault: z.tuple([id, path.min(1), id, path]),

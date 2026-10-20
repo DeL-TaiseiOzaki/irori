@@ -18,9 +18,9 @@ import {
 import { classify, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, NewEntry, Space, SpaceChange } from '../domain/types';
 import { entryNameError } from '../domain/connections';
-import { freeName, renameEntry, writeNewEntry } from './entries';
-import { carriedImage } from '../domain/vault-move';
-import { internalLinks } from '../domain/note-links';
+import { copyEntryInto, freeName, renameEntry, writeNewEntry } from './entries';
+import { carriedImage, movedWith } from '../domain/vault-move';
+import { internalLinks, rewriteLinks } from '../domain/note-links';
 import { brainLook, categoryText, iconImagePath } from '../domain/brains';
 import {
   imagesForNoteMove,
@@ -1346,36 +1346,8 @@ export class FileService {
       const destination = path.join(target, name);
       const moved = info.isDirectory() ? await this.walk(actual, from) : [from];
       // The managed images a note shows go with it; a missing one was broken already.
-      if (info.isFile() && /\.md$/i.test(from)) {
-        const text = await fs.readFile(actual, 'utf8');
-        const folder = path.posix.dirname(from) === '.' ? '' : path.posix.dirname(from);
-        const images = [
-          ...new Set(internalLinks(text, from).filter((link) => carriedImage(from, link))),
-        ];
-        for (const image of images) {
-          const asset = image.slice(folder ? folder.length + 1 : 0);
-          const bytes = await fs
-            .readFile(path.join(await parentOf(id, image), path.posix.basename(image)))
-            .catch(() => undefined);
-          if (!bytes) continue;
-          const assets = path.posix.dirname(directory ? `${directory}/${asset}` : asset);
-          await this.noteDirectory(toId, assets, true);
-          const copy = path.join(target, asset);
-          try {
-            await fs.writeFile(copy, bytes, { flag: 'wx' });
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-            // Managed images are named by their contents, so the one there is the same.
-            if (hash(await fs.readFile(copy)) !== hash(bytes))
-              throw Error(
-                t(
-                  '移動先の画像と内容が一致しません。',
-                  'The image at the destination has different contents.',
-                ),
-              );
-          }
-        }
-      }
+      if (info.isFile() && /\.md$/i.test(from))
+        await this.carryImages(id, from, toId, directory, target);
       try {
         await fs.rename(actual, destination);
       } catch (error) {
@@ -1405,6 +1377,123 @@ export class FileService {
           note: info.isFile() && /\.md$/i.test(name),
         },
         files: moved,
+      };
+    });
+  }
+  /**
+   * Copies the managed images the note at `from` shows into the same places beside
+   * `directory` of another vault's knowledge, whose real folder is `target`.
+   */
+  private async carryImages(
+    id: string,
+    from: string,
+    toId: string,
+    directory: string,
+    target: string,
+  ) {
+    const parentOf = (rel: string) => {
+      const folder = path.posix.dirname(rel);
+      return this.knowledgeFolderOf(id, folder === '.' ? '' : folder);
+    };
+    const text = await fs.readFile(
+      path.join(await parentOf(from), path.posix.basename(from)),
+      'utf8',
+    );
+    const folder = path.posix.dirname(from) === '.' ? '' : path.posix.dirname(from);
+    const images = [
+      ...new Set(internalLinks(text, from).filter((link) => carriedImage(from, link))),
+    ];
+    for (const image of images) {
+      const asset = image.slice(folder ? folder.length + 1 : 0);
+      const bytes = await fs
+        .readFile(path.join(await parentOf(image), path.posix.basename(image)))
+        .catch(() => undefined);
+      if (!bytes) continue;
+      const assets = path.posix.dirname(directory ? `${directory}/${asset}` : asset);
+      await this.noteDirectory(toId, assets, true);
+      const copy = path.join(target, asset);
+      try {
+        await fs.writeFile(copy, bytes, { flag: 'wx' });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        // Managed images are named by their contents, so the one there is the same.
+        if (hash(await fs.readFile(copy)) !== hash(bytes))
+          throw Error(
+            t(
+              '移動先の画像と内容が一致しません。',
+              'The image at the destination has different contents.',
+            ),
+          );
+      }
+    }
+  }
+  /**
+   * The real file or folder a copy reads: in this vault's knowledge, except a
+   * folder holding another vault or contents, or in one of its connected folders.
+   */
+  async copySource(id: string, rel: string) {
+    const space = this.get(id);
+    relative.parse(rel);
+    const layer = classify(space, rel);
+    if (layer === 'Knowledge_Base') {
+      this.knowledgeEntry(id, rel);
+      this.holdsNoBoundary(space, rel);
+    } else if (layer !== 'contents')
+      throw Error(
+        t(
+          'ナレッジかコンテンツの中の項目を指定してください。',
+          'Choose an item in knowledge or contents.',
+        ),
+      );
+    return this.resolve(id, rel);
+  }
+  /**
+   * Copies the file or folder at `source`, named `name`, into `directory` of this
+   * vault's knowledge under a free name; nothing is replaced, and hidden entries
+   * and aliases stay behind. A copy from knowledge (`from`) keeps leading where
+   * the original's links led: within the vault its links are rewritten for where
+   * the copy is, and into another vault a note's managed images come with it.
+   */
+  async copyEntry(
+    id: string,
+    directory: string,
+    source: string,
+    name: string,
+    from?: { scopeId: string; path: string },
+  ): Promise<Entry> {
+    return this.queue.run(async () => {
+      this.entryName(name);
+      this.knowledgeEntry(id, directory ? `${directory}/${name}` : name);
+      const target = await this.knowledgeFolderOf(id, directory);
+      const copied = await copyEntryInto(source, target, name, false);
+      const to = directory ? `${directory}/${copied.name}` : copied.name;
+      this.knowledgeEntry(id, to);
+      if (from && from.scopeId !== id && !copied.directory && /\.md$/i.test(name))
+        await this.carryImages(from.scopeId, from.path, id, directory, target);
+      if (from?.scopeId === id && from.path !== to) {
+        const notes = (
+          copied.directory ? await this.walk(path.join(target, copied.name), to) : [to]
+        ).filter((file) => /\.md$/i.test(file));
+        for (const note of notes) {
+          const filename = path.join(
+            target,
+            ...(directory ? note.slice(directory.length + 1) : note).split('/'),
+          );
+          const text = await fs.readFile(filename, 'utf8');
+          const original = movedPath({ from: to, to: from.path }, note)!;
+          // A link into what was copied leads into the copy; any other to where it led.
+          const update = rewriteLinks(text, original, note, (link) =>
+            movedWith(from.path, link) ? undefined : link,
+          );
+          if (update.links) await fs.writeFile(filename, update.text);
+        }
+      }
+      return {
+        path: to,
+        name: copied.name,
+        directory: copied.directory,
+        layer: 'Knowledge_Base',
+        note: !copied.directory && /\.md$/i.test(copied.name),
       };
     });
   }

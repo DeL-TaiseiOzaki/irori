@@ -606,6 +606,24 @@ app
         }),
       };
     }
+    /**
+     * Copies a file or folder of knowledge or contents into a folder of either, in
+     * this vault or another; it only adds, so it does not wait for runs.
+     */
+    async function copyEntry(scopeId: string, from: string, toScopeId: string, directory: string) {
+      const source = await files.copySource(scopeId, from);
+      const name = path.posix.basename(from);
+      if (classify(files.get(toScopeId), directory) === 'contents')
+        return cloud.copyEntry(toScopeId, directory, source, name);
+      const knowledge = classify(files.get(scopeId), from) === 'Knowledge_Base';
+      return files.copyEntry(
+        toScopeId,
+        directory,
+        source,
+        name,
+        knowledge ? { scopeId, path: from } : undefined,
+      );
+    }
     /** Deletes a file or folder of knowledge: a note to irori's deleted notes, the rest to the system trash. */
     async function trashKnowledgeEntry(scopeId: string, target: string) {
       if (await isNote(scopeId, target)) {
@@ -865,6 +883,8 @@ app
           : classify(files.get(scopeId), from) === 'schema'
             ? changeVault(scopeId, organizing(), () => renameSchemaEntry(scopeId, from, to))
             : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
+      copyEntry: (scopeId, from, toScopeId, directory) =>
+        changeFiles(() => changed(toScopeId, () => copyEntry(scopeId, from, toScopeId, directory))),
       trashEntry: (scopeId, target) =>
         classify(files.get(scopeId), target) === 'contents'
           ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
@@ -880,7 +900,9 @@ app
           throw Error(t('vault の中のパスではありません。', 'Not a path inside the vault.'));
         // The shared Schema and the irori agent's keep their files outside any vault.
         const root = (await schemaFolder(scopeId)).root;
-        clipboard.writeText(absolute ? path.join(root, ...parts) : parts.join('/'));
+        const text = absolute ? path.join(root, ...parts) : parts.join('/');
+        clipboard.writeText(text);
+        return text;
       },
       revealEntry: async (scopeId, target) =>
         shell.showItemInFolder(

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactElement, type ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import type { Entry, EntryMove, Layer } from '../domain/types';
 import { entryNameError } from '../domain/connections';
@@ -104,6 +104,15 @@ export interface Explorer {
   /** Moves an entry of another vault's knowledge into `directory`: a drop across vaults. */
   moveFrom?(scopeId: string, entry: Entry, directory: string): void;
   reveal(path: string): void;
+  /** Puts an entry on irori's clipboard, to be copied on paste or moved when `cut`. */
+  clip?(entry: Entry, cut: boolean): void;
+  /**
+   * Pastes into `directory`: the files the system's clipboard holds (`from`), when
+   * they were put there after irori's own, or else what irori's clipboard holds.
+   */
+  paste?(directory: string, from?: DataTransfer): void;
+  /** What irori's clipboard holds, for the menu's paste and the look of a cut row. */
+  clipped?: { scopeId: string; path: string; cut: boolean };
 }
 
 /**
@@ -118,6 +127,8 @@ export function ExplorerItems({
   scopeId,
   folder,
   entry,
+  copied,
+  cut = false,
   path,
   onOpen,
 }: {
@@ -127,6 +138,9 @@ export function ExplorerItems({
   folder?: string;
   /** The entry that may be renamed, moved and deleted. */
   entry?: Entry;
+  /** The entry that may be copied, and cut when `cut`. */
+  copied?: Entry;
+  cut?: boolean;
   path: string;
   /** Opens the row's file. */
   onOpen?: () => void;
@@ -158,6 +172,17 @@ export function ExplorerItems({
           () => explorer.act(entry, action),
         ),
       ),
+    explorer?.clip && [
+      ...(copied && cut
+        ? [item('cut', 'cut', t('切り取り', 'Cut'), () => explorer.clip!(copied, true))]
+        : []),
+      ...(copied
+        ? [item('copy', 'copy', t('コピー', 'Copy'), () => explorer.clip!(copied, false))]
+        : []),
+      ...(folder !== undefined && explorer.clipped && explorer.paste
+        ? [item('paste', 'paste', t('貼り付け', 'Paste'), () => explorer.paste!(folder))]
+        : []),
+    ],
     [
       item('copy-path', 'link', t('パスをコピー', 'Copy path'), () => copy(true)),
       item('copy-relative', 'link', t('相対パスをコピー', 'Copy relative path'), () => copy(false)),
@@ -167,7 +192,7 @@ export function ExplorerItems({
         explorer ? explorer.reveal(path) : void host.revealEntry(scopeId, path).catch(() => {}),
       ),
     ],
-  ].filter((group) => !!group);
+  ].filter((group): group is ReactElement[] => !!group && group.length > 0);
   return groups.flatMap((group, index) => [
     ...(index ? [<Menu.Separator key={`separator-${index}`} className="menu-separator" />] : []),
     ...group,

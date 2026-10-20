@@ -41,6 +41,62 @@ export async function freeName(parent: string, name: string) {
   throw taken();
 }
 
+/**
+ * Copies the file or folder at `source` into the existing folder `parent` as
+ * `name`, or the first free name after it, and returns the name it took. Nothing
+ * is replaced. Inside a copied folder, aliases stay behind, and so do hidden
+ * entries when `hidden` is false. A copy that fails partway is removed.
+ */
+export async function copyEntryInto(
+  source: string,
+  parent: string,
+  name: string,
+  hidden: boolean,
+): Promise<{ name: string; directory: boolean }> {
+  const problem = entryNameError(name);
+  if (problem) throw Error(problem);
+  const info = await fs.lstat(source);
+  if (info.isSymbolicLink() || !(info.isFile() || info.isDirectory()))
+    throw Error(
+      t(
+        'alias / シンボリックリンクはコピーできません。',
+        'Aliases and symbolic links cannot be copied.',
+      ),
+    );
+  if (!(await fs.stat(parent)).isDirectory())
+    throw Error(t('フォルダを指定してください。', 'Choose a folder.'));
+  if (info.isDirectory()) {
+    const from = await fs.realpath(source);
+    const into = await fs.realpath(parent);
+    if (into === from || into.startsWith(`${from}${path.sep}`))
+      throw Error(
+        t(
+          'フォルダを自分自身やその中のフォルダにはコピーできません。',
+          'A folder cannot be copied into itself or into one of its own folders.',
+        ),
+      );
+  }
+  const free = await freeName(parent, name);
+  const destination = path.join(parent, free);
+  try {
+    await fs.cp(source, destination, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      filter: async (item) =>
+        item === source ||
+        ((hidden || !path.basename(item).startsWith('.')) &&
+          !(await fs.lstat(item)).isSymbolicLink()),
+    });
+  } catch (error) {
+    // A name taken meanwhile holds someone else's entry; anything else is this copy's.
+    if ((error as NodeJS.ErrnoException).code !== 'ERR_FS_CP_EEXIST')
+      await fs.rm(destination, { recursive: true, force: true });
+    throw error;
+  }
+  return { name: free, directory: info.isDirectory() };
+}
+
 /** Brought-in files still being written, by the id `appendUpload` takes. */
 const uploads = new Map<
   string,
