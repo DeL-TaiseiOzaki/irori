@@ -11,7 +11,12 @@ import { placeholder } from '@milkdown/crepe/feature/placeholder';
 import { table } from '@milkdown/crepe/feature/table';
 import { toolbar as toolbarFeature } from '@milkdown/crepe/feature/toolbar';
 import { languages } from '@codemirror/language-data';
-import { serializerCtx, editorViewCtx, remarkCtx } from '@milkdown/kit/core';
+import {
+  serializerCtx,
+  editorViewCtx,
+  remarkCtx,
+  remarkStringifyOptionsCtx,
+} from '@milkdown/kit/core';
 import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
 import {
   nearest,
@@ -23,7 +28,9 @@ import {
   type SearchTarget,
 } from './search-navigation';
 import { $prose } from '@milkdown/kit/utils';
-import { literalBlock, preserveBlocks, documentEncoding } from './preservation';
+import { inlinePiece, literalBlock, preserveBlocks, documentEncoding } from './preservation';
+import { calloutView, pieceTyping } from './piece-editing';
+import { writingStyle } from './pieces';
 import { mermaidPreview } from './mermaid';
 import { literalEditing, literalView } from './literal-view';
 
@@ -190,14 +197,30 @@ export interface EditorHandle {
   reveal(quote: string, line?: number): boolean;
 }
 
-/** Where the text of each textblock of a rendered document starts, by the text it shows. */
-function renderedPositions(doc: import('@milkdown/kit/prose/model').Node, text: string) {
-  const found: number[] = [];
+/** A piece reads as the text it stands for, so a quote matches the source; another inline leaf as one mark. */
+const leafText = (node: import('@milkdown/kit/prose/model').Node) =>
+  node.type.name === 'irori_inline' ? String(node.attrs.value) : '\ufffc';
+
+/** Where each occurrence of `text` stands in a rendered document's textblocks, read as above. */
+function renderedRanges(doc: import('@milkdown/kit/prose/model').Node, text: string) {
+  const found: { from: number; to: number }[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
-    // Inline leaves count one position each, as the replacement character does here.
-    const shown = node.textBetween(0, node.content.size, '', '\ufffc');
-    for (const offset of positionsOf(shown, text)) found.push(pos + 1 + offset);
+    let shown = '';
+    const starts: number[] = [];
+    const ends: number[] = [];
+    node.forEach((child, offset) => {
+      const at = pos + 1 + offset;
+      const value = child.isText ? child.text! : leafText(child);
+      for (let index = 0; index < value.length; index++) {
+        // A leaf's characters all stand for the leaf.
+        starts.push(child.isText ? at + index : at);
+        ends.push(child.isText ? at + index + 1 : at + child.nodeSize);
+      }
+      shown += value;
+    });
+    for (const offset of positionsOf(shown, text))
+      found.push({ from: starts[offset], to: ends[offset + text.length - 1] });
     return false;
   });
   return found;
@@ -457,6 +480,11 @@ export function Editor({
       });
     crepe.editor
       .config((ctx) => {
+        // An edit writes lists and dividers as the note already does.
+        ctx.update(remarkStringifyOptionsCtx, (options) => ({
+          ...options,
+          ...writingStyle(encoding.body),
+        }));
         ctx.update(codeBlockConfig.key, (config) => ({
           ...config,
           // Crepe installs basicSetup unconditionally. Move that bundle into a
@@ -486,8 +514,11 @@ export function Editor({
         }));
       })
       .use(literalBlock)
+      .use(inlinePiece)
       .use(literalView)
       .use(literalEditing)
+      .use(pieceTyping)
+      .use(calloutView)
       .use(preserveBlocks)
       .use(
         // The debounced Markdown listener can skip a quick save/undo back to its
@@ -520,13 +551,13 @@ export function Editor({
               const { from, to, empty } = state.selection;
               if (empty) return undefined;
               const quote = state.doc
-                .textBetween(from, to, '\n', '\ufffc')
+                .textBetween(from, to, '\n', leafText)
                 .replaceAll('\ufffc', '');
               if (!quote.trim()) return undefined;
               // The source line is found by where the first line shows: the same
               // text shown earlier in the document counts the same in the source.
-              const before = renderedPositions(state.doc, quoteHead(quote)).filter(
-                (at) => at < from,
+              const before = renderedRanges(state.doc, quoteHead(quote)).filter(
+                (range) => range.from < from,
               ).length;
               return { quote, line: sourceLineOf(markdown(), quote, before) };
             });
@@ -534,7 +565,7 @@ export function Editor({
             crepe.editor.action((ctx) => {
               const view = ctx.get(editorViewCtx);
               const head = quoteHead(quote);
-              const shown = renderedPositions(view.state.doc, head);
+              const shown = renderedRanges(view.state.doc, head);
               if (!shown.length) return false;
               const source = markdown();
               const written = positionsOf(source, head);
@@ -543,10 +574,10 @@ export function Editor({
                 written.length === shown.length
                   ? written.indexOf(nearest(source, written, line)!)
                   : 0;
-              const from = shown[index];
+              const { from, to } = shown[index];
               view.dispatch(
                 view.state.tr
-                  .setSelection(TextSelection.create(view.state.doc, from, from + head.length))
+                  .setSelection(TextSelection.create(view.state.doc, from, to))
                   .scrollIntoView(),
               );
               view.focus();

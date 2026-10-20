@@ -15,7 +15,8 @@ await mkdir(root, { recursive: true });
 execFileSync('git', ['init', '--quiet', root]);
 execFileSync('git', ['-C', root, 'config', 'user.email', 'comment.person@example.com']);
 const text =
-  '---\ntitle: Topic\n---\n# Topic\n\nA claim that needs a source.\n\nSame words.\n\nSame words.\n';
+  '---\ntitle: Topic\n---\n# Topic\n\nA claim that needs a source.\n\nSame words.\n\nSame words.\n\n' +
+  'Cited here.[^src] Then more.\n\n[^src]: A source.\n';
 await writeFile(path.join(root, 'topic.md'), text);
 
 const files = new FileService(path.join(base, 'device'));
@@ -143,15 +144,42 @@ try {
   await page.keyboard.press('Escape');
   await expect(popover).toHaveCount(0);
 
+  // A passage across a footnote mark is quoted as the file writes it, and found again.
+  await editor.evaluate((element) => {
+    const paragraph = [...element.querySelectorAll('p')].find((p) =>
+      p.textContent?.includes('Cited here.'),
+    )!;
+    (element as HTMLElement).focus();
+    getSelection()!.setBaseAndExtent(paragraph.firstChild!, 0, paragraph.lastChild!, 5);
+  });
+  await expect
+    .poll(() => page.evaluate(() => getSelection()!.toString()))
+    .toBe('Cited here.src Then');
+  await page.getByRole('button', { name: 'コメント 4 件', exact: true }).click();
+  await expect(popover.locator('.comment-quote.selected')).toHaveText('Cited here.[^src] Then');
+  await popover.getByLabel('新しいコメント').fill('出典の確認');
+  await popover.getByLabel('新しいコメント').press('ControlOrMeta+Enter');
+  await expect(popover.locator('.comment-list li')).toHaveCount(5);
+  const fifth = (await saved()).comments[4];
+  if (fifth.quote !== 'Cited here.[^src] Then' || fifth.line !== 12)
+    throw Error(`Unexpected comment across a footnote: ${JSON.stringify(fifth)}`);
+  await page.keyboard.press('Escape');
+  await editor.locator('h1').click();
+  await page.getByRole('button', { name: 'コメント 5 件', exact: true }).click();
+  await popover.locator('button.comment-quote', { hasText: 'Cited here.' }).click();
+  await expect
+    .poll(() => page.evaluate(() => getSelection()!.toString()))
+    .toBe('Cited here.src Then');
+
   // A comment changed on disk — by an agent or a pull — shows in the list.
   const onDisk = await saved();
   onDisk.comments[2].body = 'エージェントが書き換えた';
   await writeFile(commentsFile, JSON.stringify(onDisk));
-  await page.getByRole('button', { name: 'コメント 4 件', exact: true }).click();
+  await page.getByRole('button', { name: 'コメント 5 件', exact: true }).click();
   await expect(popover.getByText('エージェントが書き換えた')).toBeVisible({ timeout: 10000 });
 
   // Resolving removes a comment; the last one takes its file with it.
-  for (let left = 4; left > 0; left--) {
+  for (let left = 5; left > 0; left--) {
     await popover.getByRole('button', { name: '解決', exact: true }).first().click();
     await expect(popover.locator('.comment-list li')).toHaveCount(left - 1);
   }
@@ -164,7 +192,7 @@ try {
 
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Comments UI smoke passed: a selection quoted with its file line under frontmatter, the second of two identical paragraphs told apart, a whole-note comment, quotes selecting their passage, a comment from the selection toolbar beside the passage, an on-disk change shown, and resolving down to no file.',
+    'Comments UI smoke passed: a selection quoted with its file line under frontmatter, the second of two identical paragraphs told apart, a whole-note comment, quotes selecting their passage, a comment from the selection toolbar beside the passage, a passage across a footnote mark quoted as written, an on-disk change shown, and resolving down to no file.',
   );
 } finally {
   await app.close();

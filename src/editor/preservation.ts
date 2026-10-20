@@ -1,4 +1,5 @@
 import { $node, $remark } from '@milkdown/kit/utils';
+import { preserveTree, readPiece } from './pieces';
 
 /** Unsupported blocks stay visible and editable as literal text in the document. */
 export const literalBlock = $node('irori_literal', () => ({
@@ -24,27 +25,49 @@ export const literalBlock = $node('irori_literal', () => ({
     },
   },
 }));
-export const preserveBlocks = $remark('irori-preservation', () => () => (tree, file) => {
-  const source = String(file);
-  const frontmatter = /^(?:---\n[\s\S]*?\n---|\+\+\+\n[\s\S]*?\n\+\+\+)(?:\n|$)/.exec(source)?.[0];
-  const children = tree.children as Array<{
-    type: string;
-    value?: string;
-    position?: { start: { offset?: number }; end: { offset?: number } };
-  }>;
-  tree.children = children.flatMap((node) => {
-    const start = node.position?.start.offset ?? 0;
-    const end = node.position?.end.offset ?? start;
-    if (frontmatter && start < frontmatter.length)
-      return start === 0 ? [{ type: 'iroriLiteral', value: frontmatter.trimEnd() }] : [];
-    const raw = source.slice(start, end);
-    // Crepe serializes empty paragraphs as HTML breaks; display document spacing.
-    if (/^<br\s*\/?>(?:\s*)$/i.test(raw.trim())) return [{ type: 'paragraph', children: [] }];
-    if (node.type !== 'code' && /\[\[|^>\s*\[!|^\s*<|^\s*:::|\$\$|\{[%{]|\[\^[^\]]+\]/m.test(raw))
-      return [{ type: 'iroriLiteral', value: raw }];
-    return [node];
-  }) as typeof tree.children;
-});
+
+const pieceClass = {
+  footnote: 'footnote-mark',
+  wiki: 'wiki-link',
+  embed: 'wiki-link wiki-embed',
+  callout: 'callout-marker',
+};
+/** A footnote mark, wiki link or callout marker: one piece, written back as its text. */
+export const inlinePiece = $node('irori_inline', () => ({
+  group: 'inline',
+  inline: true,
+  atom: true,
+  attrs: { value: { default: '' } },
+  parseDOM: [
+    {
+      tag: 'span[data-irori-inline]',
+      getAttrs: (dom) => ({ value: (dom as HTMLElement).dataset.iroriInline ?? '' }),
+    },
+  ],
+  toDOM: (node) => {
+    const value = String(node.attrs.value);
+    const { kind, label } = readPiece(value);
+    return ['span', { 'data-irori-inline': value, class: pieceClass[kind], title: value }, label];
+  },
+  parseMarkdown: {
+    match: (node) => node.type === 'iroriInline',
+    runner: (state, node, type) => {
+      state.addNode(type, { value: String(node.value) });
+    },
+  },
+  toMarkdown: {
+    match: (node) => node.type.name === 'irori_inline',
+    runner: (state, node) => {
+      // HTML is written as it is, unescaped, wherever it stands.
+      state.addNode('html', undefined, String(node.attrs.value));
+    },
+  },
+}));
+
+export const preserveBlocks = $remark(
+  'irori-preservation',
+  () => () => (tree, file) => preserveTree(tree, String(file)),
+);
 export function documentEncoding(text: string) {
   const bom = text.startsWith('\uFEFF') ? '\uFEFF' : '';
   const newline = text.includes('\r\n') ? '\r\n' : '\n';

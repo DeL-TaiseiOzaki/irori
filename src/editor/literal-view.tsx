@@ -12,6 +12,7 @@ import {
 import type { Node } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
 import { literalBlock } from './preservation';
+import { footnoteMark as footnoteMarkPattern, readPiece, wikiLink } from './pieces';
 
 /*
  * A literal block keeps Markdown the editor cannot carry through unchanged
@@ -29,9 +30,7 @@ type Mdast = {
 };
 
 /** Footnote marks are read as text here, so a reference without its definition still shows. */
-const footnoteMark = /\[\^([^\]\s]+)\]/g;
-/** `[[target]]`, `[[target|label]]` and `![[embed]]`. */
-const wikiLink = /(!?)\[\[([^\]|#]*)(?:#([^\]|]*))?(?:\|([^\]]*))?\]\]/g;
+const footnoteMark = new RegExp(footnoteMarkPattern.source, 'g');
 
 function inline(type: string, className: string, text: string): Mdast {
   return {
@@ -48,12 +47,9 @@ function marks(value: string): Mdast[] {
   let last = 0;
   for (const match of value.matchAll(pattern)) {
     if (match.index > last) out.push({ type: 'text', value: value.slice(last, match.index) });
-    if (match[5] !== undefined) out.push(inline('sup', 'footnote-mark', match[5]));
-    else {
-      const [, embed, target, heading, label] = match;
-      const name = label || [target, heading].filter(Boolean).join(' › ') || '';
-      out.push(inline('span', embed ? 'wiki-link wiki-embed' : 'wiki-link', name));
-    }
+    const { kind, label } = readPiece(match[0]);
+    if (kind === 'footnote') out.push(inline('sup', 'footnote-mark', label));
+    else out.push(inline('span', kind === 'embed' ? 'wiki-link wiki-embed' : 'wiki-link', label));
     last = match.index + match[0].length;
   }
   if (last < value.length) out.push({ type: 'text', value: value.slice(last) });
