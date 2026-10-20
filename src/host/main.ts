@@ -206,8 +206,8 @@ app
       undefined,
       github,
     );
-    // A folder waited for or lost is linked again by itself only as a person's
-    // connect would be: not while a run or Git operation works in the vault.
+    // A folder waited for or lost is linked again by itself only while no run or
+    // Git operation works in the vault.
     cloud.mayLink = (scopeId) => !agents.busy(scopeId) && !git.busy;
     cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
     // Where each vault's agents keep their scratch, rather than the system's temporary folder.
@@ -652,6 +652,17 @@ app
         );
       return changed(scopeId, operation);
     }
+    /** A new connection only adds to the vault's contents, so it does not wait for its runs. */
+    function addCloud<T>(scopeId: string, operation: () => Promise<T>) {
+      if (git.busy)
+        throw Error(
+          t(
+            'Git 操作が終わってから接続してください。',
+            'Connect after the Git operation finishes.',
+          ),
+        );
+      return changed(scopeId, operation);
+    }
     async function openFile(filename: string) {
       const choice = await dialog.showMessageBox(front(), {
         type: 'question',
@@ -825,7 +836,7 @@ app
         changeSchema(id, () => schemaSettings.write(id, rel, text, expected)),
       moveSkill: (id, name, to) => changeSchema(id, () => schemaSettings.moveSkill(id, name, to)),
       cloudConnections: (id) => cloud.connections(id),
-      connectCloud: (...args) => changeCloud(args[0], () => cloud.connect(...args)),
+      connectCloud: (...args) => addCloud(args[0], () => cloud.connect(...args)),
       disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
@@ -880,8 +891,8 @@ app
               )
             : await files.resolve(scopeId, target, true),
         ),
-      addLocalFolder: (input) => changeCloud(input.scopeId, () => cloud.addLocal(input)),
-      addRepository: (input) => changeCloud(input.scopeId, () => cloud.addRepository(input)),
+      addLocalFolder: (input) => addCloud(input.scopeId, () => cloud.addLocal(input)),
+      addRepository: (input) => addCloud(input.scopeId, () => cloud.addRepository(input)),
       cloneRepository: (...args) => changeCloud(args[0], () => cloud.cloneRepository(...args)),
       updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),

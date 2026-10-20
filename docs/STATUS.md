@@ -1,5 +1,23 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Adding during a run, 2026-10-20 (**0.2.40**, pull request open): while an
+agent ran, the vault panel was locked whole, so neither a note, a folder, a
+dropped file nor a new contents connection could be added.
+- The renderer splits the lock: `locked` (Git or a connection in progress) still
+  disables everything, while `held` (a run, a send, queued work or the irori
+  agent's hold) leaves the explorer `addingOnly` — creation and bringing files
+  in, with no move, rename, delete or cross-vault drop. Vault settings, the
+  graph, materials and trash stay disabled while held. `organize` lets a
+  bring-in through during a run.
+- The host's `connectCloud`, `addLocalFolder` and `addRepository` wait only for
+  Git (`addCloud`); disconnecting, removing, renaming, access, switching,
+  cloning into and updating a connection still wait for the run
+  (`changeCloud`). The connection sheet's registration form follows the same
+  split.
+- `harness-ui-smoke` checks the enabled creation buttons, a non-draggable note
+  and the connection sheet's folder picker during a fixture run; that check
+  fails on 0.2.39.
+
 Text size and line spacing, 2026-10-19 (**0.2.39**, pull request open): two
 new device settings beside the side margins.
 - `textSize` (`small`, `standard`, `large`, `larger`: 14, 16, 18 and 20px) and
