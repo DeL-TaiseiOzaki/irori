@@ -214,12 +214,13 @@ export function Tree({
     !entry.blocked &&
     layer !== 'schema' &&
     (layer === 'Knowledge_Base' || !!entry.writable);
+  const actions = explorer?.actions ?? entryActions;
   // A connected folder's name belongs to its connection; the knowledge folder's to the settings.
   const movable = (entry: Entry) =>
     editable(entry) &&
+    actions.includes('move') &&
     !entry.connection &&
     !(layer === 'Knowledge_Base' && entry.path === knowledgeFolder(space));
-  const actions = explorer?.actions ?? entryActions;
   // Schema's files are renamed in place, except irori's own and Git's.
   const renamable = (entry: Entry) =>
     !!explorer?.rename &&
@@ -517,6 +518,13 @@ export function Tree({
   return shared ? level : <DropTarget.Provider value={drop}>{level}</DropTarget.Provider>;
 }
 
+/**
+ * The explorer while a run holds the vault: files, folders and notes may still be
+ * added, but nothing is moved, renamed or deleted under the agent.
+ */
+function addingOnly(explorer?: Explorer): Explorer | undefined {
+  return explorer && { ...explorer, actions: [], moveFrom: undefined };
+}
 function SectionAction({
   icon,
   label,
@@ -571,6 +579,7 @@ export const SideBrainPanel = memo(function SideBrainPanel({
   selected,
   connections,
   locked,
+  held,
   explorer,
   onOpen,
   onChoose,
@@ -583,8 +592,10 @@ export const SideBrainPanel = memo(function SideBrainPanel({
   revision: number;
   selected?: Document;
   connections: CloudConnection[];
-  /** Its own run, Git or a connection holds what would change it. */
+  /** Git or a connection holds what would change it. */
   locked: boolean;
+  /** A run works in it: files may only be added. */
+  held: boolean;
   explorer?: Explorer;
   onOpen: (space: Space, entry: Entry) => void;
   onChoose: (space: Space) => void;
@@ -595,6 +606,7 @@ export const SideBrainPanel = memo(function SideBrainPanel({
     (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
   );
   const layers = ['Knowledge_Base', 'contents'] as const;
+  const shown = locked ? undefined : held ? addingOnly(explorer) : explorer;
   const identity = (
     <>
       <BrainTile space={space} size={34} radius={10} />
@@ -665,7 +677,7 @@ export const SideBrainPanel = memo(function SideBrainPanel({
                   revision={revision}
                   selected={selected}
                   onOpen={onOpen}
-                  {...(!locked && { explorer, writable: true })}
+                  {...(shown && { explorer: shown, writable: true })}
                 />
               ) : !contentRoots ? (
                 <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
@@ -686,7 +698,7 @@ export const SideBrainPanel = memo(function SideBrainPanel({
                         selected={selected}
                         connections={connections}
                         onOpen={onOpen}
-                        explorer={locked ? undefined : explorer}
+                        explorer={shown}
                       />
                     )}
                   </div>
@@ -711,6 +723,7 @@ export const BrainPanel = memo(function BrainPanel({
   selected,
   revision,
   locked,
+  held,
   daily,
   dirty,
   connections,
@@ -742,8 +755,10 @@ export const BrainPanel = memo(function BrainPanel({
   changes?: number;
   selected?: Document;
   revision: number;
-  /** Actions that change the brain wait (a run, Git or a connection is in progress). */
+  /** Actions that change the brain wait (Git or a connection is in progress). */
   locked: boolean;
+  /** A run works in the brain: only additions to it go on. */
+  held: boolean;
   /** The brain declares a daily note. */
   daily: boolean;
   /** The open note has unsaved edits. */
@@ -838,7 +853,7 @@ export const BrainPanel = memo(function BrainPanel({
         <SectionAction
           icon="graph"
           label={t('グラフ', 'Graph')}
-          disabled={locked || dirty}
+          disabled={locked || held || dirty}
           onClick={onGraph}
         />
       </>
@@ -867,9 +882,11 @@ export const BrainPanel = memo(function BrainPanel({
           onOpen={onOpen}
           {...(!locked &&
             (layer === 'Knowledge_Base'
-              ? { explorer, writable: true }
-              : // Schema's files and folders are only renamed here.
-                { explorer: explorer && { ...explorer, actions: ['rename'] as const } }))}
+              ? { explorer: held ? addingOnly(explorer) : explorer, writable: true }
+              : held
+                ? {}
+                : // Schema's files and folders are only renamed here.
+                  { explorer: explorer && { ...explorer, actions: ['rename'] as const } }))}
         />
       );
     // Connected folders sit directly under the section; a second contents root names itself.
@@ -888,7 +905,7 @@ export const BrainPanel = memo(function BrainPanel({
             selected={selected}
             connections={connections}
             onOpen={onOpen}
-            explorer={locked ? undefined : explorer}
+            explorer={locked ? undefined : held ? addingOnly(explorer) : explorer}
           />
         )}
       </div>
@@ -931,15 +948,15 @@ export const BrainPanel = memo(function BrainPanel({
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="end" sideOffset={4}>
                 <Menu.Popup className="menu">
-                  <Menu.Item disabled={locked} onClick={onSettings}>
+                  <Menu.Item disabled={locked || held} onClick={onSettings}>
                     <Icon name="penLine" size={14} />
                     {t('vault の設定', 'vault settings')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked} onClick={onMaterials}>
+                  <Menu.Item disabled={locked || held} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
                     {t('資料と成果物', 'Materials and outputs')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked} onClick={onGraph}>
+                  <Menu.Item disabled={locked || held} onClick={onGraph}>
                     <Icon name="graph" size={14} />
                     {t('グラフ', 'Graph')}
                   </Menu.Item>
@@ -947,7 +964,7 @@ export const BrainPanel = memo(function BrainPanel({
                     <Icon name="cloudConnect" size={14} />
                     {t('クラウド接続', 'Cloud connection')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked} onClick={onTrash}>
+                  <Menu.Item disabled={locked || held} onClick={onTrash}>
                     <Icon name="trash" size={14} />
                     {t('削除したノートを復元', 'Restore deleted notes')}
                   </Menu.Item>

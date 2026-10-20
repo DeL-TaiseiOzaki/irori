@@ -163,6 +163,19 @@ try {
       // The UI becomes stoppable during startup. Wait until this fixture actually receives
       // the prompt before testing cancellation/restart of a dispatched turn.
       await expect.poll(async () => (await requests()).length).toBe(3);
+      // A run holds what would move under the agent, but notes, files and connections may be added.
+      await expect(page.getByRole('button', { name: 'ハーネス検証 にノートを作成' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: '新しいフォルダ', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'note', exact: true })).toHaveAttribute(
+        'draggable',
+        'false',
+      );
+      await page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' }).click();
+      await expect(page.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toBeEnabled();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toHaveCount(
+        0,
+      );
       await page.getByLabel('エージェントへの指示').fill('after cancellation');
       await page.getByRole('button', { name: '送信待ちに追加', exact: true }).click();
       await page.getByLabel('エージェントへの指示').fill('discard queued message');
