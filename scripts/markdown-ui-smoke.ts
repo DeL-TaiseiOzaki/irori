@@ -5,9 +5,11 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
-// A note as people write it in a knowledge base: footnotes, a Mermaid diagram, wiki
-// links and a callout. Each shows as a page would until the cursor enters it, and
-// the file keeps every character. No provider or model process is started.
+// A note as people write it in a knowledge base: footnotes in a paragraph, a list and
+// a table, a Mermaid diagram, wiki links, a callout and a formula. Footnote marks,
+// wiki links and callout markers are pieces of blocks edited as Notion edits them;
+// only the formula shows its source when the cursor enters it. The file keeps every
+// character. No provider or model process is started.
 const base = await mkdtemp(path.join(tmpdir(), 'irori markdown UI '));
 const root = path.join(base, 'Knowledge');
 await mkdir(root, { recursive: true });
@@ -29,8 +31,21 @@ const note = [
   '',
   '関連は [[背景|研究の背景]] と ![[図表]] にまとめる。',
   '',
+  '- 10-01 キックオフ。[^proposed-rq]',
+  '- 10-02 環境を受け取った。',
+  '',
+  // As the editor writes a table: each column padded to its widest cell.
+  `| 案  | ${'出典'.padEnd(19)} |`,
+  `| -- | ${'-'.repeat(19)} |`,
+  '| 1A | 方針の整理[^proposed-rq] |',
+  `| 1B | ${'[[背景]]'.padEnd(19)} |`,
+  '',
   '> [!note] 前提',
   '> 先方との合意事項として扱わない。',
+  '',
+  '$$',
+  'r_t = \\gamma',
+  '$$',
   '',
   '```python',
   'print("short")',
@@ -59,19 +74,28 @@ try {
   const editor = page.locator('.ProseMirror');
   await expect(editor).toContainText('MTD-RLの問題設定');
 
-  // A paragraph with a footnote reads as text with a small mark, not as source.
-  const reference = editor.locator('.literal-view', { hasText: '人がRLの判断' });
-  await expect(reference.locator('.literal-preview')).toBeVisible();
+  // A paragraph, a list item and a table cell with a footnote are text with a small mark.
+  const reference = editor.locator('p', { hasText: '人がRLの判断' });
   await expect(reference.locator('.footnote-mark')).toHaveText('proposed-rq');
-  await expect(reference.locator('.literal-block')).toBeHidden();
+  await expect(
+    editor.locator('li', { hasText: '10-01 キックオフ' }).locator('.footnote-mark'),
+  ).toHaveText('proposed-rq');
+  const table = editor.locator('.milkdown-table-block');
+  await expect(table.locator('td', { hasText: '方針の整理' }).locator('.footnote-mark')).toHaveText(
+    'proposed-rq',
+  );
+  await expect(table.locator('.wiki-link')).toHaveText('背景');
+  // Only the formula is literal text.
+  await expect(editor.locator('.literal-view')).toHaveCount(1);
   // The definition shows its name before its text.
-  const definition = editor.locator('.footnote-definition');
-  await expect(definition).toContainText('2026年10月19日の整理案。');
-  await expect(definition.locator('.footnote-mark')).toHaveText('proposed-rq');
+  const definition = editor.locator('dl[data-type="footnote_definition"]');
+  await expect(definition.locator('dd')).toContainText('2026年10月19日の整理案。');
+  await expect(definition.locator('dt')).toHaveText('proposed-rq');
 
   // Wiki links show their labels; a callout its title.
   await expect(editor.locator('.wiki-link').first()).toHaveText('研究の背景');
   await expect(editor.locator('.wiki-embed')).toHaveText('図表');
+  await expect(editor.locator('.callout .callout-marker')).toHaveText('note');
   await expect(editor.locator('.callout-title')).toHaveText('前提');
   await expect(editor.locator('.callout')).toContainText('先方との合意事項として扱わない。');
 
@@ -132,21 +156,60 @@ try {
     ['32px', '43.2px'],
   ]);
 
-  // Clicking the paragraph shows its source for editing; leaving it shows the page again.
-  await reference.locator('.literal-preview').click();
-  await expect(reference.locator('.literal-block')).toBeVisible();
-  await expect(reference.locator('.literal-block')).toContainText('[^proposed-rq]');
+  // Typing in a list item and a table cell keeps them as they are shown: no source.
+  await editor.locator('li', { hasText: '10-01 キックオフ' }).click();
   await page.keyboard.press('End');
   await page.keyboard.type('追記');
+  await expect(editor.locator('li', { hasText: '追記' }).locator('.footnote-mark')).toBeVisible();
+  await table.locator('td', { hasText: '背景' }).click({ position: { x: 150, y: 12 } });
+  await page.keyboard.press('End');
+  await page.keyboard.type('も');
+  await expect(table.locator('td', { hasText: '背景も' })).toBeVisible();
+  await expect(editor.locator('.literal-editing')).toHaveCount(0);
+  // A wiki link and a footnote mark become pieces as they close.
+  await reference.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('次は[[計画|次の計画]]へ[^next]');
+  await expect(reference.locator('.wiki-link', { hasText: '次の計画' })).toBeVisible();
+  await expect(reference.locator('.footnote-mark', { hasText: 'next' })).toBeVisible();
+  // Backspace removes a piece whole, as it does a mention.
+  await page.keyboard.type('[^drop]');
+  await expect(reference.locator('.footnote-mark', { hasText: 'drop' })).toBeVisible();
+  await page.keyboard.press('Backspace');
+  await expect(reference.locator('.footnote-mark', { hasText: 'drop' })).toHaveCount(0);
+  // Undo takes a typed piece back with its typing, and stays undone.
+  await page.waitForTimeout(600);
+  await page.keyboard.type('[[戻す]]');
+  await expect(reference.locator('.wiki-link', { hasText: '戻す' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(reference).not.toContainText('戻す');
+  // A double click opens a piece as its text; leaving it closes it again.
+  await reference.locator('.footnote-mark', { hasText: 'next' }).dblclick();
+  await expect(reference).toContainText('[^next]');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.type('-x');
   await editor.getByText('MTD-RLの問題設定と解くべき問い').click();
-  await expect(reference.locator('.literal-preview')).toContainText('追記');
-  await expect(reference.locator('.literal-block')).toBeHidden();
-  // What is saved is the text as written, with the edit. (The editor's trailing
+  await expect(reference.locator('.footnote-mark', { hasText: 'nex-xt' })).toBeVisible();
+  // The formula still shows its source while the cursor is in it.
+  const formula = editor.locator('.literal-view');
+  await formula.locator('.literal-preview').click();
+  await expect(formula.locator('.literal-block')).toContainText('r_t = \\gamma');
+  await editor.getByText('MTD-RLの問題設定と解くべき問い').click();
+  // What is saved is the text as written, with the edits. (The editor's trailing
   // paragraph after a last block that is not one adds a final line break.)
   await page.keyboard.press('ControlOrMeta+s');
   await expect
     .poll(async () => (await readFile(path.join(root, 'problem.md'), 'utf8')).trimEnd())
-    .toBe(note.replace('[^proposed-rq]\n', '[^proposed-rq]追記\n').trimEnd());
+    .toBe(
+      note
+        .replace(
+          '[^proposed-rq]\n\n## 1.',
+          '[^proposed-rq]次は[[計画|次の計画]]へ[^nex-xt]\n\n## 1.',
+        )
+        .replace('キックオフ。[^proposed-rq]', 'キックオフ。[^proposed-rq]追記')
+        .replace(`| ${'[[背景]]'.padEnd(19)} |`, `| ${'[[背景]]も'.padEnd(19)} |`)
+        .trimEnd(),
+    );
 
   expect(errors).toEqual([]);
   await writeFile(
@@ -154,13 +217,15 @@ try {
     JSON.stringify(
       {
         checks: [
-          'a footnote reference shows as a mark, its source hidden',
+          'a footnote mark in a paragraph, a list item and a table cell is a piece of an editable block',
           'a footnote definition shows its name before its text',
           'wiki links show their labels, a callout its title',
           'a Mermaid block draws its diagram',
           'a short code block is as tall as its code',
           "the reader's text size and line spacing reach paragraphs and headings, not a diagram's labels, and go back",
-          'a click shows the source for editing; leaving shows the page; the file keeps the text',
+          'typing in a list item and a table cell shows no source; typed links and marks become pieces',
+          'a double click opens a piece as its text, Backspace removes it whole; only the formula shows its source',
+          'the file keeps the text, with the edits',
         ],
         errors,
       },
@@ -168,7 +233,7 @@ try {
       2,
     ),
   );
-  console.log('Markdown UI checks passed: footnotes, wiki links, callouts and Mermaid.');
+  console.log('Markdown UI checks passed: pieces, footnotes, wiki links, callouts and Mermaid.');
 } finally {
   await app.close();
   await rm(base, { recursive: true, force: true });
