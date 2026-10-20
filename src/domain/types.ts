@@ -438,6 +438,8 @@ export interface DeviceSettings {
   lineSpacing: LineSpacing;
   /** Show code assistance in source editors and Markdown code blocks. */
   editorAssistance: boolean;
+  /** Keep a page's properties folded under its title. */
+  propertiesFolded: boolean;
   /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */
   vaultAgent: boolean;
   /** The CLI your AI runs on and the model and thinking level chosen for each CLI ('' or absent: the CLI's default). */
@@ -640,16 +642,25 @@ export interface HostAPI {
     directory: string,
   ): Promise<EntryMove>;
   /**
-   * Deletes a file or folder of the vault's knowledge or of an editable connected
-   * folder. A note of knowledge goes to irori's deleted notes; anything else to
-   * the system trash.
+   * Copies a file or folder of a vault's knowledge or connected folders into
+   * `directory` of a vault's knowledge or of an editable connected folder, as a
+   * file manager's paste does: under its name or the first free one, never
+   * replacing an entry. A copy within knowledge keeps its links leading where
+   * the original's did.
+   */
+  copyEntry(scopeId: string, path: string, toScopeId: string, directory: string): Promise<Entry>;
+  /**
+   * Deletes a file or folder of the vault's knowledge, of its Schema layer
+   * (except `.irori` and `.git`) or of an editable connected folder. A note of
+   * knowledge goes to irori's deleted notes; anything else to the system trash.
    */
   trashEntry(scopeId: string, path: string): Promise<void>;
   /**
    * Puts a file's or folder's path on the clipboard, as a file manager's menu does:
    * the full path on this computer, or the path from the vault's root with `/`.
+   * Returns the text put there.
    */
-  copyEntryPath(scopeId: string, path: string, absolute: boolean): Promise<void>;
+  copyEntryPath(scopeId: string, path: string, absolute: boolean): Promise<string>;
   /** Shows a file or folder of the vault in the system file manager. */
   revealEntry(scopeId: string, path: string): Promise<void>;
   spaces(): Promise<Space[]>;

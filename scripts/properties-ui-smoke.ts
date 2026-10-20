@@ -162,6 +162,14 @@ try {
   await properties.getByRole('button', { name: 'プロパティで編集' }).click();
   await expect(properties.getByLabel('公開範囲', { exact: true })).toHaveValue('internal');
 
+  // Folded, the title and description stay and the rows give way to their count.
+  const fold = properties.locator('.properties-fold');
+  await fold.click();
+  await expect(fold).toHaveAttribute('aria-expanded', 'false');
+  await expect(properties.locator('.properties-rows')).toHaveCount(0);
+  await expect(properties.getByLabel('タイトル')).toHaveValue('Proposal for customer A, v2');
+  await expect(properties.locator('.properties-count')).toHaveText(/^\d+$/);
+
   // A folder index keeps the plain editor.
   await page.getByRole('button', { name: 'index', exact: true }).click();
   await expect(editor).toContainText('Artifacts');
@@ -172,6 +180,9 @@ try {
   await expect(editor).toContainText('素のページ');
   await properties.getByRole('button', { name: '＋ プロパティを追加' }).click();
   await expect(properties.getByLabel('タイトル')).toHaveValue('bare');
+  // The fold holds on the next page too.
+  await expect(fold).toHaveAttribute('aria-expanded', 'false');
+  await expect(properties.locator('.properties-rows')).toHaveCount(0);
   await expect
     .poll(() => onDisk('bare.md'), { timeout: 10000 })
     .toMatch(
@@ -183,11 +194,12 @@ try {
   await expect(editor).toContainText('壊れた frontmatter');
   await expect(properties.getByRole('alert')).toContainText('frontmatter を読めません');
   await expect(properties.getByLabel('frontmatter（YAML）')).toHaveValue('title: [unclosed');
+  await expect(fold).toHaveAttribute('aria-expanded', 'true');
   expect(await onDisk('broken.md')).toBe('---\ntitle: [unclosed\n---\n# 壊れた frontmatter\n');
 
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Properties UI smoke passed: declared properties shown above the body, a select and a tag written in place with the person named as the last change, the raw YAML view, a plain index, a page given frontmatter, and broken frontmatter left untouched.',
+    'Properties UI smoke passed: declared properties shown above the body, a select and a tag written in place with the person named as the last change, the raw YAML view, folding kept across pages, a plain index, a page given frontmatter, and broken frontmatter left untouched.',
   );
 } finally {
   await app.close();

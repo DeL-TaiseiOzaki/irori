@@ -17,6 +17,7 @@ let current: DeviceSettings = {
   textSize: 'standard',
   lineSpacing: 'standard',
   editorAssistance: true,
+  propertiesFolded: false,
   vaultAgent: false,
   layouts: {},
   skillAudiences: {},
@@ -78,6 +79,14 @@ export function currentEditorAssistance() {
 
 export function chooseEditorAssistance(editorAssistance: boolean) {
   return save({ editorAssistance });
+}
+
+export function currentPropertiesFolded() {
+  return current.propertiesFolded;
+}
+
+export function choosePropertiesFolded(propertiesFolded: boolean) {
+  return save({ propertiesFolded });
 }
 
 /** Whether each vault's own agent and its Schema layer are offered (ADR 021). */

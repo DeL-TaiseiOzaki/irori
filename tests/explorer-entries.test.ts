@@ -296,6 +296,40 @@ test("Schema's files and folders rename in their folder; .irori, .git and other 
   assert.equal(await read('CLAUDE.md'), '# Agents\n');
 });
 
+test("Schema's files and folders go to the trash; .irori, .git and other layers stay", async (t) => {
+  const { files, id, write, root, exists } = await fixture(t);
+  await write('AGENTS.md', '# Agents\n');
+  await write('.agents/skills/draft/SKILL.md', '# Draft\n');
+  await write('.git/HEAD', 'ref: refs/heads/main\n');
+  const trashed: string[] = [];
+  const trash = async (filename: string) => {
+    trashed.push(filename);
+    await rm(filename, { recursive: true });
+  };
+  const doc = await files.read(id, 'AGENTS.md');
+  await files.draft({ ...doc, text: '# Agents\n\nunsaved\n' });
+  await files.trashSchemaEntry(id, 'AGENTS.md', trash);
+  await files.trashSchemaEntry(id, '.agents/skills/draft', trash);
+  assert.deepEqual(trashed, [
+    path.join(await realpath(root), 'AGENTS.md'),
+    path.join(await realpath(root), '.agents/skills/draft'),
+  ]);
+  assert.equal(await exists('AGENTS.md'), false);
+  assert.equal(await exists('.agents/skills'), true);
+  // The draft of a deleted file does not come back with a new one of that name.
+  await rm(draftFile(files.dataDir, id, 'AGENTS.md')).then(
+    () => assert.fail('the draft stayed'),
+    () => {},
+  );
+  const refused = (rel: string, pattern: RegExp) =>
+    assert.rejects(() => files.trashSchemaEntry(id, rel, trash), pattern);
+  await refused('.irori', /\.irori/);
+  await refused('.irori/scope.json', /\.irori/);
+  await refused('.git/HEAD', /\.git/);
+  await refused('Knowledge_Base', /Schema/);
+  assert.equal(trashed.length, 2);
+});
+
 test('Deleting from knowledge hands files and folders to the trash, never the knowledge folder', async (t) => {
   const { files, id, write, root, exists } = await fixture(t);
   await write('Knowledge_Base/old/x.txt', 'x');

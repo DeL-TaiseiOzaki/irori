@@ -1,5 +1,44 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Copy and paste in the explorer, Obsidian-style images, folded properties, Schema
+deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**, pull request open):
+- HostAPI `copyEntry(scopeId, path, toScopeId, directory)` copies a file or
+  folder of knowledge or contents into a folder of knowledge or an editable
+  connection, in this vault or another (`changeFiles`, so it runs beside
+  agents as adding does). `FileService.copySource` refuses the knowledge folder
+  and a folder holding a vault or contents; `copyEntryInto` (`entries.ts`)
+  takes a free name, never replaces, leaves aliases (and, into knowledge,
+  hidden entries) behind and removes a partial copy. Within a vault a copied
+  note's links are rewritten with `rewriteLinks`; into another vault a note's
+  managed images come with it (`carryImages`, shared with `moveAcross`).
+- Renderer: `Explorer.clip`/`paste`/`clipped`. Rows take the clipboard events
+  (`onCopy`/`onCut`/`onPaste`), so the Edit menu's accelerators reach them. A
+  cut pastes through `moveInto` or `moveFrom`; a paste whose system clipboard
+  holds files and not irori's own path brings the files in through
+  `readDropped`. `copyEntryPath` now returns the text it wrote.
+- `PageProperties` folds its rows, raw YAML and actions under the title and
+  description; the device setting `propertiesFolded` keeps the choice. Broken
+  frontmatter stays open.
+- `trashEntry` on a Schema path goes to `FileService.trashSchemaEntry` (system
+  trash, the file's draft removed; `.irori`, `.git` and a folder holding the
+  knowledge folder, contents or another vault refused). The Schema file view
+  offers `rename` and `delete`.
+- `src/editor/images.ts`: `imageAlt` extends crepe's `image-block` schema with
+  an `alt` attribute, so alt text survives (a numeric alt is still the size;
+  ratio 1 writes no alt). `embedView` renders an `irori_inline` image embed
+  `![[x.png|W]]` as an image, resolved through `readImage` as `x.png` then
+  `_assets/x.png`. `imageOnEmptyLine` deletes the empty paragraph Milkdown's
+  upload plugin leaves beside a newly inserted image block.
+- Closing the dock's first column (`main`) with others open no longer calls
+  `closeDock`: the next column's conversation, tabs, references and status move
+  into `main`'s slot and that column goes. The × says "この列を閉じる" unless the
+  column is the only one.
+- Verified by `npm run build`, `npm test` (`tests/entry-copy.test.ts`,
+  `tests/explorer-entries.test.ts`, `tests/settings.test.ts`) and
+  `npm run test:ui` (`explorer-ui-smoke`, `images-ui-smoke`, `dock-ui-smoke`,
+  `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
+  unchecked on a device.
+
 Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
 holding a footnote mark or a wiki link is edited richly instead of turning into
 source when the cursor enters it.
