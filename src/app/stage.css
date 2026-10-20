@@ -411,10 +411,17 @@ button.save-state > i {
   margin: 0;
   white-space: pre-wrap;
   font: 0.8125em/1.7 var(--font-mono);
+  color: var(--ink-2);
   background: var(--stage-2);
-  border-left: 3px solid var(--rule-2);
-  padding: 12px 16px;
+  border-radius: 6px;
+  padding: 10px 14px;
   overflow-wrap: anywhere;
+}
+/* Literal text is the note's own, not inline code: no code colour or background. */
+.document-editor .milkdown .ProseMirror .literal-block code {
+  color: inherit;
+  background: none;
+  font: inherit;
 }
 .document-editor.source {
   padding: 15px 25px 60px;
@@ -822,6 +829,105 @@ button.comment-quote:hover {
 .document-editor .milkdown .ProseMirror .callout p {
   margin: 0;
   padding: 2px 0;
+}
+/*
+ * Pieces (src/editor/pieces.ts): a footnote mark, a wiki link or a callout marker is
+ * one piece of the text around it, selected and deleted whole, as a Notion mention.
+ * A double click opens it as its text.
+ */
+.document-editor [data-irori-inline] {
+  cursor: default;
+  border-radius: 3px;
+}
+.document-editor [data-irori-inline]:hover {
+  background: var(--stage-2);
+}
+.document-editor [data-irori-inline].ProseMirror-selectednode {
+  outline: none;
+  background: var(--stage-3);
+}
+/* A callout is a quote that opens with a marker; its first line is its title. */
+.document-editor .milkdown .ProseMirror blockquote.callout {
+  padding: 10px 14px;
+}
+.document-editor .milkdown .ProseMirror blockquote.callout::before {
+  display: none;
+}
+.document-editor .callout-marker {
+  margin-right: 8px;
+  padding: 1px 6px;
+  color: var(--ember-ink);
+  background: var(--card);
+  font: 600 0.72em/1.6 var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 0.12em;
+}
+.document-editor .callout-title {
+  font-weight: 600;
+}
+/* The soft line break after the title ends its line, with no empty line of its own. */
+.document-editor .callout-break {
+  display: block;
+  height: 0;
+  overflow: hidden;
+}
+/* A quote is a thin rule beside its text. */
+.document-editor .milkdown .ProseMirror blockquote:not(.callout) {
+  padding-left: 18px;
+}
+.document-editor .milkdown .ProseMirror blockquote:not(.callout)::before {
+  width: 3px;
+  background: var(--rule-2);
+}
+/* A footnote's text follows its name, as the end of a page lists them. */
+.document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] {
+  display: flex;
+  gap: 8px;
+  margin: 2px 0;
+  color: var(--ink-2, var(--ink));
+  font-size: 0.92em;
+}
+.document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] > dt {
+  flex: none;
+  color: var(--ember-ink);
+  font: 600 0.74em/2.4 var(--font-ui);
+}
+.document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] > dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] p {
+  margin: 0;
+  padding: 0;
+}
+/* A note's code block is a quiet panel, as in Notion; the language and copy buttons
+   appear on hover. Line numbers follow the note's code assistance. */
+.document-editor .milkdown .milkdown-code-block {
+  --crepe-color-surface: var(--stage-2);
+  padding: 12px 16px;
+  border-radius: 6px;
+}
+.document-editor .milkdown .milkdown-code-block .tools {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  gap: 4px;
+}
+.document-editor .milkdown .milkdown-code-block .tools .language-button {
+  margin-bottom: 0;
+}
+/* A rendered table in a literal block looks as an editable one does. */
+.document-editor .literal-preview table {
+  border-collapse: collapse;
+  margin: 4px 0;
+}
+.document-editor .literal-preview th,
+.document-editor .literal-preview td {
+  border: 1px solid color-mix(in srgb, var(--rule-2), transparent 20%);
+  padding: 4px 16px;
 }
 .document-editor .milkdown .milkdown-code-block .preview-panel {
   background: transparent;
