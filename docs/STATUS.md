@@ -1,5 +1,35 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
+holding a footnote mark or a wiki link is edited richly instead of turning into
+source when the cursor enters it.
+- `src/editor/pieces.ts`: `preserveTree` (the `preserveBlocks` remark step)
+  keeps a top-level block literal only for what the editor cannot write back
+  (frontmatter, HTML, `$$`, `:::`, `{{`/`{%`). Footnote marks, wiki links and a
+  quote's opening `[!kind]` become `iroriInline` pieces of an ordinary block,
+  and GFM `footnoteDefinition`s stay Milkdown's footnote blocks. The block stays
+  literal unless its pieces match what the source writes, in order (`\|` in a
+  table cell is kept as written; an escaped link or a marker past a quote's
+  first line stays literal).
+- `irori_inline` (`preservation.ts`) is an inline atom shown as its label and
+  written back as an mdast `html` node with its exact text.
+  `src/editor/piece-editing.ts`: `pieceTyping` turns text written as a piece
+  into one when it closes or the cursor leaves it, and a double click opens a
+  piece as its text. `calloutView` decorates a quote whose first piece is a
+  callout marker as `.callout`, its first line as `.callout-title`.
+- `Editor` reads a piece as its text in comment quotes and in `reveal`
+  (`renderedRanges`), so a quote across a footnote mark matches the file.
+  `writingStyle` sets remark-stringify's `bullet` and `rule` from the note, so
+  an edit keeps `-` and `---` instead of writing `*` and `***`.
+- Styles (`stage.css`): pieces, callouts, footnote definitions, a thin quote
+  rule, code blocks as a rounded panel with hover tools (line numbers still follow
+  code assistance), bordered
+  tables in a literal preview, and literal text in the note's ink colour.
+- Verified by `npm run build`, `npm test` (`tests/editor-pieces.test.ts`) and
+  `npm run test:ui` (`markdown-ui-smoke` types into a list item and a table cell
+  with footnotes, types, opens and deletes pieces, and saves the exact text;
+  `comments-ui-smoke` quotes and reveals a passage across a footnote mark).
+
 Adding during a run, 2026-10-20 (**0.2.40**, pull request open): while an
 agent ran, the vault panel was locked whole, so neither a note, a folder, a
 dropped file nor a new contents connection could be added.
