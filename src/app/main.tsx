@@ -359,6 +359,7 @@ const DockColumnView = memo(function DockColumnView({
   workspaceId,
   yourKey,
   canSplit = true,
+  alone = false,
   seed,
   act,
 }: {
@@ -390,6 +391,8 @@ const DockColumnView = memo(function DockColumnView({
   yourKey?: string;
   /** Another column fits beside this one. */
   canSplit?: boolean;
+  /** The dock's only column: closing it closes the dock. */
+  alone?: boolean;
   /** Words for the composer, placed again with each new `key`. */
   seed?: { text: string; key: number };
   act: DockActions;
@@ -441,6 +444,7 @@ const DockColumnView = memo(function DockColumnView({
       ownerChoice={vaultAgent && !isYourColumn(column.id)}
       stage={stage}
       closable={column.id !== yourFirst}
+      closesDock={alone}
       canSplit={canSplit}
       seed={seed}
       onShowSchema={isYourColumn(column.id) ? act.showYou : undefined}
@@ -2030,10 +2034,37 @@ function App() {
   }
   function closeColumn(column: DockColumn) {
     if (isYourColumn(column.id)) return closeYourColumn(column);
-    if (column.id === 'main') return closeDock();
-    setColumns((all) => all.filter((item) => item.id !== column.id));
-    setSources(({ [column.id]: _, ...rest }) => rest);
-    setColumnStatus(({ [column.id]: _, ...rest }) => rest);
+    const drop = (id: string) => {
+      setSources(({ [id]: _, ...rest }) => rest);
+      setColumnStatus(({ [id]: _, ...rest }) => rest);
+    };
+    if (column.id !== 'main') {
+      setColumns((all) => all.filter((item) => item.id !== column.id));
+      return drop(column.id);
+    }
+    // The first column closes alone: the one beside it takes its place with its
+    // conversation, tabs and references. The dock closes with its last column.
+    const next = columns.find((item) => item.id !== 'main');
+    if (!next) return closeDock();
+    const ownerKey = ownerOf(next) === 'irori' ? yourKey : active?.scopeId;
+    if (ownerKey) {
+      const from = slot(next.id, ownerKey);
+      setShown(({ [from]: moved, [ownerKey]: _, ...rest }) =>
+        moved ? { ...rest, [ownerKey]: moved } : rest,
+      );
+      setTabs(({ [from]: moved, ...rest }) => ({ ...rest, [ownerKey]: moved ?? [] }));
+    }
+    setSources(({ [next.id]: moved, main: _, ...rest }) =>
+      moved ? { ...rest, main: moved } : rest,
+    );
+    setColumnStatus(({ [next.id]: moved, main: _, ...rest }) =>
+      moved ? { ...rest, main: moved } : rest,
+    );
+    setColumns((all) =>
+      all
+        .filter((item) => item.id !== next.id)
+        .map((item) => (item.id === 'main' ? { ...item, owner: next.owner } : item)),
+    );
   }
   // Another brain's vault agent is running or waiting: the AI summary leads to the Overview.
   const othersActive = runningScopes.some((id) => id !== active?.scopeId);
@@ -3553,6 +3584,7 @@ function App() {
                           column={column}
                           owner={owner}
                           first={index === 0}
+                          alone={columns.length === 1}
                           shared={dockShared}
                           active={active}
                           you={you}
