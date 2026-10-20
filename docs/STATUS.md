@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
+Notes edited as pages, 2026-10-20 (**0.2.41**, [#276](https://github.com/DeL-TaiseiOzaki/irori/pull/276), published as `v0.2.41-preview.1`): a block
 holding a footnote mark or a wiki link is edited richly instead of turning into
 source when the cursor enters it.
 - `src/editor/pieces.ts`: `preserveTree` (the `preserveBlocks` remark step)
