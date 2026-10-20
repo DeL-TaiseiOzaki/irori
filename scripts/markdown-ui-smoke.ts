@@ -161,7 +161,10 @@ try {
   await page.keyboard.press('End');
   await page.keyboard.type('追記');
   await expect(editor.locator('li', { hasText: '追記' }).locator('.footnote-mark')).toBeVisible();
-  await table.locator('td', { hasText: '背景' }).click({ position: { x: 150, y: 12 } });
+  // Past the cell's text: a click on the piece itself would select it, and typing replace it.
+  const cell = table.locator('td', { hasText: '背景' });
+  const box = (await cell.boundingBox())!;
+  await cell.click({ position: { x: box.width - 12, y: box.height / 2 } });
   await page.keyboard.press('End');
   await page.keyboard.type('も');
   await expect(table.locator('td', { hasText: '背景も' })).toBeVisible();
