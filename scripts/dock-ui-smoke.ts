@@ -107,6 +107,17 @@ try {
     '二列目の下書き',
   );
 
+  // Closing the first column closes it alone: the one beside takes its place.
+  await columns
+    .nth(1)
+    .getByRole('button', { name: /^表示するエージェント/ })
+    .click();
+  await page.getByRole('menuitemradio', { name: 'irori agent' }).click();
+  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'irori agent 2');
+  await columns.first().getByRole('button', { name: 'この列を閉じる' }).click();
+  await expect(columns).toHaveCount(1);
+  await expect(columns.first()).toHaveAttribute('aria-label', 'irori agent');
+
   // Off again: the Schema layer leaves and the dock shows the irori agent alone.
   await setVaultAgent(page, false);
   await expect(brain.getByRole('region', { name: 'Schema', exact: true })).toHaveCount(0);

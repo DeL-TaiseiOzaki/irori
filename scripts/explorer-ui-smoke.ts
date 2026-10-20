@@ -178,12 +178,13 @@ try {
   await page.keyboard.press('Enter');
   await expect(row(schema, 'CLAUDE.md')).toBeVisible();
   expect((await readdir(root)).includes('CLAUDE.md')).toBe(true);
-  // Only renaming is offered there: nothing is made, moved or deleted.
+  // Renaming and deleting are offered there: nothing is made or moved.
   await row(schema, '.agents').click({ button: 'right' });
   await expect(menuItem('名前を変更')).toBeVisible();
+  await expect(menuItem('削除')).toBeVisible();
   await expect(menuItem('移動')).toHaveCount(0);
-  await expect(menuItem('削除')).toHaveCount(0);
   await expect(menuItem('新しいフォルダ')).toHaveCount(0);
+  await expect(menuItem('コピー')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await row(schema, '.agents').click();
   await row(schema, 'skills').click();
@@ -193,9 +194,18 @@ try {
   await page.keyboard.press('Enter');
   await expect(row(schema, 'review-skill')).toBeVisible();
   expect(await readdir(path.join(root, '.agents/skills'))).toEqual(['review-skill']);
+  // The Delete key sends a Schema folder to the system trash.
+  await row(schema, 'review-skill').focus();
+  await page.keyboard.press('Delete');
+  const schemaDeletion = page.getByRole('dialog', { name: '削除' });
+  await expect(schemaDeletion).toContainText('フォルダを中身ごとシステムのゴミ箱に移します。');
+  await schemaDeletion.getByRole('button', { name: 'ゴミ箱に移す', exact: true }).click();
+  await expect(row(schema, 'review-skill')).toHaveCount(0);
+  expect(await readdir(path.join(root, '.agents/skills'))).toEqual([]);
   await row(schema, '.irori').click({ button: 'right' });
   await expect(menuItem('パスをコピー')).toBeVisible();
   await expect(menuItem('名前を変更')).toHaveCount(0);
+  await expect(menuItem('削除')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await schema.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
 
@@ -274,6 +284,58 @@ try {
     .toEqual(['2026', 'old.md', 'scan.pdf']);
   expect(await readFile(path.join(shared, 'scan.pdf'), 'utf8')).toBe('%PDF-1.4\n%fixture\n');
 
+  // Copy and paste, as in a file manager. The keyboard's copy puts the file's full
+  // path on the system's clipboard too; a paste on a folder copies into it.
+  const at = (region: typeof knowledge, entry: string) =>
+    region.locator(`button[data-entry="${entry}"]`);
+  await at(knowledge, 'Knowledge_Base/table.csv').focus();
+  await page.keyboard.press('ControlOrMeta+C');
+  await expect.poll(clipboardText).toBe(path.join(root, 'Knowledge_Base', 'table.csv'));
+  await at(knowledge, 'Knowledge_Base/topics').focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect
+    .poll(() => disk('Knowledge_Base/topics'))
+    .toEqual(['memo.txt', 'table.csv', '図表', '話題.md']);
+  await expect(page.getByRole('contentinfo')).toContainText('table.csv をコピーしました');
+  // On a file, the paste goes beside it under a free name; the original stays.
+  await at(knowledge, 'Knowledge_Base/table.csv').focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect.poll(() => disk('Knowledge_Base')).toEqual(['table 2.csv', 'table.csv', 'topics']);
+  // A folder copied from its menu and pasted from the knowledge folder's.
+  await at(knowledge, 'Knowledge_Base/topics/図表').click({ button: 'right' });
+  await menuItem('コピー').click();
+  await row(knowledge, 'Knowledge_Base').click({ button: 'right' });
+  await menuItem('貼り付け').click();
+  await expect
+    .poll(() => disk('Knowledge_Base'))
+    .toEqual(['table 2.csv', 'table.csv', 'topics', '図表']);
+  // A cut row dims until its paste moves it.
+  await at(knowledge, 'Knowledge_Base/table 2.csv').click({ button: 'right' });
+  await menuItem('切り取り').click();
+  await expect(at(knowledge, 'Knowledge_Base/table 2.csv')).toHaveClass(/\bcut\b/);
+  await at(knowledge, 'Knowledge_Base/図表').focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect.poll(() => disk('Knowledge_Base')).toEqual(['table.csv', 'topics', '図表']);
+  expect(await disk('Knowledge_Base/図表')).toEqual(['table 2.csv']);
+  // A file of a connected folder copies into knowledge.
+  await at(contents, 'contents/共有/old.md').click({ button: 'right' });
+  await menuItem('コピー').click();
+  await at(knowledge, 'Knowledge_Base/topics').click({ button: 'right' });
+  await menuItem('貼り付け').click();
+  await expect.poll(() => disk('Knowledge_Base/topics')).toContain('old.md');
+  expect(await readFile(path.join(root, 'Knowledge_Base/topics/old.md'), 'utf8')).toBe('# Old\n');
+  // Files copied in the file manager come in on a paste, as a drop's do. The page
+  // stands in for the system's clipboard with the paste event it would send.
+  await at(knowledge, 'Knowledge_Base/topics').evaluate((target) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['pasted'], 'clip.txt', { type: 'text/plain' }));
+    target.dispatchEvent(
+      new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: transfer }),
+    );
+  });
+  await expect.poll(() => disk('Knowledge_Base/topics')).toContain('clip.txt');
+  expect(await readFile(path.join(root, 'Knowledge_Base/topics/clip.txt'), 'utf8')).toBe('pasted');
+
   expect(errors).toEqual([]);
   await writeFile(
     'test-results/explorer-ui-smoke.json',
@@ -284,7 +346,7 @@ try {
           'renaming a knowledge folder from its row menu edits its name in place and rewrites the links into it',
           'F2 renames a file in place with its extension outside the selection, and a note by its title',
           'Escape keeps the name; an invalid or taken name is refused beside the field',
-          "Schema's files and folders rename in place; .irori offers no rename, and nothing else is offered",
+          "Schema's files and folders rename in place and delete to the trash; .irori offers neither",
           'dragging a file onto a folder moves it there',
           'a file dropped from the file manager is copied into the folder',
           "a note deleted with the Delete key goes to irori's deleted notes",
@@ -292,6 +354,11 @@ try {
           'a connected folder takes a new folder and files brought in from elsewhere',
           'a closed folder opens under a drag; dropped files keep both on a taken name',
           'a dropped file over 100 MiB comes in whole',
+          'the keyboard copies a file and pastes it into a folder, or beside a file under a free name',
+          "a folder copied from its menu pastes from another folder's menu",
+          'a cut row dims and its paste moves it',
+          'a file of a connected folder copies into knowledge',
+          'files pasted from the system clipboard come in as a drop does',
         ],
         errors,
       },

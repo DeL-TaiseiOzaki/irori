@@ -12,6 +12,8 @@ import {
   type PropertyDefinition,
   type YamlValue,
 } from '../domain/properties';
+import { choosePropertiesFolded, currentPropertiesFolded } from './device-settings';
+import { Icon } from './Icon';
 import './page-properties.css';
 
 /** Labels for the keys the Open Knowledge Format and irori-templete use. */
@@ -103,6 +105,8 @@ export function PageProperties({
   onChange: (yaml: string) => void;
 }) {
   const [raw, setRaw] = useState(false);
+  // Folded under the title on every page, until the reader opens them again.
+  const [folded, setFolded] = useState(currentPropertiesFolded);
   const [problem, setProblem] = useState('');
   const [adding, setAdding] = useState('');
   const declaration = declared?.declaration ?? null;
@@ -162,6 +166,8 @@ export function PageProperties({
     );
 
   const showRaw = raw || !!parsed.error;
+  // Frontmatter that does not parse stays open, with the reason beside it.
+  const shut = folded && !parsed.error;
   const required = new Set(requiredKeys(declaration, values.type));
   const definitions = declaration?.properties ?? {};
   const rowKeys = [
@@ -200,17 +206,7 @@ export function PageProperties({
           {problem}
         </p>
       )}
-      {showRaw ? (
-        <textarea
-          className="properties-raw"
-          aria-label={t('frontmatter（YAML）', 'Frontmatter (YAML)')}
-          spellCheck={false}
-          readOnly={readOnly}
-          value={yaml}
-          rows={Math.min(24, Math.max(4, yaml.split('\n').length + 1))}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
+      {!showRaw && (
         <>
           {titled && (
             <TextField
@@ -234,81 +230,112 @@ export function PageProperties({
               onCommit={(value) => set(['description'], value)}
             />
           )}
-          <dl className="properties-rows">
-            {rowKeys.map((key) => {
-              const definition = definitions[key];
-              const value = values[key];
-              const kind = kindOf(definition, value);
-              const missing =
-                required.has(key) && isEmptyValue(value) && definition?.auto !== 'last-change';
-              return (
-                <div key={key} className="properties-row" data-missing={missing || undefined}>
-                  <dt>
-                    {label(key)}
-                    {missing && (
-                      <span className="properties-required">{t('必須', 'Required')}</span>
-                    )}
-                  </dt>
-                  <dd>
-                    <Value
-                      name={label(key)}
-                      kind={kind}
-                      value={value}
-                      definition={definition}
-                      options={
-                        kind === 'type'
-                          ? Object.keys(declaration?.types ?? {})
-                          : definition?.options
-                      }
-                      readOnly={readOnly}
-                      onSet={(next) => set([key], next)}
-                    />
-                  </dd>
-                  {!readOnly && !required.has(key) && key in values && (
-                    <button
-                      type="button"
-                      className="properties-remove"
-                      aria-label={t(`${label(key)} を削除`, `Remove ${label(key)}`)}
-                      onClick={() => set([key], undefined)}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </dl>
         </>
       )}
-      <div className="properties-actions">
-        {!readOnly && !showRaw && (
-          <select
-            aria-label={t('プロパティを追加', 'Add a property')}
-            value={adding}
-            onChange={(event) => {
-              const key = event.target.value;
-              setAdding('');
-              if (key === '\u0000other') {
-                const name = window.prompt(t('プロパティ名', 'Property name'))?.trim();
-                if (name && !(name in values)) set([name], '');
-              } else if (key) set([key], emptyOf(kindOf(definitions[key], undefined)));
-            }}
-          >
-            <option value="">{t('＋ プロパティを追加', '+ Add a property')}</option>
-            {addable.map((key) => (
-              <option key={key} value={key}>
-                {label(key)}
-              </option>
-            ))}
-            <option value={'\u0000other'}>{t('その他の名前…', 'Another name…')}</option>
-          </select>
-        )}
-        {!parsed.error && (
-          <button type="button" className="properties-toggle" onClick={() => setRaw(!raw)}>
-            {raw ? t('プロパティで編集', 'Edit as properties') : t('YAML で編集', 'Edit as YAML')}
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        className="properties-fold"
+        aria-expanded={!shut}
+        onClick={() => {
+          setFolded(!folded);
+          void choosePropertiesFolded(!folded).catch(() => {});
+        }}
+      >
+        <Icon name={shut ? 'chevron' : 'chevronDown'} size={12} />
+        {t('プロパティ', 'Properties')}
+        {shut && rowKeys.length > 0 && <span className="properties-count">{rowKeys.length}</span>}
+      </button>
+      {!shut && (
+        <>
+          {showRaw ? (
+            <textarea
+              className="properties-raw"
+              aria-label={t('frontmatter（YAML）', 'Frontmatter (YAML)')}
+              spellCheck={false}
+              readOnly={readOnly}
+              value={yaml}
+              rows={Math.min(24, Math.max(4, yaml.split('\n').length + 1))}
+              onChange={(event) => onChange(event.target.value)}
+            />
+          ) : (
+            <dl className="properties-rows">
+              {rowKeys.map((key) => {
+                const definition = definitions[key];
+                const value = values[key];
+                const kind = kindOf(definition, value);
+                const missing =
+                  required.has(key) && isEmptyValue(value) && definition?.auto !== 'last-change';
+                return (
+                  <div key={key} className="properties-row" data-missing={missing || undefined}>
+                    <dt>
+                      {label(key)}
+                      {missing && (
+                        <span className="properties-required">{t('必須', 'Required')}</span>
+                      )}
+                    </dt>
+                    <dd>
+                      <Value
+                        name={label(key)}
+                        kind={kind}
+                        value={value}
+                        definition={definition}
+                        options={
+                          kind === 'type'
+                            ? Object.keys(declaration?.types ?? {})
+                            : definition?.options
+                        }
+                        readOnly={readOnly}
+                        onSet={(next) => set([key], next)}
+                      />
+                    </dd>
+                    {!readOnly && !required.has(key) && key in values && (
+                      <button
+                        type="button"
+                        className="properties-remove"
+                        aria-label={t(`${label(key)} を削除`, `Remove ${label(key)}`)}
+                        onClick={() => set([key], undefined)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </dl>
+          )}
+          <div className="properties-actions">
+            {!readOnly && !showRaw && (
+              <select
+                aria-label={t('プロパティを追加', 'Add a property')}
+                value={adding}
+                onChange={(event) => {
+                  const key = event.target.value;
+                  setAdding('');
+                  if (key === '\u0000other') {
+                    const name = window.prompt(t('プロパティ名', 'Property name'))?.trim();
+                    if (name && !(name in values)) set([name], '');
+                  } else if (key) set([key], emptyOf(kindOf(definitions[key], undefined)));
+                }}
+              >
+                <option value="">{t('＋ プロパティを追加', '+ Add a property')}</option>
+                {addable.map((key) => (
+                  <option key={key} value={key}>
+                    {label(key)}
+                  </option>
+                ))}
+                <option value={'\u0000other'}>{t('その他の名前…', 'Another name…')}</option>
+              </select>
+            )}
+            {!parsed.error && (
+              <button type="button" className="properties-toggle" onClick={() => setRaw(!raw)}>
+                {raw
+                  ? t('プロパティで編集', 'Edit as properties')
+                  : t('YAML で編集', 'Edit as YAML')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }

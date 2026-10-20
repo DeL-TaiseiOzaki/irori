@@ -21,6 +21,7 @@ const defaults = {
   textSize: 'standard',
   lineSpacing: 'standard',
   editorAssistance: true,
+  propertiesFolded: false,
   vaultAgent: false,
   layouts: {},
   skillAudiences: {},
@@ -103,6 +104,14 @@ test('editor assistance survives restart and unrelated preference writes, with c
   assert.equal(restarted.layouts.workspace, 'kept');
   await settings.save({ editorAssistance: true });
   assert.equal((await new SettingsService(dir).read()).editorAssistance, true);
+});
+
+test('folded properties stay folded across a restart', async () => {
+  const { dir, settings } = await service();
+  assert.equal((await settings.read()).propertiesFolded, false);
+  await settings.save({ propertiesFolded: true });
+  await settings.save({ theme: 'dark' });
+  assert.equal((await new SettingsService(dir).read()).propertiesFolded, true);
 });
 
 test('the vault agent is off until the person turns it on, and stays as chosen', async () => {

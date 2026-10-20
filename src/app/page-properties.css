@@ -187,6 +187,32 @@
 .page-properties.empty {
   padding-bottom: 0;
 }
+/* The disclosure that folds the properties under the title. */
+.page-properties .properties-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 4px -7px;
+  padding: 2px 7px 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.page-properties .properties-fold:hover {
+  color: var(--ink);
+  background: var(--stage-2);
+}
+.properties-count {
+  font-size: 11px;
+  color: var(--ink-3);
+  background: var(--stage-3);
+  border-radius: 999px;
+  padding: 0 6px;
+}
 .page-properties .properties-raw {
   display: block;
   width: 100%;

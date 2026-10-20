@@ -26,7 +26,7 @@ export const literalBlock = $node('irori_literal', () => ({
   },
 }));
 
-const pieceClass = {
+export const pieceClass = {
   footnote: 'footnote-mark',
   wiki: 'wiki-link',
   embed: 'wiki-link wiki-embed',

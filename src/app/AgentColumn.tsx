@@ -53,7 +53,10 @@ const host = window.irori;
 
 /** Whose conversations a dock column shows: the vault on show's agent, or the irori agent. */
 export type ColumnOwner = 'vault' | 'irori';
-/** One column of the agent dock (ADR 021). The first, `main`, stays while the dock is open. */
+/**
+ * One column of the agent dock (ADR 021). The first, `main`, stays while the dock
+ * is open: when it closes, the column beside it takes its place.
+ */
 export interface DockColumn {
   id: string;
   owner: ColumnOwner;
@@ -128,6 +131,7 @@ export function AgentColumn({
   ownerChoice,
   stage,
   closable = true,
+  closesDock = false,
   canSplit = true,
   seed,
   onShowSchema,
@@ -181,6 +185,8 @@ export function AgentColumn({
   stage?: { hidden: boolean; onToggle: () => void };
   /** The column can be closed: irori mode's first column stays. */
   closable?: boolean;
+  /** Closing the column closes the whole dock: it is the only one. */
+  closesDock?: boolean;
   /** Another column fits beside this one. */
   canSplit?: boolean;
   /** Words for the composer, for the person to finish; each new `key` places them. */
@@ -791,7 +797,7 @@ export function AgentColumn({
           <button
             className="icon-button"
             aria-label={
-              number === 1
+              closesDock
                 ? t(`${kind} を閉じる`, `Close ${kind}`)
                 : t('この列を閉じる', 'Close this column')
             }

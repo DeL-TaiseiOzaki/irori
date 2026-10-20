@@ -32,6 +32,7 @@ import { inlinePiece, literalBlock, preserveBlocks, documentEncoding } from './p
 import { calloutView, pieceTyping } from './piece-editing';
 import { writingStyle } from './pieces';
 import { mermaidPreview } from './mermaid';
+import { embedView, imageAlt, imageOnEmptyLine } from './images';
 import { literalEditing, literalView } from './literal-view';
 
 type MermaidApply = Parameters<typeof mermaidPreview>[1];
@@ -277,6 +278,8 @@ export function Editor({
   follow.current = onFollowLink;
   const commenting = useRef(onComment);
   commenting.current = onComment;
+  const resolveImageRef = useRef(resolveImage);
+  resolveImageRef.current = resolveImage;
   const initial = useRef(text);
   const snapshot = useRef(() => initial.current);
   const selecting = useRef<() => EditorSelection | undefined>(() => undefined);
@@ -515,6 +518,9 @@ export function Editor({
       })
       .use(literalBlock)
       .use(inlinePiece)
+      .use(imageAlt)
+      .use(imageOnEmptyLine)
+      .use(embedView(() => resolveImageRef.current))
       .use(literalView)
       .use(literalEditing)
       .use(pieceTyping)
