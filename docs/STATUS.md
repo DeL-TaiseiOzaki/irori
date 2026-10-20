@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Copy and paste in the explorer, folded properties, Schema deletion, closing the
-first agent column alone, 2026-10-20 (**0.2.42**, pull request open):
+Copy and paste in the explorer, Obsidian-style images, folded properties, Schema
+deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**, pull request open):
 - HostAPI `copyEntry(scopeId, path, toScopeId, directory)` copies a file or
   folder of knowledge or contents into a folder of knowledge or an editable
   connection, in this vault or another (`changeFiles`, so it runs beside
@@ -23,13 +23,20 @@ first agent column alone, 2026-10-20 (**0.2.42**, pull request open):
   trash, the file's draft removed; `.irori`, `.git` and a folder holding the
   knowledge folder, contents or another vault refused). The Schema file view
   offers `rename` and `delete`.
+- `src/editor/images.ts`: `imageAlt` extends crepe's `image-block` schema with
+  an `alt` attribute, so alt text survives (a numeric alt is still the size;
+  ratio 1 writes no alt). `embedView` renders an `irori_inline` image embed
+  `![[x.png|W]]` as an image, resolved through `readImage` as `x.png` then
+  `_assets/x.png`. `imageOnEmptyLine` deletes the empty paragraph Milkdown's
+  upload plugin leaves beside a newly inserted image block.
 - Closing the dock's first column (`main`) with others open no longer calls
   `closeDock`: the next column's conversation, tabs, references and status move
   into `main`'s slot and that column goes. The × says "この列を閉じる" unless the
   column is the only one.
 - Verified by `npm run build`, `npm test` (`tests/entry-copy.test.ts`,
   `tests/explorer-entries.test.ts`, `tests/settings.test.ts`) and
-  `npm run test:ui` (`explorer-ui-smoke`, `dock-ui-smoke`, `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
+  `npm run test:ui` (`explorer-ui-smoke`, `images-ui-smoke`, `dock-ui-smoke`,
+  `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
   unchecked on a device.
 
 Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
