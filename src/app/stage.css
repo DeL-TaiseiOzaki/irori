@@ -807,6 +807,16 @@ button.comment-quote:hover {
   content: '↳ ';
   color: var(--rule-2);
 }
+/* An embedded image shows where its embed stands, as Obsidian shows it. */
+.document-editor .wiki-embed-image img {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+  border-radius: 6px;
+}
+.document-editor .wiki-embed.missing {
+  color: var(--ink-3);
+}
 .document-editor .callout {
   margin: 12px 0;
   padding: 10px 14px;
