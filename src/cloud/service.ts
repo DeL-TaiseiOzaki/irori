@@ -16,7 +16,7 @@ import type { RepositoryGit } from './repositories';
 import { owner, within } from '../domain/scopes';
 import { isMissing, readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, editableText, hash, readDocument } from '../host/files';
-import { renameEntry, writeNewEntry } from '../host/entries';
+import { copyEntryInto, renameEntry, writeNewEntry } from '../host/entries';
 import { noteFilename } from '../domain/note-operations';
 import type { CloudStorage } from './storage';
 import type {
@@ -1372,6 +1372,25 @@ export class CloudService {
         note: entry.kind === 'file' && /\.md$/i.test(name),
         writable: true,
         ...(upload && { upload }),
+      };
+    });
+  }
+  /**
+   * Copies the file or folder at `source`, named `name`, into a folder of an
+   * editable connection under a free name; nothing is replaced.
+   */
+  copyEntry(scopeId: string, directory: string, source: string, name: string): Promise<Entry> {
+    return this.mutate(async () => {
+      const folder = await this.resolve(scopeId, directory);
+      await this.assertWritable(scopeId, directory);
+      const copied = await copyEntryInto(source, folder, name, true);
+      return {
+        path: `${directory}/${copied.name}`,
+        name: copied.name,
+        directory: copied.directory,
+        layer: 'contents',
+        note: !copied.directory && /\.md$/i.test(copied.name),
+        writable: true,
       };
     });
   }

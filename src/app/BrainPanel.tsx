@@ -229,6 +229,15 @@ export function Tree({
       ? !entry.blocked && !/^\.(irori|git)(\/|$)/.test(entry.path)
       : movable(entry));
   const changeable = (entry: Entry) => movable(entry) || renamable(entry);
+  // Anything shown may be copied out, except the knowledge folder as a whole.
+  const copyable = (entry: Entry) =>
+    !!explorer?.clip &&
+    !entry.blocked &&
+    layer !== 'schema' &&
+    !(layer === 'Knowledge_Base' && entry.path === knowledgeFolder(space));
+  // A paste on a folder goes into it; on a file, beside it.
+  const pasteTarget = (entry: Entry) =>
+    entry.directory ? (editable(entry) ? entry.path : undefined) : writable ? directory : undefined;
   // The row whose name is being edited.
   const [renaming, setRenaming] = useState<string>();
   const accepts = (event: DragEvent) => {
@@ -300,6 +309,10 @@ export function Tree({
       if (folder !== directory) expand(folder);
       explorer.bringIn(folder, items);
     },
+    paste: (folder, from) => {
+      if (folder !== directory) expand(folder);
+      explorer.paste?.(folder, from);
+    },
     // A name is edited where it is shown, as in a file manager.
     act: (entry, action) =>
       action === 'rename' && renamable(entry)
@@ -323,6 +336,8 @@ export function Tree({
           : directory
       }
       entry={menu.entry && changeable(menu.entry) ? menu.entry : undefined}
+      copied={menu.entry && copyable(menu.entry) ? menu.entry : undefined}
+      cut={!!menu.entry && movable(menu.entry)}
       path={menu.entry?.path ?? directory}
     />
   );
@@ -377,6 +392,9 @@ export function Tree({
             ? connections.find((item) => `${item.contentsRoot}/${item.name}` === entry.path)
             : undefined;
           const takesDrop = entry.directory && editable(entry);
+          const clipped = explorer?.clipped;
+          const isCut =
+            clipped?.cut && clipped.scopeId === space.scopeId && clipped.path === entry.path;
           const marks = (
             <>
               {entry.directory ? (
@@ -417,7 +435,7 @@ export function Tree({
                 </div>
               ) : (
                 <button
-                  className={`tree-row ${entry.blocked ? 'muted' : ''} ${isSelected ? 'selected' : ''} ${takesDrop && drop.over === entry.path ? 'drop-target' : ''}`}
+                  className={`tree-row ${entry.blocked ? 'muted' : ''} ${isSelected ? 'selected' : ''} ${takesDrop && drop.over === entry.path ? 'drop-target' : ''} ${isCut ? 'cut' : ''}`}
                   style={indent}
                   data-entry={entry.path}
                   aria-current={isSelected ? 'page' : undefined}
@@ -437,6 +455,24 @@ export function Tree({
                   }}
                   onDrop={(event) => {
                     if (takesDrop) dropInto(event, entry.path);
+                  }}
+                  // The system's copy, cut and paste reach the focused row as clipboard events.
+                  onCopy={(event) => {
+                    if (!copyable(entry)) return;
+                    event.preventDefault();
+                    explorer!.clip!(entry, false);
+                  }}
+                  onCut={(event) => {
+                    if (!copyable(entry) || !movable(entry)) return;
+                    event.preventDefault();
+                    explorer!.clip!(entry, true);
+                  }}
+                  onPaste={(event) => {
+                    const folder = pasteTarget(entry);
+                    if (folder === undefined || !here?.paste) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    here.paste(folder, event.clipboardData);
                   }}
                   onKeyDown={(event) => {
                     const action =
@@ -487,6 +523,8 @@ export function Tree({
                   }
                   folder={entry.directory && editable(entry) ? entry.path : undefined}
                   entry={changeable(entry) ? entry : undefined}
+                  copied={copyable(entry) ? entry : undefined}
+                  cut={movable(entry)}
                   path={entry.path}
                 />
               </EntryMenu>

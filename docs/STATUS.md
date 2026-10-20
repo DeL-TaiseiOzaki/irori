@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Copy and paste in the explorer, folded properties, 2026-10-20 (**0.2.42**, pull
+request open):
+- HostAPI `copyEntry(scopeId, path, toScopeId, directory)` copies a file or
+  folder of knowledge or contents into a folder of knowledge or an editable
+  connection, in this vault or another (`changeFiles`, so it runs beside
+  agents as adding does). `FileService.copySource` refuses the knowledge folder
+  and a folder holding a vault or contents; `copyEntryInto` (`entries.ts`)
+  takes a free name, never replaces, leaves aliases (and, into knowledge,
+  hidden entries) behind and removes a partial copy. Within a vault a copied
+  note's links are rewritten with `rewriteLinks`; into another vault a note's
+  managed images come with it (`carryImages`, shared with `moveAcross`).
+- Renderer: `Explorer.clip`/`paste`/`clipped`. Rows take the clipboard events
+  (`onCopy`/`onCut`/`onPaste`), so the Edit menu's accelerators reach them. A
+  cut pastes through `moveInto` or `moveFrom`; a paste whose system clipboard
+  holds files and not irori's own path brings the files in through
+  `readDropped`. `copyEntryPath` now returns the text it wrote.
+- `PageProperties` folds its rows, raw YAML and actions under the title and
+  description; the device setting `propertiesFolded` keeps the choice. Broken
+  frontmatter stays open.
+- Verified by `npm run build`, `npm test` (`tests/entry-copy.test.ts`,
+  `tests/settings.test.ts`) and `npm run test:ui` (`explorer-ui-smoke`,
+  `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
+  unchecked on a device.
+
 Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
 holding a footnote mark or a wiki link is edited richly instead of turning into
 source when the cursor enters it.

@@ -287,6 +287,10 @@ kbd {
 .tree-row.muted {
   color: var(--tx-3);
 }
+/* A cut entry waits for its paste, as in a file manager. */
+.brain-panel .tree-row.cut {
+  opacity: 0.5;
+}
 .tree-chevron {
   width: 12px;
   flex: none;

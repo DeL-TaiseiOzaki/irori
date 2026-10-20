@@ -100,7 +100,7 @@ import type { AgentSkill, SkillProblem, retirementNotice } from '../domain/skill
 import type { YourAi } from '../domain/you';
 import { opensInIrori, textFilePattern, viewerKind } from '../domain/viewers';
 import { broughtChunkBytes } from '../domain/connections';
-import { broughtFileLimit, broughtFiles, TooManyFiles, type Brought } from './dropped';
+import { broughtFileLimit, broughtFiles, readDropped, TooManyFiles, type Brought } from './dropped';
 const PageEditor = lazy(() =>
   import('./PageEditor').then((module) => ({ default: module.PageEditor })),
 );
@@ -564,6 +564,14 @@ function App() {
     space: EntrySpace;
     entry: Entry;
     action: EntryAction;
+  }>();
+  // What irori's clipboard holds: an entry to copy, or to move when cut, and the
+  // text its copy put on the system's clipboard, which tells a later copy elsewhere apart.
+  const [clipped, setClipped] = useState<{
+    scopeId: string;
+    entry: Entry;
+    cut: boolean;
+    text?: string;
   }>();
   // The file input behind "Add files…", and the folder the chosen files go into.
   const picker = useRef<HTMLInputElement>(null);
@@ -2197,6 +2205,57 @@ function App() {
       }).catch(report),
     reveal: (space: Space, path: string) =>
       void host.revealEntry(space.scopeId, path).catch(report),
+    // The entry's full path goes on the system's clipboard too, as a file manager's copy does.
+    clip: (space: Space, entry: Entry, cut: boolean) => {
+      const held = { scopeId: space.scopeId, entry, cut };
+      setClipped(held);
+      void host.copyEntryPath(space.scopeId, entry.path, true).then(
+        (text) => setClipped((value) => (value?.entry === entry ? { ...held, text } : value)),
+        () => {},
+      );
+    },
+    paste: (space: Space, directory: string, from?: DataTransfer) => {
+      // Files copied in the file manager after irori's own copy come in as a drop does;
+      // they are taken during the paste event.
+      const outside = [...(from?.items ?? [])]
+        .filter((item) => item.kind === 'file')
+        .map((item) => item.webkitGetAsEntry() ?? item.getAsFile())
+        .filter((entry) => entry !== null);
+      if (outside.length && !(clipped?.text && from?.getData('text/plain') === clipped.text)) {
+        act.bringIn(space, directory, readDropped(outside));
+        return;
+      }
+      if (!clipped) return;
+      const { scopeId, entry, cut } = clipped;
+      if (!cut) {
+        void organize(async () => {
+          const made = await host.copyEntry(scopeId, entry.path, space.scopeId, directory);
+          bump(space.scopeId);
+          setStatus(t(`${made.name} をコピーしました`, `Copied ${made.name}`));
+        }, true).catch(report);
+        return;
+      }
+      // A cut moves as a drag does: within its layer, or between vaults' knowledge.
+      const into = classify(space, directory);
+      if (scopeId === space.scopeId && entry.layer === into) {
+        if (parentPath(entry.path) !== directory) act.moveInto(space, entry, directory);
+      } else if (
+        scopeId !== space.scopeId &&
+        entry.layer === 'Knowledge_Base' &&
+        into === 'Knowledge_Base'
+      )
+        act.moveFrom(space, scopeId, entry, directory);
+      else {
+        report(
+          t(
+            '切り取った項目はここには移動できません。コピーしてください。',
+            "A cut item can't move here; copy it instead.",
+          ),
+        );
+        return;
+      }
+      setClipped(undefined);
+    },
     selectSchema: (target: SchemaTarget) => {
       if (!active) return;
       const scopeId = active.scopeId;
@@ -2291,8 +2350,15 @@ function App() {
         moveInto: (entry, directory) => act.moveInto(active, entry, directory),
         moveFrom: (scopeId, entry, directory) => act.moveFrom(active, scopeId, entry, directory),
         reveal: (path) => act.reveal(active, path),
+        clip: (entry, cut) => act.clip(active, entry, cut),
+        paste: (directory, from) => act.paste(active, directory, from),
+        clipped: clipped && {
+          scopeId: clipped.scopeId,
+          path: clipped.entry.path,
+          cut: clipped.cut,
+        },
       },
-    [active, act],
+    [active, act, clipped],
   );
   // The explorer of the vault beside, doing the same in its own vault.
   const sideExplorer = useMemo<Explorer | undefined>(
@@ -2305,8 +2371,15 @@ function App() {
         moveInto: (entry, directory) => act.moveInto(sideSpace, entry, directory),
         moveFrom: (scopeId, entry, directory) => act.moveFrom(sideSpace, scopeId, entry, directory),
         reveal: (path) => act.reveal(sideSpace, path),
+        clip: (entry, cut) => act.clip(sideSpace, entry, cut),
+        paste: (directory, from) => act.paste(sideSpace, directory, from),
+        clipped: clipped && {
+          scopeId: clipped.scopeId,
+          path: clipped.entry.path,
+          cut: clipped.cut,
+        },
       },
-    [sideSpace, act],
+    [sideSpace, act, clipped],
   );
   const sideChoices = useMemo(
     () =>
