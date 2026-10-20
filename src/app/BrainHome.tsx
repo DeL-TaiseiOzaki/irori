@@ -97,6 +97,7 @@ export function BrainHome({
   schemaLayer,
   daily,
   locked,
+  held,
   revision,
   onOpen,
   onDaily,
@@ -117,8 +118,10 @@ export function BrainHome({
   /** The Schema card shows only with the vault agent (ADR 021). */
   schemaLayer: boolean;
   daily: boolean;
-  /** Actions that change the brain wait (a run, Git or a connection is in progress). */
+  /** Actions that change the brain wait (Git or a connection is in progress). */
   locked: boolean;
+  /** A run works in the brain: notes and connections may be added, nothing else changes. */
+  held: boolean;
   revision: number;
   onOpen: (entry: Entry) => void;
   onDaily: () => void;
@@ -170,7 +173,7 @@ export function BrainHome({
               className="stage-button home-edit"
               aria-label={t('vault の設定', 'vault settings')}
               title={t('vault の設定', 'vault settings')}
-              disabled={locked}
+              disabled={locked || held}
               onClick={onSettings}
             >
               <Icon name="penLine" size={15} />
@@ -269,7 +272,11 @@ export function BrainHome({
           layer="Knowledge_Base"
           title={layerLabel(space, 'Knowledge_Base')}
           action={
-            <button className="stage-text-button framed small" disabled={locked} onClick={onGraph}>
+            <button
+              className="stage-text-button framed small"
+              disabled={locked || held}
+              onClick={onGraph}
+            >
               <Icon name="graph" size={14} />
               {t('グラフ', 'Graph')}
             </button>

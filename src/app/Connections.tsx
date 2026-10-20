@@ -133,6 +133,8 @@ export function Connections({
   );
   const connections = overview.data ?? [];
   const issue = error || overview.error;
+  // A new connection is only an addition, so it goes on during a run; changing
+  // or removing the registered ones waits for the run.
   const disabled = busy || running;
   const repository = source === 'github' ? githubRepository(url.trim()) : undefined;
   const validURL = !!repository && githubCloneURL(url.trim());
@@ -218,7 +220,7 @@ export function Connections({
                     key={value}
                     className="stage-text-button framed small"
                     aria-pressed={source === value}
-                    disabled={disabled}
+                    disabled={busy}
                     onClick={() => chooseSource(value)}
                   >
                     <Icon name={icon} size={14} />
@@ -230,7 +232,7 @@ export function Connections({
                 <div className="local-pick">
                   <button
                     className="stage-text-button framed small"
-                    disabled={disabled}
+                    disabled={busy}
                     onClick={() => void perform(chooseLocal)}
                   >
                     <Icon name="folderOpen" size={14} />
@@ -246,7 +248,7 @@ export function Connections({
                       <input
                         value={url}
                         placeholder="https://github.com/owner/repository"
-                        disabled={disabled}
+                        disabled={busy}
                         spellCheck={false}
                         onChange={(e) => {
                           setUrl(e.target.value);
@@ -259,7 +261,7 @@ export function Connections({
                       <input
                         value={branch}
                         placeholder={t('既定', 'Default')}
-                        disabled={disabled || existing}
+                        disabled={busy || existing}
                         spellCheck={false}
                         onChange={(e) => setBranch(e.target.value)}
                       />
@@ -276,7 +278,7 @@ export function Connections({
                   <div className="local-pick">
                     <button
                       className="stage-text-button framed small"
-                      disabled={disabled || !validURL}
+                      disabled={busy || !validURL}
                       onClick={() => void perform(() => chooseRepositoryFolder(false))}
                     >
                       <Icon name="download" size={14} />
@@ -284,7 +286,7 @@ export function Connections({
                     </button>
                     <button
                       className="stage-text-button framed small"
-                      disabled={disabled || !validURL}
+                      disabled={busy || !validURL}
                       onClick={() => void perform(() => chooseRepositoryFolder(true))}
                     >
                       <Icon name="folderOpen" size={14} />
@@ -344,7 +346,7 @@ export function Connections({
                           <select
                             aria-label={t('contents の配置先', 'Materials location')}
                             value={contentsRoot}
-                            disabled={disabled}
+                            disabled={busy}
                             onChange={(e) => setContentsRoot(e.target.value)}
                           >
                             {space.contents.map((root) => (
@@ -359,7 +361,7 @@ export function Connections({
                       {t('フォルダ名', 'Folder name')}
                       <input
                         value={name}
-                        disabled={disabled}
+                        disabled={busy}
                         onChange={(e) => setName(e.target.value)}
                         required
                       />
@@ -375,7 +377,7 @@ export function Connections({
                       type="checkbox"
                       role="switch"
                       checked={editable}
-                      disabled={disabled}
+                      disabled={busy}
                       onChange={(e) => setEditable(e.target.checked)}
                     />
                     <span className="switch-track" aria-hidden="true" />
@@ -392,7 +394,7 @@ export function Connections({
                   <div className="connect-submit">
                     <button
                       className="solid-button"
-                      disabled={disabled || !!invalidName || (source === 'github' && !validBranch)}
+                      disabled={busy || !!invalidName || (source === 'github' && !validBranch)}
                     >
                       <Icon name={source === 'github' ? 'branch' : 'folder'} size={15} />
                       {source === 'github' && !existing
