@@ -18,6 +18,25 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-10-20: **0.2.42** ([#278](https://github.com/DeL-TaiseiOzaki/irori/pull/278),
+copy and paste in the explorer, Obsidian-style images, folded properties, Schema
+deletion, closing the first agent column alone) as `4a08399`, by `publish.yml`
+alone (push run `39429143791`): merge to release 1:24, to page 2:53, drift in
+step. Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.42-full.nupkg` matched `SHA256SUMS.txt`. See STATUS.
+
+Published 2026-10-20: **0.2.41** ([#276](https://github.com/DeL-TaiseiOzaki/irori/pull/276),
+footnote marks and wiki links as pieces, so lists and tables holding them are
+edited richly) as `716e79b`, by `publish.yml` alone (push run `39388542704`):
+release, page and drift in one run. Anonymous downloads of the Windows installer,
+the Mac image and `irori-0.2.41-full.nupkg` matched `SHA256SUMS.txt`; the live
+page links the 0.2.41 installers. See STATUS.
+
+Published 2026-10-18: **0.2.26** ([#258](https://github.com/DeL-TaiseiOzaki/irori/pull/258),
+the shared Schema's settings and the irori agent's files, ADR 048) as `aab0882`,
+from main's run (`workflow_run` `39097945691`): merge to release 9:47, to page
+10:53. Downloads verified. See STATUS.
+
 Published 2026-10-16: **0.2.24** ([#255](https://github.com/DeL-TaiseiOzaki/irori/pull/255),
 GitHub repositories in contents, ADR 046) as `9155142`, by `publish.yml` alone
 (push run `38880128620`): merge to release 1:19, to page 2:23. Downloads

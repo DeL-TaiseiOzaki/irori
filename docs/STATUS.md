@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Copy and paste in the explorer, Obsidian-style images, folded properties, Schema
-deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**, pull request open):
+deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**,
+[#278](https://github.com/DeL-TaiseiOzaki/irori/pull/278), published as `v0.2.42-preview.1`):
 - HostAPI `copyEntry(scopeId, path, toScopeId, directory)` copies a file or
   folder of knowledge or contents into a folder of knowledge or an editable
   connection, in this vault or another (`changeFiles`, so it runs beside
@@ -39,7 +40,8 @@ deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**, pull req
   `properties-ui-smoke`). Pasting from Finder/Explorer on macOS and Windows is
   unchecked on a device.
 
-Notes edited as pages, 2026-10-20 (**0.2.41**, pull request open): a block
+Notes edited as pages, 2026-10-20 (**0.2.41**,
+[#276](https://github.com/DeL-TaiseiOzaki/irori/pull/276), published as `v0.2.41-preview.1`): a block
 holding a footnote mark or a wiki link is edited richly instead of turning into
 source when the cursor enters it.
 - `src/editor/pieces.ts`: `preserveTree` (the `preserveBlocks` remark step)
@@ -249,9 +251,17 @@ Several windows, 2026-10-18 (**0.2.32**, pull request open):
   (`scripts/windows-ui-smoke.ts`). Not tried on Windows or macOS.
 
 The shared Schema's settings and the irori agent's files, 2026-10-18 (**0.2.26**,
-pull request open): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
+published): [ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md).
 The shared Schema takes rules and hooks like the other Schemas, and **環境を保存**
 saves the irori agent's files with the shared Schema.
+- Published 2026-10-18, merged by the owner
+  ([#258](https://github.com/DeL-TaiseiOzaki/irori/pull/258) as `aab0882` at 04:32:49 UTC)
+  before its pull request run had finished, so the push run published nothing.
+  `publish.yml` published it from main's run, `workflow_run` `39097945691`, after #256
+  had also landed (`ffecd46`). The release (target `aab0882`) was public at 04:42:36
+  (9:47), and the page deployed at 04:43:42 (10:53), with its drift check in step.
+  Anonymous downloads matched `SHA256SUMS.txt`. Windows / Mac / `full.nupkg` bytes:
+  176,683,520 / 142,293,659 / 175,851,614.
 - `YourAiService.shared()` adds the shared rules to the request words for every CLI;
   `sharedHooks()` gives the shared `hooks` to each Claude Code run as the SDK's
   `settings`. `SchemaFolder.settings` is gone: the shared folder takes every kind.
