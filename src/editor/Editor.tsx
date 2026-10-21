@@ -48,6 +48,7 @@ import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import { assistanceExtensions, editingCore, languageForFilename } from './assistance';
 import { t } from '../domain/i18n';
+import { Dialog } from '../app/Dialog';
 // Crepe's own entry point and its combined stylesheet are flattened bundles that
 // import KaTeX and its fonts unconditionally, so `features: { Latex: false }` —
 // a runtime flag read after bundling — never removed them. Composing the builder
@@ -261,6 +262,7 @@ export function Editor({
   onComment?: (rect: DOMRect) => void;
 }) {
   const [imageErrors, setImageErrors] = useState<string[]>([]);
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string }>();
   const navigation = useRef({ searchTarget, onSearchResult });
   navigation.current = { searchTarget, onSearchResult };
   const authored = useRef(authorship);
@@ -403,7 +405,30 @@ export function Editor({
       event.stopPropagation();
       follow.current(anchor.getAttribute('href') ?? '');
     };
+    // A click on a note's image shows it whole over the page; the click still
+    // selects the image, so it can be deleted once the view is closed.
+    const zoom = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const image = (event.target as Element | null)?.closest?.(
+        '.milkdown-image-block img, .wiki-embed-image img',
+      );
+      if (!(image instanceof HTMLImageElement) || !image.naturalWidth) return;
+      // Crepe gives an image block's picture its caption; the note's alt text is on the node.
+      const block = image.closest('.milkdown-image-block');
+      const alt = !block
+        ? image.alt
+        : crepe.editor.action((ctx) => {
+            const view = ctx.get(editorViewCtx);
+            const at = view.posAtDOM(block, 0);
+            const node = [at - 1, at]
+              .map((pos) => view.state.doc.nodeAt(pos))
+              .find((found) => found?.type.name === 'image-block');
+            return String(node?.attrs.alt || node?.attrs.caption || '');
+          });
+      setZoomed({ src: image.currentSrc || image.src, alt });
+    };
     element.addEventListener('click', followLink, true);
+    element.addEventListener('click', zoom);
     for (const event of ['beforeinput', 'paste', 'drop'])
       element.addEventListener(event, markEdited, true);
     element.addEventListener('keydown', keyboard, true);
@@ -627,6 +652,8 @@ export function Editor({
         element.removeEventListener(event, markEdited, true);
       element.removeEventListener('keydown', keyboard, true);
       element.removeEventListener('pointerdown', toolbar, true);
+      element.removeEventListener('click', zoom);
+      setZoomed(undefined);
       if (wasReady) void crepe.destroy();
     };
   }, [mode, readOnly]);
@@ -676,6 +703,22 @@ export function Editor({
         data-testid="document-editor"
         data-editor-assistance={assistance ? 'on' : 'off'}
       />
+      {zoomed && (
+        <Dialog
+          className="modal-dialog image-zoom"
+          label={zoomed.alt || t('画像', 'Image')}
+          onClose={() => setZoomed(undefined)}
+        >
+          <button
+            type="button"
+            className="image-zoom-close"
+            aria-label={t('閉じる', 'Close')}
+            onClick={() => setZoomed(undefined)}
+          >
+            <img src={zoomed.src} alt={zoomed.alt} />
+          </button>
+        </Dialog>
+      )}
     </>
   );
 }
