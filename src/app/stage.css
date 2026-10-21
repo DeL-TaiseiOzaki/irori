@@ -338,6 +338,111 @@ button.save-state > i {
   overflow: auto;
   overscroll-behavior: contain;
 }
+
+/* The stage's columns and their open files (ADR 052). */
+.stage-columns {
+  flex: 1;
+  min-height: 0;
+}
+.stage-column-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.stage-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.stage-column:not(.focused) .document-scroll {
+  cursor: pointer;
+}
+.stage-column-handle {
+  width: 1px;
+  flex: none;
+  background: var(--rule);
+  outline: none;
+}
+.stage-column-handle:hover,
+.stage-column-handle[data-separator='active'],
+.stage-column-handle:focus-visible {
+  box-shadow: 0 0 0 1px var(--ember);
+}
+.stage-tabs {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+.stage-tab-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  padding: 5px 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stage-tab {
+  flex: 0 1 auto;
+  min-width: 72px;
+  max-width: 180px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px 8px 0 0;
+  color: var(--ink-3);
+}
+.stage-tab.current {
+  background: var(--rule);
+  color: var(--ink);
+}
+.stage-tabs.focused .stage-tab.current {
+  background: var(--ember-soft);
+}
+.stage-tab > button {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+}
+.stage-tab > button[role='tab'] {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 9px;
+  font-size: 11.5px;
+  text-align: left;
+}
+.stage-tab > button[role='tab'] > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stage-tab > .stage-tab-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  padding: 0;
+  border-radius: 5px;
+  color: var(--ink-3);
+}
+.stage-tab > .stage-tab-close:hover {
+  background: var(--rule);
+  color: var(--ink);
+}
+.stage-tabs > .stage-column-close {
+  width: 26px;
+  height: 26px;
+  margin: 0 4px 3px;
+  color: var(--ink-3);
+}
 .document-editor {
   max-width: var(--page-width);
   margin: 0 auto;

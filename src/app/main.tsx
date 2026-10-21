@@ -12,6 +12,21 @@ import {
 } from '../domain/workspace-tabs';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
+  closeColumn as closeStageColumnOf,
+  closeTab as closeStageTabOf,
+  firstStage,
+  focus as focusStage,
+  focused,
+  follow,
+  moved,
+  place,
+  split as splitStageOf,
+  stageColumnLimit,
+  type StageColumn,
+  type StageSet,
+} from '../domain/stage-columns';
+import { StageTabs } from './StageTabs';
+import {
   EntryDialog,
   NewEntryDialog,
   entryActions,
@@ -79,6 +94,7 @@ import {
   useState,
   type ComponentProps,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -114,6 +130,9 @@ const OntologyPanel = lazy(() =>
   import('./OntologyPanel').then((module) => ({ default: module.OntologyPanel })),
 );
 const TerminalPanel = lazy(() => import('./TerminalPanel'));
+const StagePreview = lazy(() =>
+  import('./StagePreview').then((module) => ({ default: module.StagePreview })),
+);
 // Panels only some sessions open. Loading them on first use keeps their code,
 // and the libraries they alone pull in, out of the first paint. Each keeps its
 // own name so the panels below read the same as before.
@@ -211,7 +230,6 @@ type TabView = {
   level: 'overview' | 'routines' | 'brain' | 'you';
   overviewView: OverviewView;
   scopeId?: string;
-  doc?: { scopeId: string; path: string };
   /** The vault beside, when one was open (ADR 038). */
   side?: string;
 };
@@ -676,6 +694,13 @@ function App() {
     [editorKey, setEditorKey] = useState(0),
     [mode, setMode] = useState<'rich' | 'source' | 'table'>('rich'),
     [external, setExternal] = useState<Document>();
+  // Each vault's stage columns and their tabs (ADR 052). The focused column's file on
+  // show is `doc`; the other columns show theirs as read.
+  const [stages, setStages] = useState<Record<string, StageSet>>({});
+  const stageSet = (active && stages[active.scopeId]) || firstStage;
+  // The vault on show as of the last render or switch, for reads that finish later.
+  const activeNow = useRef(active?.scopeId);
+  activeNow.current = active?.scopeId;
   // What the views of the vault on show, and of the open note's vault, follow.
   const revision = scopeRevision(revisions, active?.scopeId);
   const docRevision = scopeRevision(revisions, doc?.scopeId);
@@ -1268,7 +1293,8 @@ function App() {
       report(error);
     }
   }
-  function load(next: Document, navigation?: Navigation) {
+  /** Puts a document in the editor, as the file on show in a stage column, the focused one unless named. */
+  function load(next: Document, navigation?: Navigation, column?: string) {
     reconciliation.current++;
     current.current = { doc: next, buffer: next.text, external: undefined };
     setSearchTarget(navigation);
@@ -1284,12 +1310,24 @@ function App() {
           : 'source',
     );
     setEditorKey((k) => k + 1);
+    setStages((all) => ({
+      ...all,
+      [next.scopeId]: place(all[next.scopeId] ?? firstStage, next.path, column),
+    }));
     // The stage's save state shows what this document is; the status bar stays quiet.
     setStatus('');
   }
+  /** Leaves the editor empty: the focused column shows the vault's home. */
+  function unload() {
+    reconciliation.current++;
+    current.current = { doc: undefined, buffer: '', external: undefined };
+    setDoc(undefined);
+    setBuffer('');
+    setExternal(undefined);
+  }
   /** Loads a document the person chose to open, and shows it on the stage. */
-  function show(next: Document, navigation?: Navigation) {
-    load(next, navigation);
+  function show(next: Document, navigation?: Navigation, column?: string) {
+    load(next, navigation, column);
     setView('note');
     goToLevel('brain');
     // A file chosen while only the agents show brings the page back.
@@ -1525,12 +1563,111 @@ function App() {
     if (sending || connecting) return false;
     if (active?.scopeId !== space.scopeId) {
       setActive(space);
-      setDoc(undefined);
-      setBuffer('');
-      setExternal(undefined);
+      activeNow.current = space.scopeId;
+      unload();
       setStatus('');
+      // The vault's stage comes back as it was left.
+      void reopenStage(space);
     }
     return true;
+  }
+  /**
+   * Opens the file on show in a vault's focused stage column again, while nothing
+   * else came on show meanwhile. A file no longer there leaves its tabs.
+   */
+  async function reopenStage(space: Space, set = stages[space.scopeId]) {
+    const path = set && focused(set).on;
+    if (!path) return;
+    const note = await host.read(space.scopeId, path).catch(() => undefined);
+    if (!note) followStage(space.scopeId, (item) => (item === path ? undefined : item));
+    else if (!current.current.doc && activeNow.current === space.scopeId) load(note);
+  }
+  /** Follows renamed, moved or deleted files in a vault's stage; returns the stage it becomes. */
+  function followStage(scopeId: string, rename: (path: string) => string | undefined) {
+    setStages((all) => (all[scopeId] ? { ...all, [scopeId]: follow(all[scopeId], rename) } : all));
+    return follow(stages[scopeId] ?? firstStage, rename);
+  }
+  /** Changes the stage of the vault on show. */
+  function changeStage(change: (set: StageSet) => StageSet) {
+    if (!active) return;
+    const scopeId = active.scopeId;
+    setStages((all) => ({ ...all, [scopeId]: change(all[scopeId] ?? firstStage) }));
+  }
+  /** Whether the editor holds this file of the vault on show. */
+  const editing = (path?: string) =>
+    !!path &&
+    current.current.doc?.scopeId === active?.scopeId &&
+    current.current.doc?.path === path;
+  /**
+   * Shows a stage column's tab, or what the column shows, and gives the column the
+   * focus: the note on show is saved first, and the editor moves there.
+   */
+  async function showStageTab(columnId: string, path?: string) {
+    if (!active || gitBusy) return;
+    const space = active;
+    const target = path ?? stageSet.columns.find((column) => column.id === columnId)?.on;
+    if (columnId === stageSet.focus && (editing(target) || (!target && !current.current.doc))) {
+      setView('note');
+      return;
+    }
+    if (!(await composer.flush()) || !(await save())) return;
+    if (!target) {
+      unload();
+      changeStage((set) => focusStage(set, columnId));
+    } else if (editing(target)) {
+      setSearchTarget(undefined);
+      changeStage((set) => place(set, target, columnId));
+    } else {
+      await open(space, fileEntry(target, classify(space, target)), undefined, 'reveal', columnId);
+      return;
+    }
+    setView('note');
+  }
+  /** Closes a tab; when the editor held it, the column's next tab comes on show. */
+  async function closeStageTab(columnId: string, path: string) {
+    if (!active) return;
+    const space = active;
+    const held = columnId === stageSet.focus && editing(path);
+    if (held && !(await save())) return;
+    const next = closeStageTabOf(stageSet, columnId, path);
+    changeStage((set) => closeStageTabOf(set, columnId, path));
+    if (!held) return;
+    const after = focused(next).on;
+    // A file that cannot be opened leaves the vault's home rather than the closed tab's note.
+    if (
+      !after ||
+      !(await open(space, fileEntry(after, classify(space, after)), undefined, 'reveal', columnId))
+    )
+      unload();
+  }
+  /** Closes a column; the focus, when it was there, moves beside it with the editor. */
+  async function closeStageColumn(columnId: string) {
+    if (!active) return;
+    const space = active;
+    const next = closeStageColumnOf(stageSet, columnId);
+    const held = columnId === stageSet.focus;
+    if (held && !(await save())) return;
+    changeStage((set) => closeStageColumnOf(set, columnId));
+    if (!held) return;
+    const after = focused(next).on;
+    if (editing(after)) setSearchTarget(undefined);
+    else if (
+      !after ||
+      !(await open(
+        space,
+        fileEntry(after, classify(space, after)),
+        undefined,
+        'reveal',
+        next.focus,
+      ))
+    )
+      unload();
+  }
+  /** Opens the file on show in a new column beside, which takes the focus. */
+  async function splitStage() {
+    if (!active || stageSet.columns.length >= stageColumnLimit || !(await save())) return;
+    setSearchTarget(undefined);
+    changeStage(splitStageOf);
   }
   /**
    * Shows a file on the stage. One irori cannot show goes to its application,
@@ -1542,6 +1679,7 @@ function App() {
     entry: Entry,
     navigation?: Navigation | ((doc: Document) => Navigation | undefined),
     elsewhere: 'launch' | 'reveal' = 'launch',
+    column?: string,
   ) {
     if (gitBusy) return false;
     try {
@@ -1564,7 +1702,7 @@ function App() {
         : undefined;
       if (next) {
         setActive(space);
-        show(next, typeof navigation === 'function' ? navigation(next) : navigation);
+        show(next, typeof navigation === 'function' ? navigation(next) : navigation, column);
       } else if (elsewhere === 'reveal') await host.revealEntry(space.scopeId, entry.path);
       else await host.openExternal(space.scopeId, entry.path);
       return true;
@@ -1673,7 +1811,6 @@ function App() {
         level,
         overviewView,
         scopeId: active?.scopeId,
-        doc: doc && !doc.cloud ? { scopeId: doc.scopeId, path: doc.path } : undefined,
         side: sideSpace?.scopeId,
       };
     const before = workspaceTabs.find((tab) => tab.id === profile.id);
@@ -1692,18 +1829,13 @@ function App() {
     setView('note');
     setSide(left?.side);
     setActive(shown);
-    current.current = { doc: undefined, buffer: '', external: undefined };
-    setDoc(undefined);
-    setBuffer('');
-    setExternal(undefined);
+    activeNow.current = shown?.scopeId;
+    unload();
     setStartup(false);
     setConnecting(true);
     try {
-      // The note the tab was left on opens again, if it is still there.
-      if (left?.doc && left.doc.scopeId === shown?.scopeId) {
-        const note = await host.read(left.doc.scopeId, left.doc.path).catch(() => undefined);
-        if (note && !current.current.doc) load(note);
-      }
+      // The vault's stage comes back as it was left, if its note is still there.
+      if (shown) await reopenStage(shown);
       // Vaults an edit took out of this workspace let go of their folders, unless
       // another tab has them; the workspace's own are connected.
       if (before)
@@ -1813,6 +1945,16 @@ function App() {
             scopeId: change.toScopeId ?? ref.scopeId,
             path: change.to + ref.path.slice(change.from.length),
           };
+    // Tabs follow within their vault; what went to another vault leaves them.
+    const stage = followStage(
+      change.scopeId,
+      moved(
+        change.from,
+        change.action === 'delete' || (change.toScopeId && change.toScopeId !== change.scopeId)
+          ? undefined
+          : change.to,
+      ),
+    );
     const open = current.current.doc;
     if (open && under(open)) {
       const next = follow(open);
@@ -1824,10 +1966,10 @@ function App() {
         }));
       if (reopened) load(reopened);
       else {
-        current.current = { doc: undefined, buffer: '', external: undefined };
-        setDoc(undefined);
-        setBuffer('');
-        setExternal(undefined);
+        unload();
+        // The focused column shows the tab beside the one that left.
+        const space = spaces.find((item) => item.scopeId === change.scopeId);
+        if (space) await reopenStage(space, stage);
       }
     }
     updateSources((all) =>
@@ -1961,6 +2103,14 @@ function App() {
   const dockLayout = useDefaultLayout({
     id: 'irori-dock',
     panelIds: dockPanes,
+    onlySaveAfterUserInteractions: true,
+    storage: layoutStorage,
+  });
+  // The stage's columns too (ADR 052).
+  const stagePanes = useMemo(() => stageSet.columns.map((column) => column.id), [stageSet.columns]);
+  const stageLayout = useDefaultLayout({
+    id: 'irori-stage-columns',
+    panelIds: stagePanes,
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
@@ -2772,6 +2922,83 @@ function App() {
     );
   // The stage's banners sit under its crumb bar, which these views and the levels without
   // the stage leave out of sight.
+  // The stage's columns (ADR 052): the focused one holds the editor and the vault's
+  // home, the others show their files as read, and a click there moves the editor.
+  const editingPath = doc && doc.scopeId === active?.scopeId ? doc.path : undefined;
+  function stageTabsOf(column: StageColumn, many: boolean) {
+    const mine = column.id === stageSet.focus;
+    if (!many && column.tabs.length < 2) return null;
+    return (
+      <StageTabs
+        tabs={column.tabs}
+        on={mine ? editingPath : column.on}
+        focused={mine}
+        disabled={gitBusy || connecting}
+        onShow={(path) => void showStageTab(column.id, path)}
+        onClose={(path) => void closeStageTab(column.id, path)}
+        onCloseColumn={many ? () => void closeStageColumn(column.id) : undefined}
+      />
+    );
+  }
+  function stageColumns(body: ReactNode) {
+    if (stageSet.columns.length === 1)
+      return (
+        <>
+          {stageTabsOf(stageSet.columns[0], false)}
+          {body}
+        </>
+      );
+    return (
+      <PaneGroup
+        className="stage-columns"
+        orientation="horizontal"
+        defaultLayout={stageLayout.defaultLayout}
+        onLayoutChanged={stageLayout.onLayoutChanged}
+      >
+        {stageSet.columns.map((column, index) => {
+          const mine = column.id === stageSet.focus;
+          return [
+            index > 0 && (
+              <PaneSeparator
+                key={`${column.id}-handle`}
+                className="stage-column-handle"
+                aria-label={t('列の幅', 'Column width')}
+              />
+            ),
+            <Pane key={column.id} id={column.id} className="stage-column-pane" minSize={200}>
+              <section
+                className={`stage-column${mine ? ' focused' : ''}`}
+                aria-label={column.on ? baseName(column.on) : t('空の列', 'Empty column')}
+                onPointerDownCapture={
+                  mine
+                    ? undefined
+                    : (event) => {
+                        if (!(event.target as HTMLElement).closest('.stage-tabs'))
+                          void showStageTab(column.id);
+                      }
+                }
+              >
+                {stageTabsOf(column, true)}
+                {mine
+                  ? body
+                  : active &&
+                    column.on && (
+                      <Suspense fallback={null}>
+                        <StagePreview
+                          space={active}
+                          path={column.on}
+                          revision={revision}
+                          onError={report}
+                        />
+                      </Suspense>
+                    )}
+              </section>
+            </Pane>,
+          ];
+        })}
+      </PaneGroup>
+    );
+  }
   const stageTop = !(gitReview || view === 'graph' || view === 'records' || view === 'schema');
   const errorOnStage = level === 'brain' && !stageHidden && stageTop;
   return (
@@ -3211,6 +3438,17 @@ function App() {
                         )}
                       </NoteMenu>
                     )}
+                    {onNote && doc && (
+                      <button
+                        className="icon-button"
+                        aria-label={t('横に並べて開く', 'Open beside')}
+                        title={t('横に並べて開く', 'Open beside')}
+                        disabled={stageSet.columns.length >= stageColumnLimit || gitBusy}
+                        onClick={() => void splitStage()}
+                      >
+                        <Icon name="split" size={16} />
+                      </button>
+                    )}
                     {onNote && <span className="stage-divider" aria-hidden="true" />}
                     <AiToggle
                       open={panel}
@@ -3373,149 +3611,155 @@ function App() {
                       gitReview || view === 'graph' || view === 'records' || view === 'schema'
                     }
                   >
-                    {doc && (
-                      <div className="document-scroll" hidden={view !== 'note'}>
-                        {searchNotice && (
-                          <p className="hint" role="status">
-                            {searchNotice}
-                          </p>
-                        )}
-                        <Suspense
-                          fallback={
-                            <p className="hint">
-                              {t('エディタを開いています…', 'Opening the editor…')}
-                            </p>
-                          }
-                        >
-                          {doc.viewer ? (
-                            <FileViewer
-                              key={editorKey}
-                              doc={{ ...doc, viewer: doc.viewer }}
-                              load={(scopeId, path) => host.viewerBytes(scopeId, path)}
-                              onExternal={() =>
-                                void host.openExternal(doc.scopeId, doc.path).catch(report)
-                              }
-                              onLink={(url) => void host.openUrl(url).catch(report)}
-                            />
-                          ) : mode === 'table' ? (
-                            <CsvPreview key={editorKey} text={buffer} />
-                          ) : (
-                            <PageEditor
-                              ref={editor}
-                              key={editorKey}
-                              page={!doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)}
-                              properties={propertiesRead.data}
-                              text={buffer}
-                              mode={mode}
-                              filename={doc.path}
-                              assistance={editorAssistance}
-                              readOnly={doc.readOnly}
-                              onChange={setBuffer}
-                              onError={report}
-                              searchTarget={searchTarget}
-                              authorship={authorship}
-                              onFollowLink={(href) => void followLink(href)}
-                              // Only where the note bar offers comments.
-                              onComment={
-                                onNote && !doc.cloud && docSpace && /\.md$/i.test(doc.path)
-                                  ? (rect) =>
-                                      setCommentRequest((last) => ({
-                                        rect,
-                                        sequence: (last?.sequence ?? 0) + 1,
-                                      }))
-                                  : undefined
-                              }
-                              onSearchResult={(found) => {
-                                if (searchTarget)
-                                  setSearchNotice(navigationNotice(searchTarget, found));
-                              }}
-                              onUpload={
-                                doc.readOnly
-                                  ? undefined
-                                  : async (file) =>
-                                      host.saveImage(
-                                        doc.scopeId,
-                                        doc.path,
-                                        new Uint8Array(await file.arrayBuffer()),
-                                      )
-                              }
-                              resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
-                            />
-                          )}
-                        </Suspense>
-                      </div>
-                    )}
-                    {active && (!doc || view === 'home') ? (
-                      <BrainHome
-                        space={active}
-                        roots={roots}
-                        git={gitRead.data}
-                        connections={connections}
-                        skills={skills}
-                        schemaLayer={vaultAgent}
-                        daily={!!notesDeclared?.daily}
-                        locked={connecting || gitBusy}
-                        held={brainHeld}
-                        revision={revision}
-                        onOpen={(entry) => void open(active, entry)}
-                        onDaily={openDaily}
-                        onNewNote={() => newNoteIn(active)}
-                        onTerminal={() => setTerminalSpace((value) => value ?? active)}
-                        onRefresh={act.refreshBrain}
-                        onGraph={() => setView('graph')}
-                        onConnect={() => showConnections(active)}
-                        onChanges={() => {
-                          void save().then((saved) => {
-                            if (saved) setBrainMode('changes');
-                          });
-                        }}
-                        onMaterials={openMaterials}
-                        onSettings={() => setBrainSettings(true)}
-                      />
-                    ) : (
-                      !doc && (
-                        <div className="welcome">
-                          {active ? (
-                            <BrainTile space={active} size={64} radius={18} />
-                          ) : (
-                            <img
-                              className="welcome-mark"
-                              src={appIcon}
-                              alt=""
-                              width="64"
-                              height="64"
-                            />
-                          )}
-                          <div className="welcome-actions">
-                            <ArrowFillButton
-                              disabled={!active || running || connecting}
-                              onClick={() => {
-                                setNoteDirectory(defaultNoteDirectory);
-                                setNewNote(true);
-                              }}
-                            >
-                              {t('新しいノートを作成', 'Create a new note')}
-                            </ArrowFillButton>
-                            {notesDeclared?.daily && (
-                              <button
-                                className="stage-text-button framed"
-                                disabled={!active || running || connecting}
-                                onClick={openDaily}
-                              >
-                                <Icon name="calendar" size={15} />
-                                {t('今日のノート', "Today's note")}
-                              </button>
+                    {stageColumns(
+                      <>
+                        {doc && (
+                          <div className="document-scroll" hidden={view !== 'note'}>
+                            {searchNotice && (
+                              <p className="hint" role="status">
+                                {searchNotice}
+                              </p>
                             )}
-                            <button
-                              className="stage-text-button framed"
-                              onClick={() => setAdd(true)}
+                            <Suspense
+                              fallback={
+                                <p className="hint">
+                                  {t('エディタを開いています…', 'Opening the editor…')}
+                                </p>
+                              }
                             >
-                              <Icon name="folder" size={15} />
-                              {t('KBフォルダを開く', 'Open a KB folder')}
-                            </button>
+                              {doc.viewer ? (
+                                <FileViewer
+                                  key={editorKey}
+                                  doc={{ ...doc, viewer: doc.viewer }}
+                                  load={(scopeId, path) => host.viewerBytes(scopeId, path)}
+                                  onExternal={() =>
+                                    void host.openExternal(doc.scopeId, doc.path).catch(report)
+                                  }
+                                  onLink={(url) => void host.openUrl(url).catch(report)}
+                                />
+                              ) : mode === 'table' ? (
+                                <CsvPreview key={editorKey} text={buffer} />
+                              ) : (
+                                <PageEditor
+                                  ref={editor}
+                                  key={editorKey}
+                                  page={
+                                    !doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)
+                                  }
+                                  properties={propertiesRead.data}
+                                  text={buffer}
+                                  mode={mode}
+                                  filename={doc.path}
+                                  assistance={editorAssistance}
+                                  readOnly={doc.readOnly}
+                                  onChange={setBuffer}
+                                  onError={report}
+                                  searchTarget={searchTarget}
+                                  authorship={authorship}
+                                  onFollowLink={(href) => void followLink(href)}
+                                  // Only where the note bar offers comments.
+                                  onComment={
+                                    onNote && !doc.cloud && docSpace && /\.md$/i.test(doc.path)
+                                      ? (rect) =>
+                                          setCommentRequest((last) => ({
+                                            rect,
+                                            sequence: (last?.sequence ?? 0) + 1,
+                                          }))
+                                      : undefined
+                                  }
+                                  onSearchResult={(found) => {
+                                    if (searchTarget)
+                                      setSearchNotice(navigationNotice(searchTarget, found));
+                                  }}
+                                  onUpload={
+                                    doc.readOnly
+                                      ? undefined
+                                      : async (file) =>
+                                          host.saveImage(
+                                            doc.scopeId,
+                                            doc.path,
+                                            new Uint8Array(await file.arrayBuffer()),
+                                          )
+                                  }
+                                  resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
+                                />
+                              )}
+                            </Suspense>
                           </div>
-                        </div>
-                      )
+                        )}
+                        {active && (!doc || view === 'home') ? (
+                          <BrainHome
+                            space={active}
+                            roots={roots}
+                            git={gitRead.data}
+                            connections={connections}
+                            skills={skills}
+                            schemaLayer={vaultAgent}
+                            daily={!!notesDeclared?.daily}
+                            locked={connecting || gitBusy}
+                            held={brainHeld}
+                            revision={revision}
+                            onOpen={(entry) => void open(active, entry)}
+                            onDaily={openDaily}
+                            onNewNote={() => newNoteIn(active)}
+                            onTerminal={() => setTerminalSpace((value) => value ?? active)}
+                            onRefresh={act.refreshBrain}
+                            onGraph={() => setView('graph')}
+                            onConnect={() => showConnections(active)}
+                            onChanges={() => {
+                              void save().then((saved) => {
+                                if (saved) setBrainMode('changes');
+                              });
+                            }}
+                            onMaterials={openMaterials}
+                            onSettings={() => setBrainSettings(true)}
+                          />
+                        ) : (
+                          !doc && (
+                            <div className="welcome">
+                              {active ? (
+                                <BrainTile space={active} size={64} radius={18} />
+                              ) : (
+                                <img
+                                  className="welcome-mark"
+                                  src={appIcon}
+                                  alt=""
+                                  width="64"
+                                  height="64"
+                                />
+                              )}
+                              <div className="welcome-actions">
+                                <ArrowFillButton
+                                  disabled={!active || running || connecting}
+                                  onClick={() => {
+                                    setNoteDirectory(defaultNoteDirectory);
+                                    setNewNote(true);
+                                  }}
+                                >
+                                  {t('新しいノートを作成', 'Create a new note')}
+                                </ArrowFillButton>
+                                {notesDeclared?.daily && (
+                                  <button
+                                    className="stage-text-button framed"
+                                    disabled={!active || running || connecting}
+                                    onClick={openDaily}
+                                  >
+                                    <Icon name="calendar" size={15} />
+                                    {t('今日のノート', "Today's note")}
+                                  </button>
+                                )}
+                                <button
+                                  className="stage-text-button framed"
+                                  onClick={() => setAdd(true)}
+                                >
+                                  <Icon name="folder" size={15} />
+                                  {t('KBフォルダを開く', 'Open a KB folder')}
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </>,
                     )}
                   </div>
                 </Pane>
@@ -3718,12 +3962,8 @@ function App() {
                   list.filter((space) => space.scopeId === id),
                 )[0],
               );
-              if (current.current.doc?.scopeId === removed) {
-                current.current = { doc: undefined, buffer: '', external: undefined };
-                setDoc(undefined);
-                setBuffer('');
-                setExternal(undefined);
-              }
+              if (current.current.doc?.scopeId === removed) unload();
+              setStages(({ [removed]: _, ...rest }) => rest);
               updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
               setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
               bump();
@@ -3747,7 +3987,20 @@ function App() {
             ]);
             if (notices.length) setError(notices.join(' '));
             else setStatus(t('vault の設定を保存しました。', "Saved the vault's settings."));
-            // The note on show follows its folder to the new name.
+            // The note on show and the stage's tabs follow their folder to the new name.
+            for (const item of renamed)
+              followStage(
+                next.scopeId,
+                (path) =>
+                  movedPath(
+                    {
+                      from: item.previous,
+                      to: layerFolder(next, item.layer),
+                      entries: item.entries,
+                    },
+                    path,
+                  ) ?? path,
+              );
             const open = current.current.doc;
             for (const item of renamed) {
               const moved =
@@ -3792,6 +4045,13 @@ function App() {
           }}
           onChanged={(next, notice) => {
             const previous = doc;
+            const stage = followStage(previous.scopeId, (path) =>
+              path !== previous.path
+                ? path
+                : next && next.scopeId === previous.scopeId
+                  ? next.path
+                  : undefined,
+            );
             if (next) {
               load(next);
               updateSources((all) =>
@@ -3802,13 +4062,12 @@ function App() {
                 ),
               );
             } else {
-              current.current = { doc: undefined, buffer: '', external: undefined };
-              setDoc(undefined);
-              setBuffer('');
-              setExternal(undefined);
+              unload();
               updateSources((all) =>
                 all.filter((ref) => ref.scopeId !== previous.scopeId || ref.path !== previous.path),
               );
+              const space = spaces.find((item) => item.scopeId === previous.scopeId);
+              if (space) void reopenStage(space, stage);
             }
             bump(previous.scopeId);
             if (next && next.scopeId !== previous.scopeId) bump(next.scopeId);
