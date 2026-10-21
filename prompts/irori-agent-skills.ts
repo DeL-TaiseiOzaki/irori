@@ -11,6 +11,8 @@
  * Channel: files in the irori agent's folder.
  */
 
+import { googleFiles } from './connected-folders';
+
 const skill = (name: string, description: string, body: string) =>
   `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n\n${body.trim()}\n`;
 
@@ -98,8 +100,9 @@ the person's.
 (\`contents/<name>\`), read-write or \`--read-only\`; \`irori disconnect\` takes it
 out. Nothing is copied, and the folder's path stays on this computer. Cloud
 storage comes through the provider's own sync app (Google Drive for desktop,
-OneDrive, Dropbox, Box, iCloud): see connect-folder. Google Docs files there
-are links agents cannot read.
+OneDrive, Dropbox, Box, iCloud): see connect-folder. Google Docs, Sheets and
+Slides there hold only the document's ID, which an agent reads with its own
+Google Drive tool: see connect-folder.
 
 ## Git and GitHub
 - A plain-folder vault works without Git. To keep history: \`git init -b main\`
@@ -375,8 +378,7 @@ is on this computer, and \`irori connect\` shows it in a vault's contents.
    appears in contents and \`--read-only\` when the person only reads the
    materials there.
 3. Report where it appears (contents/<name>). Searches skip the link it
-   appears through: name that path or use \`rg -L\`. Google Docs and Sheets
-   are .gdoc and .gsheet links whose content agents cannot read.
+   appears through: name that path or use \`rg -L\`. ${googleFiles}
 `,
   ),
 };
