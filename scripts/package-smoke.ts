@@ -319,7 +319,8 @@ try {
       return Buffer.from(await image.arrayBuffer()).toString('base64');
     },
   );
-  await page.locator('.ProseMirror').click();
+  // Focus, not a click: on Windows a click can land inside the heading, and Enter split it there.
+  await page.locator('.ProseMirror').focus();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.locator('.ProseMirror').evaluate((element) => {
