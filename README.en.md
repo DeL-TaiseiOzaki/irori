@@ -71,6 +71,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - A what-you-see Markdown editor that saves automatically. Pasted or dropped images go to `_assets/` in the note's folder and show where they were added. Obsidian embeds `![[image.png]]` (`|300` for a width) show too. A click on an image shows it full size.
 - Follow relative links and list the notes that link here (backlinks). Renaming or moving a note rewrites the links to it.
 - **Today's note** opens at a set place, from a set template.
+- Open files become tabs. **Open beside** splits the page into up to four columns, each with its own tabs. The column you click is the one you edit; the others show what is saved. Each vault keeps its columns and tabs.
 - CSV opens as a table, and an ontology as a hierarchy or a graph.
 
 **AI agents**
