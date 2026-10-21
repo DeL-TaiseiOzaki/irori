@@ -25,6 +25,13 @@ test('Connected folders are named for agents, with how to search inside the link
   assert.match(text, /"contents\/Drive", "contents\/Team"/);
   assert.match(text, /rg PATTERN "contents\/Drive"/);
   assert.match(text, /rg -L/);
+  // Google Docs files there hold only an ID, which the agent reads with its own tools.
+  assert.match(text, /\.gsheet/);
+  assert.match(text, /`doc_id`/);
+  assert.ok(text.includes('https://docs.google.com/document/d/<doc_id>'));
+  assert.match(text, /spreadsheets\/d\/<doc_id> for a \.gsheet/);
+  assert.match(prompts.iroriAgentSkills['connect-folder'], /spreadsheets\/d\/<doc_id>/);
+  assert.doesNotMatch(Object.values(prompts.iroriAgentSkills).join('\n'), /cannot read/);
   const brains = [
     { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', linked: ['contents/Drive'] },
     { name: 'Notes', agent: 'vault-notes', root: '/kb/notes' },
