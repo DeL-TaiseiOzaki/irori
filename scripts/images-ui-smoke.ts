@@ -9,7 +9,7 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 // A note's images as Obsidian keeps them: embeds `![[name.png]]` show the image
 // beside the note or in its `_assets/`, alt text survives an edit, and an image
 // pasted into a note in a folder without `_assets/` makes one there and shows
-// where it was pasted. No provider or model process is started.
+// where it was pasted. A click on an image shows it whole until closed. No provider or model process is started.
 
 /** A PNG of one colour, written without a library. */
 function png(width: number, height: number, rgb: [number, number, number]) {
@@ -96,6 +96,21 @@ try {
   await expect(embeds.nth(1)).toHaveCSS('width', '80px');
   await expect(editor.locator('.wiki-embed.missing')).toHaveText('missing.png');
 
+  // A click on an image shows it whole over the page: Escape or a click closes it,
+  // and the note is unchanged.
+  const zoom = page.locator('dialog.image-zoom');
+  await embeds.first().click();
+  await expect(zoom).toBeVisible();
+  await expect.poll(() => shown(zoom.locator('img'))).toEqual([40]);
+  await page.keyboard.press('Escape');
+  await expect(zoom).toHaveCount(0);
+  const block = editor.locator('.milkdown-image-block img');
+  await expect.poll(() => shown(block)).toEqual([40]);
+  await block.click();
+  await expect(zoom.locator('img')).toHaveAttribute('alt', 'a red block');
+  await zoom.getByRole('button', { name: '閉じる' }).click();
+  await expect(zoom).toHaveCount(0);
+
   // An edit keeps the alt text and the embeds as written.
   await editor.getByText('After').click();
   await page.keyboard.press('End');
@@ -136,7 +151,7 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'Images UI smoke passed: embeds shown beside the note and from _assets at a width, a missing one as text, alt text kept through an edit, and a pasted image saved in a new _assets/ beside its note and shown where it was pasted.',
+    'Images UI smoke passed: embeds shown beside the note and from _assets at a width, a missing one as text, an image shown whole on a click and closed again, alt text kept through an edit, and a pasted image saved in a new _assets/ beside its note and shown where it was pasted.',
   );
 } finally {
   await app.close();
