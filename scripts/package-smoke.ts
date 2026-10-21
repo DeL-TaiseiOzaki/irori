@@ -354,7 +354,8 @@ try {
   await page.locator('.ProseMirror').evaluate((element) => {
     element.dataset.lifecycle = 'packaged';
   });
-  await page.locator('.ProseMirror').click();
+  // Click the text, not the editor's middle: a click on the pasted image opens it whole.
+  await page.locator('.ProseMirror').getByText('Packaged edit 日本語').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('Continuous packaged edit');
