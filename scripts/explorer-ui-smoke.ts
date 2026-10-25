@@ -98,10 +98,9 @@ try {
   // A new empty CSV is not an error.
   await expect(page.getByRole('alert')).toHaveCount(0);
 
-  // Dragging a file onto a folder moves it there. The renamed folder opens again.
-  await row(knowledge, 'topics').click();
-  await row(knowledge, '図表').click();
-  await expect(row(knowledge, 'data.csv')).toBeVisible();
+  // Dragging a file onto a folder moves it there. The renamed folder opens again
+  // by itself: the file on the page is inside it, and the explorer follows it.
+  await expect(row(knowledge, 'data.csv')).toHaveAttribute('aria-current', 'page');
   await row(knowledge, 'data.csv').dragTo(row(knowledge, 'Knowledge_Base'));
   await expect.poll(() => disk('Knowledge_Base')).toEqual(['data.csv', 'home.md', 'topics']);
 
