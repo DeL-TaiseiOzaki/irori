@@ -32,6 +32,7 @@ import type {
   NewEntry,
   RepositoryAttachment,
   RepositoryUpdate,
+  StrayEntry,
   WorkFolder,
 } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -1484,20 +1485,148 @@ export class CloudService {
         connection: true,
         local: true,
       });
-    const parent = await this.parent({ scopeId, contentsRoot: rel });
-    if (parent)
-      for (const item of await fs.readdir(parent, { withFileTypes: true })) {
-        if (!entries.some((entry) => nameKey(entry.name) === nameKey(item.name)))
-          entries.push({
-            path: `${rel}/${item.name}`,
-            name: item.name,
-            directory: item.isDirectory(),
-            layer: 'contents',
-            note: false,
-            blocked: t('登録されていないローカルデータです。', 'Unregistered local data.'),
-          });
-      }
+    for (const item of await this.straysIn(
+      scopeId,
+      rel,
+      entries.map((entry) => entry.name),
+    ))
+      entries.push({
+        path: `${rel}/${item.name}`,
+        name: item.name,
+        directory: item.kind !== 'file',
+        layer: 'contents',
+        note: false,
+        blocked: t('登録されていないローカルデータです。', 'Unregistered local data.'),
+        stray: true,
+      });
     return entries;
+  }
+  /**
+   * What a vault's contents folders hold besides its connections and its work
+   * folder: a link a connection left when its record went (unregistered on
+   * another device, replaced by a Git pull, or unregistered here once its folder
+   * or the vault had moved), or something put there by hand. The connection
+   * dialog lists them, to be registered as connections or removed.
+   */
+  async strays(scopeId: string): Promise<StrayEntry[]> {
+    const space = await this.files.get(scopeId);
+    const records = await this.list(scopeId, false);
+    const work = await this.work(scopeId);
+    const out: StrayEntry[] = [];
+    for (const contentsRoot of space.contents) {
+      const taken = records
+        .filter((record) => record.contentsRoot === contentsRoot)
+        .map((record) => record.name);
+      if (work && contentsRoot === space.contents[0]) taken.push(workName);
+      out.push(...(await this.straysIn(scopeId, contentsRoot, taken)));
+    }
+    return out;
+  }
+  /** The entries of a contents folder not named in `taken`. */
+  private async straysIn(
+    scopeId: string,
+    contentsRoot: string,
+    taken: string[],
+  ): Promise<StrayEntry[]> {
+    const parent = await this.parent({ scopeId, contentsRoot });
+    if (!parent) return [];
+    const names = new Set(taken.map(nameKey));
+    const out: StrayEntry[] = [];
+    for (const name of await fs.readdir(parent)) {
+      if (names.has(nameKey(name))) continue;
+      const entry = path.join(parent, name);
+      const info = await fs.lstat(entry).catch(() => undefined);
+      if (!info) continue;
+      if (!info.isSymbolicLink()) {
+        out.push({ contentsRoot, name, kind: info.isDirectory() ? 'folder' : 'file' });
+        continue;
+      }
+      // Windows reports a junction's target with its \\?\ prefix.
+      const value = (await fs.readlink(entry)).replace(/^\\\\\?\\/, '');
+      const found = await fs.stat(entry).then(
+        (item) => item.isDirectory(),
+        () => false,
+      );
+      out.push({
+        contentsRoot,
+        name,
+        kind: 'link',
+        target: path.resolve(parent, value),
+        ...(!found && { missing: true }),
+      });
+    }
+    return out;
+  }
+  /** A stray as it is now, refusing a name a connection or the work folder has taken since. */
+  private async stray(scopeId: string, contentsRoot: string, name: string) {
+    const stray = (await this.strays(scopeId)).find(
+      (item) => item.contentsRoot === contentsRoot && item.name === name,
+    );
+    if (!stray)
+      throw Error(
+        t(
+          'この項目は見つからないか、接続として登録されています。',
+          'This item is gone or registered as a connection.',
+        ),
+      );
+    return { stray, entry: path.join((await this.parent({ scopeId, contentsRoot }))!, name) };
+  }
+  /**
+   * Registers a stray link as a local connection under its own name, to the
+   * folder it leads to or, when given, to `chosen`. The link stays when it
+   * already leads to that folder, so connecting uses it again; otherwise it goes.
+   */
+  adoptStray(scopeId: string, contentsRoot: string, name: string, chosen?: string) {
+    return this.mutate(async () => {
+      const error = mountNameError(name);
+      if (error) throw Error(error);
+      const { stray, entry } = await this.stray(scopeId, contentsRoot, name);
+      if (stray.kind !== 'link')
+        throw Error(
+          t(
+            '接続として登録できるのはリンクだけです。',
+            'Only a link can be registered as a connection.',
+          ),
+        );
+      const records = await this.localDeclarations(scopeId);
+      if (records.length >= 100)
+        throw Error(
+          t(
+            '接続先は1スペースにつき100件まで登録できます。',
+            'Each space can register up to 100 connections.',
+          ),
+        );
+      const target = await this.localTarget(chosen ?? stray.target!);
+      const record = localDeclaration.parse({
+        schemaVersion: 1,
+        mountId: randomUUID(),
+        scopeId,
+        provider: 'local',
+        folderName: path.basename(target) || target,
+        contentsRoot,
+        name,
+        access: 'read-write',
+      });
+      await this.assertNameFree(record);
+      if (!(await this.pointsTo(entry, target))) await fs.unlink(entry);
+      await this.writeLocal(scopeId, records, [...records, record]);
+      await writeLocalJson(this.localBindingFile(scopeId, record.mountId), {
+        scopeId,
+        mountId: record.mountId,
+        root: (await this.files.get(scopeId)).root,
+        path: target,
+      });
+      return (await this.list(scopeId, false)).find((item) => item.mountId === record.mountId)!;
+    });
+  }
+  /** Removes a stray: a link by itself, never what it leads to; anything else to the system trash. */
+  removeStray(scopeId: string, contentsRoot: string, name: string) {
+    return this.mutate(async () => {
+      const { stray, entry } = await this.stray(scopeId, contentsRoot, name);
+      if (stray.kind === 'link') return fs.unlink(entry);
+      if (!this.trash) throw Error(t('ごみ箱を使えません。', 'The trash is not available.'));
+      await this.trash(entry);
+    });
   }
   async close() {
     this.stopping = true;

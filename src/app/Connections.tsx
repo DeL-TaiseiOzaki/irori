@@ -1,7 +1,7 @@
 import { Dialog } from './Dialog';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import type { CloudConnection, CloudRoot } from '../domain/types';
+import type { CloudConnection, CloudRoot, StrayEntry } from '../domain/types';
 import { mountNameError } from '../domain/connections';
 import { githubCloneURL, githubRepository, isBranchName, repositoryFolder } from '../domain/git';
 import { useAction } from './useAction';
@@ -132,7 +132,12 @@ export function Connections({
     [space.scopeId, revision],
   );
   const connections = overview.data ?? [];
-  const issue = error || overview.error;
+  const leftovers = useResource(
+    () => host.contentsStrays(space.scopeId),
+    [space.scopeId, revision],
+  );
+  const strays = leftovers.data ?? [];
+  const issue = error || overview.error || leftovers.error;
   // A new connection is only an addition, so it goes on during a run; changing
   // or removing the registered ones waits for the run.
   const disabled = busy || running;
@@ -159,6 +164,13 @@ export function Connections({
     setLocalPath(folder);
     setName(repositoryFolder(url.trim()));
     scrollToForm();
+  }
+  /** Registers a stray link as a connection and connects it; a link to nowhere takes a chosen folder. */
+  async function adopt(stray: StrayEntry) {
+    const folder = stray.missing ? ((await host.chooseFolder()) ?? undefined) : undefined;
+    if (stray.missing && !folder) return;
+    const connection = await host.adoptStray(space.scopeId, stray.contentsRoot, stray.name, folder);
+    await host.connectCloud(space.scopeId, connection.mountId);
   }
   function chooseSource(value: 'local' | 'github') {
     setSource(value);
@@ -687,6 +699,70 @@ export function Connections({
                 </div>
               );
             })}
+            {strays.length > 0 && (
+              <>
+                <h3>
+                  {t('未登録', 'Unregistered')}
+                  <span className="connect-count">{strays.length}</span>
+                </h3>
+                {strays.map((stray) => (
+                  <div
+                    className="connection-card stray-card"
+                    key={`${stray.contentsRoot}/${stray.name}`}
+                  >
+                    <div className="connection-head">
+                      <Icon
+                        name={
+                          stray.kind === 'link'
+                            ? 'link'
+                            : stray.kind === 'folder'
+                              ? 'folder'
+                              : 'file'
+                        }
+                        size={16}
+                      />
+                      <strong>{stray.name}</strong>
+                      <span className="connection-state" data-state="stray">
+                        {stray.missing
+                          ? t('リンク先なし', 'Link target missing')
+                          : t('未登録', 'Unregistered')}
+                      </span>
+                    </div>
+                    <span className="connection-path mono">
+                      {stray.contentsRoot}/{stray.name}
+                      {stray.kind === 'file' ? '' : '/'}
+                    </span>
+                    {stray.target && <span className="connection-path mono">→ {stray.target}</span>}
+                    <div className="connection-actions">
+                      {stray.kind === 'link' && (
+                        <button
+                          className="stage-text-button framed"
+                          disabled={busy}
+                          onClick={() => void perform(() => adopt(stray))}
+                        >
+                          {stray.missing
+                            ? t('フォルダを選んで接続', 'Choose folder and connect')
+                            : t('接続として登録', 'Register as connection')}
+                        </button>
+                      )}
+                      <button
+                        className="stage-text-button framed"
+                        disabled={disabled}
+                        onClick={() =>
+                          void perform(() =>
+                            host.removeStray(space.scopeId, stray.contentsRoot, stray.name),
+                          )
+                        }
+                      >
+                        {stray.kind === 'link'
+                          ? t('リンクを削除', 'Remove link')
+                          : t('ゴミ箱に移動', 'Move to trash')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </aside>
         </div>
       </div>
