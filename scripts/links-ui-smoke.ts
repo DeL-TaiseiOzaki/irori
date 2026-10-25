@@ -23,6 +23,9 @@ await writeFile(
   '# 深いページ\n\n[上の階層へ](../arrival.md)\n',
 );
 await writeFile(path.join(root, 'arrival.md'), '# 到着点\n');
+// Enough notes that the explorer scrolls, the folders above them all.
+for (let n = 1; n <= 40; n++)
+  await writeFile(path.join(root, `memo-${String(n).padStart(2, '0')}.md`), `# Memo ${n}\n`);
 await new AuthorshipStore(files.dataDir).observe(
   { scopeId: space.scopeId, path: 'arrival.md' },
   '# 到着点\n',
@@ -51,10 +54,33 @@ try {
   await expect(editor).toContainText('出発点');
 
   // The modifier follows the link, down into a folder and back out of it.
+  const knowledge = page
+    .locator('.brain-panel')
+    .getByRole('region', { name: 'Knowledge', exact: true });
+  const wiki = knowledge.getByRole('button', { name: 'wiki', exact: true });
+  const deep = knowledge.getByRole('button', { name: 'deep', exact: true });
+  await expect(wiki).toHaveAttribute('aria-expanded', 'false');
+  await expect(wiki).not.toBeInViewport();
   await editor.getByRole('link', { name: '下の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
   await expect(editor).toContainText('深いページ');
+  // The explorer follows the file on the stage: its folder opens and its row comes into view.
+  await expect(wiki).toHaveAttribute('aria-expanded', 'true');
+  await expect(deep).toHaveAttribute('aria-current', 'page');
+  await expect(deep).toBeInViewport();
+  // A folder closed afterwards stays closed, and a folded section opens for the next file.
+  await wiki.click();
+  await expect(deep).toHaveCount(0);
+  const knowledgeToggle = knowledge.locator('.section-toggle');
+  await knowledgeToggle.click();
+  await expect(knowledgeToggle).toHaveAttribute('aria-expanded', 'false');
   await editor.getByRole('link', { name: '上の階層へ' }).click({ modifiers: ['ControlOrMeta'] });
   await expect(editor).toContainText('到着点');
+  await expect(knowledgeToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(knowledge.getByRole('button', { name: 'arrival', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(wiki).toHaveAttribute('aria-expanded', 'false');
 
   // A page that has not been written yet is named, and the note stays open.
   await page.getByRole('button', { name: 'topic', exact: true }).click();
@@ -178,7 +204,7 @@ try {
 
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Link UI smoke passed: relative links followed down, up and to a missing page, and back to the link from a list that keeps itself current; links rewritten by a rename and a move.',
+    'Link UI smoke passed: relative links followed down, up and to a missing page with the explorer following, and back to the link from a list that keeps itself current; links rewritten by a rename and a move.',
   );
 } finally {
   await app.close();
