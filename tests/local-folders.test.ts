@@ -356,3 +356,61 @@ test('Disconnecting a waiting folder stops the wait and clears only its own link
   assert.deepEqual(await readdir(folder), ['note.md']);
   await cloud.close();
 });
+
+test('A link whose record went is listed, registered again, or removed alone', async (t) => {
+  const { base, files, space, cloud, folder, trash, trashed } = await local(t);
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  // The record goes as a Git pull of another device's removal takes it; the link stays.
+  const restarted = new CloudService(files, trash);
+  files.cloud = restarted;
+  await writeFile(path.join(space.root, '.irori', 'local-folders.json'), '[]\n');
+  const entry = path.join(space.root, 'contents', 'Research');
+  assert.deepEqual(await restarted.connections(space.scopeId), []);
+  assert.deepEqual(await restarted.strays(space.scopeId), [
+    { contentsRoot: 'contents', name: 'Research', kind: 'link', target: folder },
+  ]);
+  const [shown] = await files.entries(space.scopeId, 'contents');
+  assert.equal(shown.stray, true);
+  assert(shown.blocked);
+  // Registered again under its name, it connects through the same link.
+  const adopted = await restarted.adoptStray(space.scopeId, 'contents', 'Research');
+  assert.equal(adopted.folderName, 'Research');
+  assert.deepEqual(await restarted.strays(space.scopeId), []);
+  await restarted.connect(space.scopeId, adopted.mountId);
+  assert.equal(await readlink(entry), folder);
+  assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).text, '# Synced\n');
+  await restarted.disconnect(space.scopeId, adopted.mountId);
+  await restarted.edit(space.scopeId, adopted.mountId);
+  // A link to a folder that moved away takes a chosen folder; removing a link leaves its folder.
+  const moved = path.join(base, 'Moved');
+  await symlink(path.join(base, 'Gone'), entry);
+  const [missing] = await restarted.strays(space.scopeId);
+  assert.equal(missing.missing, true);
+  await assert.rejects(
+    restarted.adoptStray(space.scopeId, 'contents', 'Research'),
+    /見つかりません/,
+  );
+  await rename(folder, moved);
+  const chosen = await restarted.adoptStray(space.scopeId, 'contents', 'Research', moved);
+  await restarted.connect(space.scopeId, chosen.mountId);
+  assert.equal(await readlink(entry), moved);
+  await restarted.disconnect(space.scopeId, chosen.mountId);
+  await restarted.edit(space.scopeId, chosen.mountId);
+  await symlink(moved, entry);
+  await restarted.removeStray(space.scopeId, 'contents', 'Research');
+  await assert.rejects(lstat(entry), { code: 'ENOENT' });
+  assert.deepEqual(await readdir(moved), ['note.md']);
+  assert.deepEqual(trashed, []);
+  // Anything else there goes to the system trash, and only a link can be registered.
+  await mkdir(path.join(space.root, 'contents', 'Own'));
+  await assert.rejects(restarted.adoptStray(space.scopeId, 'contents', 'Own'), /リンクだけ/);
+  await restarted.removeStray(space.scopeId, 'contents', 'Own');
+  assert.deepEqual(trashed, [path.join(space.root, 'contents', 'Own')]);
+  await assert.rejects(restarted.removeStray(space.scopeId, 'contents', 'Own'), /見つからない/);
+});
