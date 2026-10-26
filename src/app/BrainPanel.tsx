@@ -21,6 +21,7 @@ import {
 } from 'react-resizable-panels';
 import type { CloudConnection, Document, Entry, Layer, Space } from '../domain/types';
 import { categoryIcon, categoryName } from '../domain/brains';
+import { classify } from '../domain/scopes';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { EntryMenu, ExplorerItems, entryActions, type Explorer } from './EntryActions';
@@ -196,6 +197,12 @@ export function Tree({
   const [expanded, setExpanded] = useState<string[]>(directory ? [] : [knowledgeFolder(space)]);
   const expand = (path: string) =>
     setExpanded((value) => (value.includes(path) ? value : [...value, path]));
+  // The file on the stage is followed, however it was opened: the folders above
+  // it open and its row comes into view, once each time another file comes up,
+  // so a folder closed afterwards stays closed.
+  const target = selected?.scopeId === space.scopeId ? selected.path : undefined;
+  const following = useRef<{ path: string; done: boolean }>(undefined);
+  const selectedRow = useRef<HTMLButtonElement>(null);
   const shared = useContext(DropTarget);
   const [over, setOver] = useState<string>();
   const drop = shared ?? { over, setOver };
@@ -208,6 +215,25 @@ export function Tree({
       ? { entries: listing.data ?? [], error: listing.error }
       : undefined);
   const entries = data?.entries.filter((entry) => entry.layer === layer) ?? [];
+  useEffect(() => {
+    if (following.current?.path !== target)
+      following.current = target ? { path: target, done: false } : undefined;
+    const now = following.current;
+    if (!now || now.done || !data) return;
+    const above = entries.filter(
+      (entry) => entry.directory && !entry.blocked && now.path.startsWith(`${entry.path}/`),
+    );
+    const shown = entries.some((entry) => entry.path === now.path);
+    // A file outside this level, or not listed yet, is looked for again when the listing changes.
+    if (!above.length && !shown) return;
+    now.done = true;
+    for (const entry of above) expand(entry.path);
+    if (!shown) return;
+    // After a folded section above has opened, so the row has its place.
+    requestAnimationFrame(() =>
+      selectedRow.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' }),
+    );
+  }, [target, data, layer]);
   const indent = { paddingLeft: 10 + depth * 14 };
   const editable = (entry: Entry) =>
     !!explorer &&
@@ -439,6 +465,7 @@ export function Tree({
                 </div>
               ) : (
                 <button
+                  ref={isSelected ? selectedRow : undefined}
                   className={`tree-row ${entry.blocked ? 'muted' : ''} ${isSelected ? 'selected' : ''} ${takesDrop && drop.over === entry.path ? 'drop-target' : ''} ${isCut ? 'cut' : ''}`}
                   style={indent}
                   data-entry={entry.path}
@@ -843,6 +870,14 @@ export const BrainPanel = memo(function BrainPanel({
   } satisfies Record<Layer, unknown>;
   const shown = schema === undefined ? editorSections : sections;
   const panelIds = useMemo(() => shown.map((section) => section.layer), [shown]);
+  // The section holding the file on the stage opens for it; its tree finds the row.
+  const target = selected?.scopeId === space.scopeId ? selected.path : undefined;
+  useEffect(() => {
+    if (!target) return;
+    const layer = classify(space, target);
+    if (shown.some((section) => section.layer === layer) && folded.includes(layer))
+      refs[layer].current?.expand();
+  }, [target]);
   const layout = useDefaultLayout({
     id: 'irori-brain-sections',
     panelIds,

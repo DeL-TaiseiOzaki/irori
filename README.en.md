@@ -63,7 +63,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 **Vaults and workspaces**
 - A vault is organized as **Knowledge** (notes) and **Contents** (materials). Turning the vault agent on (**Settings → Agents**) also shows **Schema** (instructions and skills for AI).
 - **irori mode** (formerly the Overview) shows the workspace's vaults on the vault map or side by side. Search also runs across every vault.
-- The Knowledge and Contents lists work like Explorer or Finder. A right click or the ⋯ menu makes folders and files of any kind, brings in files from elsewhere, and renames, moves or deletes. Drag to move; drop files or folders from Finder or Explorer to add them. In Knowledge, links follow what moved.
+- The Knowledge and Contents lists work like Explorer or Finder. A right click or the ⋯ menu makes folders and files of any kind, brings in files from elsewhere, and renames, moves or deletes. Drag to move; drop files or folders from Finder or Explorer to add them. In Knowledge, links follow what moved. The list follows the file open on the page: however it was opened, from an agent's link, a note's link or search, its folders open and its row comes into view.
 - Copy, cut and paste files and folders from the right-click menu or with Ctrl/⌘+C, X and V. A taken name keeps both (`name 2`), and a note copied within Knowledge still links where the original did. Files copied in Finder or Explorer paste in too.
 - Each vault has its own name, category, icon and colour. The same sheet removes a vault, keeping its folder or moving it to the trash.
 
