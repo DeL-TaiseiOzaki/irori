@@ -9,6 +9,7 @@ import {
   lstat,
   chmod,
   stat,
+  symlink,
 } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -248,6 +249,37 @@ try {
   await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
   await expect(researchCard).toHaveCount(0);
   expect(await readFile(path.join(research, 'memo.md'), 'utf8')).toBe('# 研究メモ\n');
+  // Links whose records went (another device's removal, a Git pull) are listed as
+  // unregistered: registered again under their name, or removed without their folder.
+  await symlink(research, link);
+  const leftover = path.join(spaces[0].root, 'contents', '残り');
+  await symlink(research, leftover);
+  await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
+  await page.getByRole('button', { name: '個人KB のクラウド接続', exact: true }).click();
+  const strays = dialog.locator('.stray-card');
+  await expect(strays).toHaveCount(2);
+  const lost = strays.filter({ hasText: 'contents/研究/' });
+  await expect(lost.locator('.connection-state')).toHaveText('未登録');
+  await expect(lost).toContainText(research);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/irori-cloud-strays.png' });
+  await lost.getByRole('button', { name: '接続として登録', exact: true }).click();
+  const adopted = dialog
+    .locator('.connection-card:not(.stray-card)')
+    .filter({ hasText: 'contents/研究/' });
+  await expect(adopted.locator('.connection-state')).toHaveText('接続済み');
+  expect(await readlink(link)).toBe(research);
+  await expect(strays).toHaveCount(1);
+  await strays.getByRole('button', { name: 'リンクを削除', exact: true }).click();
+  await expect(strays).toHaveCount(0);
+  expect(await lstat(leftover).catch(() => undefined)).toBeUndefined();
+  expect(await readFile(path.join(research, 'memo.md'), 'utf8')).toBe('# 研究メモ\n');
+  await adopted.getByRole('button', { name: '接続先の操作' }).click();
+  await page.getByRole('menuitem', { name: '接続を解除' }).click();
+  await expect(adopted.locator('.connection-state')).toHaveText('未接続');
+  await adopted.getByRole('button', { name: '接続先の操作' }).click();
+  await page.getByRole('menuitem', { name: '登録を解除', exact: true }).click();
+  await expect(adopted).toHaveCount(0);
 } finally {
   await app.close();
 }
@@ -307,6 +339,7 @@ try {
           'duplicate-name rejection',
           'dialog text contrast in light and dark themes',
           'disconnect removes only the link; unregistering keeps the folder files',
+          'links left without records listed as unregistered, registered again or removed alone',
           'restart reconnects folders; one unreadable record does not stop another vault',
           'device paths excluded from portable records',
         ],

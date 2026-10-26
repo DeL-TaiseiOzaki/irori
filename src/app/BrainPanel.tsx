@@ -508,10 +508,12 @@ export function Tree({
                     {layer === 'schema' ? entry.name : entry.name.replace(/\.md$/, '')}
                   </span>
                   {entry.blocked ? (
-                    <span className="badge">
-                      {layer === 'contents'
-                        ? t('未接続', 'Not connected')
-                        : t('利用不可', 'Unavailable')}
+                    <span className="badge" title={entry.blocked}>
+                      {entry.stray
+                        ? t('未登録', 'Unregistered')
+                        : layer === 'contents'
+                          ? t('未接続', 'Not connected')
+                          : t('利用不可', 'Unavailable')}
                     </span>
                   ) : (
                     <DriveBadge connection={connection} />

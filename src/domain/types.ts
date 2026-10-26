@@ -81,6 +81,8 @@ export interface Entry {
   repository?: boolean;
   /** A brought-in file still being written: `appendEntry` takes its other pieces. */
   upload?: string;
+  /** In a contents folder but named by no connection; the connection dialog registers or removes it. */
+  stray?: boolean;
 }
 /**
  * A file or folder the explorer adds. A file with `bytes`, or a folder with
@@ -322,6 +324,19 @@ export type FolderAttachment = LocalAttachment | RepositoryAttachment;
 export type Attachment = CloudAttachment | FolderAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
 export type CloudConnection = Attachment & ConnectionState;
+/**
+ * Something in a vault's contents folder that no connection names, such as a
+ * link a connection left when its record went.
+ */
+export interface StrayEntry {
+  contentsRoot: string;
+  name: string;
+  kind: 'link' | 'folder' | 'file';
+  /** Where a link leads on this device. */
+  target?: string;
+  /** The link leads to no folder. */
+  missing?: boolean;
+}
 export interface ConnectionState {
   /**
    * `waiting`: its folder is not there yet (a drive not mounted, a sync app
@@ -603,6 +618,17 @@ export interface HostAPI {
   switchCloudToLocal(scopeId: string, mountId: string, path: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
+  /** What the vault's contents folders hold that no connection names. */
+  contentsStrays(scopeId: string): Promise<StrayEntry[]>;
+  /** Registers a stray link as a folder connection under its name, to its folder or to `path`. */
+  adoptStray(
+    scopeId: string,
+    contentsRoot: string,
+    name: string,
+    path?: string,
+  ): Promise<CloudConnection>;
+  /** Removes a stray: a link by itself, anything else to the system trash. */
+  removeStray(scopeId: string, contentsRoot: string, name: string): Promise<void>;
   /** Whether the connection may change its folder; a connected folder is linked again. */
   setCloudAccess(scopeId: string, mountId: string, access: CloudAccess): Promise<void>;
   /** Shows the connected folder in the system file manager, for adding files there. */

@@ -858,6 +858,9 @@ app
       disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
       renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
       removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      contentsStrays: (id) => cloud.strays(id),
+      adoptStray: (...args) => addCloud(args[0], () => cloud.adoptStray(...args)),
+      removeStray: (...args) => changeCloud(args[0], () => cloud.removeStray(...args)),
       setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
