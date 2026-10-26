@@ -97,6 +97,7 @@ irori は、Markdown のノートを中心に仕事を進めるための **知�
 - PDF・Word（.docx）・PowerPoint（.pptx）・Excel などのスプレッドシート（.xlsx/.xlsm/.xls/.ods）・画像を、外部アプリに切り替えず画面内で表示します。表示専用で、編集は元のアプリで行います。
 - Google Drive・Dropbox・Box・iCloud・OneDrive のアプリが同期するフォルダを、vault の Contents として接続できます。irori からも、その vault agent からも編集できます。Google Drive は[パソコン版 Google ドライブ](https://www.google.com/drive/download/)を使います。ドライブの準備が irori の起動より遅れても、フォルダが現れると自動で接続します。
 - GitHub のリポジトリも Contents に接続できます。vault には URL だけを記録し、各パソコンでは選んだ場所に irori がクローンします。既定は読み取り専用で、**最新にする** で取り込みます（[ADR 046](docs/decisions/046-github-repositories-in-contents.md)）。
+- 別のパソコンで登録を解除した・Git で記録が戻ったなどで、記録のないまま Contents に残った項目は **未登録** と表示されます。Contents の接続ダイアログから、接続として登録し直すか削除できます。
 
 **記録と道具**
 - **変更** タブで差分の確認・コミット・履歴の閲覧ができます。強制的な上書きや自動の stash は行いません。

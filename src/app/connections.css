@@ -586,6 +586,12 @@
 .connect-sheet .connection-state[data-state='error'] {
   color: var(--del-ink);
 }
+.connect-sheet .connection-state[data-state='stray'] {
+  color: var(--warn-ink);
+}
+.connect-sheet .connect-registered * + h3 {
+  margin-top: 10px;
+}
 .connect-sheet .connection-path {
   font-size: 11.5px;
   color: var(--ink-3);
