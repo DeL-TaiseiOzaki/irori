@@ -23,12 +23,12 @@ listed in [HANDOFF](HANDOFF.md):
 - holding only the brains a hand-off reaches;
 - with the owner, what your AI should typically ask of the brains.
 
-Work in the independent `irori/` repository inside the `KB_design/` workspace.
-The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
-`.agents/`, `scripts/`, research and initial specifications — are versioned as
-the private repository **`irori-workspace`**; it ignores the three product
-repositories and `references/`, and its changes follow the same branch and pull
-request rule. `irori-extention` ended development on 2026-09-18 and is kept as
+Work in the independent `irori/` repository, a submodule of the `dev-irori/`
+workspace. The workspace's own shared files — `AGENTS.md`, `.claude/`, `.codex/`,
+`.agents/`, `scripts/`, research and initial specifications — are versioned in
+the private repository **`dev-irori`**, which also pins the three product
+repositories as submodules and leaves `references/` out of Git. Its changes
+follow the same branch and pull request rule. `irori-extention` ended development on 2026-09-18 and is kept as
 the readable record of how the layer model was worked out; `irori-templete` is
 the recommended main-KB repository template.
 
@@ -137,7 +137,7 @@ Every branch adds to the top of `docs/STATUS.md` and advances the version, so
 parallel branches conflict there; stack a later branch on an earlier one and
 retarget it with `gh pr edit <n> --base main` once the earlier one merges.
 Several sessions, including Codex in VS Code, work in this repository at once:
-work in a worktree under `KB_design/.local/worktrees/`, and leave the shared
+work in a worktree under `dev-irori/.local/worktrees/`, and leave the shared
 checkout on `main`.
 
 ## Owner decisions in force
@@ -210,7 +210,7 @@ Node must satisfy `^24.15.0 || >=26.0.0`; the checkout has Node 24.21.0 in
 `node_modules/.bin` while the system Node may be older.
 
 ```sh
-cd /workspace/KB_design/irori
+cd /workspace/dev-irori/irori
 export PATH="$PWD/node_modules/.bin:$PATH"
 npm run build
 IRORI_TEST_RCLONE_PATH="$PWD/.local/rclone/linux-x64/rclone" npm test

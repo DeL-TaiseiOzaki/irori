@@ -7,7 +7,7 @@ design reference; new VS Code compatibility work belongs in irori.
 `irori-templete` is the recommended main-KB repository template under development. Keep each
 repository's changes and Git history separate.
 
-Within `KB_design`, follow the [workspace contract](../AGENTS.md); shared agent
+Within `dev-irori`, follow the [workspace contract](../AGENTS.md); shared agent
 skills and runtime configuration live at the workspace root. Load only the
 context needed for the task:
 
