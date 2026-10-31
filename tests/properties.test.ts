@@ -208,7 +208,7 @@ test('Required keys combine every page with the type, and pages exclude indexes'
 });
 
 test("irori-templete's declaration parses when the template is checked out beside irori", (t) => {
-  // From irori/ in KB_design, or from a worktree under KB_design/.local/worktrees/.
+  // From irori/ in dev-irori, or from a worktree under dev-irori/.local/worktrees/.
   const text = ['../../irori-templete', '../../../../irori-templete']
     .map((dir) => {
       try {
