@@ -296,7 +296,11 @@ export function BrainHome({
             title={layerLabel(space, 'Knowledge_Base')}
             action={
               <>
-                <VaultRepositories space={space} connections={connections} className="stage-button" />
+                <VaultRepositories
+                  space={space}
+                  connections={connections}
+                  className="stage-button"
+                />
                 <button
                   className="stage-text-button small"
                   disabled={locked || held}
