@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+File and conversation tabs restyled, 2026-11-01 (**0.2.49**,
+[#287](https://github.com/DeL-TaiseiOzaki/irori/pull/287), published as `v0.2.49-preview.1`):
+- `stage.css` (`.stage-tab*`) and `agent-panel.css` (`.conversation-tab*`) share
+  one style: no filled block behind the current tab, a heavier weight and a
+  2px `::after` line beneath it, `--ember` in the focused stage column and for
+  the conversation on show, `--rule-2` in another stage column.
+- Conversation tabs reset the global `:where(button)` `box-shadow` and
+  `padding` (`style.css`), which had drawn a box around each tab and its close
+  button. Close buttons show on the current tab, on hover and on
+  `:focus-visible`; a running conversation still has none.
+- Verified by `npm run build`, `npm test` and `npm run test:ui`; the
+  screenshots of `stage-columns-ui-smoke` and `conversations-ui-smoke` and the
+  CLI test desktop were inspected. Only the hearth theme was looked at; the
+  dark and light themes use the same tokens and were not inspected.
+
 Copy and paste in the explorer, Obsidian-style images, folded properties, Schema
 deletion, closing the first agent column alone, 2026-10-20 (**0.2.42**,
 [#278](https://github.com/DeL-TaiseiOzaki/irori/pull/278), published as `v0.2.42-preview.1`):
