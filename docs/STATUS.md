@@ -21,7 +21,9 @@ One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
   vault names and paths are cut with a title. Tests: `tab-labels`, `display-counts`.
 - Website and READMEs: "irori - IDE for Second Brain"; no glow, ember text or
   pill; `.button.primary` is solid paper. Screenshots retaken.
-A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**, pull request open):
+
+A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**,
+[#289](https://github.com/DeL-TaiseiOzaki/irori/pull/289), published as `v0.2.50-preview.1`):
 - `VaultRepositories` (`src/app/VaultRepositories.tsx`) is a popover on the
   Knowledge section's actions (`BrainPanel`) and the Knowledge card of
   `BrainHome`. When opened it reads `gitStatus` and `gitSubmodules` and lists
