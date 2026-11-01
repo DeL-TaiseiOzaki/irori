@@ -34,6 +34,7 @@ await mkdir(root);
 const space = await files.register(root, 'ハーネス検証', 'personal');
 await writeFile(path.join(root, 'note.md'), '# Harness fixture\n');
 await writeFile(path.join(root, 'second.md'), '# Other note\n');
+await writeFile(path.join(root, 'My Note.md'), '# Spaced note\n');
 const bin = path.join(base, 'bin');
 await mkdir(bin);
 for (const id of ['pi', 'opencode', 'hermes', 'agy'])
@@ -278,14 +279,18 @@ try {
     'href',
     'https://example.com/irori',
   );
-  expect(
-    await page.getByRole('link', { name: '危険', exact: true }).getAttribute('href'),
-  ).not.toMatch(/javascript/i);
+  // A destination that is no web address is no link at all, rather than one the host refuses.
+  for (const name of ['危険', 'メール', 'KB']) {
+    await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0);
+    await expect(
+      page.locator('.message-markdown .message-link-text').filter({ hasText: name }),
+    ).toHaveCount(1);
+  }
   await expect(page.evaluate(() => window.irori.openUrl('javascript:alert(1)'))).rejects.toThrow();
   // A path in a reply opens on the stage, at the line it names, as Claude Code
   // and Codex do in VS Code; inline code naming a vault's file does too.
   const pathLinks = page.locator('.message-markdown .path-link');
-  await expect(pathLinks).toHaveCount(4);
+  await expect(pathLinks).toHaveCount(6);
   await pathLinks.filter({ hasText: /^second\.md$/ }).click();
   await expect(page.locator('.ProseMirror')).toContainText('Other note');
   await expect(page.getByText('1 行目を選択しました。', { exact: true })).toBeVisible();
@@ -295,6 +300,14 @@ try {
   // A file not there says so instead of opening something else.
   await pathLinks.filter({ hasText: 'missing.md' }).click();
   await expect(page.getByText('missing.md が見つかりません。', { exact: true })).toBeVisible();
+  // Codex writes every file it names as a link to its absolute path, in `<…>` when it has spaces.
+  await pathLinks.filter({ hasText: 'My Note.md' }).click();
+  await expect(page.locator('.ProseMirror')).toContainText('Spaced note');
+  // A file outside every folder is the host's to refuse, in words and not as a web address.
+  await pathLinks.filter({ hasText: 'outside.md' }).click();
+  await expect(page.locator('.message-link-error')).toHaveText(
+    '/etc/irori-outside.md が見つかりません。irori が開くのは vault とその接続先・作業フォルダ、irori agent のフォルダの中のファイルです。',
+  );
   await pathLinks.filter({ hasText: 'note.md' }).first().click();
   await expect(page.locator('.ProseMirror')).toContainText('Harness fixture');
   await page.screenshot({ path: 'test-results/irori-path-links.png' });
