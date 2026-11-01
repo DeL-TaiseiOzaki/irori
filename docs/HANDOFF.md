@@ -18,6 +18,13 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-01: **0.2.52** ([#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291),
+each screen given one subject and each colour one meaning, ADR 053) as
+`de06c74`, by `publish.yml` alone (push run `41363945565`): merge to release
+1:23, to page 2:37, drift in step. Anonymous downloads of the Windows
+installer, the Mac image and `irori-0.2.52-full.nupkg` matched
+`SHA256SUMS.txt`; the live page links the 0.2.52 installers. See STATUS.
+
 Published 2026-11-01: **0.2.51** ([#290](https://github.com/DeL-TaiseiOzaki/irori/pull/290),
 Codex's absolute file links opened through the host instead of the browser
 route, and boundary refusals shown as words) as `a20a418`, by `publish.yml`
