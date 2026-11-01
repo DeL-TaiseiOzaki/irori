@@ -31,6 +31,7 @@ import { parentPath } from '../domain/paths';
 import { readDropped } from './dropped';
 import { Icon, type IconName } from './Icon';
 import { MagnetTabs } from './obsidian/MagnetTabs';
+import { VaultRepositories } from './VaultRepositories';
 import { layoutStorage } from './device-settings';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
@@ -935,6 +936,7 @@ export const BrainPanel = memo(function BrainPanel({
           disabled={locked || held || dirty}
           onClick={onGraph}
         />
+        <VaultRepositories space={space} connections={connections} className="section-action" />
       </>
     ),
     contents: (

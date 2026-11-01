@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**, pull request open):
+- `VaultRepositories` (`src/app/VaultRepositories.tsx`) is a popover on the
+  Knowledge section's actions (`BrainPanel`) and the Knowledge card of
+  `BrainHome`. When opened it reads `gitStatus` and `gitSubmodules` and lists
+  `linkedRepositories` (`src/domain/git.ts`): the vault's own remote and branch,
+  each submodule's repository and branch, and each `github` connection's URL and
+  recorded branch. **GitHub で開く** calls `openUrl` with `githubPage`
+  (`https://github.com/<owner>/<repo>/tree/<branch>`). No HostAPI change.
+- Verified by `npm run build`, `npm test` (`tests/linked-repositories.test.ts`)
+  and `npm run test:ui`, and in the CLI test desktop with a fixture vault
+  holding a GitHub remote, a submodule and a contents connection (the system
+  open call was intercepted). Not tried against github.com, macOS or Windows,
+  or the dark and light themes.
+
 File and conversation tabs restyled, 2026-11-01 (**0.2.49**,
 [#287](https://github.com/DeL-TaiseiOzaki/irori/pull/287), published as `v0.2.49-preview.1`):
 - `stage.css` (`.stage-tab*`) and `agent-panel.css` (`.conversation-tab*`) share
