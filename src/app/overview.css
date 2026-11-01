@@ -4,7 +4,7 @@
   min-width: 0;
   min-height: 0;
   display: flex;
-  padding: 0 8px 0 0;
+  border-top: 1px solid var(--hair);
   color: var(--tx);
   animation: irori-rise 0.32s var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
 }
@@ -142,13 +142,16 @@
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px currentColor;
 }
-.ai-state.running,
+.ai-state.running {
+  color: var(--tx);
+  font-weight: 600;
+}
 .ai-state.waiting {
-  color: var(--ember);
+  color: var(--attn-tx);
   font-weight: 600;
 }
 .ai-state.waiting > i {
-  background: var(--ember);
+  background: var(--attn);
   box-shadow: none;
 }
 .ai-state .spin {
@@ -161,11 +164,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
-  background:
-    radial-gradient(circle, var(--hair-2) 1px, transparent 1.2px) 0 0 / 22px 22px,
-    var(--panel);
-  box-shadow: var(--shadow);
+  background: var(--panel);
   overflow: auto;
 }
 .map-canvas {
@@ -189,12 +188,6 @@
   stroke-width: 1.3;
   stroke-dasharray: 5 5;
   opacity: 0.8;
-  animation: map-flow 1.6s linear infinite;
-}
-@keyframes map-flow {
-  to {
-    stroke-dashoffset: -20;
-  }
 }
 .map-pill {
   position: absolute;
@@ -231,7 +224,6 @@
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  animation: map-float 6.5s ease-in-out infinite;
 }
 .map-node:hover {
   background: none;
@@ -241,41 +233,14 @@
 }
 .map-node .brain-tile {
   transition: transform 140ms ease;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
-}
-.map-node.running .brain-tile,
-.map-node.waiting .brain-tile {
-  animation: map-work 3.2s ease-in-out infinite;
 }
 .map-node.waiting .brain-tile {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--attn);
   outline-offset: 3px;
 }
 .map-node strong {
   font-size: 13.5px;
   font-weight: 700;
-}
-@keyframes map-float {
-  0%,
-  100% {
-    transform: none;
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-@keyframes map-work {
-  0%,
-  100% {
-    box-shadow:
-      0 6px 18px rgb(0 0 0 / 0.25),
-      0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow:
-      0 6px 18px rgb(0 0 0 / 0.25),
-      0 0 30px 6px var(--ember-glow);
-  }
 }
 .map-legend {
   display: flex;
@@ -309,7 +274,7 @@
   font-size: 12.5px;
 }
 .ai-card-spark {
-  color: var(--ember);
+  color: var(--tx-3);
   flex: none;
 }
 .ai-card-name {
@@ -341,19 +306,7 @@
   background: var(--field);
 }
 .ai-card-line.error {
-  color: var(--del-ink, var(--tx));
-}
-.ai-card-line.shimmer {
-  background: linear-gradient(90deg, var(--tx-2) 40%, var(--tx) 50%, var(--tx-2) 60%) 0 0 / 200%
-    100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: irori-shimmer 2.4s linear infinite;
-}
-.ai-card-line.shimmer .mono {
-  color: var(--tx-3);
-  -webkit-text-fill-color: var(--tx-3);
+  color: var(--danger-tx);
 }
 .ai-card-actions {
   display: flex;
@@ -371,10 +324,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-top: 8px;
-  border-radius: 14px;
+  border-left: 1px solid var(--hair);
   background: var(--panel);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .overview-ai-head {
@@ -403,9 +354,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--ember);
-  color: var(--on-ember);
-  box-shadow: 0 0 18px var(--ember-glow);
+  background: var(--solid);
+  color: var(--on-solid);
 }
 .overview-ai-list {
   flex: 1;
@@ -422,7 +372,7 @@
   background: var(--raised);
 }
 .overview-ai-list > .ai-card.waiting {
-  box-shadow: inset 0 0 0 1px var(--ember-line);
+  box-shadow: inset 0 0 0 1px var(--attn-line);
 }
 .overview-composer {
   display: flex;
@@ -470,7 +420,7 @@
   cursor: pointer;
 }
 .target-chip:has(input:focus-visible) {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .overview-composer textarea {
@@ -499,7 +449,7 @@
   color: var(--tx-3);
   font-size: 11.5px;
 }
-.overview-composer .ember-button {
+.overview-composer .primary-button {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -518,8 +468,8 @@
   display: grid;
   grid-template-columns: 84px repeat(var(--columns), minmax(250px, 1fr));
   grid-template-rows: auto minmax(150px, auto) auto auto 1fr;
-  gap: 0 10px;
-  padding: 0 0 8px;
+  gap: 0;
+  padding: 0;
   overflow: auto;
 }
 .columns-gutter,
@@ -557,15 +507,12 @@
 }
 .brain-column {
   min-width: 0;
-  border-radius: 14px;
+  border-left: 1px solid var(--hair);
   background: var(--panel);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .brain-column.waiting {
-  box-shadow:
-    0 0 0 2px var(--ember),
-    0 0 26px var(--ember-glow);
+  box-shadow: inset 0 2px 0 var(--attn);
 }
 .column-head {
   padding: 10px 12px;
@@ -651,8 +598,8 @@ button.column-row:hover {
   gap: 2px;
   padding: 1px 6px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--cont) 16%, transparent);
-  color: var(--cont);
+  background: var(--raised-2);
+  color: var(--tx-2);
   font-size: 11px;
 }
 .column-note {
@@ -752,36 +699,22 @@ button.column-row:hover {
   background: none;
 }
 .map-orb {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--ember-2, var(--ember)), var(--ember));
-  color: var(--on-ember);
-  box-shadow:
-    0 0 0 6px var(--ember-soft),
-    0 0 44px 8px var(--ember-glow);
+  background: var(--solid);
+  color: var(--on-solid);
   transition: transform 140ms ease;
 }
 .map-hearth:hover .map-orb {
   transform: scale(1.04);
 }
 .map-hearth.working .map-orb {
-  animation: hearth-glow 3.2s ease-in-out infinite;
-}
-@keyframes hearth-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 6px var(--ember-soft),
-      0 0 44px 8px var(--ember-glow);
-  }
-  50% {
-    box-shadow:
-      0 0 0 10px var(--ember-soft),
-      0 0 64px 14px var(--ember-glow);
-  }
+  box-shadow:
+    0 0 0 3px var(--panel),
+    0 0 0 4.5px var(--run);
 }
 .map-hearth strong {
   font-size: 14px;
@@ -794,36 +727,37 @@ button.column-row:hover {
   color: var(--tx-3);
   font-size: 11.5px;
 }
+/* A hand-off is a solid line, a reference a dashed one: the line's style, not
+   a colour, tells them apart. One that waits for the person turns to the
+   attention colour. */
 .map-hand-off path {
   fill: none;
-  stroke: var(--ember);
-  stroke-width: 2;
-  opacity: 0.85;
+  stroke: var(--tx-2);
+  stroke-width: 1.6;
 }
 .map-hand-off.waiting path {
+  stroke: var(--attn);
   stroke-dasharray: 6 5;
 }
 .map-spark {
-  fill: var(--ember);
-  filter: drop-shadow(0 0 4px var(--ember));
+  fill: var(--tx);
 }
 .map-pill.hand-off {
   gap: 5px;
   padding: 3px 10px 3px 8px;
-  background: var(--ember);
-  box-shadow: none;
-  color: var(--on-ember);
+  background: var(--raised-2);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx);
   font-weight: 600;
 }
 .map-node.handed .brain-tile {
   box-shadow:
-    0 6px 18px rgb(0 0 0 / 0.25),
-    0 0 0 3px var(--ember-soft),
-    0 0 26px 4px var(--ember-glow);
+    0 0 0 2px var(--panel),
+    0 0 0 3.5px var(--tx-2);
 }
 .legend-hand-off {
   width: 26px;
-  border-top: 2px solid var(--ember);
+  border-top: 1.6px solid var(--tx-2);
 }
 
 /* Map | Columns and Your AI | Brain AIs: segmented pairs on the field colour,

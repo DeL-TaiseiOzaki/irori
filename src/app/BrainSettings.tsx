@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties } from 'react';
+import { useId, useState } from 'react';
 import {
   brainAppearance,
   brainColorName,
@@ -345,7 +345,6 @@ export function BrainSettings({
         onClose={() => setRemoving(false)}
       />
     );
-  const glow = { '--glow': `var(--t-${color})` } as CSSProperties;
   const others = spaces.filter((item) => item.scopeId !== space.scopeId).slice(0, 3);
   return (
     <Dialog
@@ -376,7 +375,7 @@ export function BrainSettings({
         </header>
         <div className="brain-sheet-body">
           <section className="brain-sheet-identity">
-            <div className="brain-sheet-hero" style={glow}>
+            <div className="brain-sheet-hero">
               <BrainTile space={draft} image={image} size={112} radius={28} ring="stage" />
             </div>
             <div className="brain-sheet-fields">

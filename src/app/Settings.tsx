@@ -315,7 +315,7 @@ export function Settings({
                       checked={vaultAgent}
                       onChange={(event) => onVaultAgent(event.target.checked)}
                     />
-                    <Icon name="sparkles" size={15} />
+                    <Icon name="agent" size={15} />
                     <span>vault agent</span>
                   </label>
                 </div>

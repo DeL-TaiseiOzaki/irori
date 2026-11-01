@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { countLabel } from './display';
 import type { GitStatus } from '../domain/git';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
@@ -37,24 +38,24 @@ export const StatusBar = memo(function StatusBar({
   return (
     <footer className="status-bar chrome">
       {space && (
-        <span className="status-item plain">
+        <span className="status-item plain status-vault" title={space.name}>
           <BrainTile space={space} size={15} radius={4} />
-          {space.name}
+          <span>{space.name}</span>
         </span>
       )}
       {git?.available && git.branch && (
         <span className="status-item plain">
           <Icon name="branch" size={12} />
           {git.branch}
-          {!!git.ahead && <span className="mono">↑{git.ahead}</span>}
-          {!!git.behind && <span className="mono">↓{git.behind}</span>}
+          {!!git.ahead && <span className="mono">↑{countLabel(git.ahead)}</span>}
+          {!!git.behind && <span className="mono">↓{countLabel(git.behind)}</span>}
         </span>
       )}
       <span className="status-message" role="status">
         {status}
       </span>
       <button className="status-item ai-summary" onClick={onAi}>
-        <Icon name="sparkles" size={13} />
+        <Icon name="agent" size={13} />
         {running > 0 && (
           <span className="ai-count">
             <i className="blink" />

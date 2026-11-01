@@ -43,7 +43,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.reload();
   await page.locator('.download-card').last().waitFor();
-  assert.equal(await page.title(), "irori — From your notes, to what's next.");
+  assert.equal(await page.title(), 'irori - IDE for Second Brain');
   await page
     .locator('.brand .mark')
     .first()

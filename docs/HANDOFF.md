@@ -24,7 +24,13 @@ route, and boundary refusals shown as words) as `a20a418`, by `publish.yml`
 alone (push run `41362862802`): merge to release 1:17, to page 3:22, drift in
 step. Anonymous downloads of the Windows installer, the Mac image and
 `irori-0.2.51-full.nupkg` matched `SHA256SUMS.txt`; the live page links the
-0.2.51 installers. Release 0.2.50 is not recorded here. See STATUS.
+0.2.51 installers. See STATUS.
+
+Published 2026-11-01: **0.2.50** ([#289](https://github.com/DeL-TaiseiOzaki/irori/pull/289),
+a vault's GitHub repositories and branches listed from Knowledge) as
+`d0b4115`, by `publish.yml` alone (push run `41324345621`): run start to
+release 1:15, to page 2:19, drift in step. Downloads of the Windows installer,
+the Mac image and `irori-0.2.50-full.nupkg` matched `SHA256SUMS.txt`.
 
 Published 2026-11-01: **0.2.49** ([#287](https://github.com/DeL-TaiseiOzaki/irori/pull/287),
 the open-file and conversation tabs restyled as plain underlined tabs) as

@@ -1,3 +1,4 @@
+import { countLabel } from './display';
 import { createPortal } from 'react-dom';
 import { knowledgeFolder } from '../domain/layers';
 import { useEffect, useRef, useState } from 'react';
@@ -832,7 +833,7 @@ function RepositoryPanel({
             label: (
               <>
                 {t('変更', 'Changes')}{' '}
-                <span className="git-tab-count">{status.changes.length}</span>
+                <span className="git-tab-count">{countLabel(status.changes.length)}</span>
               </>
             ),
             disabled: busy || conflictDirty || draftBlocked,

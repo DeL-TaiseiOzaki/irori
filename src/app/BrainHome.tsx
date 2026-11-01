@@ -12,7 +12,7 @@ import { Icon, type IconName } from './Icon';
 import { SkillReach } from './SkillReach';
 import { VaultRepositories } from './VaultRepositories';
 import { useResource } from './useResource';
-import { shortWhen } from './display';
+import { countLabel, shortWhen } from './display';
 import type { Listing } from './BrainPanel';
 
 const host = window.irori;
@@ -39,12 +39,14 @@ export function firstEntries(entries: Entry[], limit: number) {
   return { shown: sorted.slice(0, limit), more: Math.max(0, sorted.length - limit) };
 }
 
+/** A section of the home: a heading, a count and one action, then its rows. No box. */
 function Card({
   layer,
   icon,
   title,
   count,
   action,
+  className,
   children,
 }: {
   layer?: Layer;
@@ -52,14 +54,15 @@ function Card({
   title: string;
   count?: number;
   action?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className={`home-card ${layer ?? ''}`}>
+    <section className={`home-card ${layer ?? ''} ${className ?? ''}`}>
       <header>
-        <Icon name={layer ? layerIcons[layer] : icon!} size={layer ? 19 : 17} strokeWidth={1.9} />
+        <Icon name={layer ? layerIcons[layer] : icon!} size={16} strokeWidth={1.9} />
         <h2>{title}</h2>
-        {!!count && <span className="home-count">{count}</span>}
+        {!!count && <span className="home-count">{countLabel(count)}</span>}
         <span className="home-card-space" />
         {action}
       </header>
@@ -72,7 +75,9 @@ function EntryRow({ entry, onOpen }: { entry: Entry; onOpen: (entry: Entry) => v
   const content = (
     <>
       <Icon name={entry.directory ? 'folder' : 'file'} size={16} className="home-row-icon" />
-      <span className="home-row-name">{entry.name}</span>
+      <span className="home-row-name" title={entry.name}>
+        {entry.name}
+      </span>
     </>
   );
   // Folders open in the brain panel's tree; a file opens on the stage.
@@ -86,8 +91,10 @@ function EntryRow({ entry, onOpen }: { entry: Entry; onOpen: (entry: Entry) => v
 }
 
 /**
- * A brain's home: who it is, its three layers at a glance, and what changed and
- * ran lately — the stage before a note is open.
+ * A vault's home, the stage before a note is open. It reads in one order: what
+ * waits to be committed (the one thing to act on, shown only when there is
+ * some), then the notes; the records, the Schema and the contents stay quiet
+ * beside them (ADR 053).
  */
 export function BrainHome({
   space,
@@ -163,13 +170,18 @@ export function BrainHome({
     .slice(0, 3);
   const changes = git?.available ? git.changes : [];
   const category = categoryName(space.category);
+  // One solid button on the home: committing while there are changes, else
+  // today's note where daily notes are on, else a new note.
+  const primary = changes.length ? 'commit' : daily ? 'daily' : 'note';
   return (
     <div className="brain-home">
       <header className="home-header">
-        <BrainTile space={space} size={64} radius={19} ring="stage" />
+        <BrainTile space={space} size={44} radius={12} ring="stage" />
         <div className="home-title">
           <h1>
-            {space.name}
+            <span className="home-name" title={space.name}>
+              {space.name}
+            </span>
             <button
               className="stage-button home-edit"
               aria-label={t('vault の設定', 'vault settings')}
@@ -190,31 +202,43 @@ export function BrainHome({
                 <i />
               </>
             )}
-            <span className="mono">{space.root}</span>
             {git?.available && git.branch && (
               <>
-                <i />
                 <span>
                   <Icon name="branch" size={14} />
                   {git.branch}
-                  {git.ahead !== undefined && (
-                    <span className="mono">
-                      ↑{git.ahead} ↓{git.behind}
-                    </span>
-                  )}
+                  {/* Only a difference from the remote is worth a mark. */}
+                  {!!git.ahead && <span className="mono">↑{countLabel(git.ahead)}</span>}
+                  {!!git.behind && <span className="mono">↓{countLabel(git.behind)}</span>}
                 </span>
+                <i />
               </>
             )}
+            <span className="mono home-path" title={space.root}>
+              <bdi>{space.root}</bdi>
+            </span>
           </div>
         </div>
         <div className="home-actions">
           {daily && (
-            <button className="solid-button home-button" disabled={locked} onClick={onDaily}>
+            <button
+              className={
+                primary === 'daily' ? 'primary-button home-button' : 'stage-text-button framed'
+              }
+              disabled={locked}
+              onClick={onDaily}
+            >
               <Icon name="calendar" size={15} />
               {t('今日のノート', "Today's note")}
             </button>
           )}
-          <button className="stage-text-button framed" disabled={locked} onClick={onNewNote}>
+          <button
+            className={
+              primary === 'note' ? 'primary-button home-button' : 'stage-text-button framed'
+            }
+            disabled={locked}
+            onClick={onNewNote}
+          >
             <Icon name="plus" size={15} />
             {t('ノートを作成', 'Create note')}
           </button>
@@ -224,205 +248,210 @@ export function BrainHome({
           </button>
         </div>
       </header>
-      <div className="home-layers">
-        {schemaLayer && (
+      <div className="home-body">
+        <div className="home-main">
+          {changes.length > 0 && (
+            <Card
+              icon="branch"
+              title={t('変更', 'Changes')}
+              count={changes.length}
+              className="home-changes"
+              action={
+                <button className="primary-button small" onClick={onChanges}>
+                  {t('確認してコミット', 'Review and commit')}
+                </button>
+              }
+            >
+              {changes.slice(0, 6).map((change) => {
+                const state = change.conflict
+                  ? 'U'
+                  : change.index !== ' ' && change.index !== '?'
+                    ? change.index
+                    : change.worktree;
+                return (
+                  <button key={change.path} className="home-row" onClick={onChanges}>
+                    <Icon
+                      name={layerIcons[classify(space, change.path)]}
+                      size={15}
+                      className={`home-row-icon layer ${classify(space, change.path)}`}
+                    />
+                    <span className="home-row-name mono home-path" title={change.path}>
+                      <bdi>{change.path}</bdi>
+                    </span>
+                    <span className={`home-state state-${state === '?' ? 'new' : state}`}>
+                      {changeNames()[state] ?? t('変更', 'Modified')}
+                    </span>
+                  </button>
+                );
+              })}
+              {changes.length > 6 && (
+                <small className="home-more">
+                  {t(`ほか ${changes.length - 6} 件`, `${changes.length - 6} more`)}
+                </small>
+              )}
+            </Card>
+          )}
           <Card
-            layer="schema"
-            title="Schema"
+            layer="Knowledge_Base"
+            title={layerLabel(space, 'Knowledge_Base')}
             action={
-              <button
-                className="stage-button"
-                aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
-                title={t('エクスプローラーを更新', 'Refresh explorer')}
-                onClick={onRefresh}
-              >
-                <Icon name="refresh" size={15} />
+              <>
+                <VaultRepositories
+                  space={space}
+                  connections={connections}
+                  className="stage-button"
+                />
+                <button
+                  className="stage-text-button small"
+                  disabled={locked || held}
+                  onClick={onGraph}
+                >
+                  <Icon name="graph" size={14} />
+                  {t('グラフ', 'Graph')}
+                </button>
+              </>
+            }
+          >
+            {knowledge.shown.map((entry) => (
+              <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
+            ))}
+            {!knowledge.shown.length && (
+              <small className="home-more">{t('ノートはまだありません。', 'No notes yet.')}</small>
+            )}
+            {knowledge.more > 0 && (
+              <small className="home-more">
+                {t(`ほか ${knowledge.more} 件`, `${knowledge.more} more`)}
+              </small>
+            )}
+          </Card>
+        </div>
+        <aside className="home-aside">
+          {git && !git.available && <p className="home-git-note">{git.detail}</p>}
+          <Card
+            icon="archive"
+            title={t('実行の記録', 'Run records')}
+            action={
+              <button className="stage-text-button small" onClick={onMaterials}>
+                {t('資料と成果物', 'Materials and outputs')}
+                <Icon name="arrow" size={13} />
               </button>
             }
           >
-            {schema.shown.map((entry) => (
-              <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
-            ))}
-            {schema.more > 0 && (
-              <small className="home-more">
-                {t(`ほか ${schema.more} 件`, `${schema.more} more`)}
-              </small>
-            )}
-            <div className="home-row home-skills-row">
-              <Icon name="zap" size={16} className="home-row-icon" />
-              <span className="home-row-name">{t('スキル', 'Skills')}</span>
-              <button className="stage-text-button small" onClick={() => setReach(true)}>
-                <Icon name="checkCircle" size={13} />
-                {t('到達確認', 'Check reach')}
-              </button>
-            </div>
-            <div className="home-skills">
-              {skills.length ? (
-                skills.map((skill) => (
-                  <span key={skill.name} className="home-skill">
-                    {skill.name}
-                  </span>
-                ))
-              ) : (
-                <small className="home-more">{t('スキルはありません。', 'No skills.')}</small>
-              )}
-            </div>
-          </Card>
-        )}
-        <Card
-          layer="Knowledge_Base"
-          title={layerLabel(space, 'Knowledge_Base')}
-          action={
-            <>
-              <VaultRepositories space={space} connections={connections} className="stage-button" />
-              <button
-                className="stage-text-button framed small"
-                disabled={locked || held}
-                onClick={onGraph}
-              >
-                <Icon name="graph" size={14} />
-                {t('グラフ', 'Graph')}
-              </button>
-            </>
-          }
-        >
-          {knowledge.shown.map((entry) => (
-            <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
-          ))}
-          {!knowledge.shown.length && (
-            <small className="home-more">{t('ノートはまだありません。', 'No notes yet.')}</small>
-          )}
-          {knowledge.more > 0 && (
-            <small className="home-more">
-              {t(`ほか ${knowledge.more} 件`, `${knowledge.more} more`)}
-            </small>
-          )}
-        </Card>
-        <Card
-          layer="contents"
-          title={layerLabel(space, 'contents')}
-          action={
-            <button
-              className="stage-text-button framed small"
-              disabled={locked}
-              onClick={onConnect}
-            >
-              <Icon name="cloudConnect" size={14} />
-              {t('接続', 'Connect')}
-            </button>
-          }
-        >
-          {connections.map((connection) => (
-            <div key={connection.mountId} className="home-drive">
-              <div className="home-drive-name">
-                <Icon
-                  name={
-                    connection.provider === 'github'
-                      ? 'branch'
-                      : connection.provider === 'local'
-                        ? 'folder'
-                        : 'cloud'
-                  }
-                  size={16}
-                />
-                <span>{connection.name}</span>
-              </div>
-              <div className="home-drive-meta">
-                {connection.state !== 'mounted' ? (
-                  <span>{connection.detail ?? t('未接続', 'Not connected')}</span>
-                ) : connection.writable ? (
-                  <span>
-                    <Icon name="penLine" size={12} strokeWidth={2} />
-                    {t('編集可', 'Editable')}
-                  </span>
-                ) : (
-                  <span>
-                    <Icon name="lock" size={12} strokeWidth={2} />
-                    {t('読み取り専用', 'Read-only')}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-          {!connections.length && (
-            <small className="home-more">
-              {t('接続はまだありません。', 'No connections yet.')}
-            </small>
-          )}
-        </Card>
-      </div>
-      <div className="home-recent">
-        <Card
-          icon="branch"
-          title={t('変更', 'Changes')}
-          count={changes.length}
-          action={
-            <button className="stage-text-button small" onClick={onChanges}>
-              {t('コミット', 'Commit')}
-              <Icon name="arrow" size={13} />
-            </button>
-          }
-        >
-          {changes.slice(0, 4).map((change) => {
-            const state = change.conflict
-              ? 'U'
-              : change.index !== ' ' && change.index !== '?'
-                ? change.index
-                : change.worktree;
-            return (
-              <button key={change.path} className="home-row" onClick={onChanges}>
-                <Icon
-                  name={layerIcons[classify(space, change.path)]}
-                  size={15}
-                  className={`home-row-icon layer ${classify(space, change.path)}`}
-                />
-                <span className="home-row-name mono">{change.path}</span>
-                <span className={`home-state state-${state === '?' ? 'new' : state}`}>
-                  {changeNames()[state] ?? t('変更', 'Modified')}
+            {runs.map((run) => (
+              <button key={run.id} className="home-row" onClick={onMaterials}>
+                <Icon name="agent" size={15} className="home-row-icon agent" />
+                <span className="home-run-agent">{agentNames[run.agent]}</span>
+                <span className="mono home-run-date">{shortWhen(run.createdAt)}</span>
+                <span className="home-card-space" />
+                <span className={`home-outcome ${run.outcome ?? 'unknown'}`}>
+                  <Icon name={run.outcome === 'completed' ? 'checkCircle' : 'clock'} size={13} />
+                  {run.outcome === 'completed'
+                    ? t('完了', 'Completed')
+                    : run.outcome === 'cancelled'
+                      ? t('停止', 'Stopped')
+                      : run.outcome === 'failed'
+                        ? t('失敗', 'Failed')
+                        : t('完了記録なし', 'No completion recorded')}
                 </span>
               </button>
-            );
-          })}
-          {!changes.length && (
-            <small className="home-more">
-              {git && !git.available
-                ? git.detail
-                : t('変更はありません。', 'There are no changes.')}
-            </small>
+            ))}
+            {!runs.length && (
+              <small className="home-more">{t('実行はまだありません。', 'No runs yet.')}</small>
+            )}
+          </Card>
+          {schemaLayer && (
+            <Card
+              layer="schema"
+              title="Schema"
+              action={
+                <button
+                  className="stage-button"
+                  aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
+                  title={t('エクスプローラーを更新', 'Refresh explorer')}
+                  onClick={onRefresh}
+                >
+                  <Icon name="refresh" size={15} />
+                </button>
+              }
+            >
+              {schema.shown.map((entry) => (
+                <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
+              ))}
+              {schema.more > 0 && (
+                <small className="home-more">
+                  {t(`ほか ${schema.more} 件`, `${schema.more} more`)}
+                </small>
+              )}
+              <div className="home-row home-skills-row">
+                <Icon name="skill" size={16} className="home-row-icon" />
+                <span className="home-row-name">{t('スキル', 'Skills')}</span>
+                <button className="stage-text-button small" onClick={() => setReach(true)}>
+                  <Icon name="checkCircle" size={13} />
+                  {t('到達確認', 'Check reach')}
+                </button>
+              </div>
+              <div className="home-skills">
+                {skills.length ? (
+                  skills.map((skill) => (
+                    <span key={skill.name} className="home-skill">
+                      {skill.name}
+                    </span>
+                  ))
+                ) : (
+                  <small className="home-more">{t('スキルはありません。', 'No skills.')}</small>
+                )}
+              </div>
+            </Card>
           )}
-        </Card>
-        <Card
-          icon="archive"
-          title={t('実行の記録', 'Run records')}
-          action={
-            <button className="stage-text-button small" onClick={onMaterials}>
-              {t('資料と成果物', 'Materials and outputs')}
-              <Icon name="arrow" size={13} />
-            </button>
-          }
-        >
-          {runs.map((run) => (
-            <button key={run.id} className="home-row" onClick={onMaterials}>
-              <Icon name="sparkles" size={15} className="home-row-icon ember" />
-              <span className="home-run-agent">{agentNames[run.agent]}</span>
-              <span className="mono home-run-date">{shortWhen(run.createdAt)}</span>
-              <span className="home-card-space" />
-              <span className={`home-outcome ${run.outcome ?? ''}`}>
-                <Icon name={run.outcome === 'completed' ? 'checkCircle' : 'clock'} size={13} />
-                {run.outcome === 'completed'
-                  ? t('完了', 'Completed')
-                  : run.outcome === 'cancelled'
-                    ? t('停止', 'Stopped')
-                    : run.outcome === 'failed'
-                      ? t('失敗', 'Failed')
-                      : t('完了記録なし', 'No completion recorded')}
-              </span>
-            </button>
-          ))}
-          {!runs.length && (
-            <small className="home-more">{t('実行はまだありません。', 'No runs yet.')}</small>
-          )}
-        </Card>
+          <Card
+            layer="contents"
+            title={layerLabel(space, 'contents')}
+            action={
+              <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
+                <Icon name="cloudConnect" size={14} />
+                {t('接続', 'Connect')}
+              </button>
+            }
+          >
+            {connections.map((connection) => (
+              <div key={connection.mountId} className="home-drive">
+                <div className="home-drive-name">
+                  <Icon
+                    name={
+                      connection.provider === 'github'
+                        ? 'branch'
+                        : connection.provider === 'local'
+                          ? 'folder'
+                          : 'cloud'
+                    }
+                    size={16}
+                  />
+                  <span>{connection.name}</span>
+                </div>
+                <div className="home-drive-meta">
+                  {connection.state !== 'mounted' ? (
+                    <span>{connection.detail ?? t('未接続', 'Not connected')}</span>
+                  ) : connection.writable ? (
+                    <span>
+                      <Icon name="penLine" size={12} strokeWidth={2} />
+                      {t('編集可', 'Editable')}
+                    </span>
+                  ) : (
+                    <span>
+                      <Icon name="lock" size={12} strokeWidth={2} />
+                      {t('読み取り専用', 'Read-only')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!connections.length && (
+              <small className="home-more">
+                {t('接続はまだありません。', 'No connections yet.')}
+              </small>
+            )}
+          </Card>
+        </aside>
       </div>
       {reach && <SkillReach scopeId={space.scopeId} onClose={() => setReach(false)} />}
     </div>
