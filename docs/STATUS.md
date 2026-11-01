@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**, pull request open):
+A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**,
+[#289](https://github.com/DeL-TaiseiOzaki/irori/pull/289), published as `v0.2.50-preview.1`):
 - `VaultRepositories` (`src/app/VaultRepositories.tsx`) is a popover on the
   Knowledge section's actions (`BrainPanel`) and the Knowledge card of
   `BrainHome`. When opened it reads `gitStatus` and `gitSubmodules` and lists
