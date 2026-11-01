@@ -388,7 +388,15 @@ export function dispatchHost(handlers: HostHandlers, method: unknown, args: unkn
     throw Error('Unknown host operation');
   return dispatch(method as keyof HostRequests);
   function dispatch<K extends keyof HostRequests>(key: K) {
-    const parsed = hostArguments[key].parse(args) as Parameters<HostRequests[K]>;
+    const checked = hostArguments[key].safeParse(args);
+    // The window shows a refusal's words; a ZodError's text is its issues as JSON.
+    if (!checked.success) throw Error(refusal(checked.error.issues));
+    const parsed = checked.data as Parameters<HostRequests[K]>;
     return (handlers[key] as (...args: Parameters<HostRequests[K]>) => unknown)(...parsed);
   }
+}
+
+/** What the arguments' checks said, each message once. */
+function refusal(issues: readonly { message: string }[]) {
+  return [...new Set(issues.map((issue) => issue.message))].slice(0, 3).join(' ');
 }

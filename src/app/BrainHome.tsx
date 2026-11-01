@@ -10,6 +10,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon, type IconName } from './Icon';
 import { SkillReach } from './SkillReach';
+import { VaultRepositories } from './VaultRepositories';
 import { useResource } from './useResource';
 import { countLabel, shortWhen } from './display';
 import type { Listing } from './BrainPanel';
@@ -294,14 +295,17 @@ export function BrainHome({
             layer="Knowledge_Base"
             title={layerLabel(space, 'Knowledge_Base')}
             action={
-              <button
-                className="stage-text-button small"
-                disabled={locked || held}
-                onClick={onGraph}
-              >
-                <Icon name="graph" size={14} />
-                {t('グラフ', 'Graph')}
-              </button>
+              <>
+                <VaultRepositories space={space} connections={connections} className="stage-button" />
+                <button
+                  className="stage-text-button small"
+                  disabled={locked || held}
+                  onClick={onGraph}
+                >
+                  <Icon name="graph" size={14} />
+                  {t('グラフ', 'Graph')}
+                </button>
+              </>
             }
           >
             {knowledge.shown.map((entry) => (

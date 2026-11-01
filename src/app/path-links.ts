@@ -39,7 +39,11 @@ export interface PathLinkTarget {
 /**
  * The path a link's destination or inline code names, and how to find and open
  * it. A relative path is always offered: where its writer works is where it is
- * looked for first (ADR 044). An absolute one only when one of the folders holds it.
+ * looked for first (ADR 044). So is a link to an absolute one, as Codex writes
+ * every file it names: the host answers with the folders as they are now, which
+ * a run may have added to (its work folder) since the window read them.
+ * Inline code naming an absolute path is a path only when one of the folders
+ * holds it.
  */
 export function usePathTarget(
   value: string | undefined,
@@ -51,7 +55,7 @@ export function usePathTarget(
   const written = writtenPath(value, kind);
   if (!written) return undefined;
   const target = isAbsolute(written.path) ? locatePath(written, opener.roots) : undefined;
-  if (isAbsolute(written.path) && !target) return undefined;
+  if (kind === 'code' && isAbsolute(written.path) && !target) return undefined;
   const at = {
     ...(written.line && { line: written.line }),
     ...(written.column && { column: written.column }),

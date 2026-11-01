@@ -1,7 +1,8 @@
 # 044 — The irori agent works in its workspace's folder; reply paths start where their writer works
 
 Date: 2026-10-15. Status: owner request; implemented for 0.2.19. Decision 5
-corrected by [ADR 045](045-work-folder-in-contents.md).
+corrected by [ADR 045](045-work-folder-in-contents.md); decision 7 amended on
+2026-11-01 for 0.2.51.
 Extends [ADR 042](042-waiting-folders-and-work-folders.md) (work folders) and
 the path links of 0.2.14. Keeps [ADR 027](027-shared-schema.md) (the shared
 Schema) and [ADR 017](017-conversation-history.md) D4 (the irori agent's history
@@ -65,8 +66,20 @@ for a vault's work folder.
    opening another.
 7. **The folders a path may land in.** The workspace's vaults, the irori
    agent's folder, and each connected folder's real place, which stands for its
-   path inside its vault (`contents/<name>`). An absolute path outside all of
-   them is not a link. A file of the irori agent's folder opens on its screen.
+   path inside its vault (`contents/<name>`). A file of the irori agent's
+   folder opens on its screen.
+
+   *Amended 2026-11-01 (0.2.51), owner report.* Codex links every file it
+   names to its absolute path (`[app.py](/abs/path/app.py:12)`, in `<…>` when
+   the path has spaces). A link whose absolute path no folder the window had
+   read held was drawn as a web link, and clicking it showed the host's
+   refusal as raw validator output. Now a link to an absolute path is always
+   a path link: the host looks with the folders as they are when it is
+   clicked, which a run may have added to, and one outside all of them says it
+   was not found and which folders irori opens. Inline code naming an absolute
+   path outside them stays code. A destination that is neither a path nor an
+   `http`/`https` address (`mailto:`, `~/x`, a folder) keeps its words and is
+   not a link.
 8. **`AGENTS.md:12` is a file and its line,** not a scheme.
 
 ## Consequences

@@ -177,3 +177,74 @@ export function githubRepository(remote: string): string | undefined {
     /* not a supported GitHub remote */
   }
 }
+/** The page GitHub shows for an owner/repository, at a branch when one is named. */
+export function githubPage(repository: string, branch?: string) {
+  const base = `https://github.com/${repository}`;
+  return branch ? `${base}/tree/${branch.split('/').map(encodeURIComponent).join('/')}` : base;
+}
+/** A GitHub repository a vault holds: its own, a submodule's, or one connected in contents. */
+export interface LinkedRepository {
+  kind: 'vault' | 'submodule' | 'contents';
+  /** Where it is in the vault: empty for the vault itself, a folder otherwise. */
+  place: string;
+  /** owner/name, when the repository is on GitHub. */
+  repository?: string;
+  /** The branch checked out, or the one a connection records. */
+  branch?: string;
+  /** The remote's name when it is not a single GitHub repository. */
+  remote?: string;
+  /** Not cloned or not connected on this computer. */
+  absent?: boolean;
+}
+/**
+ * The GitHub repositories tied to a vault, its own first, then its submodules
+ * and its repositories in contents, each by place.
+ */
+export function linkedRepositories(
+  status: Pick<GitStatus, 'available' | 'branch' | 'remote'> | undefined,
+  submodules: GitSubmodule[],
+  connections: {
+    provider: string;
+    url?: string;
+    branch?: string;
+    contentsRoot: string;
+    name: string;
+    state: string;
+  }[],
+): LinkedRepository[] {
+  const own: LinkedRepository[] = status?.available
+    ? [
+        {
+          kind: 'vault',
+          place: '',
+          repository: status.remote?.repository,
+          branch: status.branch,
+          remote: status.remote && !status.remote.repository ? status.remote.label : undefined,
+        },
+      ]
+    : [];
+  const byPlace = (a: LinkedRepository, b: LinkedRepository) =>
+    a.place < b.place ? -1 : a.place > b.place ? 1 : 0;
+  return [
+    ...own,
+    ...submodules
+      .map((m): LinkedRepository => ({
+        kind: 'submodule',
+        place: m.path,
+        repository: m.repository,
+        branch: m.branch,
+        absent: !m.initialized,
+      }))
+      .sort(byPlace),
+    ...connections
+      .filter((c) => c.provider === 'github' && c.url)
+      .map((c): LinkedRepository => ({
+        kind: 'contents',
+        place: `${c.contentsRoot}/${c.name}`,
+        repository: githubRepository(c.url!),
+        branch: c.branch,
+        absent: c.state === 'unconfigured',
+      }))
+      .sort(byPlace),
+  ];
+}
