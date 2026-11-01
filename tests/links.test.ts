@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { webAddress, externalUrl } from '../src/domain/links';
-import { hostArguments } from '../src/domain/host-requests';
+import { dispatchHost, hostArguments, type HostHandlers } from '../src/domain/host-requests';
 
 test('ordinary web addresses from a reply are accepted and normalised', () => {
   assert.equal(webAddress('https://example.com/docs')?.href, 'https://example.com/docs');
@@ -43,4 +43,18 @@ test('openUrl is registered, so the preload allowlist carries it', () => {
   assert.equal(hostArguments.openUrl.safeParse(['https://example.com']).success, true);
   assert.equal(hostArguments.openUrl.safeParse(['file:///etc/passwd']).success, false);
   assert.equal(hostArguments.openUrl.safeParse([]).success, false);
+});
+
+test("a refused request says why in words, not as the validator's issues", () => {
+  // Codex links a file by its absolute path; one irori cannot open must not
+  // reach the window as `[ { "code": "custom", ... } ]`.
+  const handlers = { openUrl: async () => {} } as unknown as HostHandlers;
+  assert.throws(
+    () => dispatchHost(handlers, 'openUrl', ['/Users/me/project/app.py:12']),
+    (error: Error) => {
+      assert.equal(error.message, 'http または https のリンクだけを開けます。');
+      assert.equal(String(error), 'Error: http または https のリンクだけを開けます。');
+      return true;
+    },
+  );
 });
