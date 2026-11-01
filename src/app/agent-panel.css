@@ -5,10 +5,8 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  border-radius: 14px;
   background: var(--panel);
   color: var(--tx);
-  box-shadow: var(--shadow);
 }
 .agent-header {
   position: relative;
@@ -70,7 +68,7 @@
   height: 15px;
   border-radius: 5px;
   background: var(--panel);
-  color: var(--ember);
+  color: var(--tx-3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,7 +91,7 @@
   outline: none;
 }
 .agent-picker:has(select:focus-visible) {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .agent-picker option {
@@ -104,33 +102,38 @@
   color: var(--tx-3);
   pointer-events: none;
 }
+/* The agent's state in words, with a dot: running is neutral and moves,
+   waiting for the person takes the attention colour. */
 .agent-state {
   display: flex;
   align-items: center;
   gap: 6px;
   height: 24px;
-  padding: 0 9px;
-  border-radius: 12px;
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  padding: 0 4px;
+  color: var(--tx-2);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 .agent-state > i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--ember);
+  background: var(--run);
   animation: irori-blink 1.4s ease-in-out infinite;
 }
+.agent-state.waiting {
+  color: var(--attn-tx);
+  font-weight: 600;
+}
 .agent-state.waiting > i {
+  background: var(--attn);
   animation: irori-halo 2.2s ease-out infinite;
 }
 .agent-header-space {
   flex: 1;
 }
-/* A thin line runs along the header while the AI works. */
+/* A thin neutral line runs along the header while the agent works. */
 .agent-progress {
   position: absolute;
   left: 0;
@@ -143,11 +146,11 @@
   display: block;
   width: 28%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, var(--ember), transparent);
+  background: linear-gradient(90deg, transparent, var(--run), transparent);
   animation: irori-slide 1.9s ease-in-out infinite;
 }
 /* The vault's open conversations, each running beside the others (ADR 020),
-   in the stage's tab style: the one on show has weight and an ember line. */
+   in the stage's tab style: the one on show has weight and a line. */
 .conversation-tabs {
   flex: none;
   display: flex;
@@ -184,7 +187,7 @@
   color: var(--tx);
 }
 .conversation-tab.current::after {
-  background: var(--ember);
+  background: var(--tx-2);
 }
 .conversation-tab > button {
   border: 0;
@@ -222,10 +225,11 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--ember);
+  background: var(--run);
   animation: irori-blink 1.4s ease-in-out infinite;
 }
 .conversation-tab.waiting > button[role='tab'] > i {
+  background: var(--attn);
   animation: irori-halo 2.2s ease-out infinite;
 }
 .conversation-tab > .conversation-tab-close {
@@ -287,10 +291,12 @@
 .agent-connection-error {
   margin: 10px 14px 0;
   padding: 8px 10px;
-  border-radius: 9px;
-  background: rgba(255, 159, 142, 0.12);
-  color: var(--danger-on-nav);
+  border-left: 2px solid var(--danger-line);
+  border-radius: 0 8px 8px 0;
+  background: var(--danger-soft);
+  color: var(--danger-tx);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .agent-panel .hint {
   color: var(--tx-3);
@@ -358,32 +364,6 @@
   font-size: 13.5px;
   line-height: 1.75;
 }
-.agent-empty {
-  margin: auto 0;
-  color: var(--tx-3);
-}
-.agent-empty > p {
-  margin: 0 0 10px;
-  color: var(--tx-2);
-  font-weight: 600;
-}
-.prompt-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.agent-panel .prompt-suggestions button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  text-align: left;
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--tx-2);
-}
 .message {
   overflow-wrap: anywhere;
 }
@@ -407,7 +387,7 @@
   color: var(--tx-3);
 }
 .agent-label > .ui-icon {
-  color: var(--ember);
+  color: var(--tx-3);
 }
 .message.text {
   color: var(--tx);
@@ -419,10 +399,12 @@
 }
 .message.error {
   padding: 8px 11px;
-  border-radius: 10px;
-  background: rgba(255, 159, 142, 0.1);
-  color: var(--danger-on-nav);
+  border-radius: 0 8px 8px 0;
+  border-left: 2px solid var(--danger-line);
+  background: var(--danger-soft);
+  color: var(--danger-tx);
   font-size: 12.5px;
+  overflow-wrap: anywhere;
 }
 .message.done {
   display: flex;
@@ -432,7 +414,7 @@
   color: var(--tx-3);
 }
 .message.done > .ui-icon {
-  color: var(--cont);
+  color: var(--tx-3);
 }
 /* A run's steps: a timeline with a thin guide line. */
 .steps {
@@ -466,10 +448,10 @@
   display: none;
 }
 .step-icon {
-  color: var(--cont);
+  color: var(--tx-3);
 }
 .step-icon.running {
-  color: var(--ember);
+  color: var(--run);
   animation: irori-spin 0.9s linear infinite;
 }
 .step-verb {
@@ -508,7 +490,7 @@
   font-size: 11px;
 }
 /* A request that waits for the person arrives with a little overshoot and
-   breathes until it is answered. */
+   stays marked in the attention colour until it is answered. */
 @keyframes request-in {
   from {
     opacity: 0;
@@ -520,12 +502,10 @@
   flex-direction: column;
   gap: 11px;
   padding: 14px;
-  border-radius: 16px;
-  background: var(--ember-soft);
-  box-shadow: inset 0 0 0 1px var(--ember-line);
-  animation:
-    request-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    irori-glow 2.6s ease-in-out 0.45s infinite;
+  border-radius: 10px;
+  background: var(--attn-soft);
+  box-shadow: inset 0 0 0 1px var(--attn-line);
+  animation: request-in 0.3s var(--ease) both;
 }
 .request-title {
   display: flex;
@@ -537,7 +517,7 @@
   overflow-wrap: anywhere;
 }
 .request-title > .ui-icon {
-  color: var(--ember);
+  color: var(--attn);
 }
 .request-target {
   padding: 8px 10px;
@@ -635,7 +615,7 @@
   box-shadow: inset 0 0 0 1px var(--hair-3);
 }
 .choices .choice[aria-checked='true'] {
-  box-shadow: inset 0 0 0 1.5px var(--ember);
+  box-shadow: inset 0 0 0 1.5px var(--act);
 }
 .choice-mark {
   flex: none;
@@ -652,7 +632,7 @@
   border-radius: 4px;
 }
 .choice[aria-checked='true'] .choice-mark {
-  background: var(--ember);
+  background: var(--act);
   box-shadow: none;
 }
 .choice-text {
@@ -849,7 +829,7 @@
   gap: 8px;
   padding: 0 4px;
   font-size: 12px;
-  color: var(--ember-2);
+  color: var(--tx-2);
 }
 .agent-panel .new-session button {
   padding: 2px 9px;
@@ -1088,11 +1068,11 @@
   cursor: pointer;
 }
 .composer-pill.toggle:has(input:focus-visible) {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
 }
 .composer-pill.pressed {
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .agent-panel .composer-selects > button {
   height: 28px;
@@ -1132,16 +1112,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ember);
-  color: var(--on-ember);
+  background: var(--solid);
+  color: var(--on-solid);
   box-shadow: none;
 }
 .agent-panel .send-button:hover:not(:disabled) {
-  background: var(--ember);
-  filter: brightness(1.08);
+  background: var(--solid);
+  filter: brightness(0.92);
 }
 .agent-panel .send-button:disabled {
-  opacity: 0.4;
+  background: var(--raised-2);
+  color: var(--tx-3);
+  opacity: 1;
 }
 
 /* Replies are Markdown; these keep them compact in a narrow panel. */
@@ -1278,8 +1260,8 @@
   border-radius: 10px;
 }
 .task.waiting {
-  background: var(--ember-soft);
-  box-shadow: inset 0 0 0 1px var(--ember-line);
+  background: var(--attn-soft);
+  box-shadow: inset 0 0 0 1px var(--attn-line);
 }
 .task-text {
   flex: 1;
@@ -1312,13 +1294,16 @@
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px currentColor;
 }
-.task-state.working,
+.task-state.working {
+  color: var(--tx);
+  font-weight: 600;
+}
 .task-state.waiting {
-  color: var(--ember);
+  color: var(--attn-tx);
   font-weight: 600;
 }
 .task-state.waiting > i {
-  background: var(--ember);
+  background: var(--attn);
   box-shadow: none;
 }
 .task-state .spin {
@@ -1330,7 +1315,7 @@
   border-left: 2px solid var(--hair-2);
 }
 .message.report.failed {
-  border-left-color: var(--ember-line);
+  border-left-color: var(--danger-line);
 }
 .report-from {
   display: flex;
@@ -1390,8 +1375,8 @@
   font-size: 11.5px;
 }
 .history-tools button[aria-pressed='true'] {
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .history-row {
   display: flex;
@@ -1433,7 +1418,7 @@
 }
 .history-title .ui-icon {
   flex: none;
-  color: var(--ember-2);
+  color: var(--tx-3);
 }
 .history-open small {
   max-width: 100%;

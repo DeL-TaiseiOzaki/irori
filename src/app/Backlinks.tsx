@@ -1,3 +1,4 @@
+import { countLabel } from './display';
 import { useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import type { KnowledgeSearch, SearchHit } from '../domain/search';
@@ -114,7 +115,7 @@ export function Backlinks({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger className="stage-button backlinks-trigger" aria-label={label} title={label}>
         <Icon name="link" size={16} />
-        {!!count && <span className="backlinks-count">{count}</span>}
+        {!!count && <span className="backlinks-count">{countLabel(count)}</span>}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={6}>

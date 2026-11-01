@@ -383,80 +383,6 @@ export function RegisterSpace({
   );
 }
 
-type Brain = Pick<Space, 'scopeId' | 'name'>;
-
-/** An example for a first launch, before any workspace combines brains. */
-function sampleDiagram() {
-  const brain = (id: string, name: string) => ({ scopeId: `sample-${id}`, name });
-  const brains = [
-    brain('notes', t('ノート', 'Notes')),
-    brain('team', t('チーム', 'Team')),
-    brain('research', t('研究', 'Research')),
-    brain('thesis', t('論文', 'Thesis')),
-  ];
-  const ids = (...indexes: number[]) => indexes.map((i) => brains[i].scopeId);
-  return {
-    brains,
-    groups: [
-      { name: t('仕事', 'Work'), scopeIds: ids(0, 1, 2) },
-      { name: t('論文執筆', 'Thesis writing'), scopeIds: ids(0, 2, 3) },
-    ],
-  };
-}
-
-/**
- * Brains above, workspaces below: one brain can belong to several workspaces.
- * Drawn in a 480 × 330 box; the whole drawing scales with the column.
- */
-function Diagram({ spaces, profiles }: { spaces: Space[]; profiles: WorkspaceProfile[] }) {
-  const shown = profiles
-    .filter((profile) => profile.scopeIds.some((id) => spaces.some((s) => s.scopeId === id)))
-    .slice(0, 2);
-  const inGroup = (space: Brain) => shown.some((group) => group.scopeIds.includes(space.scopeId));
-  const {
-    brains,
-    groups,
-  }: { brains: Brain[]; groups: Pick<WorkspaceProfile, 'name' | 'scopeIds'>[] } = shown.length
-    ? {
-        brains: [...spaces.filter(inGroup), ...spaces.filter((s) => !inGroup(s))].slice(0, 6),
-        groups: shown,
-      }
-    : sampleDiagram();
-  const brainX = (i: number) => 240 + (i - (brains.length - 1) / 2) * 70;
-  const groupX = (i: number) => (groups.length === 1 ? 240 : 120 + i * 240);
-  return (
-    <svg className="start-diagram" viewBox="0 0 480 330" aria-hidden="true">
-      {groups.map((group, g) =>
-        brains.map(
-          (brain, b) =>
-            group.scopeIds.includes(brain.scopeId) && (
-              <g key={`${g}-${brain.scopeId}`} className={g ? 'secondary' : 'primary'}>
-                <path d={`M${groupX(g)} 240 C${groupX(g)} 172 ${brainX(b)} 164 ${brainX(b)} 98`} />
-                <circle cx={brainX(b)} cy={98} r={3} />
-              </g>
-            ),
-        ),
-      )}
-      {brains.map((brain, b) => (
-        <foreignObject key={brain.scopeId} x={brainX(b) - 36} y={28} width={72} height={80}>
-          <div className="start-diagram-brain">
-            <BrainTile space={brain} size={52} radius={15} />
-            <small>{brain.name}</small>
-          </div>
-        </foreignObject>
-      ))}
-      {groups.map((group, g) => (
-        <foreignObject key={g} x={groupX(g) - 100} y={240} width={200} height={44}>
-          <div className={`start-diagram-workspace ${g ? '' : 'primary'}`}>
-            <span>{group.name}</span>
-            <small>{group.scopeIds.length}</small>
-          </div>
-        </foreignObject>
-      ))}
-    </svg>
-  );
-}
-
 export function Startup({
   spaces,
   refresh,
@@ -517,20 +443,217 @@ export function Startup({
   const unavailable = profiles
     .find((profile) => profile.id === editing)
     ?.scopeIds.filter((id) => !spaces.some((space) => space.scopeId === id));
+  // A first launch has nothing to open or combine: adding a vault comes first.
+  const firstRun = !spaces.length && !profiles.length;
+  const addVault = (
+    <section aria-labelledby="start-add" className={firstRun ? 'start-first' : undefined}>
+      <h3 id="start-add">{t('vault を追加', 'Add vault')}</h3>
+      <div className="start-add">
+        <button disabled={busy} onClick={() => setAdding('folder')}>
+          <Icon name="folderOpen" size={16} />
+          <strong>{t('KBフォルダを開く', 'Open a KB folder')}</strong>
+        </button>
+        <button disabled={busy} onClick={() => setAdding('clone')}>
+          <Icon name="download" size={16} />
+          <strong>{t('GitHub から取得', 'Clone from GitHub')}</strong>
+        </button>
+        <button disabled={busy} onClick={() => setAdding('create')}>
+          <Icon name="plus" size={16} />
+          <strong>{t('新しく作成', 'Create new')}</strong>
+        </button>
+        <button disabled={busy} onClick={() => setRestoring(true)}>
+          <Icon name="user" size={16} />
+          <strong>{t('GitHub から環境を復元', 'Restore from GitHub')}</strong>
+        </button>
+      </div>
+    </section>
+  );
   return (
     <div className="start">
-      <section className="start-intro chrome">
-        <div className="start-brand">
-          <img className="brand-icon" src={appIcon} alt="" width="40" height="40" />
-          <span>irori</span>
+      <div className="start-column chrome">
+        <header className="start-brand">
+          <img className="brand-icon" src={appIcon} alt="" width="28" height="28" />
+          <h1 className="start-title">
+            irori <span>- IDE for Second Brain</span>
+          </h1>
           <small>{appVersion} Preview</small>
-        </div>
-        <h1>
-          {t('ノートから、', 'From your notes,')}
-          <br />
-          {t('次の仕事へ。', "to what's next.")}
-        </h1>
-        <Diagram spaces={spaces} profiles={profiles} />
+        </header>
+        <main className="start-main">
+          <h2>{t('ワークスペースを選択', 'Choose a workspace')}</h2>
+          {firstRun && addVault}
+          {profiles.length > 0 ? (
+            <div className="start-workspaces">
+              {profiles.map((profile) => {
+                const members = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
+                const missing = profile.scopeIds.length - members.length;
+                return (
+                  <div
+                    key={profile.id}
+                    className="start-workspace"
+                    data-editing={editing === profile.id || undefined}
+                  >
+                    <button
+                      className="workspace-card"
+                      disabled={busy}
+                      onClick={() => onOpen(profile)}
+                    >
+                      <span className="start-stack">
+                        {members.map((space) => (
+                          <BrainTile key={space.scopeId} space={space} size={30} radius={9} />
+                        ))}
+                      </span>
+                      <span className="start-workspace-text">
+                        <strong title={profile.name}>{profile.name}</strong>
+                        <small>
+                          <span className="start-members">
+                            {members.length
+                              ? members.map((space) => space.name).join(t('・', ' · '))
+                              : t('vault なし', 'No vaults')}
+                          </span>
+                          {missing > 0 && (
+                            <span className="start-missing">
+                              {t(`${missing} 件は利用できません`, `${missing} unavailable`)}
+                            </span>
+                          )}
+                        </small>
+                      </span>
+                      <span className="start-open">
+                        <Icon name="arrow" size={17} strokeWidth={2.2} />
+                      </span>
+                    </button>
+                    <button
+                      className="start-icon-button"
+                      disabled={busy}
+                      title={t('編集', 'Edit')}
+                      aria-label={t(`${profile.name} を編集`, `Edit ${profile.name}`)}
+                      onClick={() => {
+                        setEditing(profile.id);
+                        setName(profile.name);
+                        setSelected(profile.scopeIds);
+                        setError('');
+                      }}
+                    >
+                      <Icon name="squarePen" />
+                    </button>
+                    <button
+                      className="start-icon-button"
+                      disabled={busy || inTab(profile.id)}
+                      title={t('登録を削除', 'Remove registration')}
+                      aria-label={t(
+                        `${profile.name} の登録を削除`,
+                        `Remove ${profile.name} registration`,
+                      )}
+                      onClick={() => void remove(profile)}
+                    >
+                      <Icon name="trash" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="start-note">
+              {t('まだワークスペースはありません。', 'No workspaces yet.')}
+            </p>
+          )}
+          <section
+            aria-labelledby="start-combine"
+            className={profiles.length && !editing ? 'start-secondary' : undefined}
+          >
+            <h3 id="start-combine">
+              {editing
+                ? t('ワークスペースを編集', 'Edit workspace')
+                : t('vault を選んで組み合わせる', 'Combine vaults')}
+            </h3>
+            <div className="start-library">
+              {unavailable?.map((id) => (
+                <label key={id} className="start-chip unavailable" title={id}>
+                  <Check
+                    checked={selected.includes(id)}
+                    disabled={busy}
+                    onChange={(on) => toggle(id, on)}
+                  />
+                  <span>
+                    {t('利用できない vault', 'Unavailable vault')}
+                    <small>{id}</small>
+                  </span>
+                </label>
+              ))}
+              {spaces.map((space) => (
+                <label key={space.scopeId} className="start-chip" title={space.root}>
+                  <Check
+                    checked={selected.includes(space.scopeId)}
+                    disabled={busy}
+                    onChange={(on) => toggle(space.scopeId, on)}
+                  />
+                  <BrainTile space={space} size={24} radius={7} />
+                  <span>{space.name}</span>
+                  <button
+                    type="button"
+                    className="start-chip-remove"
+                    disabled={busy || vaultInTab(space.scopeId)}
+                    title={t('vault を削除', 'Remove vault')}
+                    aria-label={t(`${space.name} を削除`, `Remove ${space.name}`)}
+                    onClick={(event) => {
+                      // The chip is a label: the click must not tick its checkbox.
+                      event.preventDefault();
+                      setRemoving(space);
+                    }}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </label>
+              ))}
+              {!spaces.length && (
+                <p className="start-note">{t('vault はまだありません。', 'No vaults yet.')}</p>
+              )}
+            </div>
+            <form
+              className="start-create"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save();
+              }}
+            >
+              <label className="start-name">
+                <span>{t('名前', 'Name')}</span>
+                <input
+                  aria-label={t('ワークスペース名', 'Workspace name')}
+                  placeholder={t('ワークスペース名', 'Workspace name')}
+                  value={name}
+                  required
+                  disabled={busy}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <ArrowFillButton type="submit" disabled={busy}>
+                {editing
+                  ? spaces.some((space) => selected.includes(space.scopeId))
+                    ? t('変更を保存して開く', 'Save changes and open')
+                    : t('変更を保存', 'Save changes')
+                  : selected.length
+                    ? t('選択したスペースを開く', 'Open the selected spaces')
+                    : t('ワークスペースを作成', 'Create workspace')}
+              </ArrowFillButton>
+              {editing && (
+                <button
+                  type="button"
+                  className="start-text-button"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditing(undefined);
+                    setSelected([]);
+                    setName(undefined);
+                  }}
+                >
+                  {t('編集をキャンセル', 'Cancel editing')}
+                </button>
+              )}
+            </form>
+          </section>
+          {!firstRun && addVault}
+          {error && <p role="alert">{error}</p>}
+        </main>
         <footer className="start-footer">
           <UpdateNotice host={host} />
           <CloudRecovery />
@@ -543,211 +666,7 @@ export function Startup({
             onError={(e) => setError(errorText(e))}
           />
         </footer>
-      </section>
-      <main className="start-main chrome">
-        <h2>{t('ワークスペースを選択', 'Choose a workspace')}</h2>
-        {profiles.length > 0 ? (
-          <div className="start-workspaces">
-            {profiles.map((profile) => {
-              const members = spaces.filter((space) => profile.scopeIds.includes(space.scopeId));
-              const missing = profile.scopeIds.length - members.length;
-              return (
-                <div
-                  key={profile.id}
-                  className="start-workspace"
-                  data-editing={editing === profile.id || undefined}
-                >
-                  <button
-                    className="workspace-card"
-                    disabled={busy}
-                    onClick={() => onOpen(profile)}
-                  >
-                    <span className="start-stack">
-                      {members.map((space) => (
-                        <BrainTile key={space.scopeId} space={space} size={30} radius={9} />
-                      ))}
-                    </span>
-                    <span className="start-workspace-text">
-                      <strong>{profile.name}</strong>
-                      <small>
-                        {members.map((space) => space.name).join(t('・', ' · '))}
-                        {missing > 0 &&
-                          (members.length ? t('・', ' · ') : '') +
-                            t(`${missing} 件は利用できません`, `${missing} unavailable`)}
-                      </small>
-                    </span>
-                    <span className="start-open">
-                      <Icon name="arrow" size={17} strokeWidth={2.2} />
-                    </span>
-                  </button>
-                  <button
-                    className="start-icon-button"
-                    disabled={busy}
-                    title={t('編集', 'Edit')}
-                    aria-label={t(`${profile.name} を編集`, `Edit ${profile.name}`)}
-                    onClick={() => {
-                      setEditing(profile.id);
-                      setName(profile.name);
-                      setSelected(profile.scopeIds);
-                      setError('');
-                    }}
-                  >
-                    <Icon name="squarePen" />
-                  </button>
-                  <button
-                    className="start-icon-button"
-                    disabled={busy || inTab(profile.id)}
-                    title={t('登録を削除', 'Remove registration')}
-                    aria-label={t(
-                      `${profile.name} の登録を削除`,
-                      `Remove ${profile.name} registration`,
-                    )}
-                    onClick={() => void remove(profile)}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="start-note">
-            {t('まだワークスペースはありません。', 'No workspaces yet.')}
-          </p>
-        )}
-        <hr />
-        <section aria-labelledby="start-combine">
-          <h3 id="start-combine">
-            {editing
-              ? t('ワークスペースを編集', 'Edit workspace')
-              : t('vault を選んで組み合わせる', 'Combine vaults')}
-          </h3>
-          <div className="start-library">
-            {unavailable?.map((id) => (
-              <label key={id} className="start-chip unavailable" title={id}>
-                <Check
-                  checked={selected.includes(id)}
-                  disabled={busy}
-                  onChange={(on) => toggle(id, on)}
-                />
-                <span>
-                  {t('利用できない vault', 'Unavailable vault')}
-                  <small>{id}</small>
-                </span>
-              </label>
-            ))}
-            {spaces.map((space) => (
-              <label key={space.scopeId} className="start-chip" title={space.root}>
-                <Check
-                  checked={selected.includes(space.scopeId)}
-                  disabled={busy}
-                  onChange={(on) => toggle(space.scopeId, on)}
-                />
-                <BrainTile space={space} size={24} radius={7} />
-                <span>{space.name}</span>
-                <button
-                  type="button"
-                  className="start-chip-remove"
-                  disabled={busy || vaultInTab(space.scopeId)}
-                  title={t('vault を削除', 'Remove vault')}
-                  aria-label={t(`${space.name} を削除`, `Remove ${space.name}`)}
-                  onClick={(event) => {
-                    // The chip is a label: the click must not tick its checkbox.
-                    event.preventDefault();
-                    setRemoving(space);
-                  }}
-                >
-                  <Icon name="trash" size={14} />
-                </button>
-              </label>
-            ))}
-            {!spaces.length && (
-              <p className="start-note">{t('vault はまだありません。', 'No vaults yet.')}</p>
-            )}
-          </div>
-          <form
-            className="start-create"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void save();
-            }}
-          >
-            <label className="start-name">
-              <span>{t('名前', 'Name')}</span>
-              <input
-                aria-label={t('ワークスペース名', 'Workspace name')}
-                placeholder={t('ワークスペース名', 'Workspace name')}
-                value={name}
-                required
-                disabled={busy}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <ArrowFillButton type="submit" disabled={busy}>
-              {editing
-                ? spaces.some((space) => selected.includes(space.scopeId))
-                  ? t('変更を保存して開く', 'Save changes and open')
-                  : t('変更を保存', 'Save changes')
-                : selected.length
-                  ? t('選択したスペースを開く', 'Open the selected spaces')
-                  : t('ワークスペースを作成', 'Create workspace')}
-            </ArrowFillButton>
-            {editing && (
-              <button
-                type="button"
-                className="start-text-button"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(undefined);
-                  setSelected([]);
-                  setName(undefined);
-                }}
-              >
-                {t('編集をキャンセル', 'Cancel editing')}
-              </button>
-            )}
-          </form>
-        </section>
-        <hr />
-        <section aria-labelledby="start-add">
-          <h3 id="start-add">{t('vault を追加', 'Add vault')}</h3>
-          <div className="start-add">
-            <button disabled={busy} onClick={() => setAdding('folder')}>
-              <span className="start-add-icon">
-                <Icon name="folderOpen" size={20} />
-              </span>
-              <span>
-                <strong>{t('KBフォルダを開く', 'Open a KB folder')}</strong>
-              </span>
-            </button>
-            <button disabled={busy} onClick={() => setAdding('clone')}>
-              <span className="start-add-icon">
-                <Icon name="download" size={20} />
-              </span>
-              <span>
-                <strong>{t('GitHub から取得', 'Clone from GitHub')}</strong>
-              </span>
-            </button>
-            <button disabled={busy} onClick={() => setAdding('create')}>
-              <span className="start-add-icon">
-                <Icon name="plus" size={20} />
-              </span>
-              <span>
-                <strong>{t('新しく作成', 'Create new')}</strong>
-              </span>
-            </button>
-            <button disabled={busy} onClick={() => setRestoring(true)}>
-              <span className="start-add-icon">
-                <Icon name="user" size={20} />
-              </span>
-              <span>
-                <strong>{t('GitHub から環境を復元', 'Restore from GitHub')}</strong>
-              </span>
-            </button>
-          </div>
-        </section>
-        {error && <p role="alert">{error}</p>}
-      </main>
+      </div>
       {restoring && (
         <RestoreEnvironment onClose={() => setRestoring(false)} onRestored={restored} />
       )}

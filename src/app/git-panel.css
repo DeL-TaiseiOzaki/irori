@@ -102,15 +102,12 @@
   margin: 0 0 6px;
 }
 .git-notice.error {
-  background: rgba(255, 159, 142, 0.12);
-  color: var(--danger-on-nav);
+  background: var(--danger-soft);
+  color: var(--danger-tx);
 }
 .git-warning {
-  background: rgba(230, 192, 122, 0.12);
-  color: #e6c07a;
-}
-:root[data-theme='light'] .git-warning {
-  color: var(--warn-ink);
+  background: var(--attn-soft);
+  color: var(--attn-tx);
 }
 /* Changes | History: an underlined pair. */
 .git-tabs {
@@ -229,19 +226,14 @@
 }
 .git-file-state.state-new,
 .git-file-state.state-A {
-  color: #86d7a3;
+  color: var(--add-tx);
 }
-.git-file-state.state-D,
+.git-file-state.state-D {
+  color: var(--del-tx);
+}
+/* A conflict waits for the person's decision. */
 .git-file-state.state-U {
-  color: var(--danger-on-nav);
-}
-:root[data-theme='light'] .git-file-state.state-new,
-:root[data-theme='light'] .git-file-state.state-A {
-  color: var(--add-ink);
-}
-:root[data-theme='light'] .git-file-state.state-D,
-:root[data-theme='light'] .git-file-state.state-U {
-  color: var(--del-ink);
+  color: var(--attn-tx);
 }
 .git-file small {
   flex: none;
@@ -377,15 +369,15 @@
   padding: 0 9px;
   margin-right: 6px;
   border-radius: 8px;
-  background: var(--add-wash);
-  color: var(--add-ink);
+  background: var(--stage-2);
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 .diff-kind.conflict {
-  background: var(--del-wash);
-  color: var(--del-ink);
+  background: var(--attn-wash);
+  color: var(--attn-ink);
 }
 .git-detail-body {
   flex: 1;

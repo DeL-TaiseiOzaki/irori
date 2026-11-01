@@ -17,9 +17,21 @@ export function aiStateWords(state: AiState, pending = 0) {
   }
 }
 
-/** A time to the minute, without the year, in irori's language. */
+/**
+ * A count as it fits a badge: up to `max` as written, above it `max+`. A count
+ * that is not a whole number of at least zero is shown as nothing.
+ */
+export function countLabel(count: number, max = 99) {
+  if (!Number.isFinite(count) || count < 0) return '';
+  const whole = Math.floor(count);
+  return whole > max ? `${max}+` : String(whole);
+}
+
+/** A time to the minute, without the year, in irori's language; a broken time is a dash. */
 export function shortWhen(iso: string) {
-  return new Date(iso).toLocaleString(displayLocale(), {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(displayLocale(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',

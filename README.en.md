@@ -4,7 +4,7 @@
 
 # irori
 
-**From notes to the next piece of work.**
+**IDE for Second Brain**
 
 A desktop app that brings together the notes where your knowledge lives and the local AI agents that carry the work forward.
 

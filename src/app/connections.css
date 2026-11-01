@@ -138,8 +138,8 @@
 .connect-sheet .moved-notice {
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--add-wash);
-  color: var(--add-ink);
+  background: var(--stage-2);
+  color: var(--ink-2);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -295,7 +295,7 @@
   font-size: 12px;
 }
 .connect-sheet .account-state.good {
-  color: var(--add-ink);
+  color: var(--ink-2);
 }
 .connect-sheet .account-state.warn {
   color: var(--warn-ink);
@@ -491,7 +491,7 @@
   transform: translateX(14px);
 }
 .connect-sheet .connect-switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .connect-sheet .connect-switch input:disabled + .switch-track {
@@ -578,7 +578,7 @@
   background: currentColor;
 }
 .connect-sheet .connection-state[data-state='mounted'] {
-  color: var(--add-ink);
+  color: var(--ink-2);
 }
 .connect-sheet .connection-state[data-state='connecting'] {
   color: var(--warn-ink);
@@ -623,7 +623,7 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--cont-ink);
+  color: var(--run-ink);
 }
 .connect-sheet .connection-actions {
   display: flex;
