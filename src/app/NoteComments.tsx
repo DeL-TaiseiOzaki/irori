@@ -1,3 +1,4 @@
+import { countLabel } from './display';
 import { useEffect, useRef, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import type { NoteComment } from '../domain/comments';
@@ -123,7 +124,7 @@ export function NoteComments({
     >
       <Popover.Trigger className="stage-button comments-trigger" aria-label={label} title={label}>
         <Icon name="comment" size={16} />
-        {!!count && <span className="backlinks-count">{count}</span>}
+        {!!count && <span className="backlinks-count">{countLabel(count)}</span>}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner

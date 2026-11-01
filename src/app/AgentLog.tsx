@@ -289,7 +289,7 @@ export function AgentRequest({
         </button>
         {(!quick || Object.values(drafts).some((draft) => draft.other)) && (
           <button
-            className="ember-button"
+            className="primary-button"
             disabled={sending || (!!questions && !questionsAnswered(questions, answers!))}
             onClick={() => void reply(true, answers)}
           >
@@ -486,7 +486,7 @@ export const AgentLog = memo(function AgentLog({
           case 'label':
             return (
               <div className="agent-label" key={item.key}>
-                <Icon name="sparkles" size={12} />
+                <Icon name="agent" size={12} />
                 {item.event.agent ? agentNames[item.event.agent] : 'AI'}
               </div>
             );
