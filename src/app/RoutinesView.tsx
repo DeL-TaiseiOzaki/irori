@@ -102,7 +102,7 @@ function Step({
       <div className="routine-step-head">
         <span className="routine-step-number">{index + 1}</span>
         <Icon
-          name={kind === 'agent' ? 'sparkles' : 'terminal'}
+          name={kind === 'agent' ? 'agent' : 'terminal'}
           size={13}
           className={kind === 'agent' ? 'routine-step-agent' : undefined}
         />
@@ -572,7 +572,7 @@ export function RoutinesView({
               <BrainTile space={group.space} size={20} radius={6} />
             ) : (
               <span className="routine-orb" aria-hidden="true">
-                <Icon name="sparkles" size={11} strokeWidth={2.2} />
+                <Icon name="agent" size={11} strokeWidth={2.2} />
               </span>
             )}
             {group.space?.name ?? 'irori agent'}

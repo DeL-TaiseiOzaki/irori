@@ -18,7 +18,7 @@
 }
 .obsidian-arrow-fill-btn:hover {
   background: var(--nav);
-  border-color: var(--ember-border);
+  border-color: var(--nav-border-hover);
 }
 .obsidian-arrow-fill-btn__text {
   position: relative;

@@ -26,7 +26,7 @@
   font-size: 12.5px;
 }
 .stage-text-button.ask-ai {
-  color: var(--ember-ink);
+  color: var(--ink);
   font-weight: 600;
 }
 .crumb.brain:is(button) {
@@ -64,44 +64,56 @@
   text-underline-offset: 3px;
 }
 
-/* Home. */
+/* Home. One column to read and act on, one quieter column beside it, and no
+   boxes: headings and hairlines carry the order (ADR 053). */
 .brain-home {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 40px 44px;
+  padding: 32px 40px 48px;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 28px;
+  container: home / inline-size;
 }
 .home-header {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
   flex-wrap: wrap;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--rule);
 }
 .home-title {
   flex: 1;
   min-width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
 }
 .home-title h1 {
   margin: 0;
+  min-width: 0;
   font-family: var(--font-jp);
-  font-size: 30px;
-  line-height: 1.2;
+  font-size: 24px;
+  line-height: 1.25;
   font-weight: 700;
   font-feature-settings: 'palt';
+  overflow-wrap: anywhere;
+}
+/* A very long vault name stops at two lines; the settings sheet shows it whole. */
+.home-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .home-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ink-3);
 }
 .home-meta > span {
@@ -109,13 +121,24 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
+  flex: none;
 }
 .home-meta .mono {
-  max-width: 360px;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* A path keeps its end in view: a long start gives way to an ellipsis. */
+.home-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.home-meta > .home-path {
+  flex: 0 1 auto;
+  display: block;
+  max-width: 420px;
 }
 .home-meta > i,
 .home-drive-meta > i {
@@ -131,43 +154,53 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.solid-button.home-button {
-  height: 34px;
+.primary-button.home-button {
+  height: 32px;
   padding: 0 13px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 13px;
 }
-/* The cards follow the stage's own width, which the panels beside it change. */
-.home-layers {
+.primary-button.small {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+}
+/* The body follows the stage's width, which the panels beside it change: two
+   columns where there is room, one below it, the main column first. */
+.home-body {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 28px 44px;
   align-items: start;
 }
-.home-recent {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-  align-items: start;
+@container home (max-width: 760px) {
+  .home-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.home-main,
+.home-aside {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.home-aside {
+  gap: 22px;
 }
 .home-card {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border-radius: 18px;
-  background: var(--card);
-  box-shadow: var(--card-shadow);
-  transition: transform 200ms ease;
-}
-.home-card:hover {
-  transform: translateY(-2px);
+  min-width: 0;
 }
 .home-card > header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 12px 8px 18px;
-  color: var(--ink-2);
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 0 6px;
+  color: var(--ink-3);
 }
 .home-card.schema > header > .ui-icon {
   color: var(--schema-ink);
@@ -180,39 +213,62 @@
 }
 .home-card h2 {
   margin: 0;
-  font-size: 16px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
   font-weight: 650;
   color: var(--ink);
 }
-.home-recent .home-card h2 {
-  font-size: 15px;
+/* The quiet column: smaller headings, a rule above each section but the first. */
+.home-aside .home-card h2 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.home-aside .home-card + .home-card {
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
 }
 .home-card-space {
   flex: 1;
 }
 .home-count {
-  padding: 0 7px;
+  flex: none;
+  min-width: 20px;
+  padding: 0 6px;
   border-radius: 9px;
-  background: var(--ink-solid);
-  color: var(--on-ink-solid);
+  background: var(--stage-3);
+  color: var(--ink);
   font-size: 11.5px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 18px;
+  text-align: center;
 }
 .home-card-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 2px 8px 12px;
+  gap: 0;
+  border-top: 1px solid var(--rule);
+}
+.home-aside .home-card-body {
+  border-top: 0;
+}
+.home-main .home-card-body > .home-row {
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
 }
 .home-row {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-width: 0;
   min-height: 34px;
-  padding: 0 10px;
-  border-radius: 9px;
+  padding: 0 8px;
+  border-radius: 6px;
   background: none;
   box-shadow: none;
   font-size: 13.5px;
@@ -220,14 +276,20 @@
   color: var(--ink);
   text-align: left;
 }
+.home-aside .home-row {
+  min-height: 30px;
+  padding: 0 4px;
+  font-size: 12.5px;
+}
 button.home-row:hover {
   background: var(--stage-2);
 }
 .home-row-icon {
+  flex: none;
   color: var(--ink-3);
 }
-.home-row-icon.ember {
-  color: var(--ember-ink);
+.home-row-icon.agent {
+  color: var(--ink-3);
 }
 .home-row-icon.layer.schema {
   color: var(--schema-ink);
@@ -248,17 +310,23 @@ button.home-row:hover {
 .home-card.schema button.home-row .home-row-icon {
   color: var(--schema-ink);
 }
-.home-more {
+.home-more,
+.home-git-note {
   display: block;
-  padding: 6px 10px;
+  margin: 0;
+  padding: 6px 4px;
   font-size: 12px;
   color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.home-main .home-more {
+  padding: 8px;
 }
 .home-skills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 10px 4px 36px;
+  gap: 4px;
+  padding: 2px 4px 4px 30px;
 }
 .home-skills .home-more {
   padding: 0;
@@ -266,13 +334,17 @@ button.home-row:hover {
 .home-skill {
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 7px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 5px;
   background: var(--stage-2);
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .home-skills-row .home-row-icon {
   color: var(--schema-ink);
@@ -280,8 +352,8 @@ button.home-row:hover {
 .home-drive {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 2px;
+  padding: 6px 4px;
 }
 .home-drive + .home-drive {
   border-top: 1px solid var(--rule);
@@ -289,12 +361,14 @@ button.home-row:hover {
 .home-drive-name {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 30px;
-  font-size: 13.5px;
+  gap: 8px;
+  min-height: 26px;
+  min-width: 0;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .home-drive-name > .ui-icon {
+  flex: none;
   color: var(--cont-ink);
 }
 .home-drive-name > span:first-of-type {
@@ -312,7 +386,7 @@ button.home-row:hover {
   padding: 0 8px;
   border-radius: 7px;
   background: var(--stage-2);
-  color: var(--cont-ink);
+  color: var(--run-ink);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -320,7 +394,8 @@ button.home-row:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-left: 26px;
+  min-width: 0;
+  padding-left: 24px;
   font-size: 12px;
   color: var(--ink-3);
 }
@@ -328,11 +403,15 @@ button.home-row:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+/* A change reads as its diff does: added and removed in the diff's colours, a
+   conflict in the attention colour, anything else plain. */
 .home-state {
   flex: none;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 1px 7px;
+  border-radius: 5px;
   background: var(--stage-2);
   color: var(--ink-2);
   font-size: 11.5px;
@@ -343,27 +422,35 @@ button.home-row:hover {
   background: var(--add-wash);
   color: var(--add-ink);
 }
-.home-state.state-D,
-.home-state.state-U {
+.home-state.state-D {
   background: var(--del-wash);
   color: var(--del-ink);
 }
+.home-state.state-U {
+  background: var(--attn-wash);
+  color: var(--attn-ink);
+}
 .home-run-agent {
+  flex: none;
   font-weight: 500;
 }
 .home-run-date {
-  font-size: 12px;
+  flex: none;
+  font-size: 11.5px;
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 .home-outcome {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   color: var(--ink-3);
 }
-.home-outcome.completed {
-  color: var(--add-ink);
+.home-outcome.failed {
+  color: var(--del-ink);
+  font-weight: 600;
 }
 
 /* The graph. */
@@ -829,7 +916,7 @@ button.home-row:hover {
   cursor: pointer;
 }
 .palette-scope:has(input:focus-visible) {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .palette-where {
@@ -861,8 +948,8 @@ button.home-row:hover {
 }
 .palette-results .search-notice {
   margin: 6px 12px;
-  background: rgba(230, 192, 122, 0.12);
-  color: #e6c07a;
+  background: var(--attn-soft);
+  color: var(--attn-tx);
 }
 :root[data-theme='light'] .palette-results .search-notice {
   background: var(--warn-wash);
@@ -1053,15 +1140,6 @@ button.home-row:hover {
   flex: none;
   display: flex;
 }
-.brain-sheet-hero::before {
-  content: '';
-  position: absolute;
-  inset: -14px;
-  border-radius: 38px;
-  background: var(--glow);
-  opacity: 0.35;
-  filter: blur(18px);
-}
 .brain-sheet-hero .brain-tile {
   position: relative;
 }
@@ -1155,7 +1233,7 @@ button.home-row:hover {
 .segments label:has(input:focus-visible),
 .glyph-grid label:has(input:focus-visible),
 .swatches label:has(input:focus-visible) .swatch {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .brain-sheet-previews {

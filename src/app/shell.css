@@ -1,5 +1,7 @@
-/* The workspace shell: the rail, the islands on the graphite backdrop, the
-   status bar, and the chrome's own controls and menus (ADR 014). */
+/* The workspace shell: the rail, the panes joined on one chrome surface around
+   the paper stage, the status bar, and the chrome's own controls and menus
+   (ADR 014, ADR 053). The stage is the only lit surface; everything else stays
+   flat and quiet around it. */
 
 /* The window never scrolls. The shell is the containing block for absolutely
    positioned descendants and clips them, so one placed far down a long column
@@ -72,10 +74,10 @@
   height: 7px;
   flex: none;
   border-radius: 50%;
-  background: var(--ember);
+  background: var(--run);
 }
 .workspace-tab-ai[data-ai='waiting'] {
-  animation: irori-halo 2.2s ease-out infinite;
+  background: var(--attn);
 }
 .workspace-tabs button.workspace-tab-close,
 .workspace-tabs button.workspace-tab-add {
@@ -135,8 +137,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  margin: 8px 8px 0 0;
-  border-radius: 14px 14px 0 0;
+  border-top: 1px solid var(--hair-2);
   overflow: hidden;
   background: var(--term);
 }
@@ -167,7 +168,7 @@
 .islands {
   flex: 1;
   min-width: 0;
-  padding: 8px 8px 0 0;
+  border-top: 1px solid var(--hair);
 }
 .islands[inert] {
   visibility: hidden;
@@ -190,24 +191,27 @@
   flex: 1;
   min-height: 0;
 }
-/* The gap between islands is the handle; it shows itself when reached. */
+/* Panes meet on a hairline, which is also the handle: it takes the pointer a
+   few pixels either side and turns into the focus colour when reached. */
 .island-handle {
   position: relative;
-  width: 8px;
+  z-index: 5;
+  width: 1px;
   flex-shrink: 0;
+  background: var(--hair);
   cursor: col-resize;
   outline: none;
+}
+.island-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
 }
 .island-handle::after {
   content: '';
   position: absolute;
-  left: 3px;
-  top: 50%;
-  width: 2px;
-  height: 36px;
-  margin-top: -18px;
-  border-radius: 2px;
-  background: var(--hair-3);
+  inset: 0 -1px;
+  background: var(--focus);
   opacity: 0;
   transition: opacity var(--medium) ease;
 }
@@ -348,7 +352,8 @@
   border-radius: 0 3px 3px 0;
   background: var(--solid);
 }
-/* A brain whose AI works: a ring turns around its tile. */
+/* A vault whose agent works: a neutral arc turns around its tile. Motion, not
+   colour, says it runs. */
 .rail-ring {
   position: absolute;
   inset: -4px;
@@ -362,7 +367,7 @@
   top: -50%;
   width: 200%;
   height: 200%;
-  background: conic-gradient(from 0deg, transparent 0deg, transparent 230deg, var(--ember) 360deg);
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 250deg, var(--run) 360deg);
   animation: irori-spin 1.8s linear infinite;
 }
 .rail-ring::after {
@@ -372,7 +377,8 @@
   border-radius: 14px;
   background: var(--bg);
 }
-/* A brain whose AI waits for the person: an ember dot that breathes. */
+/* A vault whose agent waits for the person: the attention dot, the one thing in
+   the shell that breathes. */
 .rail-dot {
   position: absolute;
   z-index: 2;
@@ -381,7 +387,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--ember);
+  background: var(--attn);
   box-shadow: 0 0 0 2.5px var(--bg);
 }
 .rail-dot::after {
@@ -415,6 +421,18 @@
     transform 220ms var(--ease);
   pointer-events: none;
 }
+/* A long vault name gives way to an ellipsis; its state always shows. */
+.rail-label {
+  max-width: min(320px, calc(100vw - 80px));
+}
+.rail-label-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail-label-state {
+  flex: none;
+}
 .rail-slot:hover .rail-label,
 .rail-slot:focus-within .rail-label {
   opacity: 1;
@@ -433,9 +451,11 @@
   border-radius: 50%;
   background: var(--tx-3);
 }
-[data-ai='running'] .rail-label-state > i,
+[data-ai='running'] .rail-label-state > i {
+  background: var(--run);
+}
 [data-ai='waiting'] .rail-label-state > i {
-  background: var(--ember);
+  background: var(--attn);
 }
 /* A named group of brains: closed, one folder of small tiles; open, a band
    behind its brains with the folder on top. */
@@ -520,7 +540,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--cont);
+  background: var(--tx);
   box-shadow: 0 0 0 2px var(--bg);
 }
 
@@ -561,8 +581,17 @@
 .status-item.plain {
   padding: 0;
 }
+.status-vault {
+  min-width: 0;
+  max-width: 280px;
+}
+.status-vault > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .status-item.uploads {
-  color: var(--cont);
+  color: var(--tx-2);
 }
 .status-message {
   flex: 1;
@@ -574,7 +603,7 @@
   gap: 10px;
 }
 .ai-summary > .ui-icon {
-  color: var(--ember);
+  color: var(--tx-3);
 }
 .ai-count {
   display: flex;
@@ -585,10 +614,17 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--ember);
+  background: var(--run);
 }
 .ai-count.waiting {
-  color: var(--ember-2);
+  color: var(--attn-tx);
+}
+.ai-count.waiting > i {
+  background: var(--attn);
+}
+.status-item,
+.ai-count {
+  font-variant-numeric: tabular-nums;
 }
 .status-version {
   font-family: var(--font-mono);
@@ -622,11 +658,11 @@
   box-shadow: inset 0 0 0 1px var(--hair-2);
 }
 :where(.chrome) .icon-button[aria-pressed='true'] {
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .panel-button,
-.ember-button,
+.primary-button,
 .solid-button {
   display: inline-flex;
   align-items: center;
@@ -638,15 +674,21 @@
   font-size: 12.5px;
   white-space: nowrap;
 }
-.ember-button {
-  background: var(--ember);
-  color: var(--on-ember);
+/* A place's one primary action: solid, no hue. */
+.primary-button {
+  background: var(--solid);
+  color: var(--on-solid);
   box-shadow: none;
   font-weight: 600;
 }
-.ember-button:hover {
-  background: var(--ember);
-  filter: brightness(1.08);
+.primary-button:hover:not(:disabled) {
+  background: var(--solid);
+  filter: brightness(0.92);
+}
+.on-stage .primary-button,
+.stage .primary-button {
+  background: var(--ink-solid);
+  color: var(--on-ink-solid);
 }
 
 /* Menus and popovers opened from the chrome. */
@@ -814,7 +856,7 @@ button.settings-choice {
   cursor: pointer;
 }
 .settings-choice:has(input:focus-visible) {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .settings-choice > span:last-child {

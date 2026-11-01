@@ -47,7 +47,7 @@ for (const platform of platforms) {
   }
   if (item) {
     const link = document.createElement('a');
-    link.className = `button ${platform.id === detected || !detected ? 'ember' : 'ghost'}`;
+    link.className = `button ${platform.id === detected || !detected ? 'primary' : 'ghost'}`;
     link.href = item.url;
     link.textContent = `Download for ${platform.title} ↓`;
     link.setAttribute('aria-label', `Download irori for ${platform.title}, ${platform.detail}`);
@@ -82,8 +82,8 @@ if (detected && heroItem) {
   const hero = document.querySelector<HTMLAnchorElement>('#hero-download')!;
   hero.href = heroItem.url;
   hero.textContent = `Download for ${platform.title} ↓`;
-  document.querySelector('#hero-meta')!.textContent =
-    `v${release.version} · ${heroItem.size} · ${platform.detail}`;
+  // The version follows on the same line, so the size and the computer are enough here.
+  document.querySelector('#hero-meta')!.textContent = `${heroItem.size} · ${platform.detail}`;
 }
 if (release.notes) {
   // Assigned as a URL property; the manifest keeps this link on the published release.
