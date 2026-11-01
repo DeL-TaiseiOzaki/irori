@@ -462,7 +462,7 @@ export function OntologyPanel({
           </button>
           {onConfigure && (
             <button className="stage-text-button ask-ai" onClick={onConfigure}>
-              <Icon name="sparkles" size={14} />
+              <Icon name="agent" size={14} />
               {t('vault agent', 'vault agent')}
             </button>
           )}

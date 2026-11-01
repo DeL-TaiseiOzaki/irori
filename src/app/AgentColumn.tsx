@@ -617,7 +617,7 @@ export function AgentColumn({
   const mark = irori ? (
     <span className="agent-mark irori">
       <span className="overview-orb" aria-hidden="true">
-        <Icon name="sparkles" size={13} strokeWidth={2.1} />
+        <Icon name="agent" size={13} strokeWidth={2.1} />
       </span>
     </span>
   ) : (
@@ -625,7 +625,7 @@ export function AgentColumn({
       <span className="agent-mark">
         <BrainTile space={space} size={26} radius={8} />
         <span className="agent-sparkle">
-          <Icon name="sparkles" size={10} strokeWidth={2.2} />
+          <Icon name="agent" size={10} strokeWidth={2.2} />
         </span>
       </span>
     )
@@ -660,7 +660,7 @@ export function AgentColumn({
                   >
                     {(['vault', 'irori'] as const).map((owner) => (
                       <Menu.RadioItem key={owner} value={owner} closeOnClick>
-                        <Icon name="sparkles" size={14} />
+                        <Icon name="agent" size={14} />
                         {owner === 'vault' ? 'vault agent' : 'irori agent'}
                         <Menu.RadioItemIndicator className="menu-check">
                           <Icon name="check" size={14} />
@@ -892,7 +892,7 @@ export function AgentColumn({
             <p className="mono your-ai-path">{you.root}</p>
           )}
           <button
-            className="ember-button"
+            className="primary-button"
             disabled={sending}
             onClick={() => {
               setSending(true);
@@ -902,7 +902,7 @@ export function AgentColumn({
                 .finally(() => setSending(false));
             }}
           >
-            <Icon name="sparkles" size={14} />
+            <Icon name="agent" size={14} />
             {t('irori agent を用意する', 'Set up the irori agent')}
           </button>
           {setupError && (
@@ -977,32 +977,6 @@ export function AgentColumn({
             element.scrollHeight - element.scrollTop - element.clientHeight < 80;
         }}
       >
-        {events.length === 0 && !irori && space && (
-          <div className="agent-empty">
-            <p>{t('ノートについて相談する', 'Ask about the note')}</p>
-            <div className="prompt-suggestions">
-              {[
-                t('このノートの要点をまとめて', 'Summarize the key points of this note'),
-                t(
-                  'この内容から次のアクションを整理して',
-                  'Work out the next actions from this content',
-                ),
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  disabled={!doc || shownRunning}
-                  onClick={() => {
-                    setPrompt(suggestion);
-                    textarea.current?.focus();
-                  }}
-                >
-                  {suggestion}
-                  <Icon name="arrow" size={13} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <PathOpenerContext.Provider value={shared.paths}>
           <PathBase.Provider value={space?.scopeId ?? you?.id}>
             <AgentLog
@@ -1063,7 +1037,7 @@ export function AgentColumn({
           <div className="composer-context" aria-label={t('相談の対象', 'Ask about')}>
             {irori ? (
               <span className="context-chip">
-                <Icon name="sparkles" size={12} />
+                <Icon name="agent" size={12} />
                 {t(
                   `vault ${brains.length}`,
                   `${brains.length} vault${brains.length === 1 ? '' : 's'}`,

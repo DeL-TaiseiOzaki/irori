@@ -120,7 +120,7 @@ function FileView({ path, reads }: { path: string; reads: number }) {
       <header className="you-stage-bar">
         <span className="you-stage-owner">
           <span className="you-orb small" aria-hidden="true">
-            <Icon name="sparkles" size={11} strokeWidth={2.2} />
+            <Icon name="agent" size={11} strokeWidth={2.2} />
           </span>
           {t('irori agent', 'irori agent')}
         </span>
@@ -248,7 +248,7 @@ export function YourAiScreen({
               <Icon name="back" size={16} />
             </button>
             <span className="you-orb" aria-hidden="true">
-              <Icon name="sparkles" size={16} strokeWidth={2.1} />
+              <Icon name="agent" size={16} strokeWidth={2.1} />
             </span>
             <span className="you-names">
               <h1>{t('irori agent', 'irori agent')}</h1>
@@ -257,7 +257,7 @@ export function YourAiScreen({
           </div>
           <div className="you-chips">
             <span className="you-chip">
-              <Icon name="sparkles" size={13} />
+              <Icon name="agent" size={13} />
               {agentNames[agent]}
             </span>
           </div>

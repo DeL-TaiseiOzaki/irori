@@ -1,4 +1,6 @@
-/* The paper stage: the crumb bar, the note, banners and the terminal drawer. */
+/* The paper stage: the crumb bar, the note, banners and the terminal drawer.
+   It is the only lit surface in the window, so the eye lands on the note first
+   (ADR 053); it needs no frame or shadow to stand out. */
 
 .stage {
   flex: 1;
@@ -7,13 +9,11 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  border-radius: 14px;
   background: var(--stage);
   color: var(--ink);
-  box-shadow: var(--stage-shadow);
 }
 .stage:focus-visible {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: -3px;
 }
 .stage-top {
@@ -79,10 +79,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A long vault name gives way after the folders, before the file's name. */
 .crumb.brain {
   gap: 8px;
   color: var(--ink-2);
-  flex: none;
+  flex: 0 10 auto;
+  min-width: 72px;
 }
 .crumb.layer {
   color: var(--ink-2);
@@ -131,7 +133,7 @@
   white-space: nowrap;
 }
 .save-state > .ui-icon {
-  color: var(--add-ink);
+  color: var(--ink-3);
 }
 button.save-state {
   padding: 0 9px;
@@ -194,32 +196,33 @@ button.save-state > i {
   background: var(--stage-2);
   color: var(--ink);
 }
+/* Opens the agent beside the note. A control like the others in the bar: the
+   agent is a tool here, not the subject. */
 .ai-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 30px;
-  padding: 0 12px;
-  border-radius: 9px;
-  background: var(--ember);
-  color: var(--on-ember);
-  box-shadow: none;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--rule-2);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 .ai-toggle:hover {
-  background: var(--ember);
-  filter: brightness(1.08);
+  background: var(--stage-2);
+  color: var(--ink);
 }
 .ai-toggle.open {
-  padding: 0 11px;
-  background: var(--stage-2);
-  color: var(--ember-ink);
+  background: var(--stage-3);
+  color: var(--ink);
+  box-shadow: none;
 }
 .ai-toggle.open:hover {
   background: var(--stage-3);
-  filter: none;
 }
 .stage-popover {
   width: 320px;
@@ -368,7 +371,7 @@ button.save-state > i {
 .stage-column-handle:hover,
 .stage-column-handle[data-separator='active'],
 .stage-column-handle:focus-visible {
-  box-shadow: 0 0 0 1px var(--ember);
+  box-shadow: 0 0 0 1px var(--focus);
 }
 .stage-tabs {
   flex: none;
@@ -385,12 +388,12 @@ button.save-state > i {
   scrollbar-width: none;
 }
 /* An open file reads as its name; the one on show is marked by weight and a
-   line beneath it, ember in the column being edited. */
+   line beneath it, in the focus colour in the column being edited. */
 .stage-tab {
   position: relative;
   flex: 0 1 auto;
   min-width: 72px;
-  max-width: 200px;
+  max-width: 240px;
   display: flex;
   align-items: center;
   color: var(--ink-3);
@@ -417,7 +420,7 @@ button.save-state > i {
   background: var(--rule-2);
 }
 .stage-tabs.focused .stage-tab.current::after {
-  background: var(--ember);
+  background: var(--act-ink);
 }
 .stage-tab > button {
   border: 0;
@@ -434,17 +437,34 @@ button.save-state > i {
 .stage-tab > button[role='tab'] {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   height: 34px;
   padding: 0 2px 0 10px;
   font-size: 12px;
   font-weight: 450;
   text-align: left;
 }
+/* The folder that tells two same-named files apart, quieter than the name and
+   the first to give way. */
+.stage-tab-folder {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 400;
+}
 .stage-tab.current > button[role='tab'] {
   font-weight: 550;
 }
 .stage-tab > button[role='tab'] > span {
   display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -709,7 +729,7 @@ button.save-state > i {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #7fd4b8;
+  color: var(--term-muted);
 }
 .terminal-state::before {
   content: '';
@@ -762,7 +782,7 @@ button.save-state > i {
   width: 100%;
   padding: 4px 8px;
   border: none;
-  border-left: 3px solid var(--ember);
+  border-left: 3px solid var(--rule-2);
   border-radius: 0;
   background: var(--stage-2);
   box-shadow: none;
@@ -926,7 +946,7 @@ button.comment-quote:hover {
 }
 .document-editor .footnote-mark {
   margin-left: 2px;
-  color: var(--ember-ink);
+  color: var(--ink-2);
   font: 600 0.68em/1 var(--font-ui);
   vertical-align: super;
 }
@@ -988,12 +1008,25 @@ button.comment-quote:hover {
 .document-editor .wiki-embed.missing {
   color: var(--ink-3);
 }
+/* A callout is neutral; only a warning or a danger callout takes the colour
+   that means the same thing everywhere else. */
 .document-editor .callout {
+  --callout-line: var(--rule-2);
+  --callout-mark: var(--ink-2);
   margin: 12px 0;
   padding: 10px 14px;
-  border-left: 3px solid var(--ember);
-  border-radius: 8px;
+  border-left: 3px solid var(--callout-line);
+  border-radius: 0 6px 6px 0;
   background: var(--stage-2);
+}
+.document-editor
+  .callout:is([class*='warning'], [class*='caution'], [class*='attention'], [class*='important']) {
+  --callout-line: var(--attn);
+  --callout-mark: var(--attn-ink);
+}
+.document-editor .callout:is([class*='danger'], [class*='error'], [class*='bug'], [class*='fail']) {
+  --callout-line: var(--danger-line);
+  --callout-mark: var(--del-ink);
 }
 .document-editor .callout .callout-title {
   margin: 0 0 4px;
@@ -1037,7 +1070,7 @@ button.comment-quote:hover {
 .document-editor .callout-marker {
   margin-right: 8px;
   padding: 1px 6px;
-  color: var(--ember-ink);
+  color: var(--callout-mark, var(--ink-2));
   background: var(--card);
   font: 600 0.72em/1.6 var(--font-ui);
   letter-spacing: 0.04em;
@@ -1071,7 +1104,7 @@ button.comment-quote:hover {
 }
 .document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] > dt {
   flex: none;
-  color: var(--ember-ink);
+  color: var(--ink-2);
   font: 600 0.74em/2.4 var(--font-ui);
 }
 .document-editor .milkdown .ProseMirror dl[data-type='footnote_definition'] > dd {
