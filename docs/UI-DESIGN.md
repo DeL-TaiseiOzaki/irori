@@ -1,5 +1,29 @@
 # UI direction
 
+## One subject per screen, one meaning per colour (2026-11-01)
+
+[ADR 053](decisions/053-priority-and-colour-roles.md) revises v5's visual
+system; its levels and functions below still hold. Where this section and v5
+disagree, this section stands.
+
+- **Hierarchy.** The paper stage is the only lit surface; the rail, the vault
+  panel, the agent columns and the status bar are one flat chrome surface
+  joined by hairlines (the hairline is the resize handle). No island radius,
+  gap or shadow, and no box around a home section.
+- **Colour roles** (`src/app/tokens.css` lists them at the top): brand
+  (`--brand`, the mark only), action (`--solid`/`--ink-solid`, one primary
+  button per screen), focus (`--focus`, `--act*`), running (`--run*`,
+  neutral and moving), attention (`--attn*`), danger (`--danger*`), identity
+  (layers and vault colours) and diff (`--add-*`, `--del-*`, inside diffs).
+  A normal outcome takes no colour. Do not add a colour that means two of these.
+- **The agent** is marked by the `agent` icon and has no colour of its own; no
+  sparkles, glows, shimmer or canned requests. Only a request waiting for the
+  person breathes.
+- **Real data.** Use `countLabel` for counts in badges, `shortWhen` for times
+  (a broken one is `—`), `tabLabels` for tabs, a start-side ellipsis for
+  paths and a `title` with the full text wherever text is cut.
+- **Checking.** `tsx scripts/ui-screens.ts hearth-ja dark-en light-ja`, as for v5.
+
 ## v5 — brains, your AI and each brain's AI (2026-09-25)
 
 The owner approved the v5 design and switched irori to it entirely; see
@@ -30,16 +54,16 @@ Everything below this section is the history of the earlier layout.
   brain. Each brain's AI runs independently of the one on show.
 - **Tokens.** `src/app/tokens.css` holds the three themes (hearth, light, dark)
   with the canvas's exact values: chrome (`--bg --panel --raised --raised-2
-  --field --hair* --tx*`), stage (`--stage* --card --rule* --ink*`), the AI's
+--field --hair* --tx*`), stage (`--stage* --card --rule* --ink*`), the AI's
   ember (`--ember* --on-ember`), layer colours (`--schema --know --cont` and
   their `-ink` forms) and the eight brain colours (`--t-*`). The names used
   before v5 remain as aliases for components not yet restyled.
 - **Type.** Geist and Geist Mono are bundled as variable woff2 files; Japanese
   uses Noto Sans JP when installed and the system Japanese font otherwise. The
   reader's Markdown font setting still applies to notes.
-- **Colour roles.** Ember is only for the AI: sparkles, running and waiting
-  states, send and allow. Other primary actions are solid (paper on graphite,
-  ink on paper). Layers are told apart by icon colour only.
+- **Colour roles.** Superseded by ADR 053 above. (v5: ember was only for the
+  AI — sparkles, running and waiting states, send and allow.) Layers are told
+  apart by icon colour only.
 - **Motion.** Hover and press 140 ms, tabs and chips 200 ms, panels and sheets
   320 ms on `cubic-bezier(.2,.8,.2,1)`; ambient loops (the running ring, the
   waiting halo, glows) stop under reduced motion. Moving from the Overview into a

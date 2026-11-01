@@ -132,7 +132,7 @@ function AiCard({
     <section className={`ai-card ${aiState(ai)}`} role="group" aria-label={`${space.name} agent`}>
       <header>
         {named && <BrainTile space={space} size={22} radius={7} />}
-        <Icon name="sparkles" size={13} className="ai-card-spark" />
+        <Icon name="agent" size={13} className="ai-card-spark" />
         <span className="ai-card-name">{named ? `${space.name} agent` : agentNames[agent]}</span>
         <StateWords ai={ai} />
       </header>
@@ -185,8 +185,8 @@ function AiCard({
               : t('まだ指示はありません。', 'No instructions yet.')}
           </p>
           <div className="ai-card-actions">
-            <button className="ember-button" onClick={() => onEnter(space, { ai: true })}>
-              <Icon name="sparkles" size={13} />
+            <button className="panel-button" onClick={() => onEnter(space, { ai: true })}>
+              <Icon name="agent" size={13} />
               {t('vault agent', 'vault agent')}
             </button>
           </div>
@@ -309,7 +309,7 @@ function OverviewMap({
             onClick={onShowYou}
           >
             <span className="map-orb" aria-hidden="true">
-              <Icon name="sparkles" size={30} strokeWidth={1.9} />
+              <Icon name="agent" size={30} strokeWidth={1.9} />
             </span>
             <strong>{t('irori agent', 'irori agent')}</strong>
             <small>
@@ -535,7 +535,7 @@ function OverviewColumns({
         <span />
         {vaultAgent && (
           <span>
-            <Icon name="sparkles" size={15} className="ai-card-spark" />
+            <Icon name="agent" size={15} className="ai-card-spark" />
             AI
           </span>
         )}
@@ -640,12 +640,12 @@ function OverviewComposer({
       )}
       <footer>
         <small>
-          <Icon name="sparkles" size={12} />
+          <Icon name="agent" size={12} />
           {agentNames[agentFor(space.scopeId)]}
         </small>
         <button
           type="submit"
-          className="ember-button"
+          className="primary-button"
           disabled={!text.trim() || sending}
           aria-label={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
           title={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
@@ -858,7 +858,7 @@ export function Overview({
                     onAskYou(t('ルーティンを作って：', 'Write a routine: '));
                   }}
                 >
-                  <Icon name="sparkles" size={14} />
+                  <Icon name="agent" size={14} />
                   <span className="overview-label">
                     {t('irori agent に頼む', 'Ask the irori agent')}
                   </span>
@@ -1008,7 +1008,7 @@ export function Overview({
                   <>
                     <header className="overview-ai-head">
                       <span className="overview-orb" aria-hidden="true">
-                        <Icon name="sparkles" size={15} strokeWidth={2.1} />
+                        <Icon name="agent" size={15} strokeWidth={2.1} />
                       </span>
                       <span>
                         <strong>{t('vault agent', 'vault agents')}</strong>

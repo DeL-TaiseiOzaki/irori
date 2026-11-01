@@ -1,5 +1,21 @@
-/* irori v5 design tokens (ADR 014). The values are the approved canvas's own;
-   every colour in the renderer resolves through one of these roles.
+/* irori design tokens (ADR 014, colour roles from ADR 053). Every colour in the
+   renderer resolves through one of these roles, and each role means one thing:
+
+   - brand (--brand): irori's ember. The mark and the website only; never a
+     control, a state or the AI.
+   - action (--solid, --ink-solid): the primary button of a place, solid ink on
+     paper or paper on graphite. No hue.
+   - focus (--focus, --act*): where the person is — the keyboard focus, the
+     column being edited, a chosen option, a drop target.
+   - running (--run*): something works on its own. A neutral colour that moves.
+   - attention (--attn*): something waits for the person — an approval, a
+     conflict, a warning.
+   - danger (--danger*): something failed or cannot be undone.
+   - identity (--schema, --cont, --t-*): which layer or which vault. Never a state.
+   - diff (--add-*, --del-*): added and removed lines, inside a diff or a
+     change list only.
+   A normal outcome (saved, connected, succeeded) takes no colour, and links
+   are ink with an underline.
 
    Themes: hearth (graphite chrome, paper stage) is the canvas default and the
    system choice in a light desktop; light is paper throughout; dark is graphite
@@ -43,14 +59,32 @@
   --solid: #f0eee8;
   --on-solid: #141619;
 
-  /* the AI's flame */
-  --ember: #ff8b3d;
-  --ember-2: #ffa766;
-  --ember-soft: rgba(255, 139, 61, 0.13);
-  --ember-line: rgba(255, 139, 61, 0.45);
-  --ember-glow: rgba(255, 139, 61, 0.2);
-  --ember-halo: rgba(255, 139, 61, 0.5);
-  --on-ember: #1e1006;
+  /* brand: the mark only */
+  --brand: #ff8b3d;
+
+  /* focus: where the person is */
+  --focus: #4c7dff;
+  --act: #7aa2ff;
+  --act-soft: rgba(122, 162, 255, 0.14);
+  --act-line: rgba(122, 162, 255, 0.5);
+
+  /* running: neutral, told by motion */
+  --run: #d5d9de;
+
+  /* attention: waits for the person */
+  --attn: #f0b341;
+  --attn-tx: #f4c46c;
+  --attn-soft: rgba(240, 179, 65, 0.12);
+  --attn-line: rgba(240, 179, 65, 0.5);
+
+  /* danger: failed or cannot be undone */
+  --danger-tx: #ff9a8a;
+  --danger-soft: rgba(255, 120, 100, 0.12);
+  --danger-line: rgba(255, 120, 100, 0.45);
+
+  /* diff on the chrome: added and removed, inside a change list only */
+  --add-tx: #86d7a3;
+  --del-tx: #ff9a8a;
 
   /* layers, on the chrome */
   --schema: #b8abff;
@@ -71,15 +105,17 @@
   --schema-ink: #5a47c6;
   --know-ink: #1a1d21;
   --cont-ink: #0c7a6c;
-  --ember-ink: #b0541a;
+  --act-ink: #2f5fd0;
+  --act-wash: rgba(47, 95, 208, 0.09);
+  --run-ink: #4a5058;
+  --attn-ink: #8a5a00;
+  --attn-wash: #fff3dc;
   --ink-solid: #1a1d21;
   --on-ink-solid: #f6f4ef;
   --add-ink: #1d6a41;
   --add-wash: #e2f2e7;
   --del-ink: #a2392b;
   --del-wash: #fbe7e3;
-  --warn-ink: #73500f;
-  --warn-wash: #fff1d8;
   --term: #0a0b0d;
   --term-tx: #d5dad7;
 
@@ -92,7 +128,7 @@
   --label-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --scrim: rgba(6, 7, 8, 0.6);
 
-  /* brain colours: a calm set with no orange, which belongs to the AI */
+  /* vault colours: identity only, a calm set with no orange (the brand) */
   --t-stone: #2b2e33;
   --t-stone-fg: #e7e4dd;
   --t-ai: #232d42;
@@ -129,13 +165,21 @@
   --tx-3: #646a73;
   --solid: #1a1d21;
   --on-solid: #f8f7f4;
-  --ember: #f07a2a;
-  --ember-2: #b0541a;
-  --ember-soft: rgba(240, 122, 42, 0.12);
-  --ember-line: rgba(210, 98, 28, 0.42);
-  --ember-glow: rgba(240, 122, 42, 0.18);
-  --ember-halo: rgba(240, 122, 42, 0.45);
-  --on-ember: #1e1006;
+  --brand: #f07a2a;
+  --focus: #3d6fe8;
+  --act: #2f5fd0;
+  --act-soft: rgba(47, 95, 208, 0.1);
+  --act-line: rgba(47, 95, 208, 0.42);
+  --run: #4a5058;
+  --attn: #d18b0f;
+  --attn-tx: #8a5a00;
+  --attn-soft: rgba(209, 139, 15, 0.12);
+  --attn-line: rgba(209, 139, 15, 0.5);
+  --danger-tx: #a2392b;
+  --danger-soft: rgba(162, 57, 43, 0.08);
+  --danger-line: rgba(162, 57, 43, 0.4);
+  --add-tx: #1d6a41;
+  --del-tx: #a2392b;
   --schema: #5a47c6;
   --know: #1a1d21;
   --cont: #0c7a6c;
@@ -152,7 +196,11 @@
   --schema-ink: #5a47c6;
   --know-ink: #1a1d21;
   --cont-ink: #0c7a6c;
-  --ember-ink: #b0541a;
+  --act-ink: #2f5fd0;
+  --act-wash: rgba(47, 95, 208, 0.08);
+  --run-ink: #4a5058;
+  --attn-ink: #8a5a00;
+  --attn-wash: #fff3dc;
   --ink-solid: #1a1d21;
   --on-ink-solid: #ffffff;
   --add-ink: #1d6a41;
@@ -200,15 +248,18 @@
   --schema-ink: #b8abff;
   --know-ink: #eeece6;
   --cont-ink: #72d4c4;
-  --ember-ink: #ffa766;
+  --focus: #5b8aff;
+  --act-ink: #8fb0ff;
+  --act-wash: rgba(143, 176, 255, 0.12);
+  --run-ink: #b3b8bf;
+  --attn-ink: #f4c46c;
+  --attn-wash: #2e2717;
   --ink-solid: #eeece6;
   --on-ink-solid: #1b1e22;
   --add-ink: #86d7a3;
   --add-wash: rgba(80, 190, 120, 0.14);
   --del-ink: #ff9f8e;
   --del-wash: rgba(240, 100, 80, 0.15);
-  --warn-ink: #e6c07a;
-  --warn-wash: #2e2717;
   --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
@@ -241,17 +292,15 @@
   --nav-scrollbar: var(--hair-3);
   --nav-selected: var(--raised-2);
   --nav-selected-text: var(--tx);
-  --ember-border: var(--ember-line);
-  --ember-wash: var(--ember-soft);
-  --ember-pressed: var(--ember-soft);
-  --ember-on-nav: var(--ember-2);
-  --focus-ring: var(--ember);
+  --focus-ring: var(--focus);
+  --warn-ink: var(--attn-ink);
+  --warn-wash: var(--attn-wash);
   --accent-control: var(--ink-solid);
   --danger: var(--del-ink);
   --danger-strong: var(--del-ink);
   --danger-surface: var(--del-wash);
   --danger-wash: var(--del-wash);
-  --danger-on-nav: #ffb4a2;
+  --danger-on-nav: var(--danger-tx);
   --added: var(--add-ink);
   --added-wash: var(--add-wash);
   --hunk: var(--ink-3);
@@ -342,9 +391,10 @@
     opacity: 1;
   }
 }
+/* Only a request waiting for the person breathes. */
 @keyframes irori-halo {
   0% {
-    box-shadow: 0 0 0 0 var(--ember-halo);
+    box-shadow: 0 0 0 0 var(--attn-line);
   }
   70% {
     box-shadow: 0 0 0 12px transparent;
@@ -372,19 +422,6 @@
   100% {
     transform: translateY(-4px);
     opacity: 0;
-  }
-}
-@keyframes irori-glow {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px var(--ember-line),
-      0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px var(--ember-line),
-      0 0 28px 2px var(--ember-glow);
   }
 }
 

@@ -8,9 +8,8 @@
   flex-direction: column;
   gap: 18px;
   padding: 16px 18px 24px;
-  border-radius: 14px;
+  border-top: 1px solid var(--hair);
   background: var(--panel);
-  box-shadow: var(--shadow);
 }
 .routines-note {
   margin: 0;
@@ -42,8 +41,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--ember);
-  color: var(--on-ember);
+  background: var(--solid);
+  color: var(--on-solid);
 }
 .routine {
   display: flex;
@@ -99,19 +98,24 @@
   color: var(--tx-3);
   font-weight: 400;
 }
-.routine-state.running,
-.routine-state.waiting,
-.routine-state.review {
+/* Running is neutral and moves; waiting and review need the person; a success
+   is the normal outcome and takes no colour; a failure is danger. */
+.routine-state.running {
   color: var(--tx);
   font-weight: 600;
 }
+.routine-state.waiting,
+.routine-state.review {
+  color: var(--attn-tx);
+  font-weight: 600;
+}
 .routine-state.succeeded {
-  color: var(--add-ink);
+  color: var(--tx-2);
 }
 .routine-state.failed,
 .routine-state.invalid,
 .routine-state.unknown {
-  color: var(--del-ink);
+  color: var(--danger-tx);
   font-weight: 600;
 }
 .routine-state .spin {
@@ -178,7 +182,7 @@
   text-align: right;
 }
 .routine-step-agent {
-  color: var(--ember);
+  color: var(--tx-2);
 }
 .routine-step-label {
   flex: 1;
@@ -542,7 +546,7 @@
 }
 .routine-chip.kept [role='img'] {
   display: inline-flex;
-  color: var(--add-ink);
+  color: var(--ink-3);
 }
 .routine-chip.missing .mono {
   color: var(--del-ink);

@@ -5,8 +5,9 @@
 }
 .schema-dialog-body {
   display: flex;
-  gap: 8px;
+  gap: 1px;
   height: 100%;
+  background: var(--hair);
 }
 .schema-owners,
 .schema-dialog-list,
@@ -18,10 +19,8 @@
   min-height: 0;
   overflow: auto;
   padding: 10px 8px;
-  border-radius: 14px;
   background: var(--panel);
   color: var(--tx);
-  box-shadow: var(--shadow);
 }
 .schema-owners {
   width: 220px;
@@ -82,10 +81,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 14px;
   background: var(--stage);
   color: var(--ink);
-  box-shadow: var(--stage-shadow);
 }
 @media (max-width: 900px) {
   .schema-owners {

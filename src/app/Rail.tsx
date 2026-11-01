@@ -103,7 +103,7 @@ export const Rail = memo(function Rail({
             {state === 'waiting' && <span className="rail-dot" aria-hidden="true" />}
           </button>
           <span className="rail-label" aria-hidden="true">
-            {space.name}
+            <span className="rail-label-name">{space.name}</span>
             <span className="rail-label-state">
               <i />
               {aiStateWords(state)}

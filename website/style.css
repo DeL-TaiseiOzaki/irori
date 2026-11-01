@@ -1,5 +1,7 @@
-/* The download site shares the app's v5 tokens (src/app/tokens.css): graphite chrome,
-   the AI's ember, and the layer colours. It is dark only, like the app's hearth chrome. */
+/* The download site shares the app's tokens and colour roles (src/app/tokens.css,
+   ADR 053): graphite chrome, solid paper for the action, the focus blue, and the
+   layer colours as identity. The ember is the brand and appears only in the mark.
+   It is dark only, like the app's hearth chrome. */
 @font-face {
   font-family: 'Geist';
   src: url('../src/app/fonts/Geist-Variable.woff2') format('woff2');
@@ -27,12 +29,7 @@
   --tx: #f0eee8;
   --tx-2: #aab0b7;
   --tx-3: #838990;
-  --ember: #ff8b3d;
-  --ember-2: #ffa766;
-  --ember-soft: rgba(255, 139, 61, 0.13);
-  --ember-line: rgba(255, 139, 61, 0.45);
-  --ember-glow: rgba(255, 139, 61, 0.2);
-  --on-ember: #1e1006;
+  --focus: #4c7dff;
   --schema: #b8abff;
   --know: #f0eee8;
   --cont: #72d4c4;
@@ -73,7 +70,7 @@ p a,
   transition: text-decoration-color 140ms var(--ease);
 }
 p a:hover {
-  text-decoration-color: var(--ember);
+  text-decoration-color: var(--tx-2);
 }
 button {
   font: inherit;
@@ -96,12 +93,12 @@ h3 {
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--focus);
   outline-offset: 4px;
   border-radius: 6px;
 }
 ::selection {
-  background: var(--ember-soft);
+  background: rgba(122, 162, 255, 0.28);
   color: var(--tx);
 }
 .wrap {
@@ -176,23 +173,19 @@ nav a:not(.button):hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 48px;
-  padding: 12px 22px;
-  border-radius: 999px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 8px;
   border: 1px solid transparent;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.005em;
   cursor: pointer;
   transition:
-    transform 140ms var(--ease),
     background-color 140ms var(--ease),
-    border-color 140ms var(--ease),
-    box-shadow 200ms var(--ease);
+    border-color 140ms var(--ease);
 }
-.button:hover {
-  transform: translateY(-1px);
-}
+
 .button.small {
   min-height: 36px;
   padding: 7px 16px;
@@ -202,27 +195,22 @@ nav a:not(.button):hover {
   background: var(--tx);
   color: var(--bg);
 }
-.button.ember {
-  background: var(--ember);
-  color: var(--on-ember);
-  box-shadow:
-    0 0 0 1px rgba(255, 167, 102, 0.5) inset,
-    0 10px 30px var(--ember-glow);
+/* The page's one action: solid paper, as the app's primary buttons. */
+.button.primary {
+  background: var(--tx);
+  color: var(--bg);
 }
-.button.ember:hover {
-  background: var(--ember-2);
-  box-shadow:
-    0 0 0 1px rgba(255, 167, 102, 0.6) inset,
-    0 14px 40px rgba(255, 139, 61, 0.32);
+.button.primary:hover {
+  background: #ffffff;
 }
 .button.ghost {
-  background: rgba(255, 255, 255, 0.03);
+  background: none;
   border-color: var(--hair-2);
   color: var(--tx);
 }
 .button.ghost:hover {
   border-color: var(--hair-3);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--raised);
 }
 .button:disabled {
   cursor: not-allowed;
@@ -230,111 +218,62 @@ nav a:not(.button):hover {
   transform: none;
 }
 
-/* hero */
+/* hero: the name, what it is, one action. Left-aligned like the app's own text. */
 .hero {
   position: relative;
-  padding-top: 88px;
-  isolation: isolate;
-}
-.hero-glow {
-  position: absolute;
-  inset: -120px 0 auto;
-  height: 900px;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 40% 36% at 50% 62%, rgba(255, 139, 61, 0.22), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 50% 30%, rgba(184, 171, 255, 0.06), transparent 70%);
-  animation: ember 7s ease-in-out infinite alternate;
-}
-.hero-glow::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
-}
-@keyframes ember {
-  from {
-    opacity: 0.8;
-  }
-  to {
-    opacity: 1;
-  }
+  padding-top: 96px;
 }
 .hero-copy {
-  text-align: center;
   display: flex;
   flex-direction: column;
-  align-items: center;
-}
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 12px;
-  border: 1px solid var(--hair-2);
-  border-radius: 999px;
-  background: rgba(21, 23, 26, 0.7);
-  font-size: 13px;
-  color: var(--tx-2);
-  transition: border-color 140ms var(--ease);
-}
-.pill:hover {
-  border-color: var(--ember-line);
-  color: var(--tx);
-}
-.pill-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ember);
-  box-shadow: 0 0 0 4px var(--ember-soft);
+  align-items: flex-start;
 }
 .hero h1 {
-  margin: 28px 0 22px;
-  font-size: clamp(44px, 7.4vw, 88px);
+  margin: 0 0 18px;
+  font-size: clamp(36px, 5.2vw, 60px);
   font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1.02;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
-.ember-text {
-  background: linear-gradient(100deg, #ffc08f 0%, var(--ember) 45%, #e8612a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.title-rest {
+  font-weight: 500;
+  color: var(--tx-2);
 }
 .lead {
-  max-width: 640px;
+  max-width: 600px;
   margin: 0;
-  font-size: clamp(17px, 1.6vw, 19px);
+  font-size: clamp(16px, 1.5vw, 18px);
   color: var(--tx-2);
   line-height: 1.6;
 }
 .cta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 36px;
+  gap: 10px;
+  margin-top: 32px;
 }
 .cta-meta {
-  margin: 16px 0 0;
+  margin: 14px 0 0;
   font-size: 13px;
   color: var(--tx-3);
+}
+.cta-meta a {
+  color: var(--tx-2);
+  text-decoration: underline;
+  text-decoration-color: var(--hair-3);
+  text-underline-offset: 3px;
+}
+.cta-meta a:hover {
+  color: var(--tx);
 }
 
 /* screenshots */
 .shot {
   margin: 0;
-  border-radius: var(--radius);
+  border-radius: 10px;
   overflow: hidden;
   background: var(--panel);
-  box-shadow:
-    0 0 0 1px var(--hair-2),
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 30px 80px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 1px var(--hair-2);
 }
 .shot img {
   display: block;
@@ -342,19 +281,18 @@ nav a:not(.button):hover {
   height: auto;
 }
 .hero-shot {
-  margin-top: 72px;
-  box-shadow:
-    0 0 0 1px var(--hair-2),
-    0 40px 120px rgba(0, 0, 0, 0.7),
-    0 0 160px rgba(255, 139, 61, 0.12);
+  margin-top: 56px;
 }
 
 .agents {
-  margin-top: 56px;
-  text-align: center;
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
 }
 .agents p {
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 13px;
   color: var(--tx-3);
 }
@@ -364,16 +302,11 @@ nav a:not(.button):hover {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+  gap: 4px 18px;
 }
 .agents li {
-  padding: 8px 16px;
-  border: 1px solid var(--hair);
-  border-radius: 999px;
-  background: var(--panel);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--tx-2);
 }
 
@@ -382,19 +315,16 @@ section {
   position: relative;
 }
 .eyebrow {
-  margin: 0 0 14px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  margin: 0 0 10px;
+  font-size: 13px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--ember);
+  color: var(--tx-3);
 }
 .section-head h2,
 .feature-copy h2 {
-  font-size: clamp(32px, 4.4vw, 52px);
+  font-size: clamp(28px, 3.4vw, 40px);
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
 }
 .section-head > p:not(.eyebrow),
 .feature-copy > p:not(.eyebrow) {
@@ -417,36 +347,19 @@ section {
 
 /* layers */
 .layers {
-  padding-top: 150px;
+  padding-top: 128px;
 }
 .layer-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 48px;
+  gap: 32px;
+  margin-top: 40px;
 }
+/* Each layer is told by its name's colour only, as the app tells them. */
 .layer {
   --tone: var(--tx);
-  position: relative;
-  padding: 28px 26px 30px;
-  border-radius: var(--radius);
-  border: 1px solid var(--hair);
-  background:
-    radial-gradient(
-      120% 90% at 0% 0%,
-      color-mix(in srgb, var(--tone) 9%, transparent),
-      transparent 60%
-    ),
-    var(--panel);
-  overflow: hidden;
-}
-.layer::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: linear-gradient(90deg, var(--tone), transparent 80%);
-  opacity: 0.8;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--hair-2);
 }
 .layer.schema {
   --tone: var(--schema);
@@ -464,8 +377,8 @@ section {
   color: var(--tone);
 }
 .layer h3 {
-  margin: 14px 0 0;
-  font-size: 22px;
+  margin: 8px 0 0;
+  font-size: 20px;
   font-weight: 650;
 }
 /* feature rows */
@@ -474,34 +387,21 @@ section {
 }
 .feature {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 64px;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: 56px;
   align-items: center;
-  padding-top: 110px;
+  padding-top: 96px;
 }
 .feature.reverse .feature-copy {
   order: 2;
 }
 /* download */
 .download-section {
-  margin-top: 150px;
-  padding: 120px 0;
+  margin-top: 140px;
+  padding: 96px 0;
   border-top: 1px solid var(--hair);
   border-bottom: 1px solid var(--hair);
-  background: linear-gradient(180deg, #111215, var(--bg));
-  isolation: isolate;
-  overflow: hidden;
-}
-.download-glow {
-  position: absolute;
-  inset: auto 0 -200px;
-  height: 600px;
-  z-index: -1;
-  background: radial-gradient(
-    ellipse 45% 55% at 50% 70%,
-    rgba(255, 139, 61, 0.14),
-    transparent 70%
-  );
+  background: var(--panel);
 }
 .downloads {
   display: grid;
@@ -516,29 +416,26 @@ section {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 40px 28px 30px;
-  border-radius: 18px;
+  padding: 32px 24px 26px;
+  border-radius: 10px;
   border: 1px solid var(--hair-2);
-  background: rgba(21, 23, 26, 0.85);
-  transition:
-    border-color 200ms var(--ease),
-    transform 200ms var(--ease);
+  background: var(--bg);
+  transition: border-color 200ms var(--ease);
 }
 .download-card:hover {
   border-color: var(--hair-3);
 }
 .download-card.detected {
-  border-color: var(--ember-line);
-  box-shadow: 0 20px 70px rgba(255, 139, 61, 0.12);
+  border-color: var(--hair-3);
 }
 .detected-badge {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  top: 12px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--raised-2);
+  color: var(--tx);
   font-size: 12px;
   font-weight: 600;
 }
@@ -610,7 +507,7 @@ section {
 
 /* get started */
 .start {
-  padding-top: 150px;
+  padding-top: 128px;
 }
 .steps {
   list-style: none;
@@ -619,26 +516,18 @@ section {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 32px;
 }
 .steps li {
   counter-increment: step;
-  padding: 26px 24px;
-  border-radius: var(--radius);
-  border: 1px solid var(--hair);
-  background: var(--panel);
+  padding: 20px 0 0;
+  border-top: 1px solid var(--hair-2);
 }
 .steps li::before {
   content: counter(step);
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 18px;
-  border-radius: 50%;
-  border: 1px solid var(--ember-line);
-  background: var(--ember-soft);
-  color: var(--ember-2);
+  display: block;
+  margin-bottom: 10px;
+  color: var(--tx-3);
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;
@@ -656,7 +545,7 @@ section {
 
 /* faq */
 .faq {
-  padding: 150px 0 140px;
+  padding: 128px 0 120px;
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
   gap: 64px;
@@ -698,8 +587,8 @@ summary::after {
 }
 details[open] summary::after {
   transform: rotate(45deg);
-  border-color: var(--ember-line);
-  color: var(--ember);
+  border-color: var(--hair-3);
+  color: var(--tx);
 }
 details p {
   margin: -6px 0 24px;
