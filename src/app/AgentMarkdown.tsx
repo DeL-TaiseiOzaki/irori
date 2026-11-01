@@ -1,9 +1,11 @@
 import { createContext, memo, useContext, useState, type ReactNode } from 'react';
 import { t } from '../domain/i18n';
+import { webAddress } from '../domain/links';
 import type { PathTarget } from '../domain/path-links';
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { writtenPath } from '../domain/path-links';
+import { isAbsolute, writtenPath } from '../domain/path-links';
+import { errorText } from './ErrorMessage';
 import { usePathTarget, type PathLinkTarget } from './path-links';
 
 const host = window.irori;
@@ -50,6 +52,13 @@ function PathLink({
             .then((found) => {
               if (found.length === 1) link.open(found[0]);
               else if (found.length > 1) setChoices(found);
+              else if (isAbsolute(written.path))
+                onError(
+                  t(
+                    `${written.path} が見つかりません。irori が開くのは vault とその接続先・作業フォルダ、irori agent のフォルダの中のファイルです。`,
+                    `${written.path} was not found. irori opens files inside the vaults, their connected and work folders, and the irori agent's folder.`,
+                  ),
+                );
               else
                 onError(t(`${written.path} が見つかりません。`, `${written.path} was not found.`));
             }, onError)
@@ -95,14 +104,23 @@ function Link({
         {children}
       </PathLink>
     );
+  // Only a web address can be opened; any other destination (`mailto:`, `~/x`,
+  // a folder, `#heading`) keeps its words without being a link that fails.
+  const address = href ? webAddress(href) : undefined;
+  if (!address)
+    return (
+      <span className="message-link-text" title={href || undefined}>
+        <InLink.Provider value={true}>{children}</InLink.Provider>
+      </span>
+    );
   return (
     <a
       className="message-link"
-      href={href}
-      title={href}
+      href={address.href}
+      title={address.href}
       onClick={(event) => {
         event.preventDefault();
-        if (href) void host.openUrl(href).catch(onError);
+        void host.openUrl(address.href).catch(onError);
       }}
     >
       <InLink.Provider value={true}>{children}</InLink.Provider>
@@ -163,7 +181,7 @@ function urlTransform(url: string, key: string) {
 
 export const AgentMarkdown = memo(function AgentMarkdown({ text }: { text: string }) {
   const [error, setError] = useState('');
-  const [components] = useState(() => markdownComponents((value) => setError(String(value))));
+  const [components] = useState(() => markdownComponents((value) => setError(errorText(value))));
   return (
     <div className="message-markdown">
       <Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>

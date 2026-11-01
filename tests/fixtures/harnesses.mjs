@@ -96,6 +96,12 @@ export function run(kind) {
     const markdownReply =
       '### 手順\n\n1. \`note.md\` を開く\n2. 見出しを追加\n\n[公開ページ](https://example.com/irori)\n\n[危険](javascript:alert(1))\n\n' +
       `[second.md](${encodeURI(path.join(process.cwd(), 'second.md'))}:1)\n\n` +
+      // Codex's own form for a name with spaces, a file outside every folder, a
+      // folder, and a destination that is not a web address.
+      `[My Note.md](<${path.join(process.cwd(), 'My Note.md')}:1>)\n\n` +
+      '[outside.md](/etc/irori-outside.md:3)\n\n' +
+      `[KB](${encodeURI(process.cwd())}/)\n\n` +
+      '[メール](mailto:me@example.com)\n\n' +
       'A name with its line, \`second.md:1\`, and one that is not there, \`missing.md\`.\n\n' +
       '\`\`\`ts\nconst ok = true;\n\`\`\`\n';
     const complete = (error = false, text = '日本語\u2028の応答') => {
