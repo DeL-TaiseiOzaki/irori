@@ -18,6 +18,13 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-01: **0.2.49** ([#287](https://github.com/DeL-TaiseiOzaki/irori/pull/287),
+the open-file and conversation tabs restyled as plain underlined tabs) as
+`1f0373d`, by `publish.yml` alone (push run `41296101041`): merge to release
+2:20, to page 3:24, drift in step. Anonymous downloads of the Windows installer,
+the Mac image and `irori-0.2.49-full.nupkg` matched `SHA256SUMS.txt`. Releases
+0.2.43 to 0.2.48 are not recorded here. See STATUS.
+
 Published 2026-10-20: **0.2.42** ([#278](https://github.com/DeL-TaiseiOzaki/irori/pull/278),
 copy and paste in the explorer, Obsidian-style images, folded properties, Schema
 deletion, closing the first agent column alone) as `4a08399`, by `publish.yml`
