@@ -177,11 +177,13 @@ try {
   await expect(page.getByLabel('相談の対象', { exact: true })).toContainText('Research');
   await expect(page.locator('.schema-line')).toContainText('Research の Schema');
   await expect(page.locator('.schema-line')).toContainText('AGENTS.md');
-  await page.getByRole('button', { name: 'このノートの要点をまとめて', exact: true }).click();
+  // An empty conversation offers no canned requests (ADR 053): the composer is
+  // the one place to write one, and writing does not start a run.
+  await expect(page.locator('.agent-empty, .prompt-suggestions')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'エージェントへの指示' }).fill('要点をまとめて');
   await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toHaveValue(
-    'このノートの要点をまとめて',
+    '要点をまとめて',
   );
-  await expect(page.getByRole('textbox', { name: 'エージェントへの指示' })).toBeFocused();
   await expect(page.locator('.message.user')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/irori-brain-panel.png' });
@@ -220,7 +222,7 @@ try {
           'unconfigured aliases visible without a mount',
           'same-name note ownership and saving before switching brains',
           'agent context and Schema line follow the brain on show',
-          'prompt suggestions fill and focus the composer without starting a run',
+          'an empty conversation offers no canned requests; writing does not start a run',
           'cloud action targets its owning brain',
         ],
         errors,

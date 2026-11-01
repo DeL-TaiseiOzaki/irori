@@ -365,7 +365,7 @@ function StepCard({
       <div className="routine-draft-step-head">
         <span className="routine-step-number">{index + 1}</span>
         <Icon
-          name={step.kind === 'agent' ? 'sparkles' : 'terminal'}
+          name={step.kind === 'agent' ? 'agent' : 'terminal'}
           size={13}
           className={step.kind === 'agent' ? 'routine-step-agent' : undefined}
         />

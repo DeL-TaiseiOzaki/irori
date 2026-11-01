@@ -75,7 +75,7 @@ export function SchemaDialog({
               {row(
                 you.id,
                 'irori agent',
-                <Icon name="sparkles" size={16} className="schema-owner-icon" />,
+                <Icon name="agent" size={16} className="schema-owner-icon" />,
               )}
             </>
           )}

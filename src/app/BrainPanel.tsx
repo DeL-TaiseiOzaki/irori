@@ -1,3 +1,4 @@
+import { countLabel } from './display';
 import {
   createContext,
   memo,
@@ -1079,7 +1080,7 @@ export const BrainPanel = memo(function BrainPanel({
               label: (
                 <>
                   <Icon name="branch" size={14} /> {t('変更', 'Changes')}
-                  {!!changes && <span className="count">{changes}</span>}
+                  {!!changes && <span className="count">{countLabel(changes)}</span>}
                 </>
               ),
               disabled: changesDisabled,
