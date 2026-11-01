@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
+[#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291);
+[ADR 053](decisions/053-priority-and-colour-roles.md)):
+- `tokens.css` replaces the ember family with single-meaning roles: `--brand`
+  (mark only), `--focus`/`--act*`, `--run*`, `--attn*` (`--warn-*` alias it),
+  `--danger*`, chrome diff `--add-tx`/`--del-tx`. A normal outcome is uncoloured;
+  the source view's syntax is weight and grey. No `--ember*` token remains.
+- Shell: panes are flat on the chrome, joined by 1px hairlines that are the
+  resize handles (`.island-handle::before` widens the hit area); only the stage
+  is lit. The Overview, your-AI screen, routines and the Schema dialog follow.
+- `sparkles` is gone from `Icon`: `agent` (MessagesSquare) and `skill` (Wrench).
+  `.ember-button` is `.primary-button`. The empty conversation's canned requests
+  are removed (`layers-ui-smoke` now asserts there are none).
+- `BrainHome` is two boxless columns; changes show only when there are some and
+  carry the one solid button. `Startup` is one column without the diagram; its
+  title is "irori - IDE for Second Brain"; a first launch puts adding a vault first.
+- Real data: `countLabel` (badges stop at 99+), `shortWhen` returns `—` for a
+  broken time, `src/domain/tab-labels.ts` tells same-named tabs apart, long
+  vault names and paths are cut with a title. Tests: `tab-labels`, `display-counts`.
+- Website and READMEs: "irori - IDE for Second Brain"; no glow, ember text or
+  pill; `.button.primary` is solid paper. Screenshots retaken.
+
 A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**,
 [#289](https://github.com/DeL-TaiseiOzaki/irori/pull/289), published as `v0.2.50-preview.1`):
 - `VaultRepositories` (`src/app/VaultRepositories.tsx`) is a popover on the

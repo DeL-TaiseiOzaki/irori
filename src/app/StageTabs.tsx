@@ -1,5 +1,5 @@
-import { baseName } from '../domain/paths';
 import { t } from '../domain/i18n';
+import { tabLabels } from '../domain/tab-labels';
 import { Icon } from './Icon';
 
 /**
@@ -24,6 +24,8 @@ export function StageTabs({
   /** Closes the column; absent for the stage's only column. */
   onCloseColumn?: () => void;
 }) {
+  // Two open files with one name show as much of their folders as tells them apart.
+  const labels = tabLabels(tabs);
   return (
     <div className={`stage-tabs${focused ? ' focused' : ''}`}>
       <div
@@ -32,7 +34,7 @@ export function StageTabs({
         aria-label={t('開いているファイル', 'Open files')}
       >
         {tabs.map((path) => {
-          const name = baseName(path);
+          const { name, folder } = labels.get(path)!;
           const current = path === on;
           return (
             <div key={path} className={`stage-tab${current ? ' current' : ''}`}>
@@ -44,6 +46,7 @@ export function StageTabs({
                 onClick={() => onShow(path)}
               >
                 <span>{name}</span>
+                {folder && <small className="stage-tab-folder">{folder}</small>}
               </button>
               <button
                 className="stage-tab-close"

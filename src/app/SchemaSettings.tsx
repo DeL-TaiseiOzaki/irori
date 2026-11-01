@@ -71,7 +71,7 @@ const kinds: Record<SchemaKind, { icon: IconName; name: () => string; one: () =>
     name: () => t('指示', 'Instructions'),
     one: () => t('指示', 'instructions'),
   },
-  skill: { icon: 'sparkles', name: () => t('スキル', 'Skills'), one: () => t('スキル', 'a skill') },
+  skill: { icon: 'skill', name: () => t('スキル', 'Skills'), one: () => t('スキル', 'a skill') },
   rule: { icon: 'shield', name: () => t('ルール', 'Rules'), one: () => t('ルール', 'a rule') },
   hook: { icon: 'zap', name: () => t('フック', 'Hooks'), one: () => t('フック', 'a hook') },
 };
@@ -440,9 +440,7 @@ export function SchemaEditor({
         <Crumbs
           space={space}
           items={[
-            ...(space
-              ? []
-              : [{ icon: 'sparkles' as const, label: t('irori agent', 'irori agent') }]),
+            ...(space ? [] : [{ icon: 'agent' as const, label: t('irori agent', 'irori agent') }]),
             {
               icon: 'schema',
               label: common ? t('共通 Schema', 'Shared Schema') : 'Schema',

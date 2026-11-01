@@ -52,14 +52,14 @@ export function Crumbs({
     <nav className="crumbs" aria-label={t('場所', 'Location')}>
       {space &&
         (onBrain ? (
-          <button className="crumb brain" onClick={onBrain}>
+          <button className="crumb brain" title={space.name} onClick={onBrain}>
             <BrainTile space={space} size={20} radius={6} ring="stage" />
-            {space.name}
+            <span className="crumb-label">{space.name}</span>
           </button>
         ) : (
-          <span className="crumb brain">
+          <span className="crumb brain" title={space.name}>
             <BrainTile space={space} size={20} radius={6} ring="stage" />
-            {space.name}
+            <span className="crumb-label">{space.name}</span>
           </span>
         ))}
       {items.map((item, index) => (
@@ -113,7 +113,7 @@ export function NoteMenu({ children }: { children: ReactNode }) {
   );
 }
 
-/** Opens and closes the brain's vault agent; closed, it is the AI's own ember button. */
+/** Opens and closes the vault agent beside the note: a control like the others in the bar. */
 /** Opens and closes the agent dock, named after the agent its first column shows. */
 export function AiToggle({
   open,
@@ -131,12 +131,12 @@ export function AiToggle({
       aria-label={t(`${name} を閉じる`, `Close ${name}`)}
       onClick={onToggle}
     >
-      <Icon name="sparkles" size={14} />
+      <Icon name="agent" size={14} />
       AI
     </button>
   ) : (
     <button className="ai-toggle" onClick={onToggle}>
-      <Icon name="sparkles" size={14} />
+      <Icon name="agent" size={14} />
       {name}
     </button>
   );
