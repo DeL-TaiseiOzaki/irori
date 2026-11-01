@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
-[#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291);
+[#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291), published as `v0.2.52-preview.1`;
 [ADR 053](decisions/053-priority-and-colour-roles.md)):
 - `tokens.css` replaces the ember family with single-meaning roles: `--brand`
   (mark only), `--focus`/`--act*`, `--run*`, `--attn*` (`--warn-*` alias it),
