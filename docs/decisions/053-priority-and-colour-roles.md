@@ -1,6 +1,6 @@
 # 053 — One subject per screen, one meaning per colour
 
-Date: 2026-11-01. Status: owner request; implemented for 0.2.50.
+Date: 2026-11-01. Status: owner request; implemented for 0.2.52.
 Revises the visual system of [ADR 014](014-ui-v5.md) (decisions 7 and 8);
 the levels, the vault as the unit, the agents and every function stay as they are.
 
