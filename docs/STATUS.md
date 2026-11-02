@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
-[#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291);
+[#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291), published as `v0.2.52-preview.1`;
 [ADR 053](decisions/053-priority-and-colour-roles.md)):
 - `tokens.css` replaces the ember family with single-meaning roles: `--brand`
   (mark only), `--focus`/`--act*`, `--run*`, `--attn*` (`--warn-*` alias it),
@@ -21,6 +21,28 @@ One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
   vault names and paths are cut with a title. Tests: `tab-labels`, `display-counts`.
 - Website and READMEs: "irori - IDE for Second Brain"; no glow, ember text or
   pill; `.button.primary` is solid paper. Screenshots retaken.
+
+Codex's absolute file links open through the host, 2026-11-01 (**0.2.51**,
+[#290](https://github.com/DeL-TaiseiOzaki/irori/pull/290), published as `v0.2.51-preview.1`):
+- Owner report: clicking a file link in a Codex reply showed
+  `Error: [ { "code": "custom", "path": [ 0 ], "message": "http または https のリンクだけを開けます。" } ]`.
+  Codex's model instructions (`codex-rs/models-manager/models.json`, gpt-5.5
+  and later) write each local file as `[app.py](/abs/path/app.py:12)`, in `<…>`
+  when the path has spaces. A link whose absolute path no root the window had
+  read held fell through to `openUrl`, and `String(ZodError)` reached the window.
+- `usePathTarget` (`src/app/path-links.ts`) offers every link to an absolute
+  path; `locateAgentPath` answers with the roots as they are when clicked, so a
+  work folder a run made after `agentPathRoots` was read opens. A path in no
+  root shows that it was not found and which folders irori opens
+  (`AgentMarkdown.tsx`). Inline code naming an absolute path in no root stays code.
+- `AgentMarkdown`'s `Link` makes an `<a>` only for `webAddress`; any other
+  destination is a `.message-link-text` span. `dispatchHost`
+  (`src/domain/host-requests.ts`) uses `safeParse` and throws the issues'
+  messages, so every boundary refusal reads as words. ADR 044 decision 7 amended.
+- Verified by `npm run build`, `npm test` (`tests/links.test.ts`) and
+  `npm run test:ui`; `harness-ui-smoke` replies with Codex's link forms (an
+  absolute path with spaces in `<…>`, one outside every folder, a folder,
+  `mailto:`). Not tried with a real Codex run, macOS or Windows.
 
 A vault's GitHub repositories in one list, 2026-11-01 (**0.2.50**,
 [#289](https://github.com/DeL-TaiseiOzaki/irori/pull/289), published as `v0.2.50-preview.1`):
