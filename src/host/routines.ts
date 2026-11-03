@@ -239,6 +239,8 @@ interface Active {
   steps: RoutineStep[];
   workspace: Space[];
   input: RunRoutine;
+  /** The digest of the files the person confirmed, which every program step runs from (D4). */
+  digest: string;
   abort: AbortController;
   /** Hides the values this run handed out or got back from its record. */
   redactor: Redactor;
@@ -274,7 +276,6 @@ export class RoutineService {
   private active = new Map<string, Active>();
   private starting = new Set<string>();
   private records = new Map<string, RoutineRun[]>();
-  private hashes = new Map<string, { size: number; mtimeMs: number; hash: string }>();
   constructor(private host: RoutineHost) {}
   get busy() {
     return this.active.size > 0 || this.starting.size > 0;
@@ -369,13 +370,8 @@ export class RoutineService {
           );
         if (total > folderLimit)
           throw Error(t('ファイルが合計 5 MiB を超えています。', 'The files exceed 5 MiB in all.'));
-        const known = this.hashes.get(file);
-        const hash =
-          known && known.size === stat.size && known.mtimeMs === stat.mtimeMs
-            ? known.hash
-            : sha256(await fs.readFile(file));
-        this.hashes.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, hash });
-        files.push({ path: child, file, size: stat.size, hash });
+        // Hashed every time: a size and a time can be put back after an edit.
+        files.push({ path: child, file, size: stat.size, hash: sha256(await fs.readFile(file)) });
       }
     };
     await walk('', 0);
@@ -710,7 +706,8 @@ export class RoutineService {
   /**
    * Starts a routine the person asked to run (D6). A routine whose files differ
    * from what the person confirmed runs only with `digest` of the files as they
-   * are now, which the review showed.
+   * are now, which the review showed. Each program step starts only while the
+   * folder still holds those files.
    */
   async run(ref: RoutineRef, input: RunRoutine): Promise<string> {
     const key = routineKey(ref);
@@ -760,6 +757,7 @@ export class RoutineService {
         steps: found.steps,
         workspace,
         input,
+        digest: found.digest,
         abort: new AbortController(),
         redactor: new Redactor(),
       };
@@ -852,8 +850,10 @@ export class RoutineService {
         await this.save(active);
         let nothing = false;
         try {
-          if (step.kind === 'run') nothing = await this.program(active, step, record, env);
-          else await this.agent(active, step, record, env, index);
+          if (step.kind === 'run') {
+            await this.unchanged(active);
+            nothing = await this.program(active, step, record, env);
+          } else await this.agent(active, step, record, env, index);
         } catch (error) {
           record.state = 'failed';
           record.detail = active.redactor.hide(message(error));
@@ -885,6 +885,27 @@ export class RoutineService {
       await fs.rm(work, { recursive: true, force: true }).catch(() => {});
       this.active.delete(key);
     }
+  }
+  /**
+   * Throws unless the routine's folder still holds the files the person
+   * confirmed: an earlier step, such as an agent given `IRORI_ROUTINE`, may
+   * have changed the program this step runs (D4).
+   */
+  private async unchanged(active: Active) {
+    const dir = path.join(active.owner.dir, active.run.routine.folder);
+    let digest: string | undefined;
+    try {
+      if (!(await fs.lstat(dir)).isSymbolicLink()) ({ digest } = await this.read(dir));
+    } catch {
+      // A folder that cannot be read is not the one confirmed.
+    }
+    if (digest !== active.digest)
+      throw Error(
+        t(
+          'ルーティンが実行中に変わりました。確認し直してください。',
+          'The routine changed while it ran. Review it again.',
+        ),
+      );
   }
   /**
    * Runs a `run` step; true when it printed `{"continue": false}` last. Only
@@ -975,6 +996,8 @@ export class RoutineService {
         args = ['run', '--no-project', '--script', file];
         Object.assign(env, this.host.python!.env());
         delete env.VIRTUAL_ENV;
+        // Python's `__pycache__` beside a module would change the folder, stopping later steps.
+        env.PYTHONDONTWRITEBYTECODE = '1';
       } else {
         command = file;
         args = [];

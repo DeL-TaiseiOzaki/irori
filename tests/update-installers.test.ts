@@ -175,7 +175,7 @@ test('a disk image holding another app, version or broken signature is refused',
   for (const [options, pattern] of [
     [{ identifier: 'com.example.other' }, /irori ではありません/],
     [{ version: '0.1.3' }, /0\.1\.3 が公開版 0\.1\.4 と一致しません/],
-    [{ verify: false }, /署名を確認できませんでした/],
+    [{ verify: false }, /検証に合いませんでした/],
   ] as const) {
     const { bundle, dmg, installer } = await macLayout(options);
     await assert.rejects(

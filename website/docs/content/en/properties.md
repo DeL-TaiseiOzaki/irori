@@ -13,7 +13,7 @@ Properties are part of the note and can be shared with its text through Git.
 
 If a vault contains `.property/property.json`, its definitions supply options, required fields, and fields for each type. Notes can still open without that file.
 
-Saving fills fields defined as `auto: last-change` with the actor and time. Follow your vault's conventions for types and options.
+Saving fills fields defined as `auto: last-change` with the actor and time. The actor is whoever saved in irori's editor, so the field still names them after an agent changes the page outside it; treat it as a guide. Follow your vault's conventions for types and options.
 
 ## Check the YAML
 

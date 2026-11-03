@@ -56,10 +56,11 @@ export function imagesForNoteMove(text: string, rewriting = false): string[] {
   };
   if (/\[\[|\b(?:src|href)\s*=/i.test(text)) reject();
   if (!rewriting && /^\s{0,3}\[[^\]]+\]:|\]\s*\[/m.test(text)) reject();
+  // Read in place (sticky), not from a copy of the rest of the note at each link.
+  const target = /(?:<([^<>]+)>|([^\s()]+))(?:\s+["'][^\n]*?["'])?\s*\)/y;
   for (const match of text.matchAll(/\]\(/g)) {
-    const destination = /^(?:<([^<>]+)>|([^\s()]+))(?:\s+["'][^\n]*?["'])?\s*\)/.exec(
-      text.slice(match.index + 2),
-    );
+    target.lastIndex = match.index + 2;
+    const destination = target.exec(text);
     const url = destination?.[1] ?? destination?.[2];
     if (url === undefined || /^(?:https?:|mailto:|#)/i.test(url)) {
       if (url === undefined && !rewriting) reject();

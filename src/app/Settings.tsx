@@ -332,6 +332,11 @@ export function Settings({
                     <input
                       type="checkbox"
                       checked={vaultAgent}
+                      // Off hides the vault agents' columns and Schema; it does not stop CLIs in vaults.
+                      title={t(
+                        'オフにすると vault agent の列と Schema が隠れます。irori agent からの依頼とルーティンは、オフでも vault の中で CLI をその vault のエージェント設定で実行します。',
+                        "Off hides the vault agents' columns and Schema. Hand-offs from the irori agent and routines still run a CLI inside the vault, with the vault's agent configuration.",
+                      )}
                       onChange={(event) => onVaultAgent(event.target.checked)}
                     />
                     <Icon name="agent" size={15} />

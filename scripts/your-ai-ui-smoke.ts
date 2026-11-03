@@ -69,6 +69,22 @@ try {
   const page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   page.setDefaultTimeout(20000);
+  // The person allows what an agent's `irori` command asks for, and configuration
+  // that runs without asking; every other system dialog is the app's own.
+  await app.evaluate(({ dialog }) => {
+    const original = dialog.showMessageBox.bind(dialog);
+    const asked: string[] = ((globalThis as { asked?: string[] }).asked = []);
+    dialog.showMessageBox = (async (...args: Parameters<typeof original>) => {
+      const options = args.at(-1) as Electron.MessageBoxOptions;
+      if (/しようとしています|確認なしで動く|プログラムを実行します/.test(options.message)) {
+        asked.push(`${options.message}\n${options.detail ?? ''}`);
+        return { response: 1, checkboxChecked: false };
+      }
+      return original(...args);
+    }) as never;
+  });
+  const asked = () =>
+    app.evaluate(() => (globalThis as { asked?: string[] }).asked ?? []) as Promise<string[]>;
   // Each side of a hand-off logs in the folder it works in.
   const fixtureLog = async (folder = you) =>
     (await readFile(path.join(folder, 'your-ai-fixture.jsonl'), 'utf8').catch(() => ''))
@@ -176,11 +192,9 @@ try {
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
-  // The irori agent starts in full access like a vault agent. This part is
-  // about requests, so it runs in the standard mode, chosen in the composer.
+  // The irori agent starts in standard access, as a vault agent does.
   const access = island.getByLabel('エージェントのアクセス', { exact: true });
-  await expect(access).toHaveValue('full-access');
-  await access.selectOption('default');
+  await expect(access).toHaveValue('default');
   // A request goes to your AI with the workspace's vaults; it hands a note to
   // Product's agent with `irori call`, whose write asks the person here.
   await composer.fill('Write a decision note.');
@@ -337,6 +351,10 @@ try {
     .toBe(2);
   const registered = (await piLog()).filter((entry) => entry.type === 'command')[1];
   expect(registered).toMatchObject({ code: 0 });
+  // Registering a vault is the person's to allow, each time an agent asks.
+  expect((await asked()).some((text) => text.includes(`irori add ${notes} --name Notes`))).toBe(
+    true,
+  );
   expect(registered.stdout).toContain('Registered the vault "Notes"');
   expect(registered.stdout).toContain('Added it to this workspace');
   // Whole on the session's first request, one line after it (ADR 039).

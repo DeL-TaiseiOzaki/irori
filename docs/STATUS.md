@@ -1,5 +1,51 @@
 # Implementation status — notes, native agents and connection onboarding
 
+What the screen says is what agents get, 2026-11-03 (**0.2.54**; a review of
+irori against its own UI, docs and ADR 009's rule that no mode is offered which
+cannot be enforced):
+- Access: `defaultAgentAccess` is `default` for every CLI; hand-offs use it
+  (`service.ts` `handOff`), a full-access run logs a status line, the composer's
+  access select is disabled while a turn runs, and the Overview footer names the
+  quick send's access. Labels: Pi 「承認なし」, Antigravity 「編集は自動で許可」.
+- Read-only connections: `CloudService.localFolders(scopeId, writable)` and
+  `linkedPaths(scopeId, writable)`; Codex `writable_roots` gets only read-write
+  folders, Claude Code gets `permissions.deny` `Edit(//…/**)` rules
+  (`claudeRulePath`) for each read-only target and its link, and the vault
+  intro / handed list say which folders are read-only.
+- `src/agents/config-approval.ts`: before a run, the files that act without
+  asking (per CLI) in the working folder, handed vaults and connected folders'
+  `.claude`, plus the shared Schema's hooks, are digested; a change asks the
+  person (`approveConfig`, a main-process dialog) and a refusal stops the run.
+  The `/` command list uses only user settings until the folder is allowed.
+- `src/git/config-approval.ts`: `GitProcess.run` asks before Git runs where the
+  repository's own config sets hooks, filters, drivers, helpers or includes, or
+  `hooks/` holds a hook; a refusal is remembered for the session.
+- `AgentSetup` asks (`confirm`) before an agent's `add`, `connect`, `work`,
+  `remove` and `run`.
+- Host: `launch` and `findExecutable` resolve on absolute PATH entries only
+  (`onSearchPath`), and `agentEnv` drops empty and relative entries; `openFile`
+  refuses programs, scripts and shortcuts and offers Show in folder;
+  `file://` requests naming a host are cancelled; `carryImages` copies only
+  regular files; terminal write/resize/acknowledge/close are per window;
+  Windows paths with `:` are refused; a restored note's trash record is removed;
+  `folderLabel` drops an account email; linking adds the contents root to
+  `.git/info/exclude`; saving the environment leaves credential files out and
+  a restore refuses `.git`; Word/slide viewers use `contain: paint`; inline
+  piece patterns and the spreadsheet range and merges are bounded.
+- Routines: the review hashes every file each time, `unchanged()` re-checks the
+  digest before each program step, more reserved secret names (stored ones stay
+  readable and removable via `storedSecretName`), and base64/percent-encoded
+  secret forms are redacted.
+- UI strings, README, website and docs now state the real limits (system trash
+  and sync, data left by vault removal and conversation deletion, Git history of
+  the settings repository, what is encrypted, update verification, the vault
+  agent switch, secrets readable by same-user programs).
+- Electron 44.9.3, zod 4.6.7 and in-range dependency updates (`npm audit
+  --omit=dev` leaves five low KaTeX advisories that need a breaking upgrade).
+- Not verified on Windows or macOS (PATH resolution, `file://` hosts, Claude
+  Code deny rules on Windows paths), nor with real CLIs: the deny rules and the
+  confirmation flows were checked with the protocol fixtures and unit tests.
+
 irori's own title bar and the settings sheet, 2026-11-03 (**0.2.53**,
 [#294](https://github.com/DeL-TaiseiOzaki/irori/pull/294), published as `v0.2.53-preview.1`;
 [ADR 054](decisions/054-window-title-bar.md), [ADR 055](decisions/055-settings-sheet.md)):

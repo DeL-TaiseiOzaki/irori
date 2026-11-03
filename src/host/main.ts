@@ -7,6 +7,7 @@ import {
   Menu,
   nativeTheme,
   safeStorage,
+  session,
   shell,
   type BrowserWindowConstructorOptions,
 } from 'electron';
@@ -47,6 +48,7 @@ import { AgentPaths } from './agent-paths';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { GitHubCli } from '../git/github';
+import { approveGitConfig, GitConfigApprovals } from '../git/config-approval';
 import { EnvironmentService } from './environment';
 import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
@@ -90,6 +92,19 @@ import { SerialQueue } from './serial-queue';
 const windows = new Set<BrowserWindow>();
 /** The window a dialog belongs to: the one in front, else the newest. */
 const front = () => BrowserWindow.getFocusedWindow() ?? [...windows].at(-1)!;
+/** Kinds the system runs rather than opens: programs, scripts, installers and shortcuts. */
+const programKinds =
+  /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|msi|msp|msix|appx|scr|pif|cpl|lnk|url|reg|jar|app|command|terminal|tool|desktop|sh|bash|zsh|scf|library-ms|settingcontent-ms|appref-ms|application|gadget|msc|inf|chm|workflow|action|pkg|mpkg|dmg|deb|rpm|appimage|run)$/i;
+async function launchesProgram(filename: string) {
+  if (programKinds.test(filename)) return true;
+  // On macOS and Linux an executable file runs as well.
+  if (process.platform === 'win32') return false;
+  const info = await lstat(filename).catch(() => undefined);
+  return !!info && (info.isSymbolicLink() || (info.isFile() && (info.mode & 0o111) !== 0));
+}
+/** A path as a dialog shows it, with direction controls that could disguise its kind made visible. */
+const shownPath = (filename: string) =>
+  filename.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '�');
 let closing = false;
 const watchers = new Map<string, FSWatcher>();
 if (process.platform === 'win32') app.setAppUserModelId('com.squirrel.irori.irori');
@@ -206,6 +221,30 @@ app
       you,
     );
     let fileMutations = 0;
+    // Git runs in a repository whose own configuration runs programs only once the
+    // person has seen what it runs, and again after it changes.
+    approveGitConfig(
+      new GitConfigApprovals(
+        path.join(files.dataDir, 'git-config-approvals.json'),
+        async (folder, found) =>
+          (
+            await dialog.showMessageBox(front(), {
+              type: 'warning',
+              message: t(
+                'この Git リポジトリの設定はプログラムを実行します',
+                "This Git repository's configuration runs programs",
+              ),
+              detail: `${folder}\n\n${found.join('\n')}\n\n${t(
+                'irori が Git を使うと、これらが実行されます。心当たりがなければ許可しないでください。変わったときはまた確認します。',
+                'They run when irori uses Git here. Do not allow them unless you know them. irori asks again when they change.',
+              )}`,
+              buttons: [t('許可しない', "Don't allow"), t('許可', 'Allow')],
+              defaultId: 0,
+              cancelId: 0,
+            })
+          ).response === 1,
+      ),
+    );
     const github = new GitHubCli();
     const git = new GitService(
       files,
@@ -355,6 +394,21 @@ app
     );
     // The irori agent's `irori` command: vaults it registers join the request's workspace.
     const setup = new AgentSetup({
+      // An agent's command that widens what agents reach waits for the person.
+      confirm: async (command, by) =>
+        (
+          await dialog.showMessageBox(front(), {
+            type: 'question',
+            message: t(`${by} が次の操作をしようとしています`, `${by} wants to do the following`),
+            detail: `${command}\n\n${t(
+              'フォルダの接続・作業フォルダの変更・vault の登録や削除・ルーティンの実行は、エージェントが触れられる範囲を広げたり、秘密情報を使ったりします。',
+              'Connecting a folder, changing the work folder, adding or removing a vault and running a routine widen what agents reach or use secrets.',
+            )}`,
+            buttons: [t('許可しない', "Don't allow"), t('許可', 'Allow')],
+            defaultId: 0,
+            cancelId: 0,
+          })
+        ).response === 1,
       files,
       git,
       workspaces,
@@ -415,6 +469,28 @@ app
         emit(scopeId ? { type: 'files', scopeId } : { type: 'vaults', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
+    // Configuration that runs without asking (hooks, MCP servers, plugins, project
+    // settings) runs only once the person has seen where it is, and again after it changes.
+    agents.approveConfig = async (found) => {
+      const answer = await dialog.showMessageBox(front(), {
+        type: 'warning',
+        message: t(
+          'エージェントの設定に、確認なしで動く部分があります',
+          'Part of the agent configuration runs without asking',
+        ),
+        detail: [
+          ...found.map((item) => [item.label ?? '', ...item.files].filter(Boolean).join('\n')),
+          t(
+            'フック・MCP サーバー・プラグイン・設定は、承認を求めずにコマンドを実行したり、接続先や環境変数を変えたりできます。中身を確認してから許可してください。変わったときはまた確認します。',
+            'Hooks, MCP servers, plugins and settings can run commands or change where the CLI connects and its environment without asking. Check them before allowing. irori asks again when they change.',
+          ),
+        ].join('\n\n'),
+        buttons: [t('キャンセル', 'Cancel'), t('許可して実行', 'Allow and run')],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return answer.response === 1;
+    };
     // An MCP server's link opens only after the person agreed in the request.
     agents.openUrl = async (url) => {
       const address = webAddress(url);
@@ -690,10 +766,26 @@ app
       return changed(scopeId, operation);
     }
     async function openFile(filename: string) {
+      // A program, script or shortcut would run, not open: irori shows where it is instead.
+      if (await launchesProgram(filename)) {
+        const shown = await dialog.showMessageBox(front(), {
+          type: 'warning',
+          message: t(
+            'このファイルはプログラムとして実行されるおそれがあるため、irori からは開きません',
+            'This file could run as a program, so irori does not open it',
+          ),
+          detail: shownPath(filename),
+          buttons: [t('閉じる', 'Close'), t('フォルダで表示', 'Show in folder')],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (shown.response === 1) shell.showItemInFolder(filename);
+        return;
+      }
       const choice = await dialog.showMessageBox(front(), {
         type: 'question',
         message: t('外部アプリで開きますか？', 'Open in an external app?'),
-        detail: filename,
+        detail: shownPath(filename),
         buttons: [t('キャンセル', 'Cancel'), t('開く', 'Open')],
         defaultId: 0,
         cancelId: 0,
@@ -780,10 +872,6 @@ app
       deviceSettings: () => settings.read(),
       saveDeviceSettings: (patch) => saveSettings(patch),
       terminalShells: () => terminals.available(),
-      writeTerminal: (...args) => terminals.write(...args),
-      resizeTerminal: (...args) => terminals.resize(...args),
-      acknowledgeTerminal: (...args) => terminals.acknowledge(...args),
-      closeTerminal: (id) => terminals.close(id),
       gitStatus: (id) => git.status(id),
       gitDiff: (...args) => git.diff(...args),
       gitHistory: (...args) => git.history(...args),
@@ -1147,10 +1235,25 @@ app
       // The field to type into has the focus already; the system's dictation types there.
       dictate: () => startDictation(),
     } satisfies Omit<HostHandlers, WindowMethod>;
-    type WindowMethod = 'openTerminal' | 'windowTabs' | 'otherWindows' | 'showMenu';
+    type WindowMethod =
+      | 'openTerminal'
+      | 'writeTerminal'
+      | 'resizeTerminal'
+      | 'acknowledgeTerminal'
+      | 'closeTerminal'
+      | 'windowTabs'
+      | 'otherWindows'
+      | 'showMenu';
     /** The operations as one window calls them: what it opens is its own (ADR 051). */
     const windowHandlers = new WeakMap<BrowserWindow, HostHandlers>();
     function handlersOf(window: BrowserWindow) {
+      const ownTerminal = (terminal: string) => {
+        if (terminalOwners.get(terminal) !== window)
+          throw Error(
+            t('このウィンドウのターミナルではありません。', 'Not a terminal of this window.'),
+          );
+        return terminal;
+      };
       const id = window.webContents.id;
       let own = windowHandlers.get(window);
       own ??= {
@@ -1160,6 +1263,11 @@ app
           terminalOwners.set(session.id, window);
           return session;
         },
+        // A terminal is driven only from the window that opened it.
+        writeTerminal: (id, data) => terminals.write(ownTerminal(id), data),
+        resizeTerminal: (id, cols, rows) => terminals.resize(ownTerminal(id), cols, rows),
+        acknowledgeTerminal: (id, bytes) => terminals.acknowledge(ownTerminal(id), bytes),
+        closeTerminal: (id) => terminals.close(ownTerminal(id)),
         windowTabs: (open) => {
           tabs.set(id, open);
           for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
@@ -1362,6 +1470,18 @@ app
       void closings.run(async () => {
         if (!closing && (await stop())) closeAll();
       });
+    });
+    // The page is a file, so a protocol-relative address in a note's diagram or a
+    // document's styles reads as `file://host/...`: on Windows a request to another
+    // computer that sends the person's sign-in. irori loads only files of this device.
+    session.defaultSession.webRequest.onBeforeRequest({ urls: ['file://*/*'] }, (request, done) => {
+      let host = '';
+      try {
+        host = new URL(request.url).hostname;
+      } catch {
+        host = 'unreadable';
+      }
+      done({ cancel: host !== '' });
     });
     /**
      * irori draws its own title bar (ADR 054): the workspace tabs sit in it, and the system's

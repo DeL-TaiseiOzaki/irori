@@ -14,7 +14,8 @@ to the text irori writes for agents; code identifiers (`brain`, `you`,
 "irori" alone is still the app. There is no "vault mode": working in a vault
 is everything done there, not a mode. The irori agent and the vault agents
 have the same shape (owner, 2026-09-27): a Schema edited with the same settings,
-full access by default on every CLI, and a way to hand work on. They differ only
+the same access default on every CLI (full access until November 2026,
+standard since), and a way to hand work on. They differ only
 in hierarchy (the irori agent instructs; vault agents work for it) and in
 context (each vault's `AGENTS.md`). For the irori agent, a vault agent is
 `vault-<name>`, a run of that vault's agent started with `irori call` on every
@@ -102,11 +103,13 @@ vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
 - The irori agent runs on the CLI chosen in its column (Claude Code unless the
   person chose another), with the model chosen for that CLI. Both are kept on
   the device (`yourAi` in the device settings).
-- It starts in **full access** wherever the CLI offers it, on every CLI
-  including Claude Code (`defaultAgentAccess`, as for a vault agent). Each
-  column has the same access pill as a vault agent's composer; a choice holds
-  for the chosen CLI until the CLI changes, like the composer's. Pi offers only
-  its own settings. The owner accepts that the irori agent may read any vault.
+- It starts in the **standard** access on every CLI (`defaultAgentAccess`, as
+  for a vault agent); full access is the person's choice for a conversation.
+  Each column has the same access pill as a vault agent's composer; a choice
+  holds for the chosen CLI until the CLI changes, like the composer's, and is
+  not kept across a restart or a workspace switch, where it returns to
+  standard. Pi offers only its own settings. The owner accepts that the irori
+  agent may read any vault.
 - irori mode sends each request with the workspace's vaults, busy or not
   ([ADR 020](decisions/020-parallel-conversations.md)). The host resolves their
   folders and puts a preamble before the request (`brainsCommandPreamble`): each
@@ -115,8 +118,9 @@ vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
   hand it work with `irori call` and not with the CLI's own sub-agents. On
   Claude Code the folders are also `additionalDirectories`, for reading.
 - Claude Code in full access runs in `bypassPermissions`. The write hook still
-  decides every write there: the Agent SDK evaluates hooks before the permission
-  mode, and "a hook deny applies even in `bypassPermissions` mode"
+  decides every write of its file-editing tools there (not `Bash`): the Agent
+  SDK evaluates hooks before the permission mode, and "a hook deny applies even
+  in `bypassPermissions` mode"
   ([Agent SDK permissions](https://code.claude.com/docs/en/agent-sdk/permissions)).
 - Codex and OpenCode have no irori write hook: the preamble tells the irori
   agent not to change a vault's files itself, but nothing enforces it.
@@ -225,7 +229,10 @@ agent sets up the person's vaults.
   `MultiEdit` and `NotebookEdit` (`src/agents/delegation.ts`): the irori agent
   and any sub-agent of its own write only in its own folder and the vaults' work
   folders. A refused write in a vault says to hand the work with `irori call`.
-  `Bash` is not bounded by path. Claude Code asks the person for it as usual.
+  `Bash` is not bounded by path: in standard access Claude Code asks the person
+  for it as usual; in full access it runs without asking and can write anywhere
+  the person's account can. The hook is a Claude Code hook only, so it limits
+  no other CLI and no command a shell runs.
 - **Attribution.** Each hand-off becomes events of the irori agent's run that
   carry `delegate` (vault, hand-off and state): its start, the vault agent's
   steps and requests, and its report. The vault agent's own words stay with its
@@ -247,7 +254,7 @@ agent sets up the person's vaults.
 - **Map:** the irori agent's orb at the hearth. A line runs to each vault with
   a hand-off under way from any thread on show or running, with a spark moving along it unless less motion is asked
   for. The vault glows.
-- **The irori agent's columns:** the access pill (full access by default) beside
+- **The irori agent's columns:** the access pill (standard by default) beside
   the model pill, and the CLI select in the header.
 - **The irori agent's screen** (the orb, or the mark at the start of an irori
   mode column): its
@@ -298,8 +305,7 @@ agent sets up the person's vaults.
   as the command's output and the `reported` event; a vault not handed is
   refused; stopping the irori agent stops a hand-off in progress.
 - `scripts/your-ai-ui-smoke.ts`, the Claude fixture in the app: setup, the
-  access pill (full access by default; the request part selects the standard
-  mode), the screen with each vault's agent, the Schema settings there (the
+  access pill (standard access by default), the screen with each vault's agent, the Schema settings there (the
   instructions form first, a rule and a skill added in the irori agent's folder,
   the folder as files), a hand-off through `irori call` answered in irori mode
   with the settings locked meanwhile, the report, the map's line, the held
@@ -336,11 +342,13 @@ agent sets up the person's vaults.
 - **Long hand-offs on other CLIs.** Claude Code's shell timeout is raised for the
   irori agent. Whether OpenCode's, Pi's or Hermes Agent's shell tool ends a long
   `irori call` is unverified.
-- **No enforced write boundary outside Claude Code.** On Codex, OpenCode, Pi and
-  Hermes Agent the vaults' boundaries are instructions in the preamble, not a
-  hook: in full access the CLI can write anywhere its own rules allow. Since
-  ADR 020 the busy hold no longer keeps other runs out of a handed vault; it
-  holds only irori's own changes there.
+- **The only enforced write boundary is Claude Code's file-editing tools.** The
+  hook covers `Write`, `Edit`, `MultiEdit` and `NotebookEdit`; a shell command,
+  Claude Code's `Bash` included, is not limited by it. On Codex, OpenCode, Pi,
+  Hermes Agent and Antigravity CLI the vaults' boundaries are instructions in
+  the preamble, not a hook: in full access the CLI can write anywhere its own
+  rules allow. Since ADR 020 the busy hold no longer keeps other runs out of a
+  handed vault; it holds only irori's own changes there.
 - On those CLIs the person-lines notice reaches Pi and OpenCode only for a
   vault's file named by its absolute path; Codex and Hermes Agent have no hook.
 - `vault-*` definitions an earlier irori wrote into the irori agent's folder stay

@@ -6,12 +6,12 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
 }
 
 /**
- * A vault agent and the irori agent start in full access wherever the CLI
- * offers it. On Claude Code the irori agent's sub-agents inherit that mode, and
- * its write hook still decides every file write: hooks run before the mode.
+ * Every conversation starts in the CLI's standard access. Full access is the
+ * person's choice for a conversation, never a default: a vault's notes and
+ * connected folders can carry text written by someone else.
  */
-export function defaultAgentAccess(agent: AgentId): AgentAccess {
-  return agentAccessOptions(agent).includes('full-access') ? 'full-access' : 'default';
+export function defaultAgentAccess(_agent: AgentId): AgentAccess {
+  return 'default';
 }
 
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {
@@ -25,9 +25,13 @@ export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'defaul
   return access;
 }
 
+/** What the standard access means for each CLI, as irori starts it. */
 export function agentAccessLabel(agent: AgentId, access: AgentAccess = 'default') {
   if (access === 'full-access') return t('フルアクセス', 'Full access');
-  return agent === 'codex' || agent === 'claude'
-    ? t('標準（必要時に承認）', 'Standard (asks when needed)')
-    : t('CLIの設定', "CLI's settings");
+  if (agent === 'codex' || agent === 'claude')
+    return t('標準（必要時に承認）', 'Standard (asks when needed)');
+  // Pi has no approvals; Antigravity is started with `--mode accept-edits`.
+  if (agent === 'pi') return t('承認なし（Pi）', 'No approvals (Pi)');
+  if (agent === 'antigravity') return t('標準（編集は自動で許可）', 'Standard (edits allowed)');
+  return t('CLIの設定', "CLI's settings");
 }

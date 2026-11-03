@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { t } from '../domain/i18n';
-import { secretName, secretValue, unavailableText, type SecretList } from '../domain/routines';
+import {
+  secretName,
+  secretValue,
+  storedSecretName,
+  unavailableText,
+  type SecretList,
+} from '../domain/routines';
 import { readLocalJson, writeLocalJson } from './local-json';
 
 /** Electron's `safeStorage`, given by the host once the app is ready. */
@@ -52,7 +58,7 @@ export { unavailableText };
 
 const record = z.object({
   schemaVersion: z.literal(1),
-  values: z.record(secretName, z.base64().max(64 * 1024)),
+  values: z.record(storedSecretName, z.base64().max(64 * 1024)),
 });
 
 /**
@@ -151,15 +157,39 @@ export class SecretStore {
 const hidden = '***';
 
 /**
- * Hides every value a run handed out or got back from what it records. Output
- * arrives in pieces, so a stream keeps back the end of what it was given while
- * that end could still be the start of a value.
+ * A value as a program commonly encodes it on its own: base64, standard and
+ * URL-safe without padding, and percent-encoded as a URL or a form writes it.
+ * Its whole groups of three bytes also begin the base64 of the value with more
+ * after it, as `echo` adds a line break. A value later in a longer encoded
+ * text, such as `user:token` in base64, is not among them.
+ */
+function encodings(value: string) {
+  if (value.length < 8) return [];
+  const bytes = Buffer.from(value, 'utf8');
+  const base64 = [bytes, bytes.subarray(0, bytes.length - (bytes.length % 3))].map((part) =>
+    part.toString('base64').replace(/=+$/, ''),
+  );
+  const forms = [...base64, ...base64.map((text) => text.replace(/\+/g, '-').replace(/\//g, '_'))];
+  try {
+    forms.push(encodeURIComponent(value));
+  } catch {
+    // A lone surrogate has no percent-encoding.
+  }
+  forms.push(new URLSearchParams({ v: value }).toString().slice(2));
+  return forms;
+}
+
+/**
+ * Hides every value a run handed out or got back from what it records, and
+ * its encodings above. Output arrives in pieces, so a stream keeps back the end
+ * of what it was given while that end could still be the start of a value.
  */
 export class Redactor {
   private values: string[] = [];
   add(value: string) {
     if (!value || this.values.includes(value)) return;
-    this.values.push(value);
+    for (const form of [value, ...encodings(value)])
+      if (!this.values.includes(form)) this.values.push(form);
     // A longer value that contains a shorter one is hidden whole.
     this.values.sort((a, b) => b.length - a.length);
   }

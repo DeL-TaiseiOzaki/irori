@@ -414,12 +414,12 @@ export function EntryDialog({
               : layer === 'contents'
                 ? entry.directory
                   ? t(
-                      'フォルダをゴミ箱に移します（30 日以内なら復元可）。',
-                      'Moves the folder to trash (restorable within 30 days).',
+                      'フォルダを中身ごとシステムのゴミ箱に移します。同期アプリ（Google ドライブ、Dropbox など）が管理するフォルダでは、削除はクラウドと共有相手にも反映されます。',
+                      'Moves the folder and everything in it to the system trash. In a folder a sync app keeps (Google Drive, Dropbox…), the sync app passes the deletion to the cloud and to anyone it is shared with.',
                     )
                   : t(
-                      'ファイルをゴミ箱に移します（30 日以内なら復元可）。',
-                      'Moves the file to trash (restorable within 30 days).',
+                      'ファイルをシステムのゴミ箱に移します。同期アプリ（Google ドライブ、Dropbox など）が管理するフォルダでは、削除はクラウドと共有相手にも反映されます。',
+                      'Moves the file to the system trash. In a folder a sync app keeps (Google Drive, Dropbox…), the sync app passes the deletion to the cloud and to anyone it is shared with.',
                     )
                 : entry.directory
                   ? t(

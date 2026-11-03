@@ -42,6 +42,8 @@ steps:
   `.DS_Store` is ignored.
 - irori writes into a routine's folder only when the person makes a routine
   or saves its `routine.yaml` on the routines page (below); never during a run.
+  A step that writes into it, such as an agent given `IRORI_ROUTINE`, changes
+  the routine: its later program steps do not start (see **Review** below).
 
 ## Making one
 
@@ -56,9 +58,12 @@ The routines page's header has **irori agent に頼む**, **シークレット**
 - **The editor** (the pencil on a routine's row, or 新しいルーティン) shows the
   steps as a form, with **フォーム** and **YAML** to edit the text itself.
   - An agent step has its prompt, the vaults handed to the irori agent
-    (なし, すべて, or chosen ones), the access (標準 or フルアクセス, only those
-    the chosen CLI offers), the CLI (the panel's by default) and, with a CLI,
-    a model.
+    (なし, すべて, or chosen ones), the access (`default` or フルアクセス, only
+    those the chosen CLI offers), the CLI (the panel's by default) and, with a
+    CLI, a model. The access is named as on that CLI, as in the agent panel;
+    with the panel's CLI, `default` reads
+    **承認はパネルの CLI 次第（Pi は承認なし）**, since the CLI is the one chosen
+    when the run starts. A step's row names it the same way.
   - A program step is a **コマンド** on `PATH` written as a terminal takes it
     (`gh api "a b"`: spaces separate, quotes keep them) or a **ファイル** of
     the routine's folder, offered from its files. Its secrets are chips: a
@@ -73,8 +78,8 @@ The routines page's header has **irori agent に頼む**, **シークレット**
   - The form writes `routine.yaml` back changing only what the person changed:
     the comments and keys of steps they kept stay. Text the form cannot show
     (an unknown key, a value of the wrong kind, text that does not parse)
-    opens on **YAML** with the reason; a missing `access` shows as 標準 and is
-    written once saved.
+    opens on **YAML** with the reason; a missing `access` shows as `default`
+    and is written once saved.
   - **保存** writes it unless it changed since it was opened, then shows why
     the routine still cannot run, if it cannot, and stays open; otherwise it
     closes. The next **実行** reviews the change as after any other.
@@ -118,16 +123,29 @@ again every five seconds and whenever a vault's files change.
 - **実行** starts a routine, and so does the irori agent when the person asks
   it to (`irori run <routine>`, for a routine already reviewed on this device
   and unchanged since). There is no schedule and nothing runs while irori is
-  closed. The agent never receives the routine's secrets or its output; it
-  learns only that the run started, and from `irori routines` how it ended. A running routine shows **停止** instead, which
+  closed. `irori run` answers the asking agent with neither the routine's
+  secrets nor its output; it learns only that the run started, and from
+  `irori routines` how it ended. The routine's own agent steps are another
+  matter ([Secrets](#secrets)). A running routine shows **停止** instead, which
   ends the step in progress; later steps do not run. Different routines run at
   the same time; the same one cannot start twice.
 - **Review.** The first **実行** on a device opens **ルーティンの確認** with
   every file of the folder, and the routine runs after **確認して実行**. irori
   keeps, in its data directory, a digest of the files and their text as
   confirmed. After any change, by a person, an agent or a pull, the row says
-  **変更あり** and the next **実行** shows the difference line by line. The host
+  **変更あり** and the next **実行** shows the difference line by line; every
+  file is hashed each time, whatever its size and modification time. The host
   runs a changed routine only with the digest of the files the review showed.
+  Before each program step the host reads the folder again: if an earlier step
+  changed it, that step fails with
+  **ルーティンが実行中に変わりました。確認し直してください。** and the rest of the
+  run does not start. A process a step left running can still change a file
+  between that check and the program's start.
+- **What the review covers** is the routine's folder only. Code a step loads
+  from elsewhere is not shown or confirmed: a command or `#!` interpreter
+  found on `PATH`, packages a `.js` file requires from folders above the
+  routine's, and the packages a `.py` script's metadata names, which uv
+  fetches.
 - **What a device needs** is named in the row before a run: **JavaScript が必要です。**
   with **JavaScript を追加** for `.js`/`.mjs`/`.cjs` (the same switch is in
   設定 under ルーティン), `<command> が見つかりません。` for a missing `PATH`
@@ -149,8 +167,10 @@ again every five seconds and whenever a vault's files change.
   Python version. uv keeps Python (`UV_PYTHON_INSTALL_DIR`) and packages
   (`UV_CACHE_DIR`) under `<irori data>/runtimes/`, uses only Python it manages
   (`UV_PYTHON_PREFERENCE=only-managed`), reads no `uv.toml` of the person's
-  (`UV_NO_CONFIG`), and drops an active `VIRTUAL_ENV`. The first run of a
-  script fetches Python, which shows in the step's output.
+  (`UV_NO_CONFIG`), and drops an active `VIRTUAL_ENV`. Python writes no
+  `__pycache__` (`PYTHONDONTWRITEBYTECODE`), which would change the routine's
+  folder. The first run of a script fetches Python, which shows in the step's
+  output.
 - Choosing Python in the settings is not enough on its own: a device whose
   environment was restored with Python chosen still offers **Python を追加**
   until uv is there. Turning Python off keeps the download.
@@ -158,10 +178,11 @@ again every five seconds and whenever a vault's files change.
 ## Steps
 
 - Steps run in order in the working folder. A failing step stops the run.
-- Every step gets `IRORI_WORK` (a fresh folder for this run, shared by its
-  steps, removed once the run is recorded), `IRORI_STATE` (kept for this
-  routine on this device, for a cursor or the last message id) and
-  `IRORI_ROUTINE` (the routine's folder).
+- Every step, program or agent, gets `IRORI_WORK` (a fresh folder for this
+  run, shared by its steps, removed once the run is recorded), `IRORI_STATE`
+  (kept for this routine on this device, for a cursor or the last message id)
+  and `IRORI_ROUTINE` (the routine's folder). What one step writes there,
+  the next can read.
 - **`run` with a file:** `.js`, `.mjs` and `.cjs` run with irori's own
   executable as Node (`ELECTRON_RUN_AS_NODE=1`), so nothing is installed. Any
   other file runs as a program itself; its `#!` line names the interpreter,
@@ -172,8 +193,12 @@ again every five seconds and whenever a vault's files change.
   steps do not run, so a fetcher that found nothing spends no agent turn.
 - **`agent`** starts an ordinary native run: the vault's agent for a
   vault's routine, or the irori agent with the named vaults handed to it
-  (held for the run, as in irori mode). Each step is a conversation of its own
-  for that agent ([CONVERSATIONS](CONVERSATIONS.md)), titled
+  (held for the run, as in irori mode). Without `cli`, the CLI is the one
+  chosen in that agent's panel when the run starts, so one `access: default`
+  step can run on Claude Code or Codex, which ask when needed, on OpenCode or
+  Hermes Agent, whose own settings decide, on Antigravity CLI, which allows
+  edits without asking, or on Pi, which asks for nothing. Each step is a
+  conversation of its own for that agent ([CONVERSATIONS](CONVERSATIONS.md)), titled
   **ルーティン: <name>（ステップ n）** and naming the routine's run and the step,
   and its permission requests and questions show in the step as well as in the
   conversation.
@@ -196,9 +221,12 @@ again every five seconds and whenever a vault's files change.
 ## Secrets
 
 A token or API key a program needs is a secret: entered in irori, kept on the
-device and given only to the `run` steps that name it. Agent steps never
-receive one. The person obtains the token or creates their own OAuth client;
-irori signs in to no provider.
+device and given only to the `run` steps that name it. irori puts no secret
+into an agent step's environment or prompt, but that does not keep a value
+from an agent: a program step can write it into `IRORI_WORK` or
+`IRORI_STATE`, which agent steps read too, and every process the program
+starts inherits the values it was given. The person obtains the token or
+creates their own OAuth client; irori signs in to no provider.
 
 - **Entering.** A value is entered in a password field, from **<NAME> を入力**
   on a routine's row, **値を入力** on a step's chip in the editor, or the
@@ -207,8 +235,12 @@ irori signs in to no provider.
   that use them, each with **置き換え** and **削除** (pressed twice), then the
   names routines need but the device lacks, with **入力**; **追加** takes a new
   name and its value, before any routine names it. A name is an environment
-  variable name that is not `IRORI_*`, `PATH`, `HOME` or another variable that
-  changes how a program starts. A value is one line of 8 to 8192 characters.
+  variable name that is not `IRORI_*`, `LD_*`, `DYLD_*`, `GIT_CONFIG*` or one
+  of a fixed list of variables that change how a program starts or where it
+  loads code from (`PATH`, `HOME`, `BASH_ENV`, `NODE_OPTIONS`, `PYTHONPATH`,
+  `GIT_SSH_COMMAND` and others, in `src/domain/routines.ts`). The list is not
+  every such variable a program may read. A value is one line of 8 to 8192
+  characters.
 - **Storage.** `secrets.json` in irori's data directory holds each value
   sealed with the key the OS keeps (Keychain on macOS, DPAPI on Windows, the
   secret service on Linux). Without such a key, as on Linux with only
@@ -233,7 +265,12 @@ irori signs in to no provider.
   printf 'SLACK_TOKEN=%s\nSLACK_REFRESH=%s\n' "$access" "$refresh" >> "$IRORI_SECRETS_OUT"
   ```
 - **Records.** Every value a run handed out or got back shows as `***` in its
-  record: program output, agent reports and failure details.
+  record (program output, agent reports and failure details), and so do its
+  base64 (standard and URL-safe) and percent-encoded forms. Only those texts
+  are hidden: a value otherwise changed, such as hashed, split or encoded
+  after other text (`user:token` in base64), shows as written. The agent
+  step's conversation is not masked, nor is any transcript the CLI keeps
+  itself.
 
 ## Records
 
@@ -285,8 +322,11 @@ line) and no saved session. Document content cannot start a routine.
 
 - `tests/routines.test.ts` (disposable folders; Pi's protocol fixture for agent
   steps): strict `routine.yaml` reading and its reasons; the gate, the
-  `[FAILED]` marker and the line difference; review before the first run, the
-  difference after a change and a refused run with an old digest; steps in order
+  `[FAILED]` marker and the line difference; an agent step's access named for
+  its CLI or the panel's; review before the first run, the difference after a
+  change and a refused run with an old digest, a same-length edit with its
+  modification time put back, and a program step refused after an agent step
+  rewrote it (one after an agent that left the folder alone runs); steps in order
   sharing `IRORI_WORK`, `IRORI_STATE` kept across runs, the work folder removed;
   links and missing files; the nothing-to-do gate, a failing step and **停止**
   (the program ended); what a device lacks (JavaScript, Python chosen or
@@ -315,9 +355,10 @@ line) and no saved session. Document content cannot start a routine.
   `write-routine` skill a valid package.
 - `tests/settings.test.ts`: `routineRuntimes` kept and bounded.
 - `tests/keystore.test.ts`: the secure-storage check (Linux `basic_text`
-  refused), names and values, the store sealing, listing, refusing without a
-  key and keeping concurrent write-backs, hiding values that arrive in pieces,
-  and the write-back reader.
+  refused), names and values (the reserved names and beginnings), the store
+  sealing, listing, refusing without a key and keeping concurrent write-backs,
+  hiding values that arrive in pieces and their base64 and percent-encoded
+  forms, and the write-back reader.
 - `scripts/routines-ui-smoke.ts` in the app: an invalid routine's reason,
   a routine made from **新しいルーティン**'s form (a program step moved above an
   agent step, the reason shown until the prompt is written, the same routine

@@ -3,7 +3,13 @@ import { createPortal } from 'react-dom';
 import { t } from '../domain/i18n';
 import { agentIds, agentNames, type AgentId } from '../domain/types';
 import { agentAccessOptions } from '../domain/agent-access';
-import { routineKey, type Routine, type RoutineRef, type SecretList } from '../domain/routines';
+import {
+  routineKey,
+  stepAccessLabel,
+  type Routine,
+  type RoutineRef,
+  type SecretList,
+} from '../domain/routines';
 import {
   agentDraft,
   draftFromYaml,
@@ -270,9 +276,7 @@ function AgentFields({
           >
             {accesses.map((access) => (
               <option key={access} value={access}>
-                {access === 'full-access'
-                  ? t('フルアクセス', 'Full access')
-                  : t('標準', 'Standard')}
+                {stepAccessLabel({ access, cli: step.cli })}
               </option>
             ))}
           </select>

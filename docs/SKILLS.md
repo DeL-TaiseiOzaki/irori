@@ -112,7 +112,11 @@ double-quoted otherwise. A hook edit replaces only `hooks` in
 `.claude/settings.json`, keeps every other key in its place, and writes 2-space
 JSON; a malformed `hooks` value is reported, not overwritten. Hooks of another
 `type` than `command` are listed but edited as a file. Hooks are Claude Code's
-only for now: Codex, OpenCode and Pi hook formats are not handled.
+only for now: Codex, OpenCode and Pi hook formats are not handled. The list is
+not every setting that runs code: `env` and `apiKeyHelper` in
+`.claude/settings.json`, `.mcp.json`, OpenCode and Pi plugins and a connected
+folder's `.claude` run too. The Hooks group says so, and when a vault's ones change
+irori lists them for the person to confirm before an agent runs.
 
 All reads and writes go through four `HostAPI` methods: `schemaSettings`,
 `readSchemaFile`, `writeSchemaFile` and `moveSkill` (`src/host/schema-settings.ts`).

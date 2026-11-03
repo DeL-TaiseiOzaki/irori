@@ -471,6 +471,32 @@ test('connect links a folder into the named vault’s contents', async (t) => {
   await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
 });
 
+test('an agent’s connect, work, add, remove and run wait for the person to allow them', async (t) => {
+  const { base, files, deps } = await device(t);
+  const root = path.join(base, 'Notes');
+  await mkdir(root);
+  await files.register(root, 'Notes', 'personal');
+  const drive = path.join(base, 'Drive');
+  await mkdir(drive);
+  const asked: string[] = [];
+  const refusing = new AgentSetup({
+    ...deps,
+    confirm: async (command, by) => {
+      asked.push(`${by}: ${command}`);
+      return false;
+    },
+  });
+  await assert.rejects(
+    refusing.run(['connect', 'Notes', drive], base, { by: 'Claude Code (irori agent)' }),
+    /did not allow "irori connect"/,
+  );
+  await assert.rejects(lstat(path.join(root, 'contents', 'Drive')), { code: 'ENOENT' });
+  assert.deepEqual(asked, [`Claude Code (irori agent): irori connect Notes ${drive}`]);
+  // Reading what irori holds needs no answer.
+  assert.match(await refusing.run(['list'], base), /Notes/);
+  assert.equal(asked.length, 1);
+});
+
 test('connect clones a GitHub repository into contents, and clones it again for its record elsewhere', async (t) => {
   const { base, files, setup, deps } = await device(t);
   (deps.cloud as CloudService).repositories = new RepositoryGit(

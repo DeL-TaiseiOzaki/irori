@@ -5,9 +5,12 @@
  * Only what the editor cannot carry through unchanged stays literal text.
  */
 
-export const footnoteMark = /\[\^([^\]\s]+)\]/;
+// Each part is bounded: an unclosed `[[` or `[^` is then looked past in a short
+// stretch, not to the end of the note, which made a crafted note hang the editor.
+export const footnoteMark = /\[\^([^\]\s]{1,256})\]/;
 /** `[[target]]`, `[[target|label]]` and `![[embed]]`; a table cell writes `\|`. */
-export const wikiLink = /(!?)\[\[([^\]|#\\]*)(?:#([^\]|\\]*))?(?:\\?\|([^\]]*))?\]\]/;
+export const wikiLink =
+  /(!?)\[\[([^\]|#\\]{0,256})(?:#([^\]|\\]{0,256}))?(?:\\?\|([^\]]{0,256}))?\]\]/;
 /** `[!note]`, `[!tip]-`: what opens a callout, at the start of a quote. */
 const calloutMarker = /\[![\w-]+\][+-]?/;
 const inlinePieces = new RegExp(`${wikiLink.source}|${footnoteMark.source}`, 'g');
@@ -17,7 +20,7 @@ const writtenPieces = new RegExp(
   'gm',
 );
 /** What only literal text carries through unchanged. */
-const literalSyntax = /\[\[|^>\s*\[!|^\s*<|^\s*:::|\$\$|\{[%{]|\[\^[^\]]+\]/m;
+const literalSyntax = /\[\[|^>\s*\[!|^\s*<|^\s*:::|\$\$|\{[%{]|\[\^[^\]]{1,256}\]/m;
 
 export type PieceKind = 'footnote' | 'wiki' | 'embed' | 'callout';
 /** What a piece shows: its kind, and the label a reader sees. */
