@@ -911,7 +911,7 @@ export class AgentService {
           ...vault,
           instructions,
           // Searches that walk the vault skip the links its connected folders appear through.
-          linked: this.files.cloud?.linkedPaths?.(scopeId),
+          linked: this.files.cloud?.linkedFolders?.(scopeId),
           readOnly: this.files.cloud?.linkedPaths?.(scopeId, false),
           work:
             work &&
@@ -1128,7 +1128,7 @@ export class AgentService {
                 knowledge: shownFolder(knowledgeFolder(brain)),
                 contents: brain.contents,
               },
-              linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
+              linked: this.files.cloud?.linkedFolders?.(brain.scopeId),
               readOnly: this.files.cloud?.linkedPaths?.(brain.scopeId, false),
               work: await this.work(brain.scopeId),
             };

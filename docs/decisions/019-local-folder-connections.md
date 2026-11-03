@@ -1,6 +1,7 @@
 # 019 — Folders on this device in contents
 
-Date: 2026-10-01. Status: owner decision; implemented for 0.1.62.
+Date: 2026-10-01. Status: owner decision; implemented for 0.1.62. Decision 8
+added 2026-11-03 for 0.2.55.
 
 ## Context
 
@@ -52,6 +53,20 @@ Box, iCloud Drive and OneDrive all keep a folder on the device in sync.
 7. **Drive sign-in stays for invited testers.** *(Replaced by [ADR 023](023-retire-drive-sign-in.md): the sign-in was removed in 0.1.67.)* The Google connection is
    unchanged and remains limited to the project's test users until the owner
    decides on verification.
+8. **Agents hear the link and the folder as one.** *(Added 2026-11-03,
+   0.2.55, owner report.)* The CLI lists the folder's own place among the
+   folders it may use (decision 6) while irori's words named only
+   `contents/<name>`, so an agent saw two names for one folder with nothing
+   joining them; one that found nothing through the link went on in the place
+   on this device. Each connected folder is now named with its place on this
+   device, said to be the same folder, and the agent is told to go through the
+   link and to write the link's path in notes, links and replies, since the
+   place works on this device alone. The search advice adds `find` with a final
+   slash or `-L`, without which find lists only the link, and says that a named
+   link that shows nothing holds nothing there. The irori agent, which does not
+   work in the vault, gets its example as the whole path through the vault's
+   folder. The place goes only in the request text: irori's conversation record
+   keeps the person's words, and the vault never holds it (decision 3).
 
 ## Consequences
 

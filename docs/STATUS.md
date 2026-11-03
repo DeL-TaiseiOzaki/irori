@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Connected folders named as one folder, 2026-11-03 (**0.2.55**;
+[ADR 019](decisions/019-local-folder-connections.md) decision 8): an owner
+report showed a vault agent list a connected folder through `contents/<name>`,
+find nothing newer than a date, and go on in the folder's place on this device,
+which Claude Code lists as an additional directory with nothing tying it to the
+link.
+- `prompts/connected-folders.ts`: `ConnectedFolder` (`path`, `target`) and
+  `namedFolder` name each folder as `"contents/<name>" (on this device "…")`;
+  `connectedFolders` says the two are one folder, to go through the link and to
+  write its path, not the place; the search advice adds `find "<link>/"` or
+  `find -L` and that a named link showing nothing holds nothing.
+  `handedConnectedFolders(root, path)` gives the irori agent the whole path
+  through the vault's folder (forward slashes for a Windows folder).
+- `AgentService` passes `CloudService.linkedFolders` (now ordered by path, so an
+  unchanged introduction keeps its digest) to `vaultIntro` and the handed-vault
+  list. `linkedPaths` is unchanged.
+- Tests: `prompts` (wording, both agents, a Windows vault), `local-folders`
+  (`linkedFolders`), `sessions` (a Codex request names the writable root as the
+  link's folder). Verified with `npm run build` and `npm test`. Not verified
+  with a real CLI turn, on Windows, or that Claude Code shows its additional
+  directories as irori passes them.
+- Joined with 0.2.54's read-only folders: `connectedFolders(folders, readOnly)`
+  keeps the read-only sentence, the vault agent may change a folder unless it
+  is read-only, and the handed list marks `(read-only)` after the place.
+
 What the screen says is what agents get, 2026-11-03 (**0.2.54**; a review of
 irori against its own UI, docs and ADR 009's rule that no mode is offered which
 cannot be enforced):

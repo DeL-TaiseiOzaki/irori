@@ -21,10 +21,23 @@ test('Every prompt file is exported from prompts/index.ts and indexed in its REA
 });
 
 test('Connected folders are named for agents, with how to search inside the links', () => {
-  const text = prompts.connectedFolders(['contents/Drive', 'contents/Team']);
-  assert.match(text, /"contents\/Drive", "contents\/Team"/);
+  const drive = { path: 'contents/Drive', target: '/Users/me/Google Drive/Lab' };
+  const team = { path: 'contents/Team', target: '/Users/me/Team' };
+  const text = prompts.connectedFolders([drive, team]);
+  assert.match(
+    text,
+    /"contents\/Drive" \(on this device "\/Users\/me\/Google Drive\/Lab"\), "contents\/Team" \(on this device "\/Users\/me\/Team"\)/,
+  );
+  // The CLI also lists the place on this device; the agent hears it is the same
+  // folder, to go through the link and to write the link's path (ADR 019 D6).
+  assert.match(text, /The place in brackets is that same folder, not another one/);
+  assert.match(text, /write that path in notes, links and replies, not the place on this device/);
   assert.match(text, /rg PATTERN "contents\/Drive"/);
   assert.match(text, /rg -L/);
+  // find names the link itself unless the path ends in a slash or it follows links.
+  assert.ok(text.includes('`find "contents/Drive/"` with the final slash'));
+  assert.match(text, /find -L/);
+  assert.match(text, /finding nothing means nothing there matches/);
   // Google Docs files there hold only an ID, which the agent reads with its own tools.
   assert.match(text, /\.gsheet/);
   assert.match(text, /`doc_id`/);
@@ -33,16 +46,42 @@ test('Connected folders are named for agents, with how to search inside the link
   assert.match(prompts.iroriAgentSkills['connect-folder'], /spreadsheets\/d\/<doc_id>/);
   assert.doesNotMatch(Object.values(prompts.iroriAgentSkills).join('\n'), /cannot read/);
   const brains = [
-    { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', linked: ['contents/Drive'] },
+    { name: 'Lab', agent: 'vault-lab', root: '/kb/lab', linked: [drive] },
     { name: 'Notes', agent: 'vault-notes', root: '/kb/notes' },
   ];
   const handed = prompts.brainsCommandPreamble(brains);
   assert.match(
     handed,
-    /- Lab: folder "\/kb\/lab", vault agent "vault-lab", connected folders "contents\/Drive"/,
+    /- Lab: folder "\/kb\/lab", vault agent "vault-lab", connected folders "contents\/Drive" \(on this device "\/Users\/me\/Google Drive\/Lab"\)/,
   );
   assert.match(handed, /- Notes: folder "\/kb\/notes", vault agent "vault-notes"$/m);
   assert.equal(handed.match(/rg -L/g)?.length, 1);
+  // The irori agent works in its own folder: its example is the whole path through the vault.
+  assert.match(handed, /as in "\/kb\/lab\/contents\/Drive"/);
+  assert.match(handed, /rg PATTERN "\/kb\/lab\/contents\/Drive"/);
+  assert.match(handed, /Tell a vault agent the folder's path in contents/);
+  // A Windows vault's example is written with forward slashes, which every shell there takes.
+  const windows = prompts.brainsCommandPreamble([
+    {
+      ...brains[0],
+      root: 'C:\\Users\\me\\irori\\lab',
+      linked: [{ ...drive, target: 'C:\\Sync\\Lab' }],
+    },
+  ]);
+  assert.ok(windows.includes('as in "C:/Users/me/irori/lab/contents/Drive"'));
+  assert.ok(windows.includes('`find "C:/Users/me/irori/lab/contents/Drive/"`'));
+  // A read-only folder keeps its place and is marked; neither agent is told to change it.
+  const kept = prompts.connectedFolders([drive, team], ['contents/Drive']);
+  assert.match(kept, /Read-only: "contents\/Drive"\. The person connected them to be read only/);
+  assert.match(kept, /read, search and, unless it is read-only, change the folder/);
+  const handedKept = prompts.brainsCommandPreamble([
+    { ...brains[0], readOnly: ['contents/Drive'] },
+  ]);
+  assert.match(
+    handedKept,
+    /connected folders "contents\/Drive" \(on this device "\/Users\/me\/Google Drive\/Lab"\) \(read-only\)/,
+  );
+  assert.match(handedKept, /One marked \(read-only\) must never be created in/);
   // Without connected folders nothing is said about them.
   assert.doesNotMatch(prompts.brainsCommandPreamble([brains[1]]), /rg -L|connected folders/);
 });
@@ -56,14 +95,17 @@ test("A vault agent's introduction names its layers' folders and points at AGENT
     knowledge: 'wiki',
     labels: { contents: '資料' },
     instructions: true,
-    linked: ['contents/Drive'],
+    linked: [{ path: 'contents/Drive', target: '/Users/me/Drive' }],
   };
   const text = prompts.vaultIntro(vault, true);
   assert.match(text, /^irori: you are the agent of the "Lab" vault, open in irori/);
   assert.match(text, /AGENTS\.md is this vault's instructions and says where its skills/);
   assert.match(text, /^- Knowledge: "wiki\/" and every other file outside Schema and Contents\./m);
   assert.match(text, /^- Contents \(shown as "資料"\): "contents\/", "refs\/"\./m);
-  assert.match(text, /^Connected folders in Contents: "contents\/Drive"\./m);
+  assert.match(
+    text,
+    /^Connected folders in Contents: "contents\/Drive" \(on this device "\/Users\/me\/Drive"\)\./m,
+  );
   assert.match(text, /relative Markdown links, not \[\[wiki links\]\]/);
   assert.ok(text.endsWith(prompts.vaultCommandPreamble));
   // The command's essentials only: the rest is in `irori help`.

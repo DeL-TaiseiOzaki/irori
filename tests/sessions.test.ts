@@ -203,6 +203,10 @@ test(
         writable === true ? [open] : writable === false ? [kept] : [open, kept],
       linkedPaths: (_scopeId, writable) =>
         writable === false ? ['contents/Kept'] : ['contents/Kept', 'contents/Open'],
+      linkedFolders: () => [
+        { path: 'contents/Kept', target: kept },
+        { path: 'contents/Open', target: open },
+      ],
     };
     await run('default', true);
     const protocol = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
@@ -226,11 +230,12 @@ test(
       resolve: async () => folder,
       rootEntries: async () => undefined,
       localFolders: () => [folder],
-      linkedPaths: () => ['contents/Synced'],
+      linkedFolders: () => [{ path: 'contents/Synced', target: folder }],
     };
     await run('default', true);
     await run('full-access', true);
-    // Each request names where the folder appears, since searches skip the link.
+    // Each request names where the folder appears, since searches skip the link,
+    // and that the writable root Codex lists is that same folder.
     const requests = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
       .trim()
       .split('\n')
@@ -240,6 +245,9 @@ test(
     assert.equal(requests.length, 2);
     for (const request of requests) {
       assert.match(request, /Connected folders in Contents: \\"contents\/Synced\\"/);
+      assert.ok(
+        request.includes(JSON.stringify(`(on this device ${JSON.stringify(folder)})`).slice(1, -1)),
+      );
       assert.match(request, /rg -L/);
     }
     const starts = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
