@@ -132,8 +132,8 @@ export function UpdateNotice({ host }: { host: UpdateHost }) {
             <>
               <p>
                 {t(
-                  `${install.version} を確認して準備しています`,
-                  `Verifying and preparing ${install.version}`,
+                  `${install.version} のダウンロードを検証して準備しています`,
+                  `Verifying the download of ${install.version} and preparing it`,
                 )}
               </p>
             </>

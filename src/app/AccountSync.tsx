@@ -8,6 +8,7 @@ import { reloadDeviceSettings } from './device-settings';
 import { displayLocale, t } from '../domain/i18n';
 import { unavailableText } from '../domain/routines';
 import {
+  environmentRepository,
   passphraseLength,
   type EnvironmentRestore,
   type EnvironmentState,
@@ -100,19 +101,25 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
               ? t(`環境を保存：${when(state.saved.savedAt)}`, `Saved ${when(state.saved.savedAt)}`)
               : t('環境は保存されていません', 'No environment saved')}
           </p>
+          <p className="account-hint">
+            {t(
+              `保存のたびに非公開リポジトリ ${environmentRepository} に新しいコミットを作ります。外したものも Git の履歴に残ります。`,
+              `Each save is a new commit to the private ${environmentRepository} repository; what it drops stays in the Git history.`,
+            )}
+          </p>
           {droppedRoutines > 0 && (
             <p className="account-hint">
               {t(
-                `この端末にないルーティン ${droppedRoutines} 件は、保存すると外れます。`,
-                `Saving drops ${droppedRoutines} routine${droppedRoutines === 1 ? '' : 's'} not on this device.`,
+                `この端末にないルーティン ${droppedRoutines} 件は、保存すると外れます（Git の履歴には残ります）。`,
+                `Saving drops ${droppedRoutines} routine${droppedRoutines === 1 ? '' : 's'} not on this device (still in the Git history).`,
               )}
             </p>
           )}
           {dropped > 0 && (
             <p className="account-hint">
               {t(
-                `この端末にない vault ${dropped} 件は、保存すると外れます。`,
-                `Saving drops ${dropped} vault${dropped === 1 ? '' : 's'} not on this device.`,
+                `この端末にない vault ${dropped} 件は、保存すると外れます（Git の履歴には残ります）。`,
+                `Saving drops ${dropped} vault${dropped === 1 ? '' : 's'} not on this device (still in the Git history).`,
               )}
             </p>
           )}
@@ -154,11 +161,19 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
               />
             </label>
           )}
+          {keys.length > 0 && (
+            <p className="account-hint">
+              {t(
+                '合言葉で暗号化するのはシークレットの値だけです。シークレットの名前、ルーティン、irori agent のファイル、vault とワークスペースの名前は暗号化せずに保存します。',
+                "The passphrase encrypts only the secrets' values. Secret names, routines, the irori agent's files and the names of vaults and workspaces are saved unencrypted.",
+              )}
+            </p>
+          )}
           {droppedKeys > 0 && (
             <p className="account-hint">
               {t(
-                `この端末にないシークレット ${droppedKeys} 件は、保存すると外れます。`,
-                `Saving drops ${droppedKeys} secret${droppedKeys === 1 ? '' : 's'} not on this device.`,
+                `この端末にないシークレット ${droppedKeys} 件は、保存すると外れます。暗号化された値は Git の履歴に残り、GitHub からは消えません。`,
+                `Saving drops ${droppedKeys} secret${droppedKeys === 1 ? '' : 's'} not on this device. Their encrypted values stay in the Git history on GitHub.`,
               )}
             </p>
           )}

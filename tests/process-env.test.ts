@@ -19,3 +19,30 @@ test('Windows child processes retain native Path spelling and provider configura
   assert.equal(agentEnv({ PATH: 'C:\\Native' }, 'win32').PATH, 'C:\\Native');
   assert(agentEnv({ PATH: '/custom/bin' }, 'linux').PATH?.startsWith('/custom/bin:'));
 });
+
+test('a bare command is found on the search path alone, never in the working folder', async (t) => {
+  const { mkdtemp, mkdir, writeFile, chmod, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { onSearchPath } = await import('../src/agents/process');
+  const base = await mkdtemp(path.join(tmpdir(), 'irori-path-'));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const bin = path.join(base, 'bin');
+  const vault = path.join(base, 'vault');
+  await mkdir(bin);
+  await mkdir(vault);
+  await writeFile(path.join(bin, 'tool'), '#!/bin/sh\n');
+  await chmod(path.join(bin, 'tool'), 0o755);
+  await writeFile(path.join(vault, 'other'), '#!/bin/sh\n');
+  await chmod(path.join(vault, 'other'), 0o755);
+  const env = { PATH: `:.:${bin}` };
+  assert.equal(onSearchPath('tool', env, 'linux'), path.join(bin, 'tool'));
+  // Empty and relative entries, which mean the working folder, are not searched or kept.
+  assert.equal(onSearchPath('other', env, 'linux'), undefined);
+  assert.ok(
+    !agentEnv(env, 'linux')
+      .PATH?.split(':')
+      .some((dir) => !path.isAbsolute(dir)),
+  );
+  assert.equal(agentEnv({ Path: 'C:\\Git\\cmd;.;;C:\\bin' }, 'win32').Path, 'C:\\Git\\cmd;C:\\bin');
+});

@@ -170,7 +170,9 @@ app.on('window-all-closed', () => app.quit());`,
   await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect.poll(async () => (await state()).cancels).toBe(1);
   await emit({ check: available, install: { phase: 'preparing', version: '0.1.4' } });
-  await expect(page.getByRole('status')).toContainText('0.1.4 を確認して準備しています');
+  await expect(page.getByRole('status')).toContainText(
+    '0.1.4 のダウンロードを検証して準備しています',
+  );
   await expect(page.getByRole('button', { name: 'キャンセル', exact: true })).toHaveCount(0);
   // The person keeps a running agent: the restart is declined and offered again.
   await emit({ check: available, install: { phase: 'ready', version: '0.1.4' } });

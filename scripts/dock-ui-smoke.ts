@@ -125,10 +125,15 @@ try {
   await columns.first().getByRole('button', { name: 'irori agent を閉じる' }).click();
   await expect(columns).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'irori agent', exact: true })).toBeVisible();
-  const stored = JSON.parse(
-    await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8'),
-  );
-  if (stored.vaultAgent !== false) throw Error('The choice was not kept on the device.');
+  // The switch shows at once and is saved after (useChoice): wait for the device's file.
+  await expect
+    .poll(
+      async () =>
+        JSON.parse(await readFile(path.join(files.dataDir, 'device-settings.json'), 'utf8'))
+          .vaultAgent,
+      { message: 'The choice was not kept on the device.' },
+    )
+    .toBe(false);
 } finally {
   await app.close();
 }

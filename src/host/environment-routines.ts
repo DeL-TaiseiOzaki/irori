@@ -27,7 +27,10 @@ export const relativeFile = z
   .refine(
     (value) =>
       !/[\\\0:]/.test(value) &&
-      value.split('/').every((part) => part && part !== '.' && part !== '..'),
+      // Nothing restored goes into a Git folder, whose hooks and settings run programs.
+      value
+        .split('/')
+        .every((part) => part && part !== '.' && part !== '..' && part.toLowerCase() !== '.git'),
   );
 export const storedFile = z.union([
   z.object({ path: relativeFile, text: z.string(), executable: z.boolean().optional() }).strict(),

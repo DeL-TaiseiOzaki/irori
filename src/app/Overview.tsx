@@ -9,6 +9,7 @@ import {
 import { knowledgeFolder } from '../domain/layers';
 import type { AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
+import { agentAccessLabel, defaultAgentAccess } from '../domain/agent-access';
 import { categoryIcon, categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
@@ -641,7 +642,9 @@ function OverviewComposer({
       <footer>
         <small>
           <Icon name="agent" size={12} />
-          {agentNames[agentFor(space.scopeId)]}
+          {/* A send from here always uses the CLI's standard access (main.tsx's quick send). */}
+          {agentNames[agentFor(space.scopeId)]} ·{' '}
+          {agentAccessLabel(agentFor(space.scopeId), defaultAgentAccess(agentFor(space.scopeId)))}
         </small>
         <button
           type="submit"

@@ -349,8 +349,9 @@ try {
   await page.screenshot({ path: 'test-results/irori-attachments-sent.png' });
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
   const access = page.getByLabel('エージェントのアクセス', { exact: true });
-  // A brain's vault agent starts in full access.
-  await expect(access).toHaveValue('full-access');
+  // A brain's vault agent starts in standard access; full access is the person's choice.
+  await expect(access).toHaveValue('default');
+  await access.selectOption('full-access');
   await page.getByLabel('エージェントへの指示').fill('access fixture');
   // Count only once OpenCode's saved conversation has loaded.
   await expect(page.getByText('保存した会話を読み込んでいます…')).toHaveCount(0);
@@ -445,9 +446,10 @@ try {
   expect(
     (await fixtureLog()).filter((call) => call.type === 'set_thinking_level').at(-1)?.level,
   ).toBe('high');
-  // Hermes Agent lists no models: a name is typed in. It starts in full access.
+  // Hermes Agent lists no models: a name is typed in. It starts in standard access.
   await page.getByLabel('エージェント', { exact: true }).selectOption('hermes');
-  await expect(access).toHaveValue('full-access');
+  await expect(access).toHaveValue('default');
+  await access.selectOption('full-access');
   await expect(modelPill).toHaveValue('');
   // It takes no thinking level, so none is offered.
   await expect(effortPill).toHaveCount(0);
@@ -470,7 +472,8 @@ try {
   ).toBe('saved');
   // The Antigravity CLI lists its models, each naming its own level, so no level is offered.
   await page.getByLabel('エージェント', { exact: true }).selectOption('antigravity');
-  await expect(access).toHaveValue('full-access');
+  await expect(access).toHaveValue('default');
+  await access.selectOption('full-access');
   await expect(effortPill).toHaveCount(0);
   await modelPill.selectOption('gemini-3.8-flash-high');
   await page.getByLabel('エージェントへの指示').fill('antigravity fixture');

@@ -192,7 +192,10 @@ export function ConversationHistory({
   const confirmation = (id: string) => (
     <div className="history-confirm" role="group" aria-label={t('削除の確認', 'Confirm deletion')}>
       <span>
-        {t('削除しますか？CLI 側の履歴は残ります。', "Delete? The CLI's own history stays.")}
+        {t(
+          '削除しますか？CLI 側の履歴は残ります。実行に使ったノートや資料の控えも irori のデータフォルダに残ります。',
+          "Delete? The CLI's own history stays, as do the copies of notes and materials its runs used in irori's data folder.",
+        )}
       </span>
       <button className="panel-button danger" disabled={busy} onClick={() => void remove(id)}>
         {t('削除する', 'Delete')}

@@ -28,4 +28,4 @@ Choose a skill in the AI panel before sending to include its instructions with t
 
 Settings are ordinary files inside the vault and can be shared through [Git](git.md). Edit the irori agent's Schema in the same way.
 
-Hooks execute programs. Review the CLI and command before saving one. Deleting an item asks for confirmation.
+Hooks execute programs. Review the CLI and command before saving one. Deleting an item asks for confirmation. Only `.claude/settings.json` hooks are listed here. Other settings also run code: `env`, `apiKeyHelper`, `.mcp.json`, OpenCode and Pi plugins, and the `.claude` of connected folders. When a vault's ones change, irori lists them for you to confirm before an agent runs.

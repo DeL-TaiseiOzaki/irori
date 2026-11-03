@@ -35,7 +35,9 @@ is described in the history of this file.
   section. **ノート別** groups rows by linked note; **このノート** shows only the
   conversations linked to the note open beside the panel. Each row can be
   renamed, pinned, archived and deleted. Deleting asks first and says that the
-  CLI's own history stays; it removes irori's folder only. Sending in an archived
+  CLI's own history stays, and so do the copies of notes and materials its runs
+  used, which irori keeps in its data folder; it removes the conversation's own
+  folder only. Sending in an archived
   conversation brings it back.
 - The title is the first line of the first instruction, cut at 50 characters
   (whole characters, emoji included). A renamed title is never replaced. A

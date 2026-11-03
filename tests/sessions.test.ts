@@ -190,6 +190,33 @@ test(
 );
 
 test(
+  'A read-only connection is never a Codex writable root, and the request says it is read-only',
+  { skip: process.platform === 'win32' && 'POSIX protocol fixture executable', timeout: 30000 },
+  async (t) => {
+    const { root, files, run } = await codex(t);
+    const open = path.join(root, '..', 'Open');
+    const kept = path.join(root, '..', 'Kept');
+    files.cloud = {
+      resolve: async () => open,
+      rootEntries: async () => undefined,
+      localFolders: (_scopeId, writable) =>
+        writable === true ? [open] : writable === false ? [kept] : [open, kept],
+      linkedPaths: (_scopeId, writable) =>
+        writable === false ? ['contents/Kept'] : ['contents/Kept', 'contents/Open'],
+    };
+    await run('default', true);
+    const protocol = (await readFile(path.join(root, 'protocol.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const [start] = protocol.filter((m) => m.method === 'thread/start');
+    assert.deepEqual(start.params.config, { 'sandbox_workspace_write.writable_roots': [open] });
+    const [turn] = protocol.filter((m) => m.method === 'turn/start');
+    assert.match(JSON.stringify(turn.params), /Read-only: \\"contents\/Kept\\"/);
+  },
+);
+
+test(
   "A vault's local folders become Codex writable roots in standard access only",
   { skip: process.platform === 'win32' && 'POSIX protocol fixture executable', timeout: 30000 },
   async (t) => {

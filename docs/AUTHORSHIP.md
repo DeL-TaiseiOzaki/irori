@@ -6,7 +6,9 @@ A note worked on with an agent stops being legible once the person cannot tell
 their own sentences from the ones that arrived while they were looking
 elsewhere — and an agent working with the person needs the same distinction to
 understand what the person meant. irori saves the person's text itself, so it
-records which lines are theirs.
+records which lines are theirs. The record is best effort: it says which lines
+reached the file through the person's save in irori, not who composed them
+([Known limits](#known-limits)).
 
 ## What is recorded
 
@@ -146,8 +148,19 @@ commands and what happens when either side refuses.
 
 ## Known limits
 
+**A best-effort record, not proof of authorship.** Text the person pastes counts
+as theirs, AI text copied from a reply included. When an agent changes an open
+note outside the editor and the person keeps their edit to merge by hand
+(編集を維持して手動で統合), the next save marks every line of the editor's text
+the disk version lacks, whoever wrote it. The page property declared
+`auto: last-change` ([ADR 015](decisions/015-page-properties.md) D5) names the
+person on every changed save from the editor, so it can name them for a save
+that carries an agent's text, and it keeps naming them after an agent changes
+the page on disk. 人が書いた・直した行 and `last-change` are a guide, not
+evidence of who wrote a line.
+
 Two lines with identical text share one mark, and a line identical to one the
-file already carried is not marked. Text the person pastes counts as theirs.
+file already carried is not marked.
 The device record reaches another machine or a collaborator only through a
 commit made in irori and pushed; a commit made in another client carries no
 note, and GitHub's squash and rebase merge buttons create commits without the

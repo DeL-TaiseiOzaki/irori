@@ -6,6 +6,7 @@ import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import {
   routineKey,
+  stepAccessLabel,
   stepLabel,
   type Routine,
   type RoutineReviewFile,
@@ -52,16 +53,12 @@ const stepWords: Record<RoutineStepRun['state'], () => string> = {
   unknown: () => t('不明', 'Unknown'),
 };
 
-/** An agent step's vaults, access and CLI, as written in `routine.yaml`. */
+/** An agent step's vaults, CLI and what its access means there, from `routine.yaml`. */
 function agentMeta(step: RoutineStep) {
   if (step.kind !== 'agent') return '';
   const vaults =
     step.vaults === 'all' ? t('すべての vault', 'all vaults') : step.vaults?.join(', ');
-  return [
-    vaults,
-    step.cli && agentNames[step.cli],
-    step.access === 'full-access' ? t('フルアクセス', 'Full access') : t('標準', 'Standard'),
-  ]
+  return [vaults, step.cli && agentNames[step.cli], stepAccessLabel(step)]
     .filter(Boolean)
     .join(' · ');
 }

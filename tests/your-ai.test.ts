@@ -464,18 +464,24 @@ test(
   fixtureOptions,
   async (t) => {
     const { brains, id, events, run, fixtureLog } = await delegation(t);
-    assert.equal(defaultAgentAccess('claude'), 'full-access');
-    await run('Try a direct write first.', defaultAgentAccess('claude'));
+    // Full access is the person's choice; conversations start in standard access.
+    assert.equal(defaultAgentAccess('claude'), 'default');
+    await run('Try a direct write first.', 'full-access');
     const log = await fixtureLog();
     assert.equal(log[0].mode, 'bypassPermissions');
     // The write hook runs in every mode: the irori agent's own write is refused.
     assert.ok(log.some((entry) => entry.direct === 'denied'));
     await assert.rejects(readFile(path.join(brains[0].root, 'direct.md')));
-    // The vault agent runs in the same mode: it writes in its vault without asking.
+    // The vault agent runs in its own default access, never the irori agent's mode.
     const vault = await fixtureLog(brains[0].root);
-    assert.equal(vault[0].mode, 'bypassPermissions');
+    assert.equal(vault[0].mode, 'default');
     assert.ok(vault.some((entry) => entry.written === true));
-    assert.equal(events.filter((event) => event.type === 'permission').length, 0);
+    // It asks the person in the vault's log, as the vault's column says standard access does.
+    const asked = events.filter((event) => event.type === 'permission');
+    assert.ok(asked.length > 0);
+    // The irori agent's log shows the same request as its hand-off's.
+    const vaultId = brains[0].scopeId;
+    assert.ok(asked.every((event) => (event.delegate?.scopeId ?? event.scopeId) === vaultId));
     assert.equal(events.filter((event) => event.scopeId === id).at(-1)?.outcome, 'completed');
   },
 );

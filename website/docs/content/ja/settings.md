@@ -17,10 +17,10 @@ Markdown フォントは、システム・ゴシック・丸ゴシック・明�
 
 ## エージェント
 
-**エージェント** で vault agent をオンにします。初期状態ではオフです。
+**エージェント** で vault agent をオンにします。初期状態ではオフです。オフでは vault agent の列と Schema が隠れますが、irori agent からの依頼とルーティンは、vault の中で CLI をその vault のエージェント設定で実行します。
 
 ## 更新とルーティン
 
 設定の **更新** で新しい版を確認できます。通知が出たら、**更新して再起動** で更新します。
 
-[ルーティン](routines.md)で JavaScript を使う場合は、左のレールの **ルーティン** を開き、**実行環境** で **この端末で JavaScript を使用** を有効にします。AI の CLI・モデル・アクセス設定は[AI パネル](agents.md)で選びます。
+[ルーティン](routines.md)で JavaScript や Python を使う場合は、設定の **ルーティン** で **JavaScript** や **Python** を有効にします。AI の CLI・モデル・アクセス設定は[AI パネル](agents.md)で選びます。

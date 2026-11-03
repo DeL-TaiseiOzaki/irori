@@ -1174,7 +1174,18 @@ export function AgentColumn({
                 <select
                   aria-label={t('エージェントのアクセス', 'Agent access')}
                   value={access}
-                  disabled={sending || gitBusy || agentAccessOptions(agent).length === 1}
+                  // A running turn keeps the access it started with; the choice applies after it.
+                  title={
+                    shownRunning
+                      ? t(
+                          '実行中の処理は開始時のアクセスのまま続きます。',
+                          'The running turn keeps the access it started with.',
+                        )
+                      : undefined
+                  }
+                  disabled={
+                    shownRunning || sending || gitBusy || agentAccessOptions(agent).length === 1
+                  }
                   onChange={(e) => onAccess(e.target.value as AgentAccess)}
                 >
                   {agentAccessOptions(agent).map((value) => (

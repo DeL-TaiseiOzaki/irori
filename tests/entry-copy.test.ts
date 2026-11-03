@@ -149,6 +149,20 @@ test('A note copied into another vault brings its managed images', async (t) => 
   assert.equal(await a.exists('Knowledge_Base/note.md'), true);
 });
 
+test('A managed image that is a link to a file outside the vault is not carried', async (t) => {
+  const { base, a, vault, copy } = await fixture(t);
+  const b = await vault('B');
+  const outside = path.join(base, 'outside-secret.txt');
+  await writeFile(outside, 'not for the other vault');
+  const image = `_assets/image-${'0'.repeat(64)}.png`;
+  await a.write('Knowledge_Base/note.md', `# Note\n\n![x](${image})\n`);
+  await mkdir(path.join(a.root, 'Knowledge_Base/_assets'), { recursive: true });
+  await symlink(outside, path.join(a.root, 'Knowledge_Base', image));
+  await b.write('Knowledge_Base/inbox/.keep', '');
+  await copy(a.id, 'Knowledge_Base/note.md', b.id, 'Knowledge_Base/inbox');
+  assert.equal(await b.exists(`Knowledge_Base/inbox/${image}`), false);
+});
+
 test('Copies go between knowledge and connected folders; a read-only one is only read', async (t) => {
   const { files, cloud, space, target } = await connectedFixture(t, { writable: true });
   const id = space.scopeId;

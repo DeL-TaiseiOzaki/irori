@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AgentAccess, AgentId } from './types';
+import { agentAccessLabel } from './agent-access';
 import { t } from './i18n';
 
 /**
@@ -28,26 +29,53 @@ export const routineRuntimeList = z
   .max(routineRuntimes.length)
   .refine((list) => new Set(list).size === list.length);
 
-/** Names a secret cannot take: they would change how irori or the program starts. */
+/**
+ * Names a secret cannot take: they would change how irori or the program
+ * starts, or where it loads code from.
+ */
 const reservedNames = [
   'PATH',
+  'PATHEXT',
   'HOME',
   'USERPROFILE',
   'SHELL',
+  'COMSPEC',
+  'BASH_ENV',
+  'ENV',
+  'PROMPT_COMMAND',
+  'ZDOTDIR',
   'TMPDIR',
   'TEMP',
   'TMP',
   'NODE_OPTIONS',
+  'NODE_PATH',
   'ELECTRON_RUN_AS_NODE',
-  'LD_PRELOAD',
-  'LD_LIBRARY_PATH',
-  'DYLD_INSERT_LIBRARIES',
+  'PYTHONPATH',
+  'PYTHONSTARTUP',
+  'PYTHONHOME',
+  'PERL5OPT',
+  'PERL5LIB',
+  'RUBYOPT',
+  'RUBYLIB',
+  'GIT_SSH',
+  'GIT_SSH_COMMAND',
+  'GIT_EXEC_PATH',
+  'GIT_ASKPASS',
+  'GIT_PROXY_COMMAND',
+  'SSH_ASKPASS',
 ];
+/** Beginnings a secret's name cannot take: irori's own, the loaders' and Git's configuration. */
+const reservedPrefixes = ['IRORI_', 'LD_', 'DYLD_', 'GIT_CONFIG'];
+/**
+ * A name already kept, as read back or removed: a name reserved after it was
+ * saved stays readable and removable, and no routine can declare it.
+ */
+export const storedSecretName = z.string().regex(/^[A-Z_][A-Z0-9_]{0,63}$/);
 /** A secret's name: the environment variable a `run` step receives it in (ADR 016 D5). */
-export const secretName = z
-  .string()
-  .regex(/^[A-Z_][A-Z0-9_]{0,63}$/)
-  .refine((value) => !value.startsWith('IRORI_') && !reservedNames.includes(value));
+export const secretName = storedSecretName.refine(
+  (value) =>
+    !reservedPrefixes.some((prefix) => value.startsWith(prefix)) && !reservedNames.includes(value),
+);
 /**
  * A secret's value: one line, as an environment variable and a write-back line
  * hold it. Eight characters at least, since every copy of it in a record is hidden.
@@ -215,6 +243,20 @@ export function routineKey(ref: RoutineRef) {
 export function stepLabel(step: RoutineStep) {
   if (step.kind === 'run') return Array.isArray(step.run) ? step.run.join(' ') : step.run;
   return step.agent === 'irori' ? 'irori agent' : 'vault agent';
+}
+
+/**
+ * An agent step's access as it runs. Without `cli` the CLI chosen in the panel
+ * when the run starts takes the step, so the approvals are that CLI's own.
+ */
+export function stepAccessLabel(step: { access: AgentAccess; cli?: AgentId }) {
+  if (step.cli) return agentAccessLabel(step.cli, step.access);
+  return step.access === 'full-access'
+    ? t('フルアクセス', 'Full access')
+    : t(
+        '承認はパネルの CLI 次第（Pi は承認なし）',
+        "Approvals depend on the panel's CLI (Pi asks for none)",
+      );
 }
 
 /**
