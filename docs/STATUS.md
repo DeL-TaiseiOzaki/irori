@@ -1,5 +1,30 @@
 # Implementation status — notes, native agents and connection onboarding
 
+irori's own title bar and the settings sheet, 2026-11-03 (**0.2.53**,
+[#294](https://github.com/DeL-TaiseiOzaki/irori/pull/294);
+[ADR 054](decisions/054-window-title-bar.md), [ADR 055](decisions/055-settings-sheet.md)):
+- `createWindow` hides the system title bar (`titleBarStyle: 'hidden'`) and lays
+  the system's controls over the top 36 px (`titleBarOverlay`, `titleBarHeight`)
+  in `windowChrome(theme)` colours from `src/domain/window-frame.ts`;
+  `saveSettings` repaints every window when the theme changes. macOS gets
+  `trafficLightPosition`; Windows `accentColor: false`. The first paint is the
+  chrome's `--bg`.
+- `TitleBar` (`src/app/TitleBar.tsx`) is the `-webkit-app-region: drag` bar on
+  every screen, the start screen included; buttons and tabs are `no-drag`, and
+  the `titlebar-area-*` env values keep them clear of the controls. Tabs are
+  26 px pills. On Windows and Linux its menu button calls the new window method
+  `showMenu`, which pops up the application menu; Edit, View and Window are
+  labelled in the reader's language.
+- Tests: `window-frame` checks the colours against `tokens.css` and the bar's
+  height against the overlay's. Verified on Linux/Xvfb by capturing the real X
+  screen; not yet seen on Windows or macOS.
+- Settings ([ADR 055](decisions/055-settings-sheet.md)): `Settings` opens a
+  `Dialog` (`.settings-dialog`, new `closeOnBackdrop`) holding `SettingsSheet`:
+  a side `nav` of `sections` that scrolls `.settings-body` to a part (`scrollTo`,
+  not `scrollIntoView`, which also moved the sheet) and marks the part in view.
+  `Choices` takes an optional `shown` label; the radio keeps the full one as its
+  name. `account-ui-smoke` looks in `.settings-sheet`.
+
 One subject per screen and colour roles, 2026-11-01 (**0.2.52**,
 [#291](https://github.com/DeL-TaiseiOzaki/irori/pull/291), published as `v0.2.52-preview.1`;
 [ADR 053](decisions/053-priority-and-colour-roles.md)):

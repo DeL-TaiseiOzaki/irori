@@ -159,8 +159,8 @@ export function watchSystemTheme() {
   return () => media.removeEventListener('change', update);
 }
 
-// The host keeps it for the next launch and tells the operating system, which
-// owns the window chrome and the native dialogs.
+// The host keeps it for the next launch, repaints the window's controls (ADR 054)
+// and tells the operating system, which owns the native menus and dialogs.
 export function chooseTheme(theme: DeviceSettings['theme']) {
   return save({ theme }, (shown) => applyTheme(shown.theme));
 }

@@ -15,41 +15,97 @@
   background: var(--bg);
   color: var(--tx);
 }
-/* The open workspaces along the window's top, one on show (a browser's tabs). */
-.workspace-tabs {
-  height: 36px;
+/* irori draws the window's top itself (ADR 054): the handle that moves the window,
+   irori's menu on Windows and Linux, and the workspace tabs. The system's window
+   controls are laid over its far end (its start on macOS) at titleBarHeight
+   (src/domain/window-frame.ts), and the hairline below joins it to the chrome. The
+   env() areas are the space those controls leave; without them the bar is whole. */
+.titlebar {
+  height: 37px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px 0 12px;
+  padding-left: env(titlebar-area-x, 0px);
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  border-bottom: 1px solid var(--hair);
   background: var(--bg);
   color: var(--tx-3);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+.titlebar button {
+  -webkit-app-region: no-drag;
+}
+/* The menu sits over the rail, so the tabs begin where the vault panel does. */
+.titlebar-start {
+  width: 64px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.titlebar button.titlebar-menu {
+  width: 30px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 7px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+.titlebar button.titlebar-menu:hover {
+  background: var(--raised-2);
+  color: var(--tx);
+}
+/* The open workspaces, one on show (a browser's tabs). The space between and after
+   them still moves the window. */
+.workspace-tabs {
+  min-width: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 0 4px;
+  color: var(--tx-3);
   font-size: 12.5px;
+}
+.titlebar > .workspace-tabs:first-child {
+  padding-left: 10px;
 }
 .workspace-tab-list {
   min-width: 0;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .workspace-tab {
-  height: 30px;
+  height: 26px;
   min-width: 0;
   max-width: 220px;
   flex: 0 1 auto;
   display: flex;
   align-items: center;
-  border-radius: 9px 9px 0 0;
-  transition: background-color 160ms ease;
+  border-radius: 7px;
+  -webkit-app-region: no-drag;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
 }
 .workspace-tab:hover {
   background: var(--panel);
+  color: var(--tx-2);
 }
 .workspace-tab[data-current] {
   background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--tx);
 }
 .workspace-tabs button.workspace-tab-name {
@@ -81,14 +137,14 @@
 }
 .workspace-tabs button.workspace-tab-close,
 .workspace-tabs button.workspace-tab-add {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   flex: none;
   display: grid;
   place-items: center;
   padding: 0;
-  margin-right: 5px;
-  border-radius: 6px;
+  margin-right: 4px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -104,8 +160,8 @@
 .workspace-tabs button.workspace-tab-add {
   width: 26px;
   height: 26px;
-  margin: 0 0 2px 2px;
-  border-radius: 8px;
+  margin: 0 0 0 2px;
+  border-radius: 7px;
 }
 .workspace-tabs button.workspace-tab-close:hover:not(:disabled),
 .workspace-tabs button.workspace-tab-add:hover:not(:disabled),
@@ -760,41 +816,127 @@
   background: var(--rule);
 }
 
-/* Settings from the rail. */
-.settings-popover {
-  width: 316px;
-  max-height: min(640px, calc(100vh - 24px));
-  overflow: auto;
-  padding: 14px;
+/* The settings: a sheet of their own over the blurred window, the parts listed at
+   its side and shown in one scrolling column. Settings are chrome, so the sheet is
+   graphite in hearth and dark, paper in light. */
+.settings-dialog {
+  color: var(--tx);
+  color-scheme: var(--chrome-scheme);
+}
+.settings-dialog::backdrop {
+  backdrop-filter: blur(10px) saturate(0.85);
+}
+.settings-sheet {
+  position: relative;
+  width: min(900px, calc(100vw - 48px));
+  /* Clear of the title bar, which moves the window wherever it is pressed. */
+  height: min(640px, calc(100vh - 104px));
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
   border-radius: 14px;
   background: var(--panel);
   color: var(--tx);
-  box-shadow: var(--pop);
+  box-shadow:
+    0 0 0 1px var(--hair-2),
+    var(--pop);
+}
+.settings-side {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  outline: none;
-  transition:
-    opacity var(--medium) ease,
-    transform var(--medium) var(--ease);
+  gap: 16px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--hair);
+  background: var(--bg);
 }
-.settings-popover[data-starting-style],
-.settings-popover[data-ending-style] {
-  opacity: 0;
-  transform: translateX(-6px);
-}
-.settings-popover h2 {
-  margin: 0;
-  font-size: 14px;
+.settings-side h2 {
+  margin: 0 10px;
+  font-size: 15px;
   font-weight: 700;
 }
-.settings-popover h3,
+.settings-side nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-side nav button {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background-color var(--quick) ease,
+    color var(--quick) ease;
+}
+.settings-side nav button:hover {
+  background: var(--panel);
+  color: var(--tx);
+}
+.settings-side nav button[aria-current='true'] {
+  background: var(--raised);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.settings-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 28px 28px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 0 28px;
+}
+.settings-section + .settings-section {
+  border-top: 1px solid var(--hair);
+}
+.settings-section h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--tx);
+}
+.settings-section .settings-account > h3 {
+  margin-bottom: 14px;
+}
 .settings-choices legend {
-  margin: 0 0 7px;
+  margin: 0 0 8px;
   padding: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--tx-2);
+}
+.settings-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.settings-sheet button.settings-close {
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
   color: var(--tx-3);
+}
+.settings-sheet button.settings-close:hover {
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .settings-choices {
   margin: 0;
@@ -802,27 +944,21 @@
   border: 0;
   min-width: 0;
 }
+/* Every row of choices shares four columns, so they line up down the sheet. */
 .settings-choices > div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-}
-.settings-choices.markdown-font > div,
-.settings-choices.page-margins > div,
-.settings-choices.line-spacing > div {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.settings-choices.text-size > div {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 .settings-choice {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 9px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
   border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--hair);
   font-size: 12.5px;
   color: var(--tx-2);
   cursor: pointer;
@@ -833,7 +969,7 @@
 /* A choice that opens a view rather than picking a value. */
 button.settings-choice {
   background: none;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--hair);
   font-weight: 400;
 }
 .settings-choice:hover {
@@ -891,7 +1027,7 @@ button.settings-choice {
 .font-mono {
   font-family: var(--markdown-font-mono);
 }
-.settings-popover button {
+.settings-body button:not(.settings-choice) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -903,7 +1039,7 @@ button.settings-choice {
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
 }
-.settings-popover button:hover:not(:disabled) {
+.settings-body button:not(.settings-choice):hover:not(:disabled) {
   background: var(--raised-2);
 }
 .settings-link {
