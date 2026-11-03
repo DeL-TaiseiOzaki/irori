@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-irori's own title bar, 2026-11-03 (**0.2.53**;
+irori's own title bar, 2026-11-03 (**0.2.53**,
+[#294](https://github.com/DeL-TaiseiOzaki/irori/pull/294);
 [ADR 054](decisions/054-window-title-bar.md)):
 - `createWindow` hides the system title bar (`titleBarStyle: 'hidden'`) and lays
   the system's controls over the top 36 px (`titleBarOverlay`, `titleBarHeight`)
