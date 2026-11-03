@@ -816,41 +816,127 @@
   background: var(--rule);
 }
 
-/* Settings from the rail. */
-.settings-popover {
-  width: 316px;
-  max-height: min(640px, calc(100vh - 24px));
-  overflow: auto;
-  padding: 14px;
+/* The settings: a sheet of their own over the blurred window, the parts listed at
+   its side and shown in one scrolling column. Settings are chrome, so the sheet is
+   graphite in hearth and dark, paper in light. */
+.settings-dialog {
+  color: var(--tx);
+  color-scheme: var(--chrome-scheme);
+}
+.settings-dialog::backdrop {
+  backdrop-filter: blur(10px) saturate(0.85);
+}
+.settings-sheet {
+  position: relative;
+  width: min(900px, calc(100vw - 48px));
+  /* Clear of the title bar, which moves the window wherever it is pressed. */
+  height: min(640px, calc(100vh - 104px));
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
   border-radius: 14px;
   background: var(--panel);
   color: var(--tx);
-  box-shadow: var(--pop);
+  box-shadow:
+    0 0 0 1px var(--hair-2),
+    var(--pop);
+}
+.settings-side {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  outline: none;
-  transition:
-    opacity var(--medium) ease,
-    transform var(--medium) var(--ease);
+  gap: 16px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--hair);
+  background: var(--bg);
 }
-.settings-popover[data-starting-style],
-.settings-popover[data-ending-style] {
-  opacity: 0;
-  transform: translateX(-6px);
-}
-.settings-popover h2 {
-  margin: 0;
-  font-size: 14px;
+.settings-side h2 {
+  margin: 0 10px;
+  font-size: 15px;
   font-weight: 700;
 }
-.settings-popover h3,
+.settings-side nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-side nav button {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background-color var(--quick) ease,
+    color var(--quick) ease;
+}
+.settings-side nav button:hover {
+  background: var(--panel);
+  color: var(--tx);
+}
+.settings-side nav button[aria-current='true'] {
+  background: var(--raised);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.settings-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 28px 28px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 0 28px;
+}
+.settings-section + .settings-section {
+  border-top: 1px solid var(--hair);
+}
+.settings-section h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--tx);
+}
+.settings-section .settings-account > h3 {
+  margin-bottom: 14px;
+}
 .settings-choices legend {
-  margin: 0 0 7px;
+  margin: 0 0 8px;
   padding: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--tx-2);
+}
+.settings-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.settings-sheet button.settings-close {
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
   color: var(--tx-3);
+}
+.settings-sheet button.settings-close:hover {
+  background: var(--raised-2);
+  color: var(--tx);
 }
 .settings-choices {
   margin: 0;
@@ -858,27 +944,21 @@
   border: 0;
   min-width: 0;
 }
+/* Every row of choices shares four columns, so they line up down the sheet. */
 .settings-choices > div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-}
-.settings-choices.markdown-font > div,
-.settings-choices.page-margins > div,
-.settings-choices.line-spacing > div {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.settings-choices.text-size > div {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 .settings-choice {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 9px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
   border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--hair);
   font-size: 12.5px;
   color: var(--tx-2);
   cursor: pointer;
@@ -889,7 +969,7 @@
 /* A choice that opens a view rather than picking a value. */
 button.settings-choice {
   background: none;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--hair);
   font-weight: 400;
 }
 .settings-choice:hover {
@@ -947,7 +1027,7 @@ button.settings-choice {
 .font-mono {
   font-family: var(--markdown-font-mono);
 }
-.settings-popover button {
+.settings-body button:not(.settings-choice) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -959,7 +1039,7 @@ button.settings-choice {
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
 }
-.settings-popover button:hover:not(:disabled) {
+.settings-body button:not(.settings-choice):hover:not(:disabled) {
   background: var(--raised-2);
 }
 .settings-link {

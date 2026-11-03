@@ -96,7 +96,7 @@ try {
   await page.getByRole('button', { name: /^設定/ }).click();
   const account = page.getByRole('region', { name: 'アカウント' });
   // The start screen's settings leave out what needs a workspace or is already there.
-  await expect(page.locator('.settings-popover')).not.toContainText('Schema');
+  await expect(page.locator('.settings-sheet')).not.toContainText('Schema');
   await expect(page.getByRole('region', { name: '更新' })).toHaveCount(0);
   await expect(account).toContainText('GitHub: octo');
   await expect(account).toContainText('環境は保存されていません');
@@ -114,7 +114,7 @@ try {
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await page.getByRole('button', { name: /^設定/ }).click();
   await expect(account).toContainText('環境を保存：');
-  await expect(page.locator('.settings-popover')).toContainText('Schema');
+  await expect(page.locator('.settings-sheet')).toContainText('Schema');
   const saved = JSON.parse(await fake.stored());
   if (saved.vaults[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
     throw Error(`Unexpected saved environment: ${JSON.stringify(saved)}`);
