@@ -17,7 +17,10 @@ not anyone pressed the button.
 
 1. It downloads the release's package, showing the percentage and megabytes, and
    offers **キャンセル** while the download runs.
-2. It checks the file and prepares the new version (「確認して準備しています」).
+2. It verifies the download against the release's own SHA-256 list (and, on the
+   Mac, the bundle's ad-hoc code signature) and prepares the new version
+   (「ダウンロードを検証して準備しています」). Neither check identifies the
+   publisher; see ADR 010's trust limits.
 3. It closes irori as the window's close button would and opens the new version.
    Drafts are saved first. A running agent or terminal asks
    「停止して再起動しますか？」, and a Git operation in progress has to finish.

@@ -17,10 +17,10 @@ This documentation site also has an **English / 日本語** switch at the top ri
 
 ## Agents
 
-Turn on the vault agent under **Agents**. It is off by default.
+Turn on the vault agent under **Agents**. It is off by default. Off hides the vault agents' columns and Schema, but hand-offs from the irori agent and routines still run a CLI inside the vault, with the vault's agent configuration.
 
 ## Updates and routines
 
 Check for a new version under **Updates** in settings. When one is available, choose **Update and restart**.
 
-To use JavaScript in [routines](routines.md), open **Routines** in the left rail and enable **Use JavaScript on this device** under **Runtimes**. Choose the AI CLI, model, and access mode in the [AI panel](agents.md).
+To use JavaScript or Python in [routines](routines.md), turn on **JavaScript** or **Python** under **Routines** in the settings. Choose the AI CLI, model, and access mode in the [AI panel](agents.md).

@@ -12,7 +12,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
-import { CloudService, type WaitTiming } from '../src/cloud/service';
+import { CloudService, folderLabel, type WaitTiming } from '../src/cloud/service';
 import { fixture, retiredDeclaration, writeRetired } from './fixtures/cloud';
 
 /** A vault with a folder outside it, standing for one a sync app keeps on this device. */
@@ -75,6 +75,13 @@ test('A read-only local folder refuses changes, and access changes reconnect it'
     access: 'read-only',
   });
   await cloud.connect(space.scopeId, mountId);
+  // Agents get it to read, never as a place to write; the link is named with it.
+  assert.deepEqual(cloud.localFolders(space.scopeId, true), []);
+  assert.deepEqual(cloud.localFolders(space.scopeId, false), [
+    folder,
+    path.join(space.root, 'contents', 'Research'),
+  ]);
+  assert.deepEqual(cloud.linkedPaths(space.scopeId, false), ['contents/Research']);
   const doc = await files.read(space.scopeId, 'contents/Research/note.md');
   assert.equal(doc.readOnly, true);
   await assert.rejects(files.save({ ...doc, text: 'Changed' }), /読み取り専用/);
@@ -83,6 +90,8 @@ test('A read-only local folder refuses changes, and access changes reconnect it'
   assert.equal(connection.state, 'mounted');
   assert.equal(connection.writable, true);
   assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).readOnly, false);
+  assert.deepEqual(cloud.localFolders(space.scopeId, true), [folder]);
+  assert.deepEqual(cloud.localFolders(space.scopeId, false), []);
 });
 
 test('Folders overlapping a vault or irori data, and taken names, are refused', async (t) => {
@@ -413,4 +422,23 @@ test('A link whose record went is listed, registered again, or removed alone', a
   await restarted.removeStray(space.scopeId, 'contents', 'Own');
   assert.deepEqual(trashed, [path.join(space.root, 'contents', 'Own')]);
   await assert.rejects(restarted.removeStray(space.scopeId, 'contents', 'Own'), /見つからない/);
+});
+
+test('A connected folder keeps its name without an email address, and its links stay out of Git', async (t) => {
+  assert.equal(
+    folderLabel('/Users/me/Library/CloudStorage/GoogleDrive-me@example.com'),
+    'GoogleDrive-…',
+  );
+  assert.equal(folderLabel('/Users/me/Sync/Research'), 'Research');
+  const { space, cloud, folder } = await local(t);
+  await mkdir(path.join(space.root, '.git', 'info'), { recursive: true });
+  const { mountId } = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  const exclude = await readFile(path.join(space.root, '.git', 'info', 'exclude'), 'utf8');
+  assert.ok(exclude.split('\n').includes('/contents/'));
 });

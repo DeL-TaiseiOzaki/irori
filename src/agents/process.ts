@@ -1,8 +1,8 @@
 import spawn from 'cross-spawn';
 import treeKill from 'tree-kill';
 import { execFile, execFileSync } from 'node:child_process';
-import { promises as fs } from 'node:fs';
-import { homedir } from 'node:os';
+import { promises as fs, statSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
@@ -16,15 +16,58 @@ export function agentEnv(source = process.env, platform = process.platform): Nod
   delete env.IRORI_BUILD_GOOGLE_CLIENT_ID;
   delete env.IRORI_BUILD_GOOGLE_CLIENT_SECRET;
   // Windows inherits its native Path. Adding a separate PATH would shadow it in child_process.
-  if (platform === 'win32') return env;
+  // An empty or relative entry means the working folder, a vault, so none is kept.
+  if (platform === 'win32') {
+    const key = pathKey(env);
+    if (env[key] !== undefined) env[key] = searchPath(env, platform).join(';');
+    return env;
+  }
   const extra = [
     path.join(homedir(), '.local', 'bin'),
     path.join(homedir(), '.cargo', 'bin'),
     '/opt/homebrew/bin',
     '/usr/local/bin',
   ];
-  env.PATH = [env.PATH, ...extra].filter(Boolean).join(path.delimiter);
+  env.PATH = [...searchPath(env, platform), ...extra].join(':');
   return env;
+}
+const pathKey = (env: NodeJS.ProcessEnv) =>
+  Object.keys(env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+/** The absolute folders of `env`'s search path, in order. */
+function searchPath(env: NodeJS.ProcessEnv, platform: NodeJS.Platform) {
+  const paths = platform === 'win32' ? path.win32 : path.posix;
+  return (env[pathKey(env)] ?? '')
+    .split(platform === 'win32' ? ';' : ':')
+    .filter((dir) => dir && paths.isAbsolute(dir));
+}
+
+/**
+ * Where a bare command name is found on `env`'s search path, never in the working
+ * folder: Windows looks there first, so a vault holding `git.exe` would run it.
+ */
+export function onSearchPath(
+  command: string,
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): string | undefined {
+  const paths = platform === 'win32' ? path.win32 : path.posix;
+  if (paths.isAbsolute(command)) return command;
+  if (/[\\/]/.test(command)) return undefined;
+  const extensions =
+    platform === 'win32' && !paths.extname(command)
+      ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+      : [''];
+  for (const dir of searchPath(env, platform))
+    for (const extension of extensions) {
+      const file = paths.join(dir, command + extension);
+      try {
+        const info = statSync(file);
+        if (info.isFile() && (platform === 'win32' || info.mode & 0o111)) return file;
+      } catch {
+        // Not here.
+      }
+    }
+  return undefined;
 }
 
 /**
@@ -63,7 +106,13 @@ function killNow(pid: number | undefined) {
 export const agentCommand = (agent: AgentId) => (agent === 'antigravity' ? 'agy' : agent);
 
 export function launch(command: string, args: string[], cwd: string, env = agentEnv()) {
-  const child = spawn(command, args, {
+  // Resolved here from the search path alone: `cwd` is often a vault. A command not
+  // on it is given a place that cannot exist, so Windows reports it missing (as an
+  // `error` event, like any spawn) instead of finding one in `cwd`.
+  const resolved =
+    onSearchPath(command, env) ??
+    (process.platform === 'win32' ? path.join(tmpdir(), 'irori-not-on-path', command) : command);
+  const child = spawn(resolved, args, {
     cwd,
     env,
     stdio: 'pipe',

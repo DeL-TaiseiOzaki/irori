@@ -60,6 +60,10 @@ export const agentReady = (root: string) =>
     .then((stat) => stat.isFile())
     .catch(() => false);
 
+/** Files that hold credentials by their name, which saving leaves out like device files. */
+const credentialFile =
+  /^(\.env(\.(?!example$|sample$|template$)[^/]+)?|\.netrc|\.npmrc|\.pypirc|\.git-credentials|id_(rsa|dsa|ecdsa|ed25519)|.+\.(pem|key|p12|pfx|jks|keystore))$/i;
+
 /** Every file path under the folder that may travel, and the ones that cannot (links, too deep). */
 async function agentPaths(root: string) {
   const paths: string[] = [];
@@ -74,7 +78,9 @@ async function agentPaths(root: string) {
         if (depth >= depthLimit) left.push(`${child}/`);
         else await walk(child, depth + 1);
       } else if (entry.isFile()) {
-        if (!deviceFile(child)) paths.push(child);
+        // Credentials stay on this device: only secret values travel, sealed.
+        if (credentialFile.test(entry.name)) left.push(child);
+        else if (!deviceFile(child)) paths.push(child);
       } else left.push(child);
     }
   };

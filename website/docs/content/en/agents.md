@@ -11,7 +11,7 @@ Choose a CLI and model in the AI panel. Model options come from the installed CL
 
 ## Ask a vault agent
 
-The vault agent is optional. Turn it on in **Settings → Agents**. irori shows it by its vault's name, such as “Research agent”. A vault named “irori” would read as the irori agent, so give it another name.
+The vault agent is optional. Turn it on in **Settings → Agents**. Even while it is off, hand-offs from the irori agent and routines still run a CLI inside the vault, with the vault's agent configuration. irori shows it by its vault's name, such as “Research agent”. A vault named “irori” would read as the irori agent, so give it another name.
 
 Open a note, write a request in the AI panel, and send it. The vault agent works with that vault's Schema and the selected note.
 
@@ -19,7 +19,11 @@ Try “Extract the decisions from these meeting notes” or “Read the material
 
 ## Check access
 
-A vault agent starts with **Full access** when the CLI supports it. Choose **Default** to follow the CLI's settings and approval requests. Available modes differ by CLI.
+A new conversation starts in **Standard**, which follows the CLI's settings: Claude Code and Codex ask when needed, Pi asks for nothing, and the Antigravity CLI allows edits on its own. Switch to **Full access** where the CLI supports it; the choice returns to Standard after a restart or a workspace switch. Available modes differ by CLI.
+
+In full access an agent reaches anything your user account can read or write. Through the `irori` command a vault agent reaches its own vault only, but that limit does not apply to the CLI's own tools. A read-only connection is read-only only to irori and to file edits by Claude Code and Codex in standard access; full access, shell commands, the terminal and other CLIs can still write there.
+
+What an agent reads, notes and connected folders alike, is sent to that CLI's AI provider.
 
 Permission requests and questions appear in the panel. Review and answer them there. Choose **Stop** to end work in progress.
 

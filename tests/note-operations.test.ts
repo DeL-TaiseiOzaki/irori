@@ -235,11 +235,11 @@ test('Restore reports successful recovery when its subsequent ledger update fail
   const note = await files.createNote(id, 'Restore');
   const deleted = await files.trashNote(note);
   const recordPath = path.join(files.dataDir, 'note-trash', `${deleted.id}.json`);
-  const lstat = fs.lstat.bind(fs);
-  t.mock.method(fs, 'lstat', async (...args: Parameters<typeof fs.lstat>) => {
+  const remove = fs.rm.bind(fs);
+  t.mock.method(fs, 'rm', async (...args: Parameters<typeof fs.rm>) => {
     if (args[0] === recordPath)
       throw Object.assign(Error('Fixture ledger write failure'), { code: 'EIO' });
-    return lstat(...args);
+    return remove(...args);
   });
   const restored = await files.restoreNote(id, deleted.id);
   assert.equal(restored.hash, note.hash);

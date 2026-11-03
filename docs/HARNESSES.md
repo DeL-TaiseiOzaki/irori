@@ -119,9 +119,9 @@ used the standard mode on the 0.1.26 baseline.
 The selected access mode travels with queued instructions and the native
 session record. A mode change starts a new native session while retaining the
 display history. Workspace, KB or CLI changes and app restart reset the
-composer's selection to the Vault Agent's starting mode (full access where the
-CLI offers it, since 2026-09-27; standard before); a session saved under the other
-mode is not silently resumed with that label. Google OAuth and mounts remain read-only independently
+composer's selection to the starting mode: standard on every CLI (full access
+where the CLI offered it from 2026-09-27 until November 2026; standard before);
+a session saved under the other mode is not silently resumed with that label. Google OAuth and mounts remain read-only independently
 of native agent access.
 
 Install and configure the desired native CLI on the desktop's PATH. irori also searches the existing standard local binary locations. Authentication, model defaults, rules, skills and extensions remain with that CLI. The app displays detection/version status and uses the selected scope's canonical checkout as its working directory. It does not concatenate other spaces' rules. `.opencode/`, `.pi/`, `.agents/` and root `opencode.json`/`opencode.jsonc` are classified as schema; contents ownership still overrides classification.

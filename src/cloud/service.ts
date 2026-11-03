@@ -113,6 +113,33 @@ const workName = 'work';
  * itself before 0.1.67 are listed as retired, to be switched to such a folder
  * (ADR 023).
  */
+
+/**
+ * A connected folder's own name as the vault keeps it (ADR 019 D3): never its path,
+ * and without an email address, which a sync app's account folder carries
+ * (`GoogleDrive-name@example.com`).
+ */
+export function folderLabel(target: string) {
+  const name = path.basename(target) || target;
+  const account = /^(GoogleDrive|OneDrive|Dropbox|Box)-.*@/i.exec(name);
+  return account ? `${account[1]}-…` : name.replace(/[^\s@/\\]+@[^\s@/\\]+/g, '…');
+}
+
+/**
+ * Keeps a contents folder of links out of the vault's Git history on this device,
+ * whatever its `.gitignore` says: a link records the folder's path on this device.
+ */
+async function excludeFromGit(root: string, contentsRoot: string) {
+  const git = path.join(root, '.git');
+  if (!(await fs.lstat(git).catch(() => undefined))?.isDirectory()) return;
+  const file = path.join(git, 'info', 'exclude');
+  const line = `/${contentsRoot}/`;
+  const before = await fs.readFile(file, 'utf8').catch(() => '');
+  if (before.split(/\r?\n/).includes(line)) return;
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.appendFile(file, `${before && !before.endsWith('\n') ? '\n' : ''}${line}\n`);
+}
+
 export class CloudService {
   private queue = new SerialQueue();
   private mounted = new Map<string, Mounted>();
@@ -495,7 +522,7 @@ export class CloudService {
         mountId: record.mountId,
         scopeId,
         provider: 'local',
-        folderName: path.basename(target) || target,
+        folderName: folderLabel(target),
         contentsRoot: record.contentsRoot,
         name: record.name,
         access: record.access,
@@ -689,7 +716,7 @@ export class CloudService {
         mountId: randomUUID(),
         scopeId: input.scopeId,
         provider: 'local',
-        folderName: path.basename(target) || target,
+        folderName: folderLabel(target),
         contentsRoot: input.contentsRoot,
         name: input.name,
         access: input.access ?? 'read-write',
@@ -770,7 +797,7 @@ export class CloudService {
     return this.mutate(async () => {
       const space = await this.files.get(input.scopeId);
       const records = await this.localDeclarations(input.scopeId);
-      const final = { ...record, folderName: path.basename(target) || target };
+      const final = { ...record, folderName: folderLabel(target) };
       await this.assertNameFree(final);
       await this.checkVacant(final);
       await this.writeLocal(input.scopeId, records, [...records, final]);
@@ -887,7 +914,7 @@ export class CloudService {
         root: (await this.files.get(scopeId)).root,
         path: target,
       });
-      const folderName = path.basename(target) || target;
+      const folderName = folderLabel(target);
       if (folderName !== record.folderName)
         await this.writeLocal(
           scopeId,
@@ -1009,6 +1036,7 @@ export class CloudService {
         await this.checkVacant(record);
         await fs.symlink(target, entry, process.platform === 'win32' ? 'junction' : 'dir');
         made = entry;
+        await excludeFromGit((await this.files.get(scopeId)).root, record.contentsRoot);
       }
       const link = await fs.lstat(entry);
       const mounted: Mounted = {
@@ -1067,12 +1095,21 @@ export class CloudService {
     const binding = await this.localBinding(record.scopeId, record.mountId);
     if (binding && (await this.parent(record))) await this.unlink(record, binding.path);
   }
-  /** Where a vault's connected folders appear, as paths inside it, for CLI agents to be told. */
-  linkedPaths(scopeId: string) {
-    return [...this.mounted.values()]
-      .filter((item) => item.attachment.scopeId === scopeId)
+  /**
+   * Where a vault's connected folders appear, as paths inside it, for CLI agents to be
+   * told; with `writable`, only the read-write (true) or read-only (false) connections.
+   */
+  linkedPaths(scopeId: string, writable?: boolean) {
+    return this.mountedIn(scopeId, writable)
       .map((item) => `${item.attachment.contentsRoot}/${item.attachment.name}`)
       .sort();
+  }
+  private mountedIn(scopeId: string, writable?: boolean) {
+    return [...this.mounted.values()].filter(
+      (item) =>
+        item.attachment.scopeId === scopeId &&
+        (writable === undefined || item.writable === writable),
+    );
   }
   /**
    * Each connected folder of a vault: its path inside the vault and its real
@@ -1087,10 +1124,16 @@ export class CloudService {
       }));
   }
   /** The local folders and repository clones connected in a vault, for CLI agents to be allowed into. */
-  localFolders(scopeId: string) {
-    return [...this.mounted.values()]
-      .filter((item) => item.attachment.scopeId === scopeId)
-      .map((item) => item.target);
+  /**
+   * The real places of a vault's connected folders. Agents get only the read-write
+   * ones as places they may write (`writable: true`); a read-only one is refused.
+   */
+  localFolders(scopeId: string, writable?: boolean) {
+    return this.mountedIn(scopeId, writable).flatMap((item) => [
+      item.target,
+      // The link an agent may name instead, inside the vault.
+      ...(writable === false ? [item.entry] : []),
+    ]);
   }
   connect(scopeId: string, mountId: string) {
     return this.mutate(() => this.mount(scopeId, mountId));
@@ -1602,7 +1645,7 @@ export class CloudService {
         mountId: randomUUID(),
         scopeId,
         provider: 'local',
-        folderName: path.basename(target) || target,
+        folderName: folderLabel(target),
         contentsRoot,
         name,
         access: 'read-write',

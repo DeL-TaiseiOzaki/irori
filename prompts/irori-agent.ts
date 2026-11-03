@@ -15,6 +15,8 @@ type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
   layers?: { knowledge: string; contents: string[] };
   /** Folders connected in its contents, as paths inside the vault. */
   linked?: string[];
+  /** Those of them connected read-only. */
+  readOnly?: string[];
   /** The folder its agents work in, an absolute path. */
   work?: string;
   /** The description of the vault's own definition of its agent, when it has one. */
@@ -33,7 +35,12 @@ const layerList = ({ layers }: Handed) =>
     : '';
 const linkedList = (brain: Handed) =>
   brain.linked?.length
-    ? `, connected folders ${brain.linked.map((item) => JSON.stringify(item)).join(', ')}`
+    ? `, connected folders ${brain.linked
+        .map(
+          (item) =>
+            `${JSON.stringify(item)}${brain.readOnly?.includes(item) ? ' (read-only)' : ''}`,
+        )
+        .join(', ')}`
     : '';
 /** How connected folders are searched, said only when a handed vault has any. */
 const linkedNote = (brains: Handed[]) => {

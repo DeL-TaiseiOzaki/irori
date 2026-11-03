@@ -345,7 +345,9 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
    as its last line, and later steps do not run.
 5. Tokens. Never write a token or password into a file. Name it in the step's
    \`secrets\` (capitals, digits and \`_\`) and read it from the environment;
-   the person enters its value in irori. Agent steps never receive secrets.
+   the person enters its value in irori. Agent steps are not given secrets,
+   but they read \`$IRORI_WORK\` and \`$IRORI_STATE\`: never write a secret there.
+   Every process a program step starts inherits its secrets.
 6. Agent prompts say what to read from \`$IRORI_WORK\` and where results go.
    irori adds its own preamble to each step.
 7. Run \`irori routines\` and fix the routine until it reports ready, or names

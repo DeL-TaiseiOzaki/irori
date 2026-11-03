@@ -59,6 +59,8 @@ const relative = z
     (p) =>
       !path.isAbsolute(p) &&
       !p.includes('\\') &&
+      // A Windows name never holds `:`; with one it names a drive or a hidden stream.
+      !(process.platform === 'win32' && p.includes(':')) &&
       p.split('/').every((x) => x && x !== '..' && x !== '.'),
   );
 const declaration = z.object({
@@ -267,10 +269,13 @@ export class FileService {
     /** Writes an edited file of a connected folder in place, hash checked. */
     write?(doc: Document): Promise<void>;
     writable?(scopeId: string, rel: string): boolean;
-    /** The connected folders on this device that a vault's contents shows through links. */
-    localFolders?(scopeId: string): string[];
+    /**
+     * The connected folders on this device that a vault's contents shows through links;
+     * with `writable`, only the read-write or (with the links) the read-only ones.
+     */
+    localFolders?(scopeId: string, writable?: boolean): string[];
     /** Where those folders appear, as paths inside the vault. */
-    linkedPaths?(scopeId: string): string[];
+    linkedPaths?(scopeId: string, writable?: boolean): string[];
     /** Both at once: each folder's path inside the vault and its real place. */
     linkedFolders?(scopeId: string): { path: string; target: string }[];
     /** The vault's work folder, as it shows in contents and where it is (ADR 045). */
@@ -1437,9 +1442,10 @@ export class FileService {
     ];
     for (const image of images) {
       const asset = image.slice(folder ? folder.length + 1 : 0);
-      const bytes = await fs
-        .readFile(path.join(await parentOf(image), path.posix.basename(image)))
-        .catch(() => undefined);
+      const source = path.join(await parentOf(image), path.posix.basename(image));
+      // A link could carry a file from outside the vault into another one: only a file goes.
+      if (!(await fs.lstat(source).catch(() => undefined))?.isFile()) continue;
+      const bytes = await fs.readFile(source).catch(() => undefined);
       if (!bytes) continue;
       const assets = path.posix.dirname(directory ? `${directory}/${asset}` : asset);
       await this.noteDirectory(toId, assets, true);
@@ -1768,7 +1774,12 @@ export class FileService {
   }
   async restoreNote(scopeId: string, trashId: string): Promise<Document & { notice?: string }> {
     return this.queue.run(async () => {
-      const record = await this.trashRecord(trashId);
+      const check = () =>
+        Error(t('復元するノートを確認してください。', 'Check the note to restore.'));
+      // A restored note's record is removed, so it is gone as an unknown one is.
+      const record = await this.trashRecord(trashId).catch((error) => {
+        throw isMissing(error) ? check() : error;
+      });
       if (
         record.scopeId !== scopeId ||
         record.checkoutRootHash !== hash(this.get(scopeId).root) ||
@@ -1781,7 +1792,8 @@ export class FileService {
       await writeExclusive(destination, record.text);
       const doc = await this.read(scopeId, record.path);
       try {
-        await writeLocalJson(this.trashPath(trashId), { ...record, restored: true });
+        // The note is back in the vault; irori keeps no second copy of its text.
+        await fs.rm(this.trashPath(trashId));
         return doc;
       } catch {
         return {

@@ -27,6 +27,19 @@ function stateLabel(connection: CloudConnection) {
   return states()[connection.state];
 }
 
+/** What a connection's access setting does and does not hold back. */
+function accessNote(access: CloudConnection['access']) {
+  return access === 'read-write'
+    ? t(
+        'エージェントもここに書き込めます。同期アプリが管理するフォルダでは、書き込んだ内容がクラウドにも同期されます。',
+        'Agents can write here too. In a folder a sync app keeps, what they write is synced to the cloud.',
+      )
+    : t(
+        'irori と、標準アクセスの Claude Code・Codex のファイル編集には読み取り専用です。フルアクセス、シェルコマンド、ターミナル、ほかの CLI からは書き込めます。',
+        'Read-only to irori and to file edits by Claude Code and Codex in standard access. Full access, shell commands, the terminal and other CLIs can still write here.',
+      );
+}
+
 /** One numbered step of the connection, joined to the next by a guide line. */
 function Step({
   n,
@@ -395,6 +408,9 @@ export function Connections({
                     <span className="switch-track" aria-hidden="true" />
                     {t('編集を許可', 'Allow editing')}
                   </label>
+                  <p className="connect-hint">
+                    {accessNote(editable ? 'read-write' : 'read-only')}
+                  </p>
                   <p className="mount-preview" aria-live="polite">
                     <Icon name={source === 'github' ? 'branch' : 'folder'} size={15} />
                     <span className="mount-source">{chosen}</span>
@@ -458,7 +474,7 @@ export function Connections({
                         : connection.folderName}
                     </span>
                     <span className="connect-dot" aria-hidden="true" />
-                    <span className="connection-access">
+                    <span className="connection-access" title={accessNote(connection.access)}>
                       <Icon
                         name={connection.access === 'read-write' ? 'penLine' : 'lock'}
                         size={12}
@@ -554,8 +570,8 @@ export function Connections({
                                           `Brought ${result.commits} commits into ${result.branch}.`,
                                         )
                                       : t(
-                                          `${result.branch} は最新です。`,
-                                          `${result.branch} is up to date.`,
+                                          `${result.branch} にリモートの新しいコミットはありません。`,
+                                          `No new commits on the remote for ${result.branch}.`,
                                         ),
                                   });
                                 })
@@ -580,6 +596,9 @@ export function Connections({
                       <button
                         className="stage-text-button framed"
                         disabled={disabled || connection.state === 'connecting'}
+                        title={accessNote(
+                          connection.access === 'read-write' ? 'read-only' : 'read-write',
+                        )}
                         onClick={() =>
                           void perform(() =>
                             host.setCloudAccess(

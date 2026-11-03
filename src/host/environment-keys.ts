@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'node:crypto';
 import { z } from 'zod';
 import { t } from '../domain/i18n';
-import { secretName, secretValue } from '../domain/routines';
+import { secretValue, storedSecretName } from '../domain/routines';
 
 /**
  * The routine secrets kept beside the saved environment (ADR 047): every value
@@ -23,7 +23,7 @@ const sealedKeys = z.object({
   savedAt: z.iso.datetime(),
   /** The names, readable without the passphrase; the sealed data repeats them. */
   names: z
-    .array(secretName)
+    .array(storedSecretName)
     .max(1000)
     .refine((names) => new Set(names).size === names.length),
   kdf: z.object({
@@ -46,7 +46,7 @@ const sealedKeys = z.object({
 export type SealedKeys = z.infer<typeof sealedKeys>;
 export { sealedKeys };
 
-const opened = z.record(secretName, secretValue);
+const opened = z.record(storedSecretName, secretValue);
 
 function derive(passphrase: string, salt: Buffer, params: { N: number; r: number; p: number }) {
   return new Promise<Buffer>((resolve, reject) =>

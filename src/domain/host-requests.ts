@@ -13,7 +13,13 @@ import { skillAudience, skillName } from './skills';
 import { brainLook, categoryText } from './brains';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
-import { routineRef, routineRuntimeList, secretName, secretValue } from './routines';
+import {
+  routineRef,
+  routineRuntimeList,
+  secretName,
+  secretValue,
+  storedSecretName,
+} from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
@@ -354,7 +360,7 @@ export const hostArguments = {
   installPython: z.tuple([]),
   secrets: z.tuple([]),
   setSecret: z.tuple([secretName, secretValue]),
-  deleteSecret: z.tuple([secretName]),
+  deleteSecret: z.tuple([storedSecretName]),
   cancel: z.union([z.tuple([]), z.tuple([id]), z.tuple([id, id])]),
   stageAttachment: z.tuple([
     z.string().min(1).max(1024),

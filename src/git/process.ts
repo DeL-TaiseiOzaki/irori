@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { agentEnv, launch, killTree } from '../agents/process';
 import { t } from '../domain/i18n';
+import { gitConfigApprovals } from './config-approval';
 
 const authentication =
   /authentication|permission denied|could not read Username|publickey|terminal prompts disabled/i;
@@ -149,6 +150,8 @@ export class GitProcess {
     private githubCli: () => Promise<string | undefined> = () => findGitHubCli(),
   ) {}
   async run(cwd: string, args: string[], options: RunOptions = {}) {
+    // A repository's own configuration that runs programs runs only as the person allowed.
+    await gitConfigApprovals()?.check(cwd);
     try {
       return await this.once(cwd, args, options);
     } catch (error) {

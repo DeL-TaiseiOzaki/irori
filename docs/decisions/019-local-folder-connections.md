@@ -44,6 +44,11 @@ Box, iCloud Drive and OneDrive all keep a folder on the device in sync.
 6. **Agents are allowed into the folder.** In standard access, Claude Code
    receives the connected folders as additional directories and Codex as
    `sandbox_workspace_write.writable_roots`. Full access needs neither.
+   *(Amended 2026-11-03, 0.2.54: only a read-write connection is a Codex
+   writable root; a read-only one is readable and Claude Code gets deny rules
+   for its file tools there. Every CLI is told which are read-only. Full
+   access, shell commands and the terminal are not limited, as ADR 009
+   requires the screen to say.)*
 7. **Drive sign-in stays for invited testers.** *(Replaced by [ADR 023](023-retire-drive-sign-in.md): the sign-in was removed in 0.1.67.)* The Google connection is
    unchanged and remains limited to the project's test users until the owner
    decides on verification.
