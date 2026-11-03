@@ -3,6 +3,7 @@ import { layerFolder, movedPath } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
 import { WorkspaceTabs } from './WorkspaceTabs';
+import { TitleBar } from './TitleBar';
 import {
   closeTab as closeWorkspaceTab,
   onlyIn,
@@ -2906,8 +2907,8 @@ function App() {
   );
   if (startup)
     return (
-      <div className={workspaceTabs.length ? 'app app-start' : 'app-start'}>
-        {workspaceTabs.length > 0 && tabStrip}
+      <div className="app app-start">
+        <TitleBar onError={report}>{workspaceTabs.length > 0 && tabStrip}</TitleBar>
         <Startup
           spaces={spaces}
           refresh={refreshSpaces}
@@ -3008,7 +3009,7 @@ function App() {
       <a className="skip-to-editor" href="#editor-main">
         {t('編集領域へ移動', 'Skip to editor')}
       </a>
-      {tabStrip}
+      <TitleBar onError={report}>{tabStrip}</TitleBar>
       <div className="app-body">
         <Rail
           spaces={workspaceSpaces}

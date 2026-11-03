@@ -368,6 +368,7 @@ export const hostArguments = {
     z.array(z.object({ id, scopeIds: z.array(id).max(200) }).strict()).max(100),
   ]),
   otherWindows: z.tuple([]),
+  showMenu: z.tuple([z.number().int().min(0).max(100_000), z.number().int().min(0).max(100_000)]),
   respond: z.tuple([
     id,
     z.boolean(),

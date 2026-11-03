@@ -22,6 +22,14 @@ disagree, this section stands.
 - **Real data.** Use `countLabel` for counts in badges, `shortWhen` for times
   (a broken one is `—`), `tabLabels` for tabs, a start-side ellipsis for
   paths and a `title` with the full text wherever text is cut.
+- **Title bar** ([ADR 054](decisions/054-window-title-bar.md)). irori draws the
+  window's top: one 36 px chrome bar with a hairline below, holding the menu
+  button over the rail (Windows, Linux), the workspace tabs and empty space that
+  moves the window. The system's controls are laid over its end in
+  `windowChrome` colours; nothing else is placed in those 36 px.
+- **Settings** ([ADR 055](decisions/055-settings-sheet.md)) are a modal sheet
+  (`Dialog` with `closeOnBackdrop`) over a 10 px blur: a side list of parts and
+  one scrolling column, every row of choices on the same four columns.
 - **Checking.** `tsx scripts/ui-screens.ts hearth-ja dark-en light-ja`, as for v5.
 
 ## v5 — brains, your AI and each brain's AI (2026-09-25)
