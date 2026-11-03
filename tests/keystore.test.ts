@@ -69,9 +69,46 @@ test('listing secrets on macOS does not touch the Keychain', async (t) => {
 });
 
 test('names and values are bounded', () => {
-  for (const name of ['SLACK_TOKEN', 'GH_TOKEN', '_X', 'A1'])
+  for (const name of [
+    'SLACK_TOKEN',
+    'GH_TOKEN',
+    'GIT_TOKEN',
+    'LDAP_PASSWORD',
+    'ENV_KEY',
+    '_X',
+    'A1',
+  ])
     assert.ok(secretName.safeParse(name).success, name);
   for (const name of ['slack', '1A', 'PATH', 'HOME', 'NODE_OPTIONS', 'IRORI_WORK', 'A-B', ''])
+    assert.ok(!secretName.safeParse(name).success, name);
+  // Names that change how a program starts or where it loads code from.
+  for (const name of [
+    'BASH_ENV',
+    'ENV',
+    'NODE_PATH',
+    'PYTHONPATH',
+    'PYTHONSTARTUP',
+    'PYTHONHOME',
+    'PERL5OPT',
+    'PERL5LIB',
+    'RUBYOPT',
+    'RUBYLIB',
+    'GIT_SSH_COMMAND',
+    'GIT_SSH',
+    'GIT_EXEC_PATH',
+    'GIT_CONFIG_GLOBAL',
+    'GIT_CONFIG_SYSTEM',
+    'GIT_CONFIG_COUNT',
+    'GIT_CONFIG_KEY_0',
+    'PATHEXT',
+    'COMSPEC',
+    'PROMPT_COMMAND',
+    'ZDOTDIR',
+    'LD_PRELOAD',
+    'LD_AUDIT',
+    'DYLD_INSERT_LIBRARIES',
+    'DYLD_LIBRARY_PATH',
+  ])
     assert.ok(!secretName.safeParse(name).success, name);
   assert.ok(secretValue.safeParse('xoxb-1234-abcd').success);
   for (const value of ['short', 'line\nbreak', 'tab\there12', 'x'.repeat(8193)])
@@ -142,6 +179,30 @@ test('values are hidden in records, even when they arrive in pieces', () => {
   assert.equal(plain.write('nothing to hide'), 'nothing to hide');
 });
 
+test('a value is hidden in its base64 and percent-encoded forms too', () => {
+  const value = 'p@ss w/rd&x=1?>>';
+  const redactor = new Redactor();
+  redactor.add(value);
+  const base64 = Buffer.from(value).toString('base64');
+  const urlSafe = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  assert.notEqual(base64.replace(/=+$/, ''), urlSafe);
+  const form = new URLSearchParams({ q: value }).toString();
+  assert.equal(
+    redactor.hide(`a ${base64} b ${urlSafe} c ${encodeURIComponent(value)} d ${form}`),
+    'a ***== b *** c *** d q=***',
+  );
+  // `echo "$TOKEN" | base64` encodes a line break after the value.
+  const echoed = Buffer.from(`${value}\n`).toString('base64');
+  assert.doesNotMatch(redactor.hide(echoed), new RegExp(base64.slice(0, 16)));
+  // A stream holds back the beginning of an encoding as it does the value's.
+  const stream = redactor.stream();
+  let shown = '';
+  for (const piece of [`Authorization: Basic ${base64.slice(0, 5)}`, base64.slice(5), '\n'])
+    shown += stream.write(piece);
+  shown += stream.end();
+  assert.equal(shown, 'Authorization: Basic ***==\n');
+});
+
 test('a write-back keeps declared names and names refused lines without their text', () => {
   assert.deepEqual(
     readWriteBack(
@@ -172,4 +233,24 @@ test('a write-back keeps declared names and names refused lines without their te
     values: { A_ONE: 'finished-1' },
     refused: [],
   });
+});
+
+test('a secret saved under a name reserved later stays readable and removable', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'irori-keys-reserved-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'secrets.json');
+  const { writeFile } = await import('node:fs/promises');
+  const sealed = (value: string) => reversibleStorage.encryptString(value).toString('base64');
+  await writeFile(
+    file,
+    JSON.stringify({
+      schemaVersion: 1,
+      values: { PYTHONPATH: sealed('saved-before'), API_TOKEN: sealed('kept-value') },
+    }),
+  );
+  const store = new SecretStore(file, reversibleStorage);
+  assert.equal(secretName.safeParse('PYTHONPATH').success, false);
+  assert.deepEqual((await store.values(['API_TOKEN'])).API_TOKEN, 'kept-value');
+  await store.delete('PYTHONPATH');
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(file, 'utf8')).values), ['API_TOKEN']);
 });

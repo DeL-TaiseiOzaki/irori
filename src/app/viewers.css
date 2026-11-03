@@ -148,11 +148,13 @@
   user-select: none;
 }
 
-/* Word and PowerPoint render in their own shadow roots. */
+/* Word and PowerPoint render in their own shadow roots. A file's own styles stay in
+   the viewer's box: nothing it positions can cover or imitate irori around it. */
 .word-document,
 .slide-deck {
   width: max-content;
   min-width: 100%;
+  contain: paint;
 }
 
 /* Spreadsheets */

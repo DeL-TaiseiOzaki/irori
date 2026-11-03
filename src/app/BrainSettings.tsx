@@ -172,7 +172,12 @@ export function RemoveVault({
         }}
       >
         <h2>{label}</h2>
-        <p>{t('irori とワークスペースから外します。', 'It leaves irori and its workspaces.')}</p>
+        <p>
+          {t(
+            'irori とワークスペースから外します。フォルダをゴミ箱に移しても、この vault の検索インデックス・削除済みノート・下書き・会話・取り込んだ資料・ルーティンの記録は irori のデータフォルダに残ります。',
+            "It leaves irori and its workspaces. Even if the folder goes to the trash, the vault's search index, deleted notes, drafts, conversations, captured materials and routine records stay in irori's data folder.",
+          )}
+        </p>
         <label>
           <input
             type="checkbox"

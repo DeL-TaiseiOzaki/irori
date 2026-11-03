@@ -240,7 +240,8 @@ test(
         other: true,
       },
     ]);
-    assert.equal(form.text, 'Pick a size');
+    // The form's words are the server's own, so the server is named before them.
+    assert.equal(form.text, 'fixture: Pick a size');
     assert.deepEqual(form.questions?.[0].options, [{ label: 'S' }, { label: 'M' }]);
     assert.deepEqual(log[1].result, { answers: { q1: { answers: ['Purple'] } } });
     assert.deepEqual(log[2].result, { action: 'accept', content: { size: 'M' } });

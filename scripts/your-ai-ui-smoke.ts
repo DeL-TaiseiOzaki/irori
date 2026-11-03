@@ -176,11 +176,9 @@ try {
   await youPanel.getByRole('button', { name: 'ファイルとして表示', exact: true }).click();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
-  // The irori agent starts in full access like a vault agent. This part is
-  // about requests, so it runs in the standard mode, chosen in the composer.
+  // The irori agent starts in standard access, as a vault agent does.
   const access = island.getByLabel('エージェントのアクセス', { exact: true });
-  await expect(access).toHaveValue('full-access');
-  await access.selectOption('default');
+  await expect(access).toHaveValue('default');
   // A request goes to your AI with the workspace's vaults; it hands a note to
   // Product's agent with `irori call`, whose write asks the person here.
   await composer.fill('Write a decision note.');

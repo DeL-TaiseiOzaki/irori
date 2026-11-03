@@ -13,7 +13,7 @@ Open earlier conversations from **History**. Choosing a different CLI starts a n
 
 Rename, pin, or archive conversations. **By note** groups them by linked note, and **This note** filters to the note open beside the panel.
 
-Deleting a conversation removes irori's saved copy. The CLI's own history stays. Conversations live in this computer's application data. Choosing a storage folder and searching conversation text are not available yet.
+Deleting a conversation removes irori's saved copy. The CLI's own history stays, and so do the copies of notes and materials its runs used, in irori's data folder. Conversations live in this computer's application data. Choosing a storage folder and searching conversation text are not available yet.
 
 ## Queues and resuming
 

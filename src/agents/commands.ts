@@ -73,11 +73,11 @@ export async function codexSkills(rpc: Rpc, cwd: string) {
   return parseCodexSkills(await rpc.request('skills/list', { cwds: [cwd] }));
 }
 
-async function read(agent: AgentId, cwd: string): Promise<AgentCommand[]> {
+async function read(agent: AgentId, cwd: string, own = true): Promise<AgentCommand[]> {
   if (agent === 'claude') {
-    const commands = await askClaude(cwd, ['user', 'project', 'local'], (session) =>
-      session.supportedCommands(),
-    );
+    // The folder's own settings join only once the person allowed them (config-approval.ts).
+    const sources = own ? (['user', 'project', 'local'] as const) : (['user'] as const);
+    const commands = await askClaude(cwd, [...sources], (session) => session.supportedCommands());
     return commands
       .filter((command) => /^[\w:-]+$/.test(command.name))
       .map((command) => ({
@@ -106,12 +106,12 @@ export class CommandCatalog {
     private ask = read,
     private now = () => Date.now(),
   ) {}
-  async commands(agent: AgentId, cwd: string): Promise<AgentCommand[]> {
+  async commands(agent: AgentId, cwd: string, own = true): Promise<AgentCommand[]> {
     if (agent !== 'claude' && agent !== 'codex') return [];
-    const key = `${agent}\n${cwd}\n${await version(agentCommand(agent))}`;
+    const key = `${agent}\n${cwd}\n${own}\n${await version(agentCommand(agent))}`;
     const kept = this.lists.get(key);
     if (kept && this.now() - kept.at < keep) return kept.list;
-    const list = this.ask(agent, cwd);
+    const list = this.ask(agent, cwd, own);
     this.lists.set(key, { at: this.now(), list });
     // A failed read is tried again next time.
     list.catch(() => this.lists.delete(key));

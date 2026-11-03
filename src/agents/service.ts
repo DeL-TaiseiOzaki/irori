@@ -19,7 +19,7 @@ import type {
 import type { EffortLevel, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { agentIds, agentNames } from '../domain/types';
-import { requireAgentAccess } from '../domain/agent-access';
+import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
 import { runHermes } from './hermes';
@@ -27,6 +27,7 @@ import { runAntigravity } from './antigravity';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
 import { ModelCatalog } from './models';
 import { CommandCatalog, codexSkills, commandWords } from './commands';
+import { ConfigApprovals, type ConfigPlace, type FoundConfig } from './config-approval';
 import { personLinesBridge } from './person-lines';
 import { handOffTaskLimit, iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
@@ -210,6 +211,28 @@ const handOffShellTimeout = String(24 * 60 * 60 * 1000);
 const digest = (words: string) => createHash('sha256').update(words).digest('hex');
 /** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
 const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
+/**
+ * An absolute path as Claude Code's permission rules spell it: `//` from the
+ * filesystem root, Windows drives as `/c/...`.
+ */
+export const claudeRulePath = (folder: string, platform = process.platform) =>
+  platform === 'win32'
+    ? `//${folder.replace(/^([A-Za-z]):/, (_, drive: string) => drive.toLowerCase()).replaceAll('\\', '/')}`
+    : `/${folder}`;
+/**
+ * A request's details as the person sees them before answering: whole, or cut to
+ * what a view shows with a line saying that the rest is not shown.
+ */
+export function shownRequest(full: string) {
+  if (full.length <= viewDetails) return full;
+  const omitted = (n: number) =>
+    t(
+      `\n…（以降の ${n} 文字は表示されていません。全体を確認できない要求です）`,
+      `\n… (${n} more characters are not shown; this request cannot be seen in full)`,
+    );
+  const room = viewDetails - omitted(full.length).length;
+  return full.slice(0, room) + omitted(full.length - room);
+}
 const alreadyRunning = () =>
   t(
     'この会話は実行中です。停止するか、送信待ちに追加してください。',
@@ -294,6 +317,26 @@ export class AgentService {
   workFolder?: (scopeId: string) => Promise<string>;
   /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
   openUrl?: (url: string) => Promise<void>;
+  /**
+   * Asks the person whether configuration that runs without asking may run
+   * (`config-approval.ts`); without it, as in tests, it may.
+   */
+  approveConfig?: (found: FoundConfig[]) => Promise<boolean>;
+  private approvals?: ConfigApprovals;
+  private configApprovals() {
+    return (this.approvals ??= new ConfigApprovals(
+      path.join(this.files.dataDir, 'agent-config-approvals.json'),
+      (found) => this.approveConfig?.(found) ?? Promise.resolve(true),
+    ));
+  }
+  /** Where a run's CLI reads configuration that can run without asking. */
+  private configPlaces(run: Run, root: string): ConfigPlace[] {
+    return [
+      { root },
+      ...(run.delegation?.brains.map((brain) => ({ root: brain.root })) ?? []),
+      ...this.localFolders(run).map((folder) => ({ root: folder, added: true })),
+    ];
+  }
   private requests = new Map<
     string,
     { run: Run; event: AgentEvent; reply: (reply: Reply) => void }
@@ -341,11 +384,11 @@ export class AgentService {
    * The folders on this device that the run's vaults show in contents through
    * links: a vault agent's own, or those of the vaults handed to the irori agent.
    */
-  private localFolders(run: Run) {
+  private localFolders(run: Run, writable?: boolean) {
     const scopes = run.delegation
       ? run.delegation.brains.map((brain) => brain.scopeId)
       : [run.binding.scopeId];
-    return scopes.flatMap((scopeId) => this.files.cloud?.localFolders?.(scopeId) ?? []);
+    return scopes.flatMap((scopeId) => this.files.cloud?.localFolders?.(scopeId, writable) ?? []);
   }
   /** Whether `scopeId` is your AI's own id rather than a brain's. */
   private isYou(scopeId: string) {
@@ -535,8 +578,11 @@ export class AgentService {
     return this.catalog.models(agent);
   }
   /** What the installed CLI runs as `/name` in this owner's folder (ADR 040). */
-  commands(scopeId: string, agent: AgentId) {
-    return this.commandCatalog.commands(agent, this.root(scopeId));
+  async commands(scopeId: string, agent: AgentId) {
+    const root = this.root(scopeId);
+    // Listing starts the CLI; a folder's own settings join only once they are allowed.
+    const own = await this.configApprovals().isAllowed(agent, [{ root }]);
+    return this.commandCatalog.commands(agent, root, own);
   }
   async available(): Promise<AgentInfo[]> {
     return Promise.all(
@@ -705,7 +751,7 @@ export class AgentService {
       this.requests.set(requestId, pending);
       pending.event = this.publish(run, questions ? 'question' : 'permission', text, {
         requestId,
-        details: JSON.stringify(details, null, 2).slice(0, 24000),
+        details: shownRequest(JSON.stringify(details, null, 2)),
         questions,
         ...extra,
       });
@@ -866,6 +912,7 @@ export class AgentService {
           instructions,
           // Searches that walk the vault skip the links its connected folders appear through.
           linked: this.files.cloud?.linkedPaths?.(scopeId),
+          readOnly: this.files.cloud?.linkedPaths?.(scopeId, false),
           work:
             work &&
             (inside ? `${path.relative(vault.root, work).split(path.sep).join('/')}/` : work),
@@ -996,6 +1043,16 @@ export class AgentService {
         ...(input.attachments?.length && { attachments: input.attachments }),
       });
       if (run.step) this.event(run, 'status', run.step.notice);
+      // The log says when a run may act without asking, whatever a column shows now.
+      if (run.access === 'full-access')
+        this.event(
+          run,
+          'status',
+          t(
+            'フルアクセスで実行しています（承認を求めません）。',
+            'Running in full access (no approvals).',
+          ),
+        );
       if (run.cancelled) return;
       const you = this.isYou(input.scopeId);
       const space = you
@@ -1072,6 +1129,7 @@ export class AgentService {
                 contents: brain.contents,
               },
               linked: this.files.cloud?.linkedPaths?.(brain.scopeId),
+              readOnly: this.files.cloud?.linkedPaths?.(brain.scopeId, false),
               work: await this.work(brain.scopeId),
             };
           }),
@@ -1244,6 +1302,24 @@ export class AgentService {
       // a turn repeats none of them; only a change of session is worth a line.
       // Hermes Agent takes no level, and the Antigravity CLI's models name
       // theirs; one sent anyway is not passed on.
+      // What runs without asking (hooks, MCP servers, plugins, settings) runs as allowed.
+      const sharedHooks =
+        input.agent === 'claude' ? await this.you?.sharedHooks().catch(() => undefined) : undefined;
+      await this.configApprovals().check(
+        input.agent,
+        this.configPlaces(run, space.root),
+        sharedHooks
+          ? [
+              {
+                root: 'shared-schema-hooks',
+                label: t('共通 Schema のフック', "The shared Schema's hooks"),
+                files: Object.keys(sharedHooks),
+                digest: digest(JSON.stringify(sharedHooks)),
+              },
+            ]
+          : [],
+      );
+      if (run.cancelled) return;
       const effort =
         input.agent === 'hermes' || input.agent === 'antigravity' ? undefined : input.effort;
       if (input.agent === 'codex')
@@ -1462,8 +1538,9 @@ export class AgentService {
         agent: input.agent,
         ...(model && { model }),
         effort: input.effort,
-        // As the irori agent's run is: a hand-off asks the person when it asks.
-        access: holder.access,
+        // The vault agent's own default, never the irori agent's mode: the vault's
+        // column shows that access, and a hand-off asks the person when it asks.
+        access: defaultAgentAccess(input.agent),
         prompt: handedTask(task, own),
       },
       undefined,
@@ -1603,7 +1680,8 @@ export class AgentService {
     );
     run.rpc = rpc;
     await initializeCodex(rpc);
-    const folders = [...this.localFolders(run), ...(run.work ?? [])];
+    // A read-only connection is readable in the sandbox but never a root it may write.
+    const folders = [...this.localFolders(run, true), ...(run.work ?? [])];
     const writable = run.access !== 'full-access' && folders.length > 0;
     const params = {
       cwd,
@@ -1723,9 +1801,13 @@ export class AgentService {
         ),
       };
     } else if (m.method === 'item/permissions/requestApproval') {
+      // Codex grants this for the rest of the turn, which the card says with what it grants.
       const reply = await this.ask(
         run,
-        p.reason ?? t('追加アクセスの許可', 'Allow additional access'),
+        `${p.reason ?? t('追加アクセスの許可', 'Allow additional access')}\n${t(
+          '許可すると、この依頼が終わるまで有効です',
+          'If allowed, it lasts until this request ends',
+        )}: ${JSON.stringify(p.permissions ?? {}).slice(0, 2000)}`,
         p,
       );
       result = { permissions: reply.allow ? p.permissions : {}, scope: 'turn' };
@@ -1786,7 +1868,8 @@ export class AgentService {
     const questions = elicitationQuestions(request.requestedSchema);
     const reply = await this.ask(
       run,
-      message || t(`${server} からの質問`, `Question from ${server}`),
+      // The form's words are the server's own; say whose they are.
+      message ? `${server}: ${message}` : t(`${server} からの質問`, `Question from ${server}`),
       request,
       questions.length
         ? questions
@@ -1856,6 +1939,9 @@ export class AgentService {
       );
       return undefined;
     });
+    const readOnly = this.localFolders(run, false).map(
+      (folder) => `Edit(${claudeRulePath(folder)}/**)`,
+    );
     const response = query({
       prompt: images.length ? message() : prompt,
       options: {
@@ -1863,7 +1949,13 @@ export class AgentService {
         pathToClaudeCodeExecutable: 'claude',
         env: runEnv(run),
         settingSources: ['user', 'project', 'local'],
-        ...(sharedHooks && { settings: { hooks: sharedHooks } as Settings }),
+        ...((sharedHooks || readOnly.length) && {
+          settings: {
+            ...(sharedHooks && { hooks: sharedHooks }),
+            // A read-only connection stays read-only for Claude Code's file tools.
+            ...(readOnly.length && { permissions: { deny: readOnly } }),
+          } as Settings,
+        }),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         permissionMode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
         allowDangerouslySkipPermissions: run.access === 'full-access',

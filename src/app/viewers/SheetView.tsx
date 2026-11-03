@@ -6,6 +6,8 @@ import type { ViewProps } from './common';
 const pageRows = 200;
 /** Columns past this are summarized rather than drawn; a sheet this wide is rare. */
 const columnLimit = 200;
+/** The most rows read from one sheet. */
+const rowLimit = 100_000;
 
 /** A spreadsheet's sheets as tables of the values Excel would display, one sheet at a time. */
 export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
@@ -37,16 +39,25 @@ export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
     if (!book) return undefined;
     const ws = book.Sheets[book.SheetNames[sheet]];
     if (!ws?.['!ref']) return { rows: [] as string[][], columns: 0, first: 0, merges: [] };
-    const range = utils.decode_range(ws['!ref']);
+    const declared = utils.decode_range(ws['!ref']);
+    // A file can declare a range of every row and column; only what can be shown is read.
+    const range = {
+      s: declared.s,
+      e: {
+        r: Math.min(declared.e.r, declared.s.r + rowLimit - 1),
+        c: Math.min(declared.e.c, declared.s.c + columnLimit - 1),
+      },
+    };
     const rows = utils.sheet_to_json<string[]>(ws, {
       header: 1,
       raw: false,
       defval: '',
       blankrows: true,
+      range,
     });
     return {
       rows,
-      columns: range.e.c - range.s.c + 1,
+      columns: declared.e.c - declared.s.c + 1,
       first: range.s.c,
       firstRow: range.s.r,
       merges: ws['!merges'] ?? [],
@@ -78,8 +89,12 @@ export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
       rows: merge.e.r - merge.s.r + 1,
       cols: merge.e.c - merge.s.c + 1,
     });
-    for (let r = merge.s.r; r <= merge.e.r; r++)
-      for (let c = merge.s.c; c <= merge.e.c; c++)
+    // Only the cells on this page: a merge may name a whole sheet.
+    const top = Math.max(merge.s.r, firstRow + start);
+    const bottom = Math.min(merge.e.r, firstRow + start + pageRows - 1);
+    const right = Math.min(merge.e.c, table.first + columns - 1);
+    for (let r = top; r <= bottom; r++)
+      for (let c = merge.s.c; c <= right; c++)
         if (r !== merge.s.r || c !== merge.s.c) covered.add(`${r - firstRow}:${c - table.first}`);
   }
   return (

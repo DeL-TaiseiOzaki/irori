@@ -178,6 +178,11 @@ export function SchemaList({
         title: hook.command || hook.type,
       })),
       error: hooksError,
+      // Only .claude/settings.json hooks are listed; the rest is confirmed before a run.
+      note: t(
+        'ここに出るのは .claude/settings.json のフックだけです。env・apiKeyHelper・.mcp.json・プラグインなど実行される設定はほかにもあり、それらが変わるとエージェントの実行前に確認します。',
+        'Only .claude/settings.json hooks are listed here. Other settings also run code (env, apiKeyHelper, .mcp.json, plugins…); irori asks before an agent runs after they change.',
+      ),
     },
   ];
   return (

@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.2.53",
+  "version": "0.2.54",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -74,7 +74,7 @@
     "write-file-atomic": "8.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yaml": "2.9.1",
-    "zod": "4.6.2"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@codemirror/commands": "6.11.0",
@@ -94,7 +94,7 @@
     "@types/which": "3.0.4",
     "@types/write-file-atomic": "4.0.3",
     "@xmldom/xmldom": "0.9.12",
-    "electron": "44.3.0",
+    "electron": "44.9.3",
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
     "node": "24.21.0",

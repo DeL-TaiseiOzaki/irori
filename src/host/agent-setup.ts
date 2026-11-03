@@ -117,6 +117,11 @@ export interface AgentSetupHost {
   running?: (scopeId: string) => boolean;
   /** Tells the window what changed: the vaults and a workspace, or one vault's files. */
   announce?: (change: { workspace?: WorkspaceProfile; scopeId?: string }) => void;
+  /**
+   * Asks the person before a command that widens what agents reach or starts
+   * work (`confirmed`); without it, as in tests, the command runs.
+   */
+  confirm?: (command: string, by: string) => Promise<boolean>;
   home?: string;
 }
 
@@ -142,6 +147,12 @@ type Joined = 'joined' | 'member' | 'no workspace';
 
 /** Forms only the irori agent has: they register, group or remove vaults, or start routines. */
 const irori = new Set(['clone', 'create', 'add', 'workspace', 'remove', 'run']);
+/**
+ * Forms the person confirms each time: they add a folder agents may write in,
+ * register or remove a vault, or start a routine with its secrets. Any process
+ * the agent starts holds the command too, so a request alone is not enough.
+ */
+const confirmed = new Set(['add', 'connect', 'work', 'remove', 'run']);
 
 /**
  * Carries out the irori agent's `irori` command: what the person does in
@@ -176,6 +187,14 @@ export class AgentSetup {
     if (context.vault && irori.has(command.kind))
       throw Error(
         `"irori ${command.kind}" is the irori agent's. Ask the person to ask the irori agent in irori mode.`,
+      );
+    if (
+      confirmed.has(command.kind) &&
+      this.host.confirm &&
+      !(await this.host.confirm(`irori ${argv.join(' ')}`.slice(0, 2000), context.by ?? 'agent'))
+    )
+      throw Error(
+        `The person did not allow "irori ${command.kind}". Do not try it again unless they ask.`,
       );
     switch (command.kind) {
       case 'help':

@@ -210,11 +210,17 @@ export class BundleInstaller implements UpdateInstaller {
       await rmdir(mount).catch(() => {});
     }
     await step(
-      t('新しい版の署名を確認できませんでした。', "Could not verify the new version's signature."),
+      t(
+        'ダウンロードした新しい版が検証に合いませんでした。',
+        'The downloaded version did not pass verification.',
+      ),
       run('codesign', ['--verify', '--deep', '--strict', this.staged]),
     );
     const { stderr } = await step(
-      t('新しい版の署名を確認できませんでした。', "Could not verify the new version's signature."),
+      t(
+        'ダウンロードした新しい版が検証に合いませんでした。',
+        'The downloaded version did not pass verification.',
+      ),
       run('codesign', ['--display', '--verbose=2', this.staged]),
     );
     if (!/^Identifier=io\.github\.deltaiseiozaki\.irori$/m.test(stderr))

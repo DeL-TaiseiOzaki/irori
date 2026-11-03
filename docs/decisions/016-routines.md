@@ -137,9 +137,13 @@ agent can write routines. So:
 - A secret is entered in irori's own field, never in a conversation, and kept
   in irori's data directory encrypted with Electron's `safeStorage`.
 - It is given only to the `run` steps that name it, as an environment
-  variable. Agent steps never receive secrets: the agent that reads captured
-  mail holds no token that mail could make it send elsewhere.
-- Exact secret values are removed from recorded output.
+  variable. Agent steps are not given secrets: the agent that reads captured
+  mail holds no token that mail could make it send elsewhere. *(Amended
+  2026-11-03: a value a program step writes to `IRORI_WORK` or `IRORI_STATE`
+  is readable by later agent steps, and every process a program step starts
+  inherits its secrets; see [ROUTINES](../ROUTINES.md).)*
+- Exact secret values, and their base64 and percent-encoded forms, are removed
+  from recorded output; an agent step's conversation is not masked.
 - Authenticating with a provider is the person's part (owner, 2026-09-30):
   they obtain the token, or create their own OAuth client for Google, and
   store what the routine needs as a secret. irori ships no provider sign-in

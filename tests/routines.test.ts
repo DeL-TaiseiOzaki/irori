@@ -12,6 +12,7 @@ import {
   rename,
   rm,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -44,8 +45,10 @@ import {
   type StepDraft,
 } from '../src/domain/routine-file';
 import { reversibleStorage, SecretStore } from '../src/host/keystore';
+import { agentAccessLabel } from '../src/domain/agent-access';
 import {
   lineDiff,
+  stepAccessLabel,
   type RoutineRef,
   type RoutineRun,
   type RunRoutine,
@@ -287,6 +290,16 @@ test('the gate, the failure marker and the review difference are read exactly', 
     { kind: '+', text: 'y' },
     { kind: ' ', text: '' },
   ]);
+});
+
+test('an agent step names what its access means on the CLI that runs it', () => {
+  assert.equal(stepAccessLabel({ access: 'default', cli: 'pi' }), agentAccessLabel('pi'));
+  assert.equal(
+    stepAccessLabel({ access: 'full-access', cli: 'codex' }),
+    agentAccessLabel('codex', 'full-access'),
+  );
+  // The panel's CLI is chosen when the run starts, so its approvals are that CLI's.
+  assert.equal(stepAccessLabel({ access: 'default' }), '承認はパネルの CLI 次第（Pi は承認なし）');
 });
 
 async function setup(t: TestContext, { javascript = true, keychain = true } = {}) {
@@ -636,11 +649,12 @@ test(
     await settings.save({ routineRuntimes: ['javascript', 'python'] });
     host.python = { uv: async () => undefined, env: () => ({}) };
     assert.deepEqual((await listed(py)).needs, needsPython);
-    // uv runs the script by itself, outside any project, with irori's own folders.
+    // uv runs the script by itself, outside any project, with irori's own folders,
+    // and Python writes no `__pycache__` into the routine's folder.
     const uv = path.join(base, 'fake uv');
     await writeFile(
       uv,
-      '#!/bin/sh\necho "$1 $2 $3 $(basename "$4") $UV_CACHE_DIR ${VIRTUAL_ENV:-none}"\n',
+      '#!/bin/sh\necho "$1 $2 $3 $(basename "$4") $UV_CACHE_DIR ${VIRTUAL_ENV:-none} $PYTHONDONTWRITEBYTECODE"\n',
       { mode: 0o700 },
     );
     host.python = { uv: async () => uv, env: () => ({ UV_CACHE_DIR: 'cache' }) };
@@ -651,7 +665,7 @@ test(
     assert.equal((await listed(py)).needs, undefined);
     const pyRun = await ended(py, await start(py));
     assert.equal(pyRun.state, 'succeeded', JSON.stringify(pyRun));
-    assert.equal(pyRun.steps[0].output, 'run --no-project --script fetch.py cache none\n');
+    assert.equal(pyRun.steps[0].output, 'run --no-project --script fetch.py cache none 1\n');
     const secret = await routine('secret', {
       'routine.yaml': 'name: S\nsteps: [{run: [echo, hi], secrets: [TOKEN]}]\n',
     });
@@ -1108,6 +1122,74 @@ test('an agent step waits while its vault is held, and 停止 ends it', fixtureO
   );
   assert.equal(agents.busy(space.scopeId), false);
 });
+
+test(
+  'a same-length edit with its time put back still needs a review',
+  fixtureOptions,
+  async (t) => {
+    const { routines, routine, listed, start, ended, workspace, root } = await setup(t);
+    const ref = await routine('same', {
+      'routine.yaml': 'name: Same\nsteps:\n  - run: hello.sh\n',
+      'hello.sh': '#!/bin/sh\necho one\n',
+    });
+    const script = path.join(root, '.irori', 'routines', 'same', 'hello.sh');
+    const time = new Date('2026-01-02T03:04:05Z');
+    await utimes(script, time, time);
+    assert.equal((await ended(ref, await start(ref))).steps[0].output, 'one\n');
+    assert.equal((await listed(ref)).review, 'reviewed');
+    // The same size and modification time, other bytes.
+    await writeFile(script, '#!/bin/sh\necho two\n');
+    await utimes(script, time, time);
+    assert.equal((await listed(ref)).review, 'changed');
+    await assert.rejects(
+      routines.run(ref, { workspaceId: workspace.id, agents: {} }),
+      /ルーティンが変わりました/,
+    );
+  },
+);
+
+test(
+  'a program step runs only from the files confirmed, even after an agent step changed them',
+  fixtureOptions,
+  async (t) => {
+    const { routine, listed, start, ended, root } = await setup(t);
+    const later = '#!/bin/sh\necho reviewed\n';
+    // An agent step that leaves the folder alone: the program after it runs.
+    const kept = await routine('kept', {
+      'routine.yaml':
+        'name: Kept\nsteps:\n  - agent: vault\n    cli: pi\n    access: default\n    prompt: Summarize.\n  - run: later.sh\n',
+      'later.sh': later,
+    });
+    const fine = await ended(kept, await start(kept));
+    assert.equal(fine.state, 'succeeded', JSON.stringify(fine));
+    assert.equal(fine.steps[1].output, 'reviewed\n');
+    // An agent step given IRORI_ROUTINE rewrites the program that comes next.
+    const ref = await routine('swapped', {
+      'routine.yaml': `name: Swapped
+steps:
+  - agent: vault
+    cli: pi
+    access: default
+    prompt: |
+      run: printf '#!/bin/sh\\ntouch swapped-ran\\n' > "$IRORI_ROUTINE/later.sh"
+  - run: later.sh
+`,
+      'later.sh': later,
+    });
+    const run = await ended(ref, await start(ref));
+    assert.equal(run.state, 'failed', JSON.stringify(run));
+    assert.equal(run.steps[0].state, 'succeeded');
+    assert.equal(run.steps[1].state, 'failed');
+    assert.equal(run.steps[1].detail, 'ルーティンが実行中に変わりました。確認し直してください。');
+    assert.equal(run.steps[1].exitCode, undefined);
+    assert.match(
+      await readFile(path.join(root, '.irori', 'routines', 'swapped', 'later.sh'), 'utf8'),
+      /swapped-ran/,
+    );
+    assert.equal(existsSync(path.join(root, 'swapped-ran')), false);
+    assert.equal((await listed(ref)).review, 'changed');
+  },
+);
 
 test(
   'an irori agent routine hands the named vaults of the workspace to the irori agent',
