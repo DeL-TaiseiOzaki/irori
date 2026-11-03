@@ -1113,7 +1113,9 @@ export class CloudService {
   }
   /**
    * Each connected folder of a vault: its path inside the vault and its real
-   * place on this device, for a path an agent wrote by the latter (ADR 044).
+   * place on this device, for a path an agent wrote by the latter (ADR 044)
+   * and for CLI agents to be told the two are one folder (ADR 019 D6). In the
+   * order of their paths, so an unchanged vault's introduction stays the same.
    */
   linkedFolders(scopeId: string) {
     return [...this.mounted.values()]
@@ -1121,7 +1123,8 @@ export class CloudService {
       .map((item) => ({
         path: `${item.attachment.contentsRoot}/${item.attachment.name}`,
         target: item.target,
-      }));
+      }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   }
   /** The local folders and repository clones connected in a vault, for CLI agents to be allowed into. */
   /**

@@ -7,15 +7,15 @@
  */
 import type { BrainAgent } from '../src/domain/you';
 import { commentsDirectory } from '../src/domain/comments';
-import { handedConnectedFolders } from './connected-folders';
+import { handedConnectedFolders, namedFolder, type ConnectedFolder } from './connected-folders';
 import { handedWorkFolders } from './work-folder';
 
 type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
   /** Its knowledge folder, `.` for the vault's root, and its contents folders. */
   layers?: { knowledge: string; contents: string[] };
-  /** Folders connected in its contents, as paths inside the vault. */
-  linked?: string[];
-  /** Those of them connected read-only. */
+  /** Folders connected in its contents: paths inside the vault, and their places on this device. */
+  linked?: ConnectedFolder[];
+  /** Those of them connected read-only, by their paths inside the vault. */
   readOnly?: string[];
   /** The folder its agents work in, an absolute path. */
   work?: string;
@@ -38,14 +38,14 @@ const linkedList = (brain: Handed) =>
     ? `, connected folders ${brain.linked
         .map(
           (item) =>
-            `${JSON.stringify(item)}${brain.readOnly?.includes(item) ? ' (read-only)' : ''}`,
+            `${namedFolder(item)}${brain.readOnly?.includes(item.path) ? ' (read-only)' : ''}`,
         )
         .join(', ')}`
     : '';
 /** How connected folders are searched, said only when a handed vault has any. */
 const linkedNote = (brains: Handed[]) => {
-  const first = brains.find((brain) => brain.linked?.length)?.linked?.[0];
-  return first ? [handedConnectedFolders(first)] : [];
+  const brain = brains.find((item) => item.linked?.length);
+  return brain ? [handedConnectedFolders(brain.root, brain.linked![0].path)] : [];
 };
 const workItem = (brain: Handed) =>
   brain.work ? `, work folder ${JSON.stringify(brain.work)}` : '';

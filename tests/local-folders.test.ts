@@ -45,6 +45,8 @@ test('A local folder appears in contents through a link and is edited in place',
   assert.deepEqual(cloud.localFolders(space.scopeId), [folder]);
   // Agents are told where it appears: searches that walk the vault skip the link.
   assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/調査']);
+  // And that it is the folder their CLI is also allowed into (ADR 019 D6).
+  assert.deepEqual(cloud.linkedFolders(space.scopeId), [{ path: 'contents/調査', target: folder }]);
   const [listed] = await files.entries(space.scopeId, 'contents');
   assert.equal(listed.blocked, undefined);
   assert.equal(listed.writable, true);
@@ -62,6 +64,7 @@ test('A local folder appears in contents through a link and is edited in place',
   assert.deepEqual((await readdir(folder)).sort(), ['Plan.md', 'note.md']);
   assert.deepEqual(cloud.localFolders(space.scopeId), []);
   assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
+  assert.deepEqual(cloud.linkedFolders(space.scopeId), []);
   await assert.rejects(files.read(space.scopeId, rel), /未接続/);
 });
 
