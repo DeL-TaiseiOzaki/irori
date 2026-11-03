@@ -439,7 +439,7 @@ export type LineSpacing = (typeof lineSpacings)[number];
 /** Hearth is graphite chrome with a paper stage; system picks hearth or dark with the desktop. */
 export const themes = ['system', 'hearth', 'light', 'dark'] as const;
 export type Theme = (typeof themes)[number];
-/** What the operating system is told: its window frame sits beside the rail's graphite. */
+/** What the operating system is told: its menus and dialogs sit beside the rail's graphite. */
 export function nativeThemeSource(theme: Theme): 'system' | 'light' | 'dark' {
   return theme === 'hearth' ? 'dark' : theme;
 }
@@ -937,6 +937,11 @@ export interface HostAPI {
   windowTabs(tabs: import('./workspace-tabs').OpenTab[]): Promise<void>;
   /** The workspaces and vaults irori's other windows have open; closing a tab leaves them be. */
   otherWindows(): Promise<import('./workspace-tabs').OpenTab[]>;
+  /**
+   * Opens irori's menu at a point of this window, under the title bar's menu button:
+   * on Windows and Linux the window has no menu bar of its own (ADR 054).
+   */
+  showMenu(x: number, y: number): Promise<void>;
   onEvent(callback: (event: HostEvent) => void): () => void;
 }
 declare global {
