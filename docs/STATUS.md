@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Connected folders named as one folder, 2026-11-03 (**0.2.55**;
+Connected folders named as one folder, 2026-11-03 (**0.2.55**,
+[#297](https://github.com/DeL-TaiseiOzaki/irori/pull/297), published as `v0.2.55-preview.1`;
 [ADR 019](decisions/019-local-folder-connections.md) decision 8): an owner
 report showed a vault agent list a connected folder through `contents/<name>`,
 find nothing newer than a date, and go on in the folder's place on this device,
@@ -25,7 +26,8 @@ link.
   keeps the read-only sentence, the vault agent may change a folder unless it
   is read-only, and the handed list marks `(read-only)` after the place.
 
-What the screen says is what agents get, 2026-11-03 (**0.2.54**; a review of
+What the screen says is what agents get, 2026-11-03 (**0.2.54**,
+[#296](https://github.com/DeL-TaiseiOzaki/irori/pull/296), published as `v0.2.54-preview.1`; a review of
 irori against its own UI, docs and ADR 009's rule that no mode is offered which
 cannot be enforced):
 - Access: `defaultAgentAccess` is `default` for every CLI; hand-offs use it
