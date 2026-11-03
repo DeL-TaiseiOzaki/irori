@@ -8,6 +8,7 @@ import {
   nativeTheme,
   safeStorage,
   shell,
+  type BrowserWindowConstructorOptions,
 } from 'electron';
 import { setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
@@ -82,6 +83,7 @@ import {
 import type { NoteRef } from '../domain/note-operations';
 import { isDamaged } from '../domain/conversation';
 import { WindowTabs } from '../domain/workspace-tabs';
+import { titleBarHeight, windowChrome } from '../domain/window-frame';
 import { startDictation } from './dictation';
 import { SerialQueue } from './serial-queue';
 /** irori's windows (ADR 051): each keeps its own workspace tabs over the one host. */
@@ -120,12 +122,18 @@ app
     const saveSettings = async (patch: Partial<DeviceSettings>) => {
       const next = await settings.save(patch);
       nativeTheme.themeSource = nativeThemeSource(next.theme);
+      if (next.theme !== theme) {
+        theme = next.theme;
+        for (const window of windows) paintFrame(window);
+      }
       setLanguage(next.language);
       languageChanged();
       return next;
     };
     const device = await settings.read();
     nativeTheme.themeSource = nativeThemeSource(device.theme);
+    /** The theme the windows' own chrome is painted in (ADR 054). */
+    let theme = device.theme;
     // Dialogs and messages the host writes follow the reader's language too.
     setLanguage(device.language);
     const search = new SearchService(files);
@@ -1139,7 +1147,7 @@ app
       // The field to type into has the focus already; the system's dictation types there.
       dictate: () => startDictation(),
     } satisfies Omit<HostHandlers, WindowMethod>;
-    type WindowMethod = 'openTerminal' | 'windowTabs' | 'otherWindows';
+    type WindowMethod = 'openTerminal' | 'windowTabs' | 'otherWindows' | 'showMenu';
     /** The operations as one window calls them: what it opens is its own (ADR 051). */
     const windowHandlers = new WeakMap<BrowserWindow, HostHandlers>();
     function handlersOf(window: BrowserWindow) {
@@ -1157,6 +1165,9 @@ app
           for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
         },
         otherWindows: () => tabs.elsewhere(id),
+        showMenu: (x, y) => {
+          Menu.getApplicationMenu()?.popup({ window, x, y });
+        },
       } satisfies HostHandlers;
       windowHandlers.set(window, own);
       return own;
@@ -1352,6 +1363,40 @@ app
         if (!closing && (await stop())) closeAll();
       });
     });
+    /**
+     * irori draws its own title bar (ADR 054): the workspace tabs sit in it, and the system's
+     * window controls are laid over its far end in the chrome's colours, so the window has no
+     * system title bar or menu bar above the app. macOS keeps its traffic lights at the start.
+     */
+    const frameOptions = () => {
+      const chrome = windowChrome(theme);
+      return {
+        backgroundColor: chrome.background,
+        titleBarStyle: 'hidden',
+        titleBarOverlay: {
+          color: chrome.background,
+          symbolColor: chrome.symbol,
+          height: titleBarHeight,
+        },
+        ...(process.platform === 'darwin' && {
+          trafficLightPosition: { x: 14, y: (titleBarHeight - 14) / 2 },
+        }),
+        // Windows 11 outlines the active window in the accent colour when the person shows it on
+        // title bars; with none left to match, the outline stays the system's quiet one.
+        ...(process.platform === 'win32' && { accentColor: false }),
+      } satisfies BrowserWindowConstructorOptions;
+    };
+    /** Repaints a window's chrome after the theme changes. */
+    function paintFrame(window: BrowserWindow) {
+      const chrome = windowChrome(theme);
+      window.setBackgroundColor(chrome.background);
+      if (process.platform !== 'darwin')
+        window.setTitleBarOverlay({
+          color: chrome.background,
+          symbolColor: chrome.symbol,
+          height: titleBarHeight,
+        });
+    }
     function createWindow() {
       const from = BrowserWindow.getFocusedWindow() ?? [...windows].at(-1);
       const bounds = from && !from.isMaximized() && !from.isFullScreen() && from.getBounds();
@@ -1362,7 +1407,7 @@ app
         ...(bounds && { x: bounds.x + 28, y: bounds.y + 28 }),
         minWidth: 980,
         minHeight: 680,
-        backgroundColor: '#faf9f6',
+        ...frameOptions(),
         title: 'irori',
         icon,
         webPreferences: {
@@ -1418,7 +1463,10 @@ app
       });
       return window.loadFile(entry);
     }
-    /** The menu, in the reader's language: File carries New Window (ADR 051). */
+    /**
+     * The menu, in the reader's language: File carries New Window (ADR 051). macOS shows it in
+     * the menu bar; on Windows and Linux the title bar's menu button opens it (ADR 054).
+     */
     const setMenu = () => {
       const newWindow = {
         id: 'new-window',
@@ -1438,9 +1486,9 @@ app
               mac ? { role: 'close' as const } : { role: 'quit' as const },
             ],
           },
-          { role: 'editMenu' },
-          { role: 'viewMenu' },
-          { role: 'windowMenu' },
+          { role: 'editMenu', label: t('編集', 'Edit') },
+          { role: 'viewMenu', label: t('表示', 'View') },
+          { role: 'windowMenu', label: t('ウィンドウ', 'Window') },
         ]),
       );
       app.dock?.setMenu(Menu.buildFromTemplate([newWindow]));
