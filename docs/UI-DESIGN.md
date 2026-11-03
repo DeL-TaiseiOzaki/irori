@@ -27,6 +27,9 @@ disagree, this section stands.
   button over the rail (Windows, Linux), the workspace tabs and empty space that
   moves the window. The system's controls are laid over its end in
   `windowChrome` colours; nothing else is placed in those 36 px.
+- **Settings** ([ADR 055](decisions/055-settings-sheet.md)) are a modal sheet
+  (`Dialog` with `closeOnBackdrop`) over a 10 px blur: a side list of parts and
+  one scrolling column, every row of choices on the same four columns.
 - **Checking.** `tsx scripts/ui-screens.ts hearth-ja dark-en light-ja`, as for v5.
 
 ## v5 — brains, your AI and each brain's AI (2026-09-25)

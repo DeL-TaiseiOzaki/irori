@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Popover } from '@base-ui/react/popover';
-import { Icon } from './Icon';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Dialog } from './Dialog';
+import { Icon, type IconName } from './Icon';
 import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
 import { AccountSection, RestoreEnvironment } from './AccountSync';
 import { useChoice } from './useChoice';
@@ -46,6 +46,11 @@ const themeLabels: Record<Theme, () => string> = {
   dark: () => t('ダーク', 'Dark'),
 };
 
+/** What a theme's choice shows; its name stays the full label, kept as its tooltip. */
+const themeChoiceLabels: Partial<Record<Theme, () => string>> = {
+  system: () => t('システム', 'Match system'),
+};
+
 const fontLabels: Record<MarkdownFont, () => string> = {
   system: () => t('システム', 'System'),
   sans: () => t('ゴシック', 'Sans-serif'),
@@ -83,6 +88,7 @@ function Choices<T extends string>({
   value,
   options,
   label,
+  shown = label,
   render,
   onChange,
 }: {
@@ -91,6 +97,8 @@ function Choices<T extends string>({
   value: T;
   options: readonly T[];
   label: (option: T) => string;
+  /** A shorter text to show where the label does not fit; the label stays its name. */
+  shown?: (option: T) => string;
   render?: (option: T) => ReactNode;
   onChange: (option: T) => void;
 }) {
@@ -99,16 +107,22 @@ function Choices<T extends string>({
       <legend>{legend}</legend>
       <div>
         {options.map((option) => (
-          <label key={option} className="settings-choice" data-checked={value === option}>
+          <label
+            key={option}
+            className="settings-choice"
+            data-checked={value === option}
+            title={shown(option) === label(option) ? undefined : label(option)}
+          >
             <input
               type="radio"
               name={name}
               value={option}
               checked={value === option}
+              aria-label={shown(option) === label(option) ? undefined : label(option)}
               onChange={() => onChange(option)}
             />
             {render?.(option)}
-            <span>{label(option)}</span>
+            <span>{shown(option)}</span>
           </label>
         ))}
       </div>
@@ -126,7 +140,8 @@ function RoutineRuntimes({ onError }: { onError: (error: unknown) => void }) {
   const [python, choosePython] = useRuntime('python', onError);
   return (
     <fieldset className="settings-choices routine-runtimes">
-      <legend>{t('ルーティン', 'Routines')}</legend>
+      {/* The section's heading says it already. */}
+      <legend className="sr-only">{t('ルーティン', 'Routines')}</legend>
       <div>
         <label className="settings-choice" data-checked={javascript}>
           <input
@@ -224,43 +239,53 @@ export function Settings({
     `設定（テーマ：${themeLabels[theme]()}、Markdown：${fontLabels[font]()}、言語：${languageLabels[language]}）`,
     `Settings (theme: ${themeLabels[theme]()}, Markdown: ${fontLabels[font]()}, language: ${languageLabels[language]})`,
   );
+  const close = () => setOpen(false);
+  const parts = sections.filter((part) => !(start && part.id === 'updates'));
   return (
     <>
-      <Popover.Root open={open} onOpenChange={setOpen}>
-        {start ? (
-          <Popover.Trigger className="start-settings" aria-label={label} title={label}>
-            <Icon name="sliders" size={14} />
-            {t('設定', 'Settings')}
-          </Popover.Trigger>
-        ) : (
-          <Popover.Trigger
-            className="rail-button settings-trigger"
-            aria-label={label}
-            title={label}
-          >
-            <Icon name="sliders" size={18} />
-            {updateWaiting(updates) && (
-              <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
-            )}
-          </Popover.Trigger>
+      <button
+        type="button"
+        className={start ? 'start-settings' : 'rail-button settings-trigger'}
+        aria-label={label}
+        aria-haspopup="dialog"
+        title={label}
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="sliders" size={start ? 14 : 18} />
+        {start && t('設定', 'Settings')}
+        {!start && updateWaiting(updates) && (
+          <span className="rail-badge" aria-label={t('更新あり', 'Update available')} />
         )}
-        <Popover.Portal>
-          <Popover.Positioner
-            side={start ? 'top' : 'right'}
-            align={start ? 'start' : 'end'}
-            sideOffset={start ? 8 : 12}
-          >
-            <Popover.Popup className="settings-popover">
-              <Popover.Title render={<h2 />}>{t('設定', 'Settings')}</Popover.Title>
+      </button>
+      {open && (
+        <Dialog
+          label={t('設定', 'Settings')}
+          className="modal-dialog settings-dialog"
+          closeOnBackdrop
+          onClose={close}
+        >
+          <SettingsSheet parts={parts} onClose={close}>
+            <SettingsSection id="general">
+              <Choices
+                legend={t('言語', 'Language')}
+                name="language"
+                value={language}
+                options={languages}
+                label={(option) => languageLabels[option]}
+                onChange={chooseLanguageValue}
+              />
               <Choices
                 legend={t('テーマ', 'Theme')}
                 name="theme"
                 value={theme}
                 options={themes}
                 label={(option) => themeLabels[option]()}
+                shown={(option) => (themeChoiceLabels[option] ?? themeLabels[option])()}
                 render={(option) => <Icon name={option} size={15} />}
                 onChange={chooseThemeValue}
               />
+            </SettingsSection>
+            <SettingsSection id="notes">
               <Choices
                 legend={t('Markdown フォント', 'Markdown font')}
                 name="markdown-font"
@@ -298,16 +323,10 @@ export function Settings({
                 label={(option) => marginLabels[option]()}
                 onChange={chooseMargins}
               />
-              <Choices
-                legend={t('言語', 'Language')}
-                name="language"
-                value={language}
-                options={languages}
-                label={(option) => languageLabels[option]}
-                onChange={chooseLanguageValue}
-              />
+            </SettingsSection>
+            <SettingsSection id="agents">
               <fieldset className="settings-choices vault-agent">
-                <legend>{t('エージェント', 'Agents')}</legend>
+                <legend className="sr-only">{t('エージェント', 'Agents')}</legend>
                 <div>
                   <label className="settings-choice" data-checked={vaultAgent}>
                     <input
@@ -328,7 +347,7 @@ export function Settings({
                       type="button"
                       className="settings-choice"
                       onClick={() => {
-                        setOpen(false);
+                        close();
                         onSchema();
                       }}
                     >
@@ -338,26 +357,142 @@ export function Settings({
                   </div>
                 </fieldset>
               )}
+            </SettingsSection>
+            <SettingsSection id="routines">
               <RoutineRuntimes onError={onError} />
+            </SettingsSection>
+            {/* The account section names itself (its heading and region). */}
+            <div className="settings-section" data-section="account">
               <AccountSection
                 onRestore={() => {
-                  setOpen(false);
+                  close();
                   setRestoring(true);
                 }}
               />
-              {!start && (
-                <section className="settings-updates" aria-label={t('更新', 'Updates')}>
-                  <h3>{t('更新', 'Updates')}</h3>
-                  <UpdateNotice host={host} />
-                </section>
-              )}
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
-      </Popover.Root>
+            </div>
+            {!start && (
+              <section
+                className="settings-section settings-updates"
+                data-section="updates"
+                aria-label={t('更新', 'Updates')}
+              >
+                <h3>{t('更新', 'Updates')}</h3>
+                <UpdateNotice host={host} />
+              </section>
+            )}
+          </SettingsSheet>
+        </Dialog>
+      )}
       {restoring && (
         <RestoreEnvironment onClose={() => setRestoring(false)} onRestored={onRestored} />
       )}
     </>
+  );
+}
+
+/** The settings' parts, in the order the sheet shows them and its side list names them. */
+const sections = [
+  { id: 'general', icon: 'sliders', label: () => t('一般', 'General') },
+  { id: 'notes', icon: 'file', label: () => t('ノート', 'Notes') },
+  { id: 'agents', icon: 'agent', label: () => t('エージェント', 'Agents') },
+  { id: 'routines', icon: 'routine', label: () => t('ルーティン', 'Routines') },
+  { id: 'account', icon: 'user', label: () => t('アカウント', 'Account') },
+  { id: 'updates', icon: 'refresh', label: () => t('更新', 'Updates') },
+] as const satisfies readonly { id: string; icon: IconName; label: () => string }[];
+type Section = (typeof sections)[number];
+
+function SettingsSection({ id, children }: { id: Section['id']; children: ReactNode }) {
+  const part = sections.find((item) => item.id === id)!;
+  const heading = `settings-${id}`;
+  return (
+    <section className="settings-section" data-section={part.id} aria-labelledby={heading}>
+      <h3 id={heading}>{part.label()}</h3>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * The settings as a sheet of their own over the blurred window, as an editor's
+ * preferences are: the parts listed at the side, all of them in one scrolling
+ * column, the part in view marked in the list.
+ */
+function SettingsSheet({
+  parts,
+  onClose,
+  children,
+}: {
+  parts: readonly Section[];
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const body = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState<Section['id']>(parts[0].id);
+  // A jump from the list scrolls by itself; the part chosen stays marked until it ends.
+  const jumping = useRef(false);
+  const inView = () => {
+    const box = body.current;
+    if (!box || jumping.current) return;
+    const top = box.getBoundingClientRect().top;
+    const all = [...box.querySelectorAll<HTMLElement>('[data-section]')];
+    let on = all[0]?.dataset.section;
+    for (const part of all)
+      if (part.getBoundingClientRect().top - top <= 48) on = part.dataset.section;
+    if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2) on = all.at(-1)?.dataset.section;
+    if (on) setShown(on as Section['id']);
+  };
+  const jump = (id: Section['id']) => {
+    const box = body.current;
+    const part = box?.querySelector<HTMLElement>(`[data-section="${id}"]`);
+    if (!box || !part) return;
+    setShown(id);
+    const distance = part.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    const room = box.scrollHeight - box.clientHeight - box.scrollTop;
+    if (Math.abs(distance) < 1 || (distance > 0 && room < 1)) return;
+    jumping.current = true;
+    // Only the column scrolls: scrollIntoView would move the sheet inside its dialog too.
+    box.scrollTo({
+      top: box.scrollTop + distance,
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  };
+  return (
+    <div className="settings-sheet chrome">
+      <aside className="settings-side">
+        <h2>{t('設定', 'Settings')}</h2>
+        <nav aria-label={t('設定の項目', 'Settings sections')}>
+          {parts.map((part) => (
+            <button
+              key={part.id}
+              type="button"
+              aria-current={shown === part.id ? 'true' : undefined}
+              onClick={() => jump(part.id)}
+            >
+              <Icon name={part.icon} size={15} />
+              <span>{part.label()}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
+      <div
+        ref={body}
+        className="settings-body"
+        onScroll={inView}
+        onScrollEnd={() => {
+          jumping.current = false;
+        }}
+      >
+        {children}
+      </div>
+      <button
+        type="button"
+        className="settings-close"
+        aria-label={t('閉じる', 'Close')}
+        title={t('閉じる', 'Close')}
+        onClick={onClose}
+      >
+        <Icon name="close" size={16} />
+      </button>
+    </div>
   );
 }
