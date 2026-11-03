@@ -17,16 +17,16 @@ import {
   type NamedLayer,
 } from '../src/domain/layers';
 import type { ScopeDeclaration } from '../src/domain/types';
-import { connectedFolders } from './connected-folders';
+import { connectedFolders, type ConnectedFolder } from './connected-folders';
 import { workFolder } from './work-folder';
 import { vaultCommandPreamble } from './irori-command';
 
 export type VaultLayout = Pick<ScopeDeclaration, 'name' | 'contents' | 'knowledge' | 'labels'> & {
   /** The vault has an AGENTS.md at its top. */
   instructions: boolean;
-  /** Folders connected in its contents, as paths inside the vault. */
-  linked?: string[];
-  /** Those of them connected read-only. */
+  /** Folders connected in its contents: paths inside the vault, and their places on this device. */
+  linked?: ConnectedFolder[];
+  /** Those of them connected read-only, by their paths inside the vault. */
   readOnly?: string[];
   /** Where its agents work: a path inside the vault, or an absolute one elsewhere. */
   work?: string;
