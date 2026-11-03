@@ -18,6 +18,24 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-03: **0.2.55** ([#297](https://github.com/DeL-TaiseiOzaki/irori/pull/297),
+each connected folder named with its place on this device as one folder,
+ADR 019 decision 8) as `9c1b54c`, by `publish.yml` alone (push run
+`41657398146`): merge to release 1:46, to page 3:45, drift in step. Anonymous
+downloads of the Windows installer, the Mac image and `irori-0.2.55-full.nupkg`
+matched `SHA256SUMS.txt`; the live page links the 0.2.55 installers. #297 was
+rebased onto 0.2.54 before merging and keeps its read-only folders. See STATUS.
+
+Published 2026-11-03: **0.2.54** ([#296](https://github.com/DeL-TaiseiOzaki/irori/pull/296),
+what the screen says is what agents get: standard access by default,
+read-only connections, confirmation before configuration that acts without
+asking, host hardening) as `66ef362`. The push run `41654669607` found no pull
+request run that packaged the merged tree, so `publish.yml` published after
+main's CI (`41654667667`, run `41656306060`): merge to release 11:34, to page
+12:58, drift in step. Anonymous downloads of the Windows installer, the Mac
+image and `irori-0.2.54-full.nupkg` matched `SHA256SUMS.txt`; the live page
+linked the 0.2.54 installers until 0.2.55 replaced them. See STATUS.
+
 Published 2026-11-03: **0.2.53** ([#294](https://github.com/DeL-TaiseiOzaki/irori/pull/294),
 irori's own title bar and the settings as a sheet over the blurred window,
 ADR 054 and 055) as `b7a25eb`, by `publish.yml` alone (push run
