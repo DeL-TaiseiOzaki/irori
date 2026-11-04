@@ -118,6 +118,8 @@ export const otherWorkspace = () =>
 export const notYours = () =>
   t('この会話は別の持ち主のものです。', 'This conversation belongs to someone else.');
 const noConversation = () => t('この会話はありません。', 'This conversation no longer exists.');
+const notQueued = () =>
+  t('この指示は送信待ちにありません。', 'This instruction is not in the queue.');
 export const stopBeforeDeleting = () =>
   t('実行を停止してから削除してください。', 'Stop the run before deleting.');
 /** Said in place of the end of a run an earlier host left unfinished. */
@@ -920,11 +922,62 @@ export class ConversationStore {
       await this.init();
       this.usable(id);
       const state = this.states.get(id);
-      if (!state?.queued.some((item) => item.id === queuedId))
-        throw Error(t('この指示は送信待ちにありません。', 'This instruction is not in the queue.'));
+      if (!state?.queued.some((item) => item.id === queuedId)) throw Error(notQueued());
       await this.writeState({
         ...state,
         queued: state.queued.filter((item) => item.id !== queuedId),
+      });
+      return structuredClone(this.states.get(id)?.queued ?? []);
+    });
+  }
+  /** A conversation's queued instructions, oldest first. */
+  queuedItems(id: string) {
+    return this.queued(id, async () => {
+      await this.init();
+      this.usable(id);
+      return structuredClone(this.states.get(id)?.queued ?? []);
+    });
+  }
+  /** One queued instruction of a conversation, with the queue's owner. */
+  queuedItem(id: string, queuedId: string) {
+    return this.queued(id, async () => {
+      await this.init();
+      this.usable(id);
+      const state = this.states.get(id);
+      const item = state?.queued.find((entry) => entry.id === queuedId);
+      if (!state || !item) throw Error(notQueued());
+      return { owner: state.owner, item: structuredClone(item) };
+    });
+  }
+  /** Moves a queued instruction to the front, to be the next to start (ADR 056). */
+  promoteQueued(id: string, queuedId: string) {
+    return this.queued(id, async () => {
+      await this.init();
+      this.usable(id);
+      const state = this.states.get(id);
+      const item = state?.queued.find((entry) => entry.id === queuedId);
+      if (!state || !item) throw Error(notQueued());
+      await this.writeState({
+        ...state,
+        queued: [item, ...state.queued.filter((entry) => entry.id !== queuedId)],
+      });
+      return structuredClone(this.states.get(id)?.queued ?? []);
+    });
+  }
+  /**
+   * Puts an instruction taken from the queue back at its front: a run in progress
+   * did not take it after all, so it is the next to start.
+   */
+  returnQueued(id: string, item: QueuedMessage) {
+    return this.queued(id, async () => {
+      await this.init();
+      this.usable(id);
+      const state = this.states.get(id);
+      if (!state) throw Error(noConversation());
+      const message = queuedMessage.parse(item);
+      await this.writeState({
+        ...state,
+        queued: [message, ...state.queued.filter((entry) => entry.id !== message.id)],
       });
       return structuredClone(this.states.get(id)?.queued ?? []);
     });

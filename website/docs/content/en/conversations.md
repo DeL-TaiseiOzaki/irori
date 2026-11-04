@@ -19,6 +19,8 @@ Deleting a conversation removes irori's saved copy. The CLI's own history stays,
 
 Each conversation runs one instruction at a time, and several conversations can run at once. Instructions sent during a run wait in that conversation's queue.
 
+When an instruction cannot wait, press **今すぐ送る** (send now) beside it in the queue. Claude Code and Codex take it at their next step without stopping the running work. An instruction with attached files, one whose skill, model or other choices differ from the run's, and any instruction on another CLI stop the run and are then sent.
+
 A failed or stopped run pauses the queue. Sending another instruction continues it, oldest first; **Resume sending** does the same. Instructions survive a restart. A run whose completion could not be confirmed is never automatically repeated.
 
 A native CLI session resumes only on the same computer, folder, and access mode. A change starts a new CLI session. Previous conversation context is not automatically supplied to it yet; include the material it needs in your next request.

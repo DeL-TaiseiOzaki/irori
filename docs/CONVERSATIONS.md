@@ -118,6 +118,13 @@ is described in the history of this file.
   conversationId?)` starts the named conversation's next, or the oldest among
   conversations not running.
 - **停止** stops the conversation's own run; the owner's other runs go on.
+- **今すぐ送る** on a queued instruction sends it ahead of the others
+  ([ADR 056](decisions/056-send-now.md)). A Claude Code or Codex run in progress
+  takes it at its next step and goes on, when it asks for nothing the run was
+  not started with (access, model, level, vaults, materials) and nothing that
+  needs a request of its own (a skill, attached files, a `/` command); its words
+  are kept in that run. Otherwise, and on the other CLIs, the run stops and the
+  instruction starts at once. A routine's step and a hand-off refuse it.
 - A run the host could not see finish is shown as unconfirmed on the next start
   and never sent again. If the host stopped between claiming a queued
   instruction and writing it, the message is written from the claim.
@@ -152,7 +159,8 @@ The store, the queue and native handles live in the host. The renderer reaches
 them through `agentConversations`, `agentConversation`, `createConversation`,
 `renameConversation`, `pinConversation`, `archiveConversation`,
 `deleteConversation`, `queueAgentMessage`, `removeQueuedMessage`,
-`startNextQueued` and `start`, and never receives the folder's path. Agents are
+`startNextQueued`, `sendQueuedNow` and `start`, and never receives the
+folder's path. Agents are
 not given the conversations folder.
 
 ## Verification
@@ -164,6 +172,10 @@ not given the conversations folder.
 - `tests/sessions.test.ts`: the device id; resume only with the same access; a
   failed resume and the next turn; another device id; another checkout; a
   damaged device id (Codex protocol fixture).
+- `tests/send-now.test.ts`: an instruction sent now into a Codex turn
+  (`turn/steer`) and a Claude Code turn (`priority: 'next'`), recorded in that
+  run; one that does not fit, or that the turn refuses, stopping the run and
+  starting; without a run, ahead of older ones; another owner refused.
 - `tests/conversation-migration.test.ts`: records of a vault and the irori
   agent, a handle alone, damaged and misfiled records, the old files unchanged
   and a second run.

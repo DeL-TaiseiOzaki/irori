@@ -164,6 +164,18 @@ export interface Conversation {
   session: AgentSession;
 }
 
+/** The CLIs whose turn takes words sent while it works, at its next step (ADR 056). */
+export const steeringAgents: readonly AgentId[] = ['claude', 'codex'];
+/** What became of a queued instruction sent now (ADR 056). */
+export interface SentNow {
+  /** The conversation's queue afterwards. */
+  queued: QueuedMessage[];
+  /** The run that has the instruction; null when none could start. */
+  runId: string | null;
+  /** The run in progress took it and goes on; otherwise it stopped and this one started. */
+  steered: boolean;
+}
+
 const graphemes =
   typeof Intl !== 'undefined' && 'Segmenter' in Intl
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })

@@ -843,6 +843,17 @@ export interface HostAPI {
     conversationId?: string,
     workspaceId?: string,
   ): Promise<string | null>;
+  /**
+   * Sends one queued instruction now (ADR 056): into the conversation's run in
+   * progress when its CLI takes words mid-turn and the run was started as the
+   * instruction asks; otherwise that run stops and the instruction starts at once.
+   */
+  sendQueuedNow(
+    scopeId: string,
+    conversationId: string,
+    queuedId: string,
+    workspaceId?: string,
+  ): Promise<import('./conversation').SentNow>;
   start(input: StartRun): Promise<string>;
   /**
    * Which workspace the window shows: the irori agent's screens, Schema settings

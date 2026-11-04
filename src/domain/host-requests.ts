@@ -310,6 +310,7 @@ export const hostArguments = {
   queueAgentMessage: z.tuple([startInput]),
   removeQueuedMessage: z.tuple([id, id]),
   startNextQueued: z.tuple([id, id.optional(), id.optional()]),
+  sendQueuedNow: z.tuple([id, id, id, id.optional()]),
   start: z.tuple([startInput]),
   showWorkspace: z.tuple([id.nullable()]),
   iroriAgentFolder: z.tuple([id]),
