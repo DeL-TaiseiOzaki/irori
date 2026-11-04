@@ -822,6 +822,14 @@
   align-self: flex-start;
   background: var(--raised-2);
 }
+.agent-panel .message-queue > div > button {
+  flex: none;
+}
+/* Sending one now is the queue's own action; cancelling stays quieter. */
+.agent-panel .message-queue .queue-now {
+  color: var(--tx);
+  font-weight: 600;
+}
 .new-session {
   margin: 0;
   display: flex;

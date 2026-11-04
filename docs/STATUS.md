@@ -1,5 +1,42 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Send a queued instruction now, 2026-11-04 (**0.2.56**, not yet published;
+[ADR 056](decisions/056-send-now.md)): the owner asked that an instruction
+typed while a vault agent or the irori agent works can be sent at once, as
+Claude Code and Codex allow, instead of waiting in the queue for the run's end.
+- `AgentColumn`: each queued instruction has 今すぐ送る beside 取消, with a
+  tooltip saying whether the CLI takes it mid-turn or stops for it. A stop it
+  took lets the rest of the queue go on (ADR 034 D3).
+- `HostAPI.sendQueuedNow` → `AgentService.sendNow`: a Claude Code or Codex run
+  in progress takes the instruction when `joins` finds it asks for nothing the
+  run was not started with (access, model, level, workspace and vaults,
+  materials; no skill, attachments, person's lines of another note or `/`
+  command). It leaves the queue first (`removeQueued`), then the run's
+  `Steering` delivers it; the person's words are published and recorded in
+  that run. Otherwise, or when the CLI refuses it, it goes to the queue's front
+  (`promoteQueued`, `returnQueued`), the run stops, and `startNextQueued`
+  starts it. A routine's step or a hand-off refuses; one send per conversation
+  at a time; the owner is checked against the queue's.
+- `src/agents/steering.ts`: `Steering` (opened by a CLI once its turn is under
+  way, closed at its end, at a stop, and from the start for other CLIs, steps
+  and hand-offs) and `MessageChannel`. Claude Code: every turn uses the SDK's
+  streaming input; words sent now go as `priority: 'next'` user messages, and
+  the input closes at the turn's result (the SDK then waits for the run's end,
+  which Claude Code reports with its session state, before closing stdin).
+  Codex: `turn/steer` with `expectedTurnId`; closed at `turn/completed`, for a
+  compaction and a review.
+- Sources: Agent SDK 0.3.284 types and stream handling, the installed Claude
+  Code 2.1.318's queue priorities, codex-cli 0.160.0's binary strings for
+  `TurnSteerParams` and its refusals (not run), Pi's RPC documentation (its
+  `steer` left out: a steer sent as a run settles is queued with no run to take
+  it on 0.85).
+- Tests: `tests/send-now.test.ts` (Codex and Claude Code protocol fixtures;
+  a stop for a different model and for a refused steer; without a run; another
+  owner); `scripts/irori-threads-ui-smoke.ts` sends a queued instruction now in
+  the irori agent's column and in a vault's. Verified with `npm run build`,
+  `npm test` and `npm run test:ui`. Not verified with a real Claude Code or
+  Codex turn, which needs the owner's authorization to run a provider CLI.
+
 Connected folders named as one folder, 2026-11-03 (**0.2.55**,
 [#297](https://github.com/DeL-TaiseiOzaki/irori/pull/297), published as `v0.2.55-preview.1`;
 [ADR 019](decisions/019-local-folder-connections.md) decision 8): an owner

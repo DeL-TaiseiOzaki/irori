@@ -34,6 +34,7 @@ import type { NativeContext } from './adapter';
 import { agentCommand, agentEnv, killTree, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import { Tail } from './tail';
+import { MessageChannel, Steering } from './steering';
 import type { FileService } from '../host/files';
 import type { SetupContext } from '../host/agent-setup';
 import type { SessionBinding } from './sessions';
@@ -51,8 +52,11 @@ import {
   conversationTitle,
   promptLimit,
   startInput,
+  steeringAgents,
   type Conversation,
   type ConversationOwner,
+  type QueuedMessage,
+  type SentNow,
 } from '../domain/conversation';
 import { DeviceIdentity } from '../host/device';
 import {
@@ -153,6 +157,10 @@ type Run = {
   /** Work folders outside the run's own folder, which its agents may change too. */
   work?: string[];
   access: AgentAccess;
+  /** What the run was started with, against which an instruction sent now is checked. */
+  input: StartRun;
+  /** How the run takes words sent while it works, if it can (ADR 056). */
+  steering: Steering;
   queuedId?: string;
   recorded?: boolean;
   /** The id streamed text keeps until another kind of event comes. */
@@ -204,6 +212,7 @@ type Run = {
   closed: Promise<void>;
   close: () => void;
 };
+const steerable = new Set(steeringAgents);
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
 /** How long Claude Code lets the irori agent's shell commands run: a hand-off takes as long as it takes. */
@@ -237,6 +246,12 @@ const alreadyRunning = () =>
   t(
     'この会話は実行中です。停止するか、送信待ちに追加してください。',
     'This conversation is already running. Stop it or add the instruction to its queue.',
+  );
+/** A routine's step or a hand-off is not the person's to stop or steer from its queue. */
+const notTheirs = () =>
+  t(
+    'ルーティンや irori agent から渡された実行には、今すぐ送れません。終わってから送られます。',
+    "A routine's step or the irori agent's hand-off cannot take an instruction now. It is sent when the run ends.",
   );
 const historyUnsaved = () =>
   t(
@@ -299,6 +314,8 @@ export class AgentService {
   // Runs by id: one per conversation, and an owner's conversations run side by
   // side in its checkout, as Claudian's tabs do in one vault (ADR 020).
   private runs = new Map<string, Run>();
+  // Conversations an instruction is being sent to now, so one goes at a time.
+  private sendingNow = new Set<string>();
   private device: DeviceIdentity;
   private conversations: ConversationStore;
   /** Files the person attaches to instructions. */
@@ -568,6 +585,100 @@ export class AgentService {
     await this.runs.get(id)!.accepted;
     return id;
   }
+  /**
+   * Sends one queued instruction now, ahead of the rest of the queue (ADR 056).
+   * A run in progress whose CLI takes words mid-turn, started as this instruction
+   * asks, takes it at its next step and goes on. Otherwise the run is stopped and
+   * the instruction starts at once; without a run it simply starts.
+   */
+  async sendNow(
+    scopeId: string,
+    conversationId: string,
+    queuedId: string,
+    canStart = () => {},
+    workspace?: string,
+  ): Promise<SentNow> {
+    this.root(scopeId);
+    if (this.sendingNow.has(conversationId))
+      throw Error(t('送信中です。', 'An instruction is already being sent.'));
+    this.sendingNow.add(conversationId);
+    try {
+      const { owner, item } = await this.conversations.queuedItem(conversationId, queuedId);
+      if (owner !== scopeId) throw Error(notYours());
+      // An irori agent conversation is reached only from its own workspace (ADR 017 D4).
+      if (
+        workspace !== undefined &&
+        this.isYou(scopeId) &&
+        !(await this.conversations.belongs(conversationId, workspace))
+      )
+        throw Error(otherWorkspace());
+      const run = this.conversationRun(conversationId);
+      if (run && (run.step || run.holder)) throw Error(notTheirs());
+      if (run && this.joins(run, item)) {
+        const steer = await run.steering.ready();
+        if (steer && this.runs.has(run.id)) {
+          const words = await this.steerWords(run, item);
+          // Taken from the queue first, so nothing else starts it while the CLI is asked.
+          const queued = await this.conversations.removeQueued(conversationId, item.id);
+          if (!run.cancelled && (await steer(words).catch(() => false))) {
+            this.flushText(run);
+            this.record(
+              run,
+              this.publish(run, 'status', item.prompt, { role: 'user', id: randomUUID() }),
+            );
+            return { queued, runId: run.id, steered: true };
+          }
+          await this.conversations.returnQueued(conversationId, item);
+        }
+      }
+      canStart();
+      await this.conversations.promoteQueued(conversationId, item.id);
+      const current = this.conversationRun(conversationId);
+      if (current) await this.stop(current);
+      const runId = await this.startNextQueued(scopeId, conversationId, canStart, workspace);
+      const queued = await this.conversations.queuedItems(conversationId);
+      return { queued, runId, steered: false };
+    } finally {
+      this.sendingNow.delete(conversationId);
+    }
+  }
+  /**
+   * Whether an instruction can join a run in progress: it asks for nothing the run
+   * was not started with (access, model, level, vaults) and nothing that goes only
+   * with a request of its own (a skill, other materials, files, the person's lines,
+   * a CLI command).
+   */
+  private joins(run: Run, item: QueuedMessage) {
+    const asked = run.input;
+    const same = (a?: string, b?: string) => (a || '') === (b || '');
+    const set = (values: string[] = []) => JSON.stringify([...new Set(values)].sort());
+    const sources = (refs: StartRun['sources'] = []) =>
+      set(refs.map((ref) => JSON.stringify([ref.scopeId, ref.path])));
+    let access: AgentAccess;
+    try {
+      access = requireAgentAccess(run.binding.agent, item.access);
+    } catch {
+      return false;
+    }
+    return (
+      access === run.access &&
+      same(item.model, asked.model) &&
+      same(item.effort, asked.effort) &&
+      same(item.workspace, asked.workspace) &&
+      set(item.brains) === set(asked.brains) &&
+      sources(item.sources) === sources(asked.sources) &&
+      !item.skill &&
+      !item.attachments?.length &&
+      (!item.personLines || (!!asked.personLines && item.notePath === asked.notePath)) &&
+      !commandWords.test(item.prompt)
+    );
+  }
+  /** The words a run in progress takes: the note now open when it changed, then the person's. */
+  private async steerWords(run: Run, item: QueuedMessage) {
+    if (!item.notePath || item.notePath === run.input.notePath) return item.prompt;
+    await this.files.resolve(run.binding.scopeId, item.notePath);
+    return `${selectedNote(item.notePath)}\n\n${item.prompt}`;
+  }
   /** Sends and writes what every run has streamed so far, then writes the histories. */
   flush() {
     for (const run of this.runs.values()) this.flushText(run);
@@ -646,6 +757,8 @@ export class AgentService {
       // A routine's step is a conversation of its own, named at once so its record can open it.
       conversationId: step ? randomUUID() : input.conversationId,
       access,
+      input,
+      steering: new Steering(),
       holder,
       step,
       queuedId,
@@ -788,6 +901,7 @@ export class AgentService {
   }
   private async stop(run: Run) {
     run.cancelled = true;
+    run.steering.close();
     run.abort.abort();
     this.denyRequests(run);
     await this.cancelHeld(run);
@@ -1018,6 +1132,9 @@ export class AgentService {
     let outcome: AgentEvent['outcome'] = 'completed';
     let resuming = false;
     let record: RunRecord | undefined;
+    // Claude Code and Codex take words mid-turn; the others, a routine's step and a
+    // hand-off take an instruction sent now only by being stopped (ADR 056).
+    if (run.step || run.holder || !steerable.has(input.agent)) run.steering.close();
     try {
       const placed = await this.place(run, input);
       if (
@@ -1416,6 +1533,7 @@ export class AgentService {
         }
       }
     } finally {
+      run.steering.close();
       // The reply's last words go before the run's end, in the views and the history alike.
       this.flushText(run);
       this.denyRequests(run);
@@ -1612,6 +1730,7 @@ export class AgentService {
     const completion = new Promise<void>((resolve) => {
       run.finish = () => {
         finished = true;
+        run.steering.close();
         resolve();
       };
     });
@@ -1711,6 +1830,8 @@ export class AgentService {
     const words = run.command ? commandWords.exec(run.words ?? '') : null;
     const name = words?.[1];
     const rest = words?.[2]?.trim() ?? '';
+    // A compaction or a review is a turn of its own that takes no more words.
+    if (name === 'compact' || name === 'review') run.steering.close();
     if (name === 'compact') {
       if (!session) {
         this.event(
@@ -1762,6 +1883,22 @@ export class AgentService {
       ...(effort && { effort }),
     });
     run.turnId = turn.turn.id;
+    // Words sent now join this turn, which takes them at its next step; a turn that
+    // has just ended refuses them, and they start a run of their own (ADR 056).
+    const turnId = run.turnId;
+    run.steering.open(async (words) => {
+      if (finished || run.cancelled) return false;
+      try {
+        await rpc.request('turn/steer', {
+          threadId: run.threadId,
+          expectedTurnId: turnId,
+          input: [{ type: 'text', text: words, text_elements: [] }],
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    });
     await completion;
     if (failure) throw failure;
   }
@@ -1919,13 +2056,18 @@ export class AgentService {
             : undefined;
         }),
     ).then((blocks) => blocks.filter((block) => !!block));
-    const message = async function* (): AsyncGenerator<SDKUserMessage> {
-      yield {
-        type: 'user',
-        message: { role: 'user', content: [...images, { type: 'text', text: prompt }] },
-        parent_tool_use_id: null,
-      };
-    };
+    // The request, then any words the person sends while the turn works: Claude Code
+    // takes them at its next step without stopping (ADR 056). A CLI command goes alone.
+    const input = new MessageChannel<SDKUserMessage>();
+    input.push({
+      type: 'user',
+      message: { role: 'user', content: [...images, { type: 'text', text: prompt }] },
+      parent_tool_use_id: null,
+    });
+    if (run.command) {
+      input.close();
+      run.steering.close();
+    }
     const attachedFolders = (run.attached ?? []).map((file) => path.dirname(file.path));
     // The shared Schema's hooks run beside the folder's own (ADR 048).
     const sharedHooks = await this.you?.sharedHooks().catch((error) => {
@@ -1943,7 +2085,7 @@ export class AgentService {
       (folder) => `Edit(${claudeRulePath(folder)}/**)`,
     );
     const response = query({
-      prompt: images.length ? message() : prompt,
+      prompt: input,
       options: {
         cwd,
         pathToClaudeCodeExecutable: 'claude',
@@ -2076,6 +2218,16 @@ export class AgentService {
         },
       },
     });
+    run.steering.open(
+      async (words) =>
+        !run.cancelled &&
+        input.push({
+          type: 'user',
+          message: { role: 'user', content: [{ type: 'text', text: words }] },
+          parent_tool_use_id: null,
+          priority: 'next',
+        }),
+    );
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
@@ -2116,12 +2268,18 @@ export class AgentService {
           }
         if (msg.type === 'result') {
           sawResult = true;
+          // The turn is over: what was sent before it ended is read, nothing after. The
+          // CLI ends once it has answered all of it.
+          run.steering.close();
+          input.close();
           if (msg.is_error)
             throw Error('errors' in msg ? msg.errors.join('\n') : 'Claude Code reported an error');
         }
       }
       if (!sawResult && !run.cancelled) throw Error(`Claude Code ended before a result: ${stderr}`);
     } finally {
+      run.steering.close();
+      input.close();
       response.close();
     }
   }
