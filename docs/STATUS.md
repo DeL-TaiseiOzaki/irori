@@ -1,5 +1,31 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Each conversation keeps its access, 2026-11-05 (**0.2.57**, not yet published;
+[ADR 009](decisions/009-agent-access-and-extension-compatibility.md)): the
+owner reported that full access chosen in a conversation went back to
+standard on a later send, and the reverse. Reproduced with the Codex protocol
+fixture: the composer held the access per column and CLI (`accessChoice` by
+column slot, `yourAccessSelection` for the irori agent), so a new conversation
+took the last one's full access, and standard chosen there showed and sent
+the first conversation in standard once its tab was back, starting its native
+session over (`thread/start` instead of `thread/resume`). The Overview's quick
+send always used the standard access.
+- `conversationAccess(agent, chosen, saved)`: the person's choice for the
+  conversation, else the access its last run used, else standard; a mode the
+  CLI does not offer is skipped.
+- Host: `meta.json` keeps `access`, written by `begin` for every run;
+  `Conversation.access` gives it, or this device's native session's for a
+  conversation from before 0.2.57.
+- Renderer: `accessChoice` is keyed by conversation id; `AgentColumn` reads the
+  conversation's saved access with its log; the Overview's quick send and its
+  footer use the same resolution (`BrainAi.access`).
+- Tests: `tests/conversation-access.test.ts`; `scripts/irori-threads-ui-smoke.ts`
+  checks both columns (full access through later sends, a new conversation in
+  standard, the first back in full access with `thread/resume`);
+  `scripts/harness-ui-smoke.ts` now expects a new OpenCode conversation in
+  standard access. Verified with `npm run build`, `npm test` and
+  `npm run test:ui`. Not verified with a real CLI turn.
+
 Send a queued instruction now, 2026-11-04 (**0.2.56**, not yet published;
 [ADR 056](decisions/056-send-now.md)): the owner asked that an instruction
 typed while a vault agent or the irori agent works can be sent at once, as

@@ -14,6 +14,21 @@ export function defaultAgentAccess(_agent: AgentId): AgentAccess {
   return 'default';
 }
 
+/**
+ * The access a conversation runs with: the person's choice for it, else what its
+ * last run used, else the standard access. Each conversation keeps its own: one
+ * never takes another's, and none changes by itself.
+ */
+export function conversationAccess(
+  agent: AgentId,
+  chosen?: AgentAccess,
+  saved?: AgentAccess,
+): AgentAccess {
+  for (const access of [chosen, saved])
+    if (access && agentAccessOptions(agent).includes(access)) return access;
+  return defaultAgentAccess(agent);
+}
+
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {
   if (!agentAccessOptions(agent).includes(access))
     throw Error(

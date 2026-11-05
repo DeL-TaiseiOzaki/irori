@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AgentEvent, AgentId } from '../domain/types';
+import type { AgentAccess, AgentEvent, AgentId } from '../domain/types';
 import {
   appendConversationEvents,
   lastIndex,
@@ -17,6 +17,8 @@ export interface BrainAi {
   id?: string;
   /** The CLI of that conversation, once it has begun. */
   agent?: AgentId;
+  /** The access its last run used. */
+  access?: AgentAccess;
   events: AgentEvent[];
   queued: QueuedMessage[];
   /** Instructions waiting across the owner's conversations. */
@@ -95,6 +97,7 @@ export function useBrainAi(
         setState({
           id: value.id,
           agent: value.summary?.agent,
+          access: value.access,
           events: withRequests(value).slice(-120),
           queued: value.queued,
           pending: value.pending,

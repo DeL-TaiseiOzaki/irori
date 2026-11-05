@@ -58,6 +58,8 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
     }, 100));
     return;
   }
+  if (m.method.startsWith('thread/'))
+    fs.appendFileSync('codex-turns.jsonl', JSON.stringify({ thread: m.method + ':' + m.params.approvalPolicy }) + '\\n');
   const result = m.method.startsWith('thread/')
     ? { thread: { id: m.params.threadId || 'fixture-thread-' + Date.now() + Math.random() } }
     : {};
@@ -110,7 +112,7 @@ const app = await electron.launch({
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
 /** What the fixture was told, in order, in a folder: turns' last lines, or words steered in. */
-const told = async (folder: string, key: 'said' | 'steered') =>
+const told = async (folder: string, key: 'said' | 'steered' | 'thread') =>
   (await readFile(path.join(folder, 'codex-turns.jsonl'), 'utf8').catch(() => ''))
     .trim()
     .split('\n')
@@ -161,6 +163,44 @@ try {
     (await conversations(workspaceId)).find(
       (row) => 'title' in row && row.title.startsWith(title),
     ) as { id: string; running: boolean } | undefined;
+
+  /**
+   * Each conversation keeps its own access (ADR 009): full access chosen in one stays
+   * through its later sends, a new conversation starts standard, and back on the
+   * first it shows and sends with full access, its native session going on.
+   */
+  const ownAccess = async (panel: Locator, label: string, folder: string, name: string) => {
+    const access = panel.getByLabel('エージェントのアクセス', { exact: true });
+    const idle = () =>
+      expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+    const before = (await told(folder, 'thread')).length;
+    await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+    await expect(access).toHaveValue('default');
+    await access.selectOption('full-access');
+    for (const word of ['full one', 'full two', 'standard one', 'full three']) {
+      if (word === 'standard one') {
+        await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+        await expect(access).toHaveValue('default');
+      }
+      if (word === 'full three') {
+        await panel
+          .getByRole('tablist', { name: '開いている会話' })
+          .getByRole('tab', { name: new RegExp(`${name} full one`) })
+          .click();
+        await expect(access).toHaveValue('full-access');
+      }
+      await send(panel, label, `${name} ${word}`);
+      await expect(panel.getByRole('log')).toContainText(`reply to ${name} ${word}`);
+      await idle();
+      await expect(access).toHaveValue(word === 'standard one' ? 'default' : 'full-access');
+    }
+    expect((await told(folder, 'thread')).slice(before)).toEqual([
+      'thread/start:never',
+      'thread/resume:never',
+      'thread/start:on-request',
+      'thread/resume:never',
+    ]);
+  };
 
   // Two threads of the irori agent run at once, each in its own column.
   await open('First');
@@ -238,6 +278,10 @@ try {
   expect(await told(youRoot, 'steered')).toEqual(['join now']);
   expect((await said(youRoot)).slice(-2)).toEqual(['steered thread hold:steer', 'waits behind']);
 
+  await ownAccess(column(1), 'irori agent への指示', youRoot, 'irori');
+  await tabs.getByRole('tab', { name: /first thread/ }).click();
+  await expect(column(1).getByRole('log')).toContainText('after the stop');
+
   // Each workspace keeps its own threads and columns.
   await column(1).getByRole('button', { name: '列を追加' }).click();
   await expect(column(2)).toBeVisible();
@@ -302,6 +346,8 @@ try {
   await expect(vaultQueue).toHaveCount(0);
   await expect(vault.getByRole('log')).toContainText('steered: vault join now');
   expect(await told(roots.Alpha, 'steered')).toEqual(['vault join now']);
+  await expect(vault.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+  await ownAccess(vault, 'エージェントへの指示', roots.Alpha, 'vault');
   await expect
     .poll(async () =>
       (await page.evaluate(([id]) => window.irori.agentConversations(id), [ids.Alpha])).some(
@@ -312,7 +358,7 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
+    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, and each conversation keeping its own access, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
   );
 } finally {
   // A turn still held would keep its run, and the app, open.

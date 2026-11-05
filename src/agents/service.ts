@@ -525,6 +525,7 @@ export class AgentService {
       activeRunId: value.activeRunId,
       requests,
       session: native?.entry ? { state: 'saved', access: native.entry.access } : { state: 'empty' },
+      access: value.meta.access ?? native?.entry?.access,
     };
   }
   /** Where an instruction that names no conversation goes: the owner's latest with this CLI, or a new one. */
