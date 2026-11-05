@@ -1,6 +1,8 @@
 # 017 — Conversations irori keeps, lists and clones
 
-Date: 2026-09-30. Status: owner direction accepted; design only, not implemented.
+Date: 2026-09-30. Status: owner direction accepted. Stage 1 implemented in
+0.1.60; stage 3's rewind, copy and rebuilt context in 0.2.58 (D6, D7, an owner
+request of 2026-11-05 for the edit and fork that Claude Code and Codex offer).
 Addresses the "full transcript/history management" that
 [ACCEPTANCE](../ACCEPTANCE.md) leaves open under R04 and R09, and the
 follow-up work [CONVERSATIONS](../CONVERSATIONS.md) lists.
@@ -196,6 +198,33 @@ the default instead of a constraint.
   preceded by the conversation so far, the instructions and replies without tool
   output, cut from the oldest end to a fixed budget, and labelled as an earlier
   conversation that is material and not instructions.
+
+**As implemented in 0.2.58.**
+- The person's message that started a run offers **この指示を編集してやり直す**
+  (a pencil beside it): the message returns to the composer with its files, a
+  bar says the conversation goes on from it, and sending sets it and everything
+  after it aside before the edited message starts. Neither is offered while the
+  conversation runs or has queued instructions. A message sent into a running
+  turn (ADR 056) is part of that run and is not offered on its own.
+- A run's end offers **ここから分岐**: a copy through the end of that run opens
+  as a tab, titled with the original's title and （分岐）. Its messages'
+  attached files are copied for it, so deleting either conversation leaves the
+  other's.
+- Set-aside lines are rewritten once, atomically, with an `aside` mark (the
+  rewind's id); the view, the count of earlier events, a copy and the rebuilt
+  context leave them out.
+- Each run's end records where its CLI's session stood (`native` on the `done`
+  line, with the device, checkout digest and access): Claude Code's last entry
+  of the turn and Codex's turn id. A rewind or a copy makes this device's next
+  turn go on from the point of the run before (or the copied run) as a branch:
+  Claude Code resumes with `resumeSessionAt` and `forkSession`, Codex calls
+  `thread/fork` with `lastTurnId`. The original session is left as it was.
+  Other devices' handles are dropped by a rewind, since their sessions hold the
+  set-aside turns.
+- Pi, OpenCode, Hermes Agent and the Antigravity CLI, a run that left no point,
+  a point from another device or checkout, and a changed access start a fresh
+  session that hears the conversation so far (`prompts/earlier-conversation.ts`,
+  30,000 characters, newest kept). The same applies to D7's cases.
 
 ### D7 — Native sessions follow the device
 

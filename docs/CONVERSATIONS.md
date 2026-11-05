@@ -1,10 +1,11 @@
 # Conversations
 
 What irori keeps of the conversations with vault agents and the irori agent,
-as of **0.1.60** ([ADR 017](decisions/017-conversation-history.md) stage 1). Stage 2
-adds the choice of folder and search; stage 3 adds rewind, clone and rebuilt
-context. Earlier behavior (a bounded display window per space, CLI and checkout)
-is described in the history of this file.
+as of **0.1.60** ([ADR 017](decisions/017-conversation-history.md) stage 1), with
+stage 3's rewind, copy and rebuilt context from **0.2.58** (ADR 017 D6). Stage 2,
+the choice of folder and search, is still to come. Earlier behavior (a bounded
+display window per space, CLI and checkout) is described in the history of this
+file.
 
 ## What the person sees
 
@@ -25,6 +26,12 @@ is described in the history of this file.
   have no workspace and appear in none; their folders stay. A vault keeps one
   history wherever it is opened, and a routine's irori agent step is kept in the
   routine's workspace.
+- **この指示を編集してやり直す** on a person's message that started a run puts
+  it back in the composer with its files. Sending sets that message and
+  everything after it aside (kept in `events.jsonl`, out of the view) and goes
+  on from before it. **ここから分岐** on a run's end copies the conversation
+  through that run into a new one, opened as a tab ([ADR 017](decisions/017-conversation-history.md) D6).
+  Files the agent changed are not restored.
 - Choosing another CLI in the panel starts a new conversation: a conversation's
   CLI is fixed. Opening a conversation from 履歴 switches the panel to its CLI.
 - Opening a panel shows the owner's conversation that is running, else the one
@@ -64,7 +71,10 @@ is described in the history of this file.
   has an id, the run's id, a time, a role (`user` or `agent`), a type and the
   text and details. Permission and question requests are kept as status text,
   never as something to answer. A streamed reply keeps one id; when it spans
-  several writes, its lines share the id and are joined when read.
+  several writes, its lines share the id and are joined when read. A run's
+  `done` line holds `native`, where its CLI's session stood (device, checkout
+  digest, access, handle and Claude Code's entry or Codex's turn). A rewind
+  rewrites the file once, atomically, marking the set-aside lines with `aside`.
 - **Event ids** are given when irori sends an event to the views, so the view and
   the file name the same event.
 - **Details over 1 MiB** (a tool's input or result) are kept to their first
@@ -95,8 +105,15 @@ is described in the history of this file.
   Otherwise it starts a new native session in the same conversation and says
   why in one line (another device, another folder, or a changed access mode,
   [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)). Other
-  devices' handles are kept. Stage 1 does not yet give the new session the
-  conversation so far; stage 3 does.
+  devices' handles are kept. A new session in a conversation that already has
+  messages hears them first, as material: the person's messages and the
+  replies without tool output, newest kept within 30,000 characters
+  (`prompts/earlier-conversation.ts`).
+- After a rewind or in a copy, this device's entry carries `branch`: the next
+  turn goes on from that point as a new session of its own (Claude Code's
+  `resumeSessionAt` with `forkSession`, Codex's `thread/fork` with `lastTurnId`)
+  and saves the new handle. Other CLIs, and points from another device,
+  checkout or access, start a fresh session with the conversation so far.
 - A resume that fails before the agent says or does anything is reported, and
   this device's handle is set aside: the next instruction starts a new session.
   A turn that fails after the agent worked keeps the handle.
@@ -159,8 +176,8 @@ The store, the queue and native handles live in the host. The renderer reaches
 them through `agentConversations`, `agentConversation`, `createConversation`,
 `renameConversation`, `pinConversation`, `archiveConversation`,
 `deleteConversation`, `queueAgentMessage`, `removeQueuedMessage`,
-`startNextQueued`, `sendQueuedNow` and `start`, and never receives the
-folder's path. Agents are
+`startNextQueued`, `sendQueuedNow`, `rewindConversation`,
+`forkConversation` and `start`, and never receives the folder's path. Agents are
 not given the conversations folder.
 
 ## Verification
@@ -172,6 +189,11 @@ not given the conversations folder.
 - `tests/sessions.test.ts`: the device id; resume only with the same access; a
   failed resume and the next turn; another device id; another checkout; a
   damaged device id (Codex protocol fixture).
+- `tests/rewind-fork.test.ts`: a rewind and a copy on Codex (`thread/fork`
+  through the turn before, or the copied one) and Claude Code
+  (`--resume-session-at` with `--fork-session`), the set-aside lines out of the
+  view, a conversation's first message, and Hermes Agent hearing the
+  conversation so far in a new session.
 - `tests/send-now.test.ts`: an instruction sent now into a Codex turn
   (`turn/steer`) and a Claude Code turn (`priority: 'next'`), recorded in that
   run; one that does not fit, or that the turn refuses, stopping the run and

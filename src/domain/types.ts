@@ -854,6 +854,30 @@ export interface HostAPI {
     queuedId: string,
     workspaceId?: string,
   ): Promise<import('./conversation').SentNow>;
+  /**
+   * Rewinds a conversation to before one of the person's messages that started a
+   * run (ADR 017 D6): it and what followed leave the view, and the next turn goes
+   * on from before it. Answers the message, to be edited and sent again.
+   */
+  rewindConversation(
+    scopeId: string,
+    conversationId: string,
+    eventId: string,
+    workspaceId?: string,
+  ): Promise<{
+    prompt: string;
+    attachments?: import('./attachments').AttachmentRef[];
+  }>;
+  /**
+   * A new conversation holding a copy of this one through the end of the run that
+   * `eventId` belongs to (ADR 017 D6); answers its id.
+   */
+  forkConversation(
+    scopeId: string,
+    conversationId: string,
+    eventId: string,
+    workspaceId?: string,
+  ): Promise<string>;
   start(input: StartRun): Promise<string>;
   /**
    * Which workspace the window shows: the irori agent's screens, Schema settings

@@ -82,6 +82,29 @@ export class AttachmentStore {
       );
     }
   }
+  /**
+   * Copies sent files for another conversation, a copy of theirs (ADR 017 D6), so
+   * each conversation keeps its own; a file no longer here keeps its reference.
+   */
+  async copy(refs: AttachmentRef[], conversationId: string) {
+    const copies: AttachmentRef[] = [];
+    for (const ref of refs) {
+      const from = await this.path(ref).catch(() => undefined);
+      if (!from) {
+        copies.push(ref);
+        continue;
+      }
+      const id = randomUUID();
+      await fs.mkdir(this.dir(id), { recursive: true });
+      await fs.copyFile(from, path.join(this.dir(id), attachmentName(ref.name)));
+      await writeFileAtomic(
+        path.join(this.dir(id), 'sent.json'),
+        JSON.stringify({ conversationId } satisfies Sent),
+      );
+      copies.push({ ...ref, id });
+    }
+    return copies;
+  }
   /** Forgets a file the person removed before sending; a sent one is kept. */
   async discard(id: string) {
     if (await this.sent(id)) return;

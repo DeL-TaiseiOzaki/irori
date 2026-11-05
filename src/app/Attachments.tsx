@@ -105,6 +105,17 @@ export function useAttachments(onError: (error: unknown) => void) {
   function clear() {
     setItems([]);
   }
+  /** Files a message already sent, back for an edit of it: they stay its conversation's. */
+  function restore(refs: AttachmentRef[]) {
+    setItems(
+      refs.map((ref) => ({
+        key: `attachment-${++count.current}`,
+        name: ref.name,
+        size: ref.size,
+        ref,
+      })),
+    );
+  }
   const files = (list: FileList | null | undefined) => [...(list ?? [])];
   return {
     items,
@@ -114,6 +125,7 @@ export function useAttachments(onError: (error: unknown) => void) {
     add,
     remove,
     clear,
+    restore,
     onPaste(event: ClipboardEvent) {
       const pasted = files(event.clipboardData?.files);
       if (!pasted.length) return;
