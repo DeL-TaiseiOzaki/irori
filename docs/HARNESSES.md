@@ -115,6 +115,19 @@ Agent and the Antigravity CLI take nothing mid-turn; there, as for an
 instruction a run cannot take, the run stops and the instruction starts.
 Protocol fixtures only; no real turn was steered.
 
+Rewind and copy, 2026-11-05 (0.2.58, [ADR 017](decisions/017-conversation-history.md)
+D6): each run's `done` line records where the CLI's session stood. Claude Code:
+the session id from `system/init` and the `uuid` of the turn's last main
+`assistant` or `user` message; a later turn passes `resume`, `resumeSessionAt`
+and `forkSession` (`--resume-session-at=<uuid> --fork-session`), and saves the
+forked session's id. Codex: the thread and the turn id from `turn/start` (or
+`review/start`); a later turn calls `thread/fork` with `threadId`,
+`lastTurnId`, `excludeTurns: true` and the same overrides as `thread/start`,
+then `turn/start` on the new thread. The fork parameters were read from the
+app-server documentation and codex-cli 0.160.0's binary strings
+(`ThreadForkParams`), not from a run. Other CLIs get the conversation so far in
+a fresh session. Protocol fixtures only.
+
 ## Native configuration and lifecycle
 
 Access follow-up, 2026-09-23: the composer offers native/default behavior and

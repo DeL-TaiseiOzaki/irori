@@ -283,6 +283,9 @@ export function AgentColumn({
   // Events kept in the conversation but not sent to the view, and lines that could not be read.
   const [omitted, setOmitted] = useState({ earlier: 0, damaged: 0 });
   const [historyOpen, setHistoryOpen] = useState(false);
+  // One of the person's messages being edited, to go on from before it (ADR 017 D6),
+  // with the draft it replaced in the composer.
+  const [editing, setEditing] = useState<{ eventId: string; draft: string }>();
   const [retry, setRetry] = useState(0);
   // The events on show, as the effect below alone changes them, and those that
   // arrived since they were last shown. The log takes a batch per frame.
@@ -303,12 +306,14 @@ export function AgentColumn({
   const shownWaiting = !!target && shared.conversationWaiting(target.id);
   // Nothing has been said in the conversation on show: a new one can take its place.
   const shownBlank = conversationReady && !events.length && !queued.length && !shownRunning;
+  // A copy made here joins the list at once, before any run of it (ADR 017 D6).
+  const [listRevision, setListRevision] = useState(0);
   const rows = useResource(
     () => host.agentConversations(scopeId!, workspaceId),
     [scopeId, workspaceId],
     {
       enabled: !!scopeId && ready,
-      refresh: scopeId ? (shared.tabRevisions[scopeId] ?? 0) : 0,
+      refresh: (scopeId ? (shared.tabRevisions[scopeId] ?? 0) : 0) + listRevision,
     },
   );
   const agentInfo = infos.find((info) => info.id === agent);
@@ -399,6 +404,7 @@ export function AgentColumn({
     pending.current = [];
     setEvents([]);
     setQueued([]);
+    setEditing(undefined);
     setQueuePaused(true);
     setResumeWanted(false);
     setConversationReady(false);
@@ -526,6 +532,17 @@ export function AgentColumn({
       const draftRevision = composer.snapshot().record?.revision;
       if (!(await shared.save())) return;
       const input = request(message);
+      // An edited message goes on from before the one it replaces: that one and what
+      // followed leave the view, kept in the history (ADR 017 D6).
+      if (editing && target) {
+        await host.rewindConversation(scopeId, target.id, editing.eventId, workspaceId);
+        const at = view.current.findIndex((event) => event.id === editing.eventId);
+        if (at >= 0) {
+          view.current = view.current.slice(0, at);
+          setEvents(view.current);
+        }
+        setEditing(undefined);
+      }
       // Behind this conversation's run or its queue; its other conversations run beside it
       // (ADR 020). A queue left by a stop or a failure goes on with this send (ADR 034).
       if (shownRunning || queued.length) {
@@ -547,6 +564,56 @@ export function AgentColumn({
       setSending(false);
     }
   }
+  /** Puts one of the person's messages back in the composer, to edit and send again. */
+  function editMessage(event: AgentEvent) {
+    if (!target || shownRunning || queued.length || sending) return;
+    setEditing((current) => ({
+      eventId: event.id!,
+      draft: current?.draft ?? composer.snapshot().text,
+    }));
+    setPrompt(event.text);
+    attachments.restore(event.attachments ?? []);
+    requestAnimationFrame(() => {
+      const field = textarea.current;
+      if (!field) return;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    });
+  }
+  function cancelEdit() {
+    if (!editing) return;
+    setPrompt(editing.draft);
+    attachments.clear();
+    setEditing(undefined);
+  }
+  /** Copies the conversation through the end of a run into a new one, opened beside it as a tab. */
+  async function forkAt(event: AgentEvent) {
+    if (!scopeId || !target) return;
+    try {
+      const id = await host.forkConversation(scopeId, target.id, event.id!, workspaceId);
+      setListRevision((value) => value + 1);
+      onShow({ id, agent: target.agent }, false);
+    } catch (error) {
+      report(error);
+    }
+  }
+  // The log keeps its nodes while the composer changes: its actions call the handlers
+  // of the latest render, and change only with what they show.
+  const handlers = useRef({ editMessage, forkAt });
+  handlers.current = { editMessage, forkAt };
+  const blocked = shownRunning
+    ? t('実行中は編集できません', 'Not while a run is going')
+    : queued.length
+      ? t('送信待ちがあるときは編集できません', 'Not while instructions are queued')
+      : undefined;
+  const logActions = useMemo(
+    () => ({
+      edit: (event: AgentEvent) => handlers.current.editMessage(event),
+      fork: (event: AgentEvent) => void handlers.current.forkAt(event),
+      blocked,
+    }),
+    [blocked],
+  );
   /**
    * Sends one queued instruction now, ahead of the others (ADR 056): the run in
    * progress takes it mid-turn when its CLI can, or stops for it; without a run
@@ -1015,12 +1082,27 @@ export function AgentColumn({
               events={events}
               activeRun={shownRunning ? events.at(-1)?.runId : undefined}
               brains={handedSpaces}
+              actions={logActions}
               onError={report}
             />
           </PathBase.Provider>
         </PathOpenerContext.Provider>
       </div>
       <div className="composer">
+        {editing && (
+          <div className="composer-editing" role="status">
+            <Icon name="penLine" size={13} />
+            <span>
+              {t(
+                '編集中：送信すると、この指示から会話をやり直します。以降のやり取りは表示されなくなり、ファイルの変更は戻りません。',
+                'Editing: sending goes on from this message. What came after leaves the view; changed files stay as they are.',
+              )}
+            </span>
+            <button type="button" onClick={cancelEdit}>
+              {t('編集をやめる', 'Stop editing')}
+            </button>
+          </div>
+        )}
         {queued.length > 0 && (
           <div className="message-queue" aria-label={t('送信待ち', 'Pending send')}>
             <strong>

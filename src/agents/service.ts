@@ -73,6 +73,7 @@ import {
   selectedNote,
   selectedSources,
   attachedFiles,
+  earlierConversation,
   sharedSchema,
   sharedSchemaPointer,
   vaultIntro,
@@ -161,6 +162,9 @@ type Run = {
   input: StartRun;
   /** How the run takes words sent while it works, if it can (ADR 056). */
   steering: Steering;
+  /** The CLI session the run used, and where it stood at the run's end (ADR 017 D6). */
+  nativeHandle?: string;
+  nativeAt?: string;
   queuedId?: string;
   recorded?: boolean;
   /** The id streamed text keeps until another kind of event comes. */
@@ -213,6 +217,8 @@ type Run = {
   close: () => void;
 };
 const steerable = new Set(steeringAgents);
+/** The CLIs whose session irori continues from a point of its own after a rewind or a copy (ADR 017 D6). */
+const branching = new Set<AgentId>(['claude', 'codex']);
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
 const textWindow = 32;
 /** How long Claude Code lets the irori agent's shell commands run: a hand-off takes as long as it takes. */
@@ -672,6 +678,40 @@ export class AgentService {
       (!item.personLines || (!!asked.personLines && item.notePath === asked.notePath)) &&
       !commandWords.test(item.prompt)
     );
+  }
+  /**
+   * Rewinds a conversation to before one of the person's messages that started a
+   * run (ADR 017 D6): that message and what followed are set aside, and the next
+   * turn goes on from before it. Answers the message, to be edited and sent again.
+   */
+  async rewind(scopeId: string, conversationId: string, eventId: string, workspace?: string) {
+    await this.owned(scopeId, conversationId, workspace);
+    if (this.conversationRun(conversationId)) throw Error(alreadyRunning());
+    return this.conversations.rewind(conversationId, eventId);
+  }
+  /**
+   * Copies a conversation through the end of the run `eventId` belongs to into a
+   * new conversation of the same owner and CLI (ADR 017 D6); answers its id.
+   */
+  async fork(scopeId: string, conversationId: string, eventId: string, workspace?: string) {
+    await this.owned(scopeId, conversationId, workspace);
+    const id = randomUUID();
+    await this.conversations.fork(conversationId, eventId, id, (refs) =>
+      this.attachments.copy(refs, id),
+    );
+    return id;
+  }
+  /** Refuses a conversation that is not the owner's, or not in the irori agent's workspace. */
+  private async owned(scopeId: string, conversationId: string, workspace?: string) {
+    this.root(scopeId);
+    const meta = await this.conversations.meta(conversationId);
+    if (meta.owner.id !== scopeId) throw Error(notYours());
+    if (
+      workspace !== undefined &&
+      this.isYou(scopeId) &&
+      !(await this.conversations.belongs(conversationId, workspace))
+    )
+      throw Error(otherWorkspace());
   }
   /** The words a run in progress takes: the note now open when it changed, then the person's. */
   private async steerWords(run: Run, item: QueuedMessage) {
@@ -1354,12 +1394,20 @@ export class AgentService {
       // routine's step always starts afresh and is never kept.
       run.root = rootDigest(space.root);
       let saved: string | undefined;
+      let branch: string | undefined;
       let heard: string | undefined;
       let heardIntro: string | undefined;
       if (!run.step) {
         const { entry, elsewhere } = await this.conversations.native(run.conversationId!);
-        if (entry && entry.root === run.root && entry.access === run.access) {
+        if (
+          entry &&
+          entry.root === run.root &&
+          entry.access === run.access &&
+          (!entry.branch || branching.has(input.agent))
+        ) {
           saved = entry.handle;
+          // After a rewind or in a copy, the session goes on from a point of its own.
+          branch = entry.branch?.at;
           heard = entry.shared;
           heardIntro = entry.intro;
         } else if (entry || elsewhere)
@@ -1392,6 +1440,23 @@ export class AgentService {
       if (intro && !command) {
         run.intro = digest(intro.words);
         promptParts[introAt] = saved && heardIntro === run.intro ? intro.pointer : intro.words;
+      }
+      // A new session in a conversation that already has messages hears them first,
+      // as material (ADR 017 D6, D7).
+      const earlier =
+        !saved && !run.step && !command
+          ? earlierConversation(await this.conversations.said(run.conversationId!, run.id))
+          : undefined;
+      if (earlier) {
+        promptParts.splice(introAt + 1, 0, earlier);
+        this.event(
+          run,
+          'status',
+          t(
+            'これまでの会話を新しいセッションに渡しました。',
+            'The conversation so far went to the new session.',
+          ),
+        );
       }
       let prompt = command ? input.prompt : promptParts.join('\n\n');
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
@@ -1440,9 +1505,9 @@ export class AgentService {
       const effort =
         input.agent === 'hermes' || input.agent === 'antigravity' ? undefined : input.effort;
       if (input.agent === 'codex')
-        await this.codex(run, space.root, prompt, saved, input.model, effort);
+        await this.codex(run, space.root, prompt, saved, input.model, effort, branch);
       else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, saved, input.model, effort);
+        await this.claude(run, space.root, prompt, saved, input.model, effort, branch);
       else {
         // The same word Claude Code gets from its hook, through each CLI's own
         // hook: which of the person's lines a file tool call would change.
@@ -1574,7 +1639,25 @@ export class AgentService {
       };
       if (run.recorded) {
         try {
-          await this.conversations.finish(run.conversationId!, done, [...run.reached]);
+          // Where the session stood, for a later turn to go on from (ADR 017 D6).
+          const device =
+            run.nativeHandle && run.nativeAt && run.root && !run.step
+              ? await this.device.id().catch(() => undefined)
+              : undefined;
+          await this.conversations.finish(
+            run.conversationId!,
+            done,
+            [...run.reached],
+            device
+              ? {
+                  device,
+                  root: run.root!,
+                  access: run.access,
+                  handle: run.nativeHandle!,
+                  at: run.nativeAt!,
+                }
+              : undefined,
+          );
         } catch {
           done.outcome = 'failed';
           done.text = t(
@@ -1722,6 +1805,7 @@ export class AgentService {
     session?: string,
     model?: string,
     effort?: string,
+    branch?: string,
   ) {
     const child = codexServer(cwd, runEnv(run));
     run.child = child;
@@ -1818,11 +1902,18 @@ export class AgentService {
       }),
       ...(model && { model }),
     };
+    // After a rewind or in a copy, a new thread from the session's history through
+    // the turn named (ADR 017 D6); the original thread stays as it is.
     const thread = await rpc.request(
-      session ? 'thread/resume' : 'thread/start',
-      session ? { ...params, threadId: session } : params,
+      session && branch ? 'thread/fork' : session ? 'thread/resume' : 'thread/start',
+      session && branch
+        ? { ...params, threadId: session, lastTurnId: branch, excludeTurns: true }
+        : session
+          ? { ...params, threadId: session }
+          : params,
     );
     run.threadId = thread.thread.id;
+    run.nativeHandle = run.threadId;
     await this.saveSession(run, thread.thread.id);
     if (run.cancelled) return;
     // Codex's app server takes its commands as methods and its skills as items,
@@ -1853,6 +1944,7 @@ export class AgentService {
         target: rest ? { type: 'custom', instructions: rest } : { type: 'uncommittedChanges' },
       });
       run.turnId = review?.turn?.id;
+      run.nativeAt = run.turnId;
       await completion;
       if (failure) throw failure;
       return;
@@ -1883,6 +1975,7 @@ export class AgentService {
       ...(effort && { effort }),
     });
     run.turnId = turn.turn.id;
+    run.nativeAt = run.turnId;
     // Words sent now join this turn, which takes them at its next step; a turn that
     // has just ended refuses them, and they start a run of their own (ADR 056).
     const turnId = run.turnId;
@@ -2027,6 +2120,7 @@ export class AgentService {
     session?: string,
     model?: string,
     effort?: string,
+    branch?: string,
   ) {
     const { query } = await import('@anthropic-ai/claude-agent-sdk');
     const stderr = new Tail(6000);
@@ -2103,6 +2197,8 @@ export class AgentService {
         allowDangerouslySkipPermissions: run.access === 'full-access',
         includePartialMessages: true,
         resume: session,
+        // After a rewind or in a copy, a new session from the entry named (ADR 017 D6).
+        ...(session && branch && { resumeSessionAt: branch, forkSession: true }),
         ...(model && { model }),
         ...(effort && { effort: effort as EffortLevel }),
         ...(subAgents.length && {
@@ -2231,11 +2327,20 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
-        if (msg.type === 'system' && msg.subtype === 'init')
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          run.nativeHandle = msg.session_id;
           await this.saveSession(run, msg.session_id);
+        }
         // A sub-agent's words stay with its hand-off; the reply shown is the
         // main conversation's.
         const main = !('parent_tool_use_id' in msg) || !msg.parent_tool_use_id;
+        // The turn's last entry in the session, where a later turn can go on from.
+        if (
+          main &&
+          (msg.type === 'assistant' || (msg.type === 'user' && !('isReplay' in msg))) &&
+          msg.uuid
+        )
+          run.nativeAt = msg.uuid;
         if (msg.type === 'stream_event' && main) {
           const event = msg.event;
           if (event.type === 'message_start') streamed = false;
