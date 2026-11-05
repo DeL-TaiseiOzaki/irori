@@ -18,6 +18,7 @@ import {
   isDamaged,
   mergeHeldEvents,
   promptLimit,
+  steeringAgents,
   trimConversation,
   withRequests,
   type QueuedMessage,
@@ -546,6 +547,37 @@ export function AgentColumn({
       setSending(false);
     }
   }
+  /**
+   * Sends one queued instruction now, ahead of the others (ADR 056): the run in
+   * progress takes it mid-turn when its CLI can, or stops for it; without a run
+   * it starts at once.
+   */
+  async function sendNow(item: QueuedMessage) {
+    if (!scopeId || !target || submitting.current || draining.current.has(target.id)) return;
+    const conversationId = target.id;
+    submitting.current = true;
+    draining.current.add(conversationId);
+    setSending(true);
+    try {
+      if (!(await shared.save())) return;
+      followConversation.current = true;
+      let steered = false;
+      await shared.launch(scopeId, conversationId, async () => {
+        const sent = await host.sendQueuedNow(scopeId, conversationId, item.id, workspaceId);
+        if (targetNow.current?.id === conversationId) setQueued(sent.queued);
+        steered = sent.steered;
+        return sent.runId;
+      });
+      // The stop it took has paused the queue; a send lets the queue go on (ADR 034).
+      if (!steered && targetNow.current?.id === conversationId) setQueuePaused(false);
+    } catch (error) {
+      report(error);
+    } finally {
+      submitting.current = false;
+      draining.current.delete(conversationId);
+      setSending(false);
+    }
+  }
   useEffect(() => {
     if (!resumeWanted || shownRunning || !conversationReady) return;
     setResumeWanted(false);
@@ -1000,6 +1032,33 @@ export function AgentColumn({
               <div key={item.id}>
                 <span>{item.prompt}</span>
                 <small>{agentAccessLabel(agent, item.access)}</small>
+                <button
+                  className="queue-now"
+                  disabled={
+                    sending ||
+                    gitBusy ||
+                    shared.external ||
+                    !conversationReady ||
+                    agentInfo?.available !== true
+                  }
+                  aria-label={t(`送信待ち ${item.id} を今すぐ送る`, `Send pending ${item.id} now`)}
+                  title={
+                    !shownRunning
+                      ? t('この指示を今すぐ送ります。', 'Sends this instruction now.')
+                      : steeringAgents.includes(agent)
+                        ? t(
+                            '実行中のエージェントに今すぐ渡します。作業は止まりません。ファイルを添付した指示や、スキル・モデルなどが実行中と違う指示は、実行を止めて送ります。',
+                            "Gives this to the running agent now, without stopping its work. An instruction with attached files, or whose skill, model or other choices differ from the run's, stops the run and is sent.",
+                          )
+                        : t(
+                            '実行中の処理を止めて、この指示を今すぐ送ります。',
+                            'Stops the running work and sends this instruction now.',
+                          )
+                  }
+                  onClick={() => void sendNow(item)}
+                >
+                  {t('今すぐ送る', 'Send now')}
+                </button>
                 <button
                   disabled={sending}
                   aria-label={t(`送信待ち ${item.id} を削除`, `Remove pending send ${item.id}`)}

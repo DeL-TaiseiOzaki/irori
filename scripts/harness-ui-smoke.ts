@@ -214,7 +214,7 @@ try {
             .getByLabel('送信待ち', { exact: true })
             .locator('div')
             .filter({ hasText: 'discard queued message' })
-            .getByRole('button')
+            .getByRole('button', { name: /を削除$/ })
             .click();
           await expect(page.getByLabel('送信待ち', { exact: true })).not.toContainText(
             'discard queued message',

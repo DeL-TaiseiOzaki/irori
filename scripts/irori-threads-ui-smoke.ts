@@ -10,22 +10,36 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // irori mode's threads (ADR 034): the irori agent's conversations run side by side
 // in columns, a closed column's run goes on in a tab, each workspace keeps its own
-// threads and columns, a conversation of another workspace is never shown, and a
-// stopped conversation takes a new instruction after its queued one, in irori mode
-// and in a vault's column. `codex` is a protocol fixture; no model runs.
+// threads and columns, a conversation of another workspace is never shown, a
+// stopped conversation takes a new instruction after its queued one, and a queued
+// instruction sent now joins the running turn (ADR 056), in irori mode and in a
+// vault's column. `codex` is a protocol fixture; no model runs.
 if (process.platform === 'win32') {
   console.log('irori mode thread UI executable fixtures are POSIX only.');
   process.exit(0);
 }
 // A Codex app server that answers each turn with the instruction's last line. A turn
-// whose instruction says `hold:NAME` waits until a file `release-NAME` is in its folder.
+// whose instruction says `hold:NAME` waits until a file `release-NAME` is in its folder,
+// or until words are steered into it, which it answers and then ends.
 const codexFixture = `#!/usr/bin/env node
 if (process.argv.includes('--version')) { console.log('codex-cli 0.154.0 fixture'); process.exit(0); }
 const fs = require('node:fs');
 const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
+let held;
 require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
   const m = JSON.parse(line);
   if (!m.method || m.id === undefined) return;
+  if (m.method === 'turn/steer') {
+    const steered = m.params.input.map((part) => part.text ?? '').join('\\n');
+    fs.appendFileSync('codex-turns.jsonl', JSON.stringify({ steered }) + '\\n');
+    send({ id: m.id, result: { turnId: m.params.expectedTurnId } });
+    clearInterval(held);
+    setTimeout(() => {
+      send({ method: 'item/agentMessage/delta', params: { delta: 'steered: ' + steered } });
+      send({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+    }, 50);
+    return;
+  }
   if (m.method === 'turn/start') {
     const text = m.params.input.map((part) => part.text ?? '').join('\\n');
     const said = text.trim().split('\\n').at(-1);
@@ -37,11 +51,11 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
       send({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
     };
     if (!hold) return finish();
-    const timer = setInterval(() => {
+    const timer = (held = setInterval(() => {
       if (!fs.existsSync('release-' + hold)) return;
       clearInterval(timer);
       finish();
-    }, 100);
+    }, 100));
     return;
   }
   const result = m.method.startsWith('thread/')
@@ -95,13 +109,15 @@ const app = await electron.launch({
 });
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
-/** What the fixture was told, in order, in a folder. */
-const said = async (folder: string) =>
+/** What the fixture was told, in order, in a folder: turns' last lines, or words steered in. */
+const told = async (folder: string, key: 'said' | 'steered') =>
   (await readFile(path.join(folder, 'codex-turns.jsonl'), 'utf8').catch(() => ''))
     .trim()
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line).said as string);
+    .map((line) => JSON.parse(line)[key] as string | undefined)
+    .filter((value) => value !== undefined);
+const said = (folder: string) => told(folder, 'said');
 const release = (folder: string, name: string) =>
   writeFile(path.join(folder, `release-${name}`), '');
 try {
@@ -201,8 +217,26 @@ try {
   await send(column(1), 'irori agent への指示', 'after the stop', '送信待ちに追加');
   await expect(queue).toHaveCount(0);
   await expect(column(1).getByRole('log')).toContainText('reply to after the stop');
-  const told = await said(youRoot);
-  expect(told.slice(-2)).toEqual(['queued follow-up', 'after the stop']);
+  expect((await said(youRoot)).slice(-2)).toEqual(['queued follow-up', 'after the stop']);
+
+  // A queued instruction sent now joins the turn under way, which goes on with it;
+  // the one queued before it still waits, and goes when the turn ends (ADR 056).
+  await send(column(1), 'irori agent への指示', 'steered thread hold:steer');
+  await expect(column(1).getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  await send(column(1), 'irori agent への指示', 'waits behind', '送信待ちに追加');
+  await send(column(1), 'irori agent への指示', 'join now', '送信待ちに追加');
+  await expect(queue).toContainText('join now');
+  await column(1).screenshot({ path: 'test-results/irori-send-now.png' });
+  await queue
+    .locator('div')
+    .filter({ hasText: 'join now' })
+    .getByRole('button', { name: /今すぐ送る/ })
+    .click();
+  await expect(column(1).getByRole('log')).toContainText('steered: join now');
+  await expect(column(1).getByRole('log')).toContainText('reply to waits behind');
+  await expect(queue).toHaveCount(0);
+  expect(await told(youRoot, 'steered')).toEqual(['join now']);
+  expect((await said(youRoot)).slice(-2)).toEqual(['steered thread hold:steer', 'waits behind']);
 
   // Each workspace keeps its own threads and columns.
   await column(1).getByRole('button', { name: '列を追加' }).click();
@@ -259,6 +293,15 @@ try {
   await expect(vaultQueue).toHaveCount(0);
   await expect(vault.getByRole('log')).toContainText('reply to vault again');
   expect((await said(roots.Alpha)).slice(-2)).toEqual(['vault follow-up', 'vault again']);
+  // The vault agent's running turn takes an instruction sent now as well.
+  await send(vault, 'エージェントへの指示', 'vault steered hold:vaultsteer');
+  await expect(vault.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  await send(vault, 'エージェントへの指示', 'vault join now', '送信待ちに追加');
+  await expect(vaultQueue).toContainText('vault join now');
+  await vaultQueue.getByRole('button', { name: /今すぐ送る/ }).click();
+  await expect(vaultQueue).toHaveCount(0);
+  await expect(vault.getByRole('log')).toContainText('steered: vault join now');
+  expect(await told(roots.Alpha, 'steered')).toEqual(['vault join now']);
   await expect
     .poll(async () =>
       (await page.evaluate(([id]) => window.irori.agentConversations(id), [ids.Alpha])).some(
@@ -269,14 +312,16 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
+    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
   );
 } finally {
   // A turn still held would keep its run, and the app, open.
   for (const [folder, name] of [
     [youRoot, 'one'],
     [youRoot, 'two'],
+    [youRoot, 'steer'],
     [roots.Alpha, 'vault'],
+    [roots.Alpha, 'vaultsteer'],
   ])
     await release(folder, name);
   await app.close();
