@@ -45,7 +45,7 @@ import type { PathTarget } from '../domain/path-links';
 import type { PathOpener } from './path-links';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { type Conversation, isDamaged } from '../domain/conversation';
-import { defaultAgentAccess } from '../domain/agent-access';
+import { conversationAccess } from '../domain/agent-access';
 import { Dialog } from './Dialog';
 import {
   AgentColumn,
@@ -339,10 +339,7 @@ interface DockActions {
   setColumns: Dispatch<SetStateAction<DockColumn[]>>;
   setModelChoice: Dispatch<SetStateAction<Record<string, string>>>;
   setEffortChoice: Dispatch<SetStateAction<Record<string, string>>>;
-  setAccessChoice: Dispatch<SetStateAction<Record<string, { agent: AgentId; value: AgentAccess }>>>;
-  setYourAccessSelection: Dispatch<
-    SetStateAction<{ agent: AgentId; value: AgentAccess } | undefined>
-  >;
+  setAccessChoice: Dispatch<SetStateAction<Record<string, AgentAccess>>>;
   setColumnStatus: Dispatch<SetStateAction<Record<string, { sending: boolean; queued: number }>>>;
   setHanded: Dispatch<SetStateAction<string[] | undefined>>;
 }
@@ -363,7 +360,6 @@ const DockColumnView = memo(function DockColumnView({
   tabs,
   agentChoice,
   yourChoice,
-  yourAccess,
   accessChoice,
   modelChoice,
   effortChoice,
@@ -393,8 +389,8 @@ const DockColumnView = memo(function DockColumnView({
   tabs: Record<string, Tab[]>;
   agentChoice: AgentChoice;
   yourChoice: ReturnType<typeof currentYourAi>;
-  yourAccess: AgentAccess;
-  accessChoice: Record<string, { agent: AgentId; value: AgentAccess }>;
+  /** The access the person chose for each conversation, by its id. */
+  accessChoice: Record<string, AgentAccess>;
   modelChoice: Record<string, string>;
   effortChoice: Record<string, string>;
   skills: AgentSkill[];
@@ -423,11 +419,8 @@ const DockColumnView = memo(function DockColumnView({
   const target = key ? shown[key] : undefined;
   const columnAgent =
     target?.agent ?? (irori ? yourChoice.agent : agentOf(agentChoice, active?.scopeId));
-  const access = irori
-    ? yourAccess
-    : accessChoice[key]?.agent === columnAgent
-      ? accessChoice[key].value
-      : defaultAgentAccess(columnAgent);
+  // The conversation on show keeps its own access (ADR 009); the column holds none.
+  const accessChosen = target ? accessChoice[target.id] : undefined;
   const rememberAgent = (next: AgentId) => {
     if (irori) act.chooseYour({ ...yourChoice, agent: next });
     else if (active) act.remember(active.scopeId, next);
@@ -454,7 +447,7 @@ const DockColumnView = memo(function DockColumnView({
           ? yourChoice.models[columnAgent] || undefined
           : active && (modelChoice[`${active.scopeId}:${columnAgent}`] || undefined)
       }
-      access={access}
+      accessChoice={accessChosen}
       skills={irori ? noSkills : skills}
       skillsRetired={irori ? noRetired : skillsRetired}
       skillProblems={irori ? noProblems : skillProblems}
@@ -497,12 +490,7 @@ const DockColumnView = memo(function DockColumnView({
           }));
       }}
       onAccess={(value) => {
-        if (irori) act.setYourAccessSelection({ agent: columnAgent, value });
-        else
-          act.setAccessChoice((all) => ({
-            ...all,
-            [key]: { agent: columnAgent, value },
-          }));
+        if (target) act.setAccessChoice((all) => ({ ...all, [target.id]: value }));
       }}
       onAgent={(next, replace) => {
         if (!scopeId) return;
@@ -814,20 +802,10 @@ function App() {
     setYourChoice(next);
     void chooseYourAi(next).catch(report);
   }
-  // Your AI's access, kept like a brain composer's choice: for its CLI, until that changes.
-  const [yourAccessSelection, setYourAccessSelection] = useState<{
-    agent: AgentId;
-    value: AgentAccess;
-  }>();
-  const yourAccess =
-    yourAccessSelection?.agent === yourChoice.agent
-      ? yourAccessSelection.value
-      : defaultAgentAccess(yourChoice.agent);
-  // A vault column's access, by where it shows: for its CLI, until that changes.
-  const [accessChoice, setAccessChoice] = useState<
-    Record<string, { agent: AgentId; value: AgentAccess }>
-  >({});
-  useEffect(() => setAccessChoice({}), [workspace?.id]);
+  // The access the person chose for a conversation, by its id: every send to it
+  // keeps that access, wherever it is sent from. A conversation not chosen for
+  // runs with what its last run used, a new one in the standard access.
+  const [accessChoice, setAccessChoice] = useState<Record<string, AgentAccess>>({});
   // Runs in progress by id, and sends on their way to the host by conversation (by
   // space when none is named). An owner's conversations run side by side (ADR 020),
   // so a space is running while any of its runs is.
@@ -1748,11 +1726,17 @@ function App() {
     const target = shown[scopeId];
     const agentId = target?.agent ?? agentFor(scopeId);
     const value = await host.agentConversation(scopeId, agentId, target?.id);
+    const conversationId = value.summary?.agent === agentId || target ? value.id : undefined;
     const input = {
       scopeId,
       agent: agentId,
-      conversationId: value.summary?.agent === agentId || target ? value.id : undefined,
-      access: defaultAgentAccess(agentId),
+      conversationId,
+      // The conversation's own access, as its column shows it; a new one is standard.
+      access: conversationAccess(
+        agentId,
+        conversationId ? accessChoice[conversationId] : undefined,
+        conversationId ? value.access : undefined,
+      ),
       model: modelFor(scopeId, agentId),
       effort: effortFor(scopeId, agentId),
       prompt: message,
@@ -2497,7 +2481,6 @@ function App() {
     setModelChoice,
     setEffortChoice,
     setAccessChoice,
-    setYourAccessSelection,
     setColumnStatus,
     setHanded,
   });
@@ -2660,7 +2643,6 @@ function App() {
             tabs={tabs}
             agentChoice={agentChoice}
             yourChoice={yourChoice}
-            yourAccess={yourAccess}
             accessChoice={accessChoice}
             modelChoice={modelChoice}
             effortChoice={effortChoice}
@@ -3048,6 +3030,7 @@ function App() {
               revisions={revisions}
               addDisabled={anyRunning || dirty || connecting}
               agentFor={agentFor}
+              accessChoice={accessChoice}
               vaultAgent={vaultAgent}
               onView={setOverviewView}
               onSearch={() => {
@@ -3837,7 +3820,6 @@ function App() {
                           tabs={tabs}
                           agentChoice={agentChoice}
                           yourChoice={yourChoice}
-                          yourAccess={yourAccess}
                           accessChoice={accessChoice}
                           modelChoice={modelChoice}
                           effortChoice={effortChoice}

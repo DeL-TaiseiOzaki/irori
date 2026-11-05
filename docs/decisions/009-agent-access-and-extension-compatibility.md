@@ -29,6 +29,17 @@ permissions explicitly:
   re-consent, delivery checks and interruption recovery are implemented. Do not
   present an enabled write selector that cannot enforce its advertised mode.
 
+**Each conversation keeps its own mode** (2026-11-05, 0.2.57, an owner
+report). Until 0.2.56 the composer held the choice per column and CLI: a new
+conversation in that column took the last one's full access, and choosing
+standard there turned the first conversation back to standard as soon as it
+was shown again, starting its native session over. The mode now belongs to the
+conversation. A change applies to that conversation alone, and every later
+send to it keeps it, from its column, its queue or the Overview, until the
+person changes it again. A conversation not changed in this window runs with
+the mode its last run used, kept in `meta.json` across restarts. A new
+conversation starts standard, and no conversation takes another's mode.
+
 The owner clarified that the requirement is **the capabilities available to an
 ordinary native CLI agent**, including its file and command tools, through
 irori. Editor syntax coloring, completion, diagnostics and run buttons are
