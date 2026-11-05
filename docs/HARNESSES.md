@@ -100,6 +100,21 @@ extension command can hold while the person answers its dialogs, has no deadline
 of its own either. Other protocol replies keep their 45-second bound, and
 OpenCode's prompt request was already unbounded.
 
+Send now, 2026-11-04 (0.2.56, [ADR 056](decisions/056-send-now.md)): a
+queued instruction sent now joins a Claude Code or Codex turn in progress.
+Claude Code: every turn uses the Agent SDK's streaming input (`query` with an
+async iterable; the request is the same first user message a string prompt
+sends), a later message goes with `priority: 'next'`, which Claude Code takes
+at the turn's next step, and the input closes at the turn's `result`; the SDK
+then waits for the session state's `idle` before closing stdin, so words sent
+just before the result are answered too. Codex: `turn/steer` with `threadId`,
+`expectedTurnId` and a text input, refused once the turn has ended and for a
+review or a compaction. Pi's RPC `steer` is not used yet: on 0.85 a steer that
+arrives as the run settles is queued with no run to take it. OpenCode, Hermes
+Agent and the Antigravity CLI take nothing mid-turn; there, as for an
+instruction a run cannot take, the run stops and the instruction starts.
+Protocol fixtures only; no real turn was steered.
+
 ## Native configuration and lifecycle
 
 Access follow-up, 2026-09-23: the composer offers native/default behavior and
