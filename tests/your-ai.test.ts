@@ -487,6 +487,24 @@ test(
 );
 
 test(
+  'a hand-off starts in the access the settings give new conversations (protocol fixture)',
+  fixtureOptions,
+  async (t) => {
+    const { brains, service, events, run, fixtureLog } = await delegation(t);
+    // The person chose full access for every agent's new conversations (ADR 009).
+    service.preferredAccess = async () => 'full-access';
+    await run('Write a decision note.');
+    const [vault] = await fixtureLog(brains[0].root);
+    assert.equal(vault.mode, 'bypassPermissions');
+    assert.equal(events.filter((event) => event.type === 'permission').length, 0);
+    assert.equal(
+      await readFile(path.join(brains[0].root, 'Knowledge_Base', 'from-your-ai.md'), 'utf8'),
+      '# From your AI\n',
+    );
+  },
+);
+
+test(
   'a vault’s own definition of its agent goes with the hand-off; its other definitions are its sub-agents on any CLI (protocol fixture)',
   fixtureOptions,
   async (t) => {

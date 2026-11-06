@@ -1034,6 +1034,7 @@ export class ConversationStore {
           updatedAt: at,
           archived: false,
           ...(input.model && { model: input.model }),
+          access: input.access ?? 'default',
         });
       } catch (error) {
         // The claim is undone, so the instruction stays in the queue it came from.

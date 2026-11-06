@@ -6,12 +6,34 @@ export function agentAccessOptions(agent: AgentId): AgentAccess[] {
 }
 
 /**
- * Every conversation starts in the CLI's standard access. Full access is the
- * person's choice for a conversation, never a default: a vault's notes and
- * connected folders can carry text written by someone else.
+ * The access a new conversation starts in: the one the person chose in the
+ * settings for every agent, standard unless they chose full access (ADR 009). A
+ * vault's notes and connected folders can carry text written by someone else,
+ * so full access is never irori's own default. A CLI that offers only its own
+ * settings keeps them.
  */
-export function defaultAgentAccess(_agent: AgentId): AgentAccess {
-  return 'default';
+export function defaultAgentAccess(
+  agent: AgentId,
+  preferred: AgentAccess = 'default',
+): AgentAccess {
+  return agentAccessOptions(agent).includes(preferred) ? preferred : 'default';
+}
+
+/**
+ * The access a conversation runs with: the person's choice for it, else what its
+ * last run used, else the access new conversations start in (`preferred`, from
+ * the settings). Each conversation keeps its own: one never takes another's, and
+ * none changes by itself, the settings' choice included.
+ */
+export function conversationAccess(
+  agent: AgentId,
+  chosen?: AgentAccess,
+  saved?: AgentAccess,
+  preferred: AgentAccess = 'default',
+): AgentAccess {
+  for (const access of [chosen, saved])
+    if (access && agentAccessOptions(agent).includes(access)) return access;
+  return defaultAgentAccess(agent, preferred);
 }
 
 export function requireAgentAccess(agent: AgentId, access: AgentAccess = 'default'): AgentAccess {

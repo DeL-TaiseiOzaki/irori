@@ -2,7 +2,7 @@ import { Dialog } from './Dialog';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
-import type { Category, Space, WorkspaceProfile } from '../domain/types';
+import type { AgentAccess, Category, Space, WorkspaceProfile } from '../domain/types';
 import type { OpenTab } from '../domain/workspace-tabs';
 import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
 import { appIcon, appVersion } from './branding';
@@ -388,6 +388,8 @@ export function Startup({
   refresh,
   vaultAgent,
   onVaultAgent,
+  agentAccess,
+  onAgentAccess,
   onRestored,
   onOpen,
   open = [],
@@ -396,6 +398,8 @@ export function Startup({
   refresh: () => Promise<void>;
   vaultAgent: boolean;
   onVaultAgent: (on: boolean) => void;
+  agentAccess: AgentAccess;
+  onAgentAccess: (access: AgentAccess) => void;
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   onOpen: (workspace: WorkspaceProfile) => void;
@@ -662,6 +666,8 @@ export function Startup({
             start
             vaultAgent={vaultAgent}
             onVaultAgent={onVaultAgent}
+            agentAccess={agentAccess}
+            onAgentAccess={onAgentAccess}
             onRestored={restored}
             onError={(e) => setError(errorText(e))}
           />

@@ -23,7 +23,7 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
-import { agentAccessLabel, agentAccessOptions } from '../domain/agent-access';
+import { agentAccessLabel, agentAccessOptions, conversationAccess } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill, type SkillProblem } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
@@ -123,7 +123,8 @@ export function AgentColumn({
   agent,
   model,
   effort,
-  access,
+  accessChoice,
+  preferredAccess,
   skills,
   skillsRetired,
   skillProblems,
@@ -173,7 +174,10 @@ export function AgentColumn({
   model?: string;
   /** How much the CLI thinks; its own default when absent. */
   effort?: string;
-  access: AgentAccess;
+  /** The access the person chose for the conversation on show, if they did. */
+  accessChoice?: AgentAccess;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
   skillProblems: SkillProblem[];
@@ -274,6 +278,10 @@ export function AgentColumn({
   const [events, setEvents] = useState<AgentEvent[]>([]);
   // The conversation's own queue: it waits for that conversation's run alone.
   const [queued, setQueued] = useState<QueuedMessage[]>([]);
+  // The access the conversation's last run used, as the host keeps it.
+  const [savedAccess, setSavedAccess] = useState<AgentAccess>();
+  // Every send keeps the conversation's own access, unless the person changes it.
+  const access = conversationAccess(agent, accessChoice, savedAccess, preferredAccess);
   const [queuePaused, setQueuePaused] = useState(false);
   // A send to a paused queue, after 停止 or a failure, lets it go on once no run is
   // under way, even when the stopped run is still ending (ADR 034).
@@ -399,6 +407,7 @@ export function AgentColumn({
     pending.current = [];
     setEvents([]);
     setQueued([]);
+    setSavedAccess(undefined);
     setQueuePaused(true);
     setResumeWanted(false);
     setConversationReady(false);
@@ -430,6 +439,7 @@ export function AgentColumn({
         view.current = next;
         setEvents(next);
         setQueued(value.queued);
+        setSavedAccess(value.access);
         // Only the conversation holding the run knows the requests it waits on.
         if (value.activeRunId) {
           shared.addRun(value.activeRunId, scopeId, target.id);
@@ -1243,7 +1253,12 @@ export function AgentColumn({
                       : undefined
                   }
                   disabled={
-                    shownRunning || sending || gitBusy || agentAccessOptions(agent).length === 1
+                    shownRunning ||
+                    sending ||
+                    gitBusy ||
+                    // Chosen for the conversation on show, so not while another is coming.
+                    !conversationReady ||
+                    agentAccessOptions(agent).length === 1
                   }
                   onChange={(e) => onAccess(e.target.value as AgentAccess)}
                 >
