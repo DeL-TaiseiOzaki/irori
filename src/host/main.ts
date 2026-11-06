@@ -469,6 +469,8 @@ app
         emit(scopeId ? { type: 'files', scopeId } : { type: 'vaults', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
+    // A hand-off's vault conversation starts in the access the settings give new ones.
+    agents.preferredAccess = async () => (await settings.read()).agentAccess;
     // Configuration that runs without asking (hooks, MCP servers, plugins, project
     // settings) runs only once the person has seen where it is, and again after it changes.
     agents.approveConfig = async (found) => {

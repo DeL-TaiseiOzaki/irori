@@ -1071,6 +1071,7 @@ export class ConversationStore {
           updatedAt: at,
           archived: false,
           ...(input.model && { model: input.model }),
+          access: input.access ?? 'default',
         });
       } catch (error) {
         // The claim is undone, so the instruction stays in the queue it came from.
@@ -1270,6 +1271,8 @@ export class ConversationStore {
           linkedNote: meta.linkedNote,
           vaults: meta.vaults,
           ...(meta.workspace !== undefined && { workspace: meta.workspace }),
+          // A copy keeps the access the conversation had (ADR 009).
+          ...(meta.access && { access: meta.access }),
           forkedFrom: { conversationId: id, eventId: lines[end].id },
           native: point?.device === deviceId ? { [deviceId]: branchFrom(point) } : {},
         }),

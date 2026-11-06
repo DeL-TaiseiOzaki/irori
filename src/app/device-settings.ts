@@ -19,6 +19,7 @@ let current: DeviceSettings = {
   editorAssistance: true,
   propertiesFolded: false,
   vaultAgent: false,
+  agentAccess: 'default',
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
@@ -96,6 +97,15 @@ export function currentVaultAgent() {
 
 export function chooseVaultAgent(vaultAgent: boolean) {
   return save({ vaultAgent });
+}
+
+/** The access every agent's new conversation starts in (ADR 009). */
+export function currentAgentAccess() {
+  return current.agentAccess;
+}
+
+export function chooseAgentAccess(agentAccess: DeviceSettings['agentAccess']) {
+  return save({ agentAccess });
 }
 
 /** The runtimes routines may use on this device (ADR 016 D3). */

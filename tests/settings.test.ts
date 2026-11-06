@@ -23,6 +23,7 @@ const defaults = {
   editorAssistance: true,
   propertiesFolded: false,
   vaultAgent: false,
+  agentAccess: 'default',
   layouts: {},
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
@@ -124,6 +125,19 @@ test('the vault agent is off until the person turns it on, and stays as chosen',
   await settings.save({ vaultAgent: false });
   assert.equal((await new SettingsService(dir).read()).vaultAgent, false);
   assert.equal(hostArguments.saveDeviceSettings.safeParse([{ vaultAgent: 'on' }]).success, false);
+});
+
+test('new conversations start in standard access until the person chooses full access', async () => {
+  const { dir, settings } = await service();
+  // A record from before the choice existed keeps the standard access.
+  await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ vaultAgent: true }));
+  assert.equal((await settings.read()).agentAccess, 'default');
+  await settings.save({ agentAccess: 'full-access' });
+  assert.equal((await new SettingsService(dir).read()).agentAccess, 'full-access');
+  assert.equal(
+    hostArguments.saveDeviceSettings.safeParse([{ agentAccess: 'everything' }]).success,
+    false,
+  );
 });
 
 test('side margins stay as chosen, and a record without them keeps the reading column', async () => {

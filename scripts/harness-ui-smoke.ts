@@ -367,10 +367,11 @@ try {
           .session.access,
     )
     .toBe('full-access');
-  // Another CLI is another conversation (ADR 017 D2): back on OpenCode, the log is empty.
+  // Another CLI is another conversation (ADR 017 D2): back on OpenCode, the log is empty,
+  // and the new conversation starts in the standard access, not the last one's.
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
-  await expect(access).toHaveValue('full-access');
+  await expect(access).toHaveValue('default');
   await expect(page.locator('.message.done')).toHaveCount(0);
   doneCount = 0;
   await access.selectOption('default');
