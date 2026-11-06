@@ -184,7 +184,7 @@ try {
       expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     const log = panel.getByRole('log');
     const forks = (await told(folder, 'fork')).length;
-    await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+    await fresh(panel);
     for (const word of ['keep', 'change']) {
       await send(panel, label, `${name} ${word}`);
       await expect(log).toContainText(`reply to ${name} ${word}`);
