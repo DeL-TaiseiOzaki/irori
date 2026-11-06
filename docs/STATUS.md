@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Edit a sent message and branch a conversation, 2026-11-05 (**0.2.58**, not yet
-published; [ADR 017](decisions/017-conversation-history.md) D6, D7 — stage 3):
+Edit a sent message and branch a conversation, 2026-11-05 (**0.2.58**,
+[#301](https://github.com/DeL-TaiseiOzaki/irori/pull/301), published as `v0.2.58-preview.1`;
+[ADR 017](decisions/017-conversation-history.md) D6, D7 — stage 3):
 the owner asked for the edit-and-resume and fork that Claude Code and Codex
 offer.
 - `ConversationStore.rewind` sets a run-starting message and what follows aside
@@ -34,7 +35,8 @@ offer.
   the Agent SDK 0.3.284 types. Files are not restored on rewind; Pi's and
   OpenCode's own fork are not used yet.
 
-Each conversation keeps its access, 2026-11-05 (**0.2.57**, not yet published;
+Each conversation keeps its access, 2026-11-05 (**0.2.57**,
+[#300](https://github.com/DeL-TaiseiOzaki/irori/pull/300), published as `v0.2.57-preview.1`;
 [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)): the
 owner reported that full access chosen in a conversation went back to
 standard on a later send, and the reverse. Reproduced with the Codex protocol
@@ -71,7 +73,8 @@ send always used the standard access.
   standard access. Verified with `npm run build`, `npm test` and
   `npm run test:ui`. Not verified with a real CLI turn.
 
-Send a queued instruction now, 2026-11-04 (**0.2.56**, not yet published;
+Send a queued instruction now, 2026-11-04 (**0.2.56**,
+[#299](https://github.com/DeL-TaiseiOzaki/irori/pull/299), published as `v0.2.56-preview.1`;
 [ADR 056](decisions/056-send-now.md)): the owner asked that an instruction
 typed while a vault agent or the irori agent works can be sent at once, as
 Claude Code and Codex allow, instead of waiting in the queue for the run's end.
