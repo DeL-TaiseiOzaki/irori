@@ -1,4 +1,14 @@
-import { lazy, memo, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { AgentAnswers, AgentEvent, Question, Space } from '../domain/types';
 import { questionsAnswered } from '../domain/questions';
 import { MessageAttachments } from './Attachments';
@@ -423,7 +433,15 @@ const Report = memo(function Report({ event, brain }: { event: AgentEvent; brain
   );
 });
 
-const Message = memo(function Message({ event, live }: { event: AgentEvent; live: boolean }) {
+const Message = memo(function Message({
+  event,
+  live,
+  action,
+}: {
+  event: AgentEvent;
+  live: boolean;
+  action?: ReactNode;
+}) {
   return (
     <div className={`message ${event.type}`}>
       {event.type === 'done' && (
@@ -434,9 +452,20 @@ const Message = memo(function Message({ event, live }: { event: AgentEvent; live
       ) : (
         <span>{event.text}</span>
       )}
+      {action}
     </div>
   );
 });
+
+/** What the person can do with a message of the log (ADR 017 D6). */
+export interface LogActions {
+  /** Edit one of the person's messages that started a run, and go on from before it. */
+  edit?: (event: AgentEvent) => void;
+  /** Copy the conversation through the end of a run into a new one. */
+  fork?: (event: AgentEvent) => void;
+  /** Why neither can be done now (a run or a queue), shown on the buttons. */
+  blocked?: string;
+}
 
 const none: Space[] = [];
 function brainOf(brains: Space[], event: AgentEvent) {
@@ -456,6 +485,7 @@ export const AgentLog = memo(function AgentLog({
   events,
   activeRun,
   brains = none,
+  actions,
   onError,
 }: {
   events: AgentEvent[];
@@ -463,6 +493,7 @@ export const AgentLog = memo(function AgentLog({
   activeRun?: string;
   /** The brains your AI hands work to, for their names and tiles. */
   brains?: Space[];
+  actions?: LogActions;
   onError: (e: unknown) => void;
 }) {
   useLanguage();
@@ -472,6 +503,17 @@ export const AgentLog = memo(function AgentLog({
   const last = events.at(-1);
   // The newest event of the run in progress: a step being taken, or a reply still arriving.
   const current = last && activeRun && last.runId === activeRun ? last : undefined;
+  // The person's messages that started a run: the ones a rewind can go back to.
+  const starts = useMemo(() => {
+    const seen = new Set<string>();
+    const ids = new Set<string>();
+    for (const event of events)
+      if (event.role === 'user' && !seen.has(event.runId)) {
+        seen.add(event.runId);
+        ids.add(event.id!);
+      } else seen.add(event.runId);
+    return ids;
+  }, [events]);
   return (
     <>
       {items.map((item) => {
@@ -481,6 +523,27 @@ export const AgentLog = memo(function AgentLog({
               <div className="message user" key={item.key}>
                 <MessageAttachments attachments={item.event.attachments} />
                 <span>{item.event.text}</span>
+                {actions?.edit && starts.has(item.event.id!) && (
+                  <button
+                    type="button"
+                    className="message-action edit"
+                    aria-label={t(
+                      'この指示を編集してやり直す',
+                      'Edit this message and go on from it',
+                    )}
+                    title={
+                      actions.blocked ??
+                      t(
+                        'この指示を編集して、ここから会話をやり直します',
+                        'Edit this message and go on from here',
+                      )
+                    }
+                    disabled={!!actions.blocked}
+                    onClick={() => actions.edit!(item.event)}
+                  >
+                    <Icon name="penLine" size={12} />
+                  </button>
+                )}
               </div>
             );
           case 'label':
@@ -523,6 +586,25 @@ export const AgentLog = memo(function AgentLog({
                 key={item.key}
                 event={item.event}
                 live={item.event.type === 'text' && item.event === current}
+                action={
+                  actions?.fork &&
+                  item.event.type === 'done' &&
+                  item.event.runId !== activeRun && (
+                    <button
+                      type="button"
+                      className="message-action fork"
+                      aria-label={t('ここから分岐', 'Branch from here')}
+                      title={t(
+                        'ここまでの会話を新しい会話として複製します',
+                        'Copies the conversation up to here into a new conversation',
+                      )}
+                      onClick={() => actions.fork!(item.event)}
+                    >
+                      <Icon name="branch" size={12} />
+                      {t('ここから分岐', 'Branch from here')}
+                    </button>
+                  )
+                }
               />
             );
         }

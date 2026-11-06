@@ -2,9 +2,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import readline from 'node:readline';
 import { exec } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+/** Calls `on` with each LF-terminated line of `stream`. */
+function lfLines(stream, on) {
+  let buffer = '';
+  stream.setEncoding('utf8');
+  stream.on('data', (chunk) => {
+    buffer += chunk;
+    for (let at = buffer.indexOf('\n'); at >= 0; at = buffer.indexOf('\n')) {
+      const line = buffer.slice(0, at).replace(/\r$/, '');
+      buffer = buffer.slice(at + 1);
+      if (line.trim()) on(line);
+    }
+  });
+}
+// A new session hears the conversation so far before the request (ADR 017 D7); the
+// stand-ins act on the request itself, not on words quoted from earlier turns.
+const withoutEarlier = (text) =>
+  text.replace(/Earlier in this conversation[\s\S]*?\[End of the earlier conversation\.\]/, '');
 export function run(kind) {
   if (process.argv.includes('--version')) {
     console.log(
@@ -125,7 +141,9 @@ export function run(kind) {
         send({ type: 'agent_settled' });
       }, 20);
     };
-    readline.createInterface({ input: process.stdin }).on('line', (line) => {
+    // Records split at LF alone, as Pi's RPC framing does: readline would also split
+    // at U+2028, which JSON leaves unescaped inside strings.
+    lfLines(process.stdin, (line) => {
       const message = JSON.parse(line);
       log(message);
       if (message.type === 'get_state')
@@ -146,7 +164,7 @@ export function run(kind) {
       if (message.type === 'prompt') {
         if (!fs.existsSync(session))
           fs.writeFileSync(session, JSON.stringify({ type: 'session', cwd: process.cwd() }) + '\n');
-        if (message.message.includes('crash')) return process.exit(2);
+        if (withoutEarlier(message.message).includes('crash')) return process.exit(2);
         if (message.message.startsWith('/fixture')) {
           send({ type: 'response', id: message.id, command: 'prompt', success: true });
           return;
@@ -166,9 +184,10 @@ export function run(kind) {
           });
           return;
         }
-        if (message.message.includes('hold')) return;
-        if (message.message.includes('rewrite')) return void hooks(message.message).then(complete);
-        if (message.message.includes('dialog')) {
+        if (withoutEarlier(message.message).includes('hold')) return;
+        if (withoutEarlier(message.message).includes('rewrite'))
+          return void hooks(message.message).then(complete);
+        if (withoutEarlier(message.message).includes('dialog')) {
           waiting = 'confirm';
           send({
             type: 'extension_ui_request',
@@ -179,8 +198,8 @@ export function run(kind) {
           });
         } else
           complete(
-            message.message.includes('fail'),
-            message.message.includes('markdown') ? markdownReply : undefined,
+            withoutEarlier(message.message).includes('fail'),
+            withoutEarlier(message.message).includes('markdown') ? markdownReply : undefined,
           );
       }
       if (message.type === 'extension_ui_response') {
@@ -275,7 +294,7 @@ export function run(kind) {
       return res.end(JSON.stringify(session));
     }
     if (route === '/session/' + sessionID + '/message') {
-      const text = body.parts[0].text;
+      const text = withoutEarlier(body.parts[0].text);
       if (text.includes('crash')) return process.exit(2);
       if (text.includes('fail'))
         return res.end(
@@ -331,6 +350,7 @@ async function hermes(log) {
   let prompt = '';
   for await (const chunk of process.stdin) prompt += chunk;
   log({ args, prompt });
+  prompt = withoutEarlier(prompt);
   const send = (value) =>
     process.stdout.write(JSON.stringify({ ...value, timestamp: Date.now() }) + '\n');
   if (prompt.includes('crash')) process.exit(2);
@@ -399,8 +419,8 @@ async function antigravity(log) {
   let input = '';
   for await (const chunk of process.stdin) input += chunk;
   const message = JSON.parse(input.trim());
-  const prompt = message.message.content;
-  log({ args, prompt, event: message.event });
+  log({ args, prompt: message.message.content, event: message.event });
+  const prompt = withoutEarlier(message.message.content);
   const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
   const result = (value) =>
     send({

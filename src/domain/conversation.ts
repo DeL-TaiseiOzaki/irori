@@ -112,6 +112,11 @@ export const conversationMeta = z.looseObject({
         .string()
         .regex(/^[0-9a-f]{64}$/)
         .optional(),
+      /**
+       * The next turn goes on from this point of the session as a new branch of it,
+       * after a rewind or into a copy (ADR 017 D6): Claude Code's entry, Codex's turn.
+       */
+      branch: z.object({ at: z.string().min(1).max(400) }).optional(),
     }),
   ),
 });
