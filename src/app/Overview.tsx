@@ -577,12 +577,14 @@ function OverviewComposer({
   ais,
   agentFor,
   accessChoice,
+  preferredAccess,
   onSend,
 }: {
   spaces: Space[];
   ais: Record<string, BrainAi>;
   agentFor: (scopeId: string) => AgentId;
   accessChoice: Record<string, AgentAccess>;
+  preferredAccess: AgentAccess;
   onSend: (scopeId: string, prompt: string) => Promise<void>;
 }) {
   const [target, setTarget] = useState(spaces[0]?.scopeId);
@@ -652,6 +654,7 @@ function OverviewComposer({
               agentFor(space.scopeId),
               ai.id ? accessChoice[ai.id] : undefined,
               ai.access,
+              preferredAccess,
             ),
           )}
         </small>
@@ -683,6 +686,7 @@ export function Overview({
   addDisabled,
   agentFor,
   accessChoice,
+  preferredAccess,
   vaultAgent,
   onView,
   onSearch,
@@ -710,6 +714,8 @@ export function Overview({
   agentFor: (scopeId: string) => AgentId;
   /** The access the person chose for each conversation, by its id. */
   accessChoice: Record<string, AgentAccess>;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   /** Each vault's own agent is offered (ADR 021); otherwise the irori agent alone. */
   vaultAgent: boolean;
   onView: (view: OverviewView) => void;
@@ -1056,6 +1062,7 @@ export function Overview({
                       ais={ais}
                       agentFor={agentFor}
                       accessChoice={accessChoice}
+                      preferredAccess={preferredAccess}
                       onSend={reread(onSend)}
                     />
                   </>

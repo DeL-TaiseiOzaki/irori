@@ -19,9 +19,20 @@ send always used the standard access.
 - Renderer: `accessChoice` is keyed by conversation id; `AgentColumn` reads the
   conversation's saved access with its log; the Overview's quick send and its
   footer use the same resolution (`BrainAi.access`).
-- Tests: `tests/conversation-access.test.ts`; `scripts/irori-threads-ui-smoke.ts`
+- The owner then asked for a setting: `DeviceSettings.agentAccess` ('default' or
+  'full-access', default 'default') is offered as 新しい会話のアクセス in the
+  settings' エージェント part, with its meaning shown (in the attention colour
+  for full access). `conversationAccess` and `defaultAgentAccess` take it as the
+  last fallback; the composer, the Overview and `AgentService.preferredAccess`
+  (hand-offs) use it. It is device-only (not in `environmentPreferences`);
+  routine steps keep their own access; Pi keeps its settings.
+- Tests: `tests/conversation-access.test.ts` (with the setting's storage);
+  `tests/your-ai.test.ts` (a hand-off in full access from the setting, no
+  request); `scripts/irori-threads-ui-smoke.ts`
   checks both columns (full access through later sends, a new conversation in
-  standard, the first back in full access with `thread/resume`);
+  standard, the first back in full access with `thread/resume`, then the
+  setting starting a new conversation in full access while one in standard
+  keeps it);
   `scripts/harness-ui-smoke.ts` now expects a new OpenCode conversation in
   standard access. Verified with `npm run build`, `npm test` and
   `npm run test:ui`. Not verified with a real CLI turn.

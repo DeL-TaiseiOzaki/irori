@@ -348,6 +348,41 @@ try {
   expect(await told(roots.Alpha, 'steered')).toEqual(['vault join now']);
   await expect(vault.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   await ownAccess(vault, 'エージェントへの指示', roots.Alpha, 'vault');
+  // The settings choose the access every agent's new conversation starts in; one a
+  // conversation already has stays (ADR 009).
+  const chooseAccess = async (name: RegExp) => {
+    await page.getByRole('button', { name: /^設定（/ }).click();
+    const sheet = page.getByRole('dialog');
+    await sheet
+      .getByRole('group', { name: '新しい会話のアクセス' })
+      .getByRole('radio', { name })
+      .check();
+    await expect(sheet).toContainText(
+      name.test('フルアクセス') ? 'すべてフルアクセスで始まります' : '新しい会話は標準で始まり',
+    );
+    if (name.test('フルアクセス'))
+      await page.screenshot({ path: 'test-results/settings-access.png' });
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+  };
+  const vaultAccess = vault.getByLabel('エージェントのアクセス', { exact: true });
+  await expect(vaultAccess).toHaveValue('full-access');
+  await chooseAccess(/^フルアクセス$/);
+  await vault.getByRole('button', { name: '新しい会話', exact: true }).click();
+  await expect(vaultAccess).toHaveValue('full-access');
+  await send(vault, 'エージェントへの指示', 'vault from settings');
+  await expect(vault.getByRole('log')).toContainText('reply to vault from settings');
+  await expect(vault.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+  expect((await told(roots.Alpha, 'thread')).at(-1)).toBe('thread/start:never');
+  // A conversation that ran in standard keeps it.
+  await vault
+    .getByRole('tablist', { name: '開いている会話' })
+    .getByRole('tab', { name: /vault standard one/ })
+    .click();
+  await expect(vaultAccess).toHaveValue('default');
+  await chooseAccess(/^標準/);
+  await vault.getByRole('button', { name: '新しい会話', exact: true }).click();
+  await expect(vaultAccess).toHaveValue('default');
   await expect
     .poll(async () =>
       (await page.evaluate(([id]) => window.irori.agentConversations(id), [ids.Alpha])).some(
@@ -358,7 +393,7 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, and each conversation keeping its own access, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
+    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, and each conversation keeping its own access with the settings choosing where new ones start, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
   );
 } finally {
   // A turn still held would keep its run, and the app, open.

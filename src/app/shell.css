@@ -944,6 +944,16 @@
   border: 0;
   min-width: 0;
 }
+/* What a choice means, under it; one that lets agents act without asking waits on the person. */
+.settings-note {
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tx-3);
+}
+.settings-note.attention {
+  color: var(--attn-tx);
+}
 /* Every row of choices shares four columns, so they line up down the sheet. */
 .settings-choices > div {
   display: grid;
