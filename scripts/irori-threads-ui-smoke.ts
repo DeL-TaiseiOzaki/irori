@@ -144,6 +144,11 @@ try {
     await panel.getByLabel(label).fill(text);
     await panel.getByRole('button', { name: button, exact: true }).click();
   };
+  /** Opens a new conversation in a column and waits until it is the one on show. */
+  const fresh = async (panel: Locator) => {
+    await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+    await expect(panel.getByRole('log').locator('.message')).toHaveCount(0);
+  };
   const conversations = (workspaceId: string) =>
     page.evaluate(
       async ([workspace]) => {
@@ -174,12 +179,12 @@ try {
     const idle = () =>
       expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     const before = (await told(folder, 'thread')).length;
-    await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+    await fresh(panel);
     await expect(access).toHaveValue('default');
     await access.selectOption('full-access');
     for (const word of ['full one', 'full two', 'standard one', 'full three']) {
       if (word === 'standard one') {
-        await panel.getByRole('button', { name: '新しい会話', exact: true }).click();
+        await fresh(panel);
         await expect(access).toHaveValue('default');
       }
       if (word === 'full three') {
@@ -368,7 +373,7 @@ try {
   const vaultAccess = vault.getByLabel('エージェントのアクセス', { exact: true });
   await expect(vaultAccess).toHaveValue('full-access');
   await chooseAccess(/^フルアクセス$/);
-  await vault.getByRole('button', { name: '新しい会話', exact: true }).click();
+  await fresh(vault);
   await expect(vaultAccess).toHaveValue('full-access');
   await send(vault, 'エージェントへの指示', 'vault from settings');
   await expect(vault.getByRole('log')).toContainText('reply to vault from settings');
@@ -381,7 +386,7 @@ try {
     .click();
   await expect(vaultAccess).toHaveValue('default');
   await chooseAccess(/^標準/);
-  await vault.getByRole('button', { name: '新しい会話', exact: true }).click();
+  await fresh(vault);
   await expect(vaultAccess).toHaveValue('default');
   await expect
     .poll(async () =>

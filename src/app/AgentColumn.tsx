@@ -1253,7 +1253,12 @@ export function AgentColumn({
                       : undefined
                   }
                   disabled={
-                    shownRunning || sending || gitBusy || agentAccessOptions(agent).length === 1
+                    shownRunning ||
+                    sending ||
+                    gitBusy ||
+                    // Chosen for the conversation on show, so not while another is coming.
+                    !conversationReady ||
+                    agentAccessOptions(agent).length === 1
                   }
                   onChange={(e) => onAccess(e.target.value as AgentAccess)}
                 >
