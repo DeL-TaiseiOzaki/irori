@@ -34,6 +34,43 @@ offer.
   the Agent SDK 0.3.284 types. Files are not restored on rewind; Pi's and
   OpenCode's own fork are not used yet.
 
+Each conversation keeps its access, 2026-11-05 (**0.2.57**, not yet published;
+[ADR 009](decisions/009-agent-access-and-extension-compatibility.md)): the
+owner reported that full access chosen in a conversation went back to
+standard on a later send, and the reverse. Reproduced with the Codex protocol
+fixture: the composer held the access per column and CLI (`accessChoice` by
+column slot, `yourAccessSelection` for the irori agent), so a new conversation
+took the last one's full access, and standard chosen there showed and sent
+the first conversation in standard once its tab was back, starting its native
+session over (`thread/start` instead of `thread/resume`). The Overview's quick
+send always used the standard access.
+- `conversationAccess(agent, chosen, saved)`: the person's choice for the
+  conversation, else the access its last run used, else standard; a mode the
+  CLI does not offer is skipped.
+- Host: `meta.json` keeps `access`, written by `begin` for every run;
+  `Conversation.access` gives it, or this device's native session's for a
+  conversation from before 0.2.57.
+- Renderer: `accessChoice` is keyed by conversation id; `AgentColumn` reads the
+  conversation's saved access with its log; the Overview's quick send and its
+  footer use the same resolution (`BrainAi.access`).
+- The owner then asked for a setting: `DeviceSettings.agentAccess` ('default' or
+  'full-access', default 'default') is offered as 新しい会話のアクセス in the
+  settings' エージェント part, with its meaning shown (in the attention colour
+  for full access). `conversationAccess` and `defaultAgentAccess` take it as the
+  last fallback; the composer, the Overview and `AgentService.preferredAccess`
+  (hand-offs) use it. It is device-only (not in `environmentPreferences`);
+  routine steps keep their own access; Pi keeps its settings.
+- Tests: `tests/conversation-access.test.ts` (with the setting's storage);
+  `tests/your-ai.test.ts` (a hand-off in full access from the setting, no
+  request); `scripts/irori-threads-ui-smoke.ts`
+  checks both columns (full access through later sends, a new conversation in
+  standard, the first back in full access with `thread/resume`, then the
+  setting starting a new conversation in full access while one in standard
+  keeps it);
+  `scripts/harness-ui-smoke.ts` now expects a new OpenCode conversation in
+  standard access. Verified with `npm run build`, `npm test` and
+  `npm run test:ui`. Not verified with a real CLI turn.
+
 Send a queued instruction now, 2026-11-04 (**0.2.56**, not yet published;
 [ADR 056](decisions/056-send-now.md)): the owner asked that an instruction
 typed while a vault agent or the irori agent works can be sent at once, as

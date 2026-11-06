@@ -19,6 +19,8 @@ This documentation site also has an **English / 日本語** switch at the top ri
 
 Turn on the vault agent under **Agents**. It is off by default. Off hides the vault agents' columns and Schema, but hand-offs from the irori agent and routines still run a CLI inside the vault, with the vault's agent configuration.
 
+In the same place, **新しい会話のアクセス** (access of a new conversation) chooses whether new conversations of the irori agent and the vault agents start in **Standard** or **Full access**. It is Standard by default. With Full access, agents in new conversations run commands and change files without asking. Existing conversations keep their access, and each conversation can be switched. Routine steps follow each step's own setting. The choice is this computer's only and is not part of the environment saved to GitHub.
+
 ## Updates and routines
 
 Check for a new version under **Updates** in settings. When one is available, choose **Update and restart**.

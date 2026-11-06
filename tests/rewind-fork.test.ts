@@ -173,6 +173,8 @@ test(
     const firstEnd = before.find((event) => event.type === 'done')!;
     const copy = await service.fork(space.scopeId, id, firstEnd.id!);
     assert.notEqual(copy, id);
+    // The copy keeps the conversation's access.
+    assert.equal((await service.conversation(space.scopeId, 'codex', copy)).access, 'default');
     assert.deepEqual(await said('codex', copy), ['first', 'reply to first']);
     assert.equal((await said('codex', id)).length, 4);
     const rows = await service.conversationList(space.scopeId);
