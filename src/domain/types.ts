@@ -457,6 +457,11 @@ export interface DeviceSettings {
   propertiesFolded: boolean;
   /** Offer each vault's own agent and its Schema layer; off, irori is an editor with the irori agent. */
   vaultAgent: boolean;
+  /**
+   * The access every agent's new conversation starts in, on this device: standard
+   * unless the person chose full access (ADR 009). A conversation keeps its own.
+   */
+  agentAccess: AgentAccess;
   /** The CLI your AI runs on and the model and thinking level chosen for each CLI ('' or absent: the CLI's default). */
   yourAi: {
     agent: AgentId;

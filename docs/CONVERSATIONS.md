@@ -27,7 +27,8 @@ is described in the history of this file.
   routine's workspace.
 - Each conversation keeps its access ([ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
   0.2.57). The composer shows the access chosen for it in this window, else the
-  one its last run used, else the standard access for a new one. A change
+  one its last run used, else, for a new one, the access the settings give new
+  conversations (standard unless the person chose full access). A change
   applies to that conversation alone, and every send to it keeps it, from its
   column, its queue or the Overview.
 - Choosing another CLI in the panel starts a new conversation: a conversation's

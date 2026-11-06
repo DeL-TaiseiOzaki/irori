@@ -61,9 +61,11 @@ import {
   applyPageMargins,
   applyText,
   applyTheme,
+  chooseAgentAccess,
   chooseEditorAssistance,
   chooseVaultAgent,
   chooseYourAi,
+  currentAgentAccess,
   currentEditorAssistance,
   currentVaultAgent,
   currentYourAi,
@@ -361,6 +363,7 @@ const DockColumnView = memo(function DockColumnView({
   agentChoice,
   yourChoice,
   accessChoice,
+  preferredAccess,
   modelChoice,
   effortChoice,
   skills,
@@ -391,6 +394,8 @@ const DockColumnView = memo(function DockColumnView({
   yourChoice: ReturnType<typeof currentYourAi>;
   /** The access the person chose for each conversation, by its id. */
   accessChoice: Record<string, AgentAccess>;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   modelChoice: Record<string, string>;
   effortChoice: Record<string, string>;
   skills: AgentSkill[];
@@ -448,6 +453,7 @@ const DockColumnView = memo(function DockColumnView({
           : active && (modelChoice[`${active.scopeId}:${columnAgent}`] || undefined)
       }
       accessChoice={accessChosen}
+      preferredAccess={preferredAccess}
       skills={irori ? noSkills : skills}
       skillsRetired={irori ? noRetired : skillsRetired}
       skillProblems={irori ? noProblems : skillProblems}
@@ -714,6 +720,13 @@ function App() {
   const [vaultAgent, chooseVault, setVaultAgent] = useChoice(
     currentVaultAgent,
     chooseVaultAgent,
+    (error) => report(error),
+  );
+  // The access every agent's new conversation starts in (ADR 009): standard unless
+  // the person chose full access in the settings. A conversation keeps its own.
+  const [agentAccess, chooseAccess, setAgentAccess] = useChoice(
+    currentAgentAccess,
+    chooseAgentAccess,
     (error) => report(error),
   );
   // The agent dock's columns (ADR 021). The first stays while the dock is open; a
@@ -1325,6 +1338,7 @@ function App() {
     setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
     renewTabs(profiles);
     setVaultAgent(currentVaultAgent());
+    setAgentAccess(currentAgentAccess());
     setYourChoice(currentYourAi());
     // A restore may have cloned the irori agent's folder or written its files.
     setYouRevision((value) => value + 1);
@@ -1736,6 +1750,7 @@ function App() {
         agentId,
         conversationId ? accessChoice[conversationId] : undefined,
         conversationId ? value.access : undefined,
+        agentAccess,
       ),
       model: modelFor(scopeId, agentId),
       effort: effortFor(scopeId, agentId),
@@ -2644,6 +2659,7 @@ function App() {
             agentChoice={agentChoice}
             yourChoice={yourChoice}
             accessChoice={accessChoice}
+            preferredAccess={agentAccess}
             modelChoice={modelChoice}
             effortChoice={effortChoice}
             skills={noSkills}
@@ -2679,12 +2695,14 @@ function App() {
       <Settings
         vaultAgent={vaultAgent}
         onVaultAgent={act.chooseVault}
+        agentAccess={agentAccess}
+        onAgentAccess={chooseAccess}
         onRestored={act.environmentRestored}
         onSchema={() => setSchemaOpen(true)}
         onError={act.report}
       />
     ),
-    [vaultAgent, act, language],
+    [vaultAgent, agentAccess, act, language],
   );
   const schemaSelected =
     view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
@@ -2896,6 +2914,8 @@ function App() {
           refresh={refreshSpaces}
           vaultAgent={vaultAgent}
           onVaultAgent={act.chooseVault}
+          agentAccess={agentAccess}
+          onAgentAccess={chooseAccess}
           onRestored={act.environmentRestored}
           onOpen={(profile) => void openWorkspace(profile)}
           open={[...workspaceTabs, ...otherTabs]}
@@ -3031,6 +3051,7 @@ function App() {
               addDisabled={anyRunning || dirty || connecting}
               agentFor={agentFor}
               accessChoice={accessChoice}
+              preferredAccess={agentAccess}
               vaultAgent={vaultAgent}
               onView={setOverviewView}
               onSearch={() => {
@@ -3821,6 +3842,7 @@ function App() {
                           agentChoice={agentChoice}
                           yourChoice={yourChoice}
                           accessChoice={accessChoice}
+                          preferredAccess={agentAccess}
                           modelChoice={modelChoice}
                           effortChoice={effortChoice}
                           skills={composerSkills}

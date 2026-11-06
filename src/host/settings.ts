@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SerialQueue } from './serial-queue';
 import { readLocalJson, writeLocalJson } from './local-json';
 import {
+  agentAccessModes,
   lineSpacings,
   markdownFonts,
   pageMargins,
@@ -25,6 +26,7 @@ const settings = z.object({
   editorAssistance: z.boolean().default(true),
   propertiesFolded: z.boolean().default(false),
   vaultAgent: z.boolean().default(false),
+  agentAccess: z.enum(agentAccessModes).default('default'),
   // The pane library owns this format; it is stored as written and bounded.
   // Keys are the library's: its prefix, the group id and every panel id.
   layouts: z.record(z.string().max(160), z.string().max(4096)).default({}),
@@ -63,6 +65,7 @@ export class SettingsService {
         editorAssistance: patch.editorAssistance ?? current.editorAssistance,
         propertiesFolded: patch.propertiesFolded ?? current.propertiesFolded,
         vaultAgent: patch.vaultAgent ?? current.vaultAgent,
+        agentAccess: patch.agentAccess ?? current.agentAccess,
         layouts: { ...current.layouts, ...(patch.layouts ?? {}) },
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
         yourAi: patch.yourAi ?? current.yourAi,

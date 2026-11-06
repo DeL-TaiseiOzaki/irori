@@ -124,6 +124,7 @@ export function AgentColumn({
   model,
   effort,
   accessChoice,
+  preferredAccess,
   skills,
   skillsRetired,
   skillProblems,
@@ -175,6 +176,8 @@ export function AgentColumn({
   effort?: string;
   /** The access the person chose for the conversation on show, if they did. */
   accessChoice?: AgentAccess;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   skills: AgentSkill[];
   skillsRetired: Parameters<typeof retirementNotice>[0][];
   skillProblems: SkillProblem[];
@@ -278,7 +281,7 @@ export function AgentColumn({
   // The access the conversation's last run used, as the host keeps it.
   const [savedAccess, setSavedAccess] = useState<AgentAccess>();
   // Every send keeps the conversation's own access, unless the person changes it.
-  const access = conversationAccess(agent, accessChoice, savedAccess);
+  const access = conversationAccess(agent, accessChoice, savedAccess, preferredAccess);
   const [queuePaused, setQueuePaused] = useState(false);
   // A send to a paused queue, after 停止 or a failure, lets it go on once no run is
   // under way, even when the stopped run is still ending (ADR 034).

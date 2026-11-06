@@ -40,6 +40,19 @@ person changes it again. A conversation not changed in this window runs with
 the mode its last run used, kept in `meta.json` across restarts. A new
 conversation starts standard, and no conversation takes another's mode.
 
+**Where new conversations start is the person's setting** (2026-11-06, 0.2.57,
+the owner's decision). The settings' エージェント part offers 新しい会話のアクセス:
+標準 (the default) or フルアクセス, for every agent: the irori agent, the vault
+agents and the irori agent's hand-offs. It is the explicit choice this ADR asks
+for, made once for the device instead of per conversation, and the sheet says
+in the attention colour what full access lets agents do. It applies only where
+a conversation has no access of its own: existing conversations keep theirs,
+each conversation can still be switched, a CLI that offers only its own settings
+(Pi) keeps them, and a routine's step keeps the access its `routine.yaml` names.
+The choice stays on the device (`device-settings.json`) and is not part of the
+environment saved to GitHub, so restoring on another device does not start its
+agents in full access.
+
 The owner clarified that the requirement is **the capabilities available to an
 ordinary native CLI agent**, including its file and command tools, through
 irori. Editor syntax coloring, completion, diagnostics and run buttons are

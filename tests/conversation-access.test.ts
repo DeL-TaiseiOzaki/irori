@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AgentService } from '../src/agents/service';
 import { FileService } from '../src/host/files';
-import { conversationAccess } from '../src/domain/agent-access';
+import { conversationAccess, defaultAgentAccess } from '../src/domain/agent-access';
+import { environmentPreferences } from '../src/domain/environment';
+import { SettingsService } from '../src/host/settings';
 import type { AgentAccess, AgentEvent } from '../src/domain/types';
 
 test('A conversation runs with the access chosen for it, else its last, else standard', () => {
@@ -15,6 +17,27 @@ test('A conversation runs with the access chosen for it, else its last, else sta
   assert.equal(conversationAccess('codex', 'full-access', 'default'), 'full-access');
   // Pi takes its own settings only: nothing else is offered or kept for it.
   assert.equal(conversationAccess('pi', 'full-access', 'full-access'), 'default');
+  // The settings' choice is where a new conversation starts, and only there.
+  assert.equal(conversationAccess('codex', undefined, undefined, 'full-access'), 'full-access');
+  assert.equal(conversationAccess('codex', undefined, 'default', 'full-access'), 'default');
+  assert.equal(conversationAccess('claude', 'default', undefined, 'full-access'), 'default');
+  assert.equal(conversationAccess('pi', undefined, undefined, 'full-access'), 'default');
+  assert.equal(defaultAgentAccess('opencode', 'full-access'), 'full-access');
+  assert.equal(defaultAgentAccess('opencode'), 'default');
+});
+
+test('The device keeps the access new conversations start in, standard until changed', async (t) => {
+  const base = await mkdtemp(path.join(tmpdir(), 'irori access setting '));
+  t.after(() => rm(base, { recursive: true, force: true }));
+  const settings = new SettingsService(base);
+  assert.equal((await settings.read()).agentAccess, 'default');
+  await settings.save({ agentAccess: 'full-access' });
+  assert.equal((await new SettingsService(base).read()).agentAccess, 'full-access');
+  // Other choices leave it as it is.
+  await settings.save({ vaultAgent: true });
+  assert.equal((await settings.read()).agentAccess, 'full-access');
+  // It stays on this device: a saved environment does not carry it to another.
+  assert.equal((environmentPreferences as readonly string[]).includes('agentAccess'), false);
 });
 
 // A protocol stand-in for Codex's app server that notes the approval policy of each
