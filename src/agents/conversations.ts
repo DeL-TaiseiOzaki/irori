@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
+  agentAccessModes,
   agentIds,
   agentNames,
   delegateStates,
@@ -27,7 +28,7 @@ import { readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-jso
 import { SerialQueue } from '../host/serial-queue';
 import type { DeviceIdentity } from '../host/device';
 import { t } from '../domain/i18n';
-import { attachmentLimit, attachmentRef } from '../domain/attachments';
+import { attachmentLimit, attachmentRef, type AttachmentRef } from '../domain/attachments';
 
 const MiB = 1024 * 1024;
 /** A tool's details are kept to their first 1 MiB (ADR 017 D1). */
@@ -54,6 +55,13 @@ const delegate = z.object({ scopeId: z.string(), task: z.string(), state: z.enum
  * text, never as something to answer. Lines of a streamed reply share its id and
  * are joined when read.
  */
+const nativePoint = z.object({
+  device: z.uuid(),
+  root: z.string().regex(/^[0-9a-f]{64}$/),
+  access: z.enum(agentAccessModes),
+  handle: z.string().min(1).max(4096),
+  at: z.string().min(1).max(400),
+});
 export const storedEvent = z.object({
   id: z.uuid(),
   runId: z.string().min(1).max(200),
@@ -70,8 +78,17 @@ export const storedEvent = z.object({
   result: z.literal(true).optional(),
   /** Files the person attached to the message. */
   attachments: z.array(attachmentRef).max(attachmentLimit).optional(),
+  /**
+   * On a run's end: where its CLI's own session stood, so that a later turn can
+   * go on from there (ADR 017 D6). Claude Code's last entry of the turn, Codex's
+   * turn; kept for the device and checkout it was made on.
+   */
+  native: nativePoint.optional(),
+  /** Set aside by a rewind (its id): kept in the file, left out of the view and of copies. */
+  aside: z.uuid().optional(),
 });
 export type StoredEvent = z.infer<typeof storedEvent>;
+export type NativePoint = z.infer<typeof nativePoint>;
 
 /**
  * What only this device knows of a conversation (ADR 017 D2): the instructions
@@ -146,6 +163,22 @@ export const newMeta = (
   native: {},
   ...meta,
 });
+
+/** A session's point as the native entry that goes on from it as a new branch. */
+const branchFrom = (point: NativePoint): NativeSession => ({
+  handle: point.handle,
+  access: point.access,
+  root: point.root,
+  branch: { at: point.at },
+});
+/** A copy's title: the original's, marked. */
+const forkTitle = (title: string) =>
+  [...t(`${title}（分岐）`, `${title} (branch)`)].slice(0, 200).join('');
+const runningNow = () =>
+  t(
+    'この会話は実行中です。終わってから操作してください。',
+    'This conversation is running. Try again when it ends.',
+  );
 
 /** Keeps a value to its first `limit` UTF-8 bytes, on a character boundary. */
 export function cutBytes(value: string, limit: number): { value: string; cut?: number } {
@@ -253,7 +286,9 @@ const lineShape = (line: string) => {
   if (line[0] !== '{' || !line.endsWith('}')) return undefined;
   const id = /"id":"([0-9a-f-]{36})"/.exec(line);
   const type = /"type":"(status|text|tool|error|done)"/.exec(line);
-  return id && type ? { id: id[1], type: type[1] } : undefined;
+  return id && type
+    ? { id: id[1], type: type[1], aside: /"aside":"[0-9a-f-]{36}"/.test(line) }
+    : undefined;
 };
 
 /**
@@ -289,7 +324,7 @@ class ViewWindow {
 }
 
 function viewEvent(line: StoredEvent, meta: ConversationMeta): AgentEvent {
-  const { at: _at, role, details, ...rest } = line;
+  const { at: _at, role, details, native: _native, aside: _aside, ...rest } = line;
   return {
     ...rest,
     conversationId: meta.id,
@@ -657,7 +692,8 @@ export class ConversationStore {
           } catch {
             // Counted below as damaged, in the window or before it.
           }
-        if (parsed && !window.take(parsed)) break;
+        // A line a rewind set aside is neither shown nor counted.
+        if (parsed && !parsed.aside && !window.take(parsed)) break;
         if (!parsed) damaged++;
         start = offset;
       }
@@ -678,6 +714,7 @@ export class ConversationStore {
           count.damaged++;
           continue;
         }
+        if (shape.aside) continue;
         oldest = shape;
         newest ??= shape.type === 'text' && shape.id !== lastText ? shape.id : '';
         if (shape.type === 'text' && shape.id === lastText) continue;
@@ -1089,10 +1126,10 @@ export class ConversationStore {
     ).then(() => {});
   }
   /** Writes the run's last events and its end before the end is reported. */
-  finish(id: string, event: AgentEvent, vaults: string[] = []) {
+  finish(id: string, event: AgentEvent, vaults: string[] = [], native?: NativePoint) {
     return this.queued(id, async () => {
       await this.drain(id);
-      await this.append(id, [storedLine(event)]);
+      await this.append(id, [{ ...storedLine(event), ...(native && { native }) }]);
       const meta = await this.meta(id);
       await this.writeMeta({
         ...meta,
@@ -1118,6 +1155,154 @@ export class ConversationStore {
   }
   archive(id: string, archived: boolean) {
     return this.update(id, (meta) => ({ ...meta, archived }));
+  }
+  /** The lines of `events.jsonl` as written, oldest first, each with what it parses to. */
+  private async rawLines(id: string) {
+    const text =
+      (await this.withEvents(id, (handle) => handle.readFile({ encoding: 'utf8' }))) ?? '';
+    const lines = text.split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    return lines.map((raw) => {
+      try {
+        return { raw, line: storedEvent.parse(JSON.parse(raw)) as StoredEvent | undefined };
+      } catch {
+        return { raw, line: undefined };
+      }
+    });
+  }
+  /**
+   * Sets aside the person's message that started a run and everything after it
+   * (ADR 017 D6): the lines stay in `events.jsonl`, marked, and leave the view.
+   * This device's next turn goes on from where the session stood at the end of
+   * the run before, when that run left a point here; otherwise it starts a new
+   * session. Other devices' sessions, which hold the set-aside turns, are dropped.
+   * Answers the message, to be edited and sent again.
+   */
+  rewind(id: string, eventId: string) {
+    return this.queued(id, async () => {
+      await this.init();
+      this.usable(id);
+      if (this.states.get(id)?.active) throw Error(runningNow());
+      await this.drain(id);
+      const lines = await this.rawLines(id);
+      const index = lines.findIndex(({ line }) => line && !line.aside && line.id === eventId);
+      const message = lines[index]?.line;
+      const before = lines
+        .slice(0, Math.max(index, 0))
+        .flatMap(({ line }) => (line && !line.aside ? [line] : []));
+      if (
+        !message ||
+        message.role !== 'user' ||
+        before.some((line) => line.runId === message.runId)
+      )
+        throw Error(
+          t(
+            'この指示からはやり直せません。実行を始めた指示を選んでください。',
+            'This message cannot be edited. Choose a message that started a run.',
+          ),
+        );
+      const mark = randomUUID();
+      const text = lines
+        .map(({ raw, line }, at) =>
+          at >= index && line && !line.aside ? jsonLine({ ...line, aside: mark }) : `${raw}\n`,
+        )
+        .join('');
+      await writeLocalFile(path.join(await this.checkedDir(id), 'events.jsonl'), text);
+      this.counted.delete(id);
+      this.terminated.delete(id);
+      const deviceId = await this.device.id();
+      const point = [...before].reverse().find((line) => line.type === 'done')?.native;
+      const meta = await this.meta(id);
+      await this.writeMeta({
+        ...meta,
+        updatedAt: this.now(),
+        native: point?.device === deviceId ? { [deviceId]: branchFrom(point) } : {},
+      });
+      return { prompt: message.text, attachments: message.attachments };
+    });
+  }
+  /**
+   * A new conversation holding a copy of this one through the end of the run
+   * that `eventId` belongs to (ADR 017 D6), with `forkedFrom` set; this one is
+   * unchanged. Its first turn goes on from where the session stood at the end of
+   * that run, when the run left a point on this device. `copy` gives each copied
+   * message's attached files to the new conversation.
+   */
+  fork(
+    id: string,
+    eventId: string,
+    newId: string,
+    copy: (refs: AttachmentRef[]) => Promise<AttachmentRef[]>,
+  ) {
+    return this.queued(id, async () => {
+      await this.init();
+      await this.drain(id);
+      const meta = await this.meta(id);
+      const lines = (await this.rawLines(id)).flatMap(({ line }) =>
+        line && !line.aside ? [line] : [],
+      );
+      const index = lines.findIndex((line) => line.id === eventId);
+      if (index < 0)
+        throw Error(t('この発言は会話にありません。', 'This message is not in the conversation.'));
+      const runId = lines[index].runId;
+      if (this.states.get(id)?.active?.runId === runId) throw Error(runningNow());
+      let end = index;
+      while (end + 1 < lines.length && lines[end + 1].runId === runId) end++;
+      const copied: StoredEvent[] = [];
+      for (const line of lines.slice(0, end + 1))
+        copied.push(
+          line.attachments?.length ? { ...line, attachments: await copy(line.attachments) } : line,
+        );
+      const deviceId = await this.device.id();
+      const point = [...copied].reverse().find((line) => line.type === 'done')?.native;
+      const dir = this.dir(newId);
+      await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+      await writeLocalFile(path.join(dir, 'events.jsonl'), copied.map(jsonLine).join(''));
+      const at = this.now();
+      const created = await this.writeMeta(
+        newMeta({
+          id: newId,
+          owner: meta.owner,
+          agent: meta.agent,
+          model: meta.model,
+          title: forkTitle(meta.title),
+          titleSource: meta.titleSource,
+          createdAt: at,
+          linkedNote: meta.linkedNote,
+          vaults: meta.vaults,
+          ...(meta.workspace !== undefined && { workspace: meta.workspace }),
+          // A copy keeps the access the conversation had (ADR 009).
+          ...(meta.access && { access: meta.access }),
+          forkedFrom: { conversationId: id, eventId: lines[end].id },
+          native: point?.device === deviceId ? { [deviceId]: branchFrom(point) } : {},
+        }),
+      );
+      return this.summary(created);
+    });
+  }
+  /**
+   * What was said in the conversation, oldest first: the person's messages and the
+   * agent's replies, without tool output, set-aside lines, or the run `except`.
+   */
+  said(id: string, except?: string) {
+    return this.queued(id, async () => {
+      await this.drain(id);
+      const said: { role: 'person' | 'agent'; text: string }[] = [];
+      let reply: string | undefined;
+      for (const { line } of await this.rawLines(id)) {
+        if (!line || line.aside || line.runId === except || line.delegate) continue;
+        if (line.type === 'text' && line.role === 'agent') {
+          const last = said.at(-1);
+          if (reply === line.id && last) last.text += line.text;
+          else said.push({ role: 'agent', text: line.text });
+          reply = line.id;
+          continue;
+        }
+        reply = undefined;
+        if (line.role === 'user') said.push({ role: 'person', text: line.text });
+      }
+      return said.filter((entry) => entry.text.trim());
+    });
   }
   /** Removes irori's folder for the conversation; the CLI's own transcript is not touched. */
   remove(id: string) {

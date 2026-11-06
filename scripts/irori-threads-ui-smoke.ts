@@ -60,6 +60,11 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
   }
   if (m.method.startsWith('thread/'))
     fs.appendFileSync('codex-turns.jsonl', JSON.stringify({ thread: m.method + ':' + m.params.approvalPolicy }) + '\\n');
+  if (m.method === 'thread/fork') {
+    fs.appendFileSync('codex-turns.jsonl', JSON.stringify({ fork: m.params.lastTurnId }) + '\\n');
+    send({ id: m.id, result: { thread: { id: 'fixture-fork-' + Date.now() + Math.random() } } });
+    return;
+  }
   const result = m.method.startsWith('thread/')
     ? { thread: { id: m.params.threadId || 'fixture-thread-' + Date.now() + Math.random() } }
     : {};
@@ -112,7 +117,7 @@ const app = await electron.launch({
 const errors: string[] = [];
 await mkdir('test-results', { recursive: true });
 /** What the fixture was told, in order, in a folder: turns' last lines, or words steered in. */
-const told = async (folder: string, key: 'said' | 'steered' | 'thread') =>
+const told = async (folder: string, key: 'said' | 'steered' | 'thread' | 'fork') =>
   (await readFile(path.join(folder, 'codex-turns.jsonl'), 'utf8').catch(() => ''))
     .trim()
     .split('\n')
@@ -168,6 +173,52 @@ try {
     (await conversations(workspaceId)).find(
       (row) => 'title' in row && row.title.startsWith(title),
     ) as { id: string; running: boolean } | undefined;
+
+  /**
+   * A sent message is edited and sent again: it and what came after leave the view,
+   * and the session goes on from before it, as a fork of the thread. A run's end
+   * branches into a copy, opened as a tab (ADR 017 D6).
+   */
+  const editAndBranch = async (panel: Locator, label: string, folder: string, name: string) => {
+    const idle = () =>
+      expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+    const log = panel.getByRole('log');
+    const forks = (await told(folder, 'fork')).length;
+    await fresh(panel);
+    for (const word of ['keep', 'change']) {
+      await send(panel, label, `${name} ${word}`);
+      await expect(log).toContainText(`reply to ${name} ${word}`);
+      await idle();
+    }
+    const message = log.locator('.message.user').filter({ hasText: `${name} change` });
+    await message.hover();
+    await message.getByRole('button', { name: 'この指示を編集してやり直す' }).click();
+    const field = panel.getByLabel(label);
+    await expect(field).toHaveValue(`${name} change`);
+    await expect(panel.locator('.composer-editing')).toBeVisible();
+    await panel.screenshot({ path: `test-results/${name}-editing.png` });
+    await field.fill(`${name} changed`);
+    await panel.getByRole('button', { name: '送信', exact: true }).click();
+    await expect(log).toContainText(`reply to ${name} changed`);
+    await idle();
+    await expect(log).not.toContainText(new RegExp(`reply to ${name} change(?!d)`));
+    await expect(log.locator('.message.user')).toHaveText([`${name} keep`, `${name} changed`]);
+    await expect(panel.locator('.composer-editing')).toHaveCount(0);
+    expect((await told(folder, 'fork')).length).toBe(forks + 1);
+    // The first run's end branches into a copy holding it alone.
+    const end = log.locator('.message.done').first();
+    await end.hover();
+    await panel.screenshot({ path: `test-results/${name}-branch-button.png` });
+    await end.getByRole('button', { name: 'ここから分岐' }).click();
+    await expect(
+      panel.getByRole('tablist', { name: '開いている会話' }).getByRole('tab', { name: /（分岐）/ }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect(log.locator('.message.user')).toHaveText([`${name} keep`]);
+    await send(panel, label, `${name} in the branch`);
+    await expect(log).toContainText(`reply to ${name} in the branch`);
+    await idle();
+    expect((await told(folder, 'fork')).length).toBe(forks + 2);
+  };
 
   /**
    * Each conversation keeps its own access (ADR 009): full access chosen in one stays
@@ -283,6 +334,10 @@ try {
   expect(await told(youRoot, 'steered')).toEqual(['join now']);
   expect((await said(youRoot)).slice(-2)).toEqual(['steered thread hold:steer', 'waits behind']);
 
+  await editAndBranch(column(1), 'irori agent への指示', youRoot, 'irori');
+  await tabs.getByRole('tab', { name: /first thread/ }).click();
+  await expect(column(1).getByRole('log')).toContainText('after the stop');
+  await page.screenshot({ path: 'test-results/irori-edit-branch.png' });
   await ownAccess(column(1), 'irori agent への指示', youRoot, 'irori');
   await tabs.getByRole('tab', { name: /first thread/ }).click();
   await expect(column(1).getByRole('log')).toContainText('after the stop');
@@ -352,6 +407,7 @@ try {
   await expect(vault.getByRole('log')).toContainText('steered: vault join now');
   expect(await told(roots.Alpha, 'steered')).toEqual(['vault join now']);
   await expect(vault.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+  await editAndBranch(vault, 'エージェントへの指示', roots.Alpha, 'vault');
   await ownAccess(vault, 'エージェントへの指示', roots.Alpha, 'vault');
   // The settings choose the access every agent's new conversation starts in; one a
   // conversation already has stays (ADR 009).
@@ -398,7 +454,7 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, and each conversation keeping its own access with the settings choosing where new ones start, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
+    'irori mode threads UI passed: two irori agent threads running at once in columns, at most four columns, a closed column’s run kept as a tab, a stopped thread taking a new send after its queued one and a queued instruction sent now joining the running turn, a sent message edited and resent and a run branched into a copy, and each conversation keeping its own access with the settings choosing where new ones start, in irori mode and in a vault column, and threads, columns and history kept per workspace with another workspace’s conversation refused. Protocol fixtures only.',
   );
 } finally {
   // A turn still held would keep its run, and the app, open.

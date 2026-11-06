@@ -1,5 +1,39 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Edit a sent message and branch a conversation, 2026-11-05 (**0.2.58**, not yet
+published; [ADR 017](decisions/017-conversation-history.md) D6, D7 — stage 3):
+the owner asked for the edit-and-resume and fork that Claude Code and Codex
+offer.
+- `ConversationStore.rewind` sets a run-starting message and what follows aside
+  (one atomic rewrite, `aside` mark; the view window, the earlier count, copies
+  and `said` skip them) and points this device's native entry at the previous
+  run's end (`branch`), dropping other devices'. `fork` writes a new
+  conversation with the visible lines through the end of a run, `forkedFrom`,
+  copied attachments (`AttachmentStore.copy`) and a `branch` entry. `said`
+  gives the person's messages and the replies for a rebuilt context.
+- `AgentService`: each run's `done` line records `native` (device, root,
+  access, handle, at): Claude Code's last main entry uuid, Codex's turn id. A
+  `branch` entry makes Claude Code resume with `resumeSessionAt` and
+  `forkSession`, and Codex call `thread/fork` (`lastTurnId`, same overrides as
+  `thread/start`). A fresh session in a conversation with messages gets
+  `prompts/earlier-conversation.ts` after the introduction, with a status line.
+  `rewind` / `fork` check the owner and the irori agent's workspace.
+- Renderer: `AgentLog` actions (pencil on a run-starting message, ここから分岐 on
+  a run's end); `AgentColumn` edit mode (composer bar, the message and its files
+  restored, rewind on send, set-aside events trimmed from the view), copies
+  opened as tabs with the list refreshed.
+- Tests: `tests/rewind-fork.test.ts` (Codex, Claude Code and Hermes protocol
+  fixtures); `scripts/irori-threads-ui-smoke.ts` edits and branches in the irori
+  agent's column and a vault's. `tests/fixtures/harnesses.mjs` now acts on the
+  request without the retold conversation (a fresh session after a failed resume
+  hears earlier prompts such as `dialog`), and its Pi stand-in splits records
+  at LF alone, as Pi does (the retold reply carried U+2028, which `readline`
+  splits at). Verified with `npm run build`, `npm test` and
+  `npm run test:ui`. Not verified with a real CLI: Codex's `thread/fork`
+  parameters come from its documentation and binary strings, Claude Code's from
+  the Agent SDK 0.3.284 types. Files are not restored on rewind; Pi's and
+  OpenCode's own fork are not used yet.
+
 Each conversation keeps its access, 2026-11-05 (**0.2.57**, not yet published;
 [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)): the
 owner reported that full access chosen in a conversation went back to

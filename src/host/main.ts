@@ -1168,6 +1168,8 @@ app
         agents.startNextQueued(scopeId, conversationId, canStartAgent, workspaceId),
       sendQueuedNow: (scopeId, conversationId, queuedId, workspaceId) =>
         agents.sendNow(scopeId, conversationId, queuedId, canStartAgent, workspaceId),
+      rewindConversation: (...args) => agents.rewind(...args),
+      forkConversation: (...args) => agents.fork(...args),
       showWorkspace: async (workspaceId) => {
         await you.load();
         you.show(workspaceId);
