@@ -22,11 +22,13 @@ import {
   currentTheme,
 } from './device-settings';
 import {
+  agentAccessModes,
   lineSpacings,
   markdownFonts,
   pageMargins,
   textSizes,
   themes,
+  type AgentAccess,
   type LineSpacing,
   type MarkdownFont,
   type PageMargins,
@@ -204,6 +206,8 @@ export function Settings({
   start = false,
   vaultAgent,
   onVaultAgent,
+  agentAccess,
+  onAgentAccess,
   onRestored,
   onSchema,
   onError,
@@ -213,6 +217,9 @@ export function Settings({
   /** Each vault's own agent and its Schema layer are offered (ADR 021). */
   vaultAgent: boolean;
   onVaultAgent: (on: boolean) => void;
+  /** The access every agent's new conversation starts in (ADR 009). */
+  agentAccess: AgentAccess;
+  onAgentAccess: (access: AgentAccess) => void;
   /** The environment saved on the account was restored here (ADR 026). */
   onRestored: () => Promise<void>;
   /** Opens every Schema: the shared one, the irori agent's and each vault's (ADR 027). */
@@ -344,6 +351,34 @@ export function Settings({
                   </label>
                 </div>
               </fieldset>
+              <Choices
+                legend={t('新しい会話のアクセス', 'Access of a new conversation')}
+                name="agent-access"
+                value={agentAccess}
+                options={agentAccessModes}
+                label={(option) =>
+                  option === 'full-access'
+                    ? t('フルアクセス', 'Full access')
+                    : t('標準（CLI の承認に従う）', "Standard (the CLI's approvals)")
+                }
+                shown={(option) =>
+                  option === 'full-access'
+                    ? t('フルアクセス', 'Full access')
+                    : t('標準', 'Standard')
+                }
+                onChange={onAgentAccess}
+              />
+              <p className={`settings-note ${agentAccess === 'full-access' ? 'attention' : ''}`}>
+                {agentAccess === 'full-access'
+                  ? t(
+                      'irori agent と vault agent の新しい会話は、すべてフルアクセスで始まります。エージェントは承認を求めずにコマンドを実行してファイルを変更し、あなたのユーザーで届く範囲すべてに届きます。会話ごとに標準へ切り替えられます。今ある会話のアクセスは変わりません。',
+                      'Every new conversation of the irori agent and the vault agents starts in full access: agents run commands and change files without asking, and reach anything your user account can. Each conversation can be switched back to standard. Existing conversations keep their access.',
+                    )
+                  : t(
+                      '新しい会話は標準で始まり、各 CLI の承認に従います。フルアクセスは会話ごとに選べます。今ある会話のアクセスは変わりません。',
+                      "New conversations start in standard access, following each CLI's approvals. Full access can be chosen per conversation. Existing conversations keep their access.",
+                    )}
+              </p>
               {onSchema && (
                 <fieldset className="settings-choices schema-settings">
                   <legend>Schema</legend>

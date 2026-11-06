@@ -25,6 +25,12 @@ is described in the history of this file.
   have no workspace and appear in none; their folders stay. A vault keeps one
   history wherever it is opened, and a routine's irori agent step is kept in the
   routine's workspace.
+- Each conversation keeps its access ([ADR 009](decisions/009-agent-access-and-extension-compatibility.md),
+  0.2.57). The composer shows the access chosen for it in this window, else the
+  one its last run used, else, for a new one, the access the settings give new
+  conversations (standard unless the person chose full access). A change
+  applies to that conversation alone, and every send to it keeps it, from its
+  column, its queue or the Overview.
 - Choosing another CLI in the panel starts a new conversation: a conversation's
   CLI is fixed. Opening a conversation from 履歴 switches the panel to its CLI.
 - Opening a panel shows the owner's conversation that is running, else the one
@@ -58,8 +64,9 @@ is described in the history of this file.
   where it came from, times, linked note, the vaults the irori agent's
   hand-offs reached, pin and archive, `forkedFrom` (null until stage 3), a
   routine step's `routine` or a hand-off's `handedBy`, the irori agent's
-  `workspace` (the id of the workspace it began in), and `native`. Keys a later
-  version adds are read and kept.
+  `workspace` (the id of the workspace it began in), `access` (the access its
+  last run used, from 0.2.57) and `native`. Keys a later version adds are read
+  and kept.
 - **events.jsonl** (`storedEvent` in `src/agents/conversations.ts`): each line
   has an id, the run's id, a time, a role (`user` or `agent`), a type and the
   text and details. Permission and question requests are kept as status text,

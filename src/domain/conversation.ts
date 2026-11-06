@@ -5,6 +5,7 @@ import { attachmentLimit, attachmentRef } from './attachments';
 import {
   agentIds,
   agentAccessModes,
+  type AgentAccess,
   type AgentEvent,
   type AgentId,
   type AgentSession,
@@ -72,6 +73,8 @@ export const conversationMeta = z.looseObject({
   }),
   agent: z.enum(agentIds),
   model: agentModel.nullable(),
+  /** The access its last run used; the next one keeps it unless the person changes it. */
+  access: z.enum(agentAccessModes).optional(),
   title: z.string().min(1).max(200),
   titleSource: z.enum(['first-message', 'person', 'migration', 'routine']),
   createdAt: z.iso.datetime(),
@@ -162,6 +165,11 @@ export interface Conversation {
   requests?: AgentEvent[];
   /** This device's native session for the conversation. */
   session: AgentSession;
+  /**
+   * The access its last run used (from a version before 0.2.57, this device's
+   * native session's); absent before its first run.
+   */
+  access?: AgentAccess;
 }
 
 /** The CLIs whose turn takes words sent while it works, at its next step (ADR 056). */

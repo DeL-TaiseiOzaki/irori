@@ -45,7 +45,7 @@ import type { PathTarget } from '../domain/path-links';
 import type { PathOpener } from './path-links';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
 import { type Conversation, isDamaged } from '../domain/conversation';
-import { defaultAgentAccess } from '../domain/agent-access';
+import { conversationAccess } from '../domain/agent-access';
 import { Dialog } from './Dialog';
 import {
   AgentColumn,
@@ -61,9 +61,11 @@ import {
   applyPageMargins,
   applyText,
   applyTheme,
+  chooseAgentAccess,
   chooseEditorAssistance,
   chooseVaultAgent,
   chooseYourAi,
+  currentAgentAccess,
   currentEditorAssistance,
   currentVaultAgent,
   currentYourAi,
@@ -339,10 +341,7 @@ interface DockActions {
   setColumns: Dispatch<SetStateAction<DockColumn[]>>;
   setModelChoice: Dispatch<SetStateAction<Record<string, string>>>;
   setEffortChoice: Dispatch<SetStateAction<Record<string, string>>>;
-  setAccessChoice: Dispatch<SetStateAction<Record<string, { agent: AgentId; value: AgentAccess }>>>;
-  setYourAccessSelection: Dispatch<
-    SetStateAction<{ agent: AgentId; value: AgentAccess } | undefined>
-  >;
+  setAccessChoice: Dispatch<SetStateAction<Record<string, AgentAccess>>>;
   setColumnStatus: Dispatch<SetStateAction<Record<string, { sending: boolean; queued: number }>>>;
   setHanded: Dispatch<SetStateAction<string[] | undefined>>;
 }
@@ -363,8 +362,8 @@ const DockColumnView = memo(function DockColumnView({
   tabs,
   agentChoice,
   yourChoice,
-  yourAccess,
   accessChoice,
+  preferredAccess,
   modelChoice,
   effortChoice,
   skills,
@@ -393,8 +392,10 @@ const DockColumnView = memo(function DockColumnView({
   tabs: Record<string, Tab[]>;
   agentChoice: AgentChoice;
   yourChoice: ReturnType<typeof currentYourAi>;
-  yourAccess: AgentAccess;
-  accessChoice: Record<string, { agent: AgentId; value: AgentAccess }>;
+  /** The access the person chose for each conversation, by its id. */
+  accessChoice: Record<string, AgentAccess>;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   modelChoice: Record<string, string>;
   effortChoice: Record<string, string>;
   skills: AgentSkill[];
@@ -423,11 +424,8 @@ const DockColumnView = memo(function DockColumnView({
   const target = key ? shown[key] : undefined;
   const columnAgent =
     target?.agent ?? (irori ? yourChoice.agent : agentOf(agentChoice, active?.scopeId));
-  const access = irori
-    ? yourAccess
-    : accessChoice[key]?.agent === columnAgent
-      ? accessChoice[key].value
-      : defaultAgentAccess(columnAgent);
+  // The conversation on show keeps its own access (ADR 009); the column holds none.
+  const accessChosen = target ? accessChoice[target.id] : undefined;
   const rememberAgent = (next: AgentId) => {
     if (irori) act.chooseYour({ ...yourChoice, agent: next });
     else if (active) act.remember(active.scopeId, next);
@@ -454,7 +452,8 @@ const DockColumnView = memo(function DockColumnView({
           ? yourChoice.models[columnAgent] || undefined
           : active && (modelChoice[`${active.scopeId}:${columnAgent}`] || undefined)
       }
-      access={access}
+      accessChoice={accessChosen}
+      preferredAccess={preferredAccess}
       skills={irori ? noSkills : skills}
       skillsRetired={irori ? noRetired : skillsRetired}
       skillProblems={irori ? noProblems : skillProblems}
@@ -497,12 +496,7 @@ const DockColumnView = memo(function DockColumnView({
           }));
       }}
       onAccess={(value) => {
-        if (irori) act.setYourAccessSelection({ agent: columnAgent, value });
-        else
-          act.setAccessChoice((all) => ({
-            ...all,
-            [key]: { agent: columnAgent, value },
-          }));
+        if (target) act.setAccessChoice((all) => ({ ...all, [target.id]: value }));
       }}
       onAgent={(next, replace) => {
         if (!scopeId) return;
@@ -728,6 +722,13 @@ function App() {
     chooseVaultAgent,
     (error) => report(error),
   );
+  // The access every agent's new conversation starts in (ADR 009): standard unless
+  // the person chose full access in the settings. A conversation keeps its own.
+  const [agentAccess, chooseAccess, setAgentAccess] = useChoice(
+    currentAgentAccess,
+    chooseAgentAccess,
+    (error) => report(error),
+  );
   // The agent dock's columns (ADR 021). The first stays while the dock is open; a
   // vault column follows the vault on show, and shows the irori agent while the
   // vault agent is off.
@@ -814,20 +815,10 @@ function App() {
     setYourChoice(next);
     void chooseYourAi(next).catch(report);
   }
-  // Your AI's access, kept like a brain composer's choice: for its CLI, until that changes.
-  const [yourAccessSelection, setYourAccessSelection] = useState<{
-    agent: AgentId;
-    value: AgentAccess;
-  }>();
-  const yourAccess =
-    yourAccessSelection?.agent === yourChoice.agent
-      ? yourAccessSelection.value
-      : defaultAgentAccess(yourChoice.agent);
-  // A vault column's access, by where it shows: for its CLI, until that changes.
-  const [accessChoice, setAccessChoice] = useState<
-    Record<string, { agent: AgentId; value: AgentAccess }>
-  >({});
-  useEffect(() => setAccessChoice({}), [workspace?.id]);
+  // The access the person chose for a conversation, by its id: every send to it
+  // keeps that access, wherever it is sent from. A conversation not chosen for
+  // runs with what its last run used, a new one in the standard access.
+  const [accessChoice, setAccessChoice] = useState<Record<string, AgentAccess>>({});
   // Runs in progress by id, and sends on their way to the host by conversation (by
   // space when none is named). An owner's conversations run side by side (ADR 020),
   // so a space is running while any of its runs is.
@@ -1347,6 +1338,7 @@ function App() {
     setWorkspace((open) => (open && profiles.find((item) => item.id === open.id)) ?? open);
     renewTabs(profiles);
     setVaultAgent(currentVaultAgent());
+    setAgentAccess(currentAgentAccess());
     setYourChoice(currentYourAi());
     // A restore may have cloned the irori agent's folder or written its files.
     setYouRevision((value) => value + 1);
@@ -1748,11 +1740,18 @@ function App() {
     const target = shown[scopeId];
     const agentId = target?.agent ?? agentFor(scopeId);
     const value = await host.agentConversation(scopeId, agentId, target?.id);
+    const conversationId = value.summary?.agent === agentId || target ? value.id : undefined;
     const input = {
       scopeId,
       agent: agentId,
-      conversationId: value.summary?.agent === agentId || target ? value.id : undefined,
-      access: defaultAgentAccess(agentId),
+      conversationId,
+      // The conversation's own access, as its column shows it; a new one is standard.
+      access: conversationAccess(
+        agentId,
+        conversationId ? accessChoice[conversationId] : undefined,
+        conversationId ? value.access : undefined,
+        agentAccess,
+      ),
       model: modelFor(scopeId, agentId),
       effort: effortFor(scopeId, agentId),
       prompt: message,
@@ -2497,7 +2496,6 @@ function App() {
     setModelChoice,
     setEffortChoice,
     setAccessChoice,
-    setYourAccessSelection,
     setColumnStatus,
     setHanded,
   });
@@ -2660,8 +2658,8 @@ function App() {
             tabs={tabs}
             agentChoice={agentChoice}
             yourChoice={yourChoice}
-            yourAccess={yourAccess}
             accessChoice={accessChoice}
+            preferredAccess={agentAccess}
             modelChoice={modelChoice}
             effortChoice={effortChoice}
             skills={noSkills}
@@ -2697,12 +2695,14 @@ function App() {
       <Settings
         vaultAgent={vaultAgent}
         onVaultAgent={act.chooseVault}
+        agentAccess={agentAccess}
+        onAgentAccess={chooseAccess}
         onRestored={act.environmentRestored}
         onSchema={() => setSchemaOpen(true)}
         onError={act.report}
       />
     ),
-    [vaultAgent, act, language],
+    [vaultAgent, agentAccess, act, language],
   );
   const schemaSelected =
     view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
@@ -2914,6 +2914,8 @@ function App() {
           refresh={refreshSpaces}
           vaultAgent={vaultAgent}
           onVaultAgent={act.chooseVault}
+          agentAccess={agentAccess}
+          onAgentAccess={chooseAccess}
           onRestored={act.environmentRestored}
           onOpen={(profile) => void openWorkspace(profile)}
           open={[...workspaceTabs, ...otherTabs]}
@@ -3048,6 +3050,8 @@ function App() {
               revisions={revisions}
               addDisabled={anyRunning || dirty || connecting}
               agentFor={agentFor}
+              accessChoice={accessChoice}
+              preferredAccess={agentAccess}
               vaultAgent={vaultAgent}
               onView={setOverviewView}
               onSearch={() => {
@@ -3837,8 +3841,8 @@ function App() {
                           tabs={tabs}
                           agentChoice={agentChoice}
                           yourChoice={yourChoice}
-                          yourAccess={yourAccess}
                           accessChoice={accessChoice}
+                          preferredAccess={agentAccess}
                           modelChoice={modelChoice}
                           effortChoice={effortChoice}
                           skills={composerSkills}

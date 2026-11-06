@@ -7,9 +7,9 @@ import {
   usePanelRef,
 } from 'react-resizable-panels';
 import { knowledgeFolder } from '../domain/layers';
-import type { AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
+import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
-import { agentAccessLabel, defaultAgentAccess } from '../domain/agent-access';
+import { agentAccessLabel, conversationAccess } from '../domain/agent-access';
 import { categoryIcon, categoryName } from '../domain/brains';
 import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
 import { t } from '../domain/i18n';
@@ -576,11 +576,15 @@ function OverviewComposer({
   spaces,
   ais,
   agentFor,
+  accessChoice,
+  preferredAccess,
   onSend,
 }: {
   spaces: Space[];
   ais: Record<string, BrainAi>;
   agentFor: (scopeId: string) => AgentId;
+  accessChoice: Record<string, AgentAccess>;
+  preferredAccess: AgentAccess;
   onSend: (scopeId: string, prompt: string) => Promise<void>;
 }) {
   const [target, setTarget] = useState(spaces[0]?.scopeId);
@@ -642,9 +646,17 @@ function OverviewComposer({
       <footer>
         <small>
           <Icon name="agent" size={12} />
-          {/* A send from here always uses the CLI's standard access (main.tsx's quick send). */}
+          {/* A send from here keeps the conversation's own access (main.tsx's quick send). */}
           {agentNames[agentFor(space.scopeId)]} ·{' '}
-          {agentAccessLabel(agentFor(space.scopeId), defaultAgentAccess(agentFor(space.scopeId)))}
+          {agentAccessLabel(
+            agentFor(space.scopeId),
+            conversationAccess(
+              agentFor(space.scopeId),
+              ai.id ? accessChoice[ai.id] : undefined,
+              ai.access,
+              preferredAccess,
+            ),
+          )}
         </small>
         <button
           type="submit"
@@ -673,6 +685,8 @@ export function Overview({
   revisions,
   addDisabled,
   agentFor,
+  accessChoice,
+  preferredAccess,
   vaultAgent,
   onView,
   onSearch,
@@ -698,6 +712,10 @@ export function Overview({
   revisions: ScopeRevisions;
   addDisabled: boolean;
   agentFor: (scopeId: string) => AgentId;
+  /** The access the person chose for each conversation, by its id. */
+  accessChoice: Record<string, AgentAccess>;
+  /** The access a new conversation starts in, from the settings. */
+  preferredAccess: AgentAccess;
   /** Each vault's own agent is offered (ADR 021); otherwise the irori agent alone. */
   vaultAgent: boolean;
   onView: (view: OverviewView) => void;
@@ -1043,6 +1061,8 @@ export function Overview({
                       spaces={spaces}
                       ais={ais}
                       agentFor={agentFor}
+                      accessChoice={accessChoice}
+                      preferredAccess={preferredAccess}
                       onSend={reread(onSend)}
                     />
                   </>

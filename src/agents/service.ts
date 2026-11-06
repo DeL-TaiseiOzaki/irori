@@ -332,6 +332,8 @@ export class AgentService {
   setup?: (argv: string[], cwd: string, context: SetupContext) => Promise<string>;
   /** The folder a vault's agents work in, made first when it is the default. Without it none is named. */
   workFolder?: (scopeId: string) => Promise<string>;
+  /** The access new conversations start in, as the person chose it in the settings (ADR 009). */
+  preferredAccess?: () => Promise<AgentAccess>;
   /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
   openUrl?: (url: string) => Promise<void>;
   /**
@@ -525,6 +527,7 @@ export class AgentService {
       activeRunId: value.activeRunId,
       requests,
       session: native?.entry ? { state: 'saved', access: native.entry.access } : { state: 'empty' },
+      access: value.meta.access ?? native?.entry?.access,
     };
   }
   /** Where an instruction that names no conversation goes: the owner's latest with this CLI, or a new one. */
@@ -1650,15 +1653,16 @@ export class AgentService {
       input.agent,
     );
     const model = definitionModel(own, input.agent) ?? input.model;
+    const preferred = (await this.preferredAccess?.().catch(() => undefined)) ?? 'default';
     const runId = this.start(
       {
         scopeId: brain.scopeId,
         agent: input.agent,
         ...(model && { model }),
         effort: input.effort,
-        // The vault agent's own default, never the irori agent's mode: the vault's
-        // column shows that access, and a hand-off asks the person when it asks.
-        access: defaultAgentAccess(input.agent),
+        // The access new conversations start in, never the irori agent's mode: the
+        // vault's column shows that access, and a hand-off asks the person when it asks.
+        access: defaultAgentAccess(input.agent, preferred),
         prompt: handedTask(task, own),
       },
       undefined,
