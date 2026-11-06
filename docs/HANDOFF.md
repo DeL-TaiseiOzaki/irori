@@ -18,6 +18,31 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-06: **0.2.58** ([#301](https://github.com/DeL-TaiseiOzaki/irori/pull/301),
+editing a sent message and branching a conversation, ADR 017 D6 and D7) as
+`aee8fd1`, by `publish.yml` alone (push run `42194396573`): merge to release
+1:32, to page 3:34, drift in step. #301 was brought up to date with 0.2.57 and
+kept 0.2.58. Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.58-full.nupkg` matched `SHA256SUMS.txt`; the live page links the
+0.2.58 installers. See STATUS.
+
+Published 2026-11-06: **0.2.57** ([#300](https://github.com/DeL-TaiseiOzaki/irori/pull/300),
+each conversation keeps its access, and the settings choose where new ones
+start, ADR 009) as `af52cd5`, by `publish.yml` alone (push run `42191733476`):
+merge to release 1:37, to page 4:54, drift in step. Its first CI run failed in
+the threads smoke (an access chosen before the new conversation was on show);
+`f2235a2` waits for it and disables the select while a conversation loads.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.57-full.nupkg` matched `SHA256SUMS.txt`; the live page linked the
+0.2.57 installers until 0.2.58 replaced them. See STATUS.
+
+Published 2026-11-05: **0.2.56** ([#299](https://github.com/DeL-TaiseiOzaki/irori/pull/299),
+a queued instruction sent now, ADR 056) as `8b5b2d5`, by `publish.yml` alone
+(push run `41951502059`): merge to release 1:28, to page 3:12, drift in step.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.56-full.nupkg`, checked on 2026-11-06, matched `SHA256SUMS.txt`.
+See STATUS.
+
 Published 2026-11-03: **0.2.55** ([#297](https://github.com/DeL-TaiseiOzaki/irori/pull/297),
 each connected folder named with its place on this device as one folder,
 ADR 019 decision 8) as `9c1b54c`, by `publish.yml` alone (push run
