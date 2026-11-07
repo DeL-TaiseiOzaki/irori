@@ -257,6 +257,38 @@ app
     // Git operation works in the vault.
     cloud.mayLink = (scopeId) => !agents.busy(scopeId) && !git.busy;
     cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
+    // Some places have no system trash, such as Google Drive for desktop's drive on
+    // Windows. Deleting there cannot be undone on this device, so the person decides.
+    cloud.confirmPermanentDelete = async ({ name, directory, reason }) => {
+      const answer = await dialog.showMessageBox(front(), {
+        type: 'warning',
+        message: t(`「${name}」をゴミ箱に移せません`, `"${name}" cannot be moved to the trash`),
+        detail: [
+          t(
+            'この場所には、このコンピューターのゴミ箱がありません（パソコン版 Google ドライブのドライブ、ネットワーク上のフォルダなど）。',
+            "This place has no trash on this computer (Google Drive for desktop's drive, a network folder…).",
+          ),
+          directory
+            ? t(
+                '完全に削除すると、フォルダと中身はこのコンピューターから元に戻せません。',
+                'Deleted for good, the folder and everything in it cannot be restored on this computer.',
+              )
+            : t(
+                '完全に削除すると、ファイルはこのコンピューターから元に戻せません。',
+                'Deleted for good, the file cannot be restored on this computer.',
+              ),
+          t(
+            '同期アプリ（Google ドライブ、OneDrive など）は、削除をクラウドと共有相手にも反映します。クラウド側のゴミ箱から戻せる場合があります。',
+            'A sync app (Google Drive, OneDrive…) passes the deletion to the cloud and to anyone it is shared with. Its own trash in the cloud may still restore it.',
+          ),
+          `${t('システムの理由', 'The system said')}: ${reason}`,
+        ].join('\n\n'),
+        buttons: [t('キャンセル', 'Cancel'), t('完全に削除', 'Delete for good')],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return answer.response === 1;
+    };
     // Where each vault's agents keep their scratch, rather than the system's temporary folder.
     const work = new WorkFolders(files);
     const agentPaths = new AgentPaths({ files, you, workspaces: () => workspaces.list() });
