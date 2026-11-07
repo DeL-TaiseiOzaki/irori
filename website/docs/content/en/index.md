@@ -13,7 +13,7 @@ Start with the [quickstart](quickstart.md). See [installation](installation.md) 
 
 A knowledge-base folder is called a **vault**. Notes appear in **Knowledge** and materials in **Contents**. AI instructions appear in **Schema**, only when agents are on. See the [three layers](layers.md).
 
-The **vault agent** is optional; turn it on in **Settings → Agents**. The **irori agent** takes on work across several vaults. See [AI agents](agents.md) and [irori mode](irori-mode.md).
+The **vault agent** is optional; turn it on in **Settings → Agents → vault agent**. The **irori agent** takes on work across several vaults. See [AI agents](agents.md) and [irori mode](irori-mode.md).
 
 ## Find a guide for your task
 
