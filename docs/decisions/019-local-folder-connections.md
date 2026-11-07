@@ -1,7 +1,7 @@
 # 019 — Folders on this device in contents
 
 Date: 2026-10-01. Status: owner decision; implemented for 0.1.62. Decision 8
-added 2026-11-03 for 0.2.55.
+added 2026-11-03 for 0.2.55; decision 5 amended 2026-11-07 for 0.2.59.
 
 ## Context
 
@@ -42,6 +42,16 @@ Box, iCloud Drive and OneDrive all keep a folder on the device in sync.
    a hibachi or irori's data is refused.
 5. **Deleting moves to the system trash.** A plain folder has no Drive trash
    behind it; without a trash, irori deletes nothing there.
+   *(Amended 2026-11-07, 0.2.59, owner request: connected folders must be
+   deletable.)* On Windows, Google Drive for desktop's drive and network
+   shares have no Recycle Bin, and Electron's `shell.trashItem` aborts there
+   rather than delete ("Operation was aborted"), so nothing in such a folder
+   could be deleted from irori. When the system trash refuses an entry, a
+   main-process dialog now names it, says it cannot be restored on this
+   device and that the sync app passes the deletion on, and gives the
+   system's reason; only **完全に削除** deletes it, after the link and the
+   entry are checked again. The connected folder itself is still only
+   disconnected, and a read-only connection still deletes nothing.
 6. **Agents are allowed into the folder.** In standard access, Claude Code
    receives the connected folders as additional directories and Codex as
    `sandbox_workspace_write.writable_roots`. Full access needs neither.

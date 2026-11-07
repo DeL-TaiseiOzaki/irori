@@ -154,6 +154,15 @@ export class CloudService {
   mayLink?: (scopeId: string) => boolean;
   /** A waiting or lost folder was linked again without anyone asking. */
   onLinked?: (scopeId: string) => void;
+  /**
+   * Asks the person whether an entry the system trash refused may be deleted for good;
+   * without it, such an entry is not deleted.
+   */
+  confirmPermanentDelete?: (entry: {
+    name: string;
+    directory: boolean;
+    reason: string;
+  }) => Promise<boolean>;
   /** Where a vault's agents work (ADR 044), shown as `<contents>/work` (ADR 045). */
   workFolder?: (scopeId: string) => Promise<WorkFolder>;
   /** Clones and updates GitHub repositories in contents (ADR 046). */
@@ -1395,13 +1404,45 @@ export class CloudService {
       if (!isMissing(error)) throw error;
     });
   }
-  /** Moves a file or folder of an editable connection to the system trash. */
-  deleteEntry(scopeId: string, target: string): Promise<void> {
-    return this.mutate(async () => {
+  /**
+   * Moves a file or folder of an editable connection to the system trash. Where the
+   * system has no trash for it (Google Drive for desktop's drive on Windows, a network
+   * share), the person is asked, and only then is it deleted for good (ADR 019 D5).
+   */
+  async deleteEntry(scopeId: string, target: string): Promise<void> {
+    const refused = await this.mutate(async () => {
       const { actual } = await this.editable(scopeId, target);
       // A plain folder has no Drive trash behind it: the system's trash keeps the entry.
       if (!this.trash) throw Error(t('ごみ箱を使えません。', 'The trash is not available.'));
-      await this.trash(actual);
+      try {
+        await this.trash(actual);
+      } catch (error) {
+        const directory = (await fs.lstat(actual)).isDirectory();
+        return { actual, directory, error: error instanceof Error ? error : Error(String(error)) };
+      }
+      await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
+      return undefined;
+    });
+    if (!refused) return;
+    // Asked outside the queue, so other connections are not held while the person reads.
+    const confirmed = await this.confirmPermanentDelete?.({
+      name: path.posix.basename(target),
+      directory: refused.directory,
+      reason: refused.error.message,
+    });
+    if (!confirmed)
+      throw Error(
+        t(
+          `ゴミ箱に移せなかったため、削除しませんでした（${refused.error.message}）。`,
+          `Not deleted: it could not be moved to the trash (${refused.error.message}).`,
+        ),
+      );
+    await this.mutate(async () => {
+      // The link and the entry are checked again: either may have changed while the person read.
+      const { actual } = await this.editable(scopeId, target);
+      if (actual !== refused.actual)
+        throw Error(t('削除する項目が変わりました。', 'The entry changed.'));
+      await fs.rm(actual, { recursive: true });
       await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
     });
   }
