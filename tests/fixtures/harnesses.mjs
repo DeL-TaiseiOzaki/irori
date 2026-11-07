@@ -108,6 +108,23 @@ export function run(kind) {
     );
     log({ type: 'schema-hooks', pre, post: output.output, input: args });
   }
+  // OpenCode starting a sub-agent with its task tool, through irori's plugin.
+  async function taskHooks() {
+    let hooks;
+    for (const file of JSON.parse(process.env.OPENCODE_CONFIG_CONTENT).plugin) {
+      const module = await import(pathToFileURL(file).href);
+      if (module.IroriSchemaHooks) hooks = await module.IroriSchemaHooks({});
+    }
+    const args = { description: 'Look around', prompt: 'Find the notes', subagent_type: 'explore' };
+    const call = { tool: 'task', sessionID: 'ses_fixture', callID: 'call-t' };
+    const pre = await hooks['tool.execute.before'](call, { args }).then(
+      () => ({}),
+      (error) => ({ block: error.message }),
+    );
+    const output = { title: 'Look around', output: 'Found note.md', metadata: {} };
+    await hooks['tool.execute.after']({ ...call, args }, output);
+    log({ type: 'task-hooks', pre, post: output.output });
+  }
   if (kind === 'hermes') return hermes(log);
   if (kind === 'agy') return antigravity(log);
   // What the real CLI does with the script irori hands it: load it and run its
@@ -154,7 +171,7 @@ export function run(kind) {
   }
   if (kind === 'pi') {
     log({ type: 'launch', args: process.argv.slice(2) });
-    const session = process.argv.includes('--session')
+    let session = process.argv.includes('--session')
       ? process.argv[process.argv.indexOf('--session') + 1]
       : path.join(process.cwd(), 'fixture-pi.jsonl');
     const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
@@ -220,6 +237,16 @@ export function run(kind) {
         if (!fs.existsSync(session))
           fs.writeFileSync(session, JSON.stringify({ type: 'session', cwd: process.cwd() }) + '\n');
         if (withoutEarlier(message.message).includes('crash')) return process.exit(2);
+        // A command that moves Pi to a new session and answers there, as /new does.
+        if (message.message === '/new') {
+          session = path.join(process.cwd(), 'fixture-pi-new.jsonl');
+          fs.writeFileSync(session, JSON.stringify({ type: 'session', cwd: process.cwd() }) + '\n');
+          active = true;
+          send({ type: 'agent_start' });
+          send({ type: 'response', id: message.id, command: 'prompt', success: true });
+          complete(false, 'New session started.');
+          return;
+        }
         if (message.message.startsWith('/fixture')) {
           send({ type: 'response', id: message.id, command: 'prompt', success: true });
           return;
@@ -386,6 +413,7 @@ export function run(kind) {
         return void setTimeout(finish, 100);
       }
       if (text.includes('schema-hooks')) return void schemaHooks().then(finish);
+      if (text.includes('task-hooks')) return void taskHooks().then(finish);
       if (text.includes('dialog'))
         emit('permission.asked', {
           id: 'permission',

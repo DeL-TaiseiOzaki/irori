@@ -25,6 +25,8 @@ export function stopHookCap(env: NodeJS.ProcessEnv = process.env) {
 export class RunHooks {
   /** PreToolUse context for calls that ran, given with their results. */
   private later = new Map<string, string[]>();
+  /** Hooks that decide nothing, still running; the run waits for them before it ends. */
+  private running = new Set<Promise<void>>();
   constructor(
     readonly runner: SchemaHookRunner,
     private agent: AgentId,
@@ -87,19 +89,28 @@ export class RunHooks {
     );
     return outcome.decision;
   }
+  /** A hook run that decides nothing: the CLI goes on, and the run's end waits for it. */
+  private aside(job: Promise<unknown>) {
+    const done = job.then(
+      () => {},
+      () => {},
+    );
+    this.running.add(done);
+    void done.finally(() => this.running.delete(done));
+  }
   /** After the CLI compacted the session: PostCompact hooks hear it, and decide nothing. */
   postCompact(trigger: 'manual' | 'auto' = 'auto') {
     if (!this.runner.has('PostCompact')) return;
-    void this.run('PostCompact', { trigger, compact_summary: '' }, { value: trigger }).catch(
-      () => {},
-    );
+    this.aside(this.run('PostCompact', { trigger, compact_summary: '' }, { value: trigger }));
   }
-  /** The person is asked something: Notification hooks hear it, and the run does not wait for them. */
+  /** The person is asked something: Notification hooks hear it, and the CLI does not wait for them. */
   notification(message: string, type: 'permission_prompt' | 'elicitation_dialog') {
     if (!this.runner.has('Notification')) return;
-    void this.run('Notification', { message, notification_type: type }, { value: type }).catch(
-      () => {},
-    );
+    this.aside(this.run('Notification', { message, notification_type: type }, { value: type }));
+  }
+  /** Waits for the PostCompact and Notification hooks still running, each within its timeout. */
+  async settled() {
+    while (this.running.size) await Promise.all([...this.running]);
   }
   async sessionEnd() {
     await this.run('SessionEnd', { reason: 'other' }, { value: 'other' });

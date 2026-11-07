@@ -2421,8 +2421,10 @@ export class AgentService {
       await this.cancelHeld(run);
       if (run.child) await killTree(run.child).catch(() => {});
       run.commands?.();
-      // SessionEnd hooks hear the run end; hooks still running stop with it.
+      // Hooks that decide nothing finish, unless the run was stopped; SessionEnd
+      // hooks hear the run end; hooks still running stop with it.
       if (run.hooks) {
+        if (!run.cancelled) await run.hooks.settled();
         await run.hooks.sessionEnd().catch(() => {});
         await run.hooks.runner.stop();
       }

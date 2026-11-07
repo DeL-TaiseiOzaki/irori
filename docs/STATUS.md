@@ -54,9 +54,12 @@ before the CLI took the request.
   - A CLI command that moved session copied digests to the new session.
   - PermissionRequest, PostToolUseFailure, PostCompact and SubagentStart were
     added where the CLI shows them.
+- Notification and PostCompact hooks no longer die with the run: it waits for
+  them before it ends, unless stopped.
 - Tests: `schema-reach` (stand-ins for all six CLIs) and `schema-hooks`
-  (semantics, `if` rules, fields, SessionEnd budget, Codex hash vectors). No
-  real CLI was run. Whether the Antigravity CLI reads hooks from an added folder
+  (semantics, `if` rules, fields, SessionEnd budget, Codex hash vectors, the
+  forwarder's fail-closed answers). Each review fix has a test case. No real
+  CLI was run. Whether the Antigravity CLI reads hooks from an added folder
   is inferred from its docs. Not tried on Windows.
 Settings shown one part at a time from framed groups, 2026-11-07 (**0.2.60**,
 [#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305), published as `v0.2.60-preview.1`;

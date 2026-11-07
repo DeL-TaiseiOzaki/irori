@@ -114,6 +114,8 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
      - Notification runs when the person is asked something.
      - PermissionRequest answers what Codex or OpenCode asks the person.
      - PostCompact runs when irori sees the CLI compact.
+     - Notification and PostCompact hooks do not hold the CLI up. The run
+       waits for them before it ends, unless the person stopped it.
    - **Tool events, per CLI:**
      - **Pi and OpenCode.** An extension (`-e`) or a plugin
        (`OPENCODE_CONFIG_CONTENT`) from irori's data directory hands irori each
@@ -135,6 +137,8 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
          nothing is sent.
        - The forwarder answers for itself before the hook's timeout, stopping
          the call: a hook Codex timed out would let it through.
+         `IRORI_HOOK_FORWARD_DEADLINE_MS` can only bring that answer sooner;
+         the tests use it.
      - **The Antigravity CLI.** It reads `.agents/hooks.json` in a folder irori
        makes in its data directory and adds with `--add-dir`.
        - PostToolUse feedback goes before the next model call (PreInvocation).
