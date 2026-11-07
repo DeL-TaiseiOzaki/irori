@@ -1,5 +1,31 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Settings shown one part at a time from framed groups, 2026-11-07 (**0.2.60**,
+[#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305);
+[ADR 057](decisions/057-settings-by-part.md), superseding ADR 055 decisions 2
+and 3): the owner found the settings hard to follow and asked that the side list
+be designed first, with the irori agent and the vault agent apart.
+- `Settings` (`src/app/Settings.tsx`): `parts` in `groups` (表示, エージェント,
+  自動化, アカウントと更新); `SettingsSheet` draws each group as a framed list whose
+  entries carry a `summary` (current value or role) and shows only the part
+  chosen, remembered in `lastPart` for the window. Rows are `Choices` (tiles with
+  a check, `detail`, `hint`, `tone`), `SwitchRow` (`role="switch"` with オン/オフ),
+  `Row` with `OpenButton`, framed by `Group`. The notes part has `NotePreview`,
+  which follows the root's `data-*` attributes and is sticky.
+- A workspace passes `SettingsWorkspace` (id, the irori agent, its vaults,
+  `onSchema(owner)`, `onIroriAgent`, `onCreateIroriAgent`, `onFolderChanged`);
+  `SchemaDialog` takes `initialOwner`. The start screen passes none, and rows that
+  need one say so.
+- `useRuntime` keeps a runtime change under way across closing the sheet and
+  shows uv's download. `AccountSection` takes `heading` and reads an error again
+  when the language changes. Styles in `shell.css`; the error and its details in
+  the settings are framed.
+- The smokes choose a part through `navigation 設定の項目`; the vault agent and
+  runtime switches are found by the `switch` role. README and guide paths name
+  the entry (**設定 → エージェント → vault agent**), and the guide's settings
+  page describes the groups. Verified on Linux/Xvfb in hearth, light and English
+  and from the start screen; not yet seen on Windows or macOS.
+
 Connected folders deletable where the system has no trash, 2026-11-07
 (**0.2.59**, [#303](https://github.com/DeL-TaiseiOzaki/irori/pull/303), published as `v0.2.59-preview.1`;
 [ADR 019](decisions/019-local-folder-connections.md) decision 5

@@ -13,7 +13,7 @@ irori は、複数の知識ベース（GitHub のリポジトリ）と、手元�
 
 知識ベースのフォルダを **vault** と呼びます。ノートは **Knowledge**、資料は **Contents** として表示されます。AI への指示は **Schema** で、エージェントをオンにしたときだけ表示されます。[3つの層](layers.md)を参照してください。
 
-**vault agent** は任意の機能で、**設定 → エージェント** でオンにします。複数の vault をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)を参照してください。
+**vault agent** は任意の機能で、**設定 → エージェント → vault agent** でオンにします。複数の vault をまたぐ仕事は **irori agent** に頼めます。[AI エージェント](agents.md)と[irori mode](irori-mode.md)を参照してください。
 
 ## 目的から探す
 
