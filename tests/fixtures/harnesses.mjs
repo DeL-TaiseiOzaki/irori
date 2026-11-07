@@ -76,6 +76,13 @@ export function run(kind) {
             content: [{ type: 'text', text: 'note.md' }],
             isError: false,
           }),
+          await handler({
+            toolName: 'bash',
+            toolCallId: 'call-f',
+            input: { command: 'false' },
+            content: [{ type: 'text', text: 'exit 1' }],
+            isError: true,
+          }),
         );
       log({ type: 'schema-hooks', pre, post, input: call.input });
       return;
@@ -365,6 +372,19 @@ export function run(kind) {
       if (text.includes('hold')) return;
       if (text.includes('rewrite')) return void hooks(text).then(finish);
       if (text.includes('compact-now')) emit('session.compacted', { sessionID });
+      // A tool runs during the turn, before it ends, as in OpenCode.
+      if (text.includes('tool-step')) {
+        emit('message.part.updated', {
+          part: {
+            sessionID,
+            type: 'tool',
+            tool: 'bash',
+            callID: 'call-step',
+            state: { status: 'running' },
+          },
+        });
+        return void setTimeout(finish, 100);
+      }
       if (text.includes('schema-hooks')) return void schemaHooks().then(finish);
       if (text.includes('dialog'))
         emit('permission.asked', {
@@ -398,9 +418,16 @@ export function run(kind) {
     }
     res.end('true');
   });
-  server.listen(0, '127.0.0.1', () =>
-    console.log('opencode server listening on http://127.0.0.1:' + server.address().port),
-  );
+  server.listen(0, '127.0.0.1', async () => {
+    // OpenCode loads the plugins its configuration names as it starts, unless
+    // this fixture is told to behave as one that cannot load them.
+    if (!fs.existsSync('opencode-ignores-plugins'))
+      for (const file of JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? '{}').plugin ?? []) {
+        const module = await import(pathToFileURL(file).href);
+        if (module.IroriSchemaHooks) await module.IroriSchemaHooks({});
+      }
+    console.log('opencode server listening on http://127.0.0.1:' + server.address().port);
+  });
 }
 
 // `hermes chat --query-file - --format stream-json`, as its stream_json.py writes it.

@@ -139,9 +139,9 @@ CLI was run; the protocol fixtures in `tests/schema-reach.test.ts` follow them.
 
 | CLI | AGENTS.md | Knowledge folder AGENTS.md | `.claude/rules` | `.agents/skills` | Hooks | Compaction seen as |
 | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | Reads it (2.1.277+). irori sets `instructionFiles: claude-md-and-agents-md` where a CLAUDE.md is. Older versions get it from irori | Loads it on a Read there | Reads them | Links from irori (ADR 049) | Its own | `system` `compact_boundary` |
+| Claude Code | Reads it (2.1.277+). irori sets `instructionFiles: claude-md-and-agents-md` where a CLAUDE.md is, checks `InstructionsLoaded` each session and gives it through `UserPromptSubmit` when it was not loaded; with hooks off or an older version, as words | Loads it on a Read there | Reads them | Links from irori (ADR 049) | Its own | `system` `compact_boundary` |
 | Codex | Root to cwd. irori raises `project_doc_max_bytes` to 1 MiB. irori gives it when `instructionSources` omits it or `AGENTS.override.md` is present | Never: irori names them | irori, as words | Reads them | Its own hooks, given per thread and trusted by hash; they hand each event to irori | `contextCompaction` item |
-| OpenCode | Reads it (no limit) | Attached on a Read only: irori names them | irori, as words | Reads them | irori's plugin | `session.compacted` |
+| OpenCode | Reads it (no limit) | Attached on a Read only: irori names them | irori, as words | Reads them | irori's plugin, which says it loaded | `session.compacted` |
 | Pi | Reads it whatever the trust. irori gives it when `AGENTS.override.md` is present | Never: irori names them | irori, as words | `--skill` per folder from irori | irori's extension | `compaction_end` |
 | Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
 | Antigravity CLI | Reads it and cuts at 24,000 bytes; irori says to read the whole file | Never: irori names them | irori, as words | Reads them | `.agents/hooks.json` in irori's `--add-dir` folder | Not reported: words go whole every time |
@@ -150,6 +150,10 @@ Hook events irori runs for a CLI other than Claude Code:
 
 - **Around the run, on every such CLI:** SessionStart, UserPromptSubmit, Stop,
   SessionEnd and Notification.
+- **PermissionRequest:** Codex and OpenCode, on the permissions they ask.
+- **PostCompact:** Codex, OpenCode, Pi and Hermes, when irori sees a compaction.
+- **PostToolUseFailure:** Pi and Hermes, on a call that failed.
+- **SubagentStart:** Codex (its own hook) and OpenCode (before `task`).
 - **PreToolUse and PostToolUse:**
   - Codex, OpenCode, Pi and the Antigravity CLI run them.
   - Hermes runs only PostToolUse, after the call. Its feedback goes in the next
@@ -161,8 +165,12 @@ Hook events irori runs for a CLI other than Claude Code:
   - Codex runs it through its own hook.
   - OpenCode and Hermes run it after a `task` or `delegate_task` call.
   - Pi and the Antigravity CLI cannot run it.
-- **A missing event:** the person is asked before the run whether to go on
-  without the event's hooks.
+- **A missing event:** one that decides nothing is only named; for any other the
+  person is asked before the run whether to go on without its hooks, and the
+  answer is kept (`schema-hooks-without.json`) until those hooks change.
+- **Handler fields:** `if`, `args`, `shell`, `async`, `asyncRewake`,
+  `onFailure` and an `http` hook's `headers`/`allowedEnvVars` are read as Claude
+  Code reads them; `prompt`, `agent` and `mcp_tool` hooks count as missing.
 
 Tool calls are named and shaped as Claude Code's tools for the hooks
 (`src/agents/tool-names.ts`): Pi's `bash`, OpenCode's `bash`, Hermes's

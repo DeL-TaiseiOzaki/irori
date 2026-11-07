@@ -165,6 +165,8 @@ export async function runOpenCode(ctx: NativeContext) {
   const requests = new Set<string>();
   const jobs = new Set<Promise<void>>();
   const related = new Set<string>();
+  const started = new Set<string>();
+  let stopped: string | undefined;
   const fail = (error: Error) => {
     failure = error;
     server.stop();
@@ -190,12 +192,25 @@ export async function runOpenCode(ctx: NativeContext) {
     if (requests.has(p.id)) return;
     requests.add(p.id);
     if (event.type === 'permission.asked') {
+      const permission = String(event.properties.permission);
+      const asked = event.properties;
+      const patterns = Array.isArray(asked.patterns) ? asked.patterns.map(String) : [];
       const reply = await ctx.ask(
-        t(
-          `${String(event.properties.permission)} の許可`,
-          `Allow ${String(event.properties.permission)}`,
-        ),
+        t(`${permission} の許可`, `Allow ${permission}`),
         p,
+        undefined,
+        // As a tool call of OpenCode's, for the Schema's PermissionRequest hooks.
+        {
+          name: permission,
+          input:
+            permission === 'bash'
+              ? { command: patterns.join(' ') }
+              : permission === 'webfetch'
+                ? { url: patterns[0] }
+                : permission === 'edit' || permission === 'read'
+                  ? { filePath: patterns[0] }
+                  : { patterns },
+        },
       );
       if (!server.signal.aborted)
         await data(
@@ -318,6 +333,16 @@ export async function runOpenCode(ctx: NativeContext) {
       }
       if (event.type === 'message.part.updated' && event.properties.part.type === 'tool') {
         const part = event.properties.part;
+        // A call the Schema's hooks could not see stops the run (ADR 058).
+        if (!stopped && !started.has(part.callID)) {
+          started.add(part.callID);
+          const reason = ctx.toolStarted?.({ tool: part.tool, id: part.callID });
+          if (reason) {
+            stopped = reason;
+            fail(Error(reason));
+            return;
+          }
+        }
         ctx.event('tool', part.tool, {
           details: JSON.stringify(part.state),
           call: part.callID,
@@ -352,6 +377,7 @@ export async function runOpenCode(ctx: NativeContext) {
       ),
     );
     if (failure) throw failure;
+    if (stopped) throw Error(stopped);
     if (result?.info?.error) throw Error(errorMessage(result.info.error));
     if (result?.info?.role !== 'assistant' || !Array.isArray(result.parts))
       throw Error('OpenCode ended without an assistant result');

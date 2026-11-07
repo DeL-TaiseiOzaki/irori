@@ -56,8 +56,12 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
    - **Claude Code.** From 2.1.277 on, where a CLAUDE.md is in the folder or
      above it, Claude Code is told to read AGENTS.md beside it:
      `pluginConfigs["cc-plugin-agents-md@builtin"].options.instructionFiles =
-     "claude-md-and-agents-md"` in its flag settings. An older Claude Code is
-     given AGENTS.md as words.
+     "claude-md-and-agents-md"` in its flag settings. Whether it loaded AGENTS.md
+     is checked in every session: the SDK's `InstructionsLoaded` hook names the
+     files it loaded, and when AGENTS.md is not among them (an older version,
+     another provider, telemetry off) a `UserPromptSubmit` hook gives it with the
+     request. With every hook turned off (`disableAllHooks`), or a version known
+     to be older, AGENTS.md goes as words up front.
    - **Codex.** It keeps up to 1 MiB of AGENTS.md (`project_doc_max_bytes`). An
      AGENTS.md missing from the thread's `instructionSources` goes as words.
    - **A file read instead.** Where the CLI would read another file in its
@@ -82,13 +86,19 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
    For every other CLI, irori runs both itself
    ([src/agents/schema-hooks.ts](../../src/agents/schema-hooks.ts)).
    - **Claude Code's semantics:**
-     - The same standard input, matchers, exit codes and JSON fields.
-     - The same timeouts: 600 s, 30 s for UserPromptSubmit, and a 1.5 s budget
-       for SessionEnd.
+     - The same standard input, matchers, exit codes and JSON fields, `if`
+       (a permission rule such as `Bash(git *)`) on tool events.
+     - The same timeouts: 600 s, 30 s for UserPromptSubmit. SessionEnd hooks
+       share 1.5 s (or `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`), raised by a
+       hook's own timeout up to 60 s, and keep it when the run was stopped.
      - `CLAUDE_PROJECT_DIR`, the folder as working directory, hooks run in
        parallel, and a command named twice runs once.
-     - `command` and `http` hooks run. A `prompt` or `agent` hook, which needs a
-       model, is reported as not run.
+     - The shell form in bash (Git Bash or PowerShell on Windows, `shell`
+       honoured), the exec form (`args`) without a shell, `async` and
+       `asyncRewake` in the background, `onFailure: "block"`, and an `http`
+       hook's `headers` with its `allowedEnvVars`.
+     - A `prompt`, `agent` or `mcp_tool` hook needs Claude Code's model or tools;
+       irori treats it as a hook the CLI cannot run.
    - **Tool names.** A tool call is named and shaped as Claude Code's tool of the
      same kind ([src/agents/tool-names.ts](../../src/agents/tool-names.ts)), and
      a matcher is also tried on the CLI's own name. `apply_patch` is matched as
@@ -97,16 +107,22 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
      - SessionStart (`startup`, `resume` or `compact`) and UserPromptSubmit run
        before the request goes. Their context goes in the request text. A block
        stops the instruction, and nothing is sent.
-     - Stop runs after a turn. A block sends its reason as the next request in
-       the same session, at most 8 times in a row, as in Claude Code.
+     - Stop runs after a turn. A block, or context, sends the next request in
+       the same session. At most 8 in a row (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`),
+       counted again whenever the agent calls a tool, as in Claude Code.
      - SessionEnd runs when the run ends.
      - Notification runs when the person is asked something.
+     - PermissionRequest answers what Codex or OpenCode asks the person.
+     - PostCompact runs when irori sees the CLI compact.
    - **Tool events, per CLI:**
      - **Pi and OpenCode.** An extension (`-e`) or a plugin
        (`OPENCODE_CONFIG_CONTENT`) from irori's data directory hands irori each
        call. PreToolUse can stop a call, with a reason the model reads, or change
-       its input. PostToolUse adds to the result. PreCompact runs too, and on Pi
-       it can stop a compaction.
+       its input. PostToolUse adds to the result; on Pi a failed call goes to
+       PostToolUseFailure. PreCompact runs too: on Pi it can stop a compaction,
+       on OpenCode its words go to the summary. OpenCode's plugin says it loaded;
+       a tool call before that stops the run. SubagentStart and SubagentStop run
+       around OpenCode's `task`.
      - **Codex.** It gets hooks of its own in the thread's configuration, each
        handing its event to irori.
        - Each hook is trusted by its own hash in `hooks.state`, computed as
@@ -117,21 +133,28 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
          enabled. When Codex fingerprints them otherwise, irori starts it once
          more with the trust Codex reported. If they are still not trusted,
          nothing is sent.
+       - The forwarder answers for itself before the hook's timeout, stopping
+         the call: a hook Codex timed out would let it through.
      - **The Antigravity CLI.** It reads `.agents/hooks.json` in a folder irori
        makes in its data directory and adds with `--add-dir`.
        - PostToolUse feedback goes before the next model call (PreInvocation).
        - A tool call before irori has heard from those hooks stops the run.
      - **Hermes Agent.** It reports a call to irori only once the call has run.
-       - Its PostToolUse hooks run then, and what they say goes with the next
-         request.
+       - Its PostToolUse (or PostToolUseFailure) hooks run then, and what they
+         say goes with the next request, at most 8 requests in a row.
        - PreToolUse and PreCompact cannot run there.
-   - **Events a CLI cannot run.** The person is asked before the run whether to
-     go on without them. A routine step, which no one answers, does not run.
+   - **Events a CLI cannot run.** Hooks of an event that decides nothing in
+     Claude Code (SessionStart, PostCompact, SubagentStart …) are only named. For
+     the others, which may be guards, the person is asked before the run whether
+     to go on without them; the answer holds until those hooks change, and a
+     routine step runs once the person has allowed it in an ordinary run.
    - **Approval.** The shared Schema's hooks and the folder's are approved like
      other configuration that runs without asking (ADR 009) before irori runs
      them.
    - **Fail closed.** A call irori's script cannot ask about does not run: a hook
-     may be a guard.
+     may be a guard. A request irori stops before it goes (a UserPromptSubmit
+     block, Codex refusing irori's hooks, unreadable hooks) leaves the session
+     for the next request.
 6. **A session has heard what its CLI took.**
    - **When digests are recorded.** The digests of what a request gave are
      recorded only once the run shows the CLI took it: it answered, used a tool
@@ -144,7 +167,11 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
    - **CLIs that do not report compactions.** Hermes, which compresses in place,
      and the Antigravity CLI hear irori's words whole on every request.
    - **Removed parts.** A session that heard something now gone hears that it
-     is gone.
+     is gone. A part irori could not read this time is not gone: the session
+     keeps what it heard and hears that it was not read. One file irori cannot
+     read as text is named for the agent to read, and the rest still goes.
+   - **CLI commands.** A command that moves the CLI to another session (`/clear`)
+     leaves that session having heard nothing.
 7. **The settings say how.** Under Rules and Hooks, the Schema settings say how
    each reaches every CLI, built from the table. The skill reach view says irori
    gives Pi the skills and names them to Hermes.
@@ -166,7 +193,11 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
 - Inferred, not documented: that the Antigravity CLI reads `.agents/hooks.json`
   from a folder added with `--add-dir`. If it does not, a run with tool hooks
   stops before its first tool call.
-- On Windows, hooks run in Git Bash when it is installed, otherwise in cmd.exe.
-  Codex's Windows trust key is unverified there: `hooks/list` refuses the run,
-  or the second start corrects it.
+- On Windows, hooks run in Git Bash when it is installed, otherwise in
+  PowerShell, as in Claude Code. Codex's Windows trust key is unverified there:
+  `hooks/list` refuses the run, or the second start corrects it.
+- Claude Code's `InstructionsLoaded` is assumed to name AGENTS.md when it loads
+  it; if it does not, AGENTS.md is given once more with each request.
+- A Stop hook that always blocks keeps going while the agent keeps calling
+  tools, as in Claude Code; hooks should read `stop_hook_active`.
 - OpenCode's 2.x line, with its new plugin API, is not covered.

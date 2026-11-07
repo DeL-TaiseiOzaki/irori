@@ -445,10 +445,16 @@ const run = (event, payload) => {
   const result = spawnSync('/bin/sh', ['-c', hook.command], { input: JSON.stringify({ hook_event_name: event, ...payload }), encoding: 'utf8' });
   return result.stdout;
 };
+const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
 require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
   const m = JSON.parse(line);
+  // irori's answer to the permission this stand-in asked.
+  if (!m.method && m.id === 'approval-1') {
+    log({ type: 'approval', result: m.result });
+    send({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+    return;
+  }
   if (!m.method || m.id === undefined) return;
-  const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
   log({ method: m.method, params: m.params });
   if (m.method.startsWith('thread/')) {
     config = (m.params && m.params.config) || {};
@@ -469,6 +475,10 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
       log({ type: 'post', stdout: run('PostToolUse', { tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\\n*** Update File: notes/a.md\\n@@\\n-a\\n+b\\n*** End Patch' }, tool_response: 'ok', tool_use_id: 'c2' }) });
     }
     send({ method: 'item/agentMessage/delta', params: { delta: 'done' } });
+    if (text.includes('needs-approval')) {
+      send({ id: 'approval-1', method: 'item/commandExecution/requestApproval', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'rm -rf data', reason: 'Run rm?' } });
+      return;
+    }
     if (text.includes('compact-now')) send({ method: 'item/completed', params: { item: { type: 'contextCompaction', id: 'cc' } } });
     send({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
     return;
@@ -732,18 +742,50 @@ test(
 
 // --- Claude Code -------------------------------------------------------------------
 
+// Speaks the Agent SDK's stream-json as Claude Code does, and calls the hook
+// callbacks the SDK registered: InstructionsLoaded for AGENTS.md when the file
+// `claude-loads-agents` is there, then UserPromptSubmit, whose additional
+// context it records with the request.
 const claudeStandIn = (version: string) => `#!/usr/bin/env node
 const fs = require('node:fs');
+const path = require('node:path');
 if (process.argv.includes('--version')) { console.log('${version} (Claude Code)'); process.exit(0); }
 const args = process.argv.slice(2);
 const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
-require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+let hooks = {};
+let next = 0;
+const pending = new Map();
+const request = (body) => new Promise((resolve) => {
+  const id = 'stand-in-' + ++next;
+  pending.set(id, resolve);
+  send({ type: 'control_request', request_id: id, request: body });
+});
+const call = async (event, input) => {
+  const outputs = [];
+  for (const matcher of hooks[event] || [])
+    for (const id of matcher.hookCallbackIds)
+      outputs.push(await request({ subtype: 'hook_callback', callback_id: id, input: { hook_event_name: event, session_id: 'claude-session', cwd: process.cwd(), ...input } }));
+  return outputs;
+};
+require('node:readline').createInterface({ input: process.stdin }).on('line', async (line) => {
   const message = JSON.parse(line);
-  if (message.type === 'control_request')
+  if (message.type === 'control_response') {
+    const resolve = pending.get(message.response.request_id);
+    pending.delete(message.response.request_id);
+    resolve?.(message.response.response);
+    return;
+  }
+  if (message.type === 'control_request') {
+    if (message.request && message.request.subtype === 'initialize') hooks = message.request.hooks || {};
     send({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: {} } });
+  }
   if (message.type === 'user') {
     const text = message.message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    fs.appendFileSync('claude-stand-in.jsonl', JSON.stringify({ args, prompt: text }) + '\\n');
+    if (fs.existsSync('claude-loads-agents'))
+      await call('InstructionsLoaded', { file_path: path.join(process.cwd(), 'AGENTS.md'), memory_type: 'Project', load_reason: 'session_start' });
+    const submitted = await call('UserPromptSubmit', { prompt: text });
+    const context = submitted.map((output) => output && output.hookSpecificOutput && output.hookSpecificOutput.additionalContext).filter(Boolean);
+    fs.appendFileSync('claude-stand-in.jsonl', JSON.stringify({ args, prompt: text, context }) + '\\n');
     send({ type: 'system', subtype: 'init', session_id: 'claude-session' });
     send({ type: 'result', subtype: 'success', result: 'done', is_error: false, session_id: 'claude-session', duration_ms: 1, duration_api_ms: 0, num_turns: 1, total_cost_usd: 0, usage: {}, modelUsage: {}, permission_denials: [] });
     setTimeout(() => process.exit(0), 50);
@@ -752,7 +794,7 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
 `;
 
 test(
-  'Claude Code reads the vault Schema itself, and is told to read AGENTS.md beside a CLAUDE.md; an older one is given AGENTS.md',
+  'Claude Code reads the vault Schema itself; irori has it read AGENTS.md beside a CLAUDE.md, and gives AGENTS.md when it did not load it',
   posix,
   async (t) => {
     const h = await harness(t);
@@ -760,6 +802,8 @@ test(
     await h.settings.write(h.space.scopeId, 'AGENTS.md', 'VAULT-INSTRUCTIONS\n', null);
     await h.settings.write(h.space.scopeId, '.claude/rules/tone.md', 'VAULT-RULE\n', null);
     await writeFile(path.join(h.kb, 'CLAUDE.md'), 'Claude only.\n');
+    // Claude Code loads AGENTS.md: irori adds nothing.
+    await writeFile(path.join(h.kb, 'claude-loads-agents'), '');
     assert.equal((await h.execute('claude', 'one')).at(-1)?.outcome, 'completed');
     let [record] = await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'));
     assert.doesNotMatch(
@@ -767,17 +811,208 @@ test(
       /VAULT-RULE|VAULT-INSTRUCTIONS/,
       'Claude Code loads both itself',
     );
+    assert.deepEqual(record.context, []);
     const settings = JSON.parse(record.args[record.args.indexOf('--settings') + 1]);
     assert.deepEqual(settings.pluginConfigs, {
       'cc-plugin-agents-md@builtin': { options: { instructionFiles: 'claude-md-and-agents-md' } },
     });
-    // A version from before AGENTS.md support, as irori listed it, hears it from irori.
-    await writeFile(path.join(h.bin, 'claude'), claudeStandIn('2.1.200'), { mode: 0o700 });
-    assert.match(await version('claude'), /^2\.1\.200/);
-    await rm(path.join(h.kb, 'claude-stand-in.jsonl'));
-    await h.execute('claude', 'two', { conversationId: undefined });
-    [record] = await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'));
-    assert.match(record.prompt, /VAULT-INSTRUCTIONS/);
-    assert.doesNotMatch(record.prompt, /VAULT-RULE/);
+    // It did not load AGENTS.md (another provider, an older version …): irori gives it.
+    await rm(path.join(h.kb, 'claude-loads-agents'));
+    await h.execute('claude', 'two');
+    record = (await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'))).at(-1);
+    assert.match(
+      record.context[0],
+      /did not load this folder's instructions[\s\S]*VAULT-INSTRUCTIONS/,
+    );
+    assert.doesNotMatch(record.prompt, /VAULT-INSTRUCTIONS/);
+    // Hooks turned off in the folder's settings: AGENTS.md goes as words up front.
+    await writeFile(
+      path.join(h.kb, '.claude', 'settings.local.json'),
+      JSON.stringify({ disableAllHooks: true }),
+    );
+    await h.execute('claude', 'three');
+    record = (await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'))).at(-1);
+    assert.match(
+      record.prompt,
+      /<folder-instructions>\nVAULT-INSTRUCTIONS\n<\/folder-instructions>/,
+    );
+    assert.deepEqual(record.context, []);
+  },
+);
+
+test('a request irori stopped leaves the session to go on with', posix, async (t) => {
+  const h = await harness(t);
+  await h.settings.write(
+    h.space.scopeId,
+    '.claude/settings.json',
+    hooksJson({
+      UserPromptSubmit: [
+        {
+          hooks: [
+            {
+              type: 'command',
+              command: `node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{if(JSON.parse(s).prompt.includes('forbidden')){process.stderr.write('NOT TODAY');process.exit(2)}})"`,
+            },
+          ],
+        },
+      ],
+    }),
+    null,
+  );
+  await h.execute('pi', 'first words');
+  const blocked = await h.execute('pi', 'forbidden words');
+  assert.equal(blocked.at(-1)?.outcome, 'failed');
+  assert.doesNotMatch(
+    blocked.map((event) => event.text).join('\n'),
+    /Could not continue the previous session|前回のセッションを引き継げませんでした/,
+  );
+  await h.execute('pi', 'go on');
+  const launches = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl'))).filter(
+    (call) => call.kind === 'pi' && call.type === 'launch',
+  );
+  assert.equal(launches.length, 2, 'the blocked request started no CLI');
+  assert.ok(launches[1].args.includes('--session'), 'the next one went on in the session');
+});
+
+test(
+  'a guard hook a CLI cannot run is asked about once and remembered; one that decides nothing is only named',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        PreToolUse: [{ hooks: [{ type: 'command', command: 'exit 0' }] }],
+        PostCompact: [{ hooks: [{ type: 'command', command: 'exit 0' }] }],
+      }),
+      null,
+    );
+    h.answer(true);
+    assert.equal((await h.execute('hermes', 'one')).at(-1)?.outcome, 'completed');
+    assert.equal(h.asked.length, 1);
+    const two = await h.execute('hermes', 'two');
+    assert.equal(two.at(-1)?.outcome, 'completed');
+    assert.equal(h.asked.length, 1, 'the answer holds while the hooks stay the same');
+    assert.ok(two.some((event) => /以前に許可|as allowed before/.test(event.text)));
+    // The Antigravity CLI cannot run PostCompact, which decides nothing: only named.
+    await writeFile(path.join(h.bin, 'agy'), agyStandIn, { mode: 0o700 });
+    const settings = await h.settings.read(h.space.scopeId, '.claude/settings.json');
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({ PostCompact: [{ hooks: [{ type: 'command', command: 'exit 0' }] }] }),
+      settings.hash,
+    );
+    const agy = await h.execute('antigravity', 'three');
+    assert.equal(agy.at(-1)?.outcome, 'completed');
+    assert.equal(h.asked.length, 1);
+    assert.ok(agy.some((event) => /PostCompact/.test(event.text) && event.type === 'status'));
+  },
+);
+
+test(
+  'a rule irori cannot read as text is named for the agent, and the rest still goes',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(h.space.scopeId, '.claude/rules/tone.md', 'VAULT-RULE\n', null);
+    // Shift_JIS, not UTF-8.
+    await writeFile(
+      path.join(h.kb, '.claude', 'rules', 'legacy.md'),
+      Buffer.from([0x82, 0xa0, 0x82, 0xa2]),
+    );
+    await h.execute('pi', 'one');
+    const [first] = await piPrompts(h.lines, h.kb);
+    // The readable rule still goes whole; the one irori cannot read is named.
+    assert.match(first, /<folder-rule file="[^"]+tone\.md">\nVAULT-RULE\n<\/folder-rule>/);
+    assert.match(first, /Read this folder's rules first[\s\S]*legacy\.md/);
+  },
+);
+
+test(
+  "OpenCode that did not load irori's plugin stops before a tool call the hooks could not see",
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'exit 0' }] }],
+      }),
+      null,
+    );
+    assert.equal((await h.execute('opencode', 'run tool-step')).at(-1)?.outcome, 'completed');
+    await writeFile(path.join(h.kb, 'opencode-ignores-plugins'), '');
+    const stopped = await h.execute('opencode', 'run tool-step');
+    assert.equal(stopped.at(-1)?.outcome, 'failed');
+    assert.match(
+      stopped.find((event) => event.type === 'error')?.text ?? '',
+      /irori のフックを読み込まなかった|did not load irori's hooks/,
+    );
+  },
+);
+
+test(
+  'Pi: a failed call reaches PostToolUseFailure hooks, whose words go with its result',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        PostToolUseFailure: [
+          { hooks: [{ type: 'command', command: 'echo "IT FAILED" >&2; exit 2' }] },
+        ],
+      }),
+      null,
+    );
+    assert.equal((await h.execute('pi', 'run schema-hooks')).at(-1)?.outcome, 'completed');
+    const [result] = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl'))).filter(
+      (call) => call.type === 'schema-hooks',
+    );
+    assert.equal(result.post[0], null, 'the call that ran hears nothing');
+    assert.equal(
+      result.post[1].content.at(-1).text,
+      'PostToolUseFailure hook feedback from the Schema:\nIT FAILED',
+    );
+  },
+);
+
+test(
+  "Codex: a PermissionRequest hook answers Codex's request before the person is asked",
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await writeFile(path.join(h.bin, 'codex'), codexStandIn, { mode: 0o700 });
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        PermissionRequest: [
+          {
+            matcher: 'Bash',
+            if: 'Bash(rm *)',
+            hooks: [
+              {
+                type: 'command',
+                command: `printf '%s' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"no rm here"}}}'`,
+              },
+            ],
+          },
+        ],
+      }),
+      null,
+    );
+    const events = await h.execute('codex', 'needs-approval');
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+    const approval = (await h.lines(path.join(h.kb, 'codex-stand-in.jsonl'))).find(
+      (m) => m.type === 'approval',
+    );
+    assert.deepEqual(approval.result, { decision: 'decline' });
+    assert.equal(h.asked.length, 0, 'the person was not asked');
+    assert.ok(events.some((event) => /no rm here/.test(event.text)));
   },
 );

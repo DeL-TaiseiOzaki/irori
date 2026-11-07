@@ -99,14 +99,65 @@ const aroundRun = ['SessionStart', 'UserPromptSubmit', 'Stop', 'SessionEnd', 'No
 
 /**
  * The hook events irori runs for each CLI that does not run hooks itself: those
- * around the run, and the tool events its plugin, extension or own hooks hand
- * irori. Hermes Agent hands irori a tool call only once it ran, so PreToolUse
- * cannot hold one there.
+ * around the run, those of the CLI's compactions and permission requests irori
+ * sees, and the tool events its plugin, extension or own hooks hand irori.
+ * Hermes Agent hands irori a tool call only once it ran, so PreToolUse cannot
+ * hold one there; Pi, Hermes Agent and the Antigravity CLI ask no permission.
  */
 export const hookEvents: Record<Exclude<AgentId, 'claude'>, readonly string[]> = {
-  codex: [...aroundRun, 'PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStop'],
-  opencode: [...aroundRun, 'PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStop'],
-  pi: [...aroundRun, 'PreToolUse', 'PostToolUse', 'PreCompact'],
-  hermes: [...aroundRun, 'PostToolUse', 'SubagentStop'],
+  codex: [
+    ...aroundRun,
+    'PreToolUse',
+    'PostToolUse',
+    'PermissionRequest',
+    'PreCompact',
+    'PostCompact',
+    'SubagentStart',
+    'SubagentStop',
+  ],
+  opencode: [
+    ...aroundRun,
+    'PreToolUse',
+    'PostToolUse',
+    'PermissionRequest',
+    'PreCompact',
+    'PostCompact',
+    'SubagentStart',
+    'SubagentStop',
+  ],
+  pi: [
+    ...aroundRun,
+    'PreToolUse',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'PreCompact',
+    'PostCompact',
+  ],
+  hermes: [...aroundRun, 'PostToolUse', 'PostToolUseFailure', 'PostCompact', 'SubagentStop'],
   antigravity: [...aroundRun, 'PreToolUse', 'PostToolUse'],
 };
+
+/**
+ * Hook events that decide nothing in Claude Code: a CLI that cannot run them
+ * says so and goes on. A missing hook of any other event could be a guard, and
+ * the person decides whether to go on without it (ADR 058).
+ */
+export const informationalHookEvents = new Set([
+  'SessionStart',
+  'SessionEnd',
+  'Notification',
+  'PostToolUseFailure',
+  'PostCompact',
+  'SubagentStart',
+  'InstructionsLoaded',
+  'CwdChanged',
+  'FileChanged',
+  'DirectoryAdded',
+  'MessageDisplay',
+  'PostModelSwitch',
+  'StopFailure',
+  'Setup',
+  'PermissionDenied',
+  'ElicitationResult',
+  'WorktreeRemove',
+]);

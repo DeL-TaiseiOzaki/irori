@@ -5,8 +5,15 @@ import type { BridgeAnswer, BridgeEvent } from './hook-bridge';
 import type { HookEvent, HookOutcome, SchemaHookRunner } from './schema-hooks';
 import { cliToolInput, hookTool } from './tool-names';
 
-/** How many times in a row Stop hooks may keep a turn going, as Claude Code allows. */
-export const stopHookCap = 8;
+/**
+ * How many times in a row Stop hooks may keep a turn going, as Claude Code
+ * allows: 8, or `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`. The count starts again when
+ * the agent calls a tool.
+ */
+export function stopHookCap(env: NodeJS.ProcessEnv = process.env) {
+  const set = Number(env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP);
+  return Number.isInteger(set) && set > 0 ? set : 8;
+}
 
 /**
  * The Schema's hooks over one run of a CLI that does not run them itself
@@ -53,13 +60,39 @@ export class RunHooks {
     const outcome = await this.run('UserPromptSubmit', { prompt });
     return { blocked: outcome.blocked ?? outcome.halt, context: outcome.context };
   }
-  /** The reason a Stop hook keeps the turn going, if one does. */
+  /**
+   * What Stop hooks say when the turn would end: a block's reason, or context,
+   * either of which keeps the turn going as in Claude Code.
+   */
   async stop(active: boolean, last: string) {
     const outcome = await this.run('Stop', {
       stop_hook_active: active,
       last_assistant_message: last,
     });
-    return outcome.halt ? undefined : outcome.blocked;
+    return outcome.halt
+      ? { context: [] as string[] }
+      : { blocked: outcome.blocked, context: outcome.context };
+  }
+  /**
+   * A permission the CLI asks the person for: PermissionRequest hooks may
+   * answer it instead. Undefined leaves it to the person.
+   */
+  async permission(name: string, input: unknown) {
+    if (!this.runner.has('PermissionRequest')) return undefined;
+    const tool = hookTool(this.agent, name, input);
+    const outcome = await this.run(
+      'PermissionRequest',
+      { tool_name: tool.name, tool_input: tool.input },
+      { value: tool.name, also: [name, ...(tool.also ?? [])] },
+    );
+    return outcome.decision;
+  }
+  /** After the CLI compacted the session: PostCompact hooks hear it, and decide nothing. */
+  postCompact(trigger: 'manual' | 'auto' = 'auto') {
+    if (!this.runner.has('PostCompact')) return;
+    void this.run('PostCompact', { trigger, compact_summary: '' }, { value: trigger }).catch(
+      () => {},
+    );
   }
   /** The person is asked something: Notification hooks hear it, and the run does not wait for them. */
   notification(message: string, type: 'permission_prompt' | 'elicitation_dialog') {
@@ -88,7 +121,31 @@ export class RunHooks {
             `A PreCompact hook asked to stop the compaction, which this CLI cannot do: ${outcome.blocked}`,
           ),
         );
-      return outcome.blocked ? { block: outcome.blocked } : {};
+      // Its words are instructions for the summary, which only OpenCode takes.
+      if (outcome.context.length && this.agent !== 'opencode')
+        this.io.status(
+          t(
+            'PreCompact フックの要約への指示は、この CLI には渡せません。',
+            "A PreCompact hook's instructions for the summary cannot be given to this CLI.",
+          ),
+        );
+      return {
+        ...(outcome.blocked && { block: outcome.blocked }),
+        ...(outcome.context.length && { feedback: outcome.context.join('\n\n') }),
+      };
+    }
+    if (event.event === 'SubagentStart') {
+      const input = (event.input && typeof event.input === 'object' ? event.input : {}) as Record<
+        string,
+        unknown
+      >;
+      const type = String(input.agent_type ?? '');
+      const outcome = await this.run(
+        'SubagentStart',
+        { agent_id: input.agent_id ?? '', agent_type: type },
+        { value: type },
+      );
+      return outcome.context.length ? { feedback: outcome.context.join('\n\n') } : {};
     }
     if (event.event === 'SubagentStop') {
       const input = event.input && typeof event.input === 'object' ? event.input : {};
@@ -110,6 +167,17 @@ export class RunHooks {
         { tool_name: tool.name, tool_input: tool.input, tool_use_id: call },
         match,
       );
+      // A sub-agent the CLI starts as a tool: SubagentStart hooks hear it, and
+      // their context goes with its result.
+      if (tool.name === 'Task' && !outcome.blocked && this.runner.has('SubagentStart')) {
+        const type = String(tool.input.subagent_type ?? '');
+        const started = await this.run(
+          'SubagentStart',
+          { agent_id: call, agent_type: type },
+          { value: type },
+        );
+        outcome.context.push(...started.context);
+      }
       if (outcome.halt) return { block: hookDenied(outcome.halt) };
       if (outcome.blocked) return { block: hookDenied(outcome.blocked) };
       if (
@@ -138,16 +206,29 @@ export class RunHooks {
     }
     const earlier = (call && this.later.get(call)) || [];
     if (call) this.later.delete(call);
-    const outcome = await this.run(
-      'PostToolUse',
-      {
-        tool_name: tool.name,
-        tool_input: tool.input,
-        tool_response: event.output,
-        tool_use_id: call,
-      },
-      match,
-    );
+    // A call that failed goes to PostToolUseFailure, one that ran to PostToolUse.
+    const outcome =
+      event.event === 'PostToolUseFailure'
+        ? await this.run(
+            'PostToolUseFailure',
+            {
+              tool_name: tool.name,
+              tool_input: tool.input,
+              tool_use_id: call,
+              error: typeof event.output === 'string' ? event.output : JSON.stringify(event.output),
+            },
+            match,
+          )
+        : await this.run(
+            'PostToolUse',
+            {
+              tool_name: tool.name,
+              tool_input: tool.input,
+              tool_response: event.output,
+              tool_use_id: call,
+            },
+            match,
+          );
     const words = [...earlier, ...outcome.context];
     // A sub-agent the CLI ran as a tool has finished: SubagentStop hooks hear it,
     // and what would keep it going goes back with its result.
@@ -164,7 +245,12 @@ export class RunHooks {
       if (stopped.blocked) words.push(stopped.blocked);
     }
     return {
-      ...(words.length && { feedback: hookToolFeedback('PostToolUse', words) }),
+      ...(words.length && {
+        feedback: hookToolFeedback(
+          event.event === 'PostToolUseFailure' ? 'PostToolUseFailure' : 'PostToolUse',
+          words,
+        ),
+      }),
       ...(outcome.output !== undefined && {
         output:
           typeof outcome.output === 'string' ? outcome.output : JSON.stringify(outcome.output),

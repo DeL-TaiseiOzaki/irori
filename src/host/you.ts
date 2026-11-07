@@ -368,11 +368,14 @@ export class YourAiService {
   async shared(): Promise<SharedSchemaPrompt | undefined> {
     if (!(await this.homeReady())) return undefined;
     const parts = await readSchemaParts(await this.sharedSchema());
-    if (!parts.instructions && !parts.skills.length && !parts.rules.length) return undefined;
+    if (!parts.instructions && !parts.unreadable && !parts.skills.length && !parts.rules.length)
+      return undefined;
     return {
       root: parts.root,
       file: parts.file,
       ...fitParts(parts.instructions, parts.rules),
+      // Instructions irori cannot read here are read by the agent from their file.
+      ...(parts.unreadable && { long: true }),
       skills: parts.skills,
     };
   }

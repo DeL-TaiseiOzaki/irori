@@ -309,20 +309,274 @@ test('a run answers its CLI as the hooks decide: deny, ask, input, feedback', po
   assert.deepEqual(said, []);
 });
 
-test("a hook's command runs in sh, or on Windows in Git Bash, else cmd.exe as written", async (t) => {
+test("a hook's command runs in bash as Claude Code runs it, Git Bash or PowerShell on Windows", async (t) => {
   const { hookShell } = await import('../src/agents/schema-hooks');
-  assert.deepEqual(hookShell('echo hi', 'linux'), ['/bin/sh', ['-c', 'echo hi'], false]);
   const base = await mkdtemp(path.join(tmpdir(), 'irori hook shell '));
   t.after(() => rm(base, { recursive: true, force: true }));
+  // bash where the search path has it, sh where it does not.
+  await mkdir(path.join(base, 'bin'));
+  await writeFile(path.join(base, 'bin', 'bash'), '');
+  assert.deepEqual(hookShell('echo hi', 'linux', { PATH: path.join(base, 'bin') }), [
+    path.join(base, 'bin', 'bash'),
+    ['-c', 'echo hi'],
+  ]);
+  assert.deepEqual(hookShell('echo hi', 'linux', { PATH: path.join(base, 'none') }), [
+    '/bin/sh',
+    ['-c', 'echo hi'],
+  ]);
+  assert.deepEqual(hookShell('echo hi', 'linux', {}, 'powershell'), [
+    'pwsh',
+    ['-NoProfile', '-NonInteractive', '-Command', 'echo hi'],
+  ]);
   const bash = path.join(base, 'bash.exe');
   await writeFile(bash, '');
   assert.deepEqual(hookShell('echo hi', 'win32', { CLAUDE_CODE_GIT_BASH_PATH: bash }), [
     bash,
     ['-c', 'echo hi'],
-    false,
   ]);
-  assert.deepEqual(
-    hookShell('echo hi', 'win32', { ProgramFiles: base, ComSpec: 'C:\\Windows\\cmd.exe' }),
-    ['C:\\Windows\\cmd.exe', ['/d', '/s', '/c', '"echo hi"'], true],
+  assert.deepEqual(hookShell('echo hi', 'win32', { ProgramFiles: path.join(base, 'none') }), [
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Command', 'echo hi'],
+  ]);
+});
+
+test('a hook `if` takes a call as a Claude Code permission rule does', async () => {
+  const { ruleTakes } = await import('../src/agents/schema-hooks');
+  const root = '/kb';
+  const bash = (command: string) => ({ name: 'Bash', input: { command } });
+  assert.equal(ruleTakes('Bash(git *)', bash('git push'), root, '/home/me'), true);
+  assert.equal(ruleTakes('Bash(git *)', bash('rm -rf data'), root, '/home/me'), false);
+  assert.equal(
+    ruleTakes('Bash(npm run test:*)', bash('npm run test:unit'), root, '/home/me'),
+    true,
+  );
+  assert.equal(ruleTakes('Bash', bash('anything'), root, '/home/me'), true);
+  const write = (file_path: string) => ({ name: 'Write', input: { file_path } });
+  assert.equal(ruleTakes('Edit(src/**)', write('/kb/src/a/b.ts'), root, '/home/me'), true);
+  assert.equal(ruleTakes('Edit(src/**)', write('/kb/docs/a.md'), root, '/home/me'), false);
+  assert.equal(ruleTakes('Edit(*.md)', write('/kb/deep/note.md'), root, '/home/me'), true);
+  assert.equal(
+    ruleTakes(
+      'Read(~/.ssh/**)',
+      { name: 'Read', input: { file_path: '/home/me/.ssh/id' } },
+      root,
+      '/home/me',
+    ),
+    true,
+  );
+  assert.equal(
+    ruleTakes('Read(//etc/**)', { name: 'Grep', input: { path: '/etc/hosts' } }, root, '/home/me'),
+    true,
+  );
+  assert.equal(
+    ruleTakes(
+      'WebFetch(domain:example.com)',
+      { name: 'WebFetch', input: { url: 'https://docs.example.com/x' } },
+      root,
+      '/home/me',
+    ),
+    true,
+  );
+  assert.equal(ruleTakes('Bash(git *)', write('/kb/a'), root, '/home/me'), false, 'another tool');
+  // A CLI's own name and apply_patch as an edit, as matchers take them.
+  assert.equal(
+    ruleTakes(
+      'Edit(*.md)',
+      { name: 'apply_patch', also: ['Edit'], input: { file_path: 'a.md' } },
+      root,
+      '/home/me',
+    ),
+    true,
   );
 });
+
+test(
+  'hook fields Claude Code reads: exec form, onFailure, if, async and asyncRewake, http headers',
+  posix,
+  async (t) => {
+    const http = await import('node:http');
+    let heard: Record<string, string | string[] | undefined> | undefined;
+    const server = http.createServer((request, response) => {
+      heard = request.headers;
+      request.resume();
+      request.on('end', () =>
+        response.end(
+          '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"FROM-HTTP"}}',
+        ),
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    const port = (server.address() as import('node:net').AddressInfo).port;
+    const woken: string[] = [];
+    const base = await realpath(await mkdtemp(path.join(tmpdir(), 'irori hook fields ')));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const hooks = new SchemaHookRunner(
+      [
+        // Exec form: node itself with its arguments, no shell.
+        {
+          event: 'PreToolUse',
+          matcher: 'Bash',
+          type: 'command',
+          command: process.execPath,
+          args: ['-e', "process.stderr.write('EXEC-NO');process.exit(2)"],
+          if: 'Bash(rm *)',
+          from: 'folder',
+        },
+        // A guard that cannot start blocks when it says so.
+        {
+          event: 'PreToolUse',
+          matcher: 'Write',
+          type: 'command',
+          command: '/nonexistent/guard.sh',
+          onFailure: 'block',
+          from: 'folder',
+        },
+        {
+          event: 'PreToolUse',
+          matcher: 'Read',
+          type: 'command',
+          command: '/nonexistent/guard.sh',
+          from: 'folder',
+        },
+        // Background hooks decide nothing; one that wakes the agent says so.
+        {
+          event: 'PostToolUse',
+          type: 'command',
+          command: 'sleep 0.2; exit 2',
+          async: true,
+          from: 'folder',
+        },
+        {
+          event: 'PostToolUse',
+          type: 'command',
+          command: 'echo WAKE-UP >&2; exit 2',
+          asyncRewake: true,
+          from: 'folder',
+        },
+        {
+          event: 'PostToolUse',
+          type: 'http',
+          command: '',
+          url: `http://127.0.0.1:${port}/hook`,
+          headers: { Authorization: 'Bearer $TOKEN', 'X-Other': '${SECRET}' },
+          allowedEnvVars: ['TOKEN'],
+          from: 'shared',
+        },
+      ],
+      {
+        cwd: base,
+        env: { ...process.env, TOKEN: 'abc', SECRET: 'hidden' },
+        agent: 'pi',
+        fields: () => ({}),
+        rewake: (words) => woken.push(words),
+      },
+    );
+    const rm1 = await hooks.run(
+      'PreToolUse',
+      { tool_name: 'Bash', tool_input: { command: 'rm -rf x' } },
+      { value: 'Bash' },
+    );
+    assert.equal(rm1.blocked, 'EXEC-NO');
+    const git = await hooks.run(
+      'PreToolUse',
+      { tool_name: 'Bash', tool_input: { command: 'git status' } },
+      { value: 'Bash' },
+    );
+    assert.equal(git.blocked, undefined, 'the `if` rule leaves other commands alone');
+    assert.match(
+      (await hooks.run('PreToolUse', { tool_name: 'Write', tool_input: {} }, { value: 'Write' }))
+        .blocked ?? '',
+      /could not start|non-blocking status code 127/,
+    );
+    const read = await hooks.run(
+      'PreToolUse',
+      { tool_name: 'Read', tool_input: {} },
+      { value: 'Read' },
+    );
+    assert.equal(read.blocked, undefined);
+    assert.equal(read.notices.length, 1, 'without onFailure a failure is only a notice');
+    const post = await hooks.run(
+      'PostToolUse',
+      { tool_name: 'Bash', tool_input: {} },
+      { value: 'Bash' },
+    );
+    assert.deepEqual(post.context, ['FROM-HTTP'], 'the background hooks added nothing to it');
+    assert.equal(heard?.authorization, 'Bearer abc');
+    assert.equal(heard?.['x-other'], '', 'an unlisted variable stays out');
+    const started = Date.now();
+    while (!woken.length && Date.now() - started < 5000)
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(woken, ['WAKE-UP']);
+  },
+);
+
+test(
+  'SessionEnd hooks keep a budget after the run stopped, raised by their own timeout',
+  posix,
+  async (t) => {
+    const base = await realpath(await mkdtemp(path.join(tmpdir(), 'irori session end ')));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const stopped = new AbortController();
+    stopped.abort();
+    const make = (timeout?: number) =>
+      new SchemaHookRunner(
+        [
+          {
+            event: 'SessionEnd',
+            type: 'command',
+            command: 'sleep 1; echo done > ended.txt; sleep 30',
+            ...(timeout && { timeout }),
+            from: 'folder',
+          },
+        ],
+        { cwd: base, env: process.env, agent: 'pi', fields: () => ({}), signal: stopped.signal },
+      );
+    let begun = Date.now();
+    await make().run('SessionEnd', { reason: 'other' });
+    assert.ok(Date.now() - begun < 4000, 'the 1.5 s budget holds though the run was stopped');
+    begun = Date.now();
+    await make(3).run('SessionEnd', { reason: 'other' });
+    const took = Date.now() - begun;
+    assert.ok(took >= 2500 && took < 8000, `a hook's 3 s timeout raised the budget (${took} ms)`);
+    assert.equal((await readFile(path.join(base, 'ended.txt'), 'utf8')).trim(), 'done');
+  },
+);
+
+test(
+  'PermissionRequest hooks answer for the person, and Stop context keeps the turn going',
+  posix,
+  async (t) => {
+    const { runner: hooks } = await runner(t, [
+      {
+        event: 'PermissionRequest',
+        matcher: 'Bash',
+        command: `printf '%s' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"not here"}}}'`,
+      },
+      {
+        event: 'PermissionRequest',
+        matcher: 'Read',
+        command: `printf '%s' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'`,
+      },
+      {
+        event: 'Stop',
+        command: `printf '%s' '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"also update the index"}}'`,
+      },
+    ]);
+    const run = new RunHooks(hooks, 'opencode', {
+      status: () => {},
+      ask: async () => true,
+      halt: () => {},
+    });
+    assert.deepEqual(await run.permission('bash', { command: 'rm -rf x' }), {
+      behavior: 'deny',
+      message: 'not here',
+    });
+    assert.deepEqual(await run.permission('read', { filePath: 'a.md' }), { behavior: 'allow' });
+    assert.equal(await run.permission('webfetch', { url: 'https://x' }), undefined);
+    assert.deepEqual(await run.stop(false, ''), {
+      blocked: undefined,
+      context: ['also update the index'],
+    });
+  },
+);

@@ -16,7 +16,7 @@ Select an item in a vault's **Schema** to open its form in the center. Use a gro
 | Rules        | `.claude/rules/*.md`                                |
 | Hooks        | `hooks` in `.claude/settings.json`                  |
 
-Rules and hooks are written in Claude Code's format, and they reach every CLI. Claude Code reads and runs them itself. For every other CLI, irori gives the rules in the request and runs the hooks with Claude Code's meaning. Some CLIs cannot run some hooks (Hermes Agent cannot stop a tool before it runs with PreToolUse); irori asks before running with such a hook. The Rules and Hooks sections of the settings say how each reaches every CLI.
+Rules and hooks are written in Claude Code's format, and they reach every CLI. Claude Code reads and runs them itself. For every other CLI, irori gives the rules in the request and runs the hooks with Claude Code's meaning. Some CLIs cannot run some hooks (Hermes Agent cannot stop a tool before it runs with PreToolUse). irori asks once before running with such a hook, and keeps the answer until the hooks change. Hooks of an event that stops nothing, such as PostCompact, are only named. The Rules and Hooks sections of the settings say how each reaches every CLI.
 
 ## Create and use a skill
 

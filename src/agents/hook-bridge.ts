@@ -17,7 +17,13 @@ import { hookUnreachable, hookUnreachableAfter, hookUnreadable } from '../../pro
 
 /** What a CLI's script asks about one event. */
 export interface BridgeEvent {
-  event: 'PreToolUse' | 'PostToolUse' | 'PreCompact' | 'SubagentStop';
+  event:
+    | 'PreToolUse'
+    | 'PostToolUse'
+    | 'PostToolUseFailure'
+    | 'PreCompact'
+    | 'SubagentStart'
+    | 'SubagentStop';
   /** The CLI's own tool name and input. */
   tool?: string;
   input?: unknown;
@@ -79,7 +85,17 @@ export default function (pi) {
   pi.on('tool_result', async (event) => {
     let reply;
     try {
-      reply = await ask({ event: 'PostToolUse', tool: event.toolName, input: event.input, call: event.toolCallId, output: event.content });
+      reply = await ask(
+        event.isError
+          ? {
+              event: 'PostToolUseFailure',
+              tool: event.toolName,
+              input: event.input,
+              call: event.toolCallId,
+              output: (event.content || []).map((part) => part.text || '').join('\\n'),
+            }
+          : { event: 'PostToolUse', tool: event.toolName, input: event.input, call: event.toolCallId, output: event.content },
+      );
     } catch {
       return { content: [...event.content, { type: 'text', text: unreachableAfter }], structuredContent: event.structuredContent };
     }
@@ -103,7 +119,10 @@ export default function (pi) {
 // OpenCode: a thrown error stops a call and is what the model reads as its result;
 // the arguments are changed in place, the result by changing its output.
 hookBridgeScripts.opencode = `${ask}
-export const IroriSchemaHooks = async () => ({
+export const IroriSchemaHooks = async () => {
+  // irori hears that OpenCode loaded the plugin: a tool call before that stops the run.
+  await ask({ event: 'Loaded' }).catch(() => {});
+  return {
   'tool.execute.before': async (input, output) => {
     let reply;
     try {
@@ -132,10 +151,12 @@ export const IroriSchemaHooks = async () => ({
     if (typeof output.output === 'string') output.output = output.output + '\\n\\n' + reply.feedback;
     else if (Array.isArray(output.content)) output.content.push({ type: 'text', text: reply.feedback });
   },
-  'experimental.session.compacting': async () => {
-    await ask({ event: 'PreCompact', trigger: 'auto' }).catch(() => {});
+  'experimental.session.compacting': async (input, output) => {
+    const reply = await ask({ event: 'PreCompact', trigger: 'auto' }).catch(() => ({}));
+    if (reply.feedback && Array.isArray(output.context)) output.context.push(reply.feedback);
   },
-});
+  };
+};
 `;
 
 export type HookBridgeAgent = keyof typeof hookBridgeScripts;
@@ -154,6 +175,7 @@ export async function hookBridge(
   await mkdir(path.dirname(file), { recursive: true });
   // Replaced whole: another run's CLI may be loading it at this moment.
   await writeFileAtomic(file, hookBridgeScripts[agent]);
+  const state = { heard: false };
   const server = await loopbackServer(bridgeBodyLimit, async (body, response, found) => {
     if (!found) {
       response.writeHead(404, { 'content-type': 'application/json' });
@@ -162,7 +184,9 @@ export async function hookBridge(
     }
     let reply: BridgeAnswer;
     try {
-      reply = await answer(JSON.parse(body) as BridgeEvent);
+      state.heard = true;
+      const event = JSON.parse(body) as BridgeEvent | { event: 'Loaded' };
+      reply = event.event === 'Loaded' ? {} : await answer(event);
     } catch (error) {
       reply = { block: `${hookUnreachable} (${String(error)})` };
     }
@@ -181,8 +205,11 @@ export async function hookBridge(
       plugin: [...(content.plugin ?? []), file],
     });
   }
-  return { env, args: agent === 'pi' ? ['-e', file] : [], close: server.close };
+  return { env, args: agent === 'pi' ? ['-e', file] : [], state, close: server.close };
 }
+
+/** The forwarder answers for itself this long after it started, before `forwardTimeout`. */
+const forwardDeadline = 3540;
 
 // Codex and the Antigravity CLI run hooks of their own, configured in files.
 // irori gives each run hooks that hand every event to this forwarder, which
@@ -197,6 +224,11 @@ const closed = event !== 'PreToolUse'
   : cli === 'codex'
     ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: stopped } })
     : JSON.stringify({ decision: 'deny', reason: stopped });
+// Answer before the CLI gives up on this hook, which would let a call through.
+setTimeout(() => {
+  process.stdout.write(closed);
+  process.exit(0);
+}, ${forwardDeadline * 1000}).unref();
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => (input += chunk));
@@ -217,8 +249,12 @@ process.stdin.on('end', () => {
 });
 `;
 
-/** The longest a forwarded tool event may wait for irori: the hooks' own timeout, and some. */
-export const forwardTimeout = 660;
+/**
+ * How long a CLI gives irori's forwarding hook for a tool event (seconds), and
+ * how long the forwarder waits for irori before it stops the call itself: a CLI
+ * whose hook timed out would let the call run (ADR 058).
+ */
+export const forwardTimeout = 3600;
 
 /** Writes the forwarder and its launcher once; returns the launcher as a quoted shell word. */
 async function forwarderCommand(dataDir: string, runtime: string) {
@@ -241,6 +277,7 @@ const codexLabels: Record<string, string> = {
   PreToolUse: 'pre_tool_use',
   PostToolUse: 'post_tool_use',
   PreCompact: 'pre_compact',
+  SubagentStart: 'subagent_start',
   SubagentStop: 'subagent_stop',
 };
 
@@ -384,6 +421,17 @@ export class ForwardedHooks {
     if (event === 'SubagentStop') {
       const reply = await this.answer({ event, input: data });
       return reply.block ? { decision: 'block', reason: reply.block } : {};
+    }
+    if (event === 'SubagentStart') {
+      const reply = await this.answer({ event, input: data });
+      return reply.feedback
+        ? {
+            hookSpecificOutput: {
+              hookEventName: 'SubagentStart',
+              additionalContext: reply.feedback,
+            },
+          }
+        : {};
     }
     return {};
   }
