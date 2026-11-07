@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Every Schema setting reaches every CLI, 2026-11-07 (**0.2.61**, pull request open;
+Every Schema setting reaches every CLI, 2026-11-07 (**0.2.61**,
+[#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307);
 [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)): the owner
 asked whether the shared Schema and each vault's Schema reach every CLI agent,
 and found three faults fatal. A vault's rules reached Claude Code alone; hooks
