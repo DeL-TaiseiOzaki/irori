@@ -34,7 +34,11 @@ const width = (page: Page, selector: string) =>
 
 async function setVaultAgent(page: Page, on: boolean) {
   await page.getByRole('button', { name: /^設定（/ }).click();
-  const box = page.getByRole('checkbox', { name: 'vault agent', exact: true });
+  await page
+    .getByRole('navigation', { name: '設定の項目' })
+    .getByRole('button', { name: 'vault agent', exact: true })
+    .click();
+  const box = page.getByRole('switch', { name: 'vault agent を使う', exact: true });
   if (on) await box.check();
   else await box.uncheck();
   await page.keyboard.press('Escape');

@@ -294,11 +294,16 @@ try {
     'javascript',
   ]);
   // The settings' switch follows the row's addition and persists either choice.
-  const settings = rail.getByRole('button', { name: /^設定/ });
-  await settings.click();
-  const javascript = page
-    .getByRole('group', { name: 'ルーティン' })
-    .getByRole('checkbox', { name: 'JavaScript' });
+  const trigger = rail.getByRole('button', { name: /^設定/ });
+  const settings = async () => {
+    await trigger.click();
+    await page
+      .getByRole('navigation', { name: '設定の項目' })
+      .getByRole('button', { name: 'ルーティン', exact: true })
+      .click();
+  };
+  await settings();
+  const javascript = page.getByRole('switch', { name: 'JavaScript', exact: true });
   await expect(javascript).toBeChecked();
   await javascript.uncheck();
   await expect
@@ -308,7 +313,7 @@ try {
   // Nothing signals the switch to the page, which reads routines again every 5 s.
   const poll = { timeout: 12000 };
   await expect(collect).toContainText('JavaScript が必要です。', poll);
-  await settings.click();
+  await settings();
   await javascript.check();
   await expect
     .poll(async () => (await page.evaluate(() => window.irori.deviceSettings())).routineRuntimes)
@@ -320,10 +325,8 @@ try {
   const summary = card('Summary');
   await expect(summary).toContainText('Python が必要です。');
   await expect(summary.getByRole('button', { name: 'Python を追加' })).toBeEnabled();
-  await settings.click();
-  await expect(
-    page.getByRole('group', { name: 'ルーティン' }).getByRole('checkbox', { name: 'Python' }),
-  ).not.toBeChecked();
+  await settings();
+  await expect(page.getByRole('switch', { name: 'Python', exact: true })).not.toBeChecked();
   await page.keyboard.press('Escape');
 
   // The first 実行 shows every file and runs only after the confirmation.

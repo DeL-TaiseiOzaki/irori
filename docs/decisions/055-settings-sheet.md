@@ -1,6 +1,8 @@
 # 055 — Settings open as a sheet of their own
 
-Date: 2026-11-03. Status: owner request; implemented for 0.2.53.
+Date: 2026-11-03. Status: owner request; implemented for 0.2.53. Decisions 2
+and 3 are superseded by [ADR 057](057-settings-by-part.md): the side lists
+framed groups and shows one part at a time.
 Changes how the settings open from the rail and the start screen; what they
 hold is unchanged.
 

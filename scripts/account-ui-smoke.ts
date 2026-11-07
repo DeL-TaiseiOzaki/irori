@@ -94,10 +94,16 @@ try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('button', { name: /^設定/ }).click();
+  const parts = page.getByRole('navigation', { name: '設定の項目' });
+  const part = (name: string) => parts.getByRole('button', { name, exact: true });
   const account = page.getByRole('region', { name: 'アカウント' });
-  // The start screen's settings leave out what needs a workspace or is already there.
-  await expect(page.locator('.settings-sheet')).not.toContainText('Schema');
-  await expect(page.getByRole('region', { name: '更新' })).toHaveCount(0);
+  // The start screen's settings leave out updates, which its footer offers, and
+  // say that the Schema is set in a workspace.
+  await expect(part('更新')).toHaveCount(0);
+  await part('共通').click();
+  await expect(page.locator('.settings-sheet')).toContainText('ワークスペースを開くと設定できます');
+  await expect(page.getByRole('button', { name: '共通 Schema を開く' })).toHaveCount(0);
+  await part('アカウント').click();
   await expect(account).toContainText('GitHub: octo');
   await expect(account).toContainText('環境は保存されていません');
   await expect(account.getByRole('button', { name: '復元' })).toHaveCount(0);
@@ -113,8 +119,13 @@ try {
   await page.keyboard.press('Escape');
   await page.locator('.workspace-card').filter({ hasText: 'Lab' }).click();
   await page.getByRole('button', { name: /^設定/ }).click();
+  // The part last shown opens again.
   await expect(account).toContainText('環境を保存：');
-  await expect(page.locator('.settings-sheet')).toContainText('Schema');
+  await expect(part('更新')).toBeVisible();
+  await part('共通').click();
+  await expect(page.locator('.settings-sheet')).not.toContainText(
+    'ワークスペースを開くと設定できます',
+  );
   const saved = JSON.parse(await fake.stored());
   if (saved.vaults[0]?.repository !== 'octo/kb' || saved.preferences.theme !== 'dark')
     throw Error(`Unexpected saved environment: ${JSON.stringify(saved)}`);

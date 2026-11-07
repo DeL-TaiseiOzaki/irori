@@ -5,7 +5,7 @@ description: Maintain AI instructions and reusable skills as ordinary files.
 
 ## Open settings
 
-Schema appears only when the vault agent is on in **Settings → Agents**.
+Schema appears only when the vault agent is on in **Settings → Agents → vault agent**.
 
 Select an item in a vault's **Schema** to open its form in the center. Use a group's add action to create an item. The folder icon switches to **Show as files**.
 
