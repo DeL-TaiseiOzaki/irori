@@ -415,6 +415,10 @@ try {
     await page.getByRole('button', { name: /^設定（/ }).click();
     const sheet = page.getByRole('dialog');
     await sheet
+      .getByRole('navigation', { name: '設定の項目' })
+      .getByRole('button', { name: '共通', exact: true })
+      .click();
+    await sheet
       .getByRole('group', { name: '新しい会話のアクセス' })
       .getByRole('radio', { name })
       .check();

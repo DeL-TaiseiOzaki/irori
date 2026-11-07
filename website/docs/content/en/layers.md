@@ -11,7 +11,7 @@ description: Keep AI instructions, accumulated knowledge, and source materials d
 | Knowledge | Notes you write and maintain   | Markdown, ontology CSV files      |
 | Contents  | Materials your notes draw on   | PDFs, Office files, Google Drive  |
 
-Read source materials and write your understanding in Knowledge. Schema appears only when the vault agent is on in **Settings → Agents**.
+Read source materials and write your understanding in Knowledge. Schema appears only when the vault agent is on in **Settings → Agents → vault agent**.
 
 ## How folders relate
 

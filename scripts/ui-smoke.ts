@@ -62,10 +62,17 @@ const sampler = setInterval(() => {
 }, 500);
 const page = await app.firstWindow();
 page.on('pageerror', (error) => errors.push(String(error)));
-// Display choices live in the rail's settings, which stay open for several choices.
-const openSettings = () => page.getByRole('button', { name: /^設定（/ }).click();
+// Display choices live in the rail's settings, which stay open for several choices;
+// the side lists their parts, and a part shows when it is chosen.
+async function openSettings(part: string) {
+  await page.getByRole('button', { name: /^設定（/ }).click();
+  await page
+    .getByRole('navigation', { name: '設定の項目' })
+    .getByRole('button', { name: part, exact: true })
+    .click();
+}
 async function choose(theme: string) {
-  await openSettings();
+  await openSettings('言語とテーマ');
   await page.getByRole('radio', { name: theme, exact: true }).check();
   await page.keyboard.press('Escape');
 }
@@ -166,7 +173,7 @@ try {
   await expect.poll(dark).toBe(true);
   // The rendered note typeface changes without replacing the editor and is
   // kept in the same device record as the theme and pane sizes.
-  await openSettings();
+  await openSettings('ノートの表示');
   for (const name of ['システム', '丸ゴシック', '教科書体'])
     await expect(page.getByRole('radio', { name, exact: true })).toBeAttached();
   await page.screenshot({ path: 'test-results/irori-settings.png', fullPage: true });

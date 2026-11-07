@@ -11,7 +11,7 @@ description: AI への指示、書きためる知識、元になる資料を分�
 | Knowledge | 自分たちが書き、更新していくノート | Markdown、オントロジーの CSV        |
 | Contents  | ノートの元になる資料               | PDF、Office ファイル、Google Drive  |
 
-資料を読み、Knowledge に理解を書きます。Schema は **設定 → エージェント** で vault agent をオンにしたときだけ表示されます。
+資料を読み、Knowledge に理解を書きます。Schema は **設定 → エージェント → vault agent** で vault agent をオンにしたときだけ表示されます。
 
 ## フォルダとの関係
 

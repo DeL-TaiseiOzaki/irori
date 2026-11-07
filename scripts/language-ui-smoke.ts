@@ -57,6 +57,10 @@ async function japaneseLeft(page: Page, where: string) {
 
 async function chooseLanguage(page: Page, name: string, trigger: RegExp) {
   await page.getByRole('button', { name: trigger }).click();
+  await page
+    .getByRole('navigation', { name: /^(設定の項目|Settings sections)$/ })
+    .getByRole('button', { name: /^(言語とテーマ|Language and theme)$/ })
+    .click();
   await page.getByRole('radio', { name, exact: true }).check();
   await page.keyboard.press('Escape');
 }

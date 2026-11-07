@@ -16,6 +16,7 @@ import './schema-dialog.css';
 export function SchemaDialog({
   you,
   spaces,
+  initialOwner,
   revision,
   locked,
   onClose,
@@ -24,13 +25,21 @@ export function SchemaDialog({
   you?: YourAi;
   /** The workspace's vaults whose Schema is offered (none while vault agents are off). */
   spaces: Space[];
+  /** The owner shown first, as the settings chose: the shared Schema, the irori agent or a vault. */
+  initialOwner?: string;
   revision: number;
   /** Whether a run, a Git operation or a connection holds that Schema's folder. */
   locked: (scopeId: string) => boolean;
   onClose: () => void;
 }) {
   const ready = you?.state === 'ready';
-  const [owner, setOwner] = useState(() => (ready ? sharedSchemaId : spaces[0]?.scopeId));
+  const offered = (id: string | undefined) =>
+    !!id &&
+    ((ready && (id === sharedSchemaId || id === you.id)) ||
+      spaces.some((item) => item.scopeId === id));
+  const [owner, setOwner] = useState(() =>
+    offered(initialOwner) ? initialOwner : ready ? sharedSchemaId : spaces[0]?.scopeId,
+  );
   const [target, setTarget] = useState<SchemaTarget>();
   const space = spaces.find((item) => item.scopeId === owner);
   const common = owner === sharedSchemaId;
