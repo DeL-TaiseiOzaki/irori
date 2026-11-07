@@ -20,10 +20,29 @@ export interface SchemaParts {
   file: string;
   /** The instructions, absent when there are none. */
   instructions?: string;
+  /** `AGENTS.md` is there but cannot be read as text here: the agent reads the file itself. */
+  unreadable?: boolean;
   /** The size of `AGENTS.md` in bytes, 0 without one. */
   bytes: number;
-  rules: { file: string; text: string }[];
+  /** Each rule, with its text when it can be read here; one that cannot is named for the agent to read. */
+  rules: { file: string; text?: string }[];
   skills: { name: string; description: string; path: string }[];
+}
+
+/**
+ * A file's text, absent when there is no such file, and `false` when it is there
+ * but cannot be read as text here (too long for the editor, not UTF-8): one file
+ * irori cannot read never keeps the rest of a Schema from the agents.
+ */
+async function readText(
+  folder: SchemaFolder,
+  relative: string,
+): Promise<string | false | undefined> {
+  try {
+    return await ifPresent(folder.read(relative));
+  } catch {
+    return false;
+  }
 }
 
 async function ruleFiles(folder: SchemaFolder, relative: string, depth: number, out: string[]) {
@@ -38,21 +57,24 @@ async function ruleFiles(folder: SchemaFolder, relative: string, depth: number, 
 
 /** Reads what a Schema folder says to agents: `AGENTS.md`, `.claude/rules` and `.agents/skills`. */
 export async function readSchemaParts(folder: SchemaFolder): Promise<SchemaParts> {
-  const raw = await ifPresent(folder.read(instructionsFile));
-  const text = raw?.trim();
-  const skills = (await ifPresent(readFolderSkills(folder)))?.skills ?? [];
+  const raw = await readText(folder, instructionsFile);
+  const text = raw === false ? undefined : raw?.trim();
+  const skills = (await readFolderSkills(folder).catch(() => undefined))?.skills ?? [];
   const found: string[] = [];
-  await ruleFiles(folder, rulesRoot, 1, found);
+  await ruleFiles(folder, rulesRoot, 1, found).catch(() => {});
   const rules: SchemaParts['rules'] = [];
   for (const relative of found.sort((a, b) => a.localeCompare(b))) {
-    const rule = (await ifPresent(folder.read(relative)))?.trim();
-    if (rule) rules.push({ file: path.join(folder.root, relative), text: rule });
+    const rule = await readText(folder, relative);
+    const file = path.join(folder.root, relative);
+    if (rule === false) rules.push({ file });
+    else if (rule?.trim()) rules.push({ file, text: rule.trim() });
   }
   return {
     root: folder.root,
     file: path.join(folder.root, instructionsFile),
     ...(text && { instructions: text }),
-    bytes: raw === undefined ? 0 : Buffer.byteLength(raw, 'utf8'),
+    ...(raw === false && { unreadable: true }),
+    bytes: typeof raw === 'string' ? Buffer.byteLength(raw, 'utf8') : 0,
     rules,
     skills: skills.map((skill) => ({
       name: skill.name,
@@ -75,10 +97,10 @@ export function fitParts(
   const long = !!instructions && Buffer.byteLength(instructions, 'utf8') > limit;
   const room = limit - (instructions && !long ? Buffer.byteLength(instructions, 'utf8') : 0);
   const inline =
-    rules.reduce((size, rule) => size + Buffer.byteLength(rule.text, 'utf8'), 0) <= room;
+    rules.reduce((size, rule) => size + Buffer.byteLength(rule.text ?? '', 'utf8'), 0) <= room;
   return {
     ...(instructions && !long && { instructions }),
     ...(long && { long }),
-    rules: rules.map((rule) => (inline ? rule : { file: rule.file })),
+    rules: rules.map((rule) => (inline && rule.text !== undefined ? rule : { file: rule.file })),
   };
 }

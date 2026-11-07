@@ -34,10 +34,30 @@ before the CLI took the request.
   `--skill` per skill folder.
 - The settings' Rules and Hooks notes come from the table. The skill reach view
   shows Pi `irori が渡す` and Hermes `irori が依頼の中で伝える`.
+- An independent review found ten faults, all fixed in the same pull request:
+  - A UserPromptSubmit block discarded the session; `NotSent` and `run.sending`
+    now keep it.
+  - SessionEnd had no limit after a stop.
+  - Hook fields were dropped: `if`, `args`, `shell`, `async`, `asyncRewake`,
+    `onFailure` and http `headers`.
+  - Stop context and the cap reset were ignored.
+  - Read errors were reported as removals (`…Unread` lines and per-file
+    pointers now).
+  - Claude Code's AGENTS.md was unchecked; it is now checked with
+    `InstructionsLoaded`, with `UserPromptSubmit` as the backstop and
+    `disableAllHooks` making it words.
+  - The forwarder could fail open on timeout; it now has its own deadline
+    within a 3600 s hook timeout.
+  - OpenCode's plugin was unchecked; it now has a `Loaded` handshake.
+  - Hooks a CLI cannot run asked every time; logging hooks are now only named,
+    and answers are kept in `schema-hooks-without.json`.
+  - A CLI command that moved session copied digests to the new session.
+  - PermissionRequest, PostToolUseFailure, PostCompact and SubagentStart were
+    added where the CLI shows them.
 - Tests: `schema-reach` (stand-ins for all six CLIs) and `schema-hooks`
-  (semantics, Codex hash vectors). No real CLI was run. Whether the Antigravity
-  CLI reads hooks from an added folder is inferred from its docs. Not tried on
-  Windows.
+  (semantics, `if` rules, fields, SessionEnd budget, Codex hash vectors). No
+  real CLI was run. Whether the Antigravity CLI reads hooks from an added folder
+  is inferred from its docs. Not tried on Windows.
 Settings shown one part at a time from framed groups, 2026-11-07 (**0.2.60**,
 [#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305);
 [ADR 057](decisions/057-settings-by-part.md), superseding ADR 055 decisions 2

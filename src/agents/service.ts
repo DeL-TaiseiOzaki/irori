@@ -2,6 +2,7 @@ import { KnowledgeStore } from '../knowledge/store';
 import { within } from '../domain/scopes';
 import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
+import os from 'node:os';
 import type { RunRecord } from '../domain/knowledge';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -19,6 +20,7 @@ import type {
 import type { EffortLevel, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import writeFileAtomic from 'write-file-atomic';
 import { agentIds, agentNames } from '../domain/types';
 import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
@@ -78,13 +80,16 @@ import {
   sharedSchema,
   sharedSchemaPointer,
   sharedSchemaRemoved,
+  sharedSchemaUnread,
   vaultIntro,
   vaultIntroPointer,
   folderSchema,
   folderSchemaHasParts,
   folderSchemaPointer,
   folderSchemaRemoved,
+  folderSchemaUnread,
   folderInstructionsChanged,
+  folderInstructionsMissing,
   hookContext,
   hookToolFeedback,
   stopHookContinue,
@@ -94,6 +99,7 @@ import { claudeSettingsFile } from '../domain/schema-settings';
 import {
   codexInstructionBytes,
   hookEvents,
+  informationalHookEvents,
   schemaReach,
   type SchemaReach,
 } from '../domain/schema-reach';
@@ -175,12 +181,58 @@ export interface StepEnd {
 }
 /** The digests of what irori said once and then stands for with one line (ADR 027, 039, 057). */
 type Heard = { shared?: string; intro?: string; schema?: string; instructions?: string };
+/**
+ * irori did not send the request: a hook stopped it, or the CLI would not run the
+ * Schema's hooks. The session it would have gone on with is not at fault and stays.
+ */
+class NotSent extends Error {}
 /** Codex fingerprinted irori's hooks otherwise: the turn starts again with the trust it reported. */
 class CodexHooksAgain extends Error {
   constructor() {
     super('Codex reported its own trust for the hooks');
   }
 }
+/**
+ * Whether a settings file Claude Code reads for a run in `root` turns all hooks
+ * off (`disableAllHooks`): the user's, the folder's, its local one and the
+ * managed one.
+ */
+async function claudeHooksDisabled(root: string) {
+  const managed =
+    process.platform === 'darwin'
+      ? '/Library/Application Support/ClaudeCode/managed-settings.json'
+      : process.platform === 'win32'
+        ? 'C:\\ProgramData\\ClaudeCode\\managed-settings.json'
+        : '/etc/claude-code/managed-settings.json';
+  for (const file of [
+    path.join(os.homedir(), '.claude', 'settings.json'),
+    path.join(root, '.claude', 'settings.json'),
+    path.join(root, '.claude', 'settings.local.json'),
+    managed,
+  ]) {
+    const settings = await fs
+      .readFile(file, 'utf8')
+      .then((text) => JSON.parse(text) as { disableAllHooks?: unknown })
+      .catch(() => undefined);
+    if (settings?.disableAllHooks === true) return true;
+  }
+  return false;
+}
+/** A Codex file change as the patch its hooks would hear, for the files it names. */
+const patchOf = (changes: unknown) =>
+  [
+    '*** Begin Patch',
+    ...(Array.isArray(changes) ? changes : []).map((change) => {
+      const kind =
+        change?.kind?.type === 'add'
+          ? 'Add'
+          : change?.kind?.type === 'delete'
+            ? 'Delete'
+            : 'Update';
+      return `*** ${kind} File: ${String(change?.path ?? '')}`;
+    }),
+    '*** End Patch',
+  ].join('\n');
 /** Whether a version is at least another, part by part. */
 const atLeast = (version: number[], than: number[]) => {
   for (let i = 0; i < than.length; i++)
@@ -198,6 +250,8 @@ type CliSetup = {
   forwarded?: Awaited<ReturnType<typeof forwardedHookBridge>>;
   /** Codex: the events its hooks hand irori. */
   codexHooks?: string[];
+  /** OpenCode: whether its plugin has spoken to irori, so the Schema's tool hooks are live. */
+  loaded?: { heard: boolean };
 };
 /** Only the digests that are there, as the native record keeps them. */
 const heardDigests = (heard: Heard) =>
@@ -259,6 +313,8 @@ type Run = {
   halted?: string;
   /** The request has gone to the CLI: from now on what the run shows is the agent's. */
   sending?: boolean;
+  /** The agent called a tool since the last Stop hooks ran. */
+  toolsUsed?: boolean;
   /** The agent's words since its last tool call: the last message a Stop hook hears. */
   reply: Tail;
   /** What hooks said after the turn could take it, for its next turn. */
@@ -269,8 +325,12 @@ type Run = {
   setup?: CliSetup;
   /** The session handle the CLI last named in this run. */
   handle?: string;
+  /** irori gave the folder's AGENTS.md as words in this request. */
+  agentsGiven?: boolean;
   /** Claude Code: the folder has a CLAUDE.md, beside which it reads AGENTS.md only when told to. */
   agentsBesideClaude?: boolean;
+  /** Codex: the changes of each file change item, by its id, for a permission it asks. */
+  fileChanges?: Map<string, unknown>;
   /** Codex: the trust it reported for irori's hooks, when it fingerprints them otherwise. */
   codexTrust?: Map<string, { key: string; hash: string }>;
   /** The person's own words, which Codex takes apart for its commands and skills (ADR 040). */
@@ -926,7 +986,10 @@ export class AgentService {
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
     if (type === 'text' || type === 'tool') run.progressed = true;
     // The agent's last message, for a Stop hook: its words since its last tool call.
-    if (type === 'tool') run.reply.clear();
+    if (type === 'tool') {
+      run.reply.clear();
+      run.toolsUsed = true;
+    }
     if (type === 'text' && !extra.role) run.reply.add(text);
     // A reply's deltas go to the views and the history a few at a time, in one
     // piece per window; any other event of the run goes after what came before it.
@@ -1174,9 +1237,11 @@ export class AgentService {
       compacted: _compacted,
       ...rest
     } = entry;
+    // A CLI command that moved to another session (`/clear`, `/new`) gave it nothing of irori's.
+    const elsewhere = run.command && entry.handle !== run.resumed;
     await this.conversations.saveNative(run.conversationId, {
       ...rest,
-      ...(run.compacted ? { compacted: true as const } : heardDigests(run.sent)),
+      ...(run.compacted ? { compacted: true as const } : elsewhere ? {} : heardDigests(run.sent)),
     });
   }
   /**
@@ -1200,6 +1265,34 @@ export class AgentService {
       ];
     }
     return run.resumed && run.heard[key] && removed ? [removed] : [];
+  }
+  /**
+   * PermissionRequest hooks answer a permission the CLI asks, before the person
+   * is asked, as in Claude Code (ADR 058); undefined leaves it to the person.
+   */
+  private async permissionHooks(
+    run: Run,
+    name: string,
+    input: unknown,
+  ): Promise<Reply | undefined> {
+    const decision = await run.hooks?.permission(name, input).catch(() => undefined);
+    if (!decision) return undefined;
+    this.event(
+      run,
+      'status',
+      decision.behavior === 'allow'
+        ? t('PermissionRequest フックが許可しました。', 'A PermissionRequest hook allowed it.')
+        : t(
+            `PermissionRequest フックが拒否しました${decision.message ? `: ${decision.message}` : '。'}`,
+            `A PermissionRequest hook denied it${decision.message ? `: ${decision.message}` : '.'}`,
+          ),
+    );
+    return { allow: decision.behavior === 'allow' };
+  }
+  /** A part irori could not read this time: what the session heard of it stands, and it hears why. */
+  private unread(run: Run, key: keyof Heard, words: string) {
+    run.sent[key] = run.heard[key];
+    return [words];
   }
   /** The folder a vault's agents work in, made when it is the default; none when it cannot be. */
   private async work(scopeId: string) {
@@ -1313,6 +1406,8 @@ export class AgentService {
     const found = (await knownVersion('claude'))?.match(/(\d+)\.(\d+)\.(\d+)/);
     if (found && !atLeast(found.slice(1).map(Number), [2, 1, 277]))
       return { ...row, instructions: { reads: false } };
+    // With hooks off Claude Code reads no AGENTS.md, and irori cannot check it did.
+    if (await claudeHooksDisabled(root)) return { ...row, instructions: { reads: false } };
     // Claude Code reads AGENTS.md only where no CLAUDE.md is in the folder or above it.
     let claudeMd = false;
     for (let dir = root; !claudeMd; dir = path.dirname(dir)) {
@@ -1347,6 +1442,9 @@ export class AgentService {
       prompt.instructions = fitted.instructions
         ? { file: parts.file, text: fitted.instructions }
         : { file: parts.file };
+    // An AGENTS.md irori cannot read as text here is the agent's to read.
+    else if (!reach.instructions.reads && parts.unreadable)
+      prompt.instructions = { file: parts.file };
     else if (
       parts.instructions &&
       reach.instructions.limit &&
@@ -1374,6 +1472,7 @@ export class AgentService {
         part: { words: folderSchema(prompt), pointer: folderSchemaPointer(folder.root) },
       }),
       instructions,
+      gave: !!prompt.instructions && !prompt.instructions.limit,
     };
   }
   /**
@@ -1398,7 +1497,7 @@ export class AgentService {
     const list: SchemaHook[] = [];
     const approvals: FoundConfig[] = [];
     const shared = await this.you?.sharedHooks().catch((error) => {
-      throw Error(
+      throw new NotSent(
         t(
           `共通 Schema のフックを読めませんでした: ${String(error)}`,
           `Could not read the shared Schema's hooks: ${String(error)}`,
@@ -1415,7 +1514,7 @@ export class AgentService {
       });
     }
     const own = await folderHooks(root).catch((error) => {
-      throw Error(
+      throw new NotSent(
         t(
           `このフォルダの .claude/settings.json のフックを読めませんでした: ${String(error)}`,
           `Could not read the hooks in this folder's .claude/settings.json: ${String(error)}`,
@@ -1444,6 +1543,8 @@ export class AgentService {
         permission_mode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
       }),
       signal: run.abort.signal,
+      // What a background hook says to wake the agent goes with the next turn.
+      rewake: (words) => run.later.push(words),
     });
     const hooks = new RunHooks(runner, input.agent, {
       status: (text) => this.event(run, 'status', text),
@@ -1462,40 +1563,101 @@ export class AgentService {
     return { run: hooks, approvals };
   }
   /**
-   * Hooks of events this CLI cannot run (ADR 058): the person decides whether
-   * the run goes on without them. A routine's step, which no one answers, does not.
+   * Hooks this CLI cannot run (ADR 058): of an event irori cannot see on it, or
+   * of a type irori cannot run (`prompt`, `agent`, `mcp_tool`). Those that decide
+   * nothing are only named. For the others, which may be guards, the person
+   * decides whether the run goes on without them, and the answer holds until
+   * they change; a routine's step, which no one answers, needs that answer first.
    */
   private async acceptMissingHooks(run: Run, agent: AgentId, hooks: RunHooks) {
     if (agent === 'claude') return true;
     const runs = new Set(hookEvents[agent]);
-    const missing = hooks.runner.events().filter((event) => !runs.has(event));
-    if (!missing.length) return true;
-    const words = t(
-      `${agentNames[agent]} では、Schema のフックのうち ${missing.join(', ')} を実行できません。`,
-      `${agentNames[agent]} cannot run the Schema's ${missing.join(', ')} hooks.`,
+    const runnable = new Set(
+      hooks.runner.hooks.filter((hook) => !hooks.runner.unrunnable().includes(hook)),
     );
-    if (run.step)
-      throw Error(
+    const cannot = hooks.runner.hooks.filter(
+      (hook) => !runs.has(hook.event) || !runnable.has(hook),
+    );
+    if (!cannot.length) return true;
+    const names = (list: SchemaHook[]) =>
+      [
+        ...new Set(
+          list.map((hook) =>
+            hook.type === 'command' || hook.type === 'http'
+              ? hook.event
+              : `${hook.event} (${hook.type})`,
+          ),
+        ),
+      ].join(', ');
+    const quiet = cannot.filter((hook) => informationalHookEvents.has(hook.event));
+    const guards = cannot.filter((hook) => !informationalHookEvents.has(hook.event));
+    if (quiet.length)
+      this.event(
+        run,
+        'status',
+        t(
+          `${agentNames[agent]} では次のフックを実行しません（何も決めないフックです）: ${names(quiet)}`,
+          `${agentNames[agent]} does not run these hooks, which decide nothing: ${names(quiet)}`,
+        ),
+      );
+    if (!guards.length) return true;
+    const key = `${agent}:${digest(JSON.stringify(guards))}`;
+    const words = t(
+      `${agentNames[agent]} では、Schema のフックのうち ${names(guards)} を実行できません。`,
+      `${agentNames[agent]} cannot run the Schema's ${names(guards)} hooks.`,
+    );
+    if (await this.withoutHooks('has', key)) {
+      this.event(
+        run,
+        'status',
         `${words}${t(
-          'ルーティンのステップは確認できないため実行しませんでした。',
-          ' A routine step cannot ask, so it did not run.',
+          'これらのフックなしで実行します（以前に許可されています）。',
+          ' Running without them, as allowed before.',
+        )}`,
+      );
+      return true;
+    }
+    if (run.step)
+      throw new NotSent(
+        `${words}${t(
+          'ルーティンのステップは確認できないため実行しませんでした。一度この CLI でふつうに実行して許可すると、ルーティンでも実行します。',
+          ' A routine step cannot ask, so it did not run. Allow it once in an ordinary run on this CLI, and routines run too.',
         )}`,
       );
     const allowed = await this.ask(
       run,
       `${words}${t('これらのフックなしで実行しますか？', ' Run without these hooks?')}`,
-      { cli: agentNames[agent], hooks: missing },
+      { cli: agentNames[agent], hooks: guards },
     );
-    if (allowed.allow)
+    if (allowed.allow) {
+      await this.withoutHooks('add', key);
       this.event(
         run,
         'status',
         t(
-          `${missing.join(', ')} のフックなしで実行します。`,
-          `Running without the ${missing.join(', ')} hooks.`,
+          `${names(guards)} のフックなしで実行します。`,
+          `Running without the ${names(guards)} hooks.`,
         ),
       );
+    }
     return allowed.allow;
+  }
+  /** The hooks the person allowed a CLI to run without, by CLI and the hooks' digest. */
+  private async withoutHooks(action: 'has' | 'add', key: string) {
+    const file = path.join(this.files.dataDir, 'schema-hooks-without.json');
+    const keys: string[] = await fs
+      .readFile(file, 'utf8')
+      .then((text) => JSON.parse(text))
+      .then((value) =>
+        Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [],
+      )
+      .catch(() => []);
+    if (action === 'has') return keys.includes(key);
+    if (!keys.includes(key))
+      await writeFileAtomic(file, `${JSON.stringify([...keys, key].slice(-200), null, 2)}\n`, {
+        mode: 0o600,
+      });
+    return true;
   }
   /**
    * What the run's CLI is started with besides the request, made once per run
@@ -1510,13 +1672,24 @@ export class AgentService {
     const hooks = run.hooks;
     const tools = hooks?.runner
       .events()
-      .some((event) => ['PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStop'].includes(event));
+      .some((event) =>
+        [
+          'PreToolUse',
+          'PostToolUse',
+          'PostToolUseFailure',
+          'PreCompact',
+          'SubagentStart',
+          'SubagentStop',
+        ].includes(event),
+      );
     const answer = (event: BridgeEvent) => hooks!.answer(event);
     if (hooks && tools && (agent === 'pi' || agent === 'opencode')) {
       const bridge = await hookBridge(this.files.dataDir, agent, answer, env);
       env = bridge.env;
       setup.args.push(...bridge.args);
       setup.closers.push(bridge.close);
+      // Pi stops when its extension does not load; OpenCode goes on without a plugin.
+      if (agent === 'opencode') setup.loaded = bridge.state;
     }
     if (hooks && tools && (agent === 'codex' || agent === 'antigravity')) {
       const bridge = await forwardedHookBridge(this.files.dataDir, agent, answer);
@@ -1535,7 +1708,9 @@ export class AgentService {
         setup.codexHooks = hooks.runner
           .events()
           .filter((event) =>
-            ['PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStop'].includes(event),
+            ['PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStart', 'SubagentStop'].includes(
+              event,
+            ),
           );
     }
     if (agent === 'pi' || agent === 'opencode') {
@@ -1649,21 +1824,25 @@ export class AgentService {
         run.child = child;
       },
       event: (type, text, extra) => this.event(run, type, text, extra),
-      ask: (text, details, questions) => this.ask(run, text, details, questions),
+      ask: async (text, details, questions, tool) =>
+        (tool && (await this.permissionHooks(run, tool.name, tool.input))) ??
+        this.ask(run, text, details, questions),
       saveSession: async (handle) => {
         run.handle = handle;
         await this.saveSession(run, handle);
       },
       compacted: () => {
         run.compacted = true;
+        run.hooks?.postCompact();
       },
-      // The Antigravity CLI's tool calls go through irori's hooks only once its
-      // hooks have handed irori an event; a call before that stops the run.
+      // The Antigravity CLI's and OpenCode's tool calls go through irori's hooks
+      // only once its hooks or plugin have spoken to irori; a call before that
+      // stops the run, as the Schema's hooks could not see it.
       toolStarted: () =>
-        forwarded && !forwarded.state.heard
+        (forwarded && !forwarded.state.heard) || (setup.loaded && !setup.loaded.heard)
           ? t(
-              'Antigravity CLI が irori のフックを読み込まなかったため、Schema のフックを通らないツール実行の前に止めました。',
-              "The Antigravity CLI did not load irori's hooks, so the run stopped before a tool call the Schema's hooks could not see.",
+              `${agentNames[input.agent]} が irori のフックを読み込まなかったため、Schema のフックを通らないツール実行の前に止めました。`,
+              `${agentNames[input.agent]} did not load irori's hooks, so the run stopped before a tool call the Schema's hooks could not see.`,
             )
           : undefined,
       // Hermes Agent hands irori a call once it ran: its PostToolUse hooks run
@@ -1673,7 +1852,7 @@ export class AgentService {
           ? (call) => {
               const job = run
                 .hooks!.answer({
-                  event: 'PostToolUse',
+                  event: call.error ? 'PostToolUseFailure' : 'PostToolUse',
                   tool: call.tool,
                   input: call.input,
                   call: call.id,
@@ -1700,25 +1879,34 @@ export class AgentService {
    * its turn goes with the next. Each next turn is a request in the same session.
    */
   private async afterTurn(run: Run, input: StartRun, root: string, effort: string | undefined) {
+    const cap = stopHookCap(runEnv(run));
+    // Stop continuations in a row without a tool call, and turns that only pass
+    // on what hooks said after a call (Hermes Agent); each kind at most `cap`.
+    let stops = 0;
+    let passed = 0;
     let active = false;
-    for (let round = 0; !run.cancelled && !run.halted; round++) {
+    while (!run.cancelled && !run.halted) {
       await Promise.all([...run.pending]);
+      // As in Claude Code, the count starts again whenever the agent calls a tool.
+      if (run.toolsUsed) stops = 0;
+      run.toolsUsed = false;
       const said = run.later.splice(0);
-      const reason = await run.hooks!.stop(active, run.reply.toString());
+      const stop = await run.hooks!.stop(active, run.reply.toString());
       if (run.cancelled || run.halted) return;
+      const keep = !!stop.blocked || stop.context.length > 0;
       const words = [
         ...(said.length ? [hookToolFeedback('PostToolUse', said)] : []),
-        ...(reason ? [stopHookContinue(reason)] : []),
+        ...(stop.blocked ? [stopHookContinue(stop.blocked)] : []),
+        ...(stop.context.length ? [hookToolFeedback('Stop', stop.context)] : []),
       ];
       if (!words.length) return;
-      // As Claude Code does with Stop hooks, at most so many turns in a row.
-      if (round >= stopHookCap) {
+      if ((keep && stops >= cap) || (!keep && passed >= cap)) {
         this.event(
           run,
           'status',
           t(
-            `フックが ${stopHookCap} 回続けてターンを続けさせたため、Claude Code と同じくここで終えます。`,
-            `Hooks kept the turn going ${stopHookCap} times in a row, so it ends here, as in Claude Code.`,
+            `フックが ${cap} 回続けてターンを続けさせたため、Claude Code と同じくここで終えます。`,
+            `Hooks kept the turn going ${cap} times in a row, so it ends here, as in Claude Code.`,
           ),
         );
         return;
@@ -1739,11 +1927,13 @@ export class AgentService {
       this.event(
         run,
         'status',
-        reason
+        keep
           ? t('Stop フックの指示で続けます。', 'Going on as a Stop hook asks.')
           : t('フックの言葉を伝えて続けます。', 'Going on with what the hooks said.'),
       );
-      active = active || !!reason;
+      if (keep) stops++;
+      else passed++;
+      active = active || keep;
       run.reply.clear();
       await this.runCli(run, input, root, words.join('\n\n'), session, undefined, effort);
     }
@@ -2095,7 +2285,11 @@ export class AgentService {
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       // The shared Schema leads every request: whole unless this session already
       // heard it as it is now, then as one line (ADR 027).
+      // A Schema irori cannot read now is not a Schema that is gone: what the
+      // session heard of it stands, and the agent hears that it was not read.
+      let sharedUnread = false;
       const shared = await this.you?.shared().catch((error) => {
+        sharedUnread = true;
         this.event(
           run,
           'status',
@@ -2111,7 +2305,9 @@ export class AgentService {
       // What this CLI loads itself of its folder's Schema, and what irori gives it (ADR 058).
       const reach = await this.reachFor(input.agent, space.root);
       run.agentsBesideClaude = reach.claudeMd;
+      let folderUnread = false;
       const folder = await this.folderSchemaParts(input, you, reach).catch((error) => {
+        folderUnread = true;
         this.event(
           run,
           'status',
@@ -2125,17 +2321,22 @@ export class AgentService {
       if (command) run.sent = { ...run.heard };
       else {
         const lead = [
-          ...this.said(
-            run,
-            'shared',
-            shared && { words: sharedSchema(shared), pointer: sharedSchemaPointer(shared) },
-            sharedSchemaRemoved(),
-          ),
-          ...this.said(run, 'schema', folder?.part, folderSchemaRemoved(space.root)),
+          ...(sharedUnread
+            ? this.unread(run, 'shared', sharedSchemaUnread())
+            : this.said(
+                run,
+                'shared',
+                shared && { words: sharedSchema(shared), pointer: sharedSchemaPointer(shared) },
+                sharedSchemaRemoved(),
+              )),
+          ...(folderUnread
+            ? this.unread(run, 'schema', folderSchemaUnread(space.root))
+            : this.said(run, 'schema', folder?.part, folderSchemaRemoved(space.root))),
           ...this.refreshed(run, folder?.instructions),
         ];
         if (lead.length) prompt = [...lead, prompt].join('\n\n');
       }
+      run.agentsGiven = !!folder?.gave;
       // The Schema's hooks: Claude Code runs them itself; irori runs them for every
       // other CLI, with Claude Code's meaning (ADR 058).
       const hooks =
@@ -2175,7 +2376,7 @@ export class AgentService {
           prompt = `${hookContext('SessionStart', started)}\n\n${prompt}`;
         const submitted = await run.hooks.userPromptSubmit(prompt);
         if (submitted.blocked)
-          throw Error(
+          throw new NotSent(
             t(
               `UserPromptSubmit フックが指示を止めました: ${submitted.blocked}`,
               `A UserPromptSubmit hook stopped the instruction: ${submitted.blocked}`,
@@ -2183,7 +2384,7 @@ export class AgentService {
           );
         if (submitted.context.length && !command)
           prompt = `${prompt}\n\n${hookContext('UserPromptSubmit', submitted.context)}`;
-        if (run.halted) throw Error(run.halted);
+        if (run.halted) throw new NotSent(run.halted);
       }
       if (run.cancelled) return;
       const effort =
@@ -2199,7 +2400,8 @@ export class AgentService {
         this.event(run, 'error', String(e));
         // A resume that failed before the agent did anything is reported, and this
         // device's handle is set aside: the next instruction starts a new session.
-        if (resuming && !run.progressed) {
+        // A request irori did not send, or one stopped before it went, leaves the session be.
+        if (resuming && run.sending && !run.progressed && !(e instanceof NotSent)) {
           this.event(
             run,
             'error',
@@ -2433,7 +2635,7 @@ export class AgentService {
     events: string[],
   ) {
     const refused = (why: string) =>
-      Error(
+      new NotSent(
         t(
           `Codex が irori のフックを受け付けなかったため、Schema のフック（${events.join(', ')}）を実行できません。指示は送っていません（${why}）。`,
           `Codex did not take irori's hooks, so the Schema's ${events.join(', ')} hooks cannot run. The instruction was not sent (${why}).`,
@@ -2542,8 +2744,13 @@ export class AgentService {
         if (!ownCodexNotice(run, p)) return;
         if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
         // A compaction, automatic or asked for, may have taken irori's words (ADR 058).
-        if (m.method === 'item/completed' && p.item?.type === 'contextCompaction')
+        if (m.method === 'item/completed' && p.item?.type === 'contextCompaction') {
           run.compacted = true;
+          run.hooks?.postCompact(run.command ? 'manual' : 'auto');
+        }
+        // The files a change will touch, for the permission it may ask.
+        if (m.method === 'item/started' && p.item?.type === 'fileChange' && p.item.id)
+          (run.fileChanges ??= new Map()).set(String(p.item.id), p.item.changes);
         // A review's findings are its answer, said when it leaves review mode.
         if (m.method === 'item/completed' && p.item?.type === 'exitedReviewMode') {
           if (typeof p.item.review === 'string') this.event(run, 'text', p.item.review);
@@ -2723,7 +2930,15 @@ export class AgentService {
       m.method === 'item/commandExecution/requestApproval' ||
       m.method === 'item/fileChange/requestApproval'
     ) {
-      const reply = await this.ask(run, p.reason ?? t('実行の許可', 'Allow this action'), p);
+      // The Schema's PermissionRequest hooks may answer before the person (ADR 058).
+      const reply =
+        (await this.permissionHooks(
+          run,
+          m.method === 'item/fileChange/requestApproval' ? 'apply_patch' : 'Bash',
+          m.method === 'item/fileChange/requestApproval'
+            ? { command: patchOf(run.fileChanges?.get(String(p.itemId))) }
+            : { command: typeof p.command === 'string' ? p.command : '' },
+        )) ?? (await this.ask(run, p.reason ?? t('実行の許可', 'Allow this action'), p));
       result = { decision: reply.allow ? 'accept' : 'decline' };
     } else if (m.method === 'item/tool/requestUserInput') {
       const questions: Question[] = p.questions.map((q: any) => ({
@@ -2884,6 +3099,25 @@ export class AgentService {
       run.steering.close();
     }
     const attachedFolders = (run.attached ?? []).map((file) => path.dirname(file.path));
+    // The folder's AGENTS.md, for a session that did not load it (ADR 058); none
+    // when irori gave it as words already.
+    const loaded = new Set<string>();
+    // A CLI's own command takes nothing irori would add.
+    let agentsGiven = !!run.agentsGiven || !!run.command;
+    const agentsFile = path.join(cwd, 'AGENTS.md');
+    const agentsText = agentsGiven
+      ? undefined
+      : (await fs.readFile(agentsFile, 'utf8').catch(() => undefined))?.trim();
+    const agents = agentsText
+      ? {
+          file: await fs.realpath(agentsFile).catch(() => agentsFile),
+          words: folderInstructionsMissing(
+            agentNames.claude,
+            agentsFile,
+            Buffer.byteLength(agentsText, 'utf8') <= schemaInline ? agentsText : undefined,
+          ),
+        }
+      : undefined;
     // The shared Schema's hooks run beside the folder's own (ADR 048).
     const sharedHooks = await this.you?.sharedHooks().catch((error) => {
       this.event(
@@ -2958,6 +3192,43 @@ export class AgentService {
         // Told when it matters rather than on every turn: before an edit would
         // change lines the person wrote or revised, Claude Code hears which.
         hooks: {
+          // Which instruction files Claude Code loaded; an AGENTS.md it did not
+          // load goes with the request (ADR 058).
+          InstructionsLoaded: [
+            {
+              hooks: [
+                async (input) => {
+                  if (input.hook_event_name === 'InstructionsLoaded')
+                    loaded.add(await fs.realpath(input.file_path).catch(() => input.file_path));
+                  return {};
+                },
+              ],
+            },
+          ],
+          UserPromptSubmit: [
+            {
+              hooks: [
+                async () => {
+                  if (!agents || agentsGiven || loaded.has(agents.file)) return {};
+                  agentsGiven = true;
+                  this.event(
+                    run,
+                    'status',
+                    t(
+                      'Claude Code がこのフォルダの AGENTS.md を読み込まなかったため、irori が依頼と一緒に渡しました。',
+                      "Claude Code did not load this folder's AGENTS.md, so irori gave it with the request.",
+                    ),
+                  );
+                  return {
+                    hookSpecificOutput: {
+                      hookEventName: 'UserPromptSubmit',
+                      additionalContext: agents.words,
+                    },
+                  };
+                },
+              ],
+            },
+          ],
           PreToolUse: [
             {
               matcher: writeToolMatcher,

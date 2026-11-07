@@ -107,3 +107,19 @@ export function folderInstructionsChanged(file: string, text?: string) {
     ? `irori: this folder's instructions (${file}) changed since this session began. Read the whole file again and follow it instead of the copy you began with.`
     : `irori: this folder's instructions (${file}) changed since this session began. Follow this text instead of the copy you began with:\n<folder-instructions>\n${text}\n</folder-instructions>`;
 }
+
+/** The line a request gets when irori could not read the folder's Schema for it. */
+export function folderSchemaUnread(root: string) {
+  return `irori: the Schema of ${root} could not be read for this request. Keep following what was given earlier in this session, and read its AGENTS.md and .claude/rules there yourself.`;
+}
+
+/**
+ * For Claude Code when it did not load the folder's AGENTS.md this session (a
+ * CLAUDE.md beside it, an older version, another provider): the instructions,
+ * whole while they fit and otherwise as the file to read.
+ */
+export function folderInstructionsMissing(cli: string, file: string, text?: string) {
+  return text === undefined
+    ? `irori: ${cli} did not load this folder's instructions (${file}). Read the whole file first and follow it.`
+    : `irori: ${cli} did not load this folder's instructions (${file}). Follow them:\n<folder-instructions>\n${text}\n</folder-instructions>`;
+}

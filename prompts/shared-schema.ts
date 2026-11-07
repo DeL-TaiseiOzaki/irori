@@ -69,3 +69,8 @@ export function sharedSchemaPointer(shared: Pick<SharedSchemaPrompt, 'root'>) {
 export function sharedSchemaRemoved() {
   return 'irori: the shared Schema given earlier in this session no longer exists. Stop following it; the Schema of the folder you work in still applies.';
 }
+
+/** The line a request gets when irori could not read the shared Schema for it. */
+export function sharedSchemaUnread() {
+  return 'irori: the shared Schema could not be read for this request. Keep following it as given earlier in this session, if it was; nothing in it was removed.';
+}

@@ -22,6 +22,8 @@ export interface NativeContext {
     text: string,
     details: unknown,
     questions?: Question[],
+    /** A permission for a tool call: PermissionRequest hooks may answer it first (ADR 058). */
+    tool?: { name: string; input: unknown },
   ): Promise<{
     allow: boolean;
     answers?: AgentAnswers;

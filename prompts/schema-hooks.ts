@@ -29,7 +29,10 @@ export function hookDenied(reason: string) {
 }
 
 /** What PostToolUse hooks said about a call that ran, as the agent reads it with the result. */
-export function hookToolFeedback(event: 'PostToolUse' | 'SubagentStop', words: string[]) {
+export function hookToolFeedback(
+  event: 'PostToolUse' | 'PostToolUseFailure' | 'SubagentStop' | 'Stop',
+  words: string[],
+) {
   return `${event} hook feedback from the Schema:\n${words.join('\n')}`;
 }
 
