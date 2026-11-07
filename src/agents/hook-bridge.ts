@@ -6,7 +6,7 @@ import { commandLaunchers, loopbackServer } from './command-bridge';
 import { hookUnreachable, hookUnreachableAfter, hookUnreadable } from '../../prompts';
 
 /**
- * How the tool events of a CLI reach the Schema's hooks irori runs (ADR 057).
+ * How the tool events of a CLI reach the Schema's hooks irori runs (ADR 058).
  * Pi and OpenCode let a script of theirs see each tool call before and after it
  * runs; irori gives them one from its data directory, never the folder, that
  * asks irori over a loopback URL only that process knows, and does what irori

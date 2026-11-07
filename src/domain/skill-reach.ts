@@ -8,8 +8,8 @@ import type { AgentId } from './types';
 export type ReachRule = {
   /**
    * Whether the CLI itself finds the KB's `.agents/skills`; `irori`: irori gives
-   * them to it (ADR 049, Pi's `--skill` in ADR 057); `listed`: irori names each in
-   * the request, as the CLI finds them only in a trusted project (ADR 057).
+   * them to it (ADR 049, Pi's `--skill` in ADR 058); `listed`: irori names each in
+   * the request, as the CLI finds them only in a trusted project (ADR 058).
    */
   native: 'reads' | 'trusted' | 'irori' | 'listed';
   /** Home-relative directories the CLI also reads. */

@@ -80,7 +80,7 @@ const kinds: Record<SchemaKind, { icon: IconName; name: () => string; one: () =>
 
 const instructionsLabel = (file: string) => (file === instructionsFile ? file : parentPath(file));
 /**
- * Where the hooks run (ADR 057): Claude Code runs them itself; irori runs them
+ * Where the hooks run (ADR 058): Claude Code runs them itself; irori runs them
  * for every other CLI, which the table says can or cannot hear each event.
  */
 const hookReachNote = () => {
@@ -191,7 +191,7 @@ export function SchemaList({
         title: file,
         path: file,
       })),
-      // How the rules reach each CLI (ADR 057).
+      // How the rules reach each CLI (ADR 058).
       note: t(
         'Claude Code は自分で読み、ほかの CLI には irori が依頼の中で渡します。',
         'Claude Code reads these itself; irori gives them to every other CLI in its request.',
@@ -205,7 +205,7 @@ export function SchemaList({
         title: hook.command || hook.type,
       })),
       error: hooksError,
-      // How the hooks reach each CLI (ADR 057); only .claude/settings.json hooks
+      // How the hooks reach each CLI (ADR 058); only .claude/settings.json hooks
       // are listed, and the rest is confirmed before a run.
       note: `${hookReachNote()} ${t(
         'ここに出るのは .claude/settings.json のフックだけです。env・apiKeyHelper・.mcp.json・プラグインなど実行される設定はほかにもあり、それらが変わるとエージェントの実行前に確認します。',

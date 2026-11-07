@@ -41,7 +41,7 @@ export function antigravityArgs(
     '--add-dir',
     ctx.cwd,
     ...folders.flatMap((dir) => ['--add-dir', dir]),
-    // irori's own folders for the run, such as its folder of hooks (ADR 057).
+    // irori's own folders for the run, such as its folder of hooks (ADR 058).
     ...(ctx.folders ?? []).flatMap((dir) => ['--add-dir', dir]),
     ...(ctx.model ? ['--model', ctx.model] : []),
     ...(ctx.access === 'full-access'
@@ -104,7 +104,7 @@ export async function runAntigravity(ctx: NativeContext) {
       if (step.step_type === 'tool' && tool) {
         const name = tool.name ?? step.tool_name;
         const id = typeof step.step_index === 'number' ? `step-${step.step_index}` : undefined;
-        // A call the Schema's hooks did not see stops the run (ADR 057).
+        // A call the Schema's hooks did not see stops the run (ADR 058).
         if (!stopped && (!id || !started.has(id))) {
           if (id) started.add(id);
           const reason = ctx.toolStarted?.({ tool: String(name ?? ''), id });

@@ -50,7 +50,7 @@ is to make sure `AGENTS.md` is read, and to say what it cannot keep current.
    them again. A new session, a routine's step, or any change (a layer folder,
    a shown name, a connected folder, `AGENTS.md` appearing or going) gets the
    whole introduction again.
-   *Revised by [ADR 057](057-every-schema-setting-reaches-every-cli.md) (0.2.60):
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
    heard only once the CLI took the request, forgotten at a compaction, and whole
    every time on a CLI that does not say when it compacts.*
 3. **The command's details live in `irori help`.** The vault agent's help now
@@ -68,7 +68,7 @@ is to make sure `AGENTS.md` is read, and to say what it cannot keep current.
    `.claude/settings.json` does not run them.
    *Revised for skills by [ADR 049](049-skills-for-claude-code.md) (0.2.33):
    irori gives Claude Code the `.agents/skills` as links outside the vault.*
-   *Revised by [ADR 057](057-every-schema-setting-reaches-every-cli.md) (0.2.60):
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
    every Schema setting reaches every CLI. A folder's rules go as words to every
    CLI but Claude Code, irori runs the hooks for every other CLI, and gives
    AGENTS.md, a knowledge folder's AGENTS.md and skills where a CLI does not

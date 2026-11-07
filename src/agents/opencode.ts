@@ -285,7 +285,7 @@ export async function runOpenCode(ctx: NativeContext) {
         jobs.add(job);
         return;
       }
-      // A compaction may have taken irori's words from the session (ADR 057).
+      // A compaction may have taken irori's words from the session (ADR 058).
       if (event.type === 'session.compacted' && event.properties.sessionID === sessionId) {
         ctx.compacted?.();
         return;

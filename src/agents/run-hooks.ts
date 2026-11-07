@@ -10,7 +10,7 @@ export const stopHookCap = 8;
 
 /**
  * The Schema's hooks over one run of a CLI that does not run them itself
- * (ADR 057): the events irori sees itself (SessionStart, UserPromptSubmit, Stop,
+ * (ADR 058): the events irori sees itself (SessionStart, UserPromptSubmit, Stop,
  * SessionEnd, Notification) and those the CLI's plugin, extension or hook
  * passes to irori (PreToolUse, PostToolUse, PreCompact). What the hooks say for
  * the person is shown in the run; what they say for the agent goes to it.

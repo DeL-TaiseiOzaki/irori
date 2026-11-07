@@ -95,7 +95,7 @@ export class SchemaSettingsService {
   /**
    * The `AGENTS.md` of a vault's knowledge folders, by their paths inside it: the
    * instructions of a folder below its root, which irori names to a CLI that does
-   * not load them itself (ADR 057). The irori agent's folder has none.
+   * not load them itself (ADR 058). The irori agent's folder has none.
    */
   async nestedInstructions(scopeId: string): Promise<string[]> {
     const folder = await this.folderOf(scopeId);

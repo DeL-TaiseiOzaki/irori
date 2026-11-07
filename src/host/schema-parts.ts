@@ -6,7 +6,7 @@ import { readFolderSkills } from './skills';
 
 /**
  * How much of a Schema's instructions and rules goes whole into a request;
- * beyond it, their files are named for the agent to read (ADR 027, ADR 057).
+ * beyond it, their files are named for the agent to read (ADR 027, ADR 058).
  */
 export const schemaInline = 32 * 1024;
 /** How deep in `.claude/rules` rules are looked for, as Claude Code finds them in subfolders too. */

@@ -57,7 +57,7 @@ and chose:
    request in that session with the same digest gets one line saying the
    shared Schema still applies; a new session, a change, or a session that
    predates it gets the whole text again.
-   *Revised by [ADR 057](057-every-schema-setting-reaches-every-cli.md) (0.2.60):
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
    the digest counts as heard only once the CLI took the request; a compaction
    forgets it; a CLI that does not say when it compacts gets the whole text every
    time; a session that heard a shared Schema hears when it is gone.*

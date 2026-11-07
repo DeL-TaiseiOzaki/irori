@@ -2,7 +2,7 @@ import type { AgentId } from './types';
 
 /**
  * What each CLI loads by itself of the Schema of the folder it works in, when
- * irori starts it there, and what irori therefore gives it (ADR 057). Every
+ * irori starts it there, and what irori therefore gives it (ADR 058). Every
  * Schema setting reaches every CLI: by the CLI itself where its source shows it
  * loads it, otherwise by irori. The sources and versions behind each row are in
  * docs/HARNESSES.md ("Schema reach").

@@ -44,7 +44,7 @@ export async function runHermes(ctx: NativeContext) {
   let saving = Promise.resolve();
   const save = (value: unknown) => {
     if (typeof value !== 'string' || !sessionId.test(value) || value === saved) return;
-    // Hermes moves to a new session id when it compresses one (ADR 057).
+    // Hermes moves to a new session id when it compresses one (ADR 058).
     if (saved) ctx.compacted?.();
     saved = value;
     saving = saving.then(() => ctx.saveSession(value));
@@ -70,7 +70,7 @@ export async function runHermes(ctx: NativeContext) {
         ctx.event('text', text);
       }
     }
-    // What each call was given, for hooks irori runs once it finished (ADR 057).
+    // What each call was given, for hooks irori runs once it finished (ADR 058).
     const id = typeof event.tool_call_id === 'string' ? event.tool_call_id : undefined;
     if (event.type === 'tool_use' && id) inputs.set(id, event.input);
     if (event.type === 'tool_result')

@@ -1,7 +1,7 @@
 import type { AgentId } from '../domain/types';
 
 /**
- * A CLI's tool call as a Schema hook hears it (ADR 057): hooks are written for
+ * A CLI's tool call as a Schema hook hears it (ADR 058): hooks are written for
  * Claude Code, so a call is named and shaped as Claude Code's tool of the same
  * kind would be (`Bash` with `command`, `Write` with `file_path` and `content`,
  * `Edit` with `file_path`, `old_string` and `new_string` …). A matcher is also
