@@ -121,6 +121,10 @@ try {
   const choose = async (group: string, name: string) => {
     await page.getByRole('button', { name: /^設定（/ }).click();
     await page
+      .getByRole('navigation', { name: '設定の項目' })
+      .getByRole('button', { name: 'ノートの表示', exact: true })
+      .click();
+    await page
       .getByRole('group', { name: group })
       .getByRole('radio', { name, exact: true })
       .check();

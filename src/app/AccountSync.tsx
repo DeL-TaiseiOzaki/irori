@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog } from './Dialog';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { useAction } from './useAction';
 import { Icon } from './Icon';
 import { reloadDeviceSettings } from './device-settings';
+import { useLanguage } from './useLanguage';
 import { displayLocale, t } from '../domain/i18n';
 import { unavailableText } from '../domain/routines';
 import {
@@ -58,6 +59,14 @@ function useEnvironment() {
     void host.environment().then(setState, (e) => setError(errorText(e)));
   };
   useEffect(load, []);
+  // An error is worded in the language it was read in: read it again in a new one.
+  const language = useLanguage();
+  const read = useRef(language);
+  useEffect(() => {
+    if (read.current === language) return;
+    read.current = language;
+    if (error) load();
+  }, [language]);
   return { state, setState, error, load };
 }
 
@@ -65,7 +74,14 @@ function useEnvironment() {
  * The settings' account section (ADR 026): the GitHub account the GitHub CLI
  * is signed in to, and the environment saved there.
  */
-export function AccountSection({ onRestore }: { onRestore: () => void }) {
+export function AccountSection({
+  heading = true,
+  onRestore,
+}: {
+  /** The settings' account page names the part above it already. */
+  heading?: boolean;
+  onRestore: () => void;
+}) {
   const { state, setState, error, load } = useEnvironment();
   const { busy, error: issue, run } = useAction();
   const [saved, setSaved] = useState(false);
@@ -89,7 +105,7 @@ export function AccountSection({ onRestore }: { onRestore: () => void }) {
   const filesLeft = state?.local.agentFilesLeft ?? [];
   return (
     <section className="settings-account" aria-label={t('アカウント', 'Account')}>
-      <h3>{t('アカウント', 'Account')}</h3>
+      {heading && <h3>{t('アカウント', 'Account')}</h3>}
       {state ? (
         <>
           <p className="account-name">

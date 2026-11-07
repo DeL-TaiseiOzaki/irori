@@ -48,9 +48,13 @@ try {
   await page.getByRole('checkbox', { name: /Shared KB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
 
-  // The settings open every Schema; the shared one comes first.
+  // The settings' shared part opens every Schema on the shared one.
   await page.getByRole('button', { name: /^設定（/ }).click();
-  await page.getByRole('button', { name: '共通・vault', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '設定の項目' })
+    .getByRole('button', { name: '共通', exact: true })
+    .click();
+  await page.getByRole('button', { name: '共通 Schema を開く', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Schema の設定' });
   const owners = dialog.getByRole('navigation', { name: 'Schema の設定' });
   await expect(owners.getByRole('button', { name: '共通', exact: true })).toHaveAttribute(

@@ -116,6 +116,10 @@ try {
     });
   const chooseMargins = async (name: string) => {
     await page.getByRole('button', { name: /^設定（/ }).click();
+    await page
+      .getByRole('navigation', { name: '設定の項目' })
+      .getByRole('button', { name: 'ノートの表示', exact: true })
+      .click();
     await page.getByRole('group', { name: '左右の余白' }).getByRole('radio', { name }).check();
     await page.keyboard.press('Escape');
   };

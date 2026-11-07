@@ -816,9 +816,10 @@
   background: var(--rule);
 }
 
-/* The settings: a sheet of their own over the blurred window, the parts listed at
-   its side and shown in one scrolling column. Settings are chrome, so the sheet is
-   graphite in hearth and dark, paper in light. */
+/* The settings (ADR 057): a sheet of their own over the blurred window. The side
+   lists the parts in framed groups, each entry with its current value; the part
+   chosen shows alone beside them, its rows framed in groups. Settings are chrome,
+   so the sheet is graphite in hearth and dark, paper in light. */
 .settings-dialog {
   color: var(--tx);
   color-scheme: var(--chrome-scheme);
@@ -828,11 +829,11 @@
 }
 .settings-sheet {
   position: relative;
-  width: min(900px, calc(100vw - 48px));
+  width: min(960px, calc(100vw - 48px));
   /* Clear of the title bar, which moves the window wherever it is pressed. */
-  height: min(640px, calc(100vh - 104px));
+  height: min(680px, calc(100vh - 104px));
   display: grid;
-  grid-template-columns: 184px minmax(0, 1fr);
+  grid-template-columns: 252px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   border-radius: 14px;
@@ -842,157 +843,290 @@
     0 0 0 1px var(--hair-2),
     var(--pop);
 }
+
+/* The side: the groups, each a frame of entries. */
 .settings-side {
   min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 12px;
+  padding: 20px 14px;
   border-right: 1px solid var(--hair);
   background: var(--bg);
 }
-.settings-side h2 {
-  margin: 0 10px;
+.settings-sheet .settings-side > h2 {
+  margin: 0 8px;
   font-size: 15px;
   font-weight: 700;
 }
 .settings-side nav {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-nav-label {
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--tx-3);
+}
+.settings-nav-frame {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--hair);
 }
 .settings-side nav button {
-  height: 32px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 1px;
   align-items: center;
-  gap: 9px;
-  padding: 0 10px;
+  min-height: 44px;
+  padding: 6px 10px;
   border-radius: 8px;
   background: none;
   box-shadow: none;
   color: var(--tx-2);
-  font-size: 13px;
-  font-weight: 500;
   text-align: left;
   transition:
     background-color var(--quick) ease,
     color var(--quick) ease;
 }
+.settings-side nav button > svg {
+  grid-row: 1 / 3;
+}
+.settings-nav-name {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--tx);
+}
+.settings-nav-value {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--tx-3);
+}
+.settings-nav-value.attention {
+  color: var(--attn-tx);
+}
+/* An update waits: the same mark as the rail's settings button. */
+.settings-nav-badge {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tx);
+}
 .settings-side nav button:hover {
-  background: var(--panel);
-  color: var(--tx);
-}
-.settings-side nav button[aria-current='true'] {
   background: var(--raised);
-  color: var(--tx);
-  box-shadow: inset 0 0 0 1px var(--hair);
 }
+/* The part on show is where the person is: the focus colour marks its icon. */
+.settings-side nav button[aria-current='page'] {
+  background: var(--raised-2);
+  color: var(--act);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+.settings-side nav button[aria-current='page'] .settings-nav-value:not(.attention) {
+  color: var(--tx-2);
+}
+
+/* The part on show. */
 .settings-body {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 8px 28px 28px;
+  padding: 0 32px 32px;
 }
-.settings-section {
+.settings-page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px 0 28px;
+  gap: 20px;
+  padding-top: 26px;
 }
-.settings-section + .settings-section {
-  border-top: 1px solid var(--hair);
+.settings-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Clear of the close button. */
+  padding-right: 36px;
 }
-.settings-section h3 {
+.settings-page-head h3 {
   margin: 0;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
   font-weight: 650;
   color: var(--tx);
 }
-.settings-section .settings-account > h3 {
-  margin-bottom: 14px;
+.settings-page-head h3 > svg {
+  color: var(--tx-2);
 }
-.settings-choices legend {
-  margin: 0 0 8px;
-  padding: 0;
+.settings-page-head p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--tx-2);
+}
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-block > h4 {
+  margin: 0 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--tx-2);
 }
-.settings-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair);
 }
-.settings-sheet button.settings-close {
-  padding: 0;
-  border-radius: 8px;
-  background: none;
-  box-shadow: none;
-  color: var(--tx-3);
+.settings-item {
+  margin: 0;
+  padding: 16px;
 }
-.settings-sheet button.settings-close:hover {
-  background: var(--raised-2);
+.settings-item + .settings-item {
+  border-top: 1px solid var(--hair);
+}
+
+/* A row: what the setting is on the left, its control on the right. */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.settings-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-row-label,
+.settings-choices legend {
+  font-size: 13px;
+  font-weight: 550;
   color: var(--tx);
 }
+.settings-description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tx-2);
+}
+/* What a choice means, under it; one that lets agents act without asking waits on
+   the person. The start screen's own paragraphs have no margin; these keep theirs. */
+.settings-body .settings-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tx-3);
+}
+.settings-body .settings-item > .settings-note:only-child {
+  margin: 0;
+}
+.settings-note.attention {
+  color: var(--attn-tx);
+}
+.settings-row-aside,
+.settings-empty {
+  font-size: 12px;
+  color: var(--tx-3);
+}
+.settings-row-aside {
+  flex: none;
+}
+.settings-row-flat {
+  padding: 0;
+}
+.settings-vault {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.settings-vault > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A choice among a few: tiles, the chosen one marked in the focus colour. */
 .settings-choices {
   margin: 0;
   padding: 0;
   border: 0;
   min-width: 0;
 }
-/* What a choice means, under it; one that lets agents act without asking waits on the person. */
-.settings-note {
-  margin: -4px 0 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--tx-3);
+.settings-choices legend {
+  margin: 0 0 4px;
+  padding: 0;
 }
-.settings-note.attention {
-  color: var(--attn-tx);
-}
-/* Every row of choices shares four columns, so they line up down the sheet. */
-.settings-choices > div {
+.settings-tiles {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(var(--columns, 4), minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
-.settings-choice {
+.settings-tile {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 8px 10px 8px 12px;
   border-radius: 9px;
-  box-shadow: inset 0 0 0 1px var(--hair);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
   color: var(--tx-2);
   cursor: pointer;
   transition:
     background-color var(--quick) ease,
+    box-shadow var(--quick) ease,
     color var(--quick) ease;
 }
-/* A choice that opens a view rather than picking a value. */
-button.settings-choice {
-  background: none;
-  box-shadow: inset 0 0 0 1px var(--hair);
-  font-weight: 400;
-}
-.settings-choice:hover {
-  background: var(--raised);
-  color: var(--tx);
-}
-.settings-choice[data-checked='true'] {
+.settings-tile:hover {
   background: var(--raised-2);
   color: var(--tx);
-  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
-/* The radio covers its whole choice, so a click anywhere on it chooses. */
-.settings-choice input {
+.settings-tile[data-checked='true'] {
+  background: var(--act-soft);
+  box-shadow: inset 0 0 0 1.5px var(--act-line);
+  color: var(--tx);
+}
+.settings-tile[data-checked='true'][data-tone='attention'] {
+  background: var(--attn-soft);
+  box-shadow: inset 0 0 0 1.5px var(--attn-line);
+}
+/* The radio covers its whole tile, so a click anywhere on it chooses. */
+.settings-tile input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1001,15 +1135,50 @@ button.settings-choice {
   opacity: 0;
   cursor: pointer;
 }
-.settings-choice:has(input:focus-visible) {
+.settings-tile:has(input:focus-visible) {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
-.settings-choice > span:last-child {
+.settings-tile-text {
+  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.settings-tile-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.settings-tile[data-checked='true'] .settings-tile-label {
+  font-weight: 600;
+}
+.settings-tile-text small {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tx-3);
+}
+.settings-tile:has(small) {
+  align-items: flex-start;
+  padding-block: 10px;
+}
+.settings-tile-hint {
+  flex: none;
+  font-size: 11px;
+  color: var(--tx-3);
+  font-variant-numeric: tabular-nums;
+}
+.settings-tile-check {
+  flex: none;
+  color: var(--act);
+  visibility: hidden;
+}
+.settings-tile[data-checked='true'] .settings-tile-check {
+  visibility: visible;
+}
+.settings-tile[data-tone='attention'] .settings-tile-check {
+  color: var(--attn);
 }
 .font-swatch {
   width: 16px;
@@ -1037,26 +1206,262 @@ button.settings-choice {
 .font-mono {
   font-family: var(--markdown-font-mono);
 }
-.settings-body button:not(.settings-choice) {
+
+/* On or off: a switch that also says which. */
+.settings-switch-state {
+  flex: none;
+  min-width: 2.5em;
+  text-align: right;
+  font-size: 12px;
+  color: var(--tx-3);
+}
+.settings-switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+}
+.settings-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-switch > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--raised-2);
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+  transition:
+    background-color var(--quick) ease,
+    box-shadow var(--quick) ease;
+}
+.settings-switch > span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tx-3);
+  transition:
+    transform var(--quick) ease,
+    background-color var(--quick) ease;
+}
+.settings-switch input:checked + span {
+  background: var(--act-soft);
+  box-shadow: inset 0 0 0 1px var(--act-line);
+}
+.settings-switch input:checked + span::after {
+  transform: translateX(16px);
+  background: var(--act);
+}
+.settings-switch input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.settings-switch input:disabled {
+  cursor: progress;
+}
+.settings-switch input:disabled + span {
+  opacity: 0.6;
+}
+/* A change that takes a while, such as uv's download, under its row. */
+.settings-body .settings-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.settings-progress svg {
+  animation: irori-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-progress svg {
+    animation: none;
+  }
+}
+
+/* The note's own type, in a few lines on the stage's paper, kept in view while
+   the choices under it scroll. */
+.settings-preview-stick {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -10px 0;
+  padding: 10px 0;
+  background: var(--panel);
+}
+.settings-preview {
+  margin: 0;
+  padding: 18px 0;
+  border-radius: 12px;
+  background: var(--stage);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--ink);
+  color-scheme: var(--stage-scheme);
+  overflow: hidden;
+}
+/* The side margins in proportion: a reading column, a wider one, the whole page. */
+.settings-preview-page {
+  margin-inline: 20%;
+  font-family: var(--markdown-font);
+  font-size: var(--markdown-size);
+  line-height: var(--markdown-line);
+  transition: margin-inline 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+:root[data-page-margins='small'] .settings-preview-page {
+  margin-inline: 9%;
+}
+:root[data-page-margins='minimal'] .settings-preview-page {
+  margin-inline: 24px;
+}
+.settings-preview-page p {
+  margin: 0;
+}
+.settings-preview-page .settings-preview-title {
+  margin-bottom: 0.35em;
+  font-size: 1.3em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* The settings' buttons, the account's and the updates' among them. */
+.settings-body button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   min-height: 30px;
   padding: 0 11px;
   border-radius: 9px;
-  background: var(--raised);
+  background: var(--raised-2);
   color: var(--tx);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
+  white-space: nowrap;
 }
-.settings-body button:not(.settings-choice):hover:not(:disabled) {
+.settings-body button:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+}
+.settings-body button.settings-open {
+  flex: none;
+  gap: 4px;
+  padding: 0 8px 0 12px;
+}
+.settings-body button.settings-open > svg {
+  color: var(--tx-3);
+}
+/* The irori agent's folder: its path above its buttons, as the other rows' text. */
+.settings-folder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-folder .agent-folder {
+  align-items: flex-start;
+}
+.settings-folder .agent-folder-actions {
+  justify-content: flex-start;
+}
+.settings-folder .agent-folder-path {
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.settings-body .settings-folder .stage-text-button.framed {
+  height: auto;
+  min-height: 30px;
+  border-radius: 9px;
   background: var(--raised-2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
-.settings-link {
-  align-self: flex-start;
+.settings-body .settings-folder .stage-text-button.framed:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--hair-3);
 }
 .settings-updates .update-notice {
   color: var(--tx-2);
+}
+/* An error in the settings: its advice, and the tool's output folded under a chevron. */
+.settings-body .error-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--danger-soft);
+  box-shadow: inset 0 0 0 1px var(--danger-line);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--tx);
+}
+.settings-body .error-message details {
+  margin: 0;
+}
+.settings-body .error-message summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  color: var(--tx-2);
+}
+.settings-body .error-message summary::-webkit-details-marker {
+  display: none;
+}
+.settings-body .error-message summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--quick) ease;
+}
+.settings-body .error-message details[open] summary::before {
+  transform: rotate(45deg);
+}
+.settings-body .error-message pre {
+  color: var(--tx-2);
+}
+
+.settings-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.settings-sheet button.settings-close {
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-3);
+}
+.settings-sheet button.settings-close:hover {
+  background: var(--raised-2);
+  color: var(--tx);
+}
+@media (max-width: 760px) {
+  .settings-sheet {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .settings-body {
+    padding-inline: 20px;
+  }
+  .settings-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .brain-tile > img {
   width: 100%;
