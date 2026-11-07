@@ -214,7 +214,11 @@ test(
       .split('\n')
       .map((line) => JSON.parse(line));
     const [start] = protocol.filter((m) => m.method === 'thread/start');
-    assert.deepEqual(start.params.config, { 'sandbox_workspace_write.writable_roots': [open] });
+    assert.deepEqual(start.params.config, {
+      'sandbox_workspace_write.writable_roots': [open],
+      // Codex keeps the whole of AGENTS.md, not its 32 KiB default (ADR 057).
+      project_doc_max_bytes: 1048576,
+    });
     const [turn] = protocol.filter((m) => m.method === 'turn/start');
     assert.match(JSON.stringify(turn.params), /Read-only: \\"contents\/Kept\\"/);
   },
@@ -256,6 +260,9 @@ test(
       .map((line) => JSON.parse(line))
       .filter((m) => m.method === 'thread/start')
       .map((m) => m.params.config);
-    assert.deepEqual(starts, [{ 'sandbox_workspace_write.writable_roots': [folder] }, undefined]);
+    assert.deepEqual(starts, [
+      { 'sandbox_workspace_write.writable_roots': [folder], project_doc_max_bytes: 1048576 },
+      { project_doc_max_bytes: 1048576 },
+    ]);
   },
 );

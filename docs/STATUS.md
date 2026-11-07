@@ -1,5 +1,43 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Every Schema setting reaches every CLI, 2026-11-07 (**0.2.60**, pull request open;
+[ADR 057](decisions/057-every-schema-setting-reaches-every-cli.md)): the owner
+asked whether the shared Schema and each vault's Schema reach every CLI agent,
+and found three faults fatal. A vault's rules reached Claude Code alone; hooks
+ran on Claude Code alone; a session counted as having heard the shared Schema
+before the CLI took the request.
+- `src/domain/schema-reach.ts` holds what each CLI loads itself and the hook
+  events irori runs for it. `AgentService.folderSchemaParts` builds the folder's
+  rules, any AGENTS.md the CLI does not load, knowledge folders' AGENTS.md and
+  skills into `prompts/folder-schema.ts`, said like the shared Schema (digest
+  `schema`; Hermes gets `instructions` when AGENTS.md changed).
+- Hooks:
+  - `schema-hooks.ts` runs the shared and folder hooks with Claude Code's
+    meaning. `run-hooks.ts` places the events.
+  - `hook-bridge.ts` passes them on per CLI:
+    - Pi: an extension with `-e`. OpenCode: a plugin.
+    - Codex: thread `config.hooks` trusted by hash, checked with `hooks/list`
+      before a turn, with one restart on another fingerprint.
+    - Antigravity CLI: `.agents/hooks.json` in an `--add-dir` folder. A tool
+      step before the handshake stops the run.
+    - Hermes: PostToolUse after the call, with feedback in the next request.
+  - Stop and feedback continuations are capped at 8. An event a CLI cannot run
+    asks first.
+- Heard digests are written in `rememberHeard` only after the run made progress.
+  A compaction (all five signals) sets `compacted`: the next request is whole,
+  and SessionStart hears `compact`. Hermes and Antigravity send everything whole
+  every time.
+- Codex gets `project_doc_max_bytes` 1 MiB, and an AGENTS.md missing from
+  `instructionSources` goes as words. Claude Code 2.1.277+ gets
+  `instructionFiles: claude-md-and-agents-md` beside a CLAUDE.md. Pi gets
+  `--skill` per skill folder.
+- The settings' Rules and Hooks notes come from the table. The skill reach view
+  shows Pi `irori が渡す` and Hermes `irori が依頼の中で伝える`.
+- Tests: `schema-reach` (stand-ins for all six CLIs) and `schema-hooks`
+  (semantics, Codex hash vectors). No real CLI was run. Whether the Antigravity
+  CLI reads hooks from an added folder is inferred from its docs. Not tried on
+  Windows.
+
 Connected folders deletable where the system has no trash, 2026-11-07
 (**0.2.59**, [#303](https://github.com/DeL-TaiseiOzaki/irori/pull/303), published as `v0.2.59-preview.1`;
 [ADR 019](decisions/019-local-folder-connections.md) decision 5

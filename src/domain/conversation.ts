@@ -113,6 +113,24 @@ export const conversationMeta = z.looseObject({
         .regex(/^[0-9a-f]{64}$/)
         .optional(),
       /**
+       * The digest of the parts of its folder's Schema irori gave the session
+       * because its CLI does not load them itself (ADR 057).
+       */
+      schema: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+      /** The digest of the folder's AGENTS.md a session that keeps its first copy has (ADR 057). */
+      instructions: z
+        .string()
+        .regex(/^[0-9a-f]{64}$/)
+        .optional(),
+      /**
+       * The CLI compacted the session after its last request: what it heard may be
+       * gone, so the next request gives everything whole again (ADR 057).
+       */
+      compacted: z.literal(true).optional(),
+      /**
        * The next turn goes on from this point of the session as a new branch of it,
        * after a rewind or into a copy (ADR 017 D6): Claude Code's entry, Codex's turn.
        */
