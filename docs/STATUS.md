@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Settings shown one part at a time from framed groups, 2026-11-07 (**0.2.60**,
-[#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305);
+[#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305), published as `v0.2.60-preview.1`;
 [ADR 057](decisions/057-settings-by-part.md), superseding ADR 055 decisions 2
 and 3): the owner found the settings hard to follow and asked that the side list
 be designed first, with the irori agent and the vault agent apart.
