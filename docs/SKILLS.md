@@ -111,8 +111,11 @@ description is written as a plain YAML scalar when that reads back unchanged and
 double-quoted otherwise. A hook edit replaces only `hooks` in
 `.claude/settings.json`, keeps every other key in its place, and writes 2-space
 JSON; a malformed `hooks` value is reported, not overwritten. Hooks of another
-`type` than `command` are listed but edited as a file. Hooks are Claude Code's
-only for now: Codex, OpenCode and Pi hook formats are not handled. The list is
+`type` than `command` are listed but edited as a file. Hooks are written in
+Claude Code's shape. Claude Code runs them itself, and irori runs them with the
+same meaning for every other CLI ([ADR 057](decisions/057-every-schema-setting-reaches-every-cli.md),
+[HARNESSES](HARNESSES.md#schema-reach-adr-057)). Under Rules and Hooks, the
+settings say how each reaches every CLI. The list is
 not every setting that runs code: `env` and `apiKeyHelper` in
 `.claude/settings.json`, `.mcp.json`, OpenCode and Pi plugins and a connected
 folder's `.claude` run too. The Hooks group says so, and when a vault's ones change
@@ -260,9 +263,9 @@ source states it.
 | Codex CLI 0.155.1 | Yes: `$CWD/.agents/skills` and every directory up to the repository root (`REPO`) | `~/.agents/skills` (`USER`); `$CODEX_HOME/skills`, `~/.codex/skills` by default, deprecated but still read | Not merged; both appear in the skill selector |
 | Claude Code 2.1.278 | No: project skills are `.claude/skills` only. Inside irori, irori links them into a folder it adds (ADR 049, checked with 2.1.295) | `~/.claude/skills` (personal) | Personal over project; with a linked skill this was not tried |
 | OpenCode 1.18.30 | Yes: `.agents/skills` from the working directory up to the git worktree | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Warns "duplicate skill name" and keeps one; which one is not documented |
-| Pi 0.86.1 documentation (0.85.1 is what irori exercised) | Yes, once the project is trusted: `.agents/skills` in the working directory and its ancestors up to the git root | `~/.agents/skills`, `~/.pi/agent/skills` | First found wins, and global is loaded before project, so the personal copy wins |
+| Pi 0.86.1 documentation (0.85.1 is what irori exercised) | Yes, once the project is trusted: `.agents/skills` in the working directory and its ancestors up to the git root. Inside irori, irori names each skill folder with `--skill`, which Pi loads whatever the trust (ADR 057, checked in 0.87.1's source) | `~/.agents/skills`, `~/.pi/agent/skills` | First found wins, and global is loaded before project, so the personal copy wins |
 | Antigravity CLI 1.4.2 changelog (not exercised by irori) | Yes: `.agents/skills`, with the manifests of every `.agents/` from the working directory up to the project root | `~/.gemini/config/skills` | Not stated |
-| Hermes Agent v2026.9.24 documentation (not exercised by irori) | Yes, inside a git checkout once the project is trusted (`hermes skills trust`): `.hermes/skills` and `.agents/skills` at the project root | `~/.hermes/skills`; `~/.agents/skills` only when listed in `skills.external_dirs` | Project over local over external, so the KB copy wins |
+| Hermes Agent v2026.9.24 documentation (not exercised by irori) | Yes, inside a git checkout once the project is trusted (`hermes skills trust`): `.hermes/skills` and `.agents/skills` at the project root. Inside irori, irori names each skill in the request (ADR 057) | `~/.hermes/skills`; `~/.agents/skills` only when listed in `skills.external_dirs` | Project over local over external, so the KB copy wins |
 
 Sources, read on 2026-09-21:
 

@@ -44,11 +44,14 @@ export async function runHermes(ctx: NativeContext) {
   let saving = Promise.resolve();
   const save = (value: unknown) => {
     if (typeof value !== 'string' || !sessionId.test(value) || value === saved) return;
+    // Hermes moves to a new session id when it compresses one (ADR 057).
+    if (saved) ctx.compacted?.();
     saved = value;
     saving = saving.then(() => ctx.saveSession(value));
   };
   let streamed = false;
   let result: Record<string, unknown> | undefined;
+  const inputs = new Map<string, unknown>();
   const stderr = new Tail(6000);
   child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
   const receive = (line: string) => {
@@ -67,6 +70,17 @@ export async function runHermes(ctx: NativeContext) {
         ctx.event('text', text);
       }
     }
+    // What each call was given, for hooks irori runs once it finished (ADR 057).
+    const id = typeof event.tool_call_id === 'string' ? event.tool_call_id : undefined;
+    if (event.type === 'tool_use' && id) inputs.set(id, event.input);
+    if (event.type === 'tool_result')
+      ctx.toolFinished?.({
+        tool: String(event.name ?? ''),
+        id,
+        input: id ? inputs.get(id) : undefined,
+        output: event.output,
+        error: event.is_error === true,
+      });
     if (event.type === 'tool_use' || event.type === 'tool_result')
       ctx.event('tool', String(event.name ?? t('Hermes のツール', 'Hermes tool')), {
         details: JSON.stringify(event),
