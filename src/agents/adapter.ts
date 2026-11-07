@@ -29,17 +29,17 @@ export interface NativeContext {
   saveSession(handle: string): Promise<void>;
   /**
    * The CLI compacted the session: what it heard may be gone, so the next request
-   * gives the Schema and irori's words whole again (ADR 057).
+   * gives the Schema and irori's words whole again (ADR 058).
    */
   compacted?(): void;
-  /** Folders irori adds to the CLI's workspace for this run, such as its folder of hooks (ADR 057). */
+  /** Folders irori adds to the CLI's workspace for this run, such as its folder of hooks (ADR 058). */
   folders?: string[];
   /**
    * A tool call starts, as the CLI's output says. A reason given back stops the
-   * run before it goes on: the Schema's hooks could not see the call (ADR 057).
+   * run before it goes on: the Schema's hooks could not see the call (ADR 058).
    */
   toolStarted?(call: { tool: string; id?: string }): string | undefined;
-  /** A tool call finished, as the CLI's output records it, for hooks irori runs after it (ADR 057). */
+  /** A tool call finished, as the CLI's output records it, for hooks irori runs after it (ADR 058). */
   toolFinished?(call: {
     tool: string;
     id?: string;

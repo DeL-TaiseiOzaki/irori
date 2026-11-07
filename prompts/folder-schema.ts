@@ -1,6 +1,6 @@
 /**
  * The parts of the Schema of the folder an agent works in that its CLI does not
- * load by itself, which irori gives it instead (ADR 057): the folder's
+ * load by itself, which irori gives it instead (ADR 058): the folder's
  * instructions when the CLI does not read AGENTS.md or reads only part of it,
  * the AGENTS.md of folders below it, its rules (`.claude/rules`, which only
  * Claude Code reads) and its skills when the CLI may not find them.

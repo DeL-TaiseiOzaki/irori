@@ -501,7 +501,7 @@ app
         emit(scopeId ? { type: 'files', scopeId } : { type: 'vaults', workspace }),
     });
     agents.setup = (argv, cwd, context) => setup.run(argv, cwd, context);
-    // A vault's folders with instructions of their own, for CLIs that do not load them (ADR 057).
+    // A vault's folders with instructions of their own, for CLIs that do not load them (ADR 058).
     agents.nestedInstructions = (scopeId) => schemaSettings.nestedInstructions(scopeId);
     // A hand-off's vault conversation starts in the access the settings give new ones.
     agents.preferredAccess = async () => (await settings.read()).agentAccess;

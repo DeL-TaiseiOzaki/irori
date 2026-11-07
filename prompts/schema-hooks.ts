@@ -1,6 +1,6 @@
 /**
  * What an agent hears of the Schema's hooks when irori runs them for its CLI
- * (ADR 057): Claude Code runs its own and hears them itself; for every other CLI
+ * (ADR 058): Claude Code runs its own and hears them itself; for every other CLI
  * irori runs the hooks of the shared Schema and of the folder's own, and gives
  * the agent what Claude Code would.
  *

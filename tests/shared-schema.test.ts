@@ -295,7 +295,7 @@ test(
     assert.equal(missing.at(-1)?.outcome, 'failed');
     assert.equal((await prompts()).length, 6);
     // Hermes Agent compresses a session in place without a word, so what irori
-    // says goes whole on every request there (ADR 057).
+    // says goes whole on every request there (ADR 058).
     const hermes = async (prompt: string) => {
       let end!: () => void;
       const done = new Promise<void>((resolve) => {

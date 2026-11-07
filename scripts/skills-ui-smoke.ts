@@ -145,7 +145,7 @@ try {
     'irori が渡す。同名が ~/.claude/skills にあり、そちらが優先される',
   );
   await expect(reach).toContainText('退役した名前が ~/.agents/skills に残っている');
-  // Hermes Agent finds a KB's skills only in a trusted project, so irori names them (ADR 057).
+  // Hermes Agent finds a KB's skills only in a trusted project, so irori names them (ADR 058).
   await expect(reach).toContainText('irori が依頼の中で伝える');
   expect(await reach.textContent()).not.toContain(home);
   await reach.getByRole('button', { name: '閉じる' }).click();

@@ -1,6 +1,6 @@
-# 057 — Every Schema setting reaches every CLI
+# 058 — Every Schema setting reaches every CLI
 
-Date: 2026-11-07. Status: owner request; implemented for 0.2.60.
+Date: 2026-11-07. Status: owner request; implemented for 0.2.61.
 
 Revises [ADR 027](027-shared-schema.md) decisions 4 and 5,
 [ADR 039](039-what-a-vault-agent-is-told.md) decisions 2 and 6,
@@ -44,7 +44,7 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
    skills, rules and hooks of the shared Schema, of a vault and of the irori
    agent. Where a CLI's source shows it loads a setting itself, irori leaves it
    to the CLI; otherwise irori gives it. [`src/domain/schema-reach.ts`](../../src/domain/schema-reach.ts)
-   is the table, and [HARNESSES](../HARNESSES.md#schema-reach-adr-057) gives its
+   is the table, and [HARNESSES](../HARNESSES.md#schema-reach-adr-058) gives its
    sources.
 2. **A folder's rules reach every CLI.** Claude Code reads `.claude/rules`
    itself. Every other CLI hears them in the request

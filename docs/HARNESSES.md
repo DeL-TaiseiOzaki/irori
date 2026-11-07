@@ -128,9 +128,9 @@ app-server documentation and codex-cli 0.160.0's binary strings
 (`ThreadForkParams`), not from a run. Other CLIs get the conversation so far in
 a fresh session. Protocol fixtures only.
 
-## Schema reach (ADR 057)
+## Schema reach (ADR 058)
 
-Added 2026-11-07 (0.2.60, [ADR 057](decisions/057-every-schema-setting-reaches-every-cli.md)).
+Added 2026-11-07 (0.2.61, [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)).
 Every Schema setting reaches every CLI. The CLI loads a setting itself where
 its source shows it does; otherwise irori gives it. `src/domain/schema-reach.ts`
 holds the table, and `hookEvents` in the same file lists the hook events irori

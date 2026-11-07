@@ -18,7 +18,7 @@ import { sharedSchemaId } from '../src/domain/you';
 import type { AgentEvent, AgentId, StartRun } from '../src/domain/types';
 
 // Protocol fixtures stand in for each CLI; no model runs. They do with irori's
-// hooks, scripts and words what each CLI's source says it does (ADR 057).
+// hooks, scripts and words what each CLI's source says it does (ADR 058).
 const posix = { skip: process.platform === 'win32' && 'POSIX executable fixtures', timeout: 60000 };
 const fixture = pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href;
 const skill = (name: string, description: string) =>

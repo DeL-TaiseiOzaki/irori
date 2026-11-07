@@ -2,14 +2,14 @@
  * The shared Schema: instructions, rules and skills every agent in irori
  * follows beside its own Schema, kept in the irori agent's folder and written
  * through the settings (ADR 027, ADR 048). Its hooks are not words: Claude Code
- * gets them as settings, and irori runs them for every other CLI (ADR 057).
+ * gets them as settings, and irori runs them for every other CLI (ADR 058).
  *
  * Sent: first in every request, to the irori agent, a vault agent and a
  * routine's agent step alike. In full on a native session's first request,
  * whenever the shared Schema changed since that session last heard it, and
  * after the CLI compacted the session; otherwise as one line pointing at it.
  * A session counts as having heard it only once its CLI answered the request
- * (ADR 057). A session that heard one gets a line when it is gone.
+ * (ADR 058). A session that heard one gets a line when it is gone.
  * Channel: the request text, before the parts it would otherwise lead.
  */
 

@@ -53,7 +53,7 @@ export function run(kind) {
   }
   const log = (value) =>
     fs.appendFileSync('fixture-requests.jsonl', JSON.stringify({ kind, ...value }) + '\n');
-  // What the real CLI does with irori's Schema hook script (ADR 057): load it
+  // What the real CLI does with irori's Schema hook script (ADR 058): load it
   // and run its tool hooks for one shell call, before and after, with no model.
   async function schemaHooks() {
     if (kind === 'pi') {

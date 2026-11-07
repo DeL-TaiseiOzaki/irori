@@ -216,7 +216,7 @@ test(
     const [start] = protocol.filter((m) => m.method === 'thread/start');
     assert.deepEqual(start.params.config, {
       'sandbox_workspace_write.writable_roots': [open],
-      // Codex keeps the whole of AGENTS.md, not its 32 KiB default (ADR 057).
+      // Codex keeps the whole of AGENTS.md, not its 32 KiB default (ADR 058).
       project_doc_max_bytes: 1048576,
     });
     const [turn] = protocol.filter((m) => m.method === 'turn/start');

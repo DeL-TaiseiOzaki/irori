@@ -132,7 +132,7 @@ export async function runPi(ctx: NativeContext) {
           call: typeof event.toolCallId === 'string' ? event.toolCallId : undefined,
           result: event.type === 'tool_execution_end' || undefined,
         });
-      // A compaction may have taken irori's words from the session (ADR 057).
+      // A compaction may have taken irori's words from the session (ADR 058).
       if (event.type === 'compaction_end' && event.result && !event.aborted) ctx.compacted?.();
       if (event.type === 'auto_retry_start')
         ctx.event('status', t('Pi がネイティブの再試行を実行中', 'Pi is retrying natively'));

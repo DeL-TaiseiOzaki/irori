@@ -7,7 +7,7 @@ import { killTree, launch } from './process';
 
 /**
  * The hooks of a Schema (`.claude/settings.json`'s `hooks`, in Claude Code's
- * shape) run for the CLIs that do not run them themselves (ADR 057). Claude Code
+ * shape) run for the CLIs that do not run them themselves (ADR 058). Claude Code
  * runs a folder's own hooks and is given the shared Schema's as settings; for
  * every other CLI irori runs both, here, with Claude Code's meaning: the same
  * events, the same input on standard input, and the same reading of exit codes

@@ -187,7 +187,7 @@ const atLeast = (version: number[], than: number[]) => {
     if ((version[i] ?? 0) !== than[i]) return (version[i] ?? 0) > than[i];
   return true;
 };
-/** What a CLI is started with besides the request, made once per run (ADR 057). */
+/** What a CLI is started with besides the request, made once per run (ADR 058). */
 type CliSetup = {
   env?: NodeJS.ProcessEnv;
   args: string[];
@@ -240,20 +240,20 @@ type Run = {
   /**
    * What the run's native session had heard before this run, when it goes on
    * from one: the digests of the shared Schema, the introduction (ADR 039) and
-   * the parts of its folder's Schema irori gives it (ADR 057).
+   * the parts of its folder's Schema irori gives it (ADR 058).
    */
   heard: Heard;
   /** The session the run went on from; a session the CLI starts anew has heard nothing. */
   resumed?: string;
   /** What this run's request gave, whole or as a line that stands for it. */
   sent: Heard;
-  /** The CLI compacted the session during the run (ADR 057). */
+  /** The CLI compacted the session during the run (ADR 058). */
   compacted?: boolean;
   /** How the run's session began, as a SessionStart hook hears it: anew, going on, or after a compaction. */
   source?: 'startup' | 'resume' | 'compact';
   /** The CLI says when it compacts: what was heard stands for itself with one line. */
   pointers?: boolean;
-  /** The Schema's hooks irori runs for this CLI (ADR 057). */
+  /** The Schema's hooks irori runs for this CLI (ADR 058). */
   hooks?: RunHooks;
   /** A hook said `continue: false`, with its reason. */
   halted?: string;
@@ -429,7 +429,7 @@ export class AgentService {
   workFolder?: (scopeId: string) => Promise<string>;
   /**
    * The `AGENTS.md` of a vault's knowledge folders, by their paths inside it,
-   * named to a CLI that does not load them itself (ADR 057). Without it none are named.
+   * named to a CLI that does not load them itself (ADR 058). Without it none are named.
    */
   nestedInstructions?: (scopeId: string) => Promise<string[]>;
   /** The access new conversations start in, as the person chose it in the settings (ADR 009). */
@@ -475,7 +475,7 @@ export class AgentService {
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
     void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
-    // Folders of hooks a run that did not end left for the Antigravity CLI (ADR 057).
+    // Folders of hooks a run that did not end left for the Antigravity CLI (ADR 058).
     void pruneAntigravityHookFolders(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     void pruneCodexRoles(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     // An unwritable history is a whole-device fault, so every run stops.
@@ -1005,7 +1005,7 @@ export class AgentService {
     if (run.cancelled) return Promise.resolve({ allow: false });
     // A question irori asks before the CLI starts is not the agent's doing.
     if (run.sending) run.progressed = true;
-    // Notification hooks hear that the person is asked, as in Claude Code (ADR 057).
+    // Notification hooks hear that the person is asked, as in Claude Code (ADR 058).
     run.hooks?.notification(text, questions ? 'elicitation_dialog' : 'permission_prompt');
     const requestId = randomUUID();
     return new Promise((resolve) => {
@@ -1142,7 +1142,7 @@ export class AgentService {
    * Keeps the CLI's session handle for this device, unless the run is a routine's
    * step. What the session heard stays with it only while it is the session the
    * run went on from: one the CLI starts anew or forks has heard nothing of this
-   * run's request until the run shows the CLI got it (`rememberHeard`, ADR 057).
+   * run's request until the run shows the CLI got it (`rememberHeard`, ADR 058).
    */
   private async saveSession(run: Run, handle: string) {
     if (run.step || !run.conversationId || !run.root) return;
@@ -1156,7 +1156,7 @@ export class AgentService {
     });
   }
   /**
-   * Records what the session heard of this run's request (ADR 057). The digests
+   * Records what the session heard of this run's request (ADR 058). The digests
    * of what it was given count as heard only once the run shows the CLI got the
    * request: it answered, used a tool or asked. A compaction during the run
    * forgets them all, so the next request gives everything whole again.
@@ -1284,7 +1284,7 @@ export class AgentService {
     }
   }
   /**
-   * What this CLI loads itself of the Schema of `root` (ADR 057): its row of the
+   * What this CLI loads itself of the Schema of `root` (ADR 058): its row of the
    * table, where a file beside AGENTS.md that the CLI reads instead turns
    * AGENTS.md into irori's to give, and, for Claude Code, whether its version
    * reads AGENTS.md and whether a CLAUDE.md would keep it from doing so.
@@ -1324,7 +1324,7 @@ export class AgentService {
   }
   /**
    * The parts of the folder's Schema this CLI does not load itself, as words
-   * (ADR 057): its rules unless it is Claude Code, its AGENTS.md when the CLI
+   * (ADR 058): its rules unless it is Claude Code, its AGENTS.md when the CLI
    * does not read it or keeps only part of it, the AGENTS.md of folders below it,
    * and its skills when the CLI may not find them. For a CLI whose session keeps
    * the AGENTS.md it began with, `instructions` is what a changed one is given as.
@@ -1377,7 +1377,7 @@ export class AgentService {
     };
   }
   /**
-   * For a CLI whose session keeps the AGENTS.md it began with (ADR 057): a
+   * For a CLI whose session keeps the AGENTS.md it began with (ADR 058): a
    * session that goes on after the folder's instructions changed hears them
    * again; a new session read them itself.
    */
@@ -1389,7 +1389,7 @@ export class AgentService {
       : [];
   }
   /**
-   * The Schema's hooks for a CLI that does not run them itself (ADR 057): the
+   * The Schema's hooks for a CLI that does not run them itself (ADR 058): the
    * shared Schema's and those of the folder's `.claude/settings.json`, run by
    * irori; and what the person allows before they run, as for a vault's own
    * configuration. A folder's hooks irori cannot read stop the run: one may be a guard.
@@ -1462,7 +1462,7 @@ export class AgentService {
     return { run: hooks, approvals };
   }
   /**
-   * Hooks of events this CLI cannot run (ADR 057): the person decides whether
+   * Hooks of events this CLI cannot run (ADR 058): the person decides whether
    * the run goes on without them. A routine's step, which no one answers, does not.
    */
   private async acceptMissingHooks(run: Run, agent: AgentId, hooks: RunHooks) {
@@ -1499,7 +1499,7 @@ export class AgentService {
   }
   /**
    * What the run's CLI is started with besides the request, made once per run
-   * (ADR 057, 049): the person's-lines notice and the Schema's hooks through
+   * (ADR 058, 049): the person's-lines notice and the Schema's hooks through
    * the CLI's plugin, extension or own hooks; Pi's skills; for Codex, how much
    * of AGENTS.md it keeps.
    */
@@ -1561,7 +1561,7 @@ export class AgentService {
       setup.args.push(...lines.args);
       setup.closers.push(lines.close);
     }
-    // Pi finds a folder's skills only in a trusted project; irori names each skill (ADR 057).
+    // Pi finds a folder's skills only in a trusted project; irori names each skill (ADR 058).
     if (agent === 'pi')
       setup.args.push(...(await this.piSkills(input)).flatMap((dir) => ['--skill', dir]));
     setup.env = env;
@@ -1667,7 +1667,7 @@ export class AgentService {
             )
           : undefined,
       // Hermes Agent hands irori a call once it ran: its PostToolUse hooks run
-      // then, and what they say goes with the next turn (ADR 057).
+      // then, and what they say goes with the next turn (ADR 058).
       toolFinished:
         input.agent === 'hermes' && run.hooks
           ? (call) => {
@@ -1694,7 +1694,7 @@ export class AgentService {
     else await runHermes(context);
   }
   /**
-   * After a turn of a CLI irori runs hooks for (ADR 057): Stop hooks decide
+   * After a turn of a CLI irori runs hooks for (ADR 058): Stop hooks decide
    * whether the turn may end, as in Claude Code, and at most `stopHookCap` times
    * in a row keep it going; what Hermes Agent's PostToolUse hooks said during
    * its turn goes with the next. Each next turn is a request in the same session.
@@ -2065,7 +2065,7 @@ export class AgentService {
       }
       resuming = !!saved;
       run.source ??= 'startup';
-      // A CLI that does not say when it compacts a session hears everything whole each time (ADR 057).
+      // A CLI that does not say when it compacts a session hears everything whole each time (ADR 058).
       run.pointers = schemaReach[input.agent].compaction;
       if (run.cancelled) return;
       // A CLI's own command (`/compact`, a Pi extension's) works only as the
@@ -2108,7 +2108,7 @@ export class AgentService {
       });
       if (input.agent === 'claude') await this.linkSkills(run, input, you, space.root, shared);
       await this.prepareSubAgents(run, input.agent, you, space.root);
-      // What this CLI loads itself of its folder's Schema, and what irori gives it (ADR 057).
+      // What this CLI loads itself of its folder's Schema, and what irori gives it (ADR 058).
       const reach = await this.reachFor(input.agent, space.root);
       run.agentsBesideClaude = reach.claudeMd;
       const folder = await this.folderSchemaParts(input, you, reach).catch((error) => {
@@ -2137,7 +2137,7 @@ export class AgentService {
         if (lead.length) prompt = [...lead, prompt].join('\n\n');
       }
       // The Schema's hooks: Claude Code runs them itself; irori runs them for every
-      // other CLI, with Claude Code's meaning (ADR 057).
+      // other CLI, with Claude Code's meaning (ADR 058).
       const hooks =
         input.agent === 'claude' ? undefined : await this.schemaHooks(run, input, space.root);
       // The composer already shows the CLI, folder, access, model and level, so
@@ -2422,7 +2422,7 @@ export class AgentService {
   }
   /**
    * Whether Codex took irori's hooks for this thread as trusted and enabled
-   * (`hooks/list`), before a turn starts (ADR 057). When it fingerprints them
+   * (`hooks/list`), before a turn starts (ADR 058). When it fingerprints them
    * otherwise than irori did, the run starts Codex once more with the trust Codex
    * reported; otherwise nothing is sent, as the Schema's hooks would not run.
    */
@@ -2541,7 +2541,7 @@ export class AgentService {
         const p = m.params ?? {};
         if (!ownCodexNotice(run, p)) return;
         if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
-        // A compaction, automatic or asked for, may have taken irori's words (ADR 057).
+        // A compaction, automatic or asked for, may have taken irori's words (ADR 058).
         if (m.method === 'item/completed' && p.item?.type === 'contextCompaction')
           run.compacted = true;
         // A review's findings are its answer, said when it leaves review mode.
@@ -2576,7 +2576,7 @@ export class AgentService {
             { details: JSON.stringify(p.item), call: p.item.id, result: true },
           );
         if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
-        // A compaction may have taken what the thread heard (ADR 057).
+        // A compaction may have taken what the thread heard (ADR 058).
         if (m.method === 'thread/compacted') {
           run.compacted = true;
           if (run.command) run.finish?.();
@@ -2610,7 +2610,7 @@ export class AgentService {
         ...(writable && { 'sandbox_workspace_write.writable_roots': folders }),
         // The folder's sub-agents in other formats, as Codex roles (ADR 050).
         ...run.codexRoles,
-        // Codex keeps 32 KiB of AGENTS.md by its default, cut without a word (ADR 057).
+        // Codex keeps 32 KiB of AGENTS.md by its default, cut without a word (ADR 058).
         project_doc_max_bytes: codexInstructionBytes,
         // The Schema's hooks reach irori through hooks of Codex's own, each
         // trusted by its own hash: Codex's trust for every other hook stays.
@@ -2633,7 +2633,7 @@ export class AgentService {
     run.handle = run.threadId;
     await this.saveSession(run, thread.thread.id);
     if (run.cancelled) return;
-    // Before any turn: Codex runs irori's hooks, or nothing goes (ADR 057).
+    // Before any turn: Codex runs irori's hooks, or nothing goes (ADR 058).
     if (hooked) await this.checkCodexHooks(run, rpc, forwarded!, hooked);
     // Codex says which instruction files it loaded; an AGENTS.md it left out goes as words.
     prompt = await this.missingCodexInstructions(cwd, thread.instructionSources, prompt);
@@ -2911,7 +2911,7 @@ export class AgentService {
             ...(sharedHooks && { hooks: sharedHooks }),
             // A read-only connection stays read-only for Claude Code's file tools.
             ...(readOnly.length && { permissions: { deny: readOnly } }),
-            // AGENTS.md is the Schema's instructions: read beside a CLAUDE.md too (ADR 057).
+            // AGENTS.md is the Schema's instructions: read beside a CLAUDE.md too (ADR 058).
             ...(run.agentsBesideClaude && {
               pluginConfigs: {
                 'cc-plugin-agents-md@builtin': {
@@ -3056,7 +3056,7 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
-        // A compaction may have taken what the session heard (ADR 057).
+        // A compaction may have taken what the session heard (ADR 058).
         if (msg.type === 'system' && msg.subtype === 'compact_boundary') run.compacted = true;
         if (msg.type === 'system' && msg.subtype === 'init') {
           run.nativeHandle = msg.session_id;
