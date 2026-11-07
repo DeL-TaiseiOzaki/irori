@@ -18,12 +18,19 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-07: **0.2.61** ([#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307),
+every Schema setting reaching every CLI, ADR 058) as `abc56b5`, by
+`publish.yml` alone (push run `42393983599`): merge to release 2:09, to page
+4:18, drift in step. Anonymous downloads of the Windows installer, the Mac image
+and `irori-0.2.61-full.nupkg` matched `SHA256SUMS.txt`; the live page links the
+0.2.61 installers. See STATUS.
+
 Published 2026-11-07: **0.2.60** ([#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305),
 settings shown one part at a time from framed groups, ADR 057) as `c1c340c`,
 by `publish.yml` alone (push run `42381394803`): merge to release 1:51, to page
 3:23, drift in step. Anonymous downloads of the Windows installer, the Mac image
-and `irori-0.2.60-full.nupkg` matched `SHA256SUMS.txt`; the live page links the
-0.2.60 installers. See STATUS.
+and `irori-0.2.60-full.nupkg` matched `SHA256SUMS.txt`; the live page linked the
+0.2.60 installers until 0.2.61 replaced them. See STATUS.
 
 Published 2026-11-07: **0.2.59** ([#303](https://github.com/DeL-TaiseiOzaki/irori/pull/303),
 deleting in connected folders where the system has no trash, ADR 019 D5
