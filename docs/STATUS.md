@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Connected folders deletable where the system has no trash, 2026-11-07
-(**0.2.59**; [ADR 019](decisions/019-local-folder-connections.md) decision 5
+(**0.2.59**, [#303](https://github.com/DeL-TaiseiOzaki/irori/pull/303), published as `v0.2.59-preview.1`;
+[ADR 019](decisions/019-local-folder-connections.md) decision 5
 amended): the owner reported that SharePoint and Google Drive data in contents
 could not be deleted from irori. Electron's Windows `shell.trashItem` aborts an
 item that cannot be recycled (`DeleteFileProgressSink::PreDeleteItem` returns
