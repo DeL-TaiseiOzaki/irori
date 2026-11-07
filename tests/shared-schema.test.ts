@@ -183,7 +183,7 @@ test('the shared Schema says which Schema wins', () => {
 });
 
 test(
-  'every request carries the shared Schema: whole for a new session or a change, one line otherwise (protocol fixture)',
+  'every request carries the shared Schema: whole for a new session, a change or a CLI that cannot say it compacted, one line otherwise (protocol fixture)',
   fixtureOptions,
   async (t) => {
     const { base, files, you, settings } = await setup(t);
@@ -194,22 +194,27 @@ test(
     t.after(() => {
       process.env.PATH = old;
     });
-    await writeFile(
-      path.join(bin, 'hermes'),
-      `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('hermes'));\n`,
-      { mode: 0o700 },
-    );
+    for (const id of ['pi', 'hermes'])
+      await writeFile(
+        path.join(bin, id),
+        `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run(${JSON.stringify(id)}));\n`,
+        { mode: 0o700 },
+      );
     const kb = path.join(base, 'KB');
     await mkdir(kb);
     await writeFile(path.join(kb, 'note.md'), '# Fixture\n');
     const space = await files.register(kb, 'Fixture', 'personal');
-    const prompts = async () =>
+    const prompts = async (kind = 'pi') =>
       (await readFile(path.join(kb, 'fixture-requests.jsonl'), 'utf8'))
         .trim()
         .split('\n')
         .map((line) => JSON.parse(line))
-        .filter((call) => call.kind === 'hermes' && call.prompt !== undefined)
-        .map((call) => call.prompt as string);
+        .filter((call) =>
+          kind === 'pi'
+            ? call.kind === 'pi' && call.type === 'prompt'
+            : call.kind === kind && call.prompt !== undefined,
+        )
+        .map((call) => (call.kind === 'pi' ? call.message : call.prompt) as string);
     const execute = async (prompt: string, extra: Partial<StartRun> = {}) => {
       const events: AgentEvent[] = [];
       let end!: () => void;
@@ -227,7 +232,7 @@ test(
         you,
       );
       t.after(() => service.cancel());
-      service.start({ scopeId: space.scopeId, agent: 'hermes', prompt, ...extra });
+      service.start({ scopeId: space.scopeId, agent: 'pi', prompt, ...extra });
       await done;
       return events;
     };
@@ -289,5 +294,33 @@ test(
     const missing = await execute('seventh words', { skill: 'absent' });
     assert.equal(missing.at(-1)?.outcome, 'failed');
     assert.equal((await prompts()).length, 6);
+    // Hermes Agent compresses a session in place without a word, so what irori
+    // says goes whole on every request there (ADR 058).
+    const hermes = async (prompt: string) => {
+      let end!: () => void;
+      const done = new Promise<void>((resolve) => {
+        end = resolve;
+      });
+      const service = new AgentService(
+        files,
+        (event) => {
+          if (event.type === 'done') end();
+        },
+        undefined,
+        undefined,
+        you,
+      );
+      t.after(() => service.cancel());
+      service.start({ scopeId: space.scopeId, agent: 'hermes', prompt });
+      await done;
+    };
+    await hermes('hermes one');
+    await hermes('hermes two');
+    const [one, two] = await prompts('hermes');
+    for (const request of [one, two]) {
+      assert.match(request, /^irori: the shared Schema, which every agent/);
+      assert.match(request, /irori: you are the agent of the "Fixture" vault/);
+    }
+    assert.match(two, /hermes two$/);
   },
 );

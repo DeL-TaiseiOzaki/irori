@@ -2,6 +2,7 @@ import { KnowledgeStore } from '../knowledge/store';
 import { within } from '../domain/scopes';
 import { AuthorshipStore, personLinesNotice } from '../knowledge/authorship';
 import path from 'node:path';
+import os from 'node:os';
 import type { RunRecord } from '../domain/knowledge';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -18,6 +19,8 @@ import type {
 } from '../domain/types';
 import type { EffortLevel, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
 import { promises as fs } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import writeFileAtomic from 'write-file-atomic';
 import { agentIds, agentNames } from '../domain/types';
 import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
@@ -31,7 +34,7 @@ import { ConfigApprovals, type ConfigPlace, type FoundConfig } from './config-ap
 import { personLinesBridge } from './person-lines';
 import { handOffTaskLimit, iroriBridge } from './irori-bridge';
 import type { NativeContext } from './adapter';
-import { agentCommand, agentEnv, killTree, launch, version } from './process';
+import { agentCommand, agentEnv, killTree, knownVersion, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
 import { Tail } from './tail';
 import { MessageChannel, Steering } from './steering';
@@ -76,9 +79,41 @@ import {
   earlierConversation,
   sharedSchema,
   sharedSchemaPointer,
+  sharedSchemaRemoved,
+  sharedSchemaUnread,
   vaultIntro,
   vaultIntroPointer,
+  folderSchema,
+  folderSchemaHasParts,
+  folderSchemaPointer,
+  folderSchemaRemoved,
+  folderSchemaUnread,
+  folderInstructionsChanged,
+  folderInstructionsMissing,
+  hookContext,
+  hookToolFeedback,
+  stopHookContinue,
+  type FolderSchemaPrompt,
 } from '../../prompts';
+import { claudeSettingsFile } from '../domain/schema-settings';
+import {
+  codexInstructionBytes,
+  hookEvents,
+  informationalHookEvents,
+  schemaReach,
+  type SchemaReach,
+} from '../domain/schema-reach';
+import { fitParts, readSchemaParts, schemaInline } from '../host/schema-parts';
+import { folderHooks, schemaHooks, SchemaHookRunner, type SchemaHook } from './schema-hooks';
+import { RunHooks, stopHookCap } from './run-hooks';
+import {
+  antigravityHookFolder,
+  codexHookConfig,
+  forwardedHookBridge,
+  hookBridge,
+  pruneAntigravityHookFolders,
+  type BridgeEvent,
+} from './hook-bridge';
 import { commentsCount, readNoteComments } from '../host/comments';
 import { findSkill, noSkill, readFolderSkills } from '../host/skills';
 import {
@@ -144,6 +179,83 @@ export interface StepEnd {
   report: string;
   error?: string;
 }
+/** The digests of what irori said once and then stands for with one line (ADR 027, 039, 057). */
+type Heard = { shared?: string; intro?: string; schema?: string; instructions?: string };
+/**
+ * irori did not send the request: a hook stopped it, or the CLI would not run the
+ * Schema's hooks. The session it would have gone on with is not at fault and stays.
+ */
+class NotSent extends Error {}
+/** Codex fingerprinted irori's hooks otherwise: the turn starts again with the trust it reported. */
+class CodexHooksAgain extends Error {
+  constructor() {
+    super('Codex reported its own trust for the hooks');
+  }
+}
+/**
+ * Whether a settings file Claude Code reads for a run in `root` turns all hooks
+ * off (`disableAllHooks`): the user's, the folder's, its local one and the
+ * managed one.
+ */
+async function claudeHooksDisabled(root: string) {
+  const managed =
+    process.platform === 'darwin'
+      ? '/Library/Application Support/ClaudeCode/managed-settings.json'
+      : process.platform === 'win32'
+        ? 'C:\\ProgramData\\ClaudeCode\\managed-settings.json'
+        : '/etc/claude-code/managed-settings.json';
+  for (const file of [
+    path.join(os.homedir(), '.claude', 'settings.json'),
+    path.join(root, '.claude', 'settings.json'),
+    path.join(root, '.claude', 'settings.local.json'),
+    managed,
+  ]) {
+    const settings = await fs
+      .readFile(file, 'utf8')
+      .then((text) => JSON.parse(text) as { disableAllHooks?: unknown })
+      .catch(() => undefined);
+    if (settings?.disableAllHooks === true) return true;
+  }
+  return false;
+}
+/** A Codex file change as the patch its hooks would hear, for the files it names. */
+const patchOf = (changes: unknown) =>
+  [
+    '*** Begin Patch',
+    ...(Array.isArray(changes) ? changes : []).map((change) => {
+      const kind =
+        change?.kind?.type === 'add'
+          ? 'Add'
+          : change?.kind?.type === 'delete'
+            ? 'Delete'
+            : 'Update';
+      return `*** ${kind} File: ${String(change?.path ?? '')}`;
+    }),
+    '*** End Patch',
+  ].join('\n');
+/** Whether a version is at least another, part by part. */
+const atLeast = (version: number[], than: number[]) => {
+  for (let i = 0; i < than.length; i++)
+    if ((version[i] ?? 0) !== than[i]) return (version[i] ?? 0) > than[i];
+  return true;
+};
+/** What a CLI is started with besides the request, made once per run (ADR 058). */
+type CliSetup = {
+  env?: NodeJS.ProcessEnv;
+  args: string[];
+  /** Folders added to the CLI's workspace: the Antigravity CLI's folder of hooks. */
+  folders: string[];
+  closers: (() => void)[];
+  /** Codex and the Antigravity CLI: their own hooks hand irori events through this. */
+  forwarded?: Awaited<ReturnType<typeof forwardedHookBridge>>;
+  /** Codex: the events its hooks hand irori. */
+  codexHooks?: string[];
+  /** OpenCode: whether its plugin has spoken to irori, so the Schema's tool hooks are live. */
+  loaded?: { heard: boolean };
+};
+/** Only the digests that are there, as the native record keeps them. */
+const heardDigests = (heard: Heard) =>
+  Object.fromEntries(Object.entries(heard).filter(([, value]) => value)) as Heard;
 type Run = {
   id: string;
   binding: SessionBinding;
@@ -179,10 +291,48 @@ type Run = {
   reached: Set<string>;
   /** The digest of the checkout the run works in, kept with its native session. */
   root?: string;
-  /** The digest of the shared Schema this run's request gave in full or pointed at. */
-  shared?: string;
-  /** The digest of the introduction this run gave in full or stood for (ADR 039). */
-  intro?: string;
+  /**
+   * What the run's native session had heard before this run, when it goes on
+   * from one: the digests of the shared Schema, the introduction (ADR 039) and
+   * the parts of its folder's Schema irori gives it (ADR 058).
+   */
+  heard: Heard;
+  /** The session the run went on from; a session the CLI starts anew has heard nothing. */
+  resumed?: string;
+  /** What this run's request gave, whole or as a line that stands for it. */
+  sent: Heard;
+  /** The CLI compacted the session during the run (ADR 058). */
+  compacted?: boolean;
+  /** How the run's session began, as a SessionStart hook hears it: anew, going on, or after a compaction. */
+  source?: 'startup' | 'resume' | 'compact';
+  /** The CLI says when it compacts: what was heard stands for itself with one line. */
+  pointers?: boolean;
+  /** The Schema's hooks irori runs for this CLI (ADR 058). */
+  hooks?: RunHooks;
+  /** A hook said `continue: false`, with its reason. */
+  halted?: string;
+  /** The request has gone to the CLI: from now on what the run shows is the agent's. */
+  sending?: boolean;
+  /** The agent called a tool since the last Stop hooks ran. */
+  toolsUsed?: boolean;
+  /** The agent's words since its last tool call: the last message a Stop hook hears. */
+  reply: Tail;
+  /** What hooks said after the turn could take it, for its next turn. */
+  later: string[];
+  /** Hooks still running for calls the CLI reported once they ran. */
+  pending: Set<Promise<void>>;
+  /** What the CLI is started with besides the request, made on its first turn. */
+  setup?: CliSetup;
+  /** The session handle the CLI last named in this run. */
+  handle?: string;
+  /** irori gave the folder's AGENTS.md as words in this request. */
+  agentsGiven?: boolean;
+  /** Claude Code: the folder has a CLAUDE.md, beside which it reads AGENTS.md only when told to. */
+  agentsBesideClaude?: boolean;
+  /** Codex: the changes of each file change item, by its id, for a permission it asks. */
+  fileChanges?: Map<string, unknown>;
+  /** Codex: the trust it reported for irori's hooks, when it fingerprints them otherwise. */
+  codexTrust?: Map<string, { key: string; hash: string }>;
   /** The person's own words, which Codex takes apart for its commands and skills (ADR 040). */
   words?: string;
   /** The words are a CLI's command, `/name`, and went alone. */
@@ -199,7 +349,6 @@ type Run = {
   threadId?: string;
   turnId?: string;
   finish?: () => void;
-  bridge?: () => void;
   /** Files the person attached to this instruction. */
   attached?: Attached[];
   /** For your AI: the environment with the `irori` command, and its closing. */
@@ -338,6 +487,11 @@ export class AgentService {
   setup?: (argv: string[], cwd: string, context: SetupContext) => Promise<string>;
   /** The folder a vault's agents work in, made first when it is the default. Without it none is named. */
   workFolder?: (scopeId: string) => Promise<string>;
+  /**
+   * The `AGENTS.md` of a vault's knowledge folders, by their paths inside it,
+   * named to a CLI that does not load them itself (ADR 058). Without it none are named.
+   */
+  nestedInstructions?: (scopeId: string) => Promise<string[]>;
   /** The access new conversations start in, as the person chose it in the settings (ADR 009). */
   preferredAccess?: () => Promise<AgentAccess>;
   /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
@@ -381,6 +535,8 @@ export class AgentService {
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
     void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
+    // Folders of hooks a run that did not end left for the Antigravity CLI (ADR 058).
+    void pruneAntigravityHookFolders(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     void pruneCodexRoles(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     // An unwritable history is a whole-device fault, so every run stops.
     this.conversations = new ConversationStore(files.dataDir, this.device, () => {
@@ -806,6 +962,11 @@ export class AgentService {
       step,
       queuedId,
       reached: new Set(),
+      heard: {},
+      sent: {},
+      reply: new Tail(20_000),
+      later: [],
+      pending: new Set(),
       title,
       accepted,
       accept,
@@ -824,6 +985,12 @@ export class AgentService {
   }
   private event(run: Run, type: AgentEvent['type'], text: string, extra: Partial<AgentEvent> = {}) {
     if (type === 'text' || type === 'tool') run.progressed = true;
+    // The agent's last message, for a Stop hook: its words since its last tool call.
+    if (type === 'tool') {
+      run.reply.clear();
+      run.toolsUsed = true;
+    }
+    if (type === 'text' && !extra.role) run.reply.add(text);
     // A reply's deltas go to the views and the history a few at a time, in one
     // piece per window; any other event of the run goes after what came before it.
     if (type === 'text' && !Object.keys(extra).length) {
@@ -899,7 +1066,10 @@ export class AgentService {
     extra: Partial<AgentEvent> = {},
   ): Promise<Reply> {
     if (run.cancelled) return Promise.resolve({ allow: false });
-    run.progressed = true;
+    // A question irori asks before the CLI starts is not the agent's doing.
+    if (run.sending) run.progressed = true;
+    // Notification hooks hear that the person is asked, as in Claude Code (ADR 058).
+    run.hooks?.notification(text, questions ? 'elicitation_dialog' : 'permission_prompt');
     const requestId = randomUUID();
     return new Promise((resolve) => {
       // Registered before it is published, since an answer can arrive at once.
@@ -1031,16 +1201,98 @@ export class AgentService {
     const placed = await this.placement(input);
     return { id: placed.id, placement: { ...placed.placement, title: run.title } };
   }
-  /** Keeps the CLI's session handle for this device, unless the run is a routine's step. */
+  /**
+   * Keeps the CLI's session handle for this device, unless the run is a routine's
+   * step. What the session heard stays with it only while it is the session the
+   * run went on from: one the CLI starts anew or forks has heard nothing of this
+   * run's request until the run shows the CLI got it (`rememberHeard`, ADR 058).
+   */
   private async saveSession(run: Run, handle: string) {
     if (run.step || !run.conversationId || !run.root) return;
+    const same = handle === run.resumed;
     await this.conversations.saveNative(run.conversationId, {
       handle,
       access: run.access,
       root: run.root,
-      ...(run.shared && { shared: run.shared }),
-      ...(run.intro && { intro: run.intro }),
+      ...(same && heardDigests(run.heard)),
+      ...(same && run.source === 'compact' && { compacted: true as const }),
     });
+  }
+  /**
+   * Records what the session heard of this run's request (ADR 058). The digests
+   * of what it was given count as heard only once the run shows the CLI got the
+   * request: it answered, used a tool or asked. A compaction during the run
+   * forgets them all, so the next request gives everything whole again.
+   */
+  private async rememberHeard(run: Run) {
+    if (run.step || !run.conversationId || !run.recorded) return;
+    if (!run.compacted && !run.progressed) return;
+    const { entry } = await this.conversations.native(run.conversationId);
+    if (!entry) return;
+    const {
+      shared: _shared,
+      intro: _intro,
+      schema: _schema,
+      instructions: _instructions,
+      compacted: _compacted,
+      ...rest
+    } = entry;
+    // A CLI command that moved to another session (`/clear`, `/new`) gave it nothing of irori's.
+    const elsewhere = run.command && entry.handle !== run.resumed;
+    await this.conversations.saveNative(run.conversationId, {
+      ...rest,
+      ...(run.compacted ? { compacted: true as const } : elsewhere ? {} : heardDigests(run.sent)),
+    });
+  }
+  /**
+   * One part irori says once per native session (ADR 027, 039, 057): whole on a
+   * new session, after a change or a compaction; otherwise the line that stands
+   * for it; and, when it is gone, the line saying so to a session that heard it.
+   */
+  private said(
+    run: Run,
+    key: keyof Heard,
+    part: { words: string; pointer: string } | undefined,
+    removed?: string,
+  ): string[] {
+    if (part) {
+      const value = digest(part.words);
+      run.sent[key] = value;
+      return [
+        run.resumed && run.pointers !== false && run.heard[key] === value
+          ? part.pointer
+          : part.words,
+      ];
+    }
+    return run.resumed && run.heard[key] && removed ? [removed] : [];
+  }
+  /**
+   * PermissionRequest hooks answer a permission the CLI asks, before the person
+   * is asked, as in Claude Code (ADR 058); undefined leaves it to the person.
+   */
+  private async permissionHooks(
+    run: Run,
+    name: string,
+    input: unknown,
+  ): Promise<Reply | undefined> {
+    const decision = await run.hooks?.permission(name, input).catch(() => undefined);
+    if (!decision) return undefined;
+    this.event(
+      run,
+      'status',
+      decision.behavior === 'allow'
+        ? t('PermissionRequest フックが許可しました。', 'A PermissionRequest hook allowed it.')
+        : t(
+            `PermissionRequest フックが拒否しました${decision.message ? `: ${decision.message}` : '。'}`,
+            `A PermissionRequest hook denied it${decision.message ? `: ${decision.message}` : '.'}`,
+          ),
+    );
+    return { allow: decision.behavior === 'allow' };
+  }
+  /** A part irori could not read this time: what the session heard of it stands, and it hears why. */
+  private unread(run: Run, key: keyof Heard, words: string) {
+    run.sent[key] = run.heard[key];
+    return [words];
   }
   /** The folder a vault's agents work in, made when it is the default; none when it cannot be. */
   private async work(scopeId: string) {
@@ -1122,6 +1374,568 @@ export class AgentService {
           `Could not give the skills to Claude Code: ${String(error)}`,
         ),
       );
+    }
+  }
+  /**
+   * What this CLI loads itself of the Schema of `root` (ADR 058): its row of the
+   * table, where a file beside AGENTS.md that the CLI reads instead turns
+   * AGENTS.md into irori's to give, and, for Claude Code, whether its version
+   * reads AGENTS.md and whether a CLAUDE.md would keep it from doing so.
+   */
+  private async reachFor(
+    agent: AgentId,
+    root: string,
+  ): Promise<SchemaReach & { claudeMd?: boolean }> {
+    const row = schemaReach[agent];
+    const isFile = (file: string) =>
+      fs.stat(file).then(
+        (stat) => stat.isFile(),
+        () => false,
+      );
+    let instructions = row.instructions;
+    if (
+      instructions.hiddenBy &&
+      (await Promise.all(instructions.hiddenBy.map((name) => isFile(path.join(root, name))))).some(
+        Boolean,
+      )
+    )
+      instructions = { ...instructions, reads: false };
+    if (agent !== 'claude') return { ...row, instructions };
+    // Claude Code reads AGENTS.md from 2.1.277 on. The version is the one irori
+    // listed the CLIs with; an unknown one is taken to be current.
+    const found = (await knownVersion('claude'))?.match(/(\d+)\.(\d+)\.(\d+)/);
+    if (found && !atLeast(found.slice(1).map(Number), [2, 1, 277]))
+      return { ...row, instructions: { reads: false } };
+    // With hooks off Claude Code reads no AGENTS.md, and irori cannot check it did.
+    if (await claudeHooksDisabled(root)) return { ...row, instructions: { reads: false } };
+    // Claude Code reads AGENTS.md only where no CLAUDE.md is in the folder or above it.
+    let claudeMd = false;
+    for (let dir = root; !claudeMd; dir = path.dirname(dir)) {
+      for (const name of ['CLAUDE.md', path.join('.claude', 'CLAUDE.md'), 'CLAUDE.local.md'])
+        if (await isFile(path.join(dir, name))) claudeMd = true;
+      if (path.dirname(dir) === dir) break;
+    }
+    return { ...row, instructions, claudeMd };
+  }
+  /**
+   * The parts of the folder's Schema this CLI does not load itself, as words
+   * (ADR 058): its rules unless it is Claude Code, its AGENTS.md when the CLI
+   * does not read it or keeps only part of it, the AGENTS.md of folders below it,
+   * and its skills when the CLI may not find them. For a CLI whose session keeps
+   * the AGENTS.md it began with, `instructions` is what a changed one is given as.
+   */
+  private async folderSchemaParts(input: StartRun, you: boolean, reach: SchemaReach) {
+    const folder = you
+      ? await this.you!.schemaFolder(input.workspace)
+      : spaceFolder(this.files, input.scopeId);
+    const parts = await readSchemaParts(folder);
+    const given = !reach.instructions.reads ? parts.instructions : undefined;
+    const fitted = fitParts(given, reach.rules ? [] : parts.rules);
+    const prompt: FolderSchemaPrompt = {
+      root: folder.root,
+      cli: agentNames[input.agent],
+      nested: [],
+      rules: fitted.rules,
+      skills: [],
+    };
+    if (given)
+      prompt.instructions = fitted.instructions
+        ? { file: parts.file, text: fitted.instructions }
+        : { file: parts.file };
+    // An AGENTS.md irori cannot read as text here is the agent's to read.
+    else if (!reach.instructions.reads && parts.unreadable)
+      prompt.instructions = { file: parts.file };
+    else if (
+      parts.instructions &&
+      reach.instructions.limit &&
+      parts.bytes > reach.instructions.limit
+    )
+      prompt.instructions = { file: parts.file, limit: reach.instructions.limit };
+    if (!reach.nested && folder.knowledge && !you)
+      prompt.nested = (await this.nestedInstructions?.(input.scopeId).catch(() => [])) ?? [];
+    // The shared Schema's skills are listed with it; the folder's own win a name both have.
+    if (!reach.skills) prompt.skills = parts.skills;
+    const instructions =
+      reach.instructions.reads && reach.instructions.stale && parts.instructions
+        ? {
+            digest: digest(parts.instructions),
+            words: folderInstructionsChanged(
+              parts.file,
+              Buffer.byteLength(parts.instructions, 'utf8') <= schemaInline
+                ? parts.instructions
+                : undefined,
+            ),
+          }
+        : undefined;
+    return {
+      ...(folderSchemaHasParts(prompt) && {
+        part: { words: folderSchema(prompt), pointer: folderSchemaPointer(folder.root) },
+      }),
+      instructions,
+      gave: !!prompt.instructions && !prompt.instructions.limit,
+    };
+  }
+  /**
+   * For a CLI whose session keeps the AGENTS.md it began with (ADR 058): a
+   * session that goes on after the folder's instructions changed hears them
+   * again; a new session read them itself.
+   */
+  private refreshed(run: Run, instructions?: { digest: string; words: string }) {
+    if (!instructions) return [];
+    run.sent.instructions = instructions.digest;
+    return run.resumed && run.heard.instructions !== instructions.digest
+      ? [instructions.words]
+      : [];
+  }
+  /**
+   * The Schema's hooks for a CLI that does not run them itself (ADR 058): the
+   * shared Schema's and those of the folder's `.claude/settings.json`, run by
+   * irori; and what the person allows before they run, as for a vault's own
+   * configuration. A folder's hooks irori cannot read stop the run: one may be a guard.
+   */
+  private async schemaHooks(run: Run, input: StartRun, root: string) {
+    const list: SchemaHook[] = [];
+    const approvals: FoundConfig[] = [];
+    const shared = await this.you?.sharedHooks().catch((error) => {
+      throw new NotSent(
+        t(
+          `共通 Schema のフックを読めませんでした: ${String(error)}`,
+          `Could not read the shared Schema's hooks: ${String(error)}`,
+        ),
+      );
+    });
+    if (shared) {
+      list.push(...schemaHooks(shared, 'shared'));
+      approvals.push({
+        root: 'shared-schema-hooks',
+        label: t('共通 Schema のフック', "The shared Schema's hooks"),
+        files: Object.keys(shared),
+        digest: digest(JSON.stringify(shared)),
+      });
+    }
+    const own = await folderHooks(root).catch((error) => {
+      throw new NotSent(
+        t(
+          `このフォルダの .claude/settings.json のフックを読めませんでした: ${String(error)}`,
+          `Could not read the hooks in this folder's .claude/settings.json: ${String(error)}`,
+        ),
+      );
+    });
+    if (own.length) {
+      list.push(...own);
+      approvals.push({
+        // irori runs them for every CLI but Claude Code, which asks of its own.
+        root: `schema-hooks:${root}`,
+        label: t('このフォルダの Schema のフック', "This folder's Schema hooks"),
+        files: [path.join(root, claudeSettingsFile)],
+        digest: digest(JSON.stringify(own)),
+      });
+    }
+    if (!list.length) return undefined;
+    const runner = new SchemaHookRunner(list, {
+      cwd: root,
+      env: runEnv(run),
+      agent: input.agent,
+      fields: () => ({
+        session_id: run.nativeHandle ?? run.resumed ?? '',
+        transcript_path: '',
+        cwd: root,
+        permission_mode: run.access === 'full-access' ? 'bypassPermissions' : 'default',
+      }),
+      signal: run.abort.signal,
+      // What a background hook says to wake the agent goes with the next turn.
+      rewake: (words) => run.later.push(words),
+    });
+    const hooks = new RunHooks(runner, input.agent, {
+      status: (text) => this.event(run, 'status', text),
+      ask: async (text, details) => (await this.ask(run, text, details)).allow,
+      halt: (reason) => {
+        if (run.halted) return;
+        run.halted = reason;
+        this.event(
+          run,
+          'status',
+          t(`フックが実行を止めました: ${reason}`, `A hook stopped the run: ${reason}`),
+        );
+        void this.stop(run);
+      },
+    });
+    return { run: hooks, approvals };
+  }
+  /**
+   * Hooks this CLI cannot run (ADR 058): of an event irori cannot see on it, or
+   * of a type irori cannot run (`prompt`, `agent`, `mcp_tool`). Those that decide
+   * nothing are only named. For the others, which may be guards, the person
+   * decides whether the run goes on without them, and the answer holds until
+   * they change; a routine's step, which no one answers, needs that answer first.
+   */
+  private async acceptMissingHooks(run: Run, agent: AgentId, hooks: RunHooks) {
+    if (agent === 'claude') return true;
+    const runs = new Set(hookEvents[agent]);
+    const runnable = new Set(
+      hooks.runner.hooks.filter((hook) => !hooks.runner.unrunnable().includes(hook)),
+    );
+    const cannot = hooks.runner.hooks.filter(
+      (hook) => !runs.has(hook.event) || !runnable.has(hook),
+    );
+    if (!cannot.length) return true;
+    const names = (list: SchemaHook[]) =>
+      [
+        ...new Set(
+          list.map((hook) =>
+            hook.type === 'command' || hook.type === 'http'
+              ? hook.event
+              : `${hook.event} (${hook.type})`,
+          ),
+        ),
+      ].join(', ');
+    const quiet = cannot.filter((hook) => informationalHookEvents.has(hook.event));
+    const guards = cannot.filter((hook) => !informationalHookEvents.has(hook.event));
+    if (quiet.length)
+      this.event(
+        run,
+        'status',
+        t(
+          `${agentNames[agent]} では次のフックを実行しません（何も決めないフックです）: ${names(quiet)}`,
+          `${agentNames[agent]} does not run these hooks, which decide nothing: ${names(quiet)}`,
+        ),
+      );
+    if (!guards.length) return true;
+    const key = `${agent}:${digest(JSON.stringify(guards))}`;
+    const words = t(
+      `${agentNames[agent]} では、Schema のフックのうち ${names(guards)} を実行できません。`,
+      `${agentNames[agent]} cannot run the Schema's ${names(guards)} hooks.`,
+    );
+    if (await this.withoutHooks('has', key)) {
+      this.event(
+        run,
+        'status',
+        `${words}${t(
+          'これらのフックなしで実行します（以前に許可されています）。',
+          ' Running without them, as allowed before.',
+        )}`,
+      );
+      return true;
+    }
+    if (run.step)
+      throw new NotSent(
+        `${words}${t(
+          'ルーティンのステップは確認できないため実行しませんでした。一度この CLI でふつうに実行して許可すると、ルーティンでも実行します。',
+          ' A routine step cannot ask, so it did not run. Allow it once in an ordinary run on this CLI, and routines run too.',
+        )}`,
+      );
+    const allowed = await this.ask(
+      run,
+      `${words}${t('これらのフックなしで実行しますか？', ' Run without these hooks?')}`,
+      { cli: agentNames[agent], hooks: guards },
+    );
+    if (allowed.allow) {
+      await this.withoutHooks('add', key);
+      this.event(
+        run,
+        'status',
+        t(
+          `${names(guards)} のフックなしで実行します。`,
+          `Running without the ${names(guards)} hooks.`,
+        ),
+      );
+    }
+    return allowed.allow;
+  }
+  /** The hooks the person allowed a CLI to run without, by CLI and the hooks' digest. */
+  private async withoutHooks(action: 'has' | 'add', key: string) {
+    const file = path.join(this.files.dataDir, 'schema-hooks-without.json');
+    const keys: string[] = await fs
+      .readFile(file, 'utf8')
+      .then((text) => JSON.parse(text))
+      .then((value) =>
+        Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [],
+      )
+      .catch(() => []);
+    if (action === 'has') return keys.includes(key);
+    if (!keys.includes(key))
+      await writeFileAtomic(file, `${JSON.stringify([...keys, key].slice(-200), null, 2)}\n`, {
+        mode: 0o600,
+      });
+    return true;
+  }
+  /**
+   * What the run's CLI is started with besides the request, made once per run
+   * (ADR 058, 049): the person's-lines notice and the Schema's hooks through
+   * the CLI's plugin, extension or own hooks; Pi's skills; for Codex, how much
+   * of AGENTS.md it keeps.
+   */
+  private async cliSetup(run: Run, input: StartRun, root: string): Promise<CliSetup> {
+    const setup: CliSetup = { args: [], folders: [], closers: [] };
+    const agent = input.agent;
+    let env = run.env ?? agentEnv();
+    const hooks = run.hooks;
+    const tools = hooks?.runner
+      .events()
+      .some((event) =>
+        [
+          'PreToolUse',
+          'PostToolUse',
+          'PostToolUseFailure',
+          'PreCompact',
+          'SubagentStart',
+          'SubagentStop',
+        ].includes(event),
+      );
+    const answer = (event: BridgeEvent) => hooks!.answer(event);
+    if (hooks && tools && (agent === 'pi' || agent === 'opencode')) {
+      const bridge = await hookBridge(this.files.dataDir, agent, answer, env);
+      env = bridge.env;
+      setup.args.push(...bridge.args);
+      setup.closers.push(bridge.close);
+      // Pi stops when its extension does not load; OpenCode goes on without a plugin.
+      if (agent === 'opencode') setup.loaded = bridge.state;
+    }
+    if (hooks && tools && (agent === 'codex' || agent === 'antigravity')) {
+      const bridge = await forwardedHookBridge(this.files.dataDir, agent, answer);
+      setup.closers.push(bridge.close);
+      setup.forwarded = bridge;
+      if (agent === 'antigravity') {
+        const folder = await antigravityHookFolder(
+          this.files.dataDir,
+          run.id,
+          bridge.launcher,
+          bridge.url,
+        );
+        setup.folders.push(folder);
+        setup.closers.push(() => void rm(folder, { recursive: true, force: true }).catch(() => {}));
+      } else
+        setup.codexHooks = hooks.runner
+          .events()
+          .filter((event) =>
+            ['PreToolUse', 'PostToolUse', 'PreCompact', 'SubagentStart', 'SubagentStop'].includes(
+              event,
+            ),
+          );
+    }
+    if (agent === 'pi' || agent === 'opencode') {
+      // The same word Claude Code gets from its hook, through each CLI's own
+      // hook: which of the person's lines a file tool call would change.
+      const delegation = run.delegation;
+      const lines = await personLinesBridge(
+        this.files.dataDir,
+        agent,
+        async (tool, edit) => {
+          if (!delegation)
+            return personLinesNotice(this.files, this.authorship, input.scopeId, tool, edit);
+          // Your AI names a brain's file by its absolute path.
+          const file = editedPath(edit);
+          const brain = file && path.isAbsolute(file) ? brainOfPath(delegation, file) : undefined;
+          return brain
+            ? personLinesNotice(this.files, this.authorship, brain.scopeId, tool, edit)
+            : undefined;
+        },
+        env,
+      );
+      env = lines.env;
+      setup.args.push(...lines.args);
+      setup.closers.push(lines.close);
+    }
+    // Pi finds a folder's skills only in a trusted project; irori names each skill (ADR 058).
+    if (agent === 'pi')
+      setup.args.push(...(await this.piSkills(input)).flatMap((dir) => ['--skill', dir]));
+    setup.env = env;
+    return setup;
+  }
+  /** The skill folders Pi is given: the folder's own, then the shared Schema's whose names it lacks. */
+  private async piSkills(input: StartRun) {
+    const you = this.isYou(input.scopeId);
+    try {
+      const folder = you
+        ? await this.you!.schemaFolder(input.workspace)
+        : spaceFolder(this.files, input.scopeId);
+      const own = await readFolderSkills(folder);
+      const taken = new Set([
+        ...own.skills.map((skill) => skill.name),
+        ...own.retired.map((skill) => skill.name),
+      ]);
+      const shared = (await this.you?.shared().catch(() => undefined))?.skills ?? [];
+      return [
+        ...own.skills.map((skill) => path.dirname(path.join(folder.root, skill.path))),
+        ...shared
+          .filter((skill) => !taken.has(skill.name))
+          .map((skill) => path.dirname(skill.path)),
+      ];
+    } catch {
+      return [];
+    }
+  }
+  /**
+   * Runs one turn of the run's CLI in `root`: the request, in the session it
+   * goes on with. A Stop hook's next turn comes here again, in the same session.
+   */
+  private async runCli(
+    run: Run,
+    input: StartRun,
+    root: string,
+    prompt: string,
+    session: string | undefined,
+    branch: string | undefined,
+    effort: string | undefined,
+  ) {
+    // A turn after the first starts its CLI anew; the last one is done.
+    if (run.child) {
+      await killTree(run.child).catch(() => {});
+      run.child = undefined;
+    }
+    run.rpc?.fail(Error('Turn finished'));
+    run.rpc = undefined;
+    if (input.agent === 'claude')
+      return this.claude(run, root, prompt, session, input.model, effort, branch);
+    const setup = (run.setup ??= await this.cliSetup(run, input, root));
+    if (input.agent === 'codex')
+      try {
+        return await this.codex(run, root, prompt, session, input.model, effort, branch, setup);
+      } catch (error) {
+        if (!(error instanceof CodexHooksAgain)) throw error;
+        if (run.child) await killTree(run.child).catch(() => {});
+        (run.rpc as Rpc | undefined)?.fail(Error('Codex started again'));
+        // A new thread had no turn; the next one starts anew in its place.
+        return this.codex(
+          run,
+          root,
+          prompt,
+          session ?? undefined,
+          input.model,
+          effort,
+          branch,
+          setup,
+        );
+      }
+    const forwarded = setup.forwarded;
+    const context: NativeContext = {
+      cwd: root,
+      prompt,
+      session,
+      access: run.access,
+      model: input.model,
+      effort,
+      attached: run.attached,
+      env: runEnv(run, setup.env ?? run.env),
+      args: setup.args,
+      folders: setup.folders,
+      signal: run.abort.signal,
+      child: (child) => {
+        run.child = child;
+      },
+      event: (type, text, extra) => this.event(run, type, text, extra),
+      ask: async (text, details, questions, tool) =>
+        (tool && (await this.permissionHooks(run, tool.name, tool.input))) ??
+        this.ask(run, text, details, questions),
+      saveSession: async (handle) => {
+        run.handle = handle;
+        await this.saveSession(run, handle);
+      },
+      compacted: () => {
+        run.compacted = true;
+        run.hooks?.postCompact();
+      },
+      // The Antigravity CLI's and OpenCode's tool calls go through irori's hooks
+      // only once its hooks or plugin have spoken to irori; a call before that
+      // stops the run, as the Schema's hooks could not see it.
+      toolStarted: () =>
+        (forwarded && !forwarded.state.heard) || (setup.loaded && !setup.loaded.heard)
+          ? t(
+              `${agentNames[input.agent]} が irori のフックを読み込まなかったため、Schema のフックを通らないツール実行の前に止めました。`,
+              `${agentNames[input.agent]} did not load irori's hooks, so the run stopped before a tool call the Schema's hooks could not see.`,
+            )
+          : undefined,
+      // Hermes Agent hands irori a call once it ran: its PostToolUse hooks run
+      // then, and what they say goes with the next turn (ADR 058).
+      toolFinished:
+        input.agent === 'hermes' && run.hooks
+          ? (call) => {
+              const job = run
+                .hooks!.answer({
+                  event: call.error ? 'PostToolUseFailure' : 'PostToolUse',
+                  tool: call.tool,
+                  input: call.input,
+                  call: call.id,
+                  output: call.output,
+                })
+                .then((reply) => {
+                  if (reply.feedback) run.later.push(reply.feedback);
+                })
+                .catch(() => {});
+              run.pending.add(job);
+              void job.finally(() => run.pending.delete(job));
+            }
+          : undefined,
+    };
+    if (input.agent === 'pi') await runPi(context);
+    else if (input.agent === 'opencode') await runOpenCode(context);
+    else if (input.agent === 'antigravity') await runAntigravity(context);
+    else await runHermes(context);
+  }
+  /**
+   * After a turn of a CLI irori runs hooks for (ADR 058): Stop hooks decide
+   * whether the turn may end, as in Claude Code, and at most `stopHookCap` times
+   * in a row keep it going; what Hermes Agent's PostToolUse hooks said during
+   * its turn goes with the next. Each next turn is a request in the same session.
+   */
+  private async afterTurn(run: Run, input: StartRun, root: string, effort: string | undefined) {
+    const cap = stopHookCap(runEnv(run));
+    // Stop continuations in a row without a tool call, and turns that only pass
+    // on what hooks said after a call (Hermes Agent); each kind at most `cap`.
+    let stops = 0;
+    let passed = 0;
+    let active = false;
+    while (!run.cancelled && !run.halted) {
+      await Promise.all([...run.pending]);
+      // As in Claude Code, the count starts again whenever the agent calls a tool.
+      if (run.toolsUsed) stops = 0;
+      run.toolsUsed = false;
+      const said = run.later.splice(0);
+      const stop = await run.hooks!.stop(active, run.reply.toString());
+      if (run.cancelled || run.halted) return;
+      const keep = !!stop.blocked || stop.context.length > 0;
+      const words = [
+        ...(said.length ? [hookToolFeedback('PostToolUse', said)] : []),
+        ...(stop.blocked ? [stopHookContinue(stop.blocked)] : []),
+        ...(stop.context.length ? [hookToolFeedback('Stop', stop.context)] : []),
+      ];
+      if (!words.length) return;
+      if ((keep && stops >= cap) || (!keep && passed >= cap)) {
+        this.event(
+          run,
+          'status',
+          t(
+            `フックが ${cap} 回続けてターンを続けさせたため、Claude Code と同じくここで終えます。`,
+            `Hooks kept the turn going ${cap} times in a row, so it ends here, as in Claude Code.`,
+          ),
+        );
+        return;
+      }
+      const { entry } = await this.conversations.native(run.conversationId!);
+      const session = run.step ? run.handle : (entry?.handle ?? run.handle);
+      if (!session) {
+        this.event(
+          run,
+          'status',
+          t(
+            'セッションを続けられないため、フックの言葉を伝えられませんでした。',
+            'The session cannot go on, so what the hooks said could not be passed on.',
+          ),
+        );
+        return;
+      }
+      this.event(
+        run,
+        'status',
+        keep
+          ? t('Stop フックの指示で続けます。', 'Going on as a Stop hook asks.')
+          : t('フックの言葉を伝えて続けます。', 'Going on with what the hooks said.'),
+      );
+      if (keep) stops++;
+      else passed++;
+      active = active || keep;
+      run.reply.clear();
+      await this.runCli(run, input, root, words.join('\n\n'), session, undefined, effort);
     }
   }
   /**
@@ -1398,8 +2212,6 @@ export class AgentService {
       run.root = rootDigest(space.root);
       let saved: string | undefined;
       let branch: string | undefined;
-      let heard: string | undefined;
-      let heardIntro: string | undefined;
       if (!run.step) {
         const { entry, elsewhere } = await this.conversations.native(run.conversationId!);
         if (
@@ -1411,8 +2223,16 @@ export class AgentService {
           saved = entry.handle;
           // After a rewind or in a copy, the session goes on from a point of its own.
           branch = entry.branch?.at;
-          heard = entry.shared;
-          heardIntro = entry.intro;
+          run.resumed = saved;
+          run.source = entry.compacted ? 'compact' : 'resume';
+          // After a compaction what the session heard may be gone: everything goes whole.
+          if (!entry.compacted)
+            run.heard = {
+              shared: entry.shared,
+              intro: entry.intro,
+              schema: entry.schema,
+              instructions: entry.instructions,
+            };
         } else if (entry || elsewhere)
           this.event(
             run,
@@ -1434,16 +2254,16 @@ export class AgentService {
           );
       }
       resuming = !!saved;
+      run.source ??= 'startup';
+      // A CLI that does not say when it compacts a session hears everything whole each time (ADR 058).
+      run.pointers = schemaReach[input.agent].compaction;
       if (run.cancelled) return;
       // A CLI's own command (`/compact`, a Pi extension's) works only as the
       // whole request, so nothing irori adds goes before it, and nothing counts as heard.
       const command = !selectedSkill && !run.attached?.length && commandWords.test(input.prompt);
       run.words = input.prompt;
       run.command = command;
-      if (intro && !command) {
-        run.intro = digest(intro.words);
-        promptParts[introAt] = saved && heardIntro === run.intro ? intro.pointer : intro.words;
-      }
+      if (intro && !command) promptParts[introAt] = this.said(run, 'intro', intro)[0];
       // A new session in a conversation that already has messages hears them first,
       // as material (ADR 017 D6, D7).
       const earlier =
@@ -1465,7 +2285,11 @@ export class AgentService {
       if (selectedSkill) prompt = promptWithSkill(selectedSkill, prompt);
       // The shared Schema leads every request: whole unless this session already
       // heard it as it is now, then as one line (ADR 027).
+      // A Schema irori cannot read now is not a Schema that is gone: what the
+      // session heard of it stands, and the agent hears that it was not read.
+      let sharedUnread = false;
       const shared = await this.you?.shared().catch((error) => {
+        sharedUnread = true;
         this.event(
           run,
           'status',
@@ -1478,11 +2302,45 @@ export class AgentService {
       });
       if (input.agent === 'claude') await this.linkSkills(run, input, you, space.root, shared);
       await this.prepareSubAgents(run, input.agent, you, space.root);
-      if (shared && !command) {
-        const words = sharedSchema(shared);
-        run.shared = digest(words);
-        prompt = `${saved && heard === run.shared ? sharedSchemaPointer(shared) : words}\n\n${prompt}`;
+      // What this CLI loads itself of its folder's Schema, and what irori gives it (ADR 058).
+      const reach = await this.reachFor(input.agent, space.root);
+      run.agentsBesideClaude = reach.claudeMd;
+      let folderUnread = false;
+      const folder = await this.folderSchemaParts(input, you, reach).catch((error) => {
+        folderUnread = true;
+        this.event(
+          run,
+          'status',
+          t(
+            `このフォルダの Schema を読めませんでした: ${String(error)}`,
+            `Could not read this folder's Schema: ${String(error)}`,
+          ),
+        );
+        return undefined;
+      });
+      if (command) run.sent = { ...run.heard };
+      else {
+        const lead = [
+          ...(sharedUnread
+            ? this.unread(run, 'shared', sharedSchemaUnread())
+            : this.said(
+                run,
+                'shared',
+                shared && { words: sharedSchema(shared), pointer: sharedSchemaPointer(shared) },
+                sharedSchemaRemoved(),
+              )),
+          ...(folderUnread
+            ? this.unread(run, 'schema', folderSchemaUnread(space.root))
+            : this.said(run, 'schema', folder?.part, folderSchemaRemoved(space.root))),
+          ...this.refreshed(run, folder?.instructions),
+        ];
+        if (lead.length) prompt = [...lead, prompt].join('\n\n');
       }
+      run.agentsGiven = !!folder?.gave;
+      // The Schema's hooks: Claude Code runs them itself; irori runs them for every
+      // other CLI, with Claude Code's meaning (ADR 058).
+      const hooks =
+        input.agent === 'claude' ? undefined : await this.schemaHooks(run, input, space.root);
       // The composer already shows the CLI, folder, access, model and level, so
       // a turn repeats none of them; only a change of session is worth a line.
       // Hermes Agent takes no level, and the Antigravity CLI's models name
@@ -1490,10 +2348,8 @@ export class AgentService {
       // What runs without asking (hooks, MCP servers, plugins, settings) runs as allowed.
       const sharedHooks =
         input.agent === 'claude' ? await this.you?.sharedHooks().catch(() => undefined) : undefined;
-      await this.configApprovals().check(
-        input.agent,
-        this.configPlaces(run, space.root),
-        sharedHooks
+      await this.configApprovals().check(input.agent, this.configPlaces(run, space.root), [
+        ...(sharedHooks
           ? [
               {
                 root: 'shared-schema-hooks',
@@ -1502,85 +2358,41 @@ export class AgentService {
                 digest: digest(JSON.stringify(sharedHooks)),
               },
             ]
-          : [],
-      );
+          : []),
+        ...(hooks?.approvals ?? []),
+      ]);
+      if (run.cancelled) return;
+      if (hooks) {
+        // Declined: the run ends as stopped, with nothing sent.
+        if (!(await this.acceptMissingHooks(run, input.agent, hooks.run))) {
+          run.cancelled = true;
+          return;
+        }
+        run.hooks = hooks.run;
+        // SessionStart and UserPromptSubmit run before the request goes, as in
+        // Claude Code; a CLI's own command takes nothing irori would add.
+        const started = await run.hooks.sessionStart(run.source ?? 'startup');
+        if (started.length && !command)
+          prompt = `${hookContext('SessionStart', started)}\n\n${prompt}`;
+        const submitted = await run.hooks.userPromptSubmit(prompt);
+        if (submitted.blocked)
+          throw new NotSent(
+            t(
+              `UserPromptSubmit フックが指示を止めました: ${submitted.blocked}`,
+              `A UserPromptSubmit hook stopped the instruction: ${submitted.blocked}`,
+            ),
+          );
+        if (submitted.context.length && !command)
+          prompt = `${prompt}\n\n${hookContext('UserPromptSubmit', submitted.context)}`;
+        if (run.halted) throw new NotSent(run.halted);
+      }
       if (run.cancelled) return;
       const effort =
         input.agent === 'hermes' || input.agent === 'antigravity' ? undefined : input.effort;
-      if (input.agent === 'codex')
-        await this.codex(run, space.root, prompt, saved, input.model, effort, branch);
-      else if (input.agent === 'claude')
-        await this.claude(run, space.root, prompt, saved, input.model, effort, branch);
-      else {
-        // The same word Claude Code gets from its hook, through each CLI's own
-        // hook: which of the person's lines a file tool call would change.
-        // Hermes Agent and the Antigravity CLI get no such hook from irori.
-        const delegation = run.delegation;
-        const bridge =
-          input.agent === 'hermes' || input.agent === 'antigravity'
-            ? undefined
-            : await personLinesBridge(
-                this.files.dataDir,
-                input.agent,
-                async (tool, edit) => {
-                  if (!delegation)
-                    return personLinesNotice(
-                      this.files,
-                      this.authorship,
-                      input.scopeId,
-                      tool,
-                      edit,
-                    );
-                  // Your AI names a brain's file by its absolute path.
-                  const file = editedPath(edit);
-                  const brain =
-                    file && path.isAbsolute(file) ? brainOfPath(delegation, file) : undefined;
-                  return brain
-                    ? personLinesNotice(this.files, this.authorship, brain.scopeId, tool, edit)
-                    : undefined;
-                },
-                run.env ?? agentEnv(),
-              );
-        run.bridge = bridge?.close;
-        const context: NativeContext = {
-          cwd: space.root,
-          prompt,
-          session: saved,
-          access: run.access,
-          model: input.model,
-          effort,
-          attached: run.attached,
-          env: runEnv(run, bridge?.env ?? run.env),
-          args: bridge?.args,
-          signal: run.abort.signal,
-          child: (child) => {
-            run.child = child;
-          },
-          event: (type, text, extra) => this.event(run, type, text, extra),
-          ask: (text, details, questions) => this.ask(run, text, details, questions),
-          saveSession: (handle) => this.saveSession(run, handle),
-        };
-        if (input.agent === 'pi') await runPi(context);
-        else if (input.agent === 'opencode') await runOpenCode(context);
-        else if (input.agent === 'antigravity') await runAntigravity(context);
-        else await runHermes(context);
-      }
-      // A resumed session's handle is not saved again, so what it heard of the
-      // shared Schema and the introduction is recorded here, on whatever handle
-      // it now has.
-      if (
-        ((run.shared && run.shared !== heard) || (run.intro && run.intro !== heardIntro)) &&
-        !run.step &&
-        !run.cancelled
-      ) {
-        const { entry } = await this.conversations.native(run.conversationId!);
-        if (entry && (entry.shared !== run.shared || entry.intro !== run.intro))
-          await this.conversations.saveNative(run.conversationId!, {
-            ...entry,
-            ...(run.shared && { shared: run.shared }),
-            ...(run.intro && { intro: run.intro }),
-          });
-      }
+      run.sending = true;
+      await this.runCli(run, input, space.root, prompt, saved, branch, effort);
+      // Stop hooks, and feedback Hermes could not take during its turn, go on in the same session.
+      if (run.hooks && !command) await this.afterTurn(run, input, space.root, effort);
     } catch (e) {
       run.reject(e);
       if (!run.cancelled) {
@@ -1588,7 +2400,8 @@ export class AgentService {
         this.event(run, 'error', String(e));
         // A resume that failed before the agent did anything is reported, and this
         // device's handle is set aside: the next instruction starts a new session.
-        if (resuming && !run.progressed) {
+        // A request irori did not send, or one stopped before it went, leaves the session be.
+        if (resuming && run.sending && !run.progressed && !(e instanceof NotSent)) {
           this.event(
             run,
             'error',
@@ -1607,8 +2420,17 @@ export class AgentService {
       this.denyRequests(run);
       await this.cancelHeld(run);
       if (run.child) await killTree(run.child).catch(() => {});
-      run.bridge?.();
       run.commands?.();
+      // Hooks that decide nothing finish, unless the run was stopped; SessionEnd
+      // hooks hear the run end; hooks still running stop with it.
+      if (run.hooks) {
+        if (!run.cancelled) await run.hooks.settled();
+        await run.hooks.sessionEnd().catch(() => {});
+        await run.hooks.runner.stop();
+      }
+      for (const close of run.setup?.closers ?? []) close();
+      // What the session heard, once the CLI is done with it.
+      await this.rememberHeard(run).catch(() => {});
       if (run.claudeSkills) await unlinkClaudeSkills(this.files.dataDir, run.id).catch(() => {});
       if (run.codexRoles) await removeCodexRoles(this.files.dataDir, run.id).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
@@ -1802,6 +2624,87 @@ export class AgentService {
       signal.removeEventListener('abort', stop);
     }
   }
+  /**
+   * Whether Codex took irori's hooks for this thread as trusted and enabled
+   * (`hooks/list`), before a turn starts (ADR 058). When it fingerprints them
+   * otherwise than irori did, the run starts Codex once more with the trust Codex
+   * reported; otherwise nothing is sent, as the Schema's hooks would not run.
+   */
+  private async checkCodexHooks(
+    run: Run,
+    rpc: Rpc,
+    forwarded: NonNullable<CliSetup['forwarded']>,
+    events: string[],
+  ) {
+    const refused = (why: string) =>
+      new NotSent(
+        t(
+          `Codex が irori のフックを受け付けなかったため、Schema のフック（${events.join(', ')}）を実行できません。指示は送っていません（${why}）。`,
+          `Codex did not take irori's hooks, so the Schema's ${events.join(', ')} hooks cannot run. The instruction was not sent (${why}).`,
+        ),
+      );
+    let listed: any;
+    try {
+      listed = await rpc.request('hooks/list', { threadId: run.threadId });
+    } catch (error) {
+      throw refused(String(error));
+    }
+    const mine = new Map<string, any>();
+    for (const entry of Array.isArray(listed?.data) ? listed.data : [])
+      for (const hook of Array.isArray(entry?.hooks) ? entry.hooks : [])
+        for (const event of events)
+          if (hook?.command === `${forwarded.launcher} codex ${event} ${forwarded.url}`)
+            mine.set(event, hook);
+    const missing = events.filter((event) => !mine.has(event));
+    if (missing.length) throw refused(`not listed: ${missing.join(', ')}`);
+    const untrusted = events.filter((event) => {
+      const hook = mine.get(event);
+      return !hook.enabled || hook.trustStatus !== 'trusted';
+    });
+    if (!untrusted.length) return;
+    const reported = new Map(
+      events.map((event) => {
+        const hook = mine.get(event);
+        return [event, { key: String(hook.key ?? ''), hash: String(hook.currentHash ?? '') }];
+      }),
+    );
+    if (run.codexTrust || [...reported.values()].some((trust) => !trust.key || !trust.hash))
+      throw refused(`untrusted: ${untrusted.join(', ')}`);
+    run.codexTrust = reported;
+    throw new CodexHooksAgain();
+  }
+  /**
+   * The words for a folder's AGENTS.md Codex says it did not load (an
+   * `AGENTS.override.md` beside it, an untrusted project), before the request.
+   */
+  private async missingCodexInstructions(cwd: string, sources: unknown, prompt: string) {
+    if (!Array.isArray(sources)) return prompt;
+    const file = path.join(cwd, 'AGENTS.md');
+    const text = await fs.readFile(file, 'utf8').catch(() => undefined);
+    if (!text?.trim()) return prompt;
+    const real = await fs.realpath(file).catch(() => file);
+    const loaded = await Promise.all(
+      sources.map(async (source) => {
+        const value = String(source).startsWith('file://')
+          ? decodeURIComponent(new URL(String(source)).pathname)
+          : String(source);
+        return fs.realpath(value).catch(() => value);
+      }),
+    );
+    if (loaded.includes(real) || loaded.includes(file)) return prompt;
+    const instructions = text.trim();
+    return `${folderSchema({
+      root: cwd,
+      cli: agentNames.codex,
+      instructions:
+        Buffer.byteLength(instructions, 'utf8') <= schemaInline
+          ? { file, text: instructions }
+          : { file },
+      nested: [],
+      rules: [],
+      skills: [],
+    })}\n\n${prompt}`;
+  }
   private async codex(
     run: Run,
     cwd: string,
@@ -1810,8 +2713,9 @@ export class AgentService {
     model?: string,
     effort?: string,
     branch?: string,
+    setup?: CliSetup,
   ) {
-    const child = codexServer(cwd, runEnv(run));
+    const child = codexServer(cwd, runEnv(run, setup?.env ?? run.env));
     run.child = child;
     let finished = false;
     let failure: Error | undefined;
@@ -1841,6 +2745,14 @@ export class AgentService {
         const p = m.params ?? {};
         if (!ownCodexNotice(run, p)) return;
         if (m.method === 'item/agentMessage/delta') this.event(run, 'text', p.delta ?? '');
+        // A compaction, automatic or asked for, may have taken irori's words (ADR 058).
+        if (m.method === 'item/completed' && p.item?.type === 'contextCompaction') {
+          run.compacted = true;
+          run.hooks?.postCompact(run.command ? 'manual' : 'auto');
+        }
+        // The files a change will touch, for the permission it may ask.
+        if (m.method === 'item/started' && p.item?.type === 'fileChange' && p.item.id)
+          (run.fileChanges ??= new Map()).set(String(p.item.id), p.item.changes);
         // A review's findings are its answer, said when it leaves review mode.
         if (m.method === 'item/completed' && p.item?.type === 'exitedReviewMode') {
           if (typeof p.item.review === 'string') this.event(run, 'text', p.item.review);
@@ -1873,7 +2785,11 @@ export class AgentService {
             { details: JSON.stringify(p.item), call: p.item.id, result: true },
           );
         if (m.method === 'error') this.event(run, 'error', p.error?.message ?? JSON.stringify(p));
-        if (m.method === 'thread/compacted') run.finish?.();
+        // A compaction may have taken what the thread heard (ADR 058).
+        if (m.method === 'thread/compacted') {
+          run.compacted = true;
+          if (run.command) run.finish?.();
+        }
         if (m.method === 'turn/completed') {
           if (p.turn?.status === 'failed')
             failure = Error(p.turn.error?.message ?? 'Codex turn failed');
@@ -1890,20 +2806,25 @@ export class AgentService {
     // A read-only connection is readable in the sandbox but never a root it may write.
     const folders = [...this.localFolders(run, true), ...(run.work ?? [])];
     const writable = run.access !== 'full-access' && folders.length > 0;
+    const forwarded = setup?.forwarded;
+    const hooked = forwarded && setup?.codexHooks?.length ? setup.codexHooks : undefined;
     const params = {
       cwd,
       approvalPolicy: run.access === 'full-access' ? 'never' : 'on-request',
       approvalsReviewer: 'user',
       sandbox: run.access === 'full-access' ? 'danger-full-access' : 'workspace-write',
-      ...((writable || run.codexRoles) && {
-        config: {
-          // A local folder in contents is reached through a link, outside the working
-          // directory the sandbox lets the agent change.
-          ...(writable && { 'sandbox_workspace_write.writable_roots': folders }),
-          // The folder's sub-agents in other formats, as Codex roles (ADR 050).
-          ...run.codexRoles,
-        },
-      }),
+      config: {
+        // A local folder in contents is reached through a link, outside the working
+        // directory the sandbox lets the agent change.
+        ...(writable && { 'sandbox_workspace_write.writable_roots': folders }),
+        // The folder's sub-agents in other formats, as Codex roles (ADR 050).
+        ...run.codexRoles,
+        // Codex keeps 32 KiB of AGENTS.md by its default, cut without a word (ADR 058).
+        project_doc_max_bytes: codexInstructionBytes,
+        // The Schema's hooks reach irori through hooks of Codex's own, each
+        // trusted by its own hash: Codex's trust for every other hook stays.
+        ...(hooked && codexHookConfig(forwarded!.launcher, forwarded!.url, hooked, run.codexTrust)),
+      },
       ...(model && { model }),
     };
     // After a rewind or in a copy, a new thread from the session's history through
@@ -1918,8 +2839,13 @@ export class AgentService {
     );
     run.threadId = thread.thread.id;
     run.nativeHandle = run.threadId;
+    run.handle = run.threadId;
     await this.saveSession(run, thread.thread.id);
     if (run.cancelled) return;
+    // Before any turn: Codex runs irori's hooks, or nothing goes (ADR 058).
+    if (hooked) await this.checkCodexHooks(run, rpc, forwarded!, hooked);
+    // Codex says which instruction files it loaded; an AGENTS.md it left out goes as words.
+    prompt = await this.missingCodexInstructions(cwd, thread.instructionSources, prompt);
     // Codex's app server takes its commands as methods and its skills as items,
     // never as `/name` in a turn's text (ADR 040).
     const words = run.command ? commandWords.exec(run.words ?? '') : null;
@@ -2006,7 +2932,15 @@ export class AgentService {
       m.method === 'item/commandExecution/requestApproval' ||
       m.method === 'item/fileChange/requestApproval'
     ) {
-      const reply = await this.ask(run, p.reason ?? t('実行の許可', 'Allow this action'), p);
+      // The Schema's PermissionRequest hooks may answer before the person (ADR 058).
+      const reply =
+        (await this.permissionHooks(
+          run,
+          m.method === 'item/fileChange/requestApproval' ? 'apply_patch' : 'Bash',
+          m.method === 'item/fileChange/requestApproval'
+            ? { command: patchOf(run.fileChanges?.get(String(p.itemId))) }
+            : { command: typeof p.command === 'string' ? p.command : '' },
+        )) ?? (await this.ask(run, p.reason ?? t('実行の許可', 'Allow this action'), p));
       result = { decision: reply.allow ? 'accept' : 'decline' };
     } else if (m.method === 'item/tool/requestUserInput') {
       const questions: Question[] = p.questions.map((q: any) => ({
@@ -2167,6 +3101,25 @@ export class AgentService {
       run.steering.close();
     }
     const attachedFolders = (run.attached ?? []).map((file) => path.dirname(file.path));
+    // The folder's AGENTS.md, for a session that did not load it (ADR 058); none
+    // when irori gave it as words already.
+    const loaded = new Set<string>();
+    // A CLI's own command takes nothing irori would add.
+    let agentsGiven = !!run.agentsGiven || !!run.command;
+    const agentsFile = path.join(cwd, 'AGENTS.md');
+    const agentsText = agentsGiven
+      ? undefined
+      : (await fs.readFile(agentsFile, 'utf8').catch(() => undefined))?.trim();
+    const agents = agentsText
+      ? {
+          file: await fs.realpath(agentsFile).catch(() => agentsFile),
+          words: folderInstructionsMissing(
+            agentNames.claude,
+            agentsFile,
+            Buffer.byteLength(agentsText, 'utf8') <= schemaInline ? agentsText : undefined,
+          ),
+        }
+      : undefined;
     // The shared Schema's hooks run beside the folder's own (ADR 048).
     const sharedHooks = await this.you?.sharedHooks().catch((error) => {
       this.event(
@@ -2189,11 +3142,19 @@ export class AgentService {
         pathToClaudeCodeExecutable: 'claude',
         env: runEnv(run),
         settingSources: ['user', 'project', 'local'],
-        ...((sharedHooks || readOnly.length) && {
+        ...((sharedHooks || readOnly.length || run.agentsBesideClaude) && {
           settings: {
             ...(sharedHooks && { hooks: sharedHooks }),
             // A read-only connection stays read-only for Claude Code's file tools.
             ...(readOnly.length && { permissions: { deny: readOnly } }),
+            // AGENTS.md is the Schema's instructions: read beside a CLAUDE.md too (ADR 058).
+            ...(run.agentsBesideClaude && {
+              pluginConfigs: {
+                'cc-plugin-agents-md@builtin': {
+                  options: { instructionFiles: 'claude-md-and-agents-md' },
+                },
+              },
+            }),
           } as Settings,
         }),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
@@ -2233,6 +3194,43 @@ export class AgentService {
         // Told when it matters rather than on every turn: before an edit would
         // change lines the person wrote or revised, Claude Code hears which.
         hooks: {
+          // Which instruction files Claude Code loaded; an AGENTS.md it did not
+          // load goes with the request (ADR 058).
+          InstructionsLoaded: [
+            {
+              hooks: [
+                async (input) => {
+                  if (input.hook_event_name === 'InstructionsLoaded')
+                    loaded.add(await fs.realpath(input.file_path).catch(() => input.file_path));
+                  return {};
+                },
+              ],
+            },
+          ],
+          UserPromptSubmit: [
+            {
+              hooks: [
+                async () => {
+                  if (!agents || agentsGiven || loaded.has(agents.file)) return {};
+                  agentsGiven = true;
+                  this.event(
+                    run,
+                    'status',
+                    t(
+                      'Claude Code がこのフォルダの AGENTS.md を読み込まなかったため、irori が依頼と一緒に渡しました。',
+                      "Claude Code did not load this folder's AGENTS.md, so irori gave it with the request.",
+                    ),
+                  );
+                  return {
+                    hookSpecificOutput: {
+                      hookEventName: 'UserPromptSubmit',
+                      additionalContext: agents.words,
+                    },
+                  };
+                },
+              ],
+            },
+          ],
           PreToolUse: [
             {
               matcher: writeToolMatcher,
@@ -2331,6 +3329,8 @@ export class AgentService {
     try {
       for await (const msg of response) {
         if (run.cancelled) break;
+        // A compaction may have taken what the session heard (ADR 058).
+        if (msg.type === 'system' && msg.subtype === 'compact_boundary') run.compacted = true;
         if (msg.type === 'system' && msg.subtype === 'init') {
           run.nativeHandle = msg.session_id;
           await this.saveSession(run, msg.session_id);

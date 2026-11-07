@@ -1,13 +1,15 @@
 /**
  * The shared Schema: instructions, rules and skills every agent in irori
  * follows beside its own Schema, kept in the irori agent's folder and written
- * through the settings (ADR 027, ADR 048). Its hooks reach Claude Code as
- * settings, not as words.
+ * through the settings (ADR 027, ADR 048). Its hooks are not words: Claude Code
+ * gets them as settings, and irori runs them for every other CLI (ADR 058).
  *
  * Sent: first in every request, to the irori agent, a vault agent and a
- * routine's agent step alike. In full on a native session's first request and
- * whenever the shared Schema changed since that session last heard it;
- * otherwise as one line pointing at it.
+ * routine's agent step alike. In full on a native session's first request,
+ * whenever the shared Schema changed since that session last heard it, and
+ * after the CLI compacted the session; otherwise as one line pointing at it.
+ * A session counts as having heard it only once its CLI answered the request
+ * (ADR 058). A session that heard one gets a line when it is gone.
  * Channel: the request text, before the parts it would otherwise lead.
  */
 
@@ -28,7 +30,7 @@ export interface SharedSchemaPrompt {
 /** The shared Schema in full. */
 export function sharedSchema(shared: SharedSchemaPrompt) {
   const parts = [
-    `irori: the shared Schema, which every agent in irori follows beside the Schema of the folder it works in. Where the two differ, that folder's Schema wins. The shared Schema's folder is ${shared.root}.`,
+    `irori: the shared Schema, which every agent in irori follows beside the Schema of the folder it works in. Where the two differ, that folder's Schema wins. It replaces any version of it given earlier in this session. The shared Schema's folder is ${shared.root}.`,
   ];
   if (shared.instructions)
     parts.push(
@@ -61,4 +63,14 @@ export function sharedSchema(shared: SharedSchemaPrompt) {
 /** The line a session that already heard the unchanged shared Schema gets instead. */
 export function sharedSchemaPointer(shared: Pick<SharedSchemaPrompt, 'root'>) {
   return `irori: the shared Schema given earlier in this session still applies, unchanged. Its folder is ${shared.root}.`;
+}
+
+/** The line a session that heard a shared Schema gets once the shared Schema is gone. */
+export function sharedSchemaRemoved() {
+  return 'irori: the shared Schema given earlier in this session no longer exists. Stop following it; the Schema of the folder you work in still applies.';
+}
+
+/** The line a request gets when irori could not read the shared Schema for it. */
+export function sharedSchemaUnread() {
+  return 'irori: the shared Schema could not be read for this request. Keep following it as given earlier in this session, if it was; nothing in it was removed.';
 }

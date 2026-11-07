@@ -18,3 +18,5 @@ export * from './boundaries';
 export * from './irori-command';
 export * from './irori-agent-skills';
 export * from './shared-schema';
+export * from './folder-schema';
+export * from './schema-hooks';

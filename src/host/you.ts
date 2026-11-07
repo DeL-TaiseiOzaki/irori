@@ -13,18 +13,13 @@ import {
 } from '../domain/you';
 import { iroriAgentSkills, yourAiStarter, type SharedSchemaPrompt } from '../../prompts';
 import { within } from '../domain/scopes';
-import {
-  claudeSettingsFile,
-  instructionsFile,
-  readHooks,
-  ruleFileName,
-  rulesRoot,
-} from '../domain/schema-settings';
+import { claudeSettingsFile, instructionsFile, readHooks } from '../domain/schema-settings';
 import type { AgentSkill } from '../domain/skills';
 import { readTextDocument } from './files';
 import { ifPresent, isMissing, readLocalJson, writeLocalJson } from './local-json';
 import type { SchemaFolder } from './schema-folder';
-import { findSkill, readFolderSkills } from './skills';
+import { findSkill } from './skills';
+import { fitParts, readSchemaParts } from './schema-parts';
 
 const record = z
   .object({ schemaVersion: z.literal(1), id: z.uuid(), root: z.string().min(1) })
@@ -41,9 +36,6 @@ const relative = z
         !value.includes('\0') &&
         value.split('/').every((part) => part && part !== '.' && part !== '..')),
   );
-
-/** Shared instructions and rules longer than this are read from their files, not sent with each request. */
-const sharedInline = 32 * 1024;
 
 /** Where a standard skill's package is in the irori agent's folder. */
 const standardSkill = (name: string) => `.agents/skills/${name}`;
@@ -375,33 +367,16 @@ export class YourAiService {
    */
   async shared(): Promise<SharedSchemaPrompt | undefined> {
     if (!(await this.homeReady())) return undefined;
-    const folder = await this.sharedSchema();
-    const text = (await ifPresent(folder.read(instructionsFile)))?.trim();
-    const skills = (await ifPresent(readFolderSkills(folder)))?.skills ?? [];
-    const rules: { file: string; text: string }[] = [];
-    for (const entry of (await ifPresent(folder.entries(rulesRoot))) ?? []) {
-      if (entry.directory || entry.blocked || !ruleFileName(entry.name)) continue;
-      const rule = (await ifPresent(folder.read(entry.path)))?.trim();
-      if (rule) rules.push({ file: path.join(folder.root, entry.path), text: rule });
-    }
-    rules.sort((a, b) => a.file.localeCompare(b.file));
-    if (!text && !skills.length && !rules.length) return undefined;
-    const long = !!text && Buffer.byteLength(text, 'utf8') > sharedInline;
-    // The rules go whole while they fit beside the instructions sent; otherwise by their files.
-    const room = sharedInline - (text && !long ? Buffer.byteLength(text, 'utf8') : 0);
-    const inline =
-      rules.reduce((size, rule) => size + Buffer.byteLength(rule.text, 'utf8'), 0) <= room;
+    const parts = await readSchemaParts(await this.sharedSchema());
+    if (!parts.instructions && !parts.unreadable && !parts.skills.length && !parts.rules.length)
+      return undefined;
     return {
-      root: folder.root,
-      file: path.join(folder.root, instructionsFile),
-      ...(text && !long && { instructions: text }),
-      ...(long && { long }),
-      rules: rules.map((rule) => (inline ? rule : { file: rule.file })),
-      skills: skills.map((skill) => ({
-        name: skill.name,
-        description: skill.description,
-        path: path.join(folder.root, skill.path),
-      })),
+      root: parts.root,
+      file: parts.file,
+      ...fitParts(parts.instructions, parts.rules),
+      // Instructions irori cannot read here are read by the agent from their file.
+      ...(parts.unreadable && { long: true }),
+      skills: parts.skills,
     };
   }
   /**

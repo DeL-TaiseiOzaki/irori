@@ -28,12 +28,18 @@ rules and hooks as one CLI's.
    within 32 KiB, otherwise as their files to read. A rule's front matter that
    names paths limits it to those files, as the words say. A vault's own rules
    still reach Claude Code alone, which reads them itself.
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
+   a vault's rules, and the irori agent's, go as words to every CLI but Claude
+   Code too.*
 3. **Shared hooks are Claude Code's.** Every Claude Code run irori starts (the
    irori agent, a vault agent, a hand-off's sub-agents, a routine's agent step)
    gets the shared `hooks`, and nothing else from that file, as flag settings
    (the SDK's `settings`, `--settings`). They run beside the folder's own hooks.
    Other CLIs have no hooks from irori. Hooks not in Claude Code's shape are
    refused and the run says so.
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
+   irori runs the shared Schema's hooks and a folder's own for every other CLI,
+   with Claude Code's meaning.*
 4. **The irori agent's files are saved beside the environment,** as
    `irori-agent.json` in `irori-settings`: every file of its default folder
    (UTF-8 text as text, anything else as base64, with the executable bit),
