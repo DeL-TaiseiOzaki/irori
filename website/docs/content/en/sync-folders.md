@@ -33,7 +33,7 @@ The folder connects when its workspace opens and leaves Contents when irori quit
 
 - Do not sync one folder with two services at once. It can cause conflicts or damaged files.
 - A vault, or a folder that contains one, cannot be connected.
-- Files deleted in irori go to the system trash. The sync app passes the deletion to the cloud and to anyone the folder is shared with. Cloud history and trash are the service's own features.
+- Files deleted in irori go to the system trash. Where there is none (Google Drive for desktop's drive on Windows, a network folder), irori asks, then deletes them for good. The sync app passes the deletion to the cloud and to anyone the folder is shared with. Cloud history and trash are the service's own features.
 - Agents can write to an editable connection too, and the sync app syncs what they write to the cloud. Even a read-only connection can be written by an agent in full access, shell commands, the terminal and other CLIs.
 - Files an agent reads are sent to the AI provider of the CLI you use. See [AI agents](agents.md).
 - A work account's administrator may restrict sync apps.

@@ -202,6 +202,43 @@ test('Another device binds its own folder, and deletion uses the system trash', 
   await assert.rejects(cloud.bindLocal(space.scopeId, mountId, folder), /接続を解除/);
   await cloud.deleteEntry(space.scopeId, 'contents/Research/old.md');
   assert.deepEqual(trashed, [path.join(elsewhere, 'old.md')]);
+  // A place the system trash refuses (Google Drive for desktop's drive on Windows)
+  // is deleted for good only once the person agrees.
+  const refusing = new CloudService(files, async () => {
+    throw Error('Operation was aborted');
+  });
+  files.cloud = refusing;
+  await refusing.connect(space.scopeId, mountId);
+  await mkdir(path.join(elsewhere, 'Drafts'));
+  await writeFile(path.join(elsewhere, 'Drafts', 'a.md'), 'a');
+  await writeFile(path.join(elsewhere, 'gone.md'), 'gone');
+  await assert.rejects(
+    refusing.deleteEntry(space.scopeId, 'contents/Research/gone.md'),
+    /削除しませんでした（Operation was aborted）/,
+  );
+  const asked: { name: string; directory: boolean; reason: string }[] = [];
+  let answer = false;
+  refusing.confirmPermanentDelete = async (entry) => {
+    asked.push(entry);
+    return answer;
+  };
+  await assert.rejects(
+    refusing.deleteEntry(space.scopeId, 'contents/Research/gone.md'),
+    /削除しませんでした/,
+  );
+  assert.deepEqual((await readdir(elsewhere)).sort(), ['Drafts', 'gone.md']);
+  answer = true;
+  await refusing.deleteEntry(space.scopeId, 'contents/Research/gone.md');
+  await refusing.deleteEntry(space.scopeId, 'contents/Research/Drafts');
+  assert.deepEqual(await readdir(elsewhere), []);
+  assert.deepEqual(asked, [
+    { name: 'gone.md', directory: false, reason: 'Operation was aborted' },
+    { name: 'gone.md', directory: false, reason: 'Operation was aborted' },
+    { name: 'Drafts', directory: true, reason: 'Operation was aborted' },
+  ]);
+  // The connected folder itself is never deleted, only disconnected.
+  await assert.rejects(refusing.deleteEntry(space.scopeId, 'contents/Research'));
+  assert.equal(asked.length, 3);
   // Without a trash nothing local is deleted.
   const plain = new CloudService(files);
   files.cloud = plain;

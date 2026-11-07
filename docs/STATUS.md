@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Connected folders deletable where the system has no trash, 2026-11-07
+(**0.2.59**; [ADR 019](decisions/019-local-folder-connections.md) decision 5
+amended): the owner reported that SharePoint and Google Drive data in contents
+could not be deleted from irori. Electron's Windows `shell.trashItem` aborts an
+item that cannot be recycled (`DeleteFileProgressSink::PreDeleteItem` returns
+`E_ABORT` without `TSF_DELETE_RECYCLE_IF_POSSIBLE`, "Operation was aborted"), as
+on Google Drive for desktop's drive, and `CloudService.deleteEntry` stopped there.
+- `deleteEntry` tries the trash in the queue; on a refusal it leaves the queue,
+  asks `confirmPermanentDelete` (name, file or folder, the system's reason), and
+  only on yes checks the link and the entry again (`editable`, same real path)
+  and removes it with `fs.rm` (recursive) and its draft. Without the hook, or on
+  cancel, it throws `削除しませんでした（<reason>）` and keeps the entry.
+- `main.ts` answers with a main-process warning dialog (キャンセル by default,
+  **完全に削除**) saying it cannot be restored on this device and that the sync
+  app passes the deletion on.
+- Unchanged: the connected folder itself is only disconnected; read-only
+  connections delete nothing; `irori trash` still reaches knowledge notes only.
+- Guide (ja/en `sync-folders`) says so. Test: `local-folders` (refusal without
+  the hook, cancel, file and folder deleted on yes, the connected folder
+  refused). Not verified on Windows with a real Drive for desktop or OneDrive
+  folder; whether OneDrive's online-only files can be recycled is unknown.
+
 Edit a sent message and branch a conversation, 2026-11-05 (**0.2.58**,
 [#301](https://github.com/DeL-TaiseiOzaki/irori/pull/301), published as `v0.2.58-preview.1`;
 [ADR 017](decisions/017-conversation-history.md) D6, D7 — stage 3):
