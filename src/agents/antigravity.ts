@@ -24,7 +24,7 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
  * `--dangerously-skip-permissions`.
  */
 export function antigravityArgs(
-  ctx: Pick<NativeContext, 'cwd' | 'session' | 'model' | 'access' | 'attached'>,
+  ctx: Pick<NativeContext, 'cwd' | 'session' | 'model' | 'access' | 'attached' | 'folders'>,
 ) {
   // An attached file outside the checkout is read through its own folder.
   const folders = [
@@ -41,6 +41,8 @@ export function antigravityArgs(
     '--add-dir',
     ctx.cwd,
     ...folders.flatMap((dir) => ['--add-dir', dir]),
+    // irori's own folders for the run, such as its folder of hooks (ADR 058).
+    ...(ctx.folders ?? []).flatMap((dir) => ['--add-dir', dir]),
     ...(ctx.model ? ['--model', ctx.model] : []),
     ...(ctx.access === 'full-access'
       ? ['--dangerously-skip-permissions']
@@ -75,6 +77,8 @@ export async function runAntigravity(ctx: NativeContext) {
   };
   let streamed = false;
   let result: Record<string, unknown> | undefined;
+  let stopped: string | undefined;
+  const started = new Set<string>();
   const stderr = new Tail(6000);
   child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
   const receive = (line: string) => {
@@ -99,6 +103,16 @@ export async function runAntigravity(ctx: NativeContext) {
       const tool = record(step.tool_info);
       if (step.step_type === 'tool' && tool) {
         const name = tool.name ?? step.tool_name;
+        const id = typeof step.step_index === 'number' ? `step-${step.step_index}` : undefined;
+        // A call the Schema's hooks did not see stops the run (ADR 058).
+        if (!stopped && (!id || !started.has(id))) {
+          if (id) started.add(id);
+          const reason = ctx.toolStarted?.({ tool: String(name ?? ''), id });
+          if (reason) {
+            stopped = reason;
+            child.kill();
+          }
+        }
         ctx.event('tool', String(name ?? t('Antigravity のツール', 'Antigravity tool')), {
           details: JSON.stringify(tool),
           call: typeof step.step_index === 'number' ? `step-${step.step_index}` : undefined,
@@ -139,6 +153,7 @@ export async function runAntigravity(ctx: NativeContext) {
   });
   await saving;
   ctx.signal.throwIfAborted();
+  if (stopped) throw Error(stopped);
   const diagnostics = stderr.toString().trim();
   // Headless runs use the sign-in of an earlier interactive `agy`; without one they end at once.
   if (

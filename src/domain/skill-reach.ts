@@ -6,8 +6,12 @@ import type { AgentId } from './types';
  * versions behind each row are in docs/SKILLS.md; the reach view renders this.
  */
 export type ReachRule = {
-  /** Whether the CLI itself finds the KB's `.agents/skills`; `irori`: irori gives them to it (ADR 049). */
-  native: 'reads' | 'trusted' | 'irori';
+  /**
+   * Whether the CLI itself finds the KB's `.agents/skills`; `irori`: irori gives
+   * them to it (ADR 049, Pi's `--skill` in ADR 058); `listed`: irori names each in
+   * the request, as the CLI finds them only in a trusted project (ADR 058).
+   */
+  native: 'reads' | 'trusted' | 'irori' | 'listed';
   /** Home-relative directories the CLI also reads. */
   user: string[];
   /** The KB skill's fate when a user-scope skill has the same name. */
@@ -21,8 +25,8 @@ export const skillReachRules: Record<AgentId, ReachRule> = {
     user: ['~/.agents/skills', '~/.claude/skills', '~/.config/opencode/skills'],
     clash: 'unspecified',
   },
-  pi: { native: 'trusted', user: ['~/.agents/skills', '~/.pi/agent/skills'], clash: 'user-wins' },
-  hermes: { native: 'trusted', user: ['~/.hermes/skills'], clash: 'kb-wins' },
+  pi: { native: 'irori', user: ['~/.agents/skills', '~/.pi/agent/skills'], clash: 'user-wins' },
+  hermes: { native: 'listed', user: ['~/.hermes/skills'], clash: 'kb-wins' },
   antigravity: { native: 'reads', user: ['~/.gemini/config/skills'], clash: 'unspecified' },
 };
 /** Every user-scope directory some harness reads, checked once per skill name. */

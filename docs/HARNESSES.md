@@ -128,6 +128,79 @@ app-server documentation and codex-cli 0.160.0's binary strings
 (`ThreadForkParams`), not from a run. Other CLIs get the conversation so far in
 a fresh session. Protocol fixtures only.
 
+## Schema reach (ADR 058)
+
+Added 2026-11-07 (0.2.61, [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)).
+Every Schema setting reaches every CLI. The CLI loads a setting itself where
+its source shows it does; otherwise irori gives it. `src/domain/schema-reach.ts`
+holds the table, and `hookEvents` in the same file lists the hook events irori
+runs per CLI. The facts below were read from source or documentation. No real
+CLI was run; the protocol fixtures in `tests/schema-reach.test.ts` follow them.
+
+| CLI | AGENTS.md | Knowledge folder AGENTS.md | `.claude/rules` | `.agents/skills` | Hooks | Compaction seen as |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | Reads it (2.1.277+). irori sets `instructionFiles: claude-md-and-agents-md` where a CLAUDE.md is. Older versions get it from irori | Loads it on a Read there | Reads them | Links from irori (ADR 049) | Its own | `system` `compact_boundary` |
+| Codex | Root to cwd. irori raises `project_doc_max_bytes` to 1 MiB. irori gives it when `instructionSources` omits it or `AGENTS.override.md` is present | Never: irori names them | irori, as words | Reads them | Its own hooks, given per thread and trusted by hash; they hand each event to irori | `contextCompaction` item |
+| OpenCode | Reads it (no limit) | Attached on a Read only: irori names them | irori, as words | Reads them | irori's plugin | `session.compacted` |
+| Pi | Reads it whatever the trust. irori gives it when `AGENTS.override.md` is present | Never: irori names them | irori, as words | `--skill` per folder from irori | irori's extension | `compaction_end` |
+| Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
+| Antigravity CLI | Reads it and cuts at 24,000 bytes; irori says to read the whole file | Never: irori names them | irori, as words | Reads them | `.agents/hooks.json` in irori's `--add-dir` folder | Not reported: words go whole every time |
+
+Hook events irori runs for a CLI other than Claude Code:
+
+- **Around the run, on every such CLI:** SessionStart, UserPromptSubmit, Stop,
+  SessionEnd and Notification.
+- **PreToolUse and PostToolUse:**
+  - Codex, OpenCode, Pi and the Antigravity CLI run them.
+  - Hermes runs only PostToolUse, after the call. Its feedback goes in the next
+    request.
+- **PreCompact:**
+  - Codex, OpenCode and Pi run it. Only Pi can stop a compaction.
+  - Hermes and the Antigravity CLI cannot run it.
+- **SubagentStop:**
+  - Codex runs it through its own hook.
+  - OpenCode and Hermes run it after a `task` or `delegate_task` call.
+  - Pi and the Antigravity CLI cannot run it.
+- **A missing event:** the person is asked before the run whether to go on
+  without the event's hooks.
+
+Tool calls are named and shaped as Claude Code's tools for the hooks
+(`src/agents/tool-names.ts`): Pi's `bash`, OpenCode's `bash`, Hermes's
+`terminal`, Antigravity's `run_command` and Codex's `Bash` are all `Bash`, and so
+on.
+
+Codex details (rust-v0.167.0 `codex-rs/hooks/src/engine/discovery.rs`;
+`hook_hash` and `config_rules.rs`, unchanged since 0.160.0):
+
+- **Where irori's hooks go:** the thread's `config.hooks`.
+- **The trust key** is `/<session-flags>/config.toml:<event>:0:0`.
+- **The hash** is the SHA-256 of the sorted JSON of
+  `{event_name, matcher?, hooks:[{type, command, timeout, async:false}]}`,
+  prefixed `sha256:`. The vectors in `core/tests/suite/hooks.rs` check it.
+- **Why not `bypass_hook_trust`:** it would also run untrusted user and plugin
+  hooks.
+
+Sources, read on 2026-11-07:
+
+- **Codex:** `openai/codex` rust-v0.167.0 (commit `086ccc8`) and rust-v0.160.0
+  (`a956835`): `codex-rs/core/src/agents_md.rs`,
+  `codex-rs/config/src/config_toml.rs`,
+  `codex-rs/app-server-protocol/src/protocol/v2/{thread,item,plugin}.rs`, and
+  `codex-rs/hooks/src/{lib.rs,engine/*}`.
+- **OpenCode:** `anomalyco/opencode` v1.18.30 (`3104c142`) and v1.19.5
+  (`810c0eba`): `packages/plugin/src/index.ts`,
+  `packages/opencode/src/session/{instruction,compaction,tools}.ts` and
+  `packages/opencode/src/tool/registry.ts`.
+- **Pi:** `references/pi` at `8eb2bccf` (coding-agent 0.87.1):
+  `packages/coding-agent/src/core/{extensions/types.ts,resource-loader.ts,trust-manager.ts,skills.ts,agent-session.ts}`.
+- **Hermes Agent:** `references/hermes-agent` at `73688014`:
+  `agent/prompt_builder.py`, `agent/skill_utils.py`,
+  `agent/subdirectory_hints.py`, `agent/shell_hooks.py`,
+  `hermes_cli/stream_json.py` and `hermes_cli/cli_single_query.py`.
+- **Antigravity CLI:** `antigravity.google/docs/hooks/`,
+  `/docs/customization-discovery/`, `/docs/rules/` and `/docs/skills/`.
+- **Claude Code:** `code.claude.com/docs/en/hooks` and `/docs/en/memory`.
+
 ## Native configuration and lifecycle
 
 Access follow-up, 2026-09-23: the composer offers native/default behavior and

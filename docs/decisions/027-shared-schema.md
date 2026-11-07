@@ -57,6 +57,10 @@ and chose:
    request in that session with the same digest gets one line saying the
    shared Schema still applies; a new session, a change, or a session that
    predates it gets the whole text again.
+   *Revised by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
+   the digest counts as heard only once the CLI took the request; a compaction
+   forgets it; a CLI that does not say when it compacts gets the whole text every
+   time; a session that heard a shared Schema hears when it is gone.*
 6. **The folder's own Schema wins.** The words say the shared Schema applies
    beside the Schema of the folder the agent works in, and that the folder's
    wins where they differ.

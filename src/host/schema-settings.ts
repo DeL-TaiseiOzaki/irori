@@ -92,6 +92,26 @@ export class SchemaSettingsService {
     };
   }
 
+  /**
+   * The `AGENTS.md` of a vault's knowledge folders, by their paths inside it: the
+   * instructions of a folder below its root, which irori names to a CLI that does
+   * not load them itself (ADR 058). The irori agent's folder has none.
+   */
+  async nestedInstructions(scopeId: string): Promise<string[]> {
+    const folder = await this.folderOf(scopeId);
+    if (!folder.knowledge) return [];
+    const nested: string[] = [];
+    await this.search.walk(
+      scopeId,
+      (relative) => relative.split('/').at(-1) === instructionsFile,
+      () => nested.length < folderLimit,
+      async ({ path: relative }) => {
+        if (relative !== instructionsFile) nested.push(relative);
+      },
+    );
+    return nested.sort((a, b) => a.localeCompare(b));
+  }
+
   /** A setting's text, whatever its extension, under the editor's limits. */
   async read(scopeId: string, relative: string): Promise<Document> {
     const filename = await this.target(await this.folderOf(scopeId), relative, false);

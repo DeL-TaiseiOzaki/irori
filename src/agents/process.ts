@@ -262,6 +262,14 @@ async function stat(file: string) {
   const info = await fs.stat(file).catch(() => undefined);
   return info?.isFile() ? { file, mtimeMs: info.mtimeMs, size: info.size } : undefined;
 }
+/**
+ * The `--version` answer irori already has for a CLI, from when it listed the
+ * CLIs, without asking it again; undefined when it never asked or the answer
+ * failed. A run uses it where knowing the version is worth no start of the CLI.
+ */
+export async function knownVersion(command: string): Promise<string | undefined> {
+  return versions.get(command)?.value.catch(() => undefined);
+}
 /** The CLI's `--version` output; asked once per installed executable rather than per run. */
 export async function version(command: string): Promise<string> {
   const found = await executable(command);

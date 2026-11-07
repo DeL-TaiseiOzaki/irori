@@ -16,7 +16,7 @@ vault の **Schema** にある項目を選ぶと、中央に設定フォーム�
 | ルール | `.claude/rules/*.md`                            |
 | フック | `.claude/settings.json` の `hooks`              |
 
-ルールとフックは Claude Code の仕組みです。すべての CLI で同じように働く設定ではありません。
+ルールとフックは Claude Code の形式で書きますが、どの CLI にも届きます。Claude Code は自分で読み込んで実行します。ほかの CLI には、irori がルールを依頼の中で渡し、フックを Claude Code と同じ意味で実行します。CLI によっては実行できないフックがあり（Hermes Agent ではツールの実行前に止める PreToolUse など）、そのフックがあるときは実行前に確認します。各 CLI への届き方は、設定のルールとフックの欄に表示されます。
 
 ## スキルを作る・使う
 

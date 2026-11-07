@@ -53,6 +53,54 @@ export function run(kind) {
   }
   const log = (value) =>
     fs.appendFileSync('fixture-requests.jsonl', JSON.stringify({ kind, ...value }) + '\n');
+  // What the real CLI does with irori's Schema hook script (ADR 058): load it
+  // and run its tool hooks for one shell call, before and after, with no model.
+  async function schemaHooks() {
+    if (kind === 'pi') {
+      const handlers = {};
+      for (let i = 0; i < process.argv.length; i++)
+        if (process.argv[i] === '-e') {
+          const script = await import(pathToFileURL(process.argv[i + 1]).href);
+          script.default({ on: (type, handler) => (handlers[type] ??= []).push(handler) });
+        }
+      const call = { toolName: 'bash', toolCallId: 'call-h', input: { command: 'rm -rf data' } };
+      const pre = [];
+      for (const handler of handlers.tool_call ?? []) pre.push(await handler(call));
+      const post = [];
+      for (const handler of handlers.tool_result ?? [])
+        post.push(
+          await handler({
+            toolName: 'bash',
+            toolCallId: 'call-h',
+            input: { command: 'ls' },
+            content: [{ type: 'text', text: 'note.md' }],
+            isError: false,
+          }),
+        );
+      log({ type: 'schema-hooks', pre, post, input: call.input });
+      return;
+    }
+    const plugins = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT).plugin;
+    let hooks;
+    for (const file of plugins) {
+      const module = await import(pathToFileURL(file).href);
+      if (module.IroriSchemaHooks) hooks = await module.IroriSchemaHooks({});
+    }
+    const args = { command: 'rm -rf data' };
+    const pre = await hooks['tool.execute.before'](
+      { tool: 'bash', sessionID: 'ses_fixture', callID: 'call-h' },
+      { args },
+    ).then(
+      () => ({}),
+      (error) => ({ block: error.message }),
+    );
+    const output = { title: 'ls', output: 'note.md', metadata: {} };
+    await hooks['tool.execute.after'](
+      { tool: 'bash', sessionID: 'ses_fixture', callID: 'call-h', args: { command: 'ls' } },
+      output,
+    );
+    log({ type: 'schema-hooks', pre, post: output.output, input: args });
+  }
   if (kind === 'hermes') return hermes(log);
   if (kind === 'agy') return antigravity(log);
   // What the real CLI does with the script irori hands it: load it and run its
@@ -187,6 +235,16 @@ export function run(kind) {
         if (withoutEarlier(message.message).includes('hold')) return;
         if (withoutEarlier(message.message).includes('rewrite'))
           return void hooks(message.message).then(complete);
+        if (withoutEarlier(message.message).includes('compact-now'))
+          send({
+            type: 'compaction_end',
+            reason: 'threshold',
+            result: { summary: 'fixture summary', firstKeptEntryId: 'x', tokensBefore: 1 },
+            aborted: false,
+            willRetry: false,
+          });
+        if (withoutEarlier(message.message).includes('schema-hooks'))
+          return void schemaHooks().then(() => complete());
         if (withoutEarlier(message.message).includes('dialog')) {
           waiting = 'confirm';
           send({
@@ -306,6 +364,8 @@ export function run(kind) {
       pending = res;
       if (text.includes('hold')) return;
       if (text.includes('rewrite')) return void hooks(text).then(finish);
+      if (text.includes('compact-now')) emit('session.compacted', { sessionID });
+      if (text.includes('schema-hooks')) return void schemaHooks().then(finish);
       if (text.includes('dialog'))
         emit('permission.asked', {
           id: 'permission',
