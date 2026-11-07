@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Document, Entry, Space } from '../domain/types';
 import { t } from '../domain/i18n';
+import { agentNames } from '../domain/types';
+import { hookEvents as cliHookEvents } from '../domain/schema-reach';
 import { baseName, parentPath } from '../domain/paths';
 import {
   characters,
@@ -77,6 +79,26 @@ const kinds: Record<SchemaKind, { icon: IconName; name: () => string; one: () =>
 };
 
 const instructionsLabel = (file: string) => (file === instructionsFile ? file : parentPath(file));
+/**
+ * Where the hooks run (ADR 058): Claude Code runs them itself; irori runs them
+ * for every other CLI, which the table says can or cannot hear each event.
+ */
+const hookReachNote = () => {
+  const missing = (Object.keys(cliHookEvents) as (keyof typeof cliHookEvents)[])
+    .map((agent) => ({
+      name: agentNames[agent],
+      events: hookEvents.filter((event) => !cliHookEvents[agent].includes(event)),
+    }))
+    .filter((cli) => cli.events.length);
+  return t(
+    `Claude Code は自分で実行し、ほかの CLI では irori が同じ意味で実行します。${missing
+      .map((cli) => `${cli.name} では ${cli.events.join('・')}`)
+      .join('、')} を実行できないため、そのフックがあるときは実行前に確認します。`,
+    `Claude Code runs these itself; irori runs them with the same meaning for every other CLI. ${missing
+      .map((cli) => `${cli.name} cannot run ${cli.events.join(', ')}`)
+      .join('; ')}, so irori asks before such a run.`,
+  );
+};
 const hookLabel = (hook: HookEntry) =>
   hook.matcher ? `${hook.event} · ${hook.matcher}` : hook.event;
 const skillPath = (name: string, file = skillFile) => `${skillsRoot}/${name}/${file}`;
@@ -169,6 +191,11 @@ export function SchemaList({
         title: file,
         path: file,
       })),
+      // How the rules reach each CLI (ADR 058).
+      note: t(
+        'Claude Code は自分で読み、ほかの CLI には irori が依頼の中で渡します。',
+        'Claude Code reads these itself; irori gives them to every other CLI in its request.',
+      ),
     },
     {
       kind: 'hook',
@@ -178,11 +205,12 @@ export function SchemaList({
         title: hook.command || hook.type,
       })),
       error: hooksError,
-      // Only .claude/settings.json hooks are listed; the rest is confirmed before a run.
-      note: t(
+      // How the hooks reach each CLI (ADR 058); only .claude/settings.json hooks
+      // are listed, and the rest is confirmed before a run.
+      note: `${hookReachNote()} ${t(
         'ここに出るのは .claude/settings.json のフックだけです。env・apiKeyHelper・.mcp.json・プラグインなど実行される設定はほかにもあり、それらが変わるとエージェントの実行前に確認します。',
         'Only .claude/settings.json hooks are listed here. Other settings also run code (env, apiKeyHelper, .mcp.json, plugins…); irori asks before an agent runs after they change.',
-      ),
+      )}`,
     },
   ];
   return (

@@ -1,5 +1,66 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Every Schema setting reaches every CLI, 2026-11-07 (**0.2.61**,
+[#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307);
+[ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)): the owner
+asked whether the shared Schema and each vault's Schema reach every CLI agent,
+and found three faults fatal. A vault's rules reached Claude Code alone; hooks
+ran on Claude Code alone; a session counted as having heard the shared Schema
+before the CLI took the request.
+- `src/domain/schema-reach.ts` holds what each CLI loads itself and the hook
+  events irori runs for it. `AgentService.folderSchemaParts` builds the folder's
+  rules, any AGENTS.md the CLI does not load, knowledge folders' AGENTS.md and
+  skills into `prompts/folder-schema.ts`, said like the shared Schema (digest
+  `schema`; Hermes gets `instructions` when AGENTS.md changed).
+- Hooks:
+  - `schema-hooks.ts` runs the shared and folder hooks with Claude Code's
+    meaning. `run-hooks.ts` places the events.
+  - `hook-bridge.ts` passes them on per CLI:
+    - Pi: an extension with `-e`. OpenCode: a plugin.
+    - Codex: thread `config.hooks` trusted by hash, checked with `hooks/list`
+      before a turn, with one restart on another fingerprint.
+    - Antigravity CLI: `.agents/hooks.json` in an `--add-dir` folder. A tool
+      step before the handshake stops the run.
+    - Hermes: PostToolUse after the call, with feedback in the next request.
+  - Stop and feedback continuations are capped at 8. An event a CLI cannot run
+    asks first.
+- Heard digests are written in `rememberHeard` only after the run made progress.
+  A compaction (all five signals) sets `compacted`: the next request is whole,
+  and SessionStart hears `compact`. Hermes and Antigravity send everything whole
+  every time.
+- Codex gets `project_doc_max_bytes` 1 MiB, and an AGENTS.md missing from
+  `instructionSources` goes as words. Claude Code 2.1.277+ gets
+  `instructionFiles: claude-md-and-agents-md` beside a CLAUDE.md. Pi gets
+  `--skill` per skill folder.
+- The settings' Rules and Hooks notes come from the table. The skill reach view
+  shows Pi `irori が渡す` and Hermes `irori が依頼の中で伝える`.
+- An independent review found ten faults, all fixed in the same pull request:
+  - A UserPromptSubmit block discarded the session; `NotSent` and `run.sending`
+    now keep it.
+  - SessionEnd had no limit after a stop.
+  - Hook fields were dropped: `if`, `args`, `shell`, `async`, `asyncRewake`,
+    `onFailure` and http `headers`.
+  - Stop context and the cap reset were ignored.
+  - Read errors were reported as removals (`…Unread` lines and per-file
+    pointers now).
+  - Claude Code's AGENTS.md was unchecked; it is now checked with
+    `InstructionsLoaded`, with `UserPromptSubmit` as the backstop and
+    `disableAllHooks` making it words.
+  - The forwarder could fail open on timeout; it now has its own deadline
+    within a 3600 s hook timeout.
+  - OpenCode's plugin was unchecked; it now has a `Loaded` handshake.
+  - Hooks a CLI cannot run asked every time; logging hooks are now only named,
+    and answers are kept in `schema-hooks-without.json`.
+  - A CLI command that moved session copied digests to the new session.
+  - PermissionRequest, PostToolUseFailure, PostCompact and SubagentStart were
+    added where the CLI shows them.
+- Notification and PostCompact hooks no longer die with the run: it waits for
+  them before it ends, unless stopped.
+- Tests: `schema-reach` (stand-ins for all six CLIs) and `schema-hooks`
+  (semantics, `if` rules, fields, SessionEnd budget, Codex hash vectors, the
+  forwarder's fail-closed answers). Each review fix has a test case. No real
+  CLI was run. Whether the Antigravity CLI reads hooks from an added folder
+  is inferred from its docs. Not tried on Windows.
 Settings shown one part at a time from framed groups, 2026-11-07 (**0.2.60**,
 [#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305), published as `v0.2.60-preview.1`;
 [ADR 057](decisions/057-settings-by-part.md), superseding ADR 055 decisions 2

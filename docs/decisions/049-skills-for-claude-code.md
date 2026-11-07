@@ -52,6 +52,9 @@ links out of the vault.
 - Inside irori, a skill made in the settings is a Claude Code skill: listed
   with its description and run with the Skill tool or `/name`.
 - Outside irori, Claude Code still does not see `.agents/skills`.
+- *Extended by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
+  Pi is given each skill folder with `--skill`, which it loads whatever the
+  project's trust, and Hermes Agent hears the folder's skills listed.*
 - The additional directory gives Claude Code access to the linked folders,
   among them the shared Schema's skills. A vault agent in the standard mode
   therefore reads a shared skill's files without asking.

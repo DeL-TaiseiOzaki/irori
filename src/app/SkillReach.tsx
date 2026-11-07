@@ -11,6 +11,7 @@ const nativeText = {
   reads: () => t('読む', 'reads it'),
   trusted: () => t('信頼済みなら読む', 'reads it if trusted'),
   irori: () => t('irori が渡す', 'irori gives it'),
+  listed: () => t('irori が依頼の中で伝える', 'irori names it in the request'),
 };
 const clashText = {
   'user-wins': () => t('そちらが優先される', 'that one takes priority'),

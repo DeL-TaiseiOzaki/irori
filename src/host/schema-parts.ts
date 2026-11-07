@@ -1,0 +1,106 @@
+import path from 'node:path';
+import { instructionsFile, ruleFileName, rulesRoot } from '../domain/schema-settings';
+import { ifPresent } from './local-json';
+import type { SchemaFolder } from './schema-folder';
+import { readFolderSkills } from './skills';
+
+/**
+ * How much of a Schema's instructions and rules goes whole into a request;
+ * beyond it, their files are named for the agent to read (ADR 027, ADR 058).
+ */
+export const schemaInline = 32 * 1024;
+/** How deep in `.claude/rules` rules are looked for, as Claude Code finds them in subfolders too. */
+const ruleDepth = 4;
+const ruleLimit = 200;
+
+/** A Schema folder's instructions, rules and skills, as irori tells them to agents. */
+export interface SchemaParts {
+  root: string;
+  /** Its `AGENTS.md`. */
+  file: string;
+  /** The instructions, absent when there are none. */
+  instructions?: string;
+  /** `AGENTS.md` is there but cannot be read as text here: the agent reads the file itself. */
+  unreadable?: boolean;
+  /** The size of `AGENTS.md` in bytes, 0 without one. */
+  bytes: number;
+  /** Each rule, with its text when it can be read here; one that cannot is named for the agent to read. */
+  rules: { file: string; text?: string }[];
+  skills: { name: string; description: string; path: string }[];
+}
+
+/**
+ * A file's text, absent when there is no such file, and `false` when it is there
+ * but cannot be read as text here (too long for the editor, not UTF-8): one file
+ * irori cannot read never keeps the rest of a Schema from the agents.
+ */
+async function readText(
+  folder: SchemaFolder,
+  relative: string,
+): Promise<string | false | undefined> {
+  try {
+    return await ifPresent(folder.read(relative));
+  } catch {
+    return false;
+  }
+}
+
+async function ruleFiles(folder: SchemaFolder, relative: string, depth: number, out: string[]) {
+  for (const entry of (await ifPresent(folder.entries(relative))) ?? []) {
+    if (out.length >= ruleLimit) return;
+    if (entry.blocked) continue;
+    if (entry.directory) {
+      if (depth < ruleDepth) await ruleFiles(folder, entry.path, depth + 1, out);
+    } else if (ruleFileName(entry.name)) out.push(entry.path);
+  }
+}
+
+/** Reads what a Schema folder says to agents: `AGENTS.md`, `.claude/rules` and `.agents/skills`. */
+export async function readSchemaParts(folder: SchemaFolder): Promise<SchemaParts> {
+  const raw = await readText(folder, instructionsFile);
+  const text = raw === false ? undefined : raw?.trim();
+  const skills = (await readFolderSkills(folder).catch(() => undefined))?.skills ?? [];
+  const found: string[] = [];
+  await ruleFiles(folder, rulesRoot, 1, found).catch(() => {});
+  const rules: SchemaParts['rules'] = [];
+  for (const relative of found.sort((a, b) => a.localeCompare(b))) {
+    const rule = await readText(folder, relative);
+    const file = path.join(folder.root, relative);
+    if (rule === false) rules.push({ file });
+    else if (rule?.trim()) rules.push({ file, text: rule.trim() });
+  }
+  return {
+    root: folder.root,
+    file: path.join(folder.root, instructionsFile),
+    ...(text && { instructions: text }),
+    ...(raw === false && { unreadable: true }),
+    bytes: typeof raw === 'string' ? Buffer.byteLength(raw, 'utf8') : 0,
+    rules,
+    skills: skills.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      path: path.join(folder.root, skill.path),
+    })),
+  };
+}
+
+/**
+ * Instructions and rules as they fit in a request: the instructions whole when
+ * within `limit`, otherwise named as long; the rules whole while they fit beside
+ * the instructions sent, otherwise each by its file.
+ */
+export function fitParts(
+  instructions: string | undefined,
+  rules: SchemaParts['rules'],
+  limit = schemaInline,
+) {
+  const long = !!instructions && Buffer.byteLength(instructions, 'utf8') > limit;
+  const room = limit - (instructions && !long ? Buffer.byteLength(instructions, 'utf8') : 0);
+  const inline =
+    rules.reduce((size, rule) => size + Buffer.byteLength(rule.text ?? '', 'utf8'), 0) <= room;
+  return {
+    ...(instructions && !long && { instructions }),
+    ...(long && { long }),
+    rules: rules.map((rule) => (inline && rule.text !== undefined ? rule : { file: rule.file })),
+  };
+}
