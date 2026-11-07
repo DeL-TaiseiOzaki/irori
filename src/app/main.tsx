@@ -614,8 +614,9 @@ function App() {
   }, [workspaceTabs]);
   const [connectionsOpen, setConnectionsOpen] = useState(false),
     [connecting, setConnecting] = useState(false);
-  // Every Schema from the settings: the shared one, the irori agent's and each vault's.
-  const [schemaOpen, setSchemaOpen] = useState(false);
+  // Every Schema from the settings, open on the owner they chose: the shared one,
+  // the irori agent's or a vault's (ADR 027).
+  const [schemaOpen, setSchemaOpen] = useState<{ owner: string }>();
   const [connectionTarget, setConnectionTarget] = useState<CloudRoot>();
   // The brain panel shows its files or, in place of them, its changes.
   const [brainMode, setBrainMode] = useState<BrainMode>('files');
@@ -2698,11 +2699,21 @@ function App() {
         agentAccess={agentAccess}
         onAgentAccess={chooseAccess}
         onRestored={act.environmentRestored}
-        onSchema={() => setSchemaOpen(true)}
+        workspace={
+          workspace && {
+            id: workspace.id,
+            you,
+            vaults: workspaceSpaces,
+            onSchema: (owner) => setSchemaOpen({ owner }),
+            onIroriAgent: act.showYou,
+            onCreateIroriAgent: act.createYou,
+            onFolderChanged: act.youFolderChanged,
+          }
+        }
         onError={act.report}
       />
     ),
-    [vaultAgent, agentAccess, act, language],
+    [vaultAgent, agentAccess, act, language, workspace?.id, you, workspaceSpaces],
   );
   const schemaSelected =
     view === 'schema' && schemaTarget?.scopeId === active?.scopeId ? schemaTarget : undefined;
@@ -4088,6 +4099,7 @@ function App() {
       {schemaOpen && (
         <SchemaDialog
           you={you}
+          initialOwner={schemaOpen.owner}
           spaces={vaultAgent ? workspaceSpaces : []}
           // It shows the shared Schema, the irori agent's and every vault's: a change in any of them.
           revision={anyRevision(revisions) + youRevision}
@@ -4098,7 +4110,7 @@ function App() {
               : scopeId !== sharedSchemaId &&
                 (gitBusy || runningScopes.includes(scopeId) || heldByYou(scopeId)))
           }
-          onClose={() => setSchemaOpen(false)}
+          onClose={() => setSchemaOpen(undefined)}
         />
       )}
       {searchOpen && (
