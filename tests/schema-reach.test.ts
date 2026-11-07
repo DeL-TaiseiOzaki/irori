@@ -1016,3 +1016,182 @@ test(
     assert.ok(events.some((event) => /no rm here/.test(event.text)));
   },
 );
+
+test(
+  'a Schema irori could not read is not reported as gone: the session keeps what it heard',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.you.create();
+    await h.settings.write(sharedSchemaId, 'AGENTS.md', 'SHARED-INSTRUCTIONS\n', null);
+    await h.settings.write(h.space.scopeId, '.claude/rules/tone.md', 'VAULT-RULE\n', null);
+    await h.execute('pi', 'one');
+    // For the next request, irori can read neither Schema.
+    const unreadable = async (): Promise<never> => {
+      throw Error('disk unavailable');
+    };
+    const service = AgentService.prototype as unknown as { folderSchemaParts: unknown };
+    const parts = service.folderSchemaParts;
+    const shared = h.you.shared;
+    h.you.shared = unreadable;
+    service.folderSchemaParts = unreadable;
+    try {
+      const events = await h.execute('pi', 'two');
+      assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+      assert.ok(
+        events.some((event) =>
+          /Could not read the shared Schema|共通 Schema を読めませんでした/.test(event.text),
+        ),
+      );
+    } finally {
+      h.you.shared = shared;
+      service.folderSchemaParts = parts;
+    }
+    await h.execute('pi', 'three');
+    const [one, two, three] = await piPrompts(h.lines, h.kb);
+    assert.match(one, /SHARED-INSTRUCTIONS/);
+    assert.match(one, /VAULT-RULE/);
+    assert.match(two, /the shared Schema could not be read for this request/);
+    assert.match(two, /could not be read for this request\. Keep following what was given earlier/);
+    assert.doesNotMatch(two, /no longer exists|are gone/);
+    // Readable again and unchanged: the session still counts as having heard both.
+    assert.match(three, /the shared Schema given earlier in this session still applies/);
+    assert.match(three, /parts of the Schema of .+ given earlier in this session still apply/);
+    assert.doesNotMatch(three, /SHARED-INSTRUCTIONS|VAULT-RULE/);
+  },
+);
+
+test(
+  'Stop hooks keep a turn going at most the cap in a row, counted again after a tool call',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    const old = process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP;
+    process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP = '2';
+    t.after(() => {
+      if (old === undefined) delete process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP;
+      else process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP = old;
+    });
+    // It never lets the turn end; its second answer has the agent run a tool.
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        Stop: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: `node -e "const fs=require('fs');const n=Number(fs.existsSync('stops')?fs.readFileSync('stops','utf8'):0)+1;fs.writeFileSync('stops',String(n));process.stderr.write('AGAIN-'+n+(n===2?' tool-step':''));process.exit(2)"`,
+              },
+            ],
+          },
+        ],
+      }),
+      null,
+    );
+    const events = await h.execute('opencode', 'please work');
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+    const sent = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl')))
+      .filter((call) => call.method === 'POST' && /\/message$/.test(call.route ?? ''))
+      .map((call) => call.body.parts[0].text as string);
+    // Two continuations, a tool call in the second, then two more: the cap of 2
+    // counted again after the tool call.
+    assert.equal(sent.length, 5, sent.join('\n---\n'));
+    assert.match(sent[1], /AGAIN-1/);
+    assert.match(sent[2], /AGAIN-2 tool-step/);
+    assert.match(sent[4], /AGAIN-4/);
+    assert.equal(await readFile(path.join(h.kb, 'stops'), 'utf8'), '5');
+    assert.ok(events.some((event) => /2 times in a row|2 回続けて/.test(event.text)));
+  },
+);
+
+test(
+  'a CLI command that moves to another session leaves that session having heard nothing',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.you.create();
+    await h.settings.write(sharedSchemaId, 'AGENTS.md', 'SHARED-INSTRUCTIONS\n', null);
+    await h.execute('pi', 'one');
+    const moved = await h.execute('pi', '/new');
+    assert.equal(moved.at(-1)?.outcome, 'completed', JSON.stringify(moved));
+    await h.execute('pi', 'three');
+    const prompts = await piPrompts(h.lines, h.kb);
+    assert.deepEqual(prompts[1], '/new');
+    // The new session never heard the shared Schema: it goes whole.
+    assert.match(prompts[2], /SHARED-INSTRUCTIONS/);
+    const launches = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl'))).filter(
+      (call) => call.kind === 'pi' && call.type === 'launch',
+    );
+    assert.ok(launches[2].args.includes(path.join(h.kb, 'fixture-pi-new.jsonl')));
+  },
+);
+
+test(
+  'PostCompact hooks hear a compaction irori sees, and the run waits for them',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        PostCompact: [
+          { hooks: [{ type: 'command', command: 'sleep 0.3; cat > post-compact.json' }] },
+        ],
+      }),
+      null,
+    );
+    const events = await h.execute('pi', 'one compact-now');
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+    const heard = JSON.parse(await readFile(path.join(h.kb, 'post-compact.json'), 'utf8'));
+    assert.equal(heard.hook_event_name, 'PostCompact');
+    assert.equal(heard.trigger, 'auto');
+  },
+);
+
+test(
+  'OpenCode: SubagentStart and SubagentStop hooks hear the sub-agent its task tool starts',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await h.settings.write(
+      h.space.scopeId,
+      '.claude/settings.json',
+      hooksJson({
+        SubagentStart: [
+          {
+            matcher: 'explore',
+            hooks: [
+              {
+                type: 'command',
+                command: `cat > subagent-start.json; printf '%s' '{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"MIND THE ARCHIVE"}}'`,
+              },
+            ],
+          },
+        ],
+        SubagentStop: [{ hooks: [{ type: 'command', command: 'cat > subagent-stop.json' }] }],
+      }),
+      null,
+    );
+    const events = await h.execute('opencode', 'run task-hooks');
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events));
+    const start = JSON.parse(await readFile(path.join(h.kb, 'subagent-start.json'), 'utf8'));
+    assert.equal(start.hook_event_name, 'SubagentStart');
+    assert.equal(start.agent_type, 'explore');
+    const stop = JSON.parse(await readFile(path.join(h.kb, 'subagent-stop.json'), 'utf8'));
+    assert.equal(stop.hook_event_name, 'SubagentStop');
+    assert.equal(stop.agent_type, 'explore');
+    assert.equal(stop.last_assistant_message, 'Found note.md');
+    const [result] = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl'))).filter(
+      (call) => call.type === 'task-hooks',
+    );
+    assert.deepEqual(result.pre, {});
+    // SubagentStart's context goes with the task's result.
+    assert.equal(
+      result.post,
+      'Found note.md\n\nPostToolUse hook feedback from the Schema:\nMIND THE ARCHIVE',
+    );
+  },
+);

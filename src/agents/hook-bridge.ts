@@ -209,7 +209,7 @@ export async function hookBridge(
 }
 
 /** The forwarder answers for itself this long after it started, before `forwardTimeout`. */
-const forwardDeadline = 3540;
+export const forwardDeadline = 3540;
 
 // Codex and the Antigravity CLI run hooks of their own, configured in files.
 // irori gives each run hooks that hand every event to this forwarder, which
@@ -224,11 +224,19 @@ const closed = event !== 'PreToolUse'
   : cli === 'codex'
     ? JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: stopped } })
     : JSON.stringify({ decision: 'deny', reason: stopped });
+let answered = false;
+const answer = (text) => {
+  if (answered) return;
+  answered = true;
+  process.stdout.write(text, () => process.exit(0));
+};
 // Answer before the CLI gives up on this hook, which would let a call through.
-setTimeout(() => {
-  process.stdout.write(closed);
-  process.exit(0);
-}, ${forwardDeadline * 1000}).unref();
+// IRORI_HOOK_FORWARD_DEADLINE_MS can only make that sooner.
+const sooner = Number(process.env.IRORI_HOOK_FORWARD_DEADLINE_MS);
+setTimeout(
+  () => answer(closed),
+  Math.min(${forwardDeadline * 1000}, sooner > 0 ? sooner : Infinity),
+).unref();
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => (input += chunk));
@@ -241,10 +249,10 @@ process.stdin.on('end', () => {
       let text = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => (text += chunk));
-      response.on('end', () => process.stdout.write(response.statusCode === 200 && text ? text : closed));
+      response.on('end', () => answer(response.statusCode === 200 && text ? text : closed));
     },
   );
-  request.on('error', () => process.stdout.write(closed));
+  request.on('error', () => answer(closed));
   request.end(body);
 });
 `;

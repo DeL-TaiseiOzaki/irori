@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -12,6 +13,8 @@ import {
 } from '../src/agents/schema-hooks';
 import { cliToolInput, hookTool } from '../src/agents/tool-names';
 import { RunHooks } from '../src/agents/run-hooks';
+import { forwardDeadline, forwardTimeout, forwardedHookBridge } from '../src/agents/hook-bridge';
+import { hookUnreachable } from '../prompts';
 
 const posix = { skip: process.platform === 'win32' && 'POSIX shell hooks', timeout: 30000 };
 
@@ -578,5 +581,45 @@ test(
       blocked: undefined,
       context: ['also update the index'],
     });
+  },
+);
+
+test(
+  'the forwarder stops a tool call when irori is out of reach or does not answer in time',
+  posix,
+  async (t) => {
+    const base = await realpath(await mkdtemp(path.join(tmpdir(), 'irori forwarder ')));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    const forward = (launcher: string, cli: string, event: string, url: string, env = {}) =>
+      new Promise<string>((resolve, reject) => {
+        const child = spawn('/bin/sh', ['-c', `${launcher} ${cli} ${event} ${url}`], {
+          env: { ...process.env, ...env },
+        });
+        let out = '';
+        child.stdout.on('data', (chunk) => (out += chunk));
+        child.on('error', reject);
+        child.on('close', () => resolve(out));
+        child.stdin.end(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }));
+      });
+    // irori never answers: the forwarder's own deadline stops the call.
+    const silent = await forwardedHookBridge(base, 'codex', () => new Promise(() => {}));
+    t.after(() => silent.close());
+    const late = JSON.parse(
+      await forward(silent.launcher, 'codex', 'PreToolUse', silent.url, {
+        IRORI_HOOK_FORWARD_DEADLINE_MS: '300',
+      }),
+    );
+    assert.equal(late.hookSpecificOutput.permissionDecision, 'deny');
+    assert.equal(late.hookSpecificOutput.permissionDecisionReason, hookUnreachable);
+    // A deadline can only come sooner than the hook's timeout.
+    assert.ok(forwardDeadline < forwardTimeout);
+    // irori is gone: the call is stopped, in each CLI's shape; other events pass.
+    const gone = await forwardedHookBridge(base, 'antigravity', async () => ({}));
+    gone.close();
+    assert.deepEqual(
+      JSON.parse(await forward(gone.launcher, 'antigravity', 'PreToolUse', gone.url)),
+      { decision: 'deny', reason: hookUnreachable },
+    );
+    assert.equal(await forward(gone.launcher, 'antigravity', 'PostToolUse', gone.url), '{}');
   },
 );
