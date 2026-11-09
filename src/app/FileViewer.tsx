@@ -89,7 +89,7 @@ export function FileViewer({
   );
   return (
     <section
-      className="file-viewer"
+      className={`file-viewer file-viewer-${doc.viewer}`}
       aria-label={t(`${viewerLabel(doc.viewer)} ビューアー`, `${viewerLabel(doc.viewer)} viewer`)}
     >
       <div className="viewer-bar">

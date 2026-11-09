@@ -97,24 +97,9 @@ export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
       for (let c = merge.s.c; c <= right; c++)
         if (r !== merge.s.r || c !== merge.s.c) covered.add(`${r - firstRow}:${c - table.first}`);
   }
+  // As in Excel, the grid fills the viewer and the sheet tabs stay along its lower edge.
   return (
     <section className="sheet-view" aria-label={t('スプレッドシート', 'Spreadsheet')}>
-      <div className="sheet-tabs" role="tablist" aria-label={t('シート', 'Sheets')}>
-        {book.SheetNames.map((name, index) => (
-          <button
-            key={name}
-            role="tab"
-            aria-selected={index === sheet}
-            className={index === sheet ? 'on' : ''}
-            onClick={() => {
-              setSheet(index);
-              setPage(0);
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
       <div className="actions">
         <p>
           {t(
@@ -142,8 +127,9 @@ export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
           </>
         )}
       </div>
-      <div className="sheet-scroll" tabIndex={0} style={{ zoom }}>
-        <table>
+      {/* A new sheet starts at its first cell, wherever the last one was scrolled to. */}
+      <div key={sheet} className="sheet-scroll" tabIndex={0}>
+        <table style={{ zoom }}>
           <thead>
             <tr>
               <th className="corner" />
@@ -174,6 +160,23 @@ export default function SheetView({ bytes, zoom, onInfo }: ViewProps) {
             })}
           </tbody>
         </table>
+      </div>
+      <div className="sheet-tabs" role="tablist" aria-label={t('シート', 'Sheets')}>
+        {book.SheetNames.map((name, index) => (
+          <button
+            key={name}
+            role="tab"
+            aria-selected={index === sheet}
+            className={index === sheet ? 'on' : ''}
+            title={name}
+            onClick={() => {
+              setSheet(index);
+              setPage(0);
+            }}
+          >
+            {name}
+          </button>
+        ))}
       </div>
     </section>
   );
