@@ -18,12 +18,28 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-09: **0.2.62** ([#309](https://github.com/DeL-TaiseiOzaki/irori/pull/309),
+the spreadsheet viewer's sheet tabs kept along the bottom as in Excel) as
+`f2e683a`, by `publish.yml` from main's own run (workflow_run run
+`42576849706`, from app run `42572915265`). GitHub release downloads answered
+504 now and then that morning:
+- The pull request's Windows package failed on two attempts. The push run
+  therefore found no qualifying pull request run and left the release to main's
+  run.
+- main's macOS package failed once. Re-running that job let main's run succeed.
+
+The merge was at 06:25:16 UTC. The release was out at 07:05:00, 39:44 after the
+merge, and the page at 07:06:45, 41:29 after it; drift is in step. Anonymous
+downloads of the Windows installer, the Mac image and `irori-0.2.62-full.nupkg`
+matched `SHA256SUMS.txt`, and the live page links the 0.2.62 installers. See
+STATUS.
+
 Published 2026-11-07: **0.2.61** ([#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307),
 every Schema setting reaching every CLI, ADR 058) as `abc56b5`, by
 `publish.yml` alone (push run `42393983599`): merge to release 2:09, to page
 4:18, drift in step. Anonymous downloads of the Windows installer, the Mac image
-and `irori-0.2.61-full.nupkg` matched `SHA256SUMS.txt`; the live page links the
-0.2.61 installers. See STATUS.
+and `irori-0.2.61-full.nupkg` matched `SHA256SUMS.txt`; the live page linked the
+0.2.61 installers until 0.2.62 replaced them. See STATUS.
 
 Published 2026-11-07: **0.2.60** ([#305](https://github.com/DeL-TaiseiOzaki/irori/pull/305),
 settings shown one part at a time from framed groups, ADR 057) as `c1c340c`,
