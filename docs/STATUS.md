@@ -1,5 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Sheet tabs along the bottom, 2026-11-09 (**0.2.62**,
+[#309](https://github.com/DeL-TaiseiOzaki/irori/pull/309), published as `v0.2.62-preview.1`):
+the owner asked that a spreadsheet's sheet tabs always show along the bottom, as
+in Excel. They sat above the grid. The grid's height was `calc(100vh - 260px)`,
+and the viewer's zoom was applied to its scroll frame, so the stage scrolled a
+little at 100 % and the grid ran past the window at 200 %.
+- `FileViewer` marks its frame `file-viewer-<kind>`. For `sheet` the frame takes
+  the stage's height, and `SheetView` lays out the counts and paging row, the grid
+  (`flex: 1`, scrolling inside) and then the tab strip. The strip is one row that
+  scrolls sideways when the sheets do not fit.
+- Zoom scales the `<table>`, not `.sheet-scroll`, so the frame and the tabs stay
+  put at any zoom. The scroll frame is keyed by sheet, so a chosen sheet starts
+  at its first cell.
+- `viewers-ui-smoke` checks after scrolling, zooming and switching sheets that
+  the tabs lie below the grid and inside the stage, with no stage overflow.
+  Before/after measurements under Xvfb at 1280×800 put the tabs at y 144–171
+  (above the grid) and then 731–772 (directly below it), unchanged at 50 % and
+  200 % and in a short window. Not seen on Windows or macOS.
+
 Every Schema setting reaches every CLI, 2026-11-07 (**0.2.61**,
 [#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307), published as `v0.2.61-preview.1`;
 [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)): the owner
