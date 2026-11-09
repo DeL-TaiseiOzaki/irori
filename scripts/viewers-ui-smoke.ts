@@ -143,9 +143,34 @@ try {
   await expect(sheet.locator('td[rowspan="2"][colspan="2"]')).toHaveText('結合セル');
   await sheet.getByRole('button', { name: '次の 200 行' }).click();
   await expect(sheet.locator('tbody tr')).toHaveCount(51);
+  // As in Excel, the sheet tabs stay along the grid's lower edge and in view, however far
+  // the grid is scrolled or zoomed; the stage itself does not scroll them away.
+  const grid = sheet.locator('.sheet-scroll');
+  const tabs = sheet.getByRole('tablist', { name: 'シート' });
+  const stage = viewer.locator('xpath=..');
+  const tabsInView = async () => {
+    const [gridBox, tabsBox, stageBox] = await Promise.all([
+      grid.boundingBox(),
+      tabs.boundingBox(),
+      stage.boundingBox(),
+    ]);
+    expect(tabsBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height - 1);
+    expect(tabsBox!.y + tabsBox!.height).toBeLessThanOrEqual(stageBox!.y + stageBox!.height + 1);
+    expect(await stage.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
+  };
+  await grid.evaluate((element) => (element.scrollTop = element.scrollHeight));
+  await tabsInView();
   await page.screenshot({ path: 'test-results/irori-viewer-sheet.png' });
+  await bar.getByRole('button', { name: '拡大' }).click();
+  await bar.getByRole('button', { name: '拡大' }).click();
+  await expect(bar).toContainText('125%');
+  await tabsInView();
+  await bar.locator('.zoom-level').click();
+  // A sheet chosen from deep in another starts at its first cell.
   await sheet.getByRole('tab', { name: 'メモ' }).click();
   await expect(sheet.locator('tbody')).toContainText('二枚目のシート');
+  expect(await grid.evaluate((element) => element.scrollTop)).toBe(0);
+  await tabsInView();
 
   // A code file opens in the editor, highlighted by its language.
   await page.getByRole('button', { name: 'hello.py', exact: true }).click();
@@ -177,7 +202,7 @@ try {
   expect(alerts).toEqual([]);
   expect(errors).toEqual([]);
   console.log(
-    'Viewers UI passed: Japanese PDF with a bundled CMap and its text layer, zoom, Word pages and links, slides (a template title at its master size, an outlined box left unfilled), a Python file in the editor, sheet values, merges, paging and sheets, an image reloaded after a change, and no script or unsafe link carried into the page. No provider calls.',
+    'Viewers UI passed: Japanese PDF with a bundled CMap and its text layer, zoom, Word pages and links, slides (a template title at its master size, an outlined box left unfilled), a Python file in the editor, sheet values, merges, paging, sheet tabs kept along the lower edge of the grid, an image reloaded after a change, and no script or unsafe link carried into the page. No provider calls.',
   );
 } finally {
   await app.close();

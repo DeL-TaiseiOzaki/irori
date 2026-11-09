@@ -77,7 +77,8 @@ Older binary Office formats (`.doc`, `.ppt`) still open in the external applicat
   shadow root); PowerPoint covers text, pictures, tables, basic shapes and common
   charts, not animations, SmartArt or every theme effect; spreadsheets show values
   as Excel formats them, with merges, but not cell colours, charts or images.
-  Spreadsheets parse on the renderer's main thread.
+  Spreadsheets parse on the renderer's main thread. As in Excel, the grid fills
+  the stage and scrolls inside it, with the sheet tabs along its lower edge.
 
 ## References
 

@@ -157,33 +157,71 @@
   contain: paint;
 }
 
-/* Spreadsheets */
+/* Spreadsheets fill the stage as in Excel: the grid scrolls inside it, and the sheet
+   tabs stay along its lower edge however long the sheet or high the zoom. */
+.file-viewer-sheet {
+  height: 100%;
+}
+.viewer-body.viewer-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
 .sheet-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 12px 20px 0;
 }
-.sheet-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-.sheet-tabs button {
-  padding: 4px 12px;
-  border-radius: 8px;
-  font-size: 12.5px;
-}
-.sheet-tabs button.on {
-  background: var(--ink-solid);
-  color: var(--on-ink-solid);
-}
 .sheet-view .actions {
+  flex: none;
   flex-wrap: wrap;
 }
 .sheet-scroll {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
-  max-height: calc(100vh - 260px);
   border: 1px solid var(--rule);
   background: var(--card);
+}
+/* One row of tabs hanging from the grid; more sheets than fit scroll sideways. */
+.sheet-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding: 0 0 10px;
+  scrollbar-width: thin;
+}
+.sheet-tabs button {
+  flex: none;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 14px 6px;
+  border: 1px solid var(--rule);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: var(--stage-2);
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.sheet-tabs button:hover {
+  background: var(--stage-3);
+  color: var(--ink);
+}
+.sheet-tabs button.on {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--act-ink);
+}
+.sheet-tabs button:focus-visible {
+  outline-offset: -2px;
 }
 .sheet-scroll table {
   border-collapse: collapse;
