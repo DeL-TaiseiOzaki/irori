@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A window that shows the work, 2026-11-10 (**0.2.63**, pull request open, not
+A window that shows the work, 2026-11-10 (**0.2.63**,
+[#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311), open and not
 published; [ADR 059](decisions/059-the-window-shows-the-work.md)): the owner
 pointed to Antigravity's Knowledge Work layout and asked for its simplicity: no
 settings on the basic interface, and everything that can be set, down to whether
