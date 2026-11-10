@@ -8,6 +8,7 @@ import { SettingsService } from '../src/host/settings';
 import { YourAiService } from '../src/host/you';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 import { showEveryWindowItem } from '../tests/fixtures/window-items';
+import { runSettings } from '../tests/fixtures/run-settings';
 
 // irori mode's threads (ADR 034): the irori agent's conversations run side by side
 // in columns, a closed column's run goes on in a tab, each workspace keeps its own
@@ -228,29 +229,29 @@ try {
    * first it shows and sends with full access, its native session going on.
    */
   const ownAccess = async (panel: Locator, label: string, folder: string, name: string) => {
-    const access = panel.getByLabel('エージェントのアクセス', { exact: true });
+    const run = runSettings(panel);
     const idle = () =>
       expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
     const before = (await told(folder, 'thread')).length;
     await fresh(panel);
-    await expect(access).toHaveValue('default');
-    await access.selectOption('full-access');
+    await run.access('default');
+    await run.choose('フルアクセス');
     for (const word of ['full one', 'full two', 'standard one', 'full three']) {
       if (word === 'standard one') {
         await fresh(panel);
-        await expect(access).toHaveValue('default');
+        await run.access('default');
       }
       if (word === 'full three') {
         await panel
           .getByRole('tablist', { name: '開いている会話' })
           .getByRole('tab', { name: new RegExp(`${name} full one`) })
           .click();
-        await expect(access).toHaveValue('full-access');
+        await run.access('full-access');
       }
       await send(panel, label, `${name} ${word}`);
       await expect(panel.getByRole('log')).toContainText(`reply to ${name} ${word}`);
       await idle();
-      await expect(access).toHaveValue(word === 'standard one' ? 'default' : 'full-access');
+      await run.access(word === 'standard one' ? 'default' : 'full-access');
     }
     expect((await told(folder, 'thread')).slice(before)).toEqual([
       'thread/start:never',
@@ -432,11 +433,11 @@ try {
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
   };
-  const vaultAccess = vault.getByLabel('エージェントのアクセス', { exact: true });
-  await expect(vaultAccess).toHaveValue('full-access');
+  const vaultRun = runSettings(vault);
+  await vaultRun.access('full-access');
   await chooseAccess(/^フルアクセス$/);
   await fresh(vault);
-  await expect(vaultAccess).toHaveValue('full-access');
+  await vaultRun.access('full-access');
   await send(vault, 'エージェントへの指示', 'vault from settings');
   await expect(vault.getByRole('log')).toContainText('reply to vault from settings');
   await expect(vault.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
@@ -446,10 +447,10 @@ try {
     .getByRole('tablist', { name: '開いている会話' })
     .getByRole('tab', { name: /vault standard one/ })
     .click();
-  await expect(vaultAccess).toHaveValue('default');
+  await vaultRun.access('default');
   await chooseAccess(/^標準/);
   await fresh(vault);
-  await expect(vaultAccess).toHaveValue('default');
+  await vaultRun.access('default');
   await expect
     .poll(async () =>
       (await page.evaluate(([id]) => window.irori.agentConversations(id), [ids.Alpha])).some(

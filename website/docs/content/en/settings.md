@@ -30,12 +30,12 @@ This documentation site also has an **English / 日本語** switch at the top ri
 
 ## What the window shows
 
-irori's window shows what a note and a conversation need. Settings and developer tools join it only when turned on under **What the window shows**; an item turned on appears at once.
+irori's window shows what a note and a conversation need. A conversation's model, thinking level and access are chosen in one menu, opened from a button under the instruction box. Developer tools join the window only when turned on under **What the window shows**; an item turned on appears at once.
 
 | Where | Item | At first | While it is off |
 | --- | --- | --- | --- |
-| Instruction box | Access | Off | A new conversation starts in the access chosen under **Shared**. A conversation in full access shows it even when this is off |
-| Instruction box | Model and thinking level | Off | Runs with the last choice, or the CLI's default where none was made |
+| Instruction box menu | Access | On | A new conversation starts in the access chosen under **Shared**. A conversation in full access shows it even when this is off |
+| Instruction box menu | Model and thinking level | On | Runs with the last choice, or the CLI's default where none was made |
 | Instruction box | Skill | On | No skill goes with a request |
 | Instruction box | Share the person's lines | Off | The lines a person wrote are not told |
 | Top of a conversation | Columns | Off | The buttons that add a column and hide the page are not shown. While the page is hidden, the button that shows it stays |
@@ -59,4 +59,4 @@ Turn on the vault agent with the switch under **vault agent**. It is off by defa
 
 **Updates** names the version you use; **Check for updates** looks for a new one. When one is available, choose **Update and restart**.
 
-To use JavaScript or Python in [routines](routines.md), turn on **JavaScript** or **Python** under **Routines**. Turning Python on downloads uv, and "Downloading and preparing uv…" shows until it is done. Choose the AI CLI in the [AI panel](agents.md). To choose the model and the access per conversation, turn those items on under **What the window shows**.
+To use JavaScript or Python in [routines](routines.md), turn on **JavaScript** or **Python** under **Routines**. Turning Python on downloads uv, and "Downloading and preparing uv…" shows until it is done. Choose the AI CLI at the top of the [AI panel](agents.md), and the model, thinking level and access in the menu under the instruction box.

@@ -148,11 +148,12 @@ test('new conversations start in standard access until the person chooses full a
 });
 
 test('the window leaves its optional controls out until the person shows them', async () => {
-  // Settings and a developer's tools are off the window; the skill of a request stays.
+  // A developer's tools are off the window. How a conversation runs (its access, its
+  // model) and the skill of a request are set from the column.
   assert.deepEqual(windowItemsShown(), windowItemDefaults);
   assert.deepEqual(
     windowItems.filter((item) => windowItemDefaults[item]),
-    ['skill'],
+    ['access', 'model', 'skill'],
   );
   // An item never chosen follows its default, whatever else was chosen.
   assert.deepEqual(windowItemsShown({ terminal: true, skill: false }), {

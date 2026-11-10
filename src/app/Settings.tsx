@@ -170,13 +170,13 @@ const windowItemLabels: Record<WindowItem, () => string> = {
 const windowItemNotes: Record<WindowItem, () => string> = {
   access: () =>
     t(
-      'その会話が承認なしでどこまで動けるかを、入力欄で切り替えられます。オフのあいだ、新しい会話は「エージェント → 共通」で選んだアクセスで始まります。フルアクセスの会話では、オフでも表示されます。',
-      'Lets a conversation change how far it may act without asking. Off, a new conversation starts in the access chosen under Agents → Shared. A conversation in full access shows it even when this is off.',
+      '入力欄の会話の設定メニューで、その会話が承認なしでどこまで動けるかを切り替えられます。オフのあいだ、新しい会話は「エージェント → 共通」で選んだアクセスで始まります。フルアクセスの会話では、オフでも表示されます。',
+      "Lets the conversation's menu under the instruction box change how far it may act without asking. Off, a new conversation starts in the access chosen under Agents → Shared. A conversation in full access shows it even when this is off.",
     ),
   model: () =>
     t(
-      '使うモデルと思考量を、入力欄で選べます。オフのあいだは、最後に選んだもの（選んでいなければ CLI の既定）で動きます。',
-      "Lets a conversation choose its model and thinking level. Off, it runs with the last choice, or the CLI's default where none was made.",
+      '入力欄の会話の設定メニューで、使うモデルと思考量を選べます。オフのあいだは、最後に選んだもの（選んでいなければ CLI の既定）で動きます。',
+      "Lets the conversation's menu under the instruction box choose its model and thinking level. Off, it runs with the last choice, or the CLI's default where none was made.",
     ),
   skill: () =>
     t(

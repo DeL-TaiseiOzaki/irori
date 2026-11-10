@@ -261,9 +261,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 14px;
-  box-shadow: inset 0 -1px 0 var(--hair);
+  height: 30px;
+  margin: 10px 12px 0;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--chip);
   font-size: 11.5px;
   color: var(--tx-3);
   white-space: nowrap;
@@ -273,9 +275,15 @@
   color: var(--schema);
 }
 .schema-owner {
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--tx-2);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.schema-line > .mono,
+.schema-line > span:last-child {
+  flex: none;
 }
 .schema-line .mono {
   font-size: 11px;
@@ -289,10 +297,10 @@
   flex: none;
 }
 .agent-connection-error {
-  margin: 10px 14px 0;
-  padding: 8px 10px;
-  border-left: 2px solid var(--danger-line);
-  border-radius: 0 8px 8px 0;
+  margin: 10px 12px 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--danger-line);
   background: var(--danger-soft);
   color: var(--danger-tx);
   font-size: 12px;
@@ -326,6 +334,65 @@
   font-size: 13.5px;
   line-height: 1.75;
 }
+/* Before anything is said: the agent's mark, who it is and the two keys worth knowing. */
+.conversation-empty {
+  margin: auto;
+  max-width: 264px;
+  padding: 12px 0 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  line-height: 1.6;
+}
+.conversation-empty-mark {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--tx-2);
+}
+.conversation-empty > strong {
+  color: var(--tx);
+  font-size: 14px;
+  font-weight: 600;
+}
+.conversation-empty > p {
+  margin: 0;
+  color: var(--tx-3);
+  font-size: 12.5px;
+}
+.conversation-empty-keys {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+}
+.conversation-empty-keys > kbd {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.conversation-empty-keys > kbd:not(:first-child) {
+  margin-left: 8px;
+}
 .message {
   overflow-wrap: anywhere;
 }
@@ -333,9 +400,9 @@
   align-self: flex-end;
   max-width: 86%;
   margin-top: 6px;
-  padding: 10px 13px;
-  border-radius: 16px 16px 5px 16px;
-  background: var(--raised-2);
+  padding: 10px 14px;
+  border-radius: 18px 18px 6px 18px;
+  background: var(--chip-2);
   color: var(--tx);
   white-space: pre-wrap;
 }
@@ -360,9 +427,9 @@
   color: var(--tx-3);
 }
 .message.error {
-  padding: 8px 11px;
-  border-radius: 0 8px 8px 0;
-  border-left: 2px solid var(--danger-line);
+  padding: 9px 12px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--danger-line);
   background: var(--danger-soft);
   color: var(--danger-tx);
   font-size: 12.5px;
@@ -860,20 +927,30 @@
   padding: 2px 9px;
   font-size: 12px;
 }
+/* The instruction box is the one lifted surface of the column: it floats over the
+   conversation, and the focus colour rings it while the person writes there. */
 .composer-box {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 10px 8px;
-  border-radius: 16px;
+  gap: 6px;
+  padding: 12px 12px 10px;
+  border-radius: 20px;
   border: 1px solid var(--hair-2);
-  background: var(--field);
-  transition: border-color var(--quick) ease;
+  background: var(--composer);
+  box-shadow: var(--composer-shadow);
+  transition:
+    border-color var(--quick) ease,
+    box-shadow var(--medium) ease;
 }
-.composer-box:hover,
-.composer-box:focus-within {
+.composer-box:hover {
   border-color: var(--hair-3);
+}
+.composer-box:focus-within {
+  border-color: var(--act-line);
+  box-shadow:
+    0 0 0 3px var(--act-soft),
+    var(--composer-shadow);
 }
 /* The CLI's commands, offered above the box while a request is `/` and a name (ADR 040). */
 .command-menu {
@@ -934,18 +1011,21 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: 24px;
   max-width: 100%;
-  padding: 0 9px 0 6px;
-  border-radius: 8px;
-  background: var(--raised);
+  padding: 0 10px 0 5px;
+  border-radius: 999px;
+  background: var(--chip);
   color: var(--tx-2);
-  font-size: 12px;
+  font-size: 11.5px;
   white-space: nowrap;
   overflow: hidden;
 }
+.context-chip > .ui-icon:first-child {
+  margin-left: 3px;
+}
 .context-chip.reference {
-  padding-right: 5px;
+  padding-right: 6px;
 }
 .context-chip-label {
   min-width: 0;
@@ -975,18 +1055,18 @@
 .agent-panel .context-add {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 9px 0 7px;
-  border-radius: 8px;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px 0 7px;
+  border-radius: 999px;
   background: none;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-3);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 400;
 }
 .agent-panel .context-add:hover:not(:disabled) {
-  background: var(--raised);
+  background: var(--chip);
   color: var(--tx);
 }
 .composer textarea {
@@ -994,9 +1074,9 @@
   border: 0;
   outline: 0;
   background: transparent;
-  padding: 2px 3px;
+  padding: 4px 3px 2px;
   width: 100%;
-  min-height: 64px;
+  min-height: 56px;
   max-height: 240px;
   field-sizing: content;
   font-size: 13.5px;
@@ -1006,7 +1086,7 @@
 .composer-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 .composer-selects {
   flex: 1;
@@ -1016,12 +1096,19 @@
   align-items: center;
   gap: 2px;
 }
-/* Skill, access and human lines are pills; the selects keep their native menus. */
+.agent-panel .composer-tool {
+  border-radius: 50%;
+}
+.agent-panel .composer-tool:hover:not(:disabled) {
+  background: var(--chip);
+  color: var(--tx);
+}
+/* The skill and the person's lines are pills; the selects keep their native menus. */
 .composer-selects select,
 .composer-pill {
   height: 28px;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
   color: var(--tx-2);
@@ -1039,7 +1126,7 @@
   text-overflow: ellipsis;
 }
 .composer-selects select:hover:not(:disabled) {
-  background-color: var(--raised);
+  background-color: var(--chip);
 }
 .composer-selects select option {
   background: var(--panel);
@@ -1055,7 +1142,7 @@
   transition: background-color var(--quick) ease;
 }
 .composer-pill:hover {
-  background: var(--raised);
+  background: var(--chip);
 }
 .composer-pill select {
   padding-left: 0;
@@ -1066,18 +1153,31 @@
 .composer-pill.toggle {
   padding: 0 9px 0 8px;
 }
-/* A model name typed in where the CLI lists none. */
-.model-pill input {
+/* A model name or a thinking level typed in where the CLI lists none. */
+.composer-typed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--tx-3);
+  font-size: 12px;
+}
+.composer-typed input {
   width: 150px;
+  min-width: 0;
   height: 22px;
-  padding: 0 6px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
   background: var(--panel);
   color: var(--tx);
   font: inherit;
 }
-.model-pill input[aria-invalid='true'] {
+.composer-typed input[aria-invalid='true'] {
   border-color: var(--danger);
 }
 .composer-pill.toggle {
@@ -1096,7 +1196,7 @@
   outline: 2px solid var(--focus);
 }
 .composer-pill.pressed {
-  background: var(--raised-2);
+  background: var(--chip-2);
   color: var(--tx);
 }
 .agent-panel .composer-selects > button {
@@ -1113,14 +1213,90 @@
   color: var(--tx);
 }
 .composer-send {
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+/* How the conversation runs, in a few words: the model and its level, and full
+   access in the attention colour wherever it is in use (ADR 053). */
+.agent-panel .composer-settings {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px 0 11px;
+  border-radius: 999px;
+  background: none;
+  box-shadow: none;
+  color: var(--tx-2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--quick) ease,
+    color var(--quick) ease;
+}
+/* A name is being typed in its place. */
+.agent-panel .composer-settings[hidden] {
+  display: none;
+}
+.agent-panel .composer-settings:hover,
+.agent-panel .composer-settings[data-popup-open] {
+  background: var(--chip);
+  color: var(--tx);
+}
+.composer-settings-model {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.composer-settings-model > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-settings-model > i {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--tx-3);
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.composer-settings-access {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  color: var(--attn-tx);
+  font-weight: 600;
+}
+.composer-settings-access + .composer-settings-model::before {
+  content: '';
+  flex: none;
+  width: 1px;
+  height: 12px;
+  background: var(--hair-2);
+}
+.agent-panel .composer-settings.full {
+  background: var(--attn-soft);
+}
+.composer-settings-caret {
+  flex: none;
+  color: var(--tx-3);
 }
 .agent-panel .stop {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-2);
 }
 .stop-mark {
@@ -1130,23 +1306,33 @@
   background: currentColor;
 }
 .agent-panel .send-button {
-  width: 34px;
-  height: 34px;
+  flex: none;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border-radius: 11px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--solid);
   color: var(--on-solid);
   box-shadow: none;
+  transition:
+    transform var(--quick) var(--ease),
+    filter var(--quick) ease,
+    background-color var(--quick) ease;
 }
 .agent-panel .send-button:hover:not(:disabled) {
   background: var(--solid);
   filter: brightness(0.92);
 }
+.agent-panel .send-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+/* Nothing to send yet: the button is an outline until there is. */
 .agent-panel .send-button:disabled {
-  background: var(--raised-2);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-3);
   opacity: 1;
 }

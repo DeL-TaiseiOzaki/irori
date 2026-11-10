@@ -6,10 +6,12 @@ import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { agentIds } from '../src/domain/types';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { runSettings } from '../tests/fixtures/run-settings';
 
-// A new device's window shows the work alone (ADR 059): the access, the model, the
-// columns, the branch, the terminal and the version join it from the settings, each on
-// its own, and leave it again. No instruction is sent, so no CLI runs.
+// A new device's window shows the work and, in one menu under the instruction box, how the
+// conversation runs (ADR 059). The columns, the branch, the terminal and the version join it
+// from the settings, each on its own; the menu's parts leave it the same way. No instruction
+// is sent, so no CLI runs.
 const base = await mkdtemp(path.join(tmpdir(), 'irori window items 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -67,14 +69,22 @@ try {
 
   await page.getByRole('button', { name: 'irori agent', exact: true }).click();
   const column = page.locator('.agent-panel');
-  const access = column.getByLabel('エージェントのアクセス', { exact: true });
-  const model = column.getByLabel('モデル', { exact: true });
+  const run = runSettings(column);
   const addColumn = column.getByRole('button', { name: '列を追加', exact: true });
   await expect(column.getByLabel('irori agent への指示')).toBeVisible();
   await expect(column.getByRole('button', { name: '新しい会話', exact: true })).toBeVisible();
   await expect(column.getByRole('button', { name: '履歴', exact: true })).toBeVisible();
   await expect(column.getByRole('button', { name: '送信', exact: true })).toBeVisible();
-  for (const hidden of [access, model, addColumn]) await expect(hidden).toHaveCount(0);
+  await expect(addColumn).toHaveCount(0);
+  // How the conversation runs is one button: the model in use, and a menu with its parts.
+  await run.model('');
+  await run.access('default');
+  await run.open();
+  const part = (name: string) => run.menu.getByRole('group', { name, exact: true });
+  await expect(part('モデル')).toBeVisible();
+  await expect(part('アクセス')).toBeVisible();
+  await expect(run.choice('フルアクセス')).toHaveAttribute('aria-checked', 'false');
+  await run.close();
   // The CLI's version left the conversation for the settings.
   await expect(column.getByRole('button', { name: '会話と接続', exact: true })).toHaveCount(0);
   await mkdir('test-results', { recursive: true });
@@ -94,7 +104,7 @@ try {
     await expect(sheet).toHaveCount(0);
   };
   await openItems();
-  await expect(entry).toContainText('表示中 1 / 8');
+  await expect(entry).toContainText('表示中 3 / 8');
   for (const group of [
     'エージェントへの指示の入力欄',
     '会話の上部',
@@ -102,14 +112,13 @@ try {
   ])
     await expect(sheet.getByRole('heading', { name: group, exact: true })).toBeVisible();
   const item = (name: string) => sheet.getByRole('switch', { name, exact: true });
-  for (const name of ['アクセス', 'モデルと思考量', '人の行を伝える', '列の操作'])
+  for (const name of ['アクセス', 'モデルと思考量', 'スキル'])
+    await expect(item(name)).toBeChecked();
+  for (const name of ['人の行を伝える', '列の操作', 'ブランチ', 'ターミナル', 'バージョン'])
     await expect(item(name)).not.toBeChecked();
-  for (const name of ['ブランチ', 'ターミナル', 'バージョン'])
-    await expect(item(name)).not.toBeChecked();
-  await expect(item('スキル')).toBeChecked();
   await expect(sheet.getByRole('button', { name: '既定に戻す', exact: true })).toBeDisabled();
   await item('ターミナル').check();
-  await expect(entry).toContainText('表示中 2 / 8');
+  await expect(entry).toContainText('表示中 4 / 8');
   // The window is behind the sheet, so its button is counted rather than seen.
   await expect(terminalButton).toHaveCount(1);
   await expect.poll(record).toEqual({ terminal: true });
@@ -123,8 +132,7 @@ try {
   await expect(entry).toContainText('表示中 8 / 8');
   await expect(sheet.getByRole('button', { name: 'すべて出す', exact: true })).toBeDisabled();
   await close();
-  await expect(access).toHaveValue('default');
-  await expect(model).toBeVisible();
+  await expect(run.button).toBeVisible();
   await expect(addColumn).toBeVisible();
   await expect(bar).toContainText('trunk');
   await expect(bar.locator('.status-version')).toHaveText(/^\d+\.\d+\.\d+/);
@@ -134,13 +142,29 @@ try {
   // And back to what a new device shows.
   await openItems();
   await sheet.getByRole('button', { name: '既定に戻す', exact: true }).click();
-  await expect(entry).toContainText('表示中 1 / 8');
+  await expect(entry).toContainText('表示中 3 / 8');
   await expect(item('スキル')).toBeChecked();
   await close();
-  for (const hidden of [access, model, addColumn, terminalButton])
-    await expect(hidden).toHaveCount(0);
+  for (const hidden of [addColumn, terminalButton]) await expect(hidden).toHaveCount(0);
+  await expect(run.button).toBeVisible();
   await expect(bar).not.toContainText('trunk');
   await expect(bar.locator('.status-version')).toHaveCount(0);
+
+  // Each part of the menu leaves the window on its own; with neither, the button goes too.
+  await openItems();
+  await item('モデルと思考量').uncheck();
+  await expect(entry).toContainText('表示中 2 / 8');
+  await close();
+  await expect(run.button).not.toHaveAccessibleName(/モデル/);
+  await run.access('default');
+  await run.open();
+  await expect(part('モデル')).toHaveCount(0);
+  await expect(part('アクセス')).toBeVisible();
+  await run.close();
+  await openItems();
+  await item('アクセス').uncheck();
+  await close();
+  await expect(run.button).toHaveCount(0);
 
   // What is in use stays in view while its item is off. Full access is chosen in the
   // settings, and the conversation that starts in it says so (ADR 053).
@@ -153,11 +177,12 @@ try {
     await expect(sheet.getByText(name, { exact: true })).toBeVisible();
   await expect(sheet.getByText(/^(使えます|未検出)$/)).toHaveCount(agentIds.length);
   await close();
-  await expect(access).toHaveValue('full-access');
+  await run.access('full-access');
+  await expect(run.button).toContainText('フルアクセス');
   await settings.click();
   await sheet.getByRole('radio', { name: '標準（CLI の承認に従う）', exact: true }).check();
   await close();
-  await expect(access).toHaveCount(0);
+  await expect(run.button).toHaveCount(0);
 
   // The terminal still opens with its shortcut; while open, its button is there to close it.
   await page.keyboard.press('Control+Backquote');
@@ -170,7 +195,7 @@ try {
 
   expect(errors).toEqual([]);
   console.log(
-    'Window items UI passed: default window, each item from the settings, all at once and back, full access and an open terminal kept in view. No model inference.',
+    "Window items UI passed: default window with the conversation's menu, each item from the settings, all at once and back, full access and an open terminal kept in view. No model inference.",
   );
 } finally {
   await app.close();
