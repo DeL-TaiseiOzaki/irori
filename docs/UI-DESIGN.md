@@ -44,6 +44,19 @@ disagree, this section stands.
   it to the settings, and make it an item if a person may want it at hand. What
   is in use (full access, an open terminal, a hidden page) keeps its control in
   view.
+- **The agent's column** (ADR 059 decision 9). The instruction box is the
+  column's one lifted surface: `--composer` with `--composer-shadow`, a 20 px
+  radius, and a ring in the focus colour while it is written in. What sits on it
+  is round and quiet: chips (`--chip`) for what the request is about, 30 px
+  round tools, the conversation's menu button and a 32 px round send button,
+  solid when there is something to send and an outline when not. How the
+  conversation runs (model, thinking level, access) is one menu, `RunSettings`;
+  do not add a select to the box. An empty conversation names the agent in one
+  sentence. Full access is the attention colour on the menu's button.
+- **Menus.** `.menu` is translucent over a backdrop blur. A menu in parts names
+  each part with `.menu-label`; a choice that needs a second line puts both in
+  `.menu-text`, and a remark goes in `.menu-note`. Short, few choices (thinking
+  levels) are a row of chips, the chosen one in the focus colour.
 - **Checking.** `tsx scripts/ui-screens.ts hearth-ja dark-en light-ja`, as for v5.
 
 ## v5 — brains, your AI and each brain's AI (2026-09-25)

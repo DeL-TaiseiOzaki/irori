@@ -374,15 +374,29 @@
 .overview-ai-list > .ai-card.waiting {
   box-shadow: inset 0 0 0 1px var(--attn-line);
 }
+/* The same lifted card as an agent column's instruction box (ADR 059). */
 .overview-composer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin: 0 12px 12px;
-  padding: 10px;
-  border-radius: 14px;
-  background: var(--field);
-  box-shadow: inset 0 0 0 1px var(--hair-2);
+  padding: 12px 12px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--hair-2);
+  background: var(--composer);
+  box-shadow: var(--composer-shadow);
+  transition:
+    border-color var(--quick) ease,
+    box-shadow var(--medium) ease;
+}
+.overview-composer:hover {
+  border-color: var(--hair-3);
+}
+.overview-composer:focus-within {
+  border-color: var(--act-line);
+  box-shadow:
+    0 0 0 3px var(--act-soft),
+    var(--composer-shadow);
 }
 .overview-targets {
   display: flex;
@@ -398,9 +412,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 25px;
-  padding: 0 9px 0 4px;
-  border-radius: 8px;
+  height: 24px;
+  padding: 0 10px 0 4px;
+  border-radius: 999px;
   color: var(--tx-2);
   font-size: 11.5px;
   box-shadow: inset 0 0 0 1px var(--hair);
@@ -408,7 +422,7 @@
   transition: background 200ms ease;
 }
 .target-chip.on {
-  background: var(--raised-2);
+  background: var(--chip-2);
   color: var(--tx);
   box-shadow: inset 0 0 0 1px var(--hair-3);
 }
@@ -453,7 +467,13 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 50%;
+}
+.overview-composer .primary-button:disabled {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-3);
+  opacity: 1;
 }
 .overview-error {
   margin: 0;

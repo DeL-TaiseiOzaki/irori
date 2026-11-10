@@ -22,7 +22,7 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
-import { agentAccessLabel, agentAccessOptions, conversationAccess } from '../domain/agent-access';
+import { agentAccessLabel, conversationAccess } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill, type SkillProblem } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
@@ -36,7 +36,7 @@ import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
-import { EffortPicker, ModelPicker } from './ModelPicker';
+import { RunSettings } from './RunSettings';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
@@ -1059,6 +1059,36 @@ export function AgentColumn({
             element.scrollHeight - element.scrollTop - element.clientHeight < 80;
         }}
       >
+        {/* Before anything is said: who this agent is, in one sentence. Not part of the log. */}
+        {ready && shownBlank && (
+          <div className="conversation-empty" aria-hidden="true">
+            <span className="conversation-empty-mark">
+              <Icon name="agent" size={20} />
+            </span>
+            <strong>
+              {irori
+                ? 'irori agent'
+                : t(`${space?.name} の vault agent`, `${space?.name}'s vault agent`)}
+            </strong>
+            <p>
+              {irori
+                ? t(
+                    'ワークスペース全体を受け持ち、vault ごとの仕事はその vault のエージェントに任せます。',
+                    "Works across the workspace and hands each vault's work to that vault's agent.",
+                  )
+                : t(
+                    'この vault の Schema に従って、ノートの相談や編集を引き受けます。',
+                    "Follows this vault's Schema to answer about its notes and edit them.",
+                  )}
+            </p>
+            <span className="conversation-empty-keys">
+              <kbd>/</kbd>
+              {t('コマンド', 'Commands')}
+              <kbd>Enter</kbd>
+              {t('送信', 'Send')}
+            </span>
+          </div>
+        )}
         <PathOpenerContext.Provider value={shared.paths}>
           <PathBase.Provider value={space?.scopeId ?? you?.id}>
             <AgentLog
@@ -1296,57 +1326,6 @@ export function AgentColumn({
                     disabled={sending || gitBusy}
                   />
                 )}
-              {/* Full access stays in view wherever it is in use (ADR 053). */}
-              {(shown.access || access === 'full-access') && (
-                <label className="composer-pill">
-                  <Icon name="shield" size={13} />
-                  <select
-                    aria-label={t('エージェントのアクセス', 'Agent access')}
-                    value={access}
-                    // A running turn keeps the access it started with; the choice applies after it.
-                    title={
-                      shownRunning
-                        ? t(
-                            '実行中の処理は開始時のアクセスのまま続きます。',
-                            'The running turn keeps the access it started with.',
-                          )
-                        : undefined
-                    }
-                    disabled={
-                      shownRunning ||
-                      sending ||
-                      gitBusy ||
-                      // Chosen for the conversation on show, so not while another is coming.
-                      !conversationReady ||
-                      agentAccessOptions(agent).length === 1
-                    }
-                    onChange={(e) => onAccess(e.target.value as AgentAccess)}
-                  >
-                    {agentAccessOptions(agent).map((value) => (
-                      <option key={value} value={value}>
-                        {agentAccessLabel(agent, value)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {shown.model && (
-                <>
-                  <ModelPicker
-                    agent={agent}
-                    value={model ?? ''}
-                    disabled={sending || gitBusy}
-                    onChange={onModel}
-                  />
-                  <EffortPicker
-                    agent={agent}
-                    model={model ?? ''}
-                    value={effort ?? ''}
-                    disabled={sending || gitBusy}
-                    onChange={onEffort}
-                  />
-                </>
-              )}
               {shown.personLines && personLinesOffered && (
                 <label className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}>
                   <input
@@ -1361,6 +1340,29 @@ export function AgentColumn({
               )}
             </div>
             <div className="composer-send">
+              {/* Full access stays in view wherever it is in use (ADR 053). */}
+              <RunSettings
+                agent={agent}
+                model={model ?? ''}
+                effort={effort ?? ''}
+                access={access}
+                show={{ model: shown.model, access: shown.access || access === 'full-access' }}
+                disabled={sending || gitBusy}
+                // Chosen for the conversation on show, so not while another is coming.
+                accessDisabled={shownRunning || sending || gitBusy || !conversationReady}
+                // A running turn keeps the access it started with; the choice applies after it.
+                accessNote={
+                  shownRunning
+                    ? t(
+                        '実行中の処理は開始時のアクセスのまま続きます。',
+                        'The running turn keeps the access it started with.',
+                      )
+                    : undefined
+                }
+                onModel={onModel}
+                onEffort={onEffort}
+                onAccess={onAccess}
+              />
               {shownRunning && (
                 <button
                   className="icon-button stop"

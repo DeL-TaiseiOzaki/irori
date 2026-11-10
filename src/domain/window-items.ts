@@ -36,13 +36,15 @@ export const windowItemChoices = z.object(
 );
 
 /**
- * What a window shows before anyone chooses. The skill picker stays: it says
- * which skill one request uses, as an attachment does, and only a vault that
- * has skills shows it. The rest are settings or a developer's tools.
+ * What a window shows before anyone chooses. How a conversation runs is set
+ * from its column: the model with its thinking level, and the access, share one
+ * menu under the instruction box. The skill picker stays as well: it says which
+ * skill one request uses, as an attachment does, and only a vault that has
+ * skills shows it. The rest are a developer's tools.
  */
 export const windowItemDefaults: WindowItems = {
-  access: false,
-  model: false,
+  access: true,
+  model: true,
   skill: true,
   personLines: false,
   columns: false,

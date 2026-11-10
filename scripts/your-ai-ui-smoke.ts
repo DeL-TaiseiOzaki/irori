@@ -8,6 +8,7 @@ import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 import { showEveryWindowItem } from '../tests/fixtures/window-items';
+import { runSettings } from '../tests/fixtures/run-settings';
 
 // Your AI in the Overview: set up its folder, hand work to a vault's agent with
 // `irori call` (ADR 050), answer that agent's request where your AI's are
@@ -195,8 +196,8 @@ try {
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
 
   // The irori agent starts in standard access, as a vault agent does.
-  const access = island.getByLabel('エージェントのアクセス', { exact: true });
-  await expect(access).toHaveValue('default');
+  const run = runSettings(island);
+  await run.access('default');
   // A request goes to your AI with the workspace's vaults; it hands a note to
   // Product's agent with `irori call`, whose write asks the person here.
   await composer.fill('Write a decision note.');
@@ -287,7 +288,8 @@ try {
   await expect(cli).toHaveValue('claude');
   await cli.selectOption('pi');
   await expect(cli).toHaveValue('pi');
-  await island.getByLabel('モデル', { exact: true }).selectOption('anthropic/claude-fixture');
+  await run.choose('anthropic/claude-fixture');
+  await run.model('anthropic/claude-fixture');
   await composer.fill('Tidy both brains.\nrun: irori call Product "Tidy the Product notes."');
   await island.getByRole('button', { name: '送信', exact: true }).click();
   const piLog = async () =>
