@@ -1619,9 +1619,13 @@
 .menu .run-settings-levels [role='menuitemradio'][data-checked] > small {
   color: inherit;
 }
+/* A part that cannot change now dims its choices once, not the part and each choice. */
+.run-settings [role='group'][data-disabled] {
+  opacity: 1;
+}
 /* A CLI with one access only: it is said, not offered. */
 .menu .run-settings-access[data-disabled] {
-  opacity: 0.7;
+  opacity: 0.75;
 }
 /* Full access lets an agent act without asking: it waits on the person's attention. */
 .run-settings-access.full-access[data-checked] {
