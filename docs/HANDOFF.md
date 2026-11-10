@@ -18,6 +18,16 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-10: **0.2.63** ([#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311),
+the window showing the work: one menu for how a conversation runs, the rest in
+the settings, ADR 059) as `2eaf30f`, by `publish.yml` alone (push run
+`42811969997`, with the pull request's packages from app run `42810240804`):
+merge to release 1:47, to page 3:58, drift in step. Anonymous downloads of the
+Windows installer, the Mac image and `irori-0.2.63-full.nupkg` matched
+`SHA256SUMS.txt`, and the live page links the 0.2.63 installers. See STATUS.
+Not seen on Windows or macOS before publishing: the redrawn agent column and
+the settings part were inspected on Linux under Xvfb only.
+
 Published 2026-11-09: **0.2.62** ([#309](https://github.com/DeL-TaiseiOzaki/irori/pull/309),
 the spreadsheet viewer's sheet tabs kept along the bottom as in Excel) as
 `f2e683a`, by `publish.yml` from main's own run (workflow_run run
@@ -31,8 +41,8 @@ the spreadsheet viewer's sheet tabs kept along the bottom as in Excel) as
 The merge was at 06:25:16 UTC. The release was out at 07:05:00, 39:44 after the
 merge, and the page at 07:06:45, 41:29 after it; drift is in step. Anonymous
 downloads of the Windows installer, the Mac image and `irori-0.2.62-full.nupkg`
-matched `SHA256SUMS.txt`, and the live page links the 0.2.62 installers. See
-STATUS.
+matched `SHA256SUMS.txt`, and the live page linked the 0.2.62 installers until
+0.2.63 replaced them. See STATUS.
 
 Published 2026-11-07: **0.2.61** ([#307](https://github.com/DeL-TaiseiOzaki/irori/pull/307),
 every Schema setting reaching every CLI, ADR 058) as `abc56b5`, by
