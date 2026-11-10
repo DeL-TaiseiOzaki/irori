@@ -5,6 +5,7 @@ import { t } from '../domain/i18n';
 import { languages } from '../domain/i18n';
 import { yourAiChoice } from '../domain/conversation';
 import { routineRuntimeList } from '../domain/routines';
+import { windowItemChoices } from '../domain/window-items';
 import {
   lineSpacings,
   markdownFonts,
@@ -74,6 +75,7 @@ const stored = z.object({
       vaultAgent: z.boolean(),
       yourAi: yourAiChoice,
       routineRuntimes: routineRuntimeList,
+      windowItems: windowItemChoices,
     })
     .partial(),
   agent: z.object({ repository }).optional(),

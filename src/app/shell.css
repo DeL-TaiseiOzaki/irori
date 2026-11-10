@@ -750,9 +750,11 @@
 /* Menus and popovers opened from the chrome. */
 .menu {
   min-width: 210px;
-  padding: 5px;
-  border-radius: 12px;
-  background: var(--panel);
+  padding: 6px;
+  border-radius: 14px;
+  /* The window shows faintly through a menu, which sits over it for a moment. */
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(1.3);
   color: var(--tx);
   box-shadow: var(--pop);
   font-size: 12.5px;
@@ -795,6 +797,39 @@
   margin-left: auto;
   display: flex;
 }
+/* A menu in parts: each part's name above its choices, a line between parts. */
+.menu .menu-label {
+  padding: 8px 10px 4px;
+  color: var(--tx-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+.menu [role='group'] + [role='group'] {
+  margin-top: 5px;
+  padding-top: 3px;
+  border-top: 1px solid var(--hair);
+}
+/* A choice with what it means on a second line. */
+.menu .menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu .menu-text > small {
+  color: var(--tx-3);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: normal;
+}
+.menu .menu-note {
+  margin: 2px 10px 6px;
+  color: var(--tx-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
 .menu-separator {
   height: 1px;
   margin: 5px 6px;
@@ -831,7 +866,7 @@
   position: relative;
   width: min(960px, calc(100vw - 48px));
   /* Clear of the title bar, which moves the window wherever it is pressed. */
-  height: min(680px, calc(100vh - 104px));
+  height: min(720px, calc(100vh - 104px));
   display: grid;
   grid-template-columns: 252px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -1359,6 +1394,16 @@
 .settings-body button.settings-open > svg {
   color: var(--tx-3);
 }
+/* Buttons that act on the part on show, side by side at a row's end. */
+.settings-row-actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.settings-body button.settings-action {
+  flex: none;
+  padding: 0 12px;
+}
 /* The irori agent's folder: its path above its buttons, as the other rows' text. */
 .settings-folder {
   display: flex;
@@ -1529,4 +1574,65 @@
 .dock-column-pane > .agent-panel {
   flex: 1;
   min-height: 0;
+}
+
+/* How a conversation runs (the model, its thinking level, the access), set from
+   the instruction box in one menu. */
+.run-settings {
+  width: 288px;
+  max-height: min(var(--available-height), 620px);
+  overflow-y: auto;
+}
+.run-settings [role='menuitemradio']:has(small) {
+  align-items: flex-start;
+  padding-block: 7px;
+}
+.run-settings [role='menuitemradio']:has(small) > .ui-icon:first-child,
+.run-settings [role='menuitemradio']:has(small) > .menu-check {
+  margin-top: 2px;
+}
+/* The levels are few and short: a row of chips, the chosen one in the focus colour. */
+.run-settings-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 8px 8px;
+}
+.menu .run-settings-levels [role='menuitemradio'] {
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-2);
+  font-size: 12px;
+}
+.menu .run-settings-levels [role='menuitemradio'] > small {
+  color: var(--tx-3);
+  font-size: 11px;
+}
+.menu .run-settings-levels [role='menuitemradio'][data-checked] {
+  background: var(--act-soft);
+  box-shadow: inset 0 0 0 1px var(--act-line);
+  color: var(--act);
+}
+.menu .run-settings-levels [role='menuitemradio'][data-checked] > small {
+  color: inherit;
+}
+/* A part that cannot change now dims its choices once, not the part and each choice. */
+.run-settings [role='group'][data-disabled] {
+  opacity: 1;
+}
+/* A CLI with one access only: it is said, not offered. */
+.menu .run-settings-access[data-disabled] {
+  opacity: 0.75;
+}
+/* Full access lets an agent act without asking: it waits on the person's attention. */
+.run-settings-access.full-access[data-checked] {
+  background: var(--attn-soft);
+  color: var(--attn-tx);
+}
+.run-settings-access.full-access[data-checked] > .ui-icon:first-child,
+.run-settings-access.full-access[data-checked] small {
+  color: var(--attn-tx);
 }

@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { showEveryWindowItem } from '../tests/fixtures/window-items';
+import { runSettings } from '../tests/fixtures/run-settings';
 
 /** The note's human-line count, read from its details popover. */
 async function authorship(page: import('@playwright/test').Page) {
@@ -60,6 +62,7 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
   { mode: 0o700 },
 );
 await chooseJapanese(files.dataDir);
+await showEveryWindowItem(files.dataDir);
 const env = {
   ...process.env,
   PATH: bin + path.delimiter + process.env.PATH,
@@ -83,25 +86,38 @@ try {
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: 'vault agent', exact: true }).click();
-  const settings = () => page.getByRole('button', { name: '会話と接続', exact: true });
-  await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
+  // A CLI's version is in the settings, not on the conversation (ADR 059).
+  await expect(page.getByRole('button', { name: '会話と接続', exact: true })).toHaveCount(0);
+  const settings = page.getByRole('button', { name: /^設定（/ });
+  await settings.click();
+  const sheet = page.getByRole('dialog', { name: '設定', exact: true });
+  await sheet
+    .getByRole('navigation', { name: '設定の項目' })
+    .getByRole('button', { name: '共通' })
+    .click();
+  // Each fixture CLI answers `--version` with its name and "fixture".
+  await expect(sheet.getByText(/\d fixture$/).first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
+  // The conversation's model, thinking level and access, in one menu under the instruction box.
+  // The window is replaced when irori restarts below, so the menu is looked up each time.
+  const run = () => runSettings(page);
   for (const agent of ['pi', 'opencode']) {
     await page.getByLabel('エージェント', { exact: true }).selectOption(agent);
-    // This pass is about native approvals, so OpenCode leaves its default full access.
-    if (agent === 'opencode')
-      await page.getByLabel('エージェントのアクセス', { exact: true }).selectOption('default');
-    await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toHaveValue('default');
+    // This pass is about native approvals, so each CLI runs in its standard access.
+    await run().access('default');
     if (agent === 'pi') {
-      await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
+      // Pi has one access only: the menu says it and offers no other.
+      await run().open();
+      await expect(run().menu.getByRole('menuitemradio', { name: /承認なし/ })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+      await expect(run().choice('フルアクセス')).toHaveCount(0);
+      await run().close();
     }
-    await settings().click();
-    // The CLI's version line; the model list, now quicker to arrive, also says fixture.
-    await expect(page.getByText(/\d fixture$/).first()).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(settings()).toBeFocused();
-    await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
     await page.getByLabel('エージェントへの指示').fill('dialog');
     await page.getByRole('button', { name: '送信', exact: true }).click();
     if (agent === 'pi') {
@@ -348,10 +364,12 @@ try {
   expect(prompt.message).toContain('notes.txt');
   await page.screenshot({ path: 'test-results/irori-attachments-sent.png' });
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
-  const access = page.getByLabel('エージェントのアクセス', { exact: true });
   // A brain's vault agent starts in standard access; full access is the person's choice.
-  await expect(access).toHaveValue('default');
-  await access.selectOption('full-access');
+  await run().access('default');
+  await run().choose('フルアクセス');
+  await run().access('full-access');
+  // In use, full access is said on the button itself (ADR 053).
+  await expect(run().button).toContainText('フルアクセス');
   await page.getByLabel('エージェントへの指示').fill('access fixture');
   // Count only once OpenCode's saved conversation has loaded.
   await expect(page.getByText('保存した会話を読み込んでいます…')).toHaveCount(0);
@@ -371,10 +389,9 @@ try {
   // and the new conversation starts in the standard access, not the last one's.
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
   await page.getByLabel('エージェント', { exact: true }).selectOption('opencode');
-  await expect(access).toHaveValue('default');
+  await run().access('default');
   await expect(page.locator('.message.done')).toHaveCount(0);
   doneCount = 0;
-  await access.selectOption('default');
   await page.getByLabel('エージェントへの指示').fill('standard again');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.done')).toHaveCount(++doneCount);
@@ -408,22 +425,27 @@ try {
   await expect(commands).toHaveCount(0);
   await expect(instruction).toHaveValue('/re');
   await instruction.fill('');
-  // The model pill lists what the installed CLI prints, and the choice reaches it.
+  // The menu lists the models the installed CLI prints, and the choice reaches it.
   const fixtureLog = async () =>
     (await readFile(path.join(root, 'fixture-requests.jsonl'), 'utf8'))
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-  const modelPill = page.getByLabel('モデル', { exact: true });
+  const levels = () => run().menu.getByRole('group', { name: '思考量', exact: true });
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
-  await expect(modelPill).toHaveValue('');
-  await expect(modelPill.locator('option', { hasText: 'openai/gpt-fixture' })).toHaveCount(1);
-  await modelPill.selectOption('anthropic/claude-fixture');
-  // Beside it, the thinking level Pi takes for every model.
-  const effortPill = page.getByLabel('思考量', { exact: true });
-  await expect(effortPill).toHaveValue('');
-  await expect(effortPill.locator('option', { hasText: 'xhigh' })).toHaveCount(1);
-  await effortPill.selectOption('high');
+  await run().model('');
+  await run().open();
+  await expect(run().choice('openai/gpt-fixture')).toHaveCount(1);
+  await run().choice('anthropic/claude-fixture').click();
+  // Under it, the thinking level Pi takes for every model; the menu stays open for both.
+  await expect(levels().getByRole('menuitemradio', { name: 'xhigh', exact: true })).toHaveCount(1);
+  await run().choice('high').click();
+  await run().close();
+  await run().model('anthropic/claude-fixture');
+  await run().effort('high');
+  // The button names both in its own words.
+  await expect(run().button).toContainText('anthropic/claude-fixture');
+  await expect(run().button).toContainText('high');
   await page.getByLabel('エージェントへの指示').fill('model fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.user').last()).toHaveText('model fixture');
@@ -449,15 +471,16 @@ try {
   ).toBe('high');
   // Hermes Agent lists no models: a name is typed in. It starts in standard access.
   await page.getByLabel('エージェント', { exact: true }).selectOption('hermes');
-  await expect(access).toHaveValue('default');
-  await access.selectOption('full-access');
-  await expect(modelPill).toHaveValue('');
+  await run().access('default');
+  await run().choose('フルアクセス');
+  await run().model('');
   // It takes no thinking level, so none is offered.
-  await expect(effortPill).toHaveCount(0);
-  await modelPill.selectOption({ label: 'その他…' });
+  await run().open();
+  await expect(levels()).toHaveCount(0);
+  await run().menu.getByRole('menuitem', { name: 'その他…', exact: true }).click();
   await page.getByLabel('モデル名', { exact: true }).fill('vendor/model-x');
   await page.getByLabel('モデル名', { exact: true }).press('Enter');
-  await expect(modelPill).toHaveValue('vendor/model-x');
+  await run().model('vendor/model-x');
   await page.getByLabel('エージェントへの指示').fill('hermes fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.user').last()).toHaveText('hermes fixture');
@@ -473,10 +496,14 @@ try {
   ).toBe('saved');
   // The Antigravity CLI lists its models, each naming its own level, so no level is offered.
   await page.getByLabel('エージェント', { exact: true }).selectOption('antigravity');
-  await expect(access).toHaveValue('default');
-  await access.selectOption('full-access');
-  await expect(effortPill).toHaveCount(0);
-  await modelPill.selectOption('gemini-3.8-flash-high');
+  await run().access('default');
+  await run().choose('フルアクセス');
+  await run().open();
+  await expect(levels()).toHaveCount(0);
+  // A model is chosen by the name the CLI shows for it.
+  await run().choice('Gemini 3.8 Flash (High)').click();
+  await run().close();
+  await run().model('Gemini 3.8 Flash (High)');
   await page.getByLabel('エージェントへの指示').fill('antigravity fixture');
   await page.getByRole('button', { name: '送信', exact: true }).click();
   await expect(page.locator('.message.user').last()).toHaveText('antigravity fixture');
@@ -511,9 +538,9 @@ try {
         evidence: 'Explicit protocol fixtures; no native model inference',
         checks: [
           'Pi/OpenCode panel selection',
-          'model pill from the CLI list, and a typed Hermes model with its full access',
+          'models from the CLI list in the conversation menu, and a typed Hermes model with its full access',
           'Antigravity CLI selection, its listed model and full access over stream-json stdin',
-          'thinking level pill for Pi reaching set_thinking_level, absent for Hermes',
+          'thinking level for Pi reaching set_thinking_level, absent for Hermes',
           'native access selection, unsupported Pi modes hidden, and fresh session after downgrade',
           'compact assistant with optional session diagnostics and keyboard dismissal',
           'new conversation intent and cancellation preserve the composer',

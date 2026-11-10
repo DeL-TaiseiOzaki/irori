@@ -7,9 +7,12 @@ import { appVersion } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
 import { useLanguage } from './useLanguage';
+import { useWindowItems } from './useWindowItems';
 
 /**
- * The brain on show with its branch, the AI across brains, the terminal and the version, along the window's foot.
+ * The brain on show and the AI across brains, along the window's foot. Its branch, the
+ * terminal and the version are there when the settings show them (ADR 059); an open
+ * terminal keeps its button, so what is open can always be closed from here.
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const StatusBar = memo(function StatusBar({
@@ -35,6 +38,7 @@ export const StatusBar = memo(function StatusBar({
   onTerminal: () => void;
 }) {
   useLanguage();
+  const shown = useWindowItems();
   return (
     <footer className="status-bar chrome">
       {space && (
@@ -43,7 +47,7 @@ export const StatusBar = memo(function StatusBar({
           <span>{space.name}</span>
         </span>
       )}
-      {git?.available && git.branch && (
+      {shown.branch && git?.available && git.branch && (
         <span className="status-item plain">
           <Icon name="branch" size={12} />
           {git.branch}
@@ -70,16 +74,18 @@ export const StatusBar = memo(function StatusBar({
         )}
         {!running && !waiting && <span>AI</span>}
       </button>
-      <button
-        className="status-item"
-        aria-pressed={terminalOpen}
-        disabled={terminalDisabled}
-        onClick={onTerminal}
-      >
-        <Icon name="terminal" size={12} />
-        {t('ターミナル', 'Terminal')}
-      </button>
-      <span className="status-version">{appVersion}</span>
+      {(shown.terminal || terminalOpen) && (
+        <button
+          className="status-item"
+          aria-pressed={terminalOpen}
+          disabled={terminalDisabled}
+          onClick={onTerminal}
+        >
+          <Icon name="terminal" size={12} />
+          {t('ターミナル', 'Terminal')}
+        </button>
+      )}
+      {shown.version && <span className="status-version">{appVersion}</span>}
     </footer>
   );
 });

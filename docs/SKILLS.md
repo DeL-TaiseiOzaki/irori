@@ -68,7 +68,11 @@ user's own words last. The prompt tells every harness to resolve relative paths
 in those instructions from that skill's package directory. The conversation
 records which skill ran.
 
-Beside the selector, 到達確認 opens the reach view described below. When some
+The selector is one of the window's items
+([ADR 059](decisions/059-the-window-shows-the-work.md)): on from the start, and
+turned off under 設定 → 表示 → 画面に出すもの, after which no skill goes with a
+request. 到達確認, on the vault's home under Schema, opens the reach view
+described below; the composer had the same button until 0.2.62. When some
 skill names a role or a project, 役割 and プロジェクト selectors appear before
 the skill selector and narrow it to the reader's own choice. A retired skill is
 named under the composer with the date and reason the KB recorded.

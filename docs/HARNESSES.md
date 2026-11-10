@@ -58,7 +58,10 @@ seen to fail sign-in at once in this mode, and nothing more. irori gives it no
 person-lines hook and no sub-agents; the irori agent hands work over with
 `irori call`.
 
-Every CLI's composer has a model pill: "CLI の既定" passes no model, or a model the
+Every CLI's composer offers its models in the conversation's menu (one button
+under the instruction box since 0.2.63,
+[ADR 059](decisions/059-the-window-shows-the-work.md); a pill of its own
+before): "CLI の既定" passes no model, or a model the
 installed CLI lists (`agentModels`, read once per CLI version and never
 generating text). Codex answers `model/list` on its app server (hidden models
 left out, pages followed); Claude Code answers the Agent SDK's
@@ -76,8 +79,8 @@ CLI resumes a saved conversation under another model, so a model change keeps
 the conversation. The choice is kept per brain and CLI for the window's life, and
 travels with queued instructions.
 
-Thinking level, 2026-10-18 (0.2.29): beside the model pill, an effort pill
-("思考量: 既定" passes none) offers the levels the CLI gives for the chosen model,
+Thinking level, 2026-10-18 (0.2.29): under the models, in the same menu since
+0.2.63, 思考量 (既定 passes none) offers the levels the CLI gives for the chosen model,
 read with the same `agentModels` list. Codex's `model/list` names each model's
 `supportedReasoningEfforts` and `defaultReasoningEffort`, and the level goes as
 `effort` on `turn/start`. Claude Code's `supportedModels()` names

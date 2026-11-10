@@ -7,11 +7,11 @@ description: What to check when startup, AI, saving, or connections do not work.
 
 Check that you have the Windows 11 x64 or Apple silicon Mac build. The preview is unsigned; see [installation](installation.md) for the first-launch steps.
 
-If it was already installed, record the error and app version. Report the situation below before deleting application data to try again.
+If it was already installed, record the error and the app version (**Settings → Updates**). Report the situation below before deleting application data to try again.
 
 ## AI is unavailable
 
-Check that the chosen CLI starts from a terminal and is authenticated. irori uses that CLI; installing the app does not install it for you.
+Check that the chosen CLI starts from a terminal and is authenticated. The CLIs irori found, with their versions, are under **CLIs on this device** in **Settings → Agents → Shared**. irori uses that CLI; installing the app does not install it for you.
 
 Answer any permission request or question waiting in the panel. Use **Resume sending** if the queue is paused. See [AI agents](agents.md) for model and access settings, and [conversations](conversations.md) for resume conditions.
 

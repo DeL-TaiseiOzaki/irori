@@ -57,3 +57,37 @@ export function agentAccessLabel(agent: AgentId, access: AgentAccess = 'default'
   if (agent === 'antigravity') return t('標準（編集は自動で許可）', 'Standard (edits allowed)');
   return t('CLIの設定', "CLI's settings");
 }
+
+/**
+ * An access in two parts, for a list that names each on one line and says what it
+ * does on the next. Together they say what `agentAccessLabel` says in one.
+ */
+export function agentAccessParts(agent: AgentId, access: AgentAccess = 'default') {
+  if (access === 'full-access')
+    return {
+      name: t('フルアクセス', 'Full access'),
+      detail: t(
+        '承認を求めずにコマンドを実行し、ファイルを変更します',
+        'Runs commands and changes files without asking',
+      ),
+    };
+  if (agent === 'codex' || agent === 'claude')
+    return {
+      name: t('標準', 'Standard'),
+      detail: t('必要なときに承認を求めます', 'Asks when it needs to'),
+    };
+  if (agent === 'pi')
+    return {
+      name: t('承認なし', 'No approvals'),
+      detail: t('Pi には承認の仕組みがありません', 'Pi has no approvals'),
+    };
+  if (agent === 'antigravity')
+    return {
+      name: t('標準', 'Standard'),
+      detail: t('編集は自動で許可されます', 'Edits are allowed on their own'),
+    };
+  return {
+    name: t('CLI の設定', "CLI's settings"),
+    detail: t('CLI 自身の設定に従います', "Follows the CLI's own settings"),
+  };
+}
