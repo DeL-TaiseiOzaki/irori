@@ -53,6 +53,8 @@ travels with the repository.
 
 [ADR 043](043-routines-in-the-environment.md) (0.2.17) adds the irori agent's
 routines, in `routines.json`, and the routine runtimes to what is kept.
+[ADR 059](059-the-window-shows-the-work.md) (0.2.63) adds which optional
+controls the person put on the window (`windowItems`).
 
 ## Consequences
 

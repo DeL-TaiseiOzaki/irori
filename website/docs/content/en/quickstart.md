@@ -22,8 +22,8 @@ To work with several vaults, select them on the startup screen and create a work
 
 ## Ask AI to continue
 
-Keep the note open, open the **AI** panel, and choose a CLI and model. For example, send “Summarize this note and add the next things to investigate.”
+Keep the note open, open the **AI** panel, and choose a CLI. For example, send “Summarize this note and add the next things to investigate.”
 
 Permission requests and questions appear in the panel. Review the note and its [changes](git.md) after the agent finishes. For work across knowledge bases, use [irori mode](irori-mode.md).
 
-> Turn on the vault agent in **Settings → Agents → vault agent**. A new conversation starts in standard access. Agents can change files; check the panel's access setting before running one. See [access modes](agents.md#section-3).
+> Turn on the vault agent in **Settings → Agents → vault agent**. A new conversation starts in standard access. Agents can change files; check the access under **Settings → Agents → Shared** before running one. See [access modes](agents.md#section-3).

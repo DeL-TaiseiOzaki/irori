@@ -15,6 +15,7 @@ import { yourAiChoice } from '../domain/conversation';
 import { skillAudience } from '../domain/skills';
 import { languages } from '../domain/i18n';
 import { routineRuntimes } from '../domain/routines';
+import { windowItemChoices } from '../domain/window-items';
 
 const settings = z.object({
   theme: z.enum(themes).default('system'),
@@ -33,6 +34,7 @@ const settings = z.object({
   skillAudiences: z.record(z.string().max(64), skillAudience).default({}),
   yourAi: yourAiChoice.default({ agent: 'claude', models: {} }),
   routineRuntimes: z.array(z.enum(routineRuntimes)).default([]),
+  windowItems: windowItemChoices.default({}),
 });
 
 /**
@@ -70,6 +72,7 @@ export class SettingsService {
         skillAudiences: { ...current.skillAudiences, ...(patch.skillAudiences ?? {}) },
         yourAi: patch.yourAi ?? current.yourAi,
         routineRuntimes: patch.routineRuntimes ?? current.routineRuntimes,
+        windowItems: { ...current.windowItems, ...(patch.windowItems ?? {}) },
       });
       await writeLocalJson(this.file, next);
       return next;

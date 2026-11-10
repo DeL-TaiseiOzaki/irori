@@ -81,6 +81,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - **irori's actions for agents too**: the irori agent and vault agents use the `irori` command to move notes (links and comments follow), use the trash, comment, update indexes and set up a vault, as you do on screen. Through the `irori` command a vault agent reaches its own vault only. That limit is the command's: in full access the CLI's own tools reach anything your user account can. Connecting a folder, changing the work folder, adding or removing a vault and running a routine ask you each time an agent requests them.
 - **Moving in from another tool**: if you used Obsidian, orca or an editor, tell the irori agent you want to move in. It looks at your Obsidian vaults and folders, asks which become vaults, Knowledge or Contents and what to do about Git and workspaces, then sets them up as agreed.
 - A new conversation starts in standard access, where permissions follow each CLI's settings (Claude Code and Codex ask when needed; Pi asks for nothing, and Antigravity CLI allows edits on its own). Switch to full access where the CLI offers it. Access belongs to each conversation: one you switch keeps that access for its later instructions, after a restart too, and other or new conversations do not take it. To start every new conversation in full access, choose it under **Settings → Agents → Shared → Access of a new conversation** (hand-offs from the irori agent included; routines follow each step's setting).
+- **A quiet window**: the window shows what a note and a conversation need. The access and the model and thinking level of a conversation, sharing the person's lines, the column buttons (add a column, hide the page), the branch, the terminal and the version join it only when turned on under **Settings → Display → What the window shows** (the skill is on from the start); **Show all** puts them all there at once. The access of a conversation in full access and the button of an open terminal show even when their item is off. Each CLI's version is under **Settings → Agents → Shared**.
 - Each vault and the irori agent keep any number of whole conversations on this PC, with **新しい会話** and a **履歴** list (rename, pin, archive, delete). Instructions can be queued while an agent works, and survive a restart. **今すぐ送る** (send now) on a queued instruction sends it without waiting: Claude Code and Codex take it into the running work without stopping, other CLIs stop the run first. A sent message can be edited and the conversation continued from it (**この指示を編集してやり直す**), and **ここから分岐** at the end of a run copies the conversation up to there into a new one. Claude Code and Codex branch their own session too; other CLIs, and any new session, receive the conversation so far ([CONVERSATIONS](docs/CONVERSATIONS.md)).
 - Attach files to an instruction (paperclip, drop, or paste an image); agents see images as pictures. The microphone starts the system's dictation. An agent's questions show as choices ([ADR 032](docs/decisions/032-chat-attachments-dictation-questions.md)).
 - Each vault has a work folder where its agents keep scratch files, intermediate results and trial scripts: `work` in the vault's Contents (ignored by Git through its own `.gitignore`) unless you choose another under **作業フォルダ** in the vault's settings ([ADR 042](docs/decisions/042-waiting-folders-and-work-folders.md), [ADR 045](docs/decisions/045-work-folder-in-contents.md)).
@@ -93,7 +94,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 
 **Records and tools**
 - The **Changes** tab shows diffs, commits and history. irori never force-overwrites and never stashes on its own.
-- A built-in terminal opens in the vault's folder.
+- A built-in terminal opens in the vault's folder. Ctrl+` opens and closes it (its button can be shown under **Settings → Display → What the window shows**).
 - Switch the theme (Match system, Hearth, Light, Dark), the Markdown font, a note's side margins (Standard, Small, Minimal) and the interface language (日本語 / English).
 
 <div align="center">
@@ -112,7 +113,7 @@ See [STATUS](docs/STATUS.md) for progress and [ACCEPTANCE](docs/ACCEPTANCE.md) f
 ## Feedback
 
 - Report problems and requests in [GitHub Issues](https://github.com/DeL-TaiseiOzaki/irori/issues).
-- Include the version shown in the app, your OS and the exact message.
+- Include the version shown under **Settings → Updates**, your OS and the exact message.
 - Do not post note contents, credentials or OAuth URLs.
 
 ## Contributing

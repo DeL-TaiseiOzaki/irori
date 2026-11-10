@@ -7,7 +7,7 @@ description: Use local CLIs to read notes, revise them, and carry out work in yo
 
 irori runs Claude Code, Codex, OpenCode, Pi, Hermes Agent, or the Antigravity CLI (`agy`) using the CLI and authentication on your computer. Install and authenticate the CLI first.
 
-Choose a CLI and model in the AI panel. Model options come from the installed CLI. For Hermes Agent, enter the model name.
+Choose a CLI in the AI panel. It runs with the CLI's default model. To choose a model and a thinking level per conversation, turn on **Model and thinking level** under **What the window shows** in the [settings](settings.md#section-3). Model options come from the installed CLI. For Hermes Agent, enter the model name. Each CLI's version is under **CLIs on this device** in **Shared** of the settings.
 
 ## Ask a vault agent
 
@@ -19,7 +19,7 @@ Try “Extract the decisions from these meeting notes” or “Read the material
 
 ## Check access
 
-A new conversation starts in **Standard**, which follows the CLI's settings: Claude Code and Codex ask when needed, Pi asks for nothing, and the Antigravity CLI allows edits on its own. Switch to **Full access** where the CLI supports it. Access belongs to each conversation: one you switch keeps that access for its later instructions, after a restart too, while other conversations keep theirs. The access a new conversation starts in is chosen under **Access of a new conversation** in **Shared** of the [settings](settings.md) (Standard by default). Available modes differ by CLI.
+A new conversation starts in **Standard**, which follows the CLI's settings: Claude Code and Codex ask when needed, Pi asks for nothing, and the Antigravity CLI allows edits on its own. Switch to **Full access** where the CLI supports it. To switch per conversation, turn on **Access** under **What the window shows** in the [settings](settings.md#section-3); the instruction box then has the choice (a conversation in full access shows it even when the item is off). Access belongs to each conversation: one you switch keeps that access for its later instructions, after a restart too, while other conversations keep theirs. The access a new conversation starts in is chosen under **Access of a new conversation** in **Shared** of the [settings](settings.md) (Standard by default). Available modes differ by CLI.
 
 In full access an agent reaches anything your user account can read or write. Through the `irori` command a vault agent reaches its own vault only, but that limit does not apply to the CLI's own tools. A read-only connection is read-only only to irori and to file edits by Claude Code and Codex in standard access; full access, shell commands, the terminal and other CLIs can still write there.
 

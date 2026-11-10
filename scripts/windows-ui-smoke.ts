@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 // Several windows over one irori (ADR 051): each has its own tabs, what one has
 // open the others leave alone, and closing one leaves the rest running.
@@ -21,6 +22,7 @@ const workspaces = new WorkspaceService(files);
 await workspaces.save('最初の作業', [first.scopeId]);
 await workspaces.save('次の作業', [second.scopeId]);
 await chooseJapanese(files.dataDir);
+await showEveryWindowItem(files.dataDir);
 const home = path.join(base, 'home');
 await mkdir(home);
 const env = { ...process.env, HOME: home, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;

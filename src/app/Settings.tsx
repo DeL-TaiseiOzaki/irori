@@ -10,6 +10,8 @@ import { ErrorMessage } from './ErrorMessage';
 import { useAction } from './useAction';
 import { useChoice } from './useChoice';
 import { useLanguage } from './useLanguage';
+import { useResource } from './useResource';
+import { useWindowItems } from './useWindowItems';
 import {
   chooseLanguage,
   chooseLineSpacing,
@@ -18,6 +20,7 @@ import {
   chooseTextSize,
   chooseRoutineRuntimes,
   chooseTheme,
+  chooseWindowItems,
   currentLanguageChoice,
   currentLineSpacing,
   currentMarkdownFont,
@@ -28,6 +31,7 @@ import {
 } from './device-settings';
 import {
   agentAccessModes,
+  agentNames,
   lineSpacings,
   markdownFonts,
   pageMargins,
@@ -45,6 +49,14 @@ import { sharedSchemaId, type YourAi } from '../domain/you';
 import { environmentRepository } from '../domain/environment';
 import { languages, t, type Language } from '../domain/i18n';
 import type { RoutineRuntime } from '../domain/routines';
+import {
+  everyWindowItem,
+  windowItemAreas,
+  windowItemDefaults,
+  windowItems,
+  type WindowItem,
+  type WindowItemArea,
+} from '../domain/window-items';
 
 const host = window.irori;
 
@@ -136,6 +148,68 @@ const accessDetails: Record<AgentAccess, () => string> = {
     ),
 };
 
+/** Where on the window each group of optional controls appears (ADR 059). */
+const windowAreaLabels: Record<WindowItemArea, () => string> = {
+  composer: () => t('エージェントへの指示の入力欄', 'Under the instruction box'),
+  conversation: () => t('会話の上部', "At the top of an agent's column"),
+  status: () => t('ステータスバー（ウィンドウの下端）', "The status bar, along the window's foot"),
+};
+
+const windowItemLabels: Record<WindowItem, () => string> = {
+  access: () => t('アクセス', 'Access'),
+  model: () => t('モデルと思考量', 'Model and thinking level'),
+  skill: () => t('スキル', 'Skill'),
+  personLines: () => t('人の行を伝える', "Share the person's lines"),
+  columns: () => t('列の操作', 'Columns'),
+  branch: () => t('ブランチ', 'Branch'),
+  terminal: () => t('ターミナル', 'Terminal'),
+  version: () => t('バージョン', 'Version'),
+};
+
+/** What turning an item on puts on the window, and what holds while it is off. */
+const windowItemNotes: Record<WindowItem, () => string> = {
+  access: () =>
+    t(
+      'その会話が承認なしでどこまで動けるかを、入力欄で切り替えられます。オフのあいだ、新しい会話は「エージェント → 共通」で選んだアクセスで始まります。フルアクセスの会話では、オフでも表示されます。',
+      'Lets a conversation change how far it may act without asking. Off, a new conversation starts in the access chosen under Agents → Shared. A conversation in full access shows it even when this is off.',
+    ),
+  model: () =>
+    t(
+      '使うモデルと思考量を、入力欄で選べます。オフのあいだは、最後に選んだもの（選んでいなければ CLI の既定）で動きます。',
+      "Lets a conversation choose its model and thinking level. Off, it runs with the last choice, or the CLI's default where none was made.",
+    ),
+  skill: () =>
+    t(
+      'その依頼で使うスキルを、入力欄で選べます。スキルのある vault の vault agent に出ます。オフのあいだ、依頼にスキルは添えられません。',
+      'Lets a request name the skill it uses; shown for the vault agent of a vault that has skills. Off, no skill goes with a request.',
+    ),
+  personLines: () =>
+    t(
+      '人が書いた行のあるノートを開いているとき、その行をエージェントに伝えるかを入力欄で選べます。オフのあいだは伝えません。',
+      'With a note that has lines a person wrote, lets a request tell the agent which they are. Off, they are not told.',
+    ),
+  columns: () =>
+    t(
+      '会話の列を増やすボタンと、本文を隠すボタンを出します。本文を隠しているあいだは、オフでも戻すボタンが表示されます。',
+      'Shows the buttons that add a column and hide the page. While the page is hidden, the button that shows it stays even when this is off.',
+    ),
+  branch: () =>
+    t(
+      '開いている vault の Git ブランチと、まだ送っていない・受け取っていないコミットの数を出します。',
+      'Shows the Git branch of the vault on show, and how many commits wait to be pushed or pulled.',
+    ),
+  terminal: () =>
+    t(
+      'ターミナルを開くボタンを、ステータスバーと vault のホームに出します。オフでも Ctrl+` で開閉でき、開いているあいだはボタンが表示されます。',
+      "Shows the button that opens the terminal, in the status bar and on a vault's home. Off, Ctrl+` still opens and closes it, and the button stays while it is open.",
+    ),
+  version: () =>
+    t(
+      'irori のバージョンを出します。「アカウントと更新 → 更新」でも確かめられます。',
+      "Shows irori's version, which Account and updates → Updates names too.",
+    ),
+};
+
 // Each language is named in itself, so it can be found whichever is showing.
 const languageLabels: Record<Language, string> = { ja: '日本語', en: 'English' };
 
@@ -156,6 +230,12 @@ const parts = [
     label: () => t('言語とテーマ', 'Language and theme'),
   },
   { id: 'notes', group: 'display', icon: 'file', label: () => t('ノートの表示', 'Notes') },
+  {
+    id: 'window',
+    group: 'display',
+    icon: 'columns',
+    label: () => t('画面に出すもの', 'What the window shows'),
+  },
   { id: 'agents', group: 'agents', icon: 'users', label: () => t('共通', 'Shared') },
   { id: 'irori-agent', group: 'agents', icon: 'agent', label: () => 'irori agent' },
   { id: 'vault-agent', group: 'agents', icon: 'layers', label: () => 'vault agent' },
@@ -541,6 +621,8 @@ export function Settings({
     [restoring, setRestoring] = useState(false);
   const shownParts = parts.filter((part) => !(start && part.id === 'updates'));
   const [part, setPart] = useState<PartId>(lastPart);
+  // Each CLI's version, asked for while the part that lists them is on show.
+  const clis = useResource(() => host.agents(), [], { enabled: open && part === 'agents' });
   const [theme, chooseThemeValue] = useChoice(currentTheme, chooseTheme, onError);
   const [font, chooseFont] = useChoice(currentMarkdownFont, chooseMarkdownFont, onError);
   const [margins, chooseMargins] = useChoice(currentPageMargins, choosePageMargins, onError);
@@ -552,6 +634,11 @@ export function Settings({
     onError,
   );
   const setup = useAction();
+  // The window's optional controls (ADR 059); a choice shows on the window at once.
+  const items = useWindowItems();
+  const chooseItems = (choices: Parameters<typeof chooseWindowItems>[0]) =>
+    void chooseWindowItems(choices).catch(onError);
+  const itemsShown = windowItems.filter((item) => items[item]).length;
   const javascript = useRuntime('javascript', onError);
   const python = useRuntime('python', onError);
   // The start screen's language switch changes the language beside these settings.
@@ -587,6 +674,15 @@ export function Settings({
         };
       case 'notes':
         return { text: `${fontLabels[font]()}${list}${sizePixels[size]}px` };
+      case 'window':
+        return {
+          text: itemsShown
+            ? t(
+                `表示中 ${itemsShown} / ${windowItems.length}`,
+                `${itemsShown} of ${windowItems.length} shown`,
+              )
+            : t('すべてオフ', 'All off'),
+        };
       case 'agents':
         return {
           text: t(
@@ -692,6 +788,51 @@ export function Settings({
         </Group>
       </>
     ),
+    window: () => (
+      <>
+        <Group>
+          <Row
+            label={t('まとめて切り替える', 'All at once')}
+            description={t(
+              '既定では、設定や開発向けの項目を画面に出しません。',
+              'By default the window leaves out settings and developer tools.',
+            )}
+          >
+            <span className="settings-row-actions">
+              <button
+                type="button"
+                className="settings-action"
+                disabled={windowItems.every((item) => items[item] === windowItemDefaults[item])}
+                onClick={() => chooseItems(windowItemDefaults)}
+              >
+                {t('既定に戻す', 'Back to default')}
+              </button>
+              <button
+                type="button"
+                className="settings-action"
+                disabled={itemsShown === windowItems.length}
+                onClick={() => chooseItems(everyWindowItem(true))}
+              >
+                {t('すべて出す', 'Show all')}
+              </button>
+            </span>
+          </Row>
+        </Group>
+        {windowItemAreas.map((area) => (
+          <Group key={area.id} title={windowAreaLabels[area.id]()}>
+            {area.items.map((item) => (
+              <SwitchRow
+                key={item}
+                label={windowItemLabels[item]()}
+                description={windowItemNotes[item]()}
+                checked={items[item]}
+                onChange={(on) => chooseItems({ [item]: on })}
+              />
+            ))}
+          </Group>
+        ))}
+      </>
+    ),
     agents: () => (
       <>
         <Group>
@@ -742,6 +883,34 @@ export function Settings({
               <Aside>{t('irori agent の用意が必要です', 'Needs the irori agent')}</Aside>
             )}
           </Row>
+        </Group>
+        <Group title={t('この端末の CLI', 'CLIs on this device')}>
+          {clis.data ? (
+            clis.data.map((cli) => (
+              <Row
+                key={cli.id}
+                label={agentNames[cli.id]}
+                description={
+                  cli.available ? (
+                    <span className="mono">{cli.version}</span>
+                  ) : (
+                    t(
+                      '見つかりません。インストールとログインを確認してください。',
+                      'Not found. Check that it is installed and signed in.',
+                    )
+                  )
+                }
+              >
+                <Aside>{cli.available ? t('使えます', 'Ready') : t('未検出', 'Not found')}</Aside>
+              </Row>
+            ))
+          ) : (
+            <p className="settings-item settings-empty" role="status">
+              {clis.error
+                ? t('CLI を確認できませんでした。', 'Could not check the CLIs.')
+                : t('CLI を確認中…', 'Checking the CLIs…')}
+            </p>
+          )}
         </Group>
       </>
     ),
@@ -955,6 +1124,11 @@ export function Settings({
       t(
         'ノート（Markdown）の文字と幅です。選ぶとすぐに反映され、見本で確かめられます。',
         "A note's type and width. A choice applies at once; the sample shows it.",
+      ),
+    window: () =>
+      t(
+        '画面には、ノートと会話に使うものだけを出しています。ここでオンにした項目が画面に加わり、選ぶとすぐに反映されます。',
+        'The window shows what a note and a conversation need. An item turned on here joins it at once.',
       ),
     agents: () =>
       t(

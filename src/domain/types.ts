@@ -474,6 +474,11 @@ export interface DeviceSettings {
   skillAudiences: Record<string, import('./skills').SkillAudience>;
   /** The runtimes routines may use on this device, added by the person. */
   routineRuntimes: import('./routines').RoutineRuntime[];
+  /**
+   * Which optional controls the window shows (ADR 059), as the person chose them;
+   * an item absent here follows its default.
+   */
+  windowItems: import('./window-items').WindowItemChoices;
 }
 
 export interface HostAPI {

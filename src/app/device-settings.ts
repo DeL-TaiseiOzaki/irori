@@ -1,6 +1,12 @@
 import type { DeviceSettings } from '../domain/types';
 import { setLanguage } from '../domain/i18n';
 import type { SkillAudience } from '../domain/skills';
+import {
+  windowItems,
+  windowItemsShown,
+  type WindowItemChoices,
+  type WindowItems,
+} from '../domain/window-items';
 
 const host = window.irori;
 
@@ -24,7 +30,19 @@ let current: DeviceSettings = {
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
   routineRuntimes: [],
+  windowItems: {},
 };
+
+// What the window shows of its optional controls (ADR 059). One object per
+// state, replaced only when an item changes, so a reader re-renders only then.
+let shownItems: WindowItems = windowItemsShown(current.windowItems);
+const itemListeners = new Set<() => void>();
+function applyWindowItems(settings: DeviceSettings = current) {
+  const next = windowItemsShown(settings.windowItems);
+  if (windowItems.every((item) => next[item] === shownItems[item])) return;
+  shownItems = next;
+  for (const listener of itemListeners) listener();
+}
 
 /**
  * Writes a choice to the device record. One the window shows is applied at once,
@@ -49,7 +67,25 @@ export async function loadDeviceSettings() {
   } catch {
     // Defaults are a working application; a broken read must not block startup.
   }
+  applyWindowItems();
   return current;
+}
+
+/** Each optional control of the window, shown or not: the person's choice or its default. */
+export function currentWindowItems() {
+  return shownItems;
+}
+
+export function onWindowItemsChange(listener: () => void) {
+  itemListeners.add(listener);
+  return () => {
+    itemListeners.delete(listener);
+  };
+}
+
+/** Puts items on the window or takes them off; the others keep their choice. */
+export function chooseWindowItems(choices: WindowItemChoices) {
+  return save({ windowItems: { ...current.windowItems, ...choices } }, applyWindowItems);
 }
 
 export function currentTheme() {
@@ -236,5 +272,6 @@ export async function reloadDeviceSettings() {
   applyPageMargins();
   applyText();
   applyLanguage();
+  applyWindowItems();
   return current;
 }

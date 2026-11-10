@@ -1,5 +1,33 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A window that shows the work, 2026-11-10 (**0.2.63**, pull request open, not
+published; [ADR 059](decisions/059-the-window-shows-the-work.md)): the owner
+pointed to Antigravity's Knowledge Work layout and asked for its simplicity: no
+settings on the basic interface, and everything that can be set, down to whether
+a thing is shown, in the settings.
+- `src/domain/window-items.ts` names eight window items with their defaults:
+  `access`, `model`, `personLines`, `columns`, `branch`, `terminal`, `version`
+  off and `skill` on. `DeviceSettings.windowItems` keeps only what the person
+  chose; the same schema serves the device record, the save request and the
+  saved environment's preferences.
+- `useWindowItems` reads them in `AgentColumn` (access, model and thinking
+  level, skill, person's lines, add a column, hide the page), `StatusBar`
+  (branch, terminal, version) and `BrainHome` (terminal). Full access, an open
+  terminal and a hidden page keep their control while the item is off. A skill
+  and the person's lines are not sent while theirs is off.
+- `Settings` gains 表示 → 画面に出すもの (switches by area, すべて出す, 既定に戻す,
+  表示中 n / 8 on the entry) and エージェント → 共通 → この端末の CLI, which
+  replaces the conversation's 会話と接続 menu. The composer's 到達確認 is gone;
+  the vault's home keeps it. The sheet is 720 px high.
+- `window-items-ui-smoke` is new. Seven smokes about these controls turn every
+  item on through `tests/fixtures/window-items.ts`; `harness-ui-smoke` reads the
+  CLI's version from the settings and `skills-ui-smoke` checks reach from the
+  home. Screens inspected under Xvfb in Japanese with and without the vault
+  agent; not seen on Windows or macOS.
+- Open: the model itself is still chosen only in the composer, so a person who
+  wants another model turns the item on. A note's actions and the vault panel's
+  sections are not items.
+
 Sheet tabs along the bottom, 2026-11-09 (**0.2.62**,
 [#309](https://github.com/DeL-TaiseiOzaki/irori/pull/309), published as `v0.2.62-preview.1`):
 the owner asked that a spreadsheet's sheet tabs always show along the bottom, as

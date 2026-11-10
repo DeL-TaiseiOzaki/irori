@@ -7,6 +7,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 // Your AI in the Overview: set up its folder, hand work to a vault's agent with
 // `irori call` (ADR 050), answer that agent's request where your AI's are
@@ -48,6 +49,7 @@ await writeFile(
   { mode: 0o700 },
 );
 await chooseJapanese(files.dataDir);
+await showEveryWindowItem(files.dataDir);
 const env = {
   ...process.env,
   HOME: home,
