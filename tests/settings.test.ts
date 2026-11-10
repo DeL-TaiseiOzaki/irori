@@ -12,6 +12,12 @@ import {
   pageMargins,
   textSizes,
 } from '../src/domain/types';
+import {
+  everyWindowItem,
+  windowItemDefaults,
+  windowItems,
+  windowItemsShown,
+} from '../src/domain/window-items';
 
 const defaults = {
   theme: 'system',
@@ -28,6 +34,7 @@ const defaults = {
   skillAudiences: {},
   yourAi: { agent: 'claude', models: {} },
   routineRuntimes: [],
+  windowItems: {},
 };
 
 async function service() {
@@ -138,6 +145,65 @@ test('new conversations start in standard access until the person chooses full a
     hostArguments.saveDeviceSettings.safeParse([{ agentAccess: 'everything' }]).success,
     false,
   );
+});
+
+test('the window leaves its optional controls out until the person shows them', async () => {
+  // Settings and a developer's tools are off the window; the skill of a request stays.
+  assert.deepEqual(windowItemsShown(), windowItemDefaults);
+  assert.deepEqual(
+    windowItems.filter((item) => windowItemDefaults[item]),
+    ['skill'],
+  );
+  // An item never chosen follows its default, whatever else was chosen.
+  assert.deepEqual(windowItemsShown({ terminal: true, skill: false }), {
+    ...windowItemDefaults,
+    terminal: true,
+    skill: false,
+  });
+  assert.deepEqual(
+    Object.values(everyWindowItem(true)),
+    windowItems.map(() => true),
+  );
+});
+
+test('each window item is kept as chosen, beside the others and across a restart', async () => {
+  const { dir, settings } = await service();
+  // A record from before the items existed holds no choice: every item at its default.
+  await writeFile(path.join(dir, 'device-settings.json'), JSON.stringify({ theme: 'dark' }));
+  assert.deepEqual((await settings.read()).windowItems, {});
+  await settings.save({ windowItems: { terminal: true } });
+  await settings.save({ windowItems: { model: true, skill: false } });
+  await settings.save({ theme: 'light' });
+  const kept = await new SettingsService(dir).read();
+  // Only what was chosen is written, so a default that changes later still reaches the rest.
+  assert.deepEqual(kept.windowItems, { terminal: true, model: true, skill: false });
+  assert.deepEqual(windowItemsShown(kept.windowItems), {
+    ...windowItemDefaults,
+    terminal: true,
+    model: true,
+    skill: false,
+  });
+  await settings.save({ windowItems: { terminal: false } });
+  assert.equal((await new SettingsService(dir).read()).windowItems.terminal, false);
+  const save = hostArguments.saveDeviceSettings;
+  for (const item of windowItems)
+    assert.equal(save.safeParse([{ windowItems: { [item]: true } }]).success, true);
+  assert.equal(save.safeParse([{ windowItems: { terminal: 'on' } }]).success, false);
+  // The request keeps the choices; an item this version does not know is dropped, not refused.
+  assert.deepEqual(save.parse([{ windowItems: { terminal: true, minimap: true } }]), [
+    { windowItems: { terminal: true } },
+  ]);
+});
+
+test('a window item a later version added does not cost this version its other settings', async () => {
+  const { dir, settings } = await service();
+  await writeFile(
+    path.join(dir, 'device-settings.json'),
+    JSON.stringify({ theme: 'dark', windowItems: { terminal: true, minimap: true } }),
+  );
+  const read = await settings.read();
+  assert.equal(read.theme, 'dark');
+  assert.deepEqual(read.windowItems, { terminal: true });
 });
 
 test('side margins stay as chosen, and a record without them keeps the reading column', async () => {

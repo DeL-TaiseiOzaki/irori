@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { skillVisible, type AgentSkill, type SkillAudience } from '../domain/skills';
 import { chooseSkillAudience, currentSkillAudience } from './device-settings';
-import { SkillReach } from './SkillReach';
 import { t } from '../domain/i18n';
 
 /**
  * The composer's skill choice for one KB. A reader who chose a role or project on
  * this device sees the skills for it plus the unscoped ones; the choice never
  * enters the KB. Mount with `key={scopeId}` so a space change starts afresh.
+ * Which CLI finds which skill is checked from the vault's home, not here (ADR 059).
  */
 export function SkillPicker({
   scopeId,
@@ -23,7 +23,6 @@ export function SkillPicker({
   disabled: boolean;
 }) {
   const [audience, setAudience] = useState(() => currentSkillAudience(scopeId));
-  const [reach, setReach] = useState(false);
   const declared = (key: 'roles' | 'projects', chosen?: string) =>
     [...new Set([...skills.flatMap((s) => s[key]), ...(chosen ? [chosen] : [])])].sort();
   const roles = declared('roles', audience.role);
@@ -86,10 +85,6 @@ export function SkillPicker({
           ))}
         </select>
       )}
-      <button type="button" disabled={disabled} onClick={() => setReach(true)}>
-        {t('到達確認', 'Check reach')}
-      </button>
-      {reach && <SkillReach scopeId={scopeId} onClose={() => setReach(false)} />}
     </>
   );
 }

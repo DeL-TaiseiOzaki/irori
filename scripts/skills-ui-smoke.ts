@@ -95,7 +95,25 @@ try {
   for (const name of ['スキル検証', '素のKB'])
     await page.getByRole('checkbox', { name: new RegExp(name) }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
+  // The reach view names home-relative directories only, never the machine path.
+  // The vault's home offers the check; the composer has no button for it (ADR 059).
+  await page.getByRole('button', { name: '到達確認' }).click();
+  const reach = page.getByRole('dialog', { name: 'スキルの到達' });
+  await expect(reach).toContainText('Claude Code');
+  await expect(reach).toContainText(
+    'irori が渡す。同名が ~/.claude/skills にあり、そちらが優先される',
+  );
+  await expect(reach).toContainText('退役した名前が ~/.agents/skills に残っている');
+  // Hermes Agent finds a KB's skills only in a trusted project, so irori names them (ADR 058).
+  await expect(reach).toContainText('irori が依頼の中で伝える');
+  expect(await reach.textContent()).not.toContain(home);
+  await reach.getByRole('button', { name: '閉じる' }).click();
+  await expect(reach).toHaveCount(0);
+
   await page.getByRole('button', { name: 'vault agent', exact: true }).click();
+  await expect(page.locator('.agent-panel').getByRole('button', { name: '到達確認' })).toHaveCount(
+    0,
+  );
   await page.getByLabel('エージェント', { exact: true }).selectOption('pi');
 
   const picker = page.getByLabel('スキル', { exact: true });
@@ -135,21 +153,6 @@ try {
   ]);
   await role.selectOption('');
   await expect(picker.locator('option')).toHaveCount(4);
-
-  // The reach view names home-relative directories only, never the machine path.
-  // The composer's own reach check; the brain's home offers the same one.
-  await page.locator('.agent-panel').getByRole('button', { name: '到達確認' }).click();
-  const reach = page.getByRole('dialog', { name: 'スキルの到達' });
-  await expect(reach).toContainText('Claude Code');
-  await expect(reach).toContainText(
-    'irori が渡す。同名が ~/.claude/skills にあり、そちらが優先される',
-  );
-  await expect(reach).toContainText('退役した名前が ~/.agents/skills に残っている');
-  // Hermes Agent finds a KB's skills only in a trusted project, so irori names them (ADR 058).
-  await expect(reach).toContainText('irori が依頼の中で伝える');
-  expect(await reach.textContent()).not.toContain(home);
-  await reach.getByRole('button', { name: '閉じる' }).click();
-  await expect(reach).toHaveCount(0);
 
   await picker.selectOption('distill');
   // A run may add a package. It must appear when the run settles without clearing the choice.

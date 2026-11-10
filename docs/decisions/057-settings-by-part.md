@@ -3,6 +3,8 @@
 Date: 2026-11-07. Status: owner request; implemented for 0.2.60.
 Supersedes decisions 2 and 3 of [ADR 055](055-settings-sheet.md); the sheet
 itself (decision 1) and a choice applying at once (decision 4) stay.
+[ADR 059](059-the-window-shows-the-work.md) adds **画面に出すもの** to 表示 and
+the CLIs' versions to **共通**.
 
 ## Context
 

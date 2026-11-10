@@ -35,6 +35,15 @@ disagree, this section stands.
   Every row has a visible description; a choice is tiles with the chosen one in
   the focus colour and a check, on/off is a switch that says オン/オフ, and a
   setting kept elsewhere is **開く** with a chevron.
+- **The window and its items** ([ADR 059](decisions/059-the-window-shows-the-work.md)).
+  The window holds the work and the way to it: the note, the conversation, the
+  vault's files. A control that sets how irori behaves, or a developer's tool,
+  is a _window item_ (`src/domain/window-items.ts`): drawn only where
+  `useWindowItems()` says so and listed under 表示 → 画面に出すもの with what it
+  adds and what holds while it is off. Do not add a setting to the window. Add
+  it to the settings, and make it an item if a person may want it at hand. What
+  is in use (full access, an open terminal, a hidden page) keeps its control in
+  view.
 - **Checking.** `tsx scripts/ui-screens.ts hearth-ja dark-en light-ja`, as for v5.
 
 ## v5 — brains, your AI and each brain's AI (2026-09-25)

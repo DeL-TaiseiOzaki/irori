@@ -831,7 +831,7 @@
   position: relative;
   width: min(960px, calc(100vw - 48px));
   /* Clear of the title bar, which moves the window wherever it is pressed. */
-  height: min(680px, calc(100vh - 104px));
+  height: min(720px, calc(100vh - 104px));
   display: grid;
   grid-template-columns: 252px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -1358,6 +1358,16 @@
 }
 .settings-body button.settings-open > svg {
   color: var(--tx-3);
+}
+/* Buttons that act on the part on show, side by side at a row's end. */
+.settings-row-actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.settings-body button.settings-action {
+  flex: none;
+  padding: 0 12px;
 }
 /* The irori agent's folder: its path above its buttons, as the other rows' text. */
 .settings-folder {

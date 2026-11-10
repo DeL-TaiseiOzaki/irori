@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 /** The note's human-line count, read from its details popover. */
 async function authorship(page: import('@playwright/test').Page) {
@@ -60,6 +61,7 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
   { mode: 0o700 },
 );
 await chooseJapanese(files.dataDir);
+await showEveryWindowItem(files.dataDir);
 const env = {
   ...process.env,
   PATH: bin + path.delimiter + process.env.PATH,
@@ -83,8 +85,19 @@ try {
   await page.getByRole('checkbox', { name: /ハーネス検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   await page.getByRole('button', { name: 'vault agent', exact: true }).click();
-  const settings = () => page.getByRole('button', { name: '会話と接続', exact: true });
-  await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
+  // A CLI's version is in the settings, not on the conversation (ADR 059).
+  await expect(page.getByRole('button', { name: '会話と接続', exact: true })).toHaveCount(0);
+  const settings = page.getByRole('button', { name: /^設定（/ });
+  await settings.click();
+  const sheet = page.getByRole('dialog', { name: '設定', exact: true });
+  await sheet
+    .getByRole('navigation', { name: '設定の項目' })
+    .getByRole('button', { name: '共通' })
+    .click();
+  // Each fixture CLI answers `--version` with its name and "fixture".
+  await expect(sheet.getByText(/\d fixture$/).first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
   await page.getByRole('button', { name: '新しい会話', exact: true }).click();
   await expect(page.getByLabel('エージェントへの指示')).toBeFocused();
   for (const agent of ['pi', 'opencode']) {
@@ -96,12 +109,6 @@ try {
     if (agent === 'pi') {
       await expect(page.getByLabel('エージェントのアクセス', { exact: true })).toBeDisabled();
     }
-    await settings().click();
-    // The CLI's version line; the model list, now quicker to arrive, also says fixture.
-    await expect(page.getByText(/\d fixture$/).first()).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(settings()).toBeFocused();
-    await expect(page.locator('.agent-settings-sheet')).not.toBeVisible();
     await page.getByLabel('エージェントへの指示').fill('dialog');
     await page.getByRole('button', { name: '送信', exact: true }).click();
     if (agent === 'pi') {

@@ -32,6 +32,7 @@ export const environmentPreferences = [
   'vaultAgent',
   'yourAi',
   'routineRuntimes',
+  'windowItems',
 ] as const satisfies readonly (keyof DeviceSettings)[];
 export type EnvironmentPreferences = Partial<
   Pick<DeviceSettings, (typeof environmentPreferences)[number]>
