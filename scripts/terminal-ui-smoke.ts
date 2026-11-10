@@ -4,6 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
+import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 const base = await mkdtemp(path.join(tmpdir(), 'irori terminal UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
@@ -17,6 +18,7 @@ const you = path.join(home, 'irori', 'you');
 await mkdir(you, { recursive: true });
 await writeFile(path.join(you, 'AGENTS.md'), '# irori agent\n');
 await chooseJapanese(files.dataDir);
+await showEveryWindowItem(files.dataDir);
 const env = { ...process.env, HOME: home, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({

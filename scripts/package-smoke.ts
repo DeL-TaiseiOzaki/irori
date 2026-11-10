@@ -11,6 +11,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { ontologyFixture } from '../tests/fixtures/ontology';
 import { SettingsService } from '../src/host/settings';
+import { everyWindowItem } from '../src/domain/window-items';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
@@ -203,7 +204,12 @@ try {
   // The packaged run exercises the vault agent, which is off until turned on (ADR 021).
   await mkdir(env.IRORI_DATA_DIR, { recursive: true });
   // The checks below read the interface in Japanese; a new device starts in English (ADR 011).
-  await new SettingsService(env.IRORI_DATA_DIR).save({ vaultAgent: true, language: 'ja' });
+  // They also use the terminal's button, which a new device's window leaves out (ADR 059).
+  await new SettingsService(env.IRORI_DATA_DIR).save({
+    vaultAgent: true,
+    language: 'ja',
+    windowItems: everyWindowItem(true),
+  });
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_PATH;
   delete env.NODE_OPTIONS;

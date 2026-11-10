@@ -18,6 +18,7 @@ import { externalUrl } from './links';
 import { languages } from './i18n';
 import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
+import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
@@ -90,6 +91,7 @@ export const hostArguments = {
       skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
       yourAi: yourAiChoice.optional(),
       routineRuntimes: routineRuntimeList.optional(),
+      windowItems: windowItemChoices.optional(),
     }),
   ]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),

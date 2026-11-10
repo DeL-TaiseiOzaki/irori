@@ -12,6 +12,7 @@ import { Icon, type IconName } from './Icon';
 import { SkillReach } from './SkillReach';
 import { VaultRepositories } from './VaultRepositories';
 import { useResource } from './useResource';
+import { useWindowItems } from './useWindowItems';
 import { countLabel, shortWhen } from './display';
 import type { Listing } from './BrainPanel';
 
@@ -143,6 +144,7 @@ export function BrainHome({
   onSettings: () => void;
 }) {
   const [reach, setReach] = useState(false);
+  const shown = useWindowItems();
   const knowledgeRoot = roots?.entries.some(
     (entry) => entry.path === knowledgeFolder(space) && entry.directory,
   );
@@ -242,10 +244,12 @@ export function BrainHome({
             <Icon name="plus" size={15} />
             {t('ノートを作成', 'Create note')}
           </button>
-          <button className="stage-text-button" onClick={onTerminal}>
-            <Icon name="terminal" size={15} />
-            {t('ターミナル', 'Terminal')}
-          </button>
+          {shown.terminal && (
+            <button className="stage-text-button" onClick={onTerminal}>
+              <Icon name="terminal" size={15} />
+              {t('ターミナル', 'Terminal')}
+            </button>
+          )}
         </div>
       </header>
       <div className="home-body">

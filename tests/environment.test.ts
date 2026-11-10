@@ -106,7 +106,12 @@ async function deviceA(f: Awaited<ReturnType<typeof fixture>>) {
       open: true,
     },
   ]);
-  await f.a.settings.save({ theme: 'dark', language: 'en', layouts: { device: 'only' } });
+  await f.a.settings.save({
+    theme: 'dark',
+    language: 'en',
+    layouts: { device: 'only' },
+    windowItems: { terminal: true },
+  });
   git(f.a.dir, 'clone', '--quiet', f.you.url, f.a.agentRoot);
   return { research, plain, lab };
 }
@@ -160,6 +165,8 @@ test('a device saves its GitHub vaults, workspaces and preferences to a private 
   ]);
   assert.ok(!JSON.stringify(saved).includes(plain.scopeId));
   assert.equal(saved.preferences.theme, 'dark');
+  // What the person put on the window follows them (ADR 059).
+  assert.deepEqual(saved.preferences.windowItems, { terminal: true });
   assert.equal(saved.preferences.language, 'en');
   assert.equal('layouts' in saved.preferences, false);
   assert.deepEqual(saved.agent, { repository: 'octo/you' });
@@ -226,6 +233,7 @@ test('another device restores the vaults, workspaces, preferences and irori agen
   );
   const settings = await f.b.settings.read();
   assert.equal(settings.theme, 'dark');
+  assert.deepEqual(settings.windowItems, { terminal: true });
   assert.equal(settings.language, 'en');
   assert.deepEqual(settings.layouts, {});
 

@@ -105,7 +105,8 @@ vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
   the device (`yourAi` in the device settings).
 - It starts in the **standard** access on every CLI (`defaultAgentAccess`, as
   for a vault agent); full access is the person's choice for a conversation.
-  Each column has the same access pill as a vault agent's composer; a choice
+  Each column has the same access choice as a vault agent's composer (in the
+  conversation's menu since 0.2.63); a choice
   holds for the chosen CLI until the CLI changes, like the composer's, and is
   not kept across a restart or a workspace switch, where it returns to
   standard. Pi offers only its own settings. The owner accepts that the irori
@@ -254,8 +255,9 @@ agent sets up the person's vaults.
 - **Map:** the irori agent's orb at the hearth. A line runs to each vault with
   a hand-off under way from any thread on show or running, with a spark moving along it unless less motion is asked
   for. The vault glows.
-- **The irori agent's columns:** the access pill (standard by default) beside
-  the model pill, and the CLI select in the header.
+- **The irori agent's columns:** the conversation's menu under the instruction
+  box (model, thinking level, and the access, standard by default), and the CLI
+  select in the header.
 - **The irori agent's screen** (the orb, or the mark at the start of an irori
   mode column): its
   Schema as the same settings a vault has ([SKILLS](SKILLS.md#schema-settings)):

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { Popover } from '@base-ui/react/popover';
 import {
   agentIds,
   agentNames,
@@ -23,20 +22,21 @@ import {
   withRequests,
   type QueuedMessage,
 } from '../domain/conversation';
-import { agentAccessLabel, agentAccessOptions, conversationAccess } from '../domain/agent-access';
+import { agentAccessLabel, conversationAccess } from '../domain/agent-access';
 import { retirementNotice, type AgentSkill, type SkillProblem } from '../domain/skills';
 import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
 import { useDraft } from './useDraft';
 import { useLanguage } from './useLanguage';
 import { useResource } from './useResource';
+import { useWindowItems } from './useWindowItems';
 import { AgentLog } from './AgentLog';
 import { PathBase, PathOpenerContext, type PathOpener } from './path-links';
 import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
-import { EffortPicker, ModelPicker } from './ModelPicker';
+import { RunSettings } from './RunSettings';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
@@ -223,6 +223,8 @@ export function AgentColumn({
 }) {
   // The column sits behind a memo boundary, so it follows the language itself.
   useLanguage();
+  // The controls the settings put on the window (ADR 059); the rest stay off it.
+  const shown = useWindowItems();
   const irori = column.owner === 'irori';
   const scopeId = irori ? you?.id : space?.scopeId;
   const ready = irori ? you?.state === 'ready' : !!space;
@@ -518,8 +520,9 @@ export function AgentColumn({
       ...common,
       notePath: noteInContext ? doc!.path : undefined,
       sources,
-      skill: skill || undefined,
-      personLines: (personLines && personLinesOffered) || undefined,
+      // A choice whose control is off the window is not sent: the person cannot see it.
+      skill: (shown.skill && skill) || undefined,
+      personLines: (shown.personLines && personLines && personLinesOffered) || undefined,
     };
   }
   async function start() {
@@ -849,49 +852,19 @@ export function AgentColumn({
         >
           <Icon name="history" size={16} />
         </button>
-        <Popover.Root>
-          <Popover.Trigger
-            className="icon-button agent-settings"
-            aria-label={t('会話と接続', 'Conversation and connection')}
-            title={t('会話と接続', 'Conversation and connection')}
+        {shown.columns && (
+          <button
+            className="icon-button"
+            aria-label={t('列を追加', 'Add a column')}
+            title={t('列を追加', 'Add a column')}
+            disabled={!canSplit}
+            onClick={onSplit}
           >
-            <Icon name="more" size={16} />
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Positioner side="bottom" align="end" sideOffset={6}>
-              {/* Opening with the pointer left the close button focused.
-                  Keyboard users still get the default focus move. */}
-              <Popover.Popup
-                className="agent-settings-sheet"
-                initialFocus={(interaction) => interaction === 'keyboard'}
-              >
-                <div className="agent-settings-heading">
-                  <Popover.Title render={<strong />}>
-                    {t('会話と接続', 'Conversation and connection')}
-                  </Popover.Title>
-                  <Popover.Close className="icon-button" aria-label={t('閉じる', 'Close')}>
-                    <Icon name="close" />
-                  </Popover.Close>
-                </div>
-                <p>
-                  {agentNames[agent]}{' '}
-                  <span>{agentInfo?.version || t('CLIを確認中', 'Checking the CLI')}</span>
-                </p>
-                {agentInfo?.available === false && <p role="alert">{agentInfo.detail}</p>}
-              </Popover.Popup>
-            </Popover.Positioner>
-          </Popover.Portal>
-        </Popover.Root>
-        <button
-          className="icon-button"
-          aria-label={t('列を追加', 'Add a column')}
-          title={t('列を追加', 'Add a column')}
-          disabled={!canSplit}
-          onClick={onSplit}
-        >
-          <Icon name="split" size={16} />
-        </button>
-        {stage && (
+            <Icon name="split" size={16} />
+          </button>
+        )}
+        {/* A hidden page keeps its button, so it can always be shown again. */}
+        {stage && (shown.columns || stage.hidden) && (
           <button
             className="icon-button"
             aria-pressed={stage.hidden}
@@ -1086,6 +1059,36 @@ export function AgentColumn({
             element.scrollHeight - element.scrollTop - element.clientHeight < 80;
         }}
       >
+        {/* Before anything is said: who this agent is, in one sentence. Not part of the log. */}
+        {ready && shownBlank && (
+          <div className="conversation-empty" aria-hidden="true">
+            <span className="conversation-empty-mark">
+              <Icon name="agent" size={20} />
+            </span>
+            <strong>
+              {irori
+                ? 'irori agent'
+                : t(`${space?.name} の vault agent`, `${space?.name}'s vault agent`)}
+            </strong>
+            <p>
+              {irori
+                ? t(
+                    'ワークスペース全体を受け持ち、vault ごとの仕事はその vault のエージェントに任せます。',
+                    "Works across the workspace and hands each vault's work to that vault's agent.",
+                  )
+                : t(
+                    'この vault の Schema に従って、ノートの相談や編集を引き受けます。',
+                    "Follows this vault's Schema to answer about its notes and edit them.",
+                  )}
+            </p>
+            <span className="conversation-empty-keys">
+              <kbd>/</kbd>
+              {t('コマンド', 'Commands')}
+              <kbd>Enter</kbd>
+              {t('送信', 'Send')}
+            </span>
+          </div>
+        )}
         <PathOpenerContext.Provider value={shared.paths}>
           <PathBase.Provider value={space?.scopeId ?? you?.id}>
             <AgentLog
@@ -1310,61 +1313,20 @@ export function AgentColumn({
             <div className="composer-selects">
               <AttachButton attachments={attachments} disabled={!ready || sending} />
               <DictateButton field={textarea} disabled={!ready || sending} onError={report} />
-              {!irori && space && (skills.length > 0 || skillsRetired.length > 0) && (
-                <SkillPicker
-                  key={space.scopeId}
-                  scopeId={space.scopeId}
-                  skills={skills}
-                  value={skill}
-                  onChange={setSkill}
-                  disabled={sending || gitBusy}
-                />
-              )}
-              <label className="composer-pill">
-                <Icon name="shield" size={13} />
-                <select
-                  aria-label={t('エージェントのアクセス', 'Agent access')}
-                  value={access}
-                  // A running turn keeps the access it started with; the choice applies after it.
-                  title={
-                    shownRunning
-                      ? t(
-                          '実行中の処理は開始時のアクセスのまま続きます。',
-                          'The running turn keeps the access it started with.',
-                        )
-                      : undefined
-                  }
-                  disabled={
-                    shownRunning ||
-                    sending ||
-                    gitBusy ||
-                    // Chosen for the conversation on show, so not while another is coming.
-                    !conversationReady ||
-                    agentAccessOptions(agent).length === 1
-                  }
-                  onChange={(e) => onAccess(e.target.value as AgentAccess)}
-                >
-                  {agentAccessOptions(agent).map((value) => (
-                    <option key={value} value={value}>
-                      {agentAccessLabel(agent, value)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <ModelPicker
-                agent={agent}
-                value={model ?? ''}
-                disabled={sending || gitBusy}
-                onChange={onModel}
-              />
-              <EffortPicker
-                agent={agent}
-                model={model ?? ''}
-                value={effort ?? ''}
-                disabled={sending || gitBusy}
-                onChange={onEffort}
-              />
-              {personLinesOffered && (
+              {shown.skill &&
+                !irori &&
+                space &&
+                (skills.length > 0 || skillsRetired.length > 0) && (
+                  <SkillPicker
+                    key={space.scopeId}
+                    scopeId={space.scopeId}
+                    skills={skills}
+                    value={skill}
+                    onChange={setSkill}
+                    disabled={sending || gitBusy}
+                  />
+                )}
+              {shown.personLines && personLinesOffered && (
                 <label className={`composer-pill toggle ${personLines ? 'pressed' : ''}`}>
                   <input
                     type="checkbox"
@@ -1378,6 +1340,29 @@ export function AgentColumn({
               )}
             </div>
             <div className="composer-send">
+              {/* Full access stays in view wherever it is in use (ADR 053). */}
+              <RunSettings
+                agent={agent}
+                model={model ?? ''}
+                effort={effort ?? ''}
+                access={access}
+                show={{ model: shown.model, access: shown.access || access === 'full-access' }}
+                disabled={sending || gitBusy}
+                // Chosen for the conversation on show, so not while another is coming.
+                accessDisabled={shownRunning || sending || gitBusy || !conversationReady}
+                // A running turn keeps the access it started with; the choice applies after it.
+                accessNote={
+                  shownRunning
+                    ? t(
+                        '実行中の処理は開始時のアクセスのまま続きます。',
+                        'The running turn keeps the access it started with.',
+                      )
+                    : undefined
+                }
+                onModel={onModel}
+                onEffort={onEffort}
+                onAccess={onAccess}
+              />
               {shownRunning && (
                 <button
                   className="icon-button stop"
