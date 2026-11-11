@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Full access asks nothing at the start, 2026-11-11 (**0.2.64**, not yet merged or
-published; [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)):
+Full access asks nothing at the start, 2026-11-11 (**0.2.64**,
+[#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313), published as
+`v0.2.64-preview.1`; [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)):
 the owner reported an unexplained permission window when a session started in
 full access, and said full access had already allowed it. It was the
 main-process dialog of `config-approval.ts` (0.2.54), which asked about
