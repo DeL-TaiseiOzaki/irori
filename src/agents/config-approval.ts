@@ -117,15 +117,33 @@ export class ConfigApprovals {
     return !(await this.changed(agent, places, extra)).changed.length;
   }
   /** Asks about what changed since the person allowed it; refuses when they do not allow it. */
-  check(agent: AgentId, places: ConfigPlace[], extra: FoundConfig[] = []): Promise<void> {
+  async check(agent: AgentId, places: ConfigPlace[], extra: FoundConfig[] = []): Promise<void> {
+    await this.settle(agent, places, extra, (changed) => this.ask(changed));
+  }
+  /**
+   * Records what changed as allowed without asking, and returns it: a run in full
+   * access, which the person let act without asking (ADR 009), loads it by that
+   * choice. Once it has run here, asking about the same content again protects
+   * nothing; a later change is asked about as usual.
+   */
+  allow(agent: AgentId, places: ConfigPlace[], extra: FoundConfig[] = []) {
+    return this.settle(agent, places, extra, async () => true);
+  }
+  private settle(
+    agent: AgentId,
+    places: ConfigPlace[],
+    extra: FoundConfig[],
+    decide: (changed: FoundConfig[]) => Promise<boolean>,
+  ): Promise<FoundConfig[]> {
     // One question at a time, so two runs of one vault do not ask twice.
     const next = this.queue.then(async () => {
       const { allowed, changed } = await this.changed(agent, places, extra);
-      if (!changed.length) return;
-      if (!(await this.ask(changed))) throw new ConfigRefused();
+      if (!changed.length) return changed;
+      if (!(await decide(changed))) throw new ConfigRefused();
       for (const item of changed) allowed[item.root] = item.digest;
       await fs.mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
       await writeFileAtomic(this.file, JSON.stringify(allowed, null, 2) + '\n', { mode: 0o600 });
+      return changed;
     });
     this.queue = next.catch(() => {});
     return next;

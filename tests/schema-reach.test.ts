@@ -1195,3 +1195,32 @@ test(
     );
   },
 );
+
+test(
+  'a run in full access takes the Schema hooks without the dialog and names them; a later change is asked about',
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    const guard = (command: string) =>
+      hooksJson({ PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] });
+    await h.settings.write(h.space.scopeId, '.claude/settings.json', guard('exit 0'), null);
+    const full = await h.execute('opencode', 'one', { access: 'full-access' });
+    assert.equal(full.at(-1)?.outcome, 'completed', JSON.stringify(full));
+    assert.deepEqual(h.approvals, []);
+    assert.ok(
+      full.some(
+        (event) =>
+          event.type === 'status' &&
+          /確認せずに使います|used without a question/.test(event.text) &&
+          /このフォルダの Schema のフック|This folder's Schema hooks/.test(event.text),
+      ),
+    );
+    // What ran in full access is not asked about again in standard access.
+    assert.equal((await h.execute('opencode', 'two')).at(-1)?.outcome, 'completed');
+    assert.deepEqual(h.approvals, []);
+    const settings = await h.settings.read(h.space.scopeId, '.claude/settings.json');
+    await h.settings.write(h.space.scopeId, '.claude/settings.json', guard('true'), settings.hash);
+    assert.equal((await h.execute('opencode', 'three')).at(-1)?.outcome, 'completed');
+    assert.equal(h.approvals.length, 1);
+  },
+);

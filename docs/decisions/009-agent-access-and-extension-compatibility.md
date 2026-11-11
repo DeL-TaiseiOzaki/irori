@@ -53,6 +53,20 @@ The choice stays on the device (`device-settings.json`) and is not part of the
 environment saved to GitHub, so restoring on another device does not start its
 agents in full access.
 
+**Full access takes the configuration that runs without asking** (2026-11-11,
+0.2.64, an owner report). Since 0.2.54 a run whose folder holds configuration
+that acts without asking (Claude Code's project settings and `.mcp.json`,
+OpenCode's config and plugins, Pi's extensions, a connected folder's `.claude`,
+the Schemas' hooks) waited for a main-process dialog, in full access too. The
+owner reported it as an unexplained permission window at the start of a session
+in full access: full access was allowed, so this was allowed. A run in full
+access now takes that configuration without the dialog, and its log names what
+it took. What it took is recorded as allowed, because it has already run on
+this device; a later change is asked about again in standard access. Questions
+stay interactive in full access, as above. The confirmation of the irori
+agent's `irori add`, `connect`, `work`, `remove` and `run`, and the question
+whether to run without a Schema guard hook a CLI cannot run, are unchanged.
+
 The owner clarified that the requirement is **the capabilities available to an
 ordinary native CLI agent**, including its file and command tools, through
 irori. Editor syntax coloring, completion, diagnostics and run buttons are
