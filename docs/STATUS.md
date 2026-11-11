@@ -1,5 +1,26 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Full access asks nothing at the start, 2026-11-11 (**0.2.64**, not yet merged or
+published; [ADR 009](decisions/009-agent-access-and-extension-compatibility.md)):
+the owner reported an unexplained permission window when a session started in
+full access, and said full access had already allowed it. It was the
+main-process dialog of `config-approval.ts` (0.2.54), which asked about
+configuration that runs without asking whatever the run's access.
+- `ConfigApprovals.allow` records what changed as allowed without asking and
+  returns it; `check` and `allow` share one queue (`settle`). `AgentService`
+  calls `allow` for a run in full access and `check` otherwise, and a full-access
+  run's log names what it took (`configNames`: a label for what irori passes,
+  paths for files).
+- What a full-access run took counts as allowed for later runs in standard
+  access, since it has already run here; a change asks again. The `/` command
+  list therefore includes the folder's own settings after a full-access run too.
+- Unchanged: questions, `AgentSetup`'s confirmation of `irori add`, `connect`,
+  `work`, `remove` and `run`, `acceptMissingHooks` and Git's configuration
+  approval.
+- `tests/config-approval.test.ts` and `tests/schema-reach.test.ts` (OpenCode
+  fixture in full access, then standard before and after a hook change) cover
+  it. Not tried with real CLI accounts, on Windows or on macOS.
+
 A window that shows the work, 2026-11-10 (**0.2.63**,
 [#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311), published as
 `v0.2.63-preview.1`; [ADR 059](decisions/059-the-window-shows-the-work.md)): the owner

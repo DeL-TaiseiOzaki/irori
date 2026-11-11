@@ -373,6 +373,9 @@ const textWindow = 32;
 /** How long Claude Code lets the irori agent's shell commands run: a hand-off takes as long as it takes. */
 const handOffShellTimeout = String(24 * 60 * 60 * 1000);
 const digest = (words: string) => createHash('sha256').update(words).digest('hex');
+/** The configuration a run took, in one line: what irori passes by its name, files by path. */
+const configNames = (found: FoundConfig[]) =>
+  found.flatMap((item) => (item.label ? [item.label] : item.files)).join(', ');
 /** The environment a run's CLI starts in: `base`, or irori's own, with a routine step's variables. */
 const runEnv = (run: Run, base = run.env) => ({ ...(base ?? agentEnv()), ...run.step?.env });
 /**
@@ -2348,7 +2351,8 @@ export class AgentService {
       // What runs without asking (hooks, MCP servers, plugins, settings) runs as allowed.
       const sharedHooks =
         input.agent === 'claude' ? await this.you?.sharedHooks().catch(() => undefined) : undefined;
-      await this.configApprovals().check(input.agent, this.configPlaces(run, space.root), [
+      const places = this.configPlaces(run, space.root);
+      const given: FoundConfig[] = [
         ...(sharedHooks
           ? [
               {
@@ -2360,7 +2364,21 @@ export class AgentService {
             ]
           : []),
         ...(hooks?.approvals ?? []),
-      ]);
+      ];
+      // Full access acts without asking (ADR 009), and so does what it loads: the
+      // log names what it took instead of a dialog stopping the run.
+      if (run.access === 'full-access') {
+        const taken = await this.configApprovals().allow(input.agent, places, given);
+        if (taken.length)
+          this.event(
+            run,
+            'status',
+            t(
+              `フルアクセスのため、確認なしで動く設定を確認せずに使います: ${configNames(taken)}`,
+              `In full access, the configuration that runs without asking is used without a question: ${configNames(taken)}`,
+            ),
+          );
+      } else await this.configApprovals().check(input.agent, places, given);
       if (run.cancelled) return;
       if (hooks) {
         // Declined: the run ends as stopped, with nothing sent.

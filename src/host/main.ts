@@ -507,6 +507,7 @@ app
     agents.preferredAccess = async () => (await settings.read()).agentAccess;
     // Configuration that runs without asking (hooks, MCP servers, plugins, project
     // settings) runs only once the person has seen where it is, and again after it changes.
+    // A run in full access takes it without this dialog; its log names it (ADR 009).
     agents.approveConfig = async (found) => {
       const answer = await dialog.showMessageBox(front(), {
         type: 'warning',

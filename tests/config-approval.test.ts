@@ -64,3 +64,29 @@ test('the person is asked once, again after a change, and a refusal stops the ru
   await assert.rejects(approvals.check('claude', [{ root: vault }]), ConfigRefused);
   assert.equal(asked.length, 3);
 });
+
+test('a run in full access takes what changed without asking, and a later change is asked about', async (t) => {
+  const { base, vault } = await folders(t);
+  await writeFile(path.join(vault, '.claude', 'settings.json'), '{"hooks":{}}');
+  const asked: FoundConfig[][] = [];
+  const approvals = new ConfigApprovals(
+    path.join(base, 'data', 'approvals.json'),
+    async (found) => {
+      asked.push(found);
+      return true;
+    },
+  );
+  const taken = await approvals.allow('claude', [{ root: vault }]);
+  assert.deepEqual(
+    taken.flatMap((item) => item.files),
+    [path.join(vault, '.claude/settings.json')],
+  );
+  assert.equal(asked.length, 0);
+  // Already taken: nothing new to name, and standard access does not ask about it.
+  assert.deepEqual(await approvals.allow('claude', [{ root: vault }]), []);
+  await approvals.check('claude', [{ root: vault }]);
+  assert.equal(asked.length, 0);
+  await writeFile(path.join(vault, '.claude', 'settings.json'), '{"env":{"X":"1"}}');
+  await approvals.check('claude', [{ root: vault }]);
+  assert.equal(asked.length, 1);
+});
