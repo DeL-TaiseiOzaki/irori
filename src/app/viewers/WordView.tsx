@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { renderAsync } from 'docx-preview';
 import { t } from '../../domain/i18n';
+import { domFinder, findHighlightStyle, useFinder } from '../FindBar';
 import type { ViewProps } from './common';
 import { followLinks, neutralize } from './safe-dom';
 
@@ -12,6 +13,12 @@ export default function WordView({ bytes, zoom, width, onInfo, onLink }: ViewPro
   const host = useRef<HTMLDivElement>(null);
   const [pageWidth, setPageWidth] = useState(0);
   const [error, setError] = useState('');
+  const finder = useMemo(
+    () => domFinder(() => (host.current?.shadowRoot ? [host.current.shadowRoot] : [])),
+    [],
+  );
+  const changed = useFinder(finder);
+  useEffect(() => () => void finder.clear(false), [finder]);
   useEffect(() => {
     const root = host.current!.shadowRoot ?? host.current!.attachShadow({ mode: 'open' });
     const body = document.createElement('div');
@@ -19,7 +26,8 @@ export default function WordView({ bytes, zoom, width, onInfo, onLink }: ViewPro
     const frame = document.createElement('style');
     // The library's grey backdrop gives way to the stage; pages keep their paper.
     frame.textContent = `.docx-wrapper { background: transparent !important; padding: 20px 0 !important; }
-      .docx-wrapper > section.docx { box-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 8px 24px rgba(24, 26, 30, 0.12) !important; }`;
+      .docx-wrapper > section.docx { box-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 8px 24px rgba(24, 26, 30, 0.12) !important; }
+      ${findHighlightStyle}`;
     root.replaceChildren(styles, frame, body);
     let live = true;
     setError('');
@@ -42,6 +50,8 @@ export default function WordView({ bytes, zoom, width, onInfo, onLink }: ViewPro
           Math.max(0, ...[...pages].map((page) => parseFloat(getComputedStyle(page).width) || 0)),
         );
         onInfo(t(`${pages.length} ページ（目安）`, `About ${pages.length} pages`));
+        // The find bar searches the pages now drawn.
+        changed();
       },
       (reason: Error) =>
         live &&
