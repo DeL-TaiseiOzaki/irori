@@ -430,3 +430,92 @@ test(
     assert.equal(remote.hosts().find((item) => item.id === host.id)?.state, 'connected');
   },
 );
+
+// A real SSH host, when one is named: `IRORI_TEST_SSH=<destination> npm test` after
+// `npm run build`. It must be a disposable Linux machine that `ssh <destination>`
+// reaches without a prompt. The test leaves irori's own files (~/.irori-host) there
+// and removes the one folder it makes.
+const sshTarget = process.env.IRORI_TEST_SSH;
+test(
+  'over real ssh, the vault host is installed with the official Node, serves a vault and outlives the connection',
+  {
+    skip: !sshTarget && 'set IRORI_TEST_SSH to the ssh destination of a disposable Linux host',
+    timeout: 900000,
+  },
+  async (t) => {
+    const { execFileSync } = await import('node:child_process');
+    const { randomUUID } = await import('node:crypto');
+    const { sshLauncher, shippedPayload } = await import('../src/host/remote-payload');
+    const far = (script: string) =>
+      execFileSync('ssh', ['-T', '-o', 'BatchMode=yes', '--', sshTarget!, script], {
+        encoding: 'utf8',
+      });
+    const base = await mkdtemp(path.join(tmpdir(), 'irori ssh '));
+    const folder = `irori-ssh-test-${randomUUID().slice(0, 8)}`;
+    const home = far('printf %s "$HOME"');
+    far(`mkdir -p ~/${folder}/notes && printf '# Far\\n\\nlapwing-9\\n' > ~/${folder}/notes/a.md`);
+    t.after(async () => {
+      far(`rm -rf ~/${folder}`);
+      await rm(base, { recursive: true, force: true });
+    });
+    const progress: string[] = [];
+    const remote = new RemoteHosts({
+      dataDir: path.join(base, 'device'),
+      launcher: sshLauncher,
+      payload: shippedPayload({
+        dataDir: path.join(base, 'device'),
+        bundle: path.resolve('dist-host/vault-host.cjs'),
+        packaged: false,
+      }),
+      language: () => 'en',
+      localScopes: () => [],
+      emit: (event) => {
+        if (event.type !== 'hosts') return;
+        const detail = remote.hosts()[0]?.detail;
+        if (detail && progress.at(-1) !== detail) progress.push(detail);
+      },
+      ask: async () => true,
+    });
+    await remote.init();
+    const host = await remote.saveHost({ name: 'far', destination: sshTarget! });
+    const connected = await remote.connect(host.id);
+    assert.equal(connected.state, 'connected', progress.join(' | '));
+    assert.equal(connected.about?.home, home);
+    assert.equal(connected.about?.platform, 'linux');
+    const vault = await remote.register(host.id, `${home}/${folder}`, 'Far', 'team');
+    assert.match((await remote.read(vault.scopeId, 'notes/a.md')).text, /lapwing-9/);
+    assert.equal((await remote.search(vault.scopeId, 'lapwing')).hits[0]?.path, 'notes/a.md');
+    const sent = await remote.send(
+      vault.scopeId,
+      'from here.txt',
+      new TextEncoder().encode('hi\n'),
+    );
+    assert.equal(sent, 'contents/work/from here.txt');
+    assert.equal(far(`cat ~/${folder}/contents/work/'from here.txt'`), 'hi\n');
+    // The connection ends; the vault host does not, and the next connection finds it.
+    const pid = far('cat ~/.irori-host/data/host.pid').trim();
+    remote.close();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    assert.equal(far(`kill -0 ${pid} && echo alive`).trim(), 'alive');
+    const again = new RemoteHosts({
+      dataDir: path.join(base, 'device'),
+      launcher: sshLauncher,
+      payload: shippedPayload({
+        dataDir: path.join(base, 'device'),
+        bundle: path.resolve('dist-host/vault-host.cjs'),
+        packaged: false,
+      }),
+      language: () => 'en',
+      localScopes: () => [],
+      emit: () => {},
+      ask: async () => true,
+    });
+    await again.init();
+    t.after(() => again.close());
+    assert.equal((await again.connect(host.id)).state, 'connected');
+    assert.equal(far('cat ~/.irori-host/data/host.pid').trim(), pid);
+    assert.match((await again.read(vault.scopeId, 'notes/a.md')).text, /lapwing-9/);
+    await again.unregister(vault.scopeId);
+    console.log(`  steps shown while connecting: ${progress.join(' | ')}`);
+  },
+);
