@@ -78,8 +78,11 @@ type Live = {
   retries: number;
 };
 
-/** How soon a host that just refused is tried again by itself. */
-const cooldown = 4000;
+/**
+ * How long a host that could not be reached is left alone by what the window
+ * reads by itself; the person's 接続 tries at once.
+ */
+const cooldown = 30_000;
 const notYet = () =>
   t(
     'SSH ホストにある vault では、まだこの操作はできません。',
