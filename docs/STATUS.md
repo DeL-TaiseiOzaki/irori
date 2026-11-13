@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Relations picked and pages started from a type, 2026-11-13 (**0.2.67**;
+Relations picked and pages started from a type, 2026-11-13 (**0.2.67**,
+[#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318);
 [ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage
 3, on top of [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the
 declaration is applied where a page is written, not only checked afterwards.
