@@ -3,7 +3,7 @@
 Date: 2026-11-13 ([ADR 060](decisions/060-the-ontology-is-the-declaration.md)).
 Replaces the CSV graph presentation of 2026-09-13 and the generated graph index
 of 2026-09-22 ([ADR 008](decisions/008-graph-index-module.md)), which this
-document described until 0.2.64.
+document described until 0.2.65.
 
 The ontology of a knowledge base is what kinds of pages it has and how they may
 relate. A knowledge base states it in one file, `.property/property.json`, and
@@ -140,7 +140,7 @@ owns CSV parsing; tables allow 20,000 rows and 100 columns, 100 rows per page.
 
 ## What irori no longer does
 
-Until 0.2.64 irori generated `ontology/entities.csv` and `ontology/relations.csv`
+Until 0.2.65 irori generated `ontology/entities.csv` and `ontology/relations.csv`
 in the knowledge folder from every page's relations, the person committed them,
 and the view drew them; and it drew a CSV pair that `.irori/ontology.json`
 declared instead. Both are gone (ADR 060). The files of an earlier irori stay

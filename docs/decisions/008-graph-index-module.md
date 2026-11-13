@@ -4,7 +4,7 @@ Date: 2026-09-22. Status: decided by the owner; implemented in 0.1.24.
 Settles the open decision recorded in [STATUS](../STATUS.md) on 2026-09-17.
 Amended by [ADR 028](028-generated-indexes.md): the button is **索引を更新** and
 writes an OKF bundle's folder indexes too.
-**Superseded by [ADR 060](060-the-ontology-is-the-declaration.md) in 0.2.65:**
+**Superseded by [ADR 060](060-the-ontology-is-the-declaration.md) in 0.2.66:**
 irori keeps no graph of the pages, and generates and reads no `ontology/`.
 
 ## Context

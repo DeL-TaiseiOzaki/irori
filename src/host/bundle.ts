@@ -191,7 +191,7 @@ export class BundleService {
     return { frontmatter: page.head.slice(page.bom.length), declaration };
   }
 
-  /** Where the graph index of an irori before 0.2.65 still lies, if it does. */
+  /** Where the graph index of an irori before 0.2.66 still lies, if it does. */
   private async formerGraphIndex(scopeId: string) {
     const file = formerGraphIndex(knowledgeFolder(this.files.get(scopeId)));
     const folder = parentOf(file);

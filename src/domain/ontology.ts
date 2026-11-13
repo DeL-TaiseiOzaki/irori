@@ -102,7 +102,7 @@ export interface Ontology {
   report?: OntologyReport;
   /** The folder indexes of an OKF bundle (ADR 028); absent when the knowledge folder is not one. */
   indexes?: FolderIndexStatus;
-  /** The graph index an irori before 0.2.65 generated is still in the knowledge folder, at this path. */
+  /** The graph index an irori before 0.2.66 generated is still in the knowledge folder, at this path. */
   formerGraphIndex?: string;
 }
 

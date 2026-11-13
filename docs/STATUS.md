@@ -1,9 +1,10 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The ontology is the declaration, 2026-11-13 (**0.2.65**;
+The ontology is the declaration, 2026-11-13 (**0.2.66**,
+[#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316);
 [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked
 how irori handles the ontology and for the simplest mechanism, then corrected the
-first answer: what is wanted is an ontology, not a knowledge graph. Until 0.2.64
+first answer: what is wanted is an ontology, not a knowledge graph. Until 0.2.65
 the view called オントロジー drew a graph of the pages from generated CSV files,
 and nothing in irori read the relations a knowledge base declares.
 - The ontology is `.property/property.json`. A relation's `to` may now name the

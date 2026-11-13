@@ -1,6 +1,6 @@
 # 060 — The ontology is the declaration
 
-Date: 2026-11-13. Status: owner decision; implemented for 0.2.65.
+Date: 2026-11-13. Status: owner decision; implemented for 0.2.66.
 Supersedes [ADR 008](008-graph-index-module.md) (the graph index the knowledge
 base carries) and the declared CSV pair of
 [ADR 002](002-release-and-workspace.md) and [ONTOLOGY](../ONTOLOGY.md) as it was
@@ -118,7 +118,7 @@ hierarchy filters, and the list of entities with their notes. `HostAPI` loses
 - A knowledge base with `ontology/` from an earlier irori keeps the folder until
   a person deletes it. Its root index lists it like any folder that has an
   `index.md`.
-- A template that writes a list in `to` needs irori 0.2.65 or later: an earlier
+- A template that writes a list in `to` needs irori 0.2.66 or later: an earlier
   irori cannot read that declaration, shows generic property rows and offers no
   folder indexes.
 - The mechanical half of the template's `lint` vocabulary check is now irori's.

@@ -125,7 +125,7 @@ export interface IndexUpdate {
 }
 
 /**
- * The graph index irori generated before 0.2.65 (`ontology/` in the knowledge
+ * The graph index irori generated before 0.2.66 (`ontology/` in the knowledge
  * folder, ADR 008). Nothing reads or writes it now (ADR 060); irori only says
  * that it is still there.
  */
