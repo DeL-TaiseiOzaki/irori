@@ -11,18 +11,21 @@ import {
   shell,
   type BrowserWindowConstructorOptions,
 } from 'electron';
-import { setLanguage, t } from '../domain/i18n';
+import { currentLanguage, setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
 import { lstat, mkdir, realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
-import { FileService, readViewerBytes, watcherIgnored, watchRegistrationChanges } from './files';
+import { FileService, watcherIgnored, watchRegistrationChanges } from './files';
+import { vaultReads } from './vault-reads';
+import { RemoteHosts } from './remote-hosts';
+import { shippedPayload, sshLauncher } from './remote-payload';
+import { isForwardedRead } from '../remote/protocol';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
-import { resolveLink } from './links';
-import { referringLinks, relink } from './relink';
+import { relink } from './relink';
 import { carryMove, renameLayerFolder } from './layer-folders';
 import { appendUpload, discardUpload } from './entries';
 import { classify } from '../domain/scopes';
@@ -54,17 +57,16 @@ import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { BundleService } from './bundle';
 import { brokenLinks } from '../domain/vault-move';
-import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
-import { createTypedNote, readPageProperties } from './properties';
+import { noteDirectory, openDailyNote } from './notes';
+import { createTypedNote } from './properties';
 import {
   addNoteComment,
   moveFolderComments,
   moveNoteComments,
-  readNoteComments,
   removeNoteComment,
   resolveNoteComment,
 } from './comments';
-import { readFolderSkills, readSkillReach, readSkills } from './skills';
+import { readFolderSkills, readSkills } from './skills';
 import { SchemaSettingsService } from './schema-settings';
 import { RoutineService } from './routines';
 import { PythonRuntime } from './python-runtime';
@@ -150,6 +152,49 @@ app
     let theme = device.theme;
     // Dialogs and messages the host writes follow the reader's language too.
     setLanguage(device.language);
+    /** Asks before Git runs the programs a repository's own configuration names; `where` says which repository. */
+    async function approveGitPrograms(where: string, found: string[]) {
+      const answer = await dialog.showMessageBox(front(), {
+        type: 'warning',
+        message: t(
+          'この Git リポジトリの設定はプログラムを実行します',
+          "This Git repository's configuration runs programs",
+        ),
+        detail: `${where}\n\n${found.join('\n')}\n\n${t(
+          'irori が Git を使うと、これらが実行されます。心当たりがなければ許可しないでください。変わったときはまた確認します。',
+          'They run when irori uses Git here. Do not allow them unless you know them. irori asks again when they change.',
+        )}`,
+        buttons: [t('許可しない', "Don't allow"), t('許可', 'Allow')],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return answer.response === 1;
+    }
+    /** Asks before an agent's configuration that runs without asking runs; `where` names an SSH host (ADR 061). */
+    async function approveAgentConfig(
+      found: { label?: string; files: string[] }[],
+      where?: string,
+    ) {
+      const answer = await dialog.showMessageBox(front(), {
+        type: 'warning',
+        message: t(
+          'エージェントの設定に、確認なしで動く部分があります',
+          'Part of the agent configuration runs without asking',
+        ),
+        detail: [
+          ...(where ? [where] : []),
+          ...found.map((item) => [item.label ?? '', ...item.files].filter(Boolean).join('\n')),
+          t(
+            'フック・MCP サーバー・プラグイン・設定は、承認を求めずにコマンドを実行したり、接続先や環境変数を変えたりできます。中身を確認してから許可してください。変わったときはまた確認します。',
+            'Hooks, MCP servers, plugins and settings can run commands or change where the CLI connects and its environment without asking. Check them before allowing. irori asks again when they change.',
+          ),
+        ].join('\n\n'),
+        buttons: [t('キャンセル', 'Cancel'), t('許可して実行', 'Allow and run')],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return answer.response === 1;
+    }
     const search = new SearchService(files);
     const bundle = new BundleService(files, search);
     const drafts = new DraftService(files);
@@ -172,6 +217,36 @@ app
     // This process is the version an earlier update switched to, or one that never finished.
     void updates.cleanup().catch((error) => console.warn('Update cleanup failed', String(error)));
     const workspaces = new WorkspaceService(files);
+    // Vaults on SSH hosts (ADR 061): the hosts this device knows, and the connections to
+    // irori's vault host on each. What a vault host asks the person is asked here.
+    const remote = new RemoteHosts({
+      dataDir: files.dataDir,
+      launcher: sshLauncher,
+      payload: shippedPayload({
+        dataDir: files.dataDir,
+        bundle: path.resolve(__dirname, 'vault-host.cjs'),
+        packaged: app.isPackaged,
+      }),
+      language: currentLanguage,
+      localScopes: () => files.list().map((space) => space.scopeId),
+      emit: (event) => emit(event),
+      ask: async (host, question, params) => {
+        const where = t(`SSH ホスト「${host.name}」`, `SSH host "${host.name}"`);
+        if (question === 'approveConfig')
+          return approveAgentConfig(params as Parameters<typeof approveAgentConfig>[0], where);
+        if (question === 'approveGitConfig') {
+          const { folder, found } = params as { folder: string; found: string[] };
+          return approveGitPrograms(`${where}\n${folder}`, found);
+        }
+        return false;
+      },
+    });
+    await remote.init();
+    workspaces.elsewhere = (scopeId) => remote.has(scopeId);
+    drafts.elsewhere = (scopeId) => {
+      const vault = remote.list().find((item) => item.scopeId === scopeId);
+      return vault && `ssh:${vault.host.id}:${vault.root}`;
+    };
     // Folders on this device in contents (ADR 019); Drive is reached through its own app (ADR 023).
     const cloud = new CloudService(files, (filename) => shell.trashItem(filename));
     // GitHub repositories in contents, cloned on this device (ADR 046).
@@ -225,23 +300,7 @@ app
     approveGitConfig(
       new GitConfigApprovals(
         path.join(files.dataDir, 'git-config-approvals.json'),
-        async (folder, found) =>
-          (
-            await dialog.showMessageBox(front(), {
-              type: 'warning',
-              message: t(
-                'この Git リポジトリの設定はプログラムを実行します',
-                "This Git repository's configuration runs programs",
-              ),
-              detail: `${folder}\n\n${found.join('\n')}\n\n${t(
-                'irori が Git を使うと、これらが実行されます。心当たりがなければ許可しないでください。変わったときはまた確認します。',
-                'They run when irori uses Git here. Do not allow them unless you know them. irori asks again when they change.',
-              )}`,
-              buttons: [t('許可しない', "Don't allow"), t('許可', 'Allow')],
-              defaultId: 0,
-              cancelId: 0,
-            })
-          ).response === 1,
+        approveGitPrograms,
       ),
     );
     const github = new GitHubCli();
@@ -405,6 +464,16 @@ app
     const registerWatched = (root: string, name: string, category: Category) =>
       changeFiles(async () => {
         const space = await files.register(root, name, category);
+        // A vault is registered in one place only: one on an SSH host stays there (ADR 061).
+        if (remote.has(space.scopeId)) {
+          await files.unregister(space.scopeId);
+          throw Error(
+            t(
+              'この vault は SSH ホストにすでに登録されています。同じ vault を登録できるのは 1 か所だけです。',
+              'This vault is already registered on an SSH host. One vault is registered in one place only.',
+            ),
+          );
+        }
         watch(space);
         return space;
       });
@@ -508,26 +577,9 @@ app
     // Configuration that runs without asking (hooks, MCP servers, plugins, project
     // settings) runs only once the person has seen where it is, and again after it changes.
     // A run in full access takes it without this dialog; its log names it (ADR 009).
-    agents.approveConfig = async (found) => {
-      const answer = await dialog.showMessageBox(front(), {
-        type: 'warning',
-        message: t(
-          'エージェントの設定に、確認なしで動く部分があります',
-          'Part of the agent configuration runs without asking',
-        ),
-        detail: [
-          ...found.map((item) => [item.label ?? '', ...item.files].filter(Boolean).join('\n')),
-          t(
-            'フック・MCP サーバー・プラグイン・設定は、承認を求めずにコマンドを実行したり、接続先や環境変数を変えたりできます。中身を確認してから許可してください。変わったときはまた確認します。',
-            'Hooks, MCP servers, plugins and settings can run commands or change where the CLI connects and its environment without asking. Check them before allowing. irori asks again when they change.',
-          ),
-        ].join('\n\n'),
-        buttons: [t('キャンセル', 'Cancel'), t('許可して実行', 'Allow and run')],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      return answer.response === 1;
-    };
+    agents.approveConfig = (found) => approveAgentConfig(found);
+    // The irori agent reaches the vaults on SSH hosts that are handed to its request (ADR 061).
+    agents.remote = remote;
     // An MCP server's link opens only after the person agreed in the request.
     agents.openUrl = async (url) => {
       const address = webAddress(url);
@@ -833,6 +885,8 @@ app
       }
     }
     const handlers = {
+      // What is read of a vault without changing it, as a vault host reads its own (ADR 061).
+      ...vaultReads({ files, search, bundle, images, git, knowledge, authorship, work }),
       draftRead: (key) => drafts.read(key),
       draftWrite: (...args) => drafts.write(...args),
       checkForUpdates: () => updates.check(),
@@ -849,7 +903,6 @@ app
       moveNote: (ref, destination, links) =>
         changeVault(ref.scopeId, organizing(), () => moveNoteCarrying(ref, destination, links)),
       trashNote: (ref) => changeVault(ref.scopeId, organizing(), () => files.trashNote(ref)),
-      trashedNotes: (id) => files.trashedNotes(id),
       restoreNote: (id, trashId) =>
         changeVault(
           id,
@@ -859,14 +912,6 @@ app
           ),
           () => files.restoreNote(id, trashId),
         ),
-      search: (...args) => search.search(...args),
-      backlinks: (...args) => search.backlinks(...args),
-      referringLinks: (...args) => referringLinks(files, search, ...args),
-      resolveLink: (...args) => resolveLink(files, ...args),
-      knowledgeHistory: (id) => {
-        files.get(id);
-        return knowledge.history(id);
-      },
       restoreSource: async (source) => {
         const bytes = await knowledge.bytes(source);
         const choice = await dialog.showSaveDialog(front(), {
@@ -909,11 +954,6 @@ app
       deviceSettings: () => settings.read(),
       saveDeviceSettings: (patch) => saveSettings(patch),
       terminalShells: () => terminals.available(),
-      gitStatus: (id) => git.status(id),
-      gitDiff: (...args) => git.diff(...args),
-      gitHistory: (...args) => git.history(...args),
-      gitCommitDiff: (...args) => git.commitDiff(...args),
-      gitConflict: (...args) => git.conflict(...args),
       gitStage: (...args) => changed(gitScope(args[0]), () => git.stage(...args)),
       gitStageMany: (...args) => changed(gitScope(args[0]), () => git.stageMany(...args)),
       gitCommit: (...args) => changed(gitScope(args[0]), () => git.commit(...args)),
@@ -929,7 +969,6 @@ app
           }
         }),
       gitResolve: (...args) => changed(gitScope(args[0]), () => git.resolve(...args)),
-      gitSubmodules: (id) => git.submodules(id),
       gitSubmoduleAdd: (...args) => changed(args[0], () => git.addSubmodule(...args)),
       gitSubmoduleInit: (...args) => changed(args[0], () => git.initSubmodules(...args)),
       gitClone: (input) => git.clone(input),
@@ -965,8 +1004,6 @@ app
         );
         await workspaces.remove(id);
       },
-      ontology: (id) => bundle.ontology(id),
-      ontologyPages: (id) => bundle.pages(id),
       updateIndexes: (id) =>
         changeVault(
           id,
@@ -980,7 +1017,6 @@ app
         id === sharedSchemaId || you.rootOf(id)
           ? readFolderSkills(await schemaFolder(id))
           : readSkills(files, id),
-      skillReach: (id) => readSkillReach(files, id),
       schemaSettings: (id) => schemaSettings.list(id),
       readSchemaFile: (...args) => schemaSettings.read(...args),
       writeSchemaFile: (id, rel, text, expected) =>
@@ -1059,8 +1095,14 @@ app
       updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
       bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
-      spaces: () => files.list(),
-      workFolder: (scopeId) => work.folder(scopeId),
+      spaces: () => [...files.list(), ...remote.list()],
+      remoteHosts: () => remote.hosts(),
+      saveRemoteHost: (input) => remote.saveHost(input),
+      removeRemoteHost: (id) => remote.removeHost(id),
+      connectRemoteHost: (id) => remote.connect(id),
+      remoteFolders: (hostId, folder) => remote.folders(hostId, folder),
+      registerRemote: (hostId, root, name, category) =>
+        remote.register(hostId, root, name, category),
       setWorkFolder: async (scopeId, folder) => {
         const chosen = await work.choose(scopeId, folder);
         emit({ type: 'files', scopeId });
@@ -1149,11 +1191,7 @@ app
         ),
       saveSpaceIcon: (scopeId, bytes) =>
         changeFiles(() => files.saveIcon(scopeId, bytes, imageType(bytes))),
-      entries: (...args) => files.entries(...args),
-      read: (...args) => files.read(...args),
       saveImage: (...args) => changeFiles(() => images.save(...args)),
-      readImage: (...args) => images.read(...args),
-      viewerBytes: async (id, rel) => readViewerBytes(await files.resolve(id, rel), rel),
       save: (doc) =>
         changeFiles(async () => {
           // The bytes this save replaces: only the lines it introduces are the
@@ -1177,15 +1215,11 @@ app
             ? createTypedNote(files, git, id, name, folder, type)
             : files.createNote(id, name, folder);
         }),
-      notesDeclaration: (id) => readNotesDeclaration(files, id),
-      pageProperties: (id) => readPageProperties(files, git, id),
       dailyNote: (id) => changeFiles(() => openDailyNote(files, id)),
       openExternal: async (...args) => {
         const filename = await files.resolve(...args);
         await openFile(filename);
       },
-      noteAuthorship: (id, p, text) => authorship.view({ scopeId: id, path: p }, text),
-      noteComments: (id, p) => readNoteComments(files, id, p),
       addNoteComment: (id, p, comment) =>
         changeFiles(() => addNoteComment(files, git, id, p, comment)),
       removeNoteComment: (id, p, commentId) =>
@@ -1237,15 +1271,20 @@ app
       yourAiEntries: (rel) => you.entries(rel),
       yourAiRead: (rel) => you.read(rel),
       yourAiBrains: async (scopeIds) => {
-        const names = brainAgentNames(files.list());
-        const brains = scopeIds.map((scopeId) => files.get(scopeId));
-        return brains.map((brain) => ({
-          scopeId: brain.scopeId,
-          name: brain.name,
-          category: brain.category,
-          agent: names.get(brain.scopeId)!,
-          root: brain.root,
-        }));
+        const elsewhere = remote.list();
+        const names = brainAgentNames([...files.list(), ...elsewhere]);
+        return scopeIds.map((scopeId) => {
+          const far = elsewhere.find((vault) => vault.scopeId === scopeId);
+          const brain = far ?? files.get(scopeId);
+          return {
+            scopeId: brain.scopeId,
+            name: brain.name,
+            category: brain.category,
+            agent: names.get(brain.scopeId)!,
+            root: brain.root,
+            ...(far && { host: far.host.name }),
+          };
+        });
       },
       start: (input) => {
         canStartAgent();
@@ -1288,6 +1327,64 @@ app
       | 'windowTabs'
       | 'otherWindows'
       | 'showMenu';
+    /**
+     * For a vault on an SSH host (ADR 061), what this device answers itself. Its
+     * reads go to its host (`forwardedReads`), and anything else waits for a later
+     * version and is refused in words the window shows.
+     */
+    const hosted: Partial<HostHandlers> = {
+      // Shown, not changed: a note of such a vault opens read-only.
+      read: async (scopeId, rel) => ({ ...(await remote.read(scopeId, rel)), readOnly: true }),
+      // Drafts are this device's, wherever the vault is.
+      draftRead: handlers.draftRead,
+      draftWrite: handlers.draftWrite,
+      // Connected folders and the vault's own conversations come later; the window shows none.
+      cloudConnections: async () => [],
+      contentsStrays: async () => [],
+      agentConversations: async () => [],
+      agentCommands: async () => [],
+      cancel: async () => {},
+      // Off this device's list and its workspaces; the folder on the host stays as it is.
+      removeSpace: async (scopeId) => {
+        await remote.unregister(scopeId);
+        await workspaces.forget(scopeId);
+      },
+    };
+    const itsAgent = new Set([
+      'start',
+      'queueAgentMessage',
+      'createConversation',
+      'agentConversation',
+    ]);
+    /** `local` with each operation that names a vault on an SSH host answered for that vault. */
+    function onHosts(local: HostHandlers): HostHandlers {
+      const route = (method: string, handler: (...args: unknown[]) => unknown) => {
+        return (...args: unknown[]) => {
+          const [first] = args;
+          const scopeId =
+            first && typeof first === 'object' && 'scopeId' in first ? first.scopeId : first;
+          if (!remote.has(scopeId)) return handler(...args);
+          const own = hosted[method as keyof HostHandlers] as
+            ((...args: unknown[]) => unknown) | undefined;
+          if (own) return own(...args);
+          if (isForwardedRead(method)) return remote.forward(scopeId, method, args);
+          throw Error(
+            itsAgent.has(method)
+              ? t(
+                  'この vault のエージェントは SSH ホストで動きます。irori モードで irori agent に依頼してください。',
+                  "This vault's agent runs on its SSH host. Ask the irori agent in irori mode.",
+                )
+              : RemoteHosts.notYet(),
+          );
+        };
+      };
+      return Object.fromEntries(
+        Object.entries(local).map(([method, handler]) => [
+          method,
+          route(method, handler as (...args: unknown[]) => unknown),
+        ]),
+      ) as HostHandlers;
+    }
     /** The operations as one window calls them: what it opens is its own (ADR 051). */
     const windowHandlers = new WeakMap<BrowserWindow, HostHandlers>();
     function handlersOf(window: BrowserWindow) {
@@ -1300,7 +1397,7 @@ app
       };
       const id = window.webContents.id;
       let own = windowHandlers.get(window);
-      own ??= {
+      own ??= onHosts({
         ...handlers,
         openTerminal: async (...args) => {
           const session = await terminals.open(...args);
@@ -1320,7 +1417,7 @@ app
         showMenu: (x, y) => {
           Menu.getApplicationMenu()?.popup({ window, x, y });
         },
-      } satisfies HostHandlers;
+      } satisfies HostHandlers);
       windowHandlers.set(window, own);
       return own;
     }
@@ -1404,6 +1501,8 @@ app
       }
       await restart?.();
       await terminals.closeAll();
+      // A vault host goes on by itself while an agent works there; only the connections end.
+      remote.close();
       await git.close();
       try {
         await cloud.close();

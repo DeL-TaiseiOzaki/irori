@@ -28,13 +28,19 @@ const maxRecordBytes = 13 * 1024 * 1024; // JSON may escape every character; tex
 
 export class DraftService {
   private queue = new SerialQueue();
+  /**
+   * What stands for the folder of a vault that is not on this device (ADR 061):
+   * its drafts are kept here all the same, under its host and its folder there.
+   */
+  elsewhere: (scopeId: string) => string | undefined = () => undefined;
   constructor(private files: Pick<FileService, 'dataDir' | 'get'>) {}
   idle() {
     return this.queue.idle();
   }
   private async target(raw: DraftKey) {
     const key = draftKey.parse(raw);
-    const root = await fs.realpath(this.files.get(key.scopeId).root);
+    const root =
+      this.elsewhere(key.scopeId) ?? (await fs.realpath(this.files.get(key.scopeId).root));
     const identity = hash(
       JSON.stringify([
         root,

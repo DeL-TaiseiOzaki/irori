@@ -55,6 +55,8 @@ export interface BrainAgent {
   /** The vault agent's name, `vault-<slug>`, as `irori call` takes it. */
   agent: string;
   root: string;
+  /** The SSH host the vault lives on (ADR 061); `root` is then its folder there. */
+  host?: string;
 }
 
 /**
