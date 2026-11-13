@@ -66,9 +66,11 @@ async function farHost(t: TestContext) {
   const previous = process.env.PATH;
   process.env.PATH = bin + path.delimiter + previous;
   const logins: ChildProcess[] = [];
+  // While `down`, every login fails as `ssh` does when the host cannot be reached.
+  const network = { down: false };
   const launcher: RemoteLauncher = {
     run: (command) => {
-      const child = spawn('sh', ['-c', command], {
+      const child = spawn('sh', ['-c', network.down ? 'exit 255' : command], {
         env: { ...process.env, HOME: home, IRORI_VAULT_HOST_IDLE_MS: '1500' },
         stdio: 'pipe',
       });
@@ -99,7 +101,7 @@ async function farHost(t: TestContext) {
     path.join(code, 'notes', 'train.md'),
     '# Training\n\nThe run uses the zebrafinch-42 seed.\n',
   );
-  return { base, home, code, payload, launcher, logins };
+  return { base, home, code, payload, launcher, logins, network };
 }
 
 async function hub(t: TestContext, far: Awaited<ReturnType<typeof farHost>>) {
@@ -126,10 +128,13 @@ async function hub(t: TestContext, far: Awaited<ReturnType<typeof farHost>>) {
   return { dataDir, files, remote, host, events, asked };
 }
 
-const until = async <T>(get: () => T | undefined | false, ms = 20000) => {
+const until = async <T>(
+  get: () => T | undefined | false | Promise<T | undefined | false>,
+  ms = 20000,
+) => {
   const end = Date.now() + ms;
   for (;;) {
-    const value = get();
+    const value = await get();
     if (value) return value;
     if (Date.now() > end) throw Error('Timed out waiting');
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -429,6 +434,49 @@ test(
     assert.match(reported?.text ?? '', /finished-there/);
     assert.equal((await readFile(path.join(far.code, 'survived.txt'), 'utf8')).trim(), 'survived');
     assert.equal(remote.hosts().find((item) => item.id === host.id)?.state, 'connected');
+  },
+);
+
+test(
+  'a report waits on the host for the device that handed the task, however long it is away (protocol fixture)',
+  posixOnly,
+  async (t) => {
+    const { far, run, remote } = await handing(t);
+    const alive = async () => {
+      const pid = await readFile(path.join(far.home, '.irori-host/data/host.pid'), 'utf8').catch(
+        () => '',
+      );
+      try {
+        return !!pid && process.kill(Number(pid), 0);
+      } catch {
+        return false;
+      }
+    };
+    const { done, mine } = await run(
+      'Hand over.\nrun: irori call vault-code "run: touch began && sleep 1 && echo late-report"',
+    );
+    const { existsSync } = await import('node:fs');
+    await until(() => existsSync(path.join(far.code, 'began')));
+    // The host cannot be reached for well over the time a vault host stays idle
+    // (1.5 s here); the run ends meanwhile, with nobody attached to hear it.
+    far.network.down = true;
+    for (const login of far.logins) login.kill('SIGKILL');
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    assert.equal(await alive(), true, 'the vault host stays while a report waits');
+    far.network.down = false;
+    await done;
+    assert.equal(mine().at(-1)?.outcome, 'completed', JSON.stringify(mine()));
+    assert.match(
+      mine().find((event) => event.delegate?.state === 'reported')?.text ?? '',
+      /late-report/,
+    );
+    // Collected, with nothing running and no device attached, it ends by itself.
+    remote.close();
+    const gone = await until(async () => !(await alive()), 15000).then(
+      () => true,
+      () => false,
+    );
+    assert.equal(gone || !(await alive()), true);
   },
 );
 

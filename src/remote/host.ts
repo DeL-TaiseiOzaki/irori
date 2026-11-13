@@ -295,6 +295,13 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
     get running() {
       return agents.anyBusy;
     },
+    /**
+     * Whether a hand-off's report still waits for the device that handed the task:
+     * until that device has collected it, or a day has passed since the run ended.
+     */
+    get waiting() {
+      return handOffs.size > 0;
+    },
     /** Answers one operation; what it refuses, it refuses in the words the window shows. */
     async call(method: string, args: unknown[]): Promise<unknown> {
       if (isForwardedRead(method)) return dispatchHost(forwarded, method, args);

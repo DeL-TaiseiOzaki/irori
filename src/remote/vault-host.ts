@@ -7,7 +7,8 @@
 //   vault-host.cjs serve --data <folder>
 //     is that vault host. It listens on a socket only its user can open, goes on
 //     while an agent works after the connection has gone, and ends by itself
-//     once nothing has run and no device has been attached for a while.
+//     once nothing has run, no report waits to be collected and no device has
+//     been attached for a while.
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -30,7 +31,7 @@ const vaultHostVersion = /\.cjs$/.test(process.argv[1] ?? '')
 
 /** How many events are kept for a device that attaches again. */
 const eventsKept = 2000;
-/** How long the vault host stays with nothing running and no device attached. */
+/** How long the vault host stays with nothing running, no report waiting and no device attached. */
 const idleDefault = 15 * 60_000;
 /** A host started this recently may not listen yet; it is not taken for a dead one. */
 const startingFor = 15_000;
@@ -182,7 +183,8 @@ async function serve(dataDir: string) {
   const idle = Number(process.env.IRORI_VAULT_HOST_IDLE_MS) || idleDefault;
   setInterval(
     () => {
-      if (device || host.running) lastAttached = Date.now();
+      // A report not yet collected is a reason to stay, as a run is: its device may be away for hours.
+      if (device || host.running || host.waiting) lastAttached = Date.now();
       else if (Date.now() - lastAttached >= idle) void stop();
     },
     Math.min(idle, 30_000),

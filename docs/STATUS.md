@@ -11,7 +11,9 @@ handed work; nothing in the window changes it yet.
   joins an `ssh` login's pipes to the vault host of `~/.irori-host/data` and
   starts one when none answers; `serve` stays, on a socket only its user opens,
   keeps the last 2,000 events and the open questions for a device that attaches
-  again, and ends after fifteen minutes with nothing running and no device.
+  again, keeps a hand-off's report for a day until its device collects it, and
+  ends after fifteen minutes with nothing running, no report waiting and no
+  device.
 - `RemoteLink` (`src/host/remote-link.ts`) is one `ssh` login in `BatchMode`: it
   installs what is missing (the vault host, and Node v24.21.0 from nodejs.org,
   pinned by size and SHA-256 in `remote-payload.ts`) and replaces a vault host

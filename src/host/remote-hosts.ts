@@ -232,6 +232,7 @@ export class RemoteHosts implements RemoteVaults {
   private drop(id: string) {
     const live = this.state(id);
     clearTimeout(live.retry);
+    live.retry = undefined;
     live.link?.close();
     live.link = undefined;
     live.failed = undefined;
@@ -295,12 +296,13 @@ export class RemoteHosts implements RemoteVaults {
     // A hand-off goes on there; this device comes back for its report.
     if (live.handOffs.size) this.retry(id);
   }
+  /** Tries a host again after a while, for the hand-offs waiting on it; one attempt is scheduled at a time. */
   private retry(id: string) {
     const live = this.state(id);
-    clearTimeout(live.retry);
-    if (this.closing || !live.handOffs.size) return;
+    if (this.closing || !live.handOffs.size || live.retry) return;
     const wait = Math.min(60_000, 2000 * 2 ** Math.min(live.retries++, 5));
     live.retry = setTimeout(() => {
+      live.retry = undefined;
       live.failed = undefined;
       this.link(id).then(
         (link) => this.resume(id, link),

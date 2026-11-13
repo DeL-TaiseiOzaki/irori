@@ -72,9 +72,11 @@ weighed and dropped:
    the vault host of a data folder and starts one when none answers; `serve` is
    that process, on a socket only its user can open. A device that attaches
    again is sent the events it missed (the last 2,000 are kept) and the
-   questions still open. With no agent working and no device attached for
-   fifteen minutes it ends by itself. One device is attached at a time, the
-   newest. *The owner's default for a cut connection: a run goes on to its end.*
+   questions still open. A hand-off's report waits there for the device that
+   handed the task, for a day after the run ended. With no agent working, no
+   report waiting and no device attached for fifteen minutes it ends by itself.
+   One device is attached at a time, the newest. *The owner's default for a cut
+   connection: a run goes on to its end.*
 5. **What irori puts on the host** is under `~/.irori-host`, readable by its
    user alone: `node/<version>/node`, `bin/<version>/vault-host.cjs` and `data/`
    (the host's own records: its vaults, conversations and indexes, its socket
