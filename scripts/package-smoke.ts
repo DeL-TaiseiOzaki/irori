@@ -9,7 +9,7 @@ import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { ontologyFixture } from '../tests/fixtures/ontology';
+import { vocabulary } from '../tests/fixtures/ontology';
 import { SettingsService } from '../src/host/settings';
 import { everyWindowItem } from '../src/domain/window-items';
 
@@ -289,19 +289,9 @@ try {
     { path: 'note.md', line: 1, preview: '# Packaged edit 日本語' },
   ]);
   await stat(path.join(temporary, 'device', 'search-index', `${recovery.scopeId}.sqlite`));
-  await mkdir(path.join(root, 'ontology'));
-  await writeFile(
-    path.join(root, '.irori/ontology.json'),
-    JSON.stringify(ontologyFixture.declaration),
-  );
-  await writeFile(
-    path.join(root, ontologyFixture.declaration.entities.path),
-    ontologyFixture.entities,
-  );
-  await writeFile(
-    path.join(root, ontologyFixture.declaration.relations.path),
-    ontologyFixture.relations,
-  );
+  // A declared vocabulary and one page: the ontology view loads its lazy chunk in the package.
+  await mkdir(path.join(root, '.property'));
+  await writeFile(path.join(root, '.property/property.json'), JSON.stringify(vocabulary));
   await page.reload();
   await page.getByRole('checkbox', { name: /配布検証/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
@@ -415,10 +405,11 @@ try {
         ),
     )
     .toBe(true);
-  await page.getByRole('button', { name: 'グラフ', exact: true }).first().click();
+  await page.getByRole('button', { name: 'オントロジー', exact: true }).first().click();
+  // The four declared types, and the three ends that name none.
   await expect(
     page.getByRole('region', { name: 'オントロジー', exact: true }).locator('.react-flow__node'),
-  ).toHaveCount(4);
+  ).toHaveCount(7);
   await page.keyboard.press('Escape');
   await page
     .locator('.status-bar')
@@ -560,7 +551,7 @@ try {
     JSON.stringify(
       {
         evidence:
-          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, CSV graph, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership; no model inference; not installed-device acceptance',
+          'Relocated Forge package, unsigned on Windows and Linux and ad-hoc signed on macOS; SDK imports, save/undo/redo and editing after autosave, native OS clipboard image paste/bytes/reopen, ontology view, Japanese note/terminal file save, private composer/conflict draft and recoverable note deletion restored after restart, guarded note move with source identity, queued instruction restored without execution after restart, single-instance ownership; no model inference; not installed-device acceptance',
         rootContainerFallback: process.platform === 'linux' && process.getuid?.() === 0,
         platform: process.platform,
         arch: process.arch,
@@ -575,7 +566,7 @@ try {
     ) + '\n',
   );
   console.log(
-    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, CSV graph and normal shutdown. ` +
+    `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, ontology view and normal shutdown. ` +
       `The application weighs ${weight.asar} bytes archived and ${weight.unpacked} unpacked.`,
   );
 } catch (error) {

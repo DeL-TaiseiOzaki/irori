@@ -1,85 +1,174 @@
-# CSV ontology presentation
+# The ontology
 
-Date: 2026-09-13. Implements the initial CSV/graph presentation in [ADR 002](decisions/002-release-and-workspace.md). Native CLI agents and people construct the ontology; irori projects saved CSV records into readable tables and graphs.
+Date: 2026-11-13 ([ADR 060](decisions/060-the-ontology-is-the-declaration.md)).
+Replaces the CSV graph presentation of 2026-09-13 and the generated graph index
+of 2026-09-22 ([ADR 008](decisions/008-graph-index-module.md)), which this
+document described until 0.2.65.
 
-## The graph index the knowledge base carries, 2026-09-22
+The ontology of a knowledge base is what kinds of pages it has and how they may
+relate. A knowledge base states it in one file, `.property/property.json`, and
+irori applies that file to the pages. The pages are instances of the ontology,
+not part of it: irori keeps no graph of them.
 
-The recommended template is an Open Knowledge Format bundle whose pages carry `type`, `title` and `relations` in their frontmatter. The owner decided ([ADR 008](decisions/008-graph-index-module.md)) that the pages are the source of truth and that the graph index is a module the knowledge base carries: `Knowledge_Base/ontology/`, tracked in Git, generated deterministically by irori on request and committed by the person through the ordinary Git flow. It is not a device-local index, so every device shows the same graph for the same commit. Agents do not hand-write it.
+## The declaration
 
-**Generation.** `GraphIndexService` (`src/host/graph-index.ts`) walks the knowledge layer with search's own walk (`SearchService.walk`: the same layer rules, hidden-path and `node_modules` exclusions, blocked aliases, and entry, file and 2 MiB limits), keeping the `.md` files under `Knowledge_Base/` that are neither a folder's `index.md` nor inside `Knowledge_Base/ontology/`. It parses only each page's leading `---` block with the host's `yaml` package (failsafe schema, so every value is a string) and takes `type`, `title` and `relations`. Each relation's `target` is resolved from its page with `resolveNoteLink` and kept only when it names another walked page; a URL (`same_as`), a missing page, a folder index, a path outside the bundle, a file that is not a page and an entry without `rel` are left out and counted. `entities.csv` (`id,label,note,parentId,group`) has one row per page that is the source or target of a kept relation: `id` is the page's path inside `Knowledge_Base/` without `.md`, `label` its `title` or its file name when the title is absent or blank, `note` its path from the KB root, `parentId` empty and `group` its `type`. `relations.csv` (`sourceId,relation,targetId`) has one row per kept relation, exact duplicates removed. The bytes are deterministic: paths in NFC, rows in code point order (entities by id; relations by source, relation, target), Papa Parse `unparse` with the fixed columns, `\n` line ends, one final newline, UTF-8 without BOM and quoting only where CSV needs it; both tables carry their header even when empty. `index.md` is a fixed English text saying the files are generated and are to be regenerated in irori (0.1.86 changed it to name **索引を更新**, so each module rewrites it once). A result above the reader's limits (2,000 entities, 10,000 relations or 2 MiB per file) is refused with a message before any module file changes. All three outputs are validated before writing; generated NUL bytes are refused too. Long paths repeated in relation rows count toward the byte limit even when every source page is small. Files go through `FileService.writeGenerated` — knowledge layer only, no hidden components, no aliases, the folder created when needed, an atomic replace guarded by the hash of the bytes replaced — and only when their bytes change. Nothing is generated while `.irori/ontology.json` exists.
-
-**Reading.** With no declaration and `Knowledge_Base/ontology/entities.csv` present, `readOntology` reads the module with the built-in mapping above, the relation table optional, through the same parser and validations as a declared pair; the view says whether its `source` is `module` or `declared`. A declared pair is read exactly as before and wins over a module. Module CSV paths remain NFC for deterministic bytes, while note navigation resolves each path component to the actual filename in the current checkout, including decomposed Japanese names. Ambiguous normalized names, aliases, blocked entries and foreign ownership are refused; genuinely missing notes remain explicit links.
-
-**Freshness.** `graphIndexStatus` generates the module in memory and compares it with the files on disk: whether both tables hold the bytes the pages give now and, if not, how many entity rows and relation rows an update would add and remove, plus the relations left out and the pages whose frontmatter could not be read. A page's body is not part of the comparison, so only what the graph is made of makes the index stale. The check runs in the main process; the walk yields between batches of pages, and each page's facts are remembered by size and modification time, so a repeated check reads only the pages that changed. The panel shows the graph from the CSV first and the freshness line when the check returns.
-
-**Panel.** For a module: the freshness line and **索引を更新** (before 0.1.86, **グラフ索引を更新**). If its CSV cannot be read, **ページからグラフ索引を再生成** remains available after the host independently confirms that no explicit declaration exists. Regeneration can replace oversized, binary or malformed generated tables: existing bytes are hashed in bounded memory and replaced only while that hash still matches. Declaration and ownership/alias checks still apply, including to an invalid `.irori/ontology.json`; no repair action is offered for declared CSV pairs. With neither declaration nor module: the pages can be indexed, and **索引を作成** does it. After a write the view reloads and says once that committing `Knowledge_Base/ontology/` makes other devices show the same graph. **構築・表示設定をエージェントに相談** stays, and a declared CSV pair changes nothing.
-
-## Folder indexes, 2026-10-07
-
-[ADR 028](decisions/028-generated-indexes.md) adds the folder indexes of an Open Knowledge Format bundle to the same button. They are offered when the knowledge folder's root `index.md` opens with frontmatter naming `okf_version` and `.property/property.json` reads; a declared `.irori/ontology.json` stops only the graph module, not them.
-
-**Which folders.** The same walk as the graph index, without the `ontology/` module, submodule folders (holding `.git`) and nested vaults. A folder with a page (a `.md` other than `index.md`) in it or below it gets an `index.md`; its `# Folders` lists the subfolders that get one or already have an `index.md`. An `index.md` in a folder with no page in or below it is left alone.
-
-**The text** (`src/domain/folder-index.ts`). The root keeps its frontmatter block byte for byte; no other index has frontmatter. `# Folders` first, `* [name](name/)` plus ` - description` kept from the current line linking `name/` or `name/index.md`; then each declared type in `types` order under its `heading` (`# <type>` without one), `* [title](file.md) - description` in file-name order, the title falling back to the file name and the description being `description` on one line; pages with a missing or undeclared `type` last under `# Other pages`. Headings only with entries, one blank line between sections, nothing else kept. Link text escapes `\`, `[` and `]`; destinations are NFC with whitespace, `%`, parentheses, angle brackets, `#`, `:`, `\`, backticks and control characters percent-encoded, so `resolveNoteLink` resolves every line, and a folder link opens that folder's `index.md`. NFC, `\n`, one final newline, UTF-8 without BOM; names sort by code point.
-
-**Freshness and writing.** `graphIndexStatus` adds `indexes: { folders, added, changed }`; the panel shows it under the graph's line. **索引を更新** (**索引を作成** while neither the module nor any of those indexes exists) writes the module, unless declared, and the indexes through `FileService.writeGenerated`, only the files whose bytes change, after every output is checked. Each `index.md` is remembered by size and modification time with the pages' facts.
-
-## User flow
-
-Open any CSV to see a paginated table, including unknown columns. Use **ソース** for basic editing and the ordinary version-aware save/draft/conflict flow. **表** previews the current buffer without rewriting it. An unchanged CSV is never serialized. CSV on Drive remains read-only.
-
-With a KB selected, **オントロジー** opens its declared graph. Choose a subgraph/group, a hierarchy root and descendants, or parent-child relations only. The graph supports zoom/fit and has a paginated entity/note table for keyboard navigation. Selecting a graph node exposes its associated note. The entity/relation CSV buttons return to ordinary file editing. Graph presentation itself does not modify records. Filters show the displayed/total counts, and exclude edges whose endpoints are outside the selected subset.
-
-**構築・表示設定をエージェントに相談** prepares a request in the ordinary native-agent panel, including the supported mapping format. It preserves any existing unsent request and does not start a model turn. The user chooses the native harness and sends it through the existing permission flow. The request asks the agent to inspect existing files and propose a mapping before changing the ontology.
-
-## Explicit declaration for agents
-
-An arbitrary CSV is not ontology. Create `.irori/ontology.json` in the owning KB to declare existing entity/relation files and their columns. The declaration is schema-layer metadata; CSV records belong to that KB's knowledge layer. Example:
+`.property/property.json` is a schema-layer file of the knowledge base, read by
+every agent and by irori ([ADR 015](decisions/015-page-properties.md)). irori
+defines no vocabulary of its own; a knowledge base without the file has no
+ontology for irori to apply.
 
 ```json
 {
   "schemaVersion": 1,
-  "entities": {
-    "path": "ontology/entities.csv",
-    "id": "id",
-    "label": "label",
-    "note": "note",
-    "parent": "parentId",
-    "group": "group"
+  "properties": { "type": { "kind": "type" }, "title": { "kind": "text" } },
+  "required": ["type", "title"],
+  "types": {
+    "concept": { "description": "One reusable claim.", "heading": "# Concepts", "required": ["sources"] },
+    "project": { "description": "The record of a project.", "heading": "# Projects", "required": [] }
   },
   "relations": {
-    "path": "ontology/relations.csv",
-    "source": "sourceId",
-    "target": "targetId",
-    "label": "relation"
-  }
+    "about": { "description": "The record this page is about.", "from": "any", "to": ["person", "org", "project"] },
+    "part_of": { "description": "This record belongs to the target.", "from": ["person", "org", "project"], "to": ["org", "project"] },
+    "uses": { "description": "What this page describes depends on the target.", "from": "any", "to": "page" },
+    "same_as": { "description": "The same identity elsewhere.", "from": ["person", "org", "project"], "to": "url" }
+  },
+  "avoid": [{ "name": "depends_on", "use": "uses" }]
 }
 ```
 
-```csv
-id,label,note,parentId,group,other_column
-knowledge,Knowledge,notes/knowledge.md,,Foundations,preserved
-research,Research,notes/research.md,knowledge,Research,preserved
-source,Source,,research,Research,preserved
-```
+- A **type** has a meaning, the heading its pages are listed under in a folder
+  index, and the keys its pages must carry besides the ones every page carries.
+- A **relation** has a meaning, the types it goes `from` (`any`, or a list) and
+  what it points `to`: `page` for any page, `url`, or a list of types. A page
+  states one in its frontmatter as `relations: [{ rel, target }]`, the target a
+  link relative to the page or a URL.
+- **`avoid`** lists names not to write, each with what to use instead.
 
-```csv
-sourceId,relation,targetId
-research,uses,source
-```
+## What irori does with it
 
-Column names can be mapped to an existing schema. `id`/`label` default to those names; relation mappings default to `sourceId`/`targetId`/`relation`. Omit `note`, `parent`, `group` or the entire `relations` declaration when unused. A mapped optional column must exist, but its cell may be empty. Headers must be nonempty and unique; records must be rectangular comma-separated CSV. Quoting, embedded commas/newlines, BOM and unknown columns are supported. Formula-like values remain inert strings.
+**Applies it to the pages.** `BundleService` (`src/host/bundle.ts`) walks the
+knowledge layer with search's own walk (`SearchService.walk`: the same layer
+rules, hidden-path and `node_modules` exclusions, blocked aliases, and entry,
+file and 2 MiB limits) and keeps every `.md` that is not a folder's `index.md`.
+It parses only each page's leading `---` block with the host's `yaml` package
+(failsafe schema, so every value is a string) and takes the page's `type`,
+`title`, `description`, the keys that hold a value and its `relations`.
+`checkOntology` (`src/domain/ontology.ts`) then reports where a page parts from
+the declaration:
 
-Entity identity is the owning `scopeId` plus the unchanged CSV ID, independent of label and diagram position. Library node/edge IDs are disposable projections; they never replace CSV IDs. IDs/labels must be nonempty, IDs unique, parents present and acyclic, and relation endpoints present. General relations can contain cycles. A note field contains one Markdown path relative to the owning KB. Traversal, absolute paths, contents, schema files, foreign/nested KB ownership and aliases are rejected. Missing notes remain explicit links and report a normal missing-file error when opened; no substitute file is created.
+| Finding | What it means |
+| --- | --- |
+| `unreadable` | The frontmatter cannot be read. |
+| `type-missing` | The page has no `type`. |
+| `type-undeclared` | Its type is not declared; `avoid` may say what to use. |
+| `key-missing` | A key every page, or its type, requires is absent or empty. |
+| `relation-incomplete` | A relation has no `rel` or no `target`. |
+| `relation-undeclared` | The relation's name is not declared; `avoid` may say what to use. |
+| `relation-from` | The relation does not go from a page of this type. |
+| `relation-not-url` | The relation points at a URL, and the target is not one. |
+| `relation-not-page` | The relation points at a page, and the target is no page of this knowledge base. |
+| `relation-target-type` | The relation points at pages of other types than the target's. |
+| `relation-repeated` | The page states the same relation to the same target twice. |
 
-Saved CSV revisions are returned as content hashes for refresh. These fingerprints are not immutable source snapshots or artifact provenance. No existing note/frontmatter is bulk-rewritten, and graph views do not register durable note/artifact/run IDs.
+The check reads nothing but those facts, so the same pages give the same report
+on every device. It never refuses a page and never changes one. It runs in the
+main process; the walk yields between batches of pages, and each page's facts
+are remembered by size and modification time, so a repeated check reads only
+the pages that changed. The first 500 findings are returned with the full
+count.
+
+**Shows it.** With a knowledge base selected, **オントロジー** opens the view. It
+draws each type as a node with its number of pages, and each relation as a line
+from the types that may carry it to the types it points at; an end that names
+no type is drawn as *どのページからも*, *どのページへも* or *URL*. Below are the
+types and the relations with their meaning, how many pages use each and how
+many findings name each, the names pages use that the declaration does not
+have, and the findings, each of which opens its page. The view reads the files
+again when they change. A knowledge base that declares nothing is told so.
+**vault agent** prepares a request in the agent panel to review the declaration
+against the pages; it preserves an unsent request and starts no model turn.
+
+**Uses it where a page is edited.** The property view offers the declared types,
+marks an undeclared one and marks a required key that is missing (ADR 015). The
+relation picker that offers only the names a page's type may use, and the new
+page that starts from a type, are not built yet; `relationsFrom` gives the
+picker its names.
+
+## Folder indexes
+
+[ADR 028](decisions/028-generated-indexes.md). They are offered when the
+knowledge folder's root `index.md` opens with frontmatter naming `okf_version`
+and `.property/property.json` reads.
+
+**Which folders.** The same walk, without submodule folders (holding `.git`) and
+nested vaults. A folder with a page (a `.md` other than `index.md`) in it or
+below it gets an `index.md`; its `# Folders` lists the subfolders that get one or
+already have an `index.md`. An `index.md` in a folder with no page in or below it
+is left alone.
+
+**The text** (`src/domain/folder-index.ts`). The root keeps its frontmatter block
+byte for byte; no other index has frontmatter. `# Folders` first, `* [name](name/)`
+plus ` - description` kept from the current line linking `name/` or
+`name/index.md`; then each declared type in `types` order under its `heading`
+(`# <type>` without one), `* [title](file.md) - description` in file-name order,
+the title falling back to the file name and the description being `description`
+on one line; pages with a missing or undeclared `type` last under
+`# Other pages`. Headings only with entries, one blank line between sections,
+nothing else kept. Link text escapes `\`, `[` and `]`; destinations are NFC with
+whitespace, `%`, parentheses, angle brackets, `#`, `:`, `\`, backticks and
+control characters percent-encoded, so `resolveNoteLink` resolves every line,
+and a folder link opens that folder's `index.md`. NFC, `\n`, one final newline,
+UTF-8 without BOM; names sort by code point.
+
+**Freshness and writing.** The view shows how many indexes an update would add
+and change. **索引を更新** (**索引を作成** while none exists) and `irori index`
+write them through `FileService.writeGenerated` — knowledge layer only, no
+hidden components, no aliases, the folder created when needed, an atomic
+replace guarded by the hash of the bytes replaced — only the files whose bytes
+change, after every output is checked (2 MiB, no NUL). After a write the view
+says once that committing makes other devices show the same indexes. A knowledge
+folder that is not a bundle has no index to write.
+
+## CSV tables
+
+Open any CSV to see a paginated table, including unknown columns. Use **ソース**
+for basic editing and the ordinary version-aware save/draft/conflict flow.
+**表** previews the current buffer without rewriting it. An unchanged CSV is
+never serialized. CSV on Drive remains read-only. A CSV is a table and nothing
+more: irori draws no graph from one. [Papa Parse](https://www.papaparse.com/docs)
+owns CSV parsing; tables allow 20,000 rows and 100 columns, 100 rows per page.
+
+## What irori no longer does
+
+Until 0.2.65 irori generated `ontology/entities.csv` and `ontology/relations.csv`
+in the knowledge folder from every page's relations, the person committed them,
+and the view drew them; and it drew a CSV pair that `.irori/ontology.json`
+declared instead. Both are gone (ADR 060). The files of an earlier irori stay
+where they are: the view says `ontology/` is still there and can be deleted, and
+`.irori/ontology.json` is read by nothing.
 
 ## Reuse, limits and evidence
 
-[Papa Parse](https://www.papaparse.com/docs) owns CSV parsing. [React Flow](https://reactflow.dev/learn/layouting/layouting) supplies graph interaction/accessibility controls and Dagre provides directed layout. Native HTML tables retain ordinary table semantics and paginate without a custom editable-grid engine. Graph/editor chunks load on demand; host file access remains behind the validated `HostAPI` registry.
+[React Flow](https://reactflow.dev/learn/layouting/layouting) draws the
+diagram and Dagre lays it out; both load on demand with the view. Host file
+access stays behind the validated `HostAPI` registry (`ontology`,
+`updateIndexes`).
 
-The ordinary text limit remains 2 MiB. CSV tables allow 20,000 rows/100 columns, with 100 rows per page. Ontology parsing allows 2,000 entities/10,000 relations. A rendered graph is limited to 250 entities/1,000 relations; larger graphs require an explicit group/hierarchy filter, while the complete entity list remains available. Nothing is silently truncated. Larger-graph performance, native keyboard/screen-reader/IME acceptance, multiple linked notes per entity, stable note IDs and reverse note/entity navigation remain follow-up work.
+The ordinary text limit remains 2 MiB per page. The check has no limit of its
+own beyond the walk's (50,000 files, 100,000 entries, 4,000 entries in one
+folder). Not measured: the view with a declaration of hundreds of types, and
+native keyboard and screen-reader acceptance of the diagram; the tables carry
+everything the diagram shows.
 
-Behavior tests cover quoted unknown data, string IDs, structural errors, hierarchy/subgraph direction, duplicate IDs/cycles/unknown references, unchanged bytes, hashes, stale saves, missing notes and ownership/alias boundaries. The Electron UI journey covers table/source/save transitions, graph filters, note navigation, external invalidation, dialog keyboard behavior and preparation of the agent request. Packaged-app smoke also loads the actual host parser and lazy graph chunk outside the checkout. None of these tests calls a model or Google account. Latest suite/native CI results belong in [STATUS](STATUS.md) and [PACKAGING](PACKAGING.md).
-
-This advances R08 and part of D06. Search, rename/backlinks/properties, explicit multi-source selection, durable note/artifact/run IDs, retained source versions/snapshots and output provenance remain full-release requirements.
+Behavior tests (`tests/ontology.test.ts`, `tests/bundle.test.ts`,
+`tests/folder-index.test.ts`, `tests/bundle-host-load.test.ts`) cover every
+finding, a declaration that names target types and one that does not, the pages
+the walk keeps, a page that could not be read and is read again, coalesced
+checks and fresh updates, the indexes' bytes and the former graph index left
+alone. The Electron journey (`scripts/ontology-ui-smoke.ts`) covers a knowledge
+base that declares nothing, the diagram, the tables, findings that open their
+page and follow the files, the folder indexes, the stage view's keyboard
+handling and a CSV's table/source/save. Packaged-app smoke loads the view's
+lazy chunk outside the checkout. None of these tests calls a model or a Google
+account. Latest suite and native CI results belong in [STATUS](STATUS.md) and
+[PACKAGING](PACKAGING.md).

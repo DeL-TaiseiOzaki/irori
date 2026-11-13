@@ -72,7 +72,8 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - Follow relative links and list the notes that link here (backlinks). Renaming or moving a note rewrites the links to it.
 - **Today's note** opens at a set place, from a set template.
 - Open files become tabs. **Open beside** splits the page into up to four columns, each with its own tabs. The column you click is the one you edit; the others show what is saved. Each vault keeps its columns and tabs.
-- CSV opens as a table, and an ontology as a hierarchy or a graph.
+- CSV opens as a table.
+- The ontology — the page types and relations a vault declares — opens as a diagram and tables, with a list of the pages that differ from it.
 - **Ctrl/⌘+F** (or **Find in file** under "…") finds words in the file on show: a note (inside its code blocks too), code, a CSV table, a PDF, Word, PowerPoint and a spreadsheet (every sheet). Case and full-width letters do not matter. Enter (or F3) goes to the next one, Shift+Enter to the previous one and Esc closes the bar; in a note, closing it selects the words found.
 
 **AI agents**

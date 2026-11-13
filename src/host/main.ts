@@ -52,8 +52,7 @@ import { approveGitConfig, GitConfigApprovals } from '../git/config-approval';
 import { EnvironmentService } from './environment';
 import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
-import { readOntology } from './ontology';
-import { GraphIndexService } from './graph-index';
+import { BundleService } from './bundle';
 import { brokenLinks } from '../domain/vault-move';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
 import { readPageProperties } from './properties';
@@ -152,7 +151,7 @@ app
     // Dialogs and messages the host writes follow the reader's language too.
     setLanguage(device.language);
     const search = new SearchService(files);
-    const graphIndex = new GraphIndexService(files, search);
+    const bundle = new BundleService(files, search);
     const drafts = new DraftService(files);
     /** Tells every window, or only `to`. */
     const emit = (event: HostEvent, to?: BrowserWindow) => {
@@ -494,7 +493,8 @@ app
         agentChange(scopeId, () => addNoteComment(files, git, scopeId, file, comment, by)),
       removeComment: (scopeId, file, id) =>
         agentChange(scopeId, () => resolveNoteComment(files, scopeId, file, id)),
-      updateIndex: (scopeId) => agentChange(scopeId, () => graphIndex.update(scopeId)),
+      updateIndex: (scopeId) => agentChange(scopeId, () => bundle.update(scopeId)),
+      checkOntology: (scopeId) => bundle.ontology(scopeId),
       runRoutine: (ref, input) => routines.run(ref, input),
       running: (scopeId) => agents.running(scopeId),
       announce: ({ workspace, scopeId }) =>
@@ -965,16 +965,15 @@ app
         );
         await workspaces.remove(id);
       },
-      ontology: (id) => readOntology(files, id),
-      graphIndexStatus: (id) => graphIndex.status(id),
-      updateGraphIndex: (id) =>
+      ontology: (id) => bundle.ontology(id),
+      updateIndexes: (id) =>
         changeVault(
           id,
           t(
             '実行と接続の準備が終わってから索引を更新してください。',
             'Wait for runs and connection setup to finish before updating the indexes.',
           ),
-          () => graphIndex.update(id),
+          () => bundle.update(id),
         ),
       skills: async (id) =>
         id === sharedSchemaId || you.rootOf(id)

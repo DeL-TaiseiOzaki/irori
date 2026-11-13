@@ -8,7 +8,7 @@ description: AI への指示、書きためる知識、元になる資料を分�
 | 層        | 役割                               | 例                                  |
 | --------- | ---------------------------------- | ----------------------------------- |
 | Schema    | AI への指示や設定（任意）          | `AGENTS.md`、スキル、ルール、フック |
-| Knowledge | 自分たちが書き、更新していくノート | Markdown、オントロジーの CSV        |
+| Knowledge | 自分たちが書き、更新していくノート | Markdown、CSV の表                  |
 | Contents  | ノートの元になる資料               | PDF、Office ファイル、Google Drive  |
 
 資料を読み、Knowledge に理解を書きます。Schema は **設定 → エージェント → vault agent** で vault agent をオンにしたときだけ表示されます。

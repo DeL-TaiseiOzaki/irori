@@ -730,11 +730,10 @@ export interface HostAPI {
   saveSpaceIcon(scopeId: string, bytes: Uint8Array): Promise<string>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
-  ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
-  /** Whether the graph index and an OKF bundle's folder indexes match the pages now, and what an update would change (ADR 008, 028). Writes nothing. */
-  graphIndexStatus(scopeId: string): Promise<import('./graph-index').GraphIndexStatus>;
-  /** Generates the graph index (unless declared) and the folder indexes from the pages, and writes the files whose bytes change. */
-  updateGraphIndex(scopeId: string): Promise<import('./graph-index').GraphIndexUpdate>;
+  /** The declared types and relations applied to the pages now, and whether an OKF bundle's folder indexes match them (ADR 060, 028). Writes nothing. */
+  ontology(scopeId: string): Promise<import('./ontology').Ontology>;
+  /** Generates an OKF bundle's folder indexes from the pages, and writes the files whose bytes change. */
+  updateIndexes(scopeId: string): Promise<import('./bundle').IndexUpdate>;
   /** Who typed each line of this text, resolved against the record on this device. */
   noteAuthorship(
     scopeId: string,

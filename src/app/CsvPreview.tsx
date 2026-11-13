@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { parseCsv } from '../domain/ontology';
+import { parseCsv } from '../domain/csv';
 import { findAll } from '../domain/find';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';

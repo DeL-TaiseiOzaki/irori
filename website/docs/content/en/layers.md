@@ -8,7 +8,7 @@ description: Keep AI instructions, accumulated knowledge, and source materials d
 | Layer     | Role                           | Examples                          |
 | --------- | ------------------------------ | --------------------------------- |
 | Schema    | Instructions for AI (optional) | `AGENTS.md`, skills, rules, hooks |
-| Knowledge | Notes you write and maintain   | Markdown, ontology CSV files      |
+| Knowledge | Notes you write and maintain   | Markdown, CSV tables              |
 | Contents  | Materials your notes draw on   | PDFs, Office files, Google Drive  |
 
 Read source materials and write your understanding in Knowledge. Schema appears only when the vault agent is on in **Settings → Agents → vault agent**.

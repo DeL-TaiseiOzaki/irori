@@ -1,11 +1,11 @@
-import { compareCodePoints } from './graph-index';
+import { compareCodePoints } from './bundle';
 import type { PropertyDeclaration } from './properties';
 import { inFolder, underFolder } from './layers';
 
 /**
  * The folder indexes of an Open Knowledge Format bundle (ADR 028), generated
- * from its pages as the graph index is: every folder with a page in it or below
- * it gets an `index.md` that lists its subfolders and its pages, one line each.
+ * from its pages: every folder with a page in it or below it gets an `index.md`
+ * that lists its subfolders and its pages, one line each.
  * The rule is the one irori-templete states for its `lint`, so a person pressing
  * the button and an agent applying the rule write the same bytes.
  *

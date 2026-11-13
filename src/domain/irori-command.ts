@@ -61,7 +61,8 @@ export type IroriCommand =
   | { kind: 'trash'; note: string }
   | { kind: 'comment'; file: string; body: string; quote?: string; line?: number }
   | { kind: 'resolve'; file: string; id: string }
-  | { kind: 'index'; vault?: string };
+  | { kind: 'index'; vault?: string }
+  | { kind: 'check'; vault?: string };
 
 /** The longest argument list and argument the command takes. */
 export const iroriArgumentLimit = { count: 20, length: 4096 };
@@ -83,6 +84,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   comment: ['quote', 'line'],
   resolve: [],
   index: [],
+  check: [],
 };
 const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default', 'editable']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
@@ -103,6 +105,7 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   comment: [2, 'a file and the comment'],
   resolve: [2, "a file and the comment's id"],
   index: [1, 'at most one vault'],
+  check: [1, 'at most one vault'],
 };
 
 /**
@@ -158,7 +161,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
   if (
     kind === 'workspace'
       ? !words.length
-      : kind === 'index'
+      : kind === 'index' || kind === 'check'
         ? words.length > count
         : kind === 'work'
           ? words.length !== (values.default === true ? 1 : 2)
@@ -327,6 +330,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     case 'resolve':
       return { kind, file: words[0], id: words[1].trim() };
     case 'index':
+    case 'check':
       return { kind, ...(words[0] && { vault: words[0] }) };
   }
 }

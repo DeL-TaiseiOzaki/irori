@@ -5,6 +5,9 @@ stages 2 and 3 open.
 Addresses the "properties" item that [ACCEPTANCE](../ACCEPTANCE.md) leaves open
 under R03 and R08. Amended by [ADR 028](028-generated-indexes.md): the hibachi's
 root `README.md` is Schema, so it has no properties block.
+[ADR 060](060-the-ontology-is-the-declaration.md) makes this declaration the
+knowledge base's ontology: a relation's `to` may name the types it points at,
+and irori checks every page against it.
 
 ## Context
 

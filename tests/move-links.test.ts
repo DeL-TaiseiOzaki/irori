@@ -11,7 +11,7 @@ import { linkCount, rewriteLinks } from '../src/domain/note-links';
 import { imagesForNoteMove } from '../src/domain/note-operations';
 import { dispatchHost, type HostHandlers } from '../src/domain/host-requests';
 import type { Document } from '../src/domain/types';
-import { GraphIndexService } from '../src/host/graph-index';
+import { BundleService } from '../src/host/bundle';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { rewriteNoteReferences } from '../src/host/note-references';
 
@@ -44,8 +44,16 @@ test('Renaming keeps OKF relations and source references without rewriting other
     '\ufeff---\r\ntype: concept\r\ntitle: A\r\nrelations:\r\n  - { rel: uses, target: "b.md" } # keep\r\nsources:\r\n  - resource: \'b.md\'\r\n  - resource: Knowledge_Base/wiki/b.md\r\ndescription: "[example](b.md)"\r\n---\r\n\r\n[b](b.md)\r\n';
   await write('Knowledge_Base/wiki/a.md', original);
   await write('Knowledge_Base/wiki/b.md', '---\ntype: concept\ntitle: B\n---\n');
-  const graph = new GraphIndexService(files, search);
-  await graph.update(id);
+  await write(
+    '.property/property.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      types: { concept: {} },
+      relations: { uses: { from: 'any', to: ['concept'] } },
+    }),
+  );
+  const bundles = new BundleService(files, search);
+  assert.equal((await bundles.ontology(id)).report!.findingCount, 0);
   assert.deepEqual(await referringLinks(files, search, id, 'Knowledge_Base/wiki/b.md'), {
     notes: 1,
     links: 4,
@@ -66,10 +74,10 @@ test('Renaming keeps OKF relations and source references without rewriting other
       .replace('resource: Knowledge_Base/wiki/b.md', 'resource: Knowledge_Base/wiki/c.md')
       .replace('[b](b.md)', '[b](c.md)'),
   );
-  const status = await graph.update(id);
-  assert.equal(status.entities.rows, 2);
-  assert.equal(status.relations.rows, 1);
-  assert.equal(status.excluded, 0);
+  // The relation still points at a concept page after the move.
+  const report = (await bundles.ontology(id)).report!;
+  assert.equal(report.relations[0].uses, 1);
+  assert.equal(report.findingCount, 0);
 });
 
 test('Moves preserve differently cased body and metadata links where the disk folds case', async (t) => {

@@ -1,5 +1,16 @@
 # irori continuation handoff
 
+**The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
+[ONTOLOGY](ONTOLOGY.md)). `.property/property.json` is a knowledge base's
+ontology; irori applies it to the pages (`checkOntology`), shows it
+(`OntologyPanel`) and keeps no graph of the pages. `ontology/` CSV files and
+`.irori/ontology.json` are no longer generated or read. Next, in this order:
+the relation picker of [ADR 015](decisions/015-page-properties.md) stage 2,
+which offers `relationsFrom(declaration, type)` and the pages of the types a
+relation points at; then stage 3, a new page that starts from a type. The
+template's change that writes type lists in `to` is irori-templete's own pull
+request and needs 0.2.66 or later.
+
 **Publishing a preview, from 0.2.4** ([DISTRIBUTION](DISTRIBUTION.md#how-the-rule-is-held)).
 `IRORI_AUTO_PUBLISH=on` is set, so merging a pull request that ships publishes
 it by itself through `publish.yml`: release, page with a generated manifest,

@@ -311,7 +311,7 @@ export function BrainHome({
                   onClick={onGraph}
                 >
                   <Icon name="graph" size={14} />
-                  {t('グラフ', 'Graph')}
+                  {t('オントロジー', 'Ontology')}
                 </button>
               </>
             }

@@ -1,5 +1,42 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The ontology is the declaration, 2026-11-13 (**0.2.66**,
+[#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316);
+[ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked
+how irori handles the ontology and for the simplest mechanism, then corrected the
+first answer: what is wanted is an ontology, not a knowledge graph. Until 0.2.65
+the view called オントロジー drew a graph of the pages from generated CSV files,
+and nothing in irori read the relations a knowledge base declares.
+- The ontology is `.property/property.json`. A relation's `to` may now name the
+  types it points at (`src/domain/properties.ts`); `page`, `url` and older
+  declarations read as before.
+- `checkOntology` (`src/domain/ontology.ts`) applies the declaration to the
+  pages and returns eleven kinds of finding, counts per type and relation, and
+  the names in use that are not declared. `BundleService` (`src/host/bundle.ts`,
+  was `GraphIndexService`) walks the pages as before, remembers each page's facts
+  by size and modification time, and now also keeps the keys a page carries.
+- `OntologyPanel` draws the declared types and relations (React Flow, laid out
+  top to bottom, with an arc for a relation from a type to itself) and lists
+  types, relations, undeclared names and findings; a finding opens its page.
+  The entry is **オントロジー** (was **グラフ**), and the prepared vault-agent
+  request asks for a review of the declaration.
+- Removed: the graph index module (`ontology/entities.csv`, `relations.csv`,
+  its `index.md`), its freshness check, limits and repair; the declared CSV pair
+  of `.irori/ontology.json`; the group and hierarchy filters and the entity
+  list. `HostAPI.ontology` returns the report; `graphIndexStatus` and
+  `updateGraphIndex` give way to `updateIndexes`. **索引を更新** and
+  `irori index` write the folder indexes only (ADR 028), and say so for a vault
+  that is not an OKF bundle. An `ontology/` folder left by an earlier irori is
+  named in the view and otherwise untouched.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux, with
+  `tests/ontology.test.ts`, `tests/bundle.test.ts`, `tests/csv.test.ts` and
+  `tests/bundle-host-load.test.ts` new or rewritten and the folder-index,
+  root-layout, layer-name, move and command tests adapted.
+  `scripts/ontology-ui-smoke.ts` passes in a real Electron under Xvfb. Not seen
+  on Windows or macOS, and not tried against a real knowledge base.
+- Not done: the relation picker and the new page that starts from a type
+  (ADR 015 stages 2 and 3); a list, on a page, of the pages that name it in a
+  relation.
 Find in the file on show, 2026-11-13 (**0.2.65**,
 [#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315)): the owner asked for a
 keyword search inside each file on the main stage.

@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import {
   ReactFlow,
   Background,
+  BaseEdge,
   Controls,
   Position,
   MarkerType,
   type Node,
   type Edge,
+  type EdgeProps,
 } from '@xyflow/react';
 import dagre from '@dagrejs/dagre';
 import '@xyflow/react/dist/style.css';
@@ -14,78 +16,144 @@ import { StageView } from './StageView';
 import { Crumbs } from './NoteBar';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
-import { selectSubgraph, type OntologyView } from '../domain/ontology';
-import { graphIndexAt, type FolderIndexStatus, type GraphIndexStatus } from '../domain/graph-index';
-import { knowledgeFolder, layerLabel } from '../domain/layers';
+import type { FolderIndexStatus } from '../domain/bundle';
+import type {
+  OntologyFinding,
+  OntologyRelation,
+  OntologyReport,
+  UndeclaredName,
+} from '../domain/ontology';
+import { layerLabel } from '../domain/layers';
+import { propertyDeclarationFile } from '../domain/properties';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { useAction } from './useAction';
 
-function Graph({
-  view,
-  onSelect,
-}: {
-  view: Pick<OntologyView, 'entities' | 'edges'>;
-  onSelect: (id: string) => void;
-}) {
+/** The stand-ins a relation's ends take when it names no type. */
+const anyFrom = '\0from';
+const anyTo = '\0to';
+const url = '\0url';
+
+const nodeWidth = 148;
+const nodeHeight = 42;
+
+/** A relation from a type to itself: an arc round the node's right side, from its foot back to its head. */
+function LoopEdge({ sourceX, sourceY, targetX, targetY, label, markerEnd }: EdgeProps) {
+  const out = nodeWidth / 2 + 64;
+  const path = `M ${sourceX} ${sourceY} C ${sourceX + out} ${sourceY + 34}, ${targetX + out} ${targetY - 34}, ${targetX} ${targetY}`;
+  return (
+    <BaseEdge
+      path={path}
+      label={label}
+      labelX={sourceX + out * 0.74}
+      labelY={(sourceY + targetY) / 2}
+      markerEnd={markerEnd}
+    />
+  );
+}
+const edgeTypes = { loop: LoopEdge };
+
+/**
+ * The declaration as a diagram: a node for each type, and a line for each
+ * relation from the types that may carry it to the types it points at. The
+ * pages are not drawn: the ontology is what kinds there are, not what there is.
+ */
+function Diagram({ report }: { report: OntologyReport }) {
   const { nodes, edges } = useMemo(() => {
-    // Library layout/DOM IDs are disposable. CSV entity IDs remain unchanged, including punctuation.
-    const ids = new Map(view.entities.map((entity, index) => [entity.id, `n${index}`]));
+    const declared = new Map(report.types.map((type) => [type.name, type]));
+    // Lines between the same two ends share one label.
+    const lines = new Map<string, { from: string; to: string; names: string[] }>();
+    for (const relation of report.relations) {
+      const sources = relation.from === 'any' ? [anyFrom] : relation.from;
+      const targets =
+        relation.to === 'url' ? [url] : relation.to === 'page' ? [anyTo] : relation.to;
+      for (const from of sources)
+        for (const to of targets) {
+          const key = `${from}\0\0${to}`;
+          const line = lines.get(key);
+          if (line) line.names.push(relation.name);
+          else lines.set(key, { from, to, names: [relation.name] });
+        }
+    }
+    const ends = new Set([...lines.values()].flatMap(({ from, to }) => [from, to]));
+    const names = [...new Set([...declared.keys(), ...ends])];
+    const ids = new Map(names.map((name, index) => [name, `n${index}`]));
     const graph = new dagre.graphlib.Graph({ multigraph: true })
-      .setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 80 })
+      .setGraph({ rankdir: 'TB', nodesep: 34, ranksep: 62 })
       .setDefaultEdgeLabel(() => ({}));
-    view.entities.forEach((entity) =>
-      graph.setNode(ids.get(entity.id)!, { width: 148, height: 42 }),
+    names.forEach((name) =>
+      graph.setNode(ids.get(name)!, { width: nodeWidth, height: nodeHeight }),
     );
-    view.edges.forEach((edge, index) =>
-      graph.setEdge(ids.get(edge.source)!, ids.get(edge.target)!, {}, `e${index}`),
-    );
+    [...lines.values()].forEach(({ from, to }, index) => {
+      if (from !== to) graph.setEdge(ids.get(from)!, ids.get(to)!, {}, `e${index}`);
+    });
     dagre.layout(graph);
-    const nodes: Node[] = view.entities.map((entity) => {
-      const { x, y } = graph.node(ids.get(entity.id)!);
+    const stand = (name: string) =>
+      name === anyFrom
+        ? t('どのページからも', 'From any page')
+        : name === anyTo
+          ? t('どのページへも', 'To any page')
+          : name === url
+            ? 'URL'
+            : undefined;
+    const nodes: Node[] = names.map((name) => {
+      const { x, y } = graph.node(ids.get(name)!);
+      const type = declared.get(name);
+      const label = stand(name) ?? name;
       return {
-        id: ids.get(entity.id)!,
-        position: { x: x - 74, y: y - 21 },
-        data: { label: entity.label, entityId: entity.id },
+        id: ids.get(name)!,
+        position: { x: x - nodeWidth / 2, y: y - nodeHeight / 2 },
+        data: {
+          label: type ? (
+            <>
+              <strong title={type.description}>{name}</strong>
+              <span>{type.pages.toLocaleString('en-US')}</span>
+            </>
+          ) : (
+            label
+          ),
+        },
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
-        style: { width: 148, height: 42 },
-        ariaLabel: `${entity.label} · ${entity.id}`,
-        focusable: true,
+        style: { width: nodeWidth, height: nodeHeight },
+        className: type ? 'type' : stand(name) ? 'stand-in' : 'undeclared',
+        ariaLabel: type
+          ? t(`${name}、${type.pages} ページ`, `${name}, ${type.pages} pages`)
+          : label,
+        focusable: false,
+        selectable: false,
       };
     });
-    const edges: Edge[] = view.edges.map((edge, index) => ({
+    const edges: Edge[] = [...lines.values()].map(({ from, to, names }, index) => ({
       id: `e${index}`,
-      source: ids.get(edge.source)!,
-      target: ids.get(edge.target)!,
-      label: edge.hierarchy ? undefined : edge.label,
-      type: 'smoothstep',
-      className: edge.hierarchy ? 'hierarchy' : 'relation',
-      markerEnd: edge.hierarchy ? undefined : { type: MarkerType.ArrowClosed },
+      source: ids.get(from)!,
+      target: ids.get(to)!,
+      label: names.join(', '),
+      type: from === to ? 'loop' : 'smoothstep',
+      className: 'relation',
+      markerEnd: { type: MarkerType.ArrowClosed },
     }));
     return { nodes, edges };
-  }, [view]);
+  }, [report]);
   return (
     <div
       className="ontology-graph"
-      aria-label={t('オントロジーの階層グラフ', 'Ontology hierarchy graph')}
+      aria-label={t('種類と関係の図', 'Diagram of types and relations')}
     >
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        edgeTypes={edgeTypes}
         fitView
-        // A small graph shows at its own size instead of filling the view.
+        // A small diagram shows at its own size instead of filling the view.
         fitViewOptions={{ maxZoom: 1 }}
-        minZoom={0.1}
+        minZoom={0.2}
         maxZoom={2}
         nodesDraggable={false}
         nodesConnectable={false}
         edgesReconnectable={false}
+        elementsSelectable={false}
         deleteKeyCode={null}
-        onNodeClick={(_event, node) => onSelect(String(node.data.entityId))}
-        onSelectionChange={({ nodes }) => {
-          if (nodes.length === 1) onSelect(String(nodes[0].data.entityId));
-        }}
         ariaLabelConfig={{
           'controls.zoomIn.ariaLabel': t('拡大', 'Zoom in'),
           'controls.zoomOut.ariaLabel': t('縮小', 'Zoom out'),
@@ -99,241 +167,226 @@ function Graph({
   );
 }
 
-function OntologyContent({
-  view,
-  table,
-  onOpen,
-}: {
-  view: OntologyView;
-  /** The entity list and the CSV files, shown instead of the canvas's foot. */
-  table: boolean;
-  onOpen: (path: string) => void;
-}) {
-  const [group, setGroup] = useState(''),
-    [root, setRoot] = useState(''),
-    [hierarchy, setHierarchy] = useState(false),
-    [selectedId, setSelectedId] = useState(''),
-    [page, setPage] = useState(0);
-  const groups = [
-    ...new Set(
-      view.entities.map((entity) => entity.group).filter((value): value is string => !!value),
-    ),
-  ].sort();
-  const subgraph = useMemo(
-    () => selectSubgraph(view, group, root, hierarchy),
-    [view, group, root, hierarchy],
-  );
-  const selected = subgraph.entities.find((entity) => entity.id === selectedId);
-  const current = Math.min(page, Math.max(0, Math.ceil(subgraph.entities.length / 100) - 1));
-  const tooLarge = subgraph.entities.length > 250 || subgraph.edges.length > 1000;
+const quoted = (name: string) => t(`「${name}」`, `"${name}"`);
+const instead = (use: string | undefined) =>
+  use ? t(`（代わりに ${use}）`, ` (use ${use} instead)`) : '';
+
+/** One finding in words. */
+function describeFinding(finding: OntologyFinding) {
+  switch (finding.kind) {
+    case 'unreadable':
+      return t('frontmatter を読めません。', 'The frontmatter cannot be read.');
+    case 'type-missing':
+      return t('種類（type）がありません。', 'It has no type.');
+    case 'type-undeclared':
+      return t(
+        `宣言にない種類${quoted(finding.name)}です${instead(finding.use)}。`,
+        `Its type ${quoted(finding.name)} is not declared${instead(finding.use)}.`,
+      );
+    case 'key-missing':
+      return t(
+        `必須のプロパティ${quoted(finding.name)}がありません。`,
+        `The required property ${quoted(finding.name)} is missing.`,
+      );
+    case 'relation-incomplete':
+      return t('関係に rel か target がありません。', 'A relation has no rel or no target.');
+    case 'relation-undeclared':
+      return t(
+        `宣言にない関係${quoted(finding.name)}です${instead(finding.use)}。`,
+        `The relation ${quoted(finding.name)} is not declared${instead(finding.use)}.`,
+      );
+    case 'relation-from':
+      return t(
+        `関係${quoted(finding.name)}は、種類${quoted(finding.type)}のページからは使えません。`,
+        `The relation ${quoted(finding.name)} does not go from a page of type ${quoted(finding.type)}.`,
+      );
+    case 'relation-not-url':
+      return t(
+        `関係${quoted(finding.name)}の相手は URL です（${finding.target}）。`,
+        `The relation ${quoted(finding.name)} points at a URL (${finding.target}).`,
+      );
+    case 'relation-not-page':
+      return t(
+        `関係${quoted(finding.name)}の相手が、この KB のページではありません（${finding.target}）。`,
+        `The relation ${quoted(finding.name)} points at no page of this KB (${finding.target}).`,
+      );
+    case 'relation-target-type':
+      return t(
+        `関係${quoted(finding.name)}の相手の種類が違います（${finding.target} は ${finding.type ?? '種類なし'}）。`,
+        `The relation ${quoted(finding.name)} points at a page of another type (${finding.target} is ${finding.type ?? 'untyped'}).`,
+      );
+    case 'relation-repeated':
+      return t(
+        `関係${quoted(finding.name)}が同じ相手に重複しています（${finding.target}）。`,
+        `The relation ${quoted(finding.name)} is stated twice for the same target (${finding.target}).`,
+      );
+  }
+}
+
+const anyPage = () => t('どのページでも', 'any page');
+const fromText = (relation: OntologyRelation) =>
+  relation.from === 'any' ? anyPage() : relation.from.join(', ');
+const toText = (relation: OntologyRelation) =>
+  relation.to === 'url' ? 'URL' : relation.to === 'page' ? anyPage() : relation.to.join(', ');
+
+function Undeclared({ label, names }: { label: string; names: UndeclaredName[] }) {
+  if (!names.length) return null;
   return (
-    <>
-      <div className="ontology-controls">
-        <label>
-          {t('サブグラフ', 'Subgraph')}
-          <select
-            aria-label={t('サブグラフ', 'Subgraph')}
-            value={group}
-            onChange={(event) => setGroup(event.target.value)}
-          >
-            <option value="">{t('すべてのグループ', 'All groups')}</option>
-            {groups.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t('階層の起点', 'Hierarchy root')}
-          <select
-            aria-label={t('階層の起点', 'Hierarchy root')}
-            value={root}
-            onChange={(event) => setRoot(event.target.value)}
-          >
-            <option value="">{t('全階層', 'All hierarchy')}</option>
-            {view.entities.map((entity) => (
-              <option key={entity.id} value={entity.id}>
-                {entity.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={hierarchy}
-            onChange={(event) => setHierarchy(event.target.checked)}
-          />
-          {t('親子関係だけを表示', 'Show only parent-child relations')}
-        </label>
-        <button
-          onClick={() => {
-            setGroup('');
-            setRoot('');
-            setHierarchy(false);
-          }}
-        >
-          {t('絞り込みを解除', 'Clear filters')}
-        </button>
-        <span className="graph-counts" role="status">
-          {t(
-            `${subgraph.entities.length} / ${view.entities.length} エンティティ · ${subgraph.edges.length} / ${view.edges.length} 関係`,
-            `${subgraph.entities.length} / ${view.entities.length} entities · ${subgraph.edges.length} / ${view.edges.length} relations`,
-          )}
+    <p className="ontology-undeclared">
+      <strong>{label}</strong>
+      {names.map(({ name, count, use }) => (
+        <span key={name}>
+          <code>{name}</code> × {count.toLocaleString('en-US')}
+          {instead(use)}
         </span>
-      </div>
-      <div className="graph-canvas">
-        {tooLarge ? (
-          <p className="hint">{t('多すぎて表示できません。', 'Too many to display.')}</p>
-        ) : subgraph.entities.length ? (
-          <Graph key={`${group}:${root}:${hierarchy}`} view={subgraph} onSelect={setSelectedId} />
-        ) : (
-          <p>
-            {t('この条件に一致するエンティティはありません。', 'No entities match this condition.')}
-          </p>
-        )}
-        <div className="ontology-selection" aria-live="polite">
-          {selected ? (
-            <>
-              <strong>{selected.label}</strong>
-              <dl>
-                <dt>ID</dt>
-                <dd>
-                  <code>{selected.id}</code>
-                </dd>
-                {selected.group && (
-                  <>
-                    <dt>{t('グループ', 'Group')}</dt>
-                    <dd>{selected.group}</dd>
-                  </>
-                )}
-                {selected.parent && (
-                  <>
-                    <dt>{t('親', 'Parent')}</dt>
-                    <dd>
-                      {view.entities.find((entity) => entity.id === selected.parent)?.label ??
-                        selected.parent}
-                    </dd>
-                  </>
-                )}
-                {selected.note && (
-                  <>
-                    <dt>{t('ノート', 'Note')}</dt>
-                    <dd>
-                      <code>{selected.note}</code>
-                    </dd>
-                  </>
-                )}
-              </dl>
-              {selected.note ? (
-                <button className="solid-button" onClick={() => onOpen(selected.note!)}>
-                  <Icon name="file" size={14} />
-                  {t('関連ノートを開く', 'Open related note')}
-                </button>
-              ) : (
-                <span className="muted">
-                  {t('関連ノートは未登録です', 'No related note is registered')}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="muted">{t('未選択', 'Nothing selected')}</span>
-          )}
-        </div>
-        <div className="graph-legend" aria-hidden="true">
-          <span>
-            <i className="solid" />
-            {t('親子', 'Parent')}
-          </span>
-          <span>
-            <i className="dashed" />
-            {t('関係', 'Relation')}
-          </span>
-        </div>
-      </div>
-      {table && (
-        <div className="graph-table">
-          <details className="ontology-list" open>
-            <summary>{t('エンティティとノートの一覧', 'List of entities and notes')}</summary>
-            <div className="actions">
-              <button disabled={!current} onClick={() => setPage(current - 1)}>
-                {t('前の 100 件', 'Previous 100')}
-              </button>
-              <span>
-                {current * 100 + (subgraph.entities.length ? 1 : 0)}–
-                {Math.min(subgraph.entities.length, (current + 1) * 100)}
-              </span>
-              <button
-                disabled={(current + 1) * 100 >= subgraph.entities.length}
-                onClick={() => setPage(current + 1)}
-              >
-                {t('次の 100 件', 'Next 100')}
-              </button>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">{t('エンティティ', 'Entity')}</th>
-                  <th scope="col">ID</th>
-                  <th scope="col">{t('グループ', 'Group')}</th>
-                  <th scope="col">{t('ノート', 'Note')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subgraph.entities.slice(current * 100, (current + 1) * 100).map((entity) => (
-                  <tr key={entity.id}>
-                    <td>{entity.label}</td>
-                    <td>
-                      <code>{entity.id}</code>
-                    </td>
-                    <td>{entity.group}</td>
-                    <td>
-                      {entity.note ? (
-                        <button onClick={() => onOpen(entity.note!)}>{entity.note}</button>
-                      ) : (
-                        t('未登録', 'Not registered')
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-          <div className="actions">
-            <button onClick={() => onOpen(view.entitiesPath)}>
-              {t('エンティティ CSV を開く', 'Open entities CSV')}
-            </button>
-            {view.relationsPath && (
-              <button onClick={() => onOpen(view.relationsPath!)}>
-                {t('関係 CSV を開く', 'Open relations CSV')}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+      ))}
+    </p>
   );
 }
 
-/** The freshness line for the graph index the KB carries, as the host reports it. */
-function describeGraphIndex(status: GraphIndexStatus, folder: string) {
-  const detailJa = [
-    status.excluded ? `除外した関係 ${status.excluded} 件。` : '',
-    status.unreadable ? `読めないページ ${status.unreadable} 件。` : '',
-  ].join('');
-  const detailEn = [
-    status.excluded ? `Excludes ${status.excluded} relations.` : '',
-    status.unreadable ? `${status.unreadable} pages unreadable.` : '',
-  ].join(' ');
-  if (status.current)
-    return t(
-      `グラフ索引（${folder}）はページと一致しています。${detailJa}`,
-      `The graph index (${folder}) matches the pages.${detailEn ? ` ${detailEn}` : ''}`,
-    );
-  return t(
-    `グラフ索引（${folder}）はページと一致しません。更新するとエンティティ +${status.entities.added} / −${status.entities.removed}、` +
-      `関係 +${status.relations.added} / −${status.relations.removed}。${detailJa}`,
-    `The graph index (${folder}) does not match the pages. Updating would change entities +${status.entities.added} / −${status.entities.removed}, ` +
-      `relations +${status.relations.added} / −${status.relations.removed}.${detailEn ? ` ${detailEn}` : ''}`,
+function OntologyContent({
+  report,
+  onOpen,
+}: {
+  report: OntologyReport;
+  onOpen: (path: string) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const current = Math.min(page, Math.max(0, Math.ceil(report.findings.length / 100) - 1));
+  return (
+    <>
+      <div className="graph-canvas">
+        {report.types.length || report.relations.length ? (
+          <Diagram report={report} />
+        ) : (
+          <p>
+            {t('宣言に種類も関係もありません。', 'The declaration has no types and no relations.')}
+          </p>
+        )}
+      </div>
+      <div className="graph-table">
+        <details className="ontology-list" open>
+          <summary>{t('種類', 'Types')}</summary>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{t('種類', 'Type')}</th>
+                <th scope="col">{t('意味', 'Meaning')}</th>
+                <th scope="col">{t('必須', 'Required')}</th>
+                <th scope="col">{t('ページ', 'Pages')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.types.map((type) => (
+                <tr key={type.name}>
+                  <td>
+                    <code>{type.name}</code>
+                  </td>
+                  <td>{type.description}</td>
+                  <td>{type.required.join(', ')}</td>
+                  <td>{type.pages.toLocaleString('en-US')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+        <details className="ontology-list" open>
+          <summary>{t('関係', 'Relations')}</summary>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{t('関係', 'Relation')}</th>
+                <th scope="col">{t('意味', 'Meaning')}</th>
+                <th scope="col">{t('どの種類から', 'From')}</th>
+                <th scope="col">{t('どの種類へ', 'To')}</th>
+                <th scope="col">{t('使用', 'Uses')}</th>
+                <th scope="col">{t('宣言と違う', 'Differ')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.relations.map((relation) => (
+                <tr key={relation.name}>
+                  <td>
+                    <code>{relation.name}</code>
+                  </td>
+                  <td>{relation.description}</td>
+                  <td>{fromText(relation)}</td>
+                  <td>{toText(relation)}</td>
+                  <td>{relation.uses.toLocaleString('en-US')}</td>
+                  <td>{relation.findings.toLocaleString('en-US')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+        <Undeclared
+          label={t('宣言にない種類', 'Types not declared')}
+          names={report.undeclaredTypes}
+        />
+        <Undeclared
+          label={t('宣言にない関係', 'Relations not declared')}
+          names={report.undeclaredRelations}
+        />
+        <details className="ontology-list" open>
+          <summary>
+            {t(
+              `宣言と違うページ（${report.findingCount.toLocaleString('en-US')} 件）`,
+              `Pages that differ from the declaration (${report.findingCount.toLocaleString('en-US')})`,
+            )}
+          </summary>
+          {report.findings.length ? (
+            <>
+              {report.findingCount > report.findings.length && (
+                <p className="hint">
+                  {t(
+                    `最初の ${report.findings.length.toLocaleString('en-US')} 件を表示しています。`,
+                    `Showing the first ${report.findings.length.toLocaleString('en-US')}.`,
+                  )}
+                </p>
+              )}
+              {report.findings.length > 100 && (
+                <div className="actions">
+                  <button disabled={!current} onClick={() => setPage(current - 1)}>
+                    {t('前の 100 件', 'Previous 100')}
+                  </button>
+                  <span>
+                    {current * 100 + 1}–{Math.min(report.findings.length, (current + 1) * 100)}
+                  </span>
+                  <button
+                    disabled={(current + 1) * 100 >= report.findings.length}
+                    onClick={() => setPage(current + 1)}
+                  >
+                    {t('次の 100 件', 'Next 100')}
+                  </button>
+                </div>
+              )}
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">{t('ページ', 'Page')}</th>
+                    <th scope="col">{t('宣言と違う点', 'How it differs')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.findings.slice(current * 100, (current + 1) * 100).map((finding, row) => (
+                    <tr key={`${current}:${row}`}>
+                      <td>
+                        <button onClick={() => onOpen(finding.path)}>{finding.path}</button>
+                      </td>
+                      <td>{describeFinding(finding)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p className="hint">
+              {t('すべてのページが宣言どおりです。', 'Every page follows the declaration.')}
+            </p>
+          )}
+        </details>
+      </div>
+    </>
   );
 }
 
@@ -347,6 +400,10 @@ function describeFolderIndexes(indexes: FolderIndexStatus) {
   );
 }
 
+/**
+ * A knowledge base's ontology (ADR 060): the types and relations it declares,
+ * how many pages use each, and where pages part from the declaration.
+ */
 export function OntologyPanel({
   space,
   revision,
@@ -358,46 +415,31 @@ export function OntologyPanel({
   revision: number;
   onClose: () => void;
   onOpen: (path: string) => void;
-  /** Asks the vault agent to set the ontology up; absent while it is off. */
+  /** Asks the vault agent to review the ontology; absent while it is off. */
   onConfigure?: () => void;
 }) {
   const [refresh, setRefresh] = useState(0);
-  const [table, setTable] = useState(false);
   const { busy, error: failure, run } = useAction();
   const [notice, setNotice] = useState('');
-  // A file change reads the CSV again behind the graph on show; the graph below
-  // is keyed by what it read, so it is rebuilt only when the tables changed.
+  // A file change applies the declaration again behind the view on show.
   const read = useResource(() => window.irori.ontology(space.scopeId), [space.scopeId], {
     refresh: revision + refresh,
   });
   const { error, loading } = read;
-  // A reread that fails hides the graph it replaces rather than showing tables that no longer hold.
   const data = error ? undefined : read.data;
-  const module = data?.source === 'module';
-  // The graph shows first; the freshness check walks every page and arrives when it does.
-  // A declared graph still asks: an OKF bundle's folder indexes are generated either way (ADR 028).
-  const status = useResource(() => window.irori.graphIndexStatus(space.scopeId), [space.scopeId], {
-    refresh: revision + refresh,
-  });
-  // An unreadable generated table must still be replaceable from its pages.
-  // The host's independent declaration check keeps declared CSV pairs protected.
-  const repairModule = !!error && !!status.data && !status.data.declared;
-  const indexes = status.data?.indexes;
-  async function generate() {
+  const report = data?.report;
+  const indexes = data?.indexes;
+  async function updateIndexes() {
     await run(async () => {
-      await window.irori.updateGraphIndex(space.scopeId);
+      await window.irori.updateIndexes(space.scopeId);
       setNotice(t('コミットすると共有されます。', 'Commit it to share.'));
       setRefresh((value) => value + 1);
     });
   }
-  const indexed = module || repairModule;
-  // Nothing the button writes is there yet: no graph module, and no folder index.
-  const fresh = !module && (!indexes || indexes.added === indexes.folders);
+  // Nothing the button writes is there yet.
+  const fresh = !!indexes && indexes.folders > 0 && indexes.added === indexes.folders;
   const updateLabel = fresh ? t('索引を作成', 'Create indexes') : t('索引を更新', 'Update indexes');
-  const matches =
-    (!indexed || !!status.data?.current) && (!indexes || !(indexes.added || indexes.changed));
-  // The module lives in the vault's knowledge folder (ADR 024).
-  const indexFolder = `${graphIndexAt(knowledgeFolder(space)).folder}/`;
+  const follows = !!report && report.findingCount === 0;
   return (
     <StageView
       label={t('オントロジー', 'Ontology')}
@@ -414,42 +456,26 @@ export function OntologyPanel({
               className: 'layer Knowledge_Base',
             },
           ]}
-          here={t('グラフ', 'Graph')}
+          here={t('オントロジー', 'Ontology')}
         />
       }
       actions={
         <>
-          {(indexed || (data && indexes)) && status.data && (
-            <span
-              className={`index-state ${matches ? 'current' : ''}`}
-              title={[
-                indexed ? describeGraphIndex(status.data, indexFolder) : '',
-                indexes ? describeFolderIndexes(indexes) : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <Icon name={matches ? 'checkCircle' : 'refresh'} size={13} />
-              {matches
-                ? t('ページと一致', 'Matches the pages')
-                : t('ページと不一致', 'Differs from the pages')}
+          {report && (
+            <span className={`index-state ${follows ? 'current' : ''}`}>
+              <Icon name={follows ? 'checkCircle' : 'refresh'} size={13} />
+              {follows
+                ? t('宣言どおり', 'Follows the declaration')
+                : t(
+                    `宣言と違う点 ${report.findingCount.toLocaleString('en-US')} 件`,
+                    `${report.findingCount.toLocaleString('en-US')} differ`,
+                  )}
             </span>
           )}
-          {(indexed || (data && indexes)) && (
-            <button className="stage-text-button framed" disabled={busy} onClick={generate}>
+          {indexes && (
+            <button className="stage-text-button framed" disabled={busy} onClick={updateIndexes}>
               <Icon name="refresh" size={14} />
-              {repairModule ? t('ページから再生成', 'Regenerate from pages') : updateLabel}
-            </button>
-          )}
-          {data && (
-            <button
-              className="stage-button"
-              aria-label={t('エンティティとノートの一覧', 'List of entities and notes')}
-              title={t('エンティティとノートの一覧', 'List of entities and notes')}
-              aria-pressed={table}
-              onClick={() => setTable((value) => !value)}
-            >
-              <Icon name="table" size={16} />
+              {updateLabel}
             </button>
           )}
           <button
@@ -469,24 +495,25 @@ export function OntologyPanel({
         </>
       }
     >
-      {indexed && (
+      {report && (
         <p className="graph-index-line muted" role="status">
-          {status.loading
-            ? t(
-                `グラフ索引（${indexFolder}）とページの整合性を確認しています…`,
-                `Checking that the graph index (${indexFolder}) matches the pages…`,
-              )
-            : status.error
-              ? t(
-                  `グラフ索引を確認できません: ${status.error}`,
-                  `Cannot check the graph index: ${status.error}`,
-                )
-              : status.data && describeGraphIndex(status.data, indexFolder)}
+          {t(
+            `${propertyDeclarationFile} の宣言を ${report.pages.toLocaleString('en-US')} ページに当てはめました: 種類 ${report.types.length}・関係 ${report.relations.length}。`,
+            `Applied the declaration in ${propertyDeclarationFile} to ${report.pages.toLocaleString('en-US')} pages: ${report.types.length} types, ${report.relations.length} relations.`,
+          )}
         </p>
       )}
       {indexes && (
         <p className="graph-index-line muted" role="status">
           {describeFolderIndexes(indexes)}
+        </p>
+      )}
+      {data?.formerGraphIndex && (
+        <p className="graph-index-line muted">
+          {t(
+            `以前の irori が作ったグラフ索引（${data.formerGraphIndex}）が残っています。今は読み書きしないので、削除できます。`,
+            `The graph index an earlier irori generated (${data.formerGraphIndex}) is still here. Nothing reads or writes it now, so it can be deleted.`,
+          )}
         </p>
       )}
       {notice && <p className="hint">{notice}</p>}
@@ -500,23 +527,27 @@ export function OntologyPanel({
           {error}
         </p>
       )}
-      {loading ? (
-        <p className="hint">{t('CSV を読み込んでいます…', 'Loading CSV…')}</p>
-      ) : data ? (
-        <OntologyContent
-          key={JSON.stringify(data.revisions)}
-          view={data}
-          table={table}
-          onOpen={onOpen}
-        />
+      {loading && !data ? (
+        <p className="hint">{t('ページを確認しています…', 'Checking the pages…')}</p>
+      ) : report ? (
+        <OntologyContent report={report} onOpen={onOpen} />
       ) : (
-        !error && (
+        data && (
           <div className="graph-empty">
             <Icon name="graph" size={32} />
-            <p>{t('グラフ索引はまだありません。', 'No graph index yet.')}</p>
-            <button className="solid-button" disabled={busy} onClick={generate}>
-              {updateLabel}
-            </button>
+            <p>
+              {t(
+                'この KB は種類と関係を宣言していません。',
+                'This KB declares no types and relations.',
+              )}
+            </p>
+            <p className="muted">
+              {data.problem ??
+                t(
+                  `${propertyDeclarationFile} に種類と関係を宣言すると、irori がページに当てはめます。`,
+                  `Declare types and relations in ${propertyDeclarationFile}, and irori applies them to the pages.`,
+                )}
+            </p>
           </div>
         )
       )}
