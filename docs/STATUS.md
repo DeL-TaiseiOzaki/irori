@@ -37,6 +37,30 @@ and nothing in irori read the relations a knowledge base declares.
 - Not done: the relation picker and the new page that starts from a type
   (ADR 015 stages 2 and 3); a list, on a page, of the pages that name it in a
   relation.
+Find in the file on show, 2026-11-13 (**0.2.65**,
+[#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315)): the owner asked for a
+keyword search inside each file on the main stage.
+- `src/app/FindBar.tsx` holds `FindScope`, the find bar above the focused
+  column's `document-scroll`, and the `Finder` contract a view offers through
+  `useFinder`: `find` returns the count and the occurrence to start from (the
+  last one shown, else the cursor or the view), `show` marks one current and
+  scrolls to it, `clear` takes the marks away and, in an editor, selects the
+  current occurrence. Ctrl/⌘+F, F3 and Ctrl/⌘+G are taken in the capture phase
+  while the file is on show and no `<dialog>` is open, so CodeMirror's search
+  panel never opens; the terminal is left alone. The note's **…** menu offers it
+  except for images.
+- `src/domain/find.ts` folds case and full-width ASCII one code unit for one,
+  so offsets carry over to what is drawn.
+- Each view marks its own content: ProseMirror decorations from a plugin in the
+  rich view (`renderedRanges` now takes a matcher), with code blocks marked by
+  the CodeMirror field of `src/editor/find.ts`, which the source view uses too;
+  React `<mark>`s in the CSV table and the spreadsheet, which search every row
+  and every sheet and turn to the page and sheet of the one shown; the CSS
+  Custom Highlight API over Word pages and slides (in their shadow roots) and
+  over a PDF's text layers, whose items map back to `getTextContent` offsets of
+  every page.
+- `tests/find-in-file.test.ts` and `scripts/find-in-file-ui-smoke.ts` cover it.
+  Not seen on Windows or macOS.
 
 Full access asks nothing at the start, 2026-11-11 (**0.2.64**,
 [#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313), published as

@@ -178,6 +178,7 @@ function KnowledgePanel(props: ComponentProps<typeof KnowledgePanelView>) {
   );
 }
 import type { PageEditorHandle } from './PageEditor';
+import { FindScope, type FindScopeHandle } from './FindBar';
 import './tokens.css';
 import './style.css';
 import './shell.css';
@@ -186,6 +187,7 @@ import './agent-panel.css';
 import './views.css';
 import { Startup, RegisterSpace } from './Startup';
 import { appIcon } from './branding';
+import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useStableFunctions } from './useStableFunctions';
@@ -1227,6 +1229,7 @@ function App() {
   }, [doc?.scopeId, doc?.path, doc?.hash]);
   const personLineCount = authorship?.lines.filter(Boolean).length ?? 0;
   const editor = useRef<PageEditorHandle>(null);
+  const findInFile = useRef<FindScopeHandle>(null);
   const current = useRef({ doc, buffer, external });
   current.current = { doc, buffer, external };
   const saving = useRef<Promise<boolean> | undefined>(undefined);
@@ -3396,6 +3399,13 @@ function App() {
                               {actionLabel(action)}
                             </Menu.Item>
                           ))}
+                        {doc.viewer !== 'image' && (
+                          <Menu.Item onClick={() => findInFile.current?.open()}>
+                            <Icon name="search" size={14} />
+                            {t('ファイル内を検索', 'Find in file')}
+                            <kbd className="menu-key">{shortcut('F')}</kbd>
+                          </Menu.Item>
+                        )}
                         <Menu.Item disabled={gitBusy} onClick={() => void reconcile()}>
                           <Icon name="refresh" size={14} />
                           {t('再読み込み', 'Reload')}
@@ -3632,78 +3642,82 @@ function App() {
                     {stageColumns(
                       <>
                         {doc && (
-                          <div className="document-scroll" hidden={view !== 'note'}>
-                            {searchNotice && (
-                              <p className="hint" role="status">
-                                {searchNotice}
-                              </p>
-                            )}
-                            <Suspense
-                              fallback={
-                                <p className="hint">
-                                  {t('エディタを開いています…', 'Opening the editor…')}
+                          <FindScope ref={findInFile} hidden={view !== 'note'}>
+                            <div className="document-scroll" hidden={view !== 'note'}>
+                              {searchNotice && (
+                                <p className="hint" role="status">
+                                  {searchNotice}
                                 </p>
-                              }
-                            >
-                              {doc.viewer ? (
-                                <FileViewer
-                                  key={editorKey}
-                                  doc={{ ...doc, viewer: doc.viewer }}
-                                  load={(scopeId, path) => host.viewerBytes(scopeId, path)}
-                                  onExternal={() =>
-                                    void host.openExternal(doc.scopeId, doc.path).catch(report)
-                                  }
-                                  onLink={(url) => void host.openUrl(url).catch(report)}
-                                />
-                              ) : mode === 'table' ? (
-                                <CsvPreview key={editorKey} text={buffer} />
-                              ) : (
-                                <PageEditor
-                                  ref={editor}
-                                  key={editorKey}
-                                  page={
-                                    !doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)
-                                  }
-                                  properties={propertiesRead.data}
-                                  text={buffer}
-                                  mode={mode}
-                                  filename={doc.path}
-                                  assistance={editorAssistance}
-                                  readOnly={doc.readOnly}
-                                  onChange={setBuffer}
-                                  onError={report}
-                                  searchTarget={searchTarget}
-                                  authorship={authorship}
-                                  onFollowLink={(href) => void followLink(href)}
-                                  // Only where the note bar offers comments.
-                                  onComment={
-                                    onNote && !doc.cloud && docSpace && /\.md$/i.test(doc.path)
-                                      ? (rect) =>
-                                          setCommentRequest((last) => ({
-                                            rect,
-                                            sequence: (last?.sequence ?? 0) + 1,
-                                          }))
-                                      : undefined
-                                  }
-                                  onSearchResult={(found) => {
-                                    if (searchTarget)
-                                      setSearchNotice(navigationNotice(searchTarget, found));
-                                  }}
-                                  onUpload={
-                                    doc.readOnly
-                                      ? undefined
-                                      : async (file) =>
-                                          host.saveImage(
-                                            doc.scopeId,
-                                            doc.path,
-                                            new Uint8Array(await file.arrayBuffer()),
-                                          )
-                                  }
-                                  resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
-                                />
                               )}
-                            </Suspense>
-                          </div>
+                              <Suspense
+                                fallback={
+                                  <p className="hint">
+                                    {t('エディタを開いています…', 'Opening the editor…')}
+                                  </p>
+                                }
+                              >
+                                {doc.viewer ? (
+                                  <FileViewer
+                                    key={editorKey}
+                                    doc={{ ...doc, viewer: doc.viewer }}
+                                    load={(scopeId, path) => host.viewerBytes(scopeId, path)}
+                                    onExternal={() =>
+                                      void host.openExternal(doc.scopeId, doc.path).catch(report)
+                                    }
+                                    onLink={(url) => void host.openUrl(url).catch(report)}
+                                  />
+                                ) : mode === 'table' ? (
+                                  <CsvPreview key={editorKey} text={buffer} />
+                                ) : (
+                                  <PageEditor
+                                    ref={editor}
+                                    key={editorKey}
+                                    page={
+                                      !doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)
+                                    }
+                                    properties={propertiesRead.data}
+                                    text={buffer}
+                                    mode={mode}
+                                    filename={doc.path}
+                                    assistance={editorAssistance}
+                                    readOnly={doc.readOnly}
+                                    onChange={setBuffer}
+                                    onError={report}
+                                    searchTarget={searchTarget}
+                                    authorship={authorship}
+                                    onFollowLink={(href) => void followLink(href)}
+                                    // Only where the note bar offers comments.
+                                    onComment={
+                                      onNote && !doc.cloud && docSpace && /\.md$/i.test(doc.path)
+                                        ? (rect) =>
+                                            setCommentRequest((last) => ({
+                                              rect,
+                                              sequence: (last?.sequence ?? 0) + 1,
+                                            }))
+                                        : undefined
+                                    }
+                                    onSearchResult={(found) => {
+                                      if (searchTarget)
+                                        setSearchNotice(navigationNotice(searchTarget, found));
+                                    }}
+                                    onUpload={
+                                      doc.readOnly
+                                        ? undefined
+                                        : async (file) =>
+                                            host.saveImage(
+                                              doc.scopeId,
+                                              doc.path,
+                                              new Uint8Array(await file.arrayBuffer()),
+                                            )
+                                    }
+                                    resolveImage={(url) =>
+                                      host.readImage(doc.scopeId, doc.path, url)
+                                    }
+                                  />
+                                )}
+                              </Suspense>
+                            </div>
+                          </FindScope>
                         )}
                         {active && (!doc || view === 'home') ? (
                           <BrainHome

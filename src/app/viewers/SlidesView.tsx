@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { pptxToHtml } from '@jvmr/pptx-to-html';
 import { t } from '../../domain/i18n';
+import { domFinder, findHighlightStyle, useFinder } from '../FindBar';
 import type { ViewProps } from './common';
 import { followLinks, safeFragment } from './safe-dom';
 import { normalizeDeck } from './pptx-normalize';
@@ -13,6 +14,13 @@ export default function SlidesView({ bytes, zoom, width, onInfo, onLink }: ViewP
   const host = useRef<HTMLDivElement>(null);
   const [slides, setSlides] = useState<{ html: string; width: number; height: number }[]>();
   const [error, setError] = useState('');
+  // The find bar searches the slides' text, past their numbers.
+  const finder = useMemo(
+    () => domFinder(() => [...(host.current?.shadowRoot?.querySelectorAll('section.frame') ?? [])]),
+    [],
+  );
+  const changed = useFinder(finder);
+  useEffect(() => () => void finder.clear(false), [finder]);
   useEffect(() => {
     let live = true;
     setSlides(undefined);
@@ -68,7 +76,8 @@ export default function SlidesView({ bytes, zoom, width, onInfo, onLink }: ViewP
         transform-origin: top left !important; overflow: hidden; }
       /* PowerPoint lets text run past its box rather than cutting it, at single spacing. */
       .slide div[style*="pre-wrap"] { overflow: visible !important; line-height: 1.2; }
-      .number { font: 12px/1 system-ui, sans-serif; color: #646a73; margin-top: -12px; }`;
+      .number { font: 12px/1 system-ui, sans-serif; color: #646a73; margin-top: -12px; }
+      ${findHighlightStyle}`;
     const deck = document.createElement('div');
     deck.className = 'deck';
     for (const [index, slide] of slides.entries()) {
@@ -83,6 +92,7 @@ export default function SlidesView({ bytes, zoom, width, onInfo, onLink }: ViewP
       deck.append(frame, number);
     }
     root.replaceChildren(style, deck);
+    changed();
     return followLinks(root, onLink);
   }, [slides]);
   useEffect(() => {

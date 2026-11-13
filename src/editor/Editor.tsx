@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useImperativeHandle, type Ref } from 'react';
+import { useEffect, useMemo, useRef, useState, useImperativeHandle, type Ref } from 'react';
 import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { blockEdit } from '@milkdown/crepe/feature/block-edit';
 import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
@@ -17,7 +17,8 @@ import {
   remarkCtx,
   remarkStringifyOptionsCtx,
 } from '@milkdown/kit/core';
-import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
+import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
+import { Decoration, DecorationSet, type EditorView as RichView } from '@milkdown/kit/prose/view';
 import {
   nearest,
   positionsOf,
@@ -49,6 +50,9 @@ import { basicSetup } from 'codemirror';
 import { assistanceExtensions, editingCore, languageForFilename } from './assistance';
 import { t } from '../domain/i18n';
 import { Dialog } from '../app/Dialog';
+import { reveal, useFinder, type Finder } from '../app/FindBar';
+import { findAll } from '../domain/find';
+import { findMarks, setFind } from './find';
 // Crepe's own entry point and its combined stylesheet are flattened bundles that
 // import KaTeX and its fonts unconditionally, so `features: { Latex: false }` —
 // a runtime flag read after bundling — never removed them. Composing the builder
@@ -205,8 +209,15 @@ export interface EditorHandle {
 const leafText = (node: import('@milkdown/kit/prose/model').Node) =>
   node.type.name === 'irori_inline' ? String(node.attrs.value) : '\ufffc';
 
-/** Where each occurrence of `text` stands in a rendered document's textblocks, read as above. */
-function renderedRanges(doc: import('@milkdown/kit/prose/model').Node, text: string) {
+/**
+ * Where each occurrence of `text` stands in a rendered document's textblocks, read as
+ * above; `positions` finds it in a textblock's text (exactly as written, by default).
+ */
+function renderedRanges(
+  doc: import('@milkdown/kit/prose/model').Node,
+  text: string,
+  positions: (shown: string, text: string) => number[] = positionsOf,
+) {
   const found: { from: number; to: number }[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
@@ -223,12 +234,72 @@ function renderedRanges(doc: import('@milkdown/kit/prose/model').Node, text: str
       }
       shown += value;
     });
-    for (const offset of positionsOf(shown, text))
+    for (const offset of positions(shown, text))
       found.push({ from: starts[offset], to: ends[offset + text.length - 1] });
     return false;
   });
   return found;
 }
+
+/** The find bar's occurrences in the rich view, and which is current (-1 for none). */
+interface RichFind {
+  query: string;
+  ranges: { from: number; to: number }[];
+  current: number;
+  decorations: DecorationSet;
+}
+const richFindKey = new PluginKey<RichFind>('irori-find');
+const noRichFind: RichFind = {
+  query: '',
+  ranges: [],
+  current: -1,
+  decorations: DecorationSet.empty,
+};
+/** Marks the find bar's occurrences in the rich view; an edit finds them again. */
+const richFind = $prose(
+  () =>
+    new Plugin<RichFind>({
+      key: richFindKey,
+      state: {
+        init: () => noRichFind,
+        apply(transaction, value, _old, state) {
+          const meta = transaction.getMeta(richFindKey) as
+            { query?: string; current?: number } | undefined;
+          if (!meta && !transaction.docChanged) return value;
+          const query = meta?.query ?? value.query;
+          if (!query) return noRichFind;
+          const ranges =
+            meta?.query !== undefined || transaction.docChanged
+              ? renderedRanges(state.doc, query, findAll)
+              : value.ranges;
+          const current = Math.min(
+            meta?.current ?? (meta?.query !== undefined ? -1 : value.current),
+            ranges.length - 1,
+          );
+          return {
+            query,
+            ranges,
+            current,
+            decorations: DecorationSet.create(
+              state.doc,
+              ranges.map((range, index) =>
+                Decoration.inline(range.from, range.to, {
+                  class: index === current ? 'find-hit current' : 'find-hit',
+                }),
+              ),
+            ),
+          };
+        },
+      },
+      props: { decorations: (state) => richFindKey.getState(state)?.decorations },
+    }),
+);
+
+const noFinder: Finder = {
+  find: () => ({ count: 0, start: 0 }),
+  show: () => {},
+  clear: () => false,
+};
 export function Editor({
   text,
   mode,
@@ -288,6 +359,20 @@ export function Editor({
   const snapshot = useRef(() => initial.current);
   const selecting = useRef<() => EditorSelection | undefined>(() => undefined);
   const revealing = useRef<(quote: string, line?: number) => boolean>(() => false);
+  // The find bar reaches the view on show through a stable finder.
+  const finding = useRef<Finder>(noFinder);
+  const finder = useMemo<Finder>(
+    () => ({
+      find: (query) => finding.current.find(query),
+      show: (index, scroll) => finding.current.show(index, scroll),
+      clear: (select) => finding.current.clear(select),
+    }),
+    [],
+  );
+  const findChanged = useFinder(finder);
+  const foundChanged = useRef(findChanged);
+  foundChanged.current = findChanged;
+  const paintCodeBlocks = useRef<(scroll: boolean) => void>(() => {});
   useImperativeHandle(
     ref,
     () => ({
@@ -329,8 +414,11 @@ export function Editor({
             ),
             languageConfig.current.of([]),
             EditorView.lineWrapping,
+            findMarks,
             EditorView.updateListener.of((update) => {
-              if (update.docChanged) change.current(update.state.sliceDoc());
+              if (!update.docChanged) return;
+              change.current(update.state.sliceDoc());
+              if (update.state.field(findMarks).query) foundChanged.current();
             }),
           ],
         }),
@@ -357,6 +445,49 @@ export function Editor({
         view.focus();
         return true;
       };
+      let found: number[] = [];
+      finding.current = {
+        find(query) {
+          // From the occurrence last shown, or else from the cursor.
+          const from = view.state.field(findMarks).current ?? view.state.selection.main.from;
+          found = findAll(view.state.doc.toString(), query);
+          view.dispatch({ effects: setFind.of({ query }) });
+          return {
+            count: found.length,
+            start: Math.max(
+              0,
+              found.findIndex((at) => at >= from),
+            ),
+          };
+        },
+        show(index, scroll) {
+          const at = found[index];
+          if (at === undefined) return;
+          view.dispatch({
+            effects: [
+              setFind.of({ query: view.state.field(findMarks).query, current: at }),
+              ...(scroll ? [EditorView.scrollIntoView(at, { y: 'center' })] : []),
+            ],
+          });
+        },
+        clear(select) {
+          const { query, current } = view.state.field(findMarks);
+          const selected = select && current !== undefined;
+          view.dispatch({
+            effects: setFind.of({ query: '' }),
+            selection: selected
+              ? {
+                  anchor: current,
+                  head: Math.min(current + query.length, view.state.doc.length),
+                }
+              : undefined,
+          });
+          found = [];
+          if (selected) view.focus();
+          return selected;
+        },
+      };
+      foundChanged.current();
       if (navigation.current.searchTarget) {
         // CodeMirror positions count a line separator as one character, even
         // when sliceDoc preserves the original CRLF encoding on disk.
@@ -374,6 +505,7 @@ export function Editor({
         source.current = null;
         selecting.current = () => undefined;
         revealing.current = () => false;
+        finding.current = noFinder;
         view.destroy();
       };
     }
@@ -525,18 +657,22 @@ export function Editor({
             assistanceConfig.current.of(
               assistanceExtensions(assistanceEnabled.current, sourceHighlight),
             ),
+            findMarks,
             ViewPlugin.define((view) => {
               if (!dead) codeBlocks.current.add(view);
               // Milkdown creates fenced editors lazily. The preference may have
               // changed after this configuration was created but before the block
               // entered the viewport. Dispatch only after its construction ends.
               queueMicrotask(() => {
-                if (!dead && codeBlocks.current.has(view))
+                if (!dead && codeBlocks.current.has(view)) {
                   view.dispatch({
                     effects: assistanceConfig.current.reconfigure(
                       assistanceExtensions(assistanceEnabled.current, sourceHighlight),
                     ),
                   });
+                  // A block drawn after a search shows its occurrences too.
+                  paintCodeBlocks.current(false);
+                }
               });
               return { destroy: () => codeBlocks.current.delete(view) };
             }),
@@ -553,6 +689,7 @@ export function Editor({
       .use(pieceTyping)
       .use(calloutView)
       .use(preserveBlocks)
+      .use(richFind)
       .use(
         // The debounced Markdown listener can skip a quick save/undo back to its
         // previous value, leaving the saved document and React draft out of sync.
@@ -563,6 +700,13 @@ export function Editor({
                 update: (view, previous) => {
                   if (ready && !dead && userEdited && !view.state.doc.eq(previous.doc))
                     change.current(encoding.restore(ctx.get(serializerCtx)(view.state.doc)));
+                  if (
+                    ready &&
+                    !dead &&
+                    !view.state.doc.eq(previous.doc) &&
+                    richFindKey.getState(view.state)?.query
+                  )
+                    foundChanged.current();
                 },
               }),
             }),
@@ -616,6 +760,89 @@ export function Editor({
               view.focus();
               return true;
             });
+          // A code block draws itself with CodeMirror, which takes its marks from here:
+          // every block the query, and the block holding the current occurrence its place.
+          const markCodeBlocks = (view: RichView, scroll: boolean) => {
+            const find = richFindKey.getState(view.state) ?? noRichFind;
+            const current = find.ranges[find.current];
+            let holder: Node | null = null;
+            let offset: number | undefined;
+            if (current) {
+              const $from = view.state.doc.resolve(current.from);
+              if ($from.parent.type.name === 'code_block') {
+                holder = view.nodeDOM($from.before());
+                offset = current.from - $from.start();
+              }
+            }
+            let shown = false;
+            for (const block of codeBlocks.current) {
+              const marked = block.state.field(findMarks, false);
+              if (!marked) continue;
+              const mine = !!holder?.contains(block.dom);
+              const next = { query: find.query, current: mine ? offset : undefined };
+              const move = scroll && mine && offset !== undefined;
+              if (marked.query !== next.query || marked.current !== next.current || move)
+                block.dispatch({
+                  effects: [
+                    setFind.of(next),
+                    ...(move ? [EditorView.scrollIntoView(offset!, { y: 'center' })] : []),
+                  ],
+                });
+              shown ||= move;
+            }
+            if (!scroll || !current || shown) return;
+            // A block not drawn yet is brought into view, and draws its marks then.
+            const at = view.domAtPos(current.from).node;
+            reveal(
+              holder instanceof Element
+                ? holder
+                : (view.dom.querySelector('.find-hit.current') ??
+                    (at instanceof Element ? at : at.parentElement)),
+            );
+          };
+          paintCodeBlocks.current = (scroll) =>
+            crepe.editor.action((ctx) => markCodeBlocks(ctx.get(editorViewCtx), scroll));
+          finding.current = {
+            find: (query) =>
+              crepe.editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const last = richFindKey.getState(view.state) ?? noRichFind;
+                // From the occurrence last shown, or else from the cursor.
+                const from = last.ranges[last.current]?.from ?? view.state.selection.from;
+                view.dispatch(view.state.tr.setMeta(richFindKey, { query }));
+                markCodeBlocks(view, false);
+                const { ranges } = richFindKey.getState(view.state) ?? noRichFind;
+                return {
+                  count: ranges.length,
+                  start: Math.max(
+                    0,
+                    ranges.findIndex((range) => range.from >= from),
+                  ),
+                };
+              }),
+            show: (index, scroll) =>
+              crepe.editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                view.dispatch(view.state.tr.setMeta(richFindKey, { current: index }));
+                markCodeBlocks(view, scroll);
+              }),
+            clear: (select) =>
+              crepe.editor.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const last = richFindKey.getState(view.state) ?? noRichFind;
+                const range = select ? last.ranges[last.current] : undefined;
+                const transaction = view.state.tr.setMeta(richFindKey, { query: '' });
+                if (range)
+                  transaction.setSelection(
+                    TextSelection.create(transaction.doc, range.from, range.to),
+                  );
+                view.dispatch(transaction);
+                markCodeBlocks(view, false);
+                if (range) view.focus();
+                return !!range;
+              }),
+          };
+          foundChanged.current();
           const target = navigation.current.searchTarget;
           if (target) {
             const found = crepe.editor.action((ctx) => {
@@ -646,6 +873,8 @@ export function Editor({
       dead = true;
       selecting.current = () => undefined;
       revealing.current = () => false;
+      finding.current = noFinder;
+      paintCodeBlocks.current = () => {};
       codeBlocks.current.clear();
       const wasReady = ready;
       ready = false;
