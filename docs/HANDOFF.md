@@ -30,6 +30,29 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-13: **0.2.67** ([#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318),
+a relation picked from the declared names and pages, and a new page that
+starts from a type, ADR 015) as `7cd2cdc`, and **0.2.66**
+([#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316), the ontology is the
+declaration and irori keeps no graph of the pages, ADR 060) as `cb3855c`. Both
+by `publish.yml` alone, with the pull requests' packages:
+- 0.2.66: push run `43385201693`, packages from app run `43382834347`. Merged
+  at 07:21:38 UTC, the release out at 07:23:05 (1:27), the run finished with
+  the page and the drift check at 07:25:18 (3:40).
+- 0.2.67: push run `43386395208`, packages from app run `43384523816`. Merged
+  at 07:31:43 UTC, the release out at 07:33:36 (1:53), the page linking 0.2.67
+  by 07:35:48 (4:05), and the run finished with the drift check at 07:36:06.
+
+Anonymous downloads of the Windows installer, the Mac image and the
+`-full.nupkg` of each matched its `SHA256SUMS.txt`, and the live page links the
+0.2.67 installers and shows the ontology view's screenshot. The template's side
+merged the same day as irori-templete #19, after 0.2.66 was out. See STATUS.
+Seen on Linux under Xvfb and through CI's packaged-app smokes on the three
+platforms; not by hand on Windows or macOS, and not against a vault in real use.
+#316's first CI run failed once in `tests/schema-reach.test.ts` (the Codex
+hook-trust test, `1 !== 2` at its second start), which that change does not
+touch; the next run passed. It is a test to watch.
+
 Published 2026-11-11: **0.2.64** ([#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313),
 a run in full access takes the configuration that runs without asking without
 the dialog and names it in its log, ADR 009) as `64e86f2`, by `publish.yml`

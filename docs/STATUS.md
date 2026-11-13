@@ -1,8 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Relations picked and pages started from a type, 2026-11-13 (**0.2.67**,
-[#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318);
-[ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage
+[#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318), published as
+`v0.2.67-preview.1`; [ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage
 3, on top of [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the
 declaration is applied where a page is written, not only checked afterwards.
 - `PageProperties` shows `relations` as rows of a name and a target instead of a
@@ -23,8 +23,8 @@ declaration is applied where a page is written, not only checked afterwards.
 - Not done: the pickers for `link` and `sources`, and **確認済みにする**.
 
 The ontology is the declaration, 2026-11-13 (**0.2.66**,
-[#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316);
-[ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked
+[#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316), published as
+`v0.2.66-preview.1`; [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked
 how irori handles the ontology and for the simplest mechanism, then corrected the
 first answer: what is wanted is an ontology, not a knowledge graph. Until 0.2.65
 the view called オントロジー drew a graph of the pages from generated CSV files,
