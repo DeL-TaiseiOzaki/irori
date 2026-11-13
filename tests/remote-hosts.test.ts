@@ -329,7 +329,7 @@ async function handing(t: TestContext) {
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-  return { ...made, far, vault, notes, root, service, events, run, log };
+  return { ...made, far, vault, notes, id, root, service, events, run, log };
 }
 
 test(
@@ -428,6 +428,107 @@ test(
     assert.match(reported?.text ?? '', /finished-there/);
     assert.equal((await readFile(path.join(far.code, 'survived.txt'), 'utf8')).trim(), 'survived');
     assert.equal(remote.hosts().find((item) => item.id === host.id)?.state, 'connected');
+  },
+);
+
+test(
+  'stopping the irori agent stops its hand-off on the host (protocol fixture)',
+  posixOnly,
+  async (t) => {
+    const { far, service, run, id } = await handing(t);
+    const { done, mine } = await run(
+      'Hand over.\nrun: irori call vault-code "run: sleep 30 && echo late > late.txt"',
+    );
+    await until(() => mine().some((event) => event.delegate?.state === 'working'));
+    await service.cancel(id);
+    await done;
+    assert.equal(mine().at(-1)?.outcome, 'cancelled');
+    // The run there ended with it: nothing is left working, and the file never comes.
+    const vaultHost = (
+      await readFile(path.join(far.home, '.irori-host/data/host.pid'), 'utf8')
+    ).trim();
+    const { execFileSync } = await import('node:child_process');
+    await until(() => {
+      const left = execFileSync('sh', ['-c', 'pgrep -f "[s]leep 30" || true'], { encoding: 'utf8' });
+      return !left.trim();
+    });
+    assert.ok(vaultHost);
+    await assert.rejects(readFile(path.join(far.code, 'late.txt')));
+  },
+);
+
+test(
+  'what an agent on a host asks is answered on this device: its configuration, and a permission (protocol fixture)',
+  posixOnly,
+  async (t) => {
+    const far = await farHost(t);
+    const { remote, host, files, dataDir, asked } = await hub(t, far);
+    // The stand-in `claude` plays the irori agent here and the vault's agent there.
+    const bin = path.join(far.base, 'bin');
+    await writeFile(
+      path.join(bin, 'claude'),
+      `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/claude-your-ai.mjs')).href)}).then(m=>m.run());\n`,
+      { mode: 0o700 },
+    );
+    // The far vault's own settings run a hook without asking: the person is asked first.
+    await mkdir(path.join(far.code, '.claude'), { recursive: true });
+    await writeFile(
+      path.join(far.code, '.claude', 'settings.json'),
+      JSON.stringify({
+        hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'true' }] }] },
+      }),
+    );
+    const vault = await remote.register(host.id, far.code, 'Code', 'team');
+    const youHome = path.join(far.base, 'home');
+    await mkdir(youHome);
+    const you = new YourAiService(dataDir, youHome);
+    const { id } = await you.create();
+    const events: AgentEvent[] = [];
+    let finished!: () => void;
+    const done = new Promise<void>((resolve) => {
+      finished = resolve;
+    });
+    const answered = new Set<string>();
+    const service = new AgentService(
+      files,
+      (event) => {
+        events.push(event);
+        if (event.type === 'permission' && !answered.has(event.requestId!)) {
+          answered.add(event.requestId!);
+          setTimeout(() => void service.respond(event.requestId!, true), 0);
+        }
+        if (event.type === 'done' && event.scopeId === id) finished();
+      },
+      undefined,
+      undefined,
+      you,
+    );
+    service.remote = remote;
+    t.after(() => service.cancel());
+    await service.startAccepted({
+      scopeId: id,
+      agent: 'claude',
+      prompt: 'Hand a note over.',
+      brains: [vault.scopeId],
+    });
+    await done;
+    assert.equal(events.at(-1)?.outcome, 'completed', JSON.stringify(events.slice(-6)));
+    // The host asked this device before its CLI ran the vault's own hooks.
+    assert.deepEqual(asked, ['approveConfig']);
+    // The vault agent's request to write showed in the irori agent's conversation,
+    // labelled with the vault, and the answer reached the run on the host.
+    const request = events.find((event) => event.type === 'permission');
+    assert.equal(request?.scopeId, id);
+    assert.equal(request?.delegate?.scopeId, vault.scopeId);
+    assert.ok(
+      events.some((event) => event.type === 'status' && event.resolved === request?.requestId),
+    );
+    assert.equal(
+      await readFile(path.join(far.code, 'Knowledge_Base', 'from-your-ai.md'), 'utf8'),
+      '# From your AI\n',
+    );
+    const reported = events.find((event) => event.delegate?.state === 'reported');
+    assert.match(reported?.text ?? '', /Wrote Knowledge_Base\/from-your-ai\.md/);
   },
 );
 
