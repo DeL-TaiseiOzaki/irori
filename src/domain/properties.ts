@@ -322,6 +322,40 @@ export function stampLastChange(
   return frontmatterHead(tidyYaml(yaml), page.newline, page.bom) + page.body;
 }
 
+/** An empty value of the shape a property of this kind takes. */
+export function emptyProperty(definition: PropertyDefinition | undefined): YamlValue {
+  const kind = definition?.kind;
+  return kind === 'multi-select' ||
+    kind === 'sources' ||
+    kind === 'relations' ||
+    kind === 'actor-time-list'
+    ? []
+    : '';
+}
+
+/**
+ * The text a new page of `type` starts from (ADR 015 D6): frontmatter with the
+ * type, the title, who made it and when, and the other keys the type requires
+ * left empty to fill. The body is left to the person.
+ */
+export function newPageText(
+  declaration: PropertyDeclaration,
+  type: string,
+  title: string,
+  actor: string | undefined,
+  at: Date,
+): string {
+  let yaml = setProperty('', ['type'], type);
+  for (const key of new Set(['title', ...requiredKeys(declaration, type)])) {
+    if (key === 'type') continue;
+    const definition = declaration.properties[key];
+    if (definition?.auto === 'last-change') {
+      if (actor) yaml = setProperty(yaml, [key], { by: actor, at: localTimestamp(at) });
+    } else yaml = setProperty(yaml, [key], key === 'title' ? title : emptyProperty(definition));
+  }
+  return `${frontmatterHead(tidyYaml(yaml))}\n`;
+}
+
 /** The keys a page of `type` must carry under the declaration. */
 export function requiredKeys(declaration: PropertyDeclaration | null | undefined, type: unknown) {
   if (!declaration) return [];

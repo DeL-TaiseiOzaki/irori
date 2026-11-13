@@ -4,11 +4,13 @@ import { setImmediate } from 'node:timers/promises';
 import { parse as parseYaml } from 'yaml';
 import {
   bundlePage,
+  compareCodePoints,
   formerGraphIndex,
   frontmatterBlock,
   pageFacts,
   type FolderIndexStatus,
   type IndexUpdate,
+  type PageChoice,
   type PageFacts,
 } from '../domain/bundle';
 import { checkOntology, type Ontology } from '../domain/ontology';
@@ -132,6 +134,18 @@ export class BundleService {
       ...(bundle && { indexes: await this.indexStatus(scopeId, walked, bundle) }),
       ...(former && { formerGraphIndex: former }),
     };
+  }
+
+  /**
+   * The pages a relation can point at, each with its title and type, for the
+   * property view's picker (ADR 015 stage 2). Paths are the checkout's own
+   * spelling, so a link written from one opens the file that is there.
+   */
+  async pages(scopeId: string): Promise<PageChoice[]> {
+    const walked = await this.build(scopeId);
+    return walked.pages
+      .map((facts, slot) => ({ path: walked.paths[slot], title: facts.title, type: facts.type }))
+      .sort((a, b) => compareCodePoints(a.path, b.path));
   }
 
   /**

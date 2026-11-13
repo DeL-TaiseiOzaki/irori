@@ -6,6 +6,7 @@ import type { Space } from '../src/domain/types';
 import {
   actorFromEmail,
   frontmatterHead,
+  newPageText,
   parseProperties,
   propertyDeclaration,
   requiredKeys,
@@ -234,4 +235,40 @@ test('The head keeps the YAML as typed, and a structured edit leaves no blank li
   }
   assert.equal(withProperty('---\na: 1\n---\nbody', ['b'], 2), '---\na: 1\nb: 2\n---\nbody');
   assert.equal(withProperty('body', ['title'], 'x'), '---\ntitle: x\n---\nbody');
+});
+
+test('A new page of a type starts with the keys that type requires', () => {
+  const declaration = propertyDeclaration.parse({
+    schemaVersion: 1,
+    properties: {
+      type: { kind: 'type' },
+      title: { kind: 'text' },
+      description: { kind: 'text' },
+      generated: { kind: 'actor-time', auto: 'last-change' },
+      status: { kind: 'select', options: ['draft', 'stable'], default: 'stable' },
+      resource: { kind: 'link' },
+      sources: { kind: 'sources' },
+    },
+    required: ['type', 'title', 'description', 'generated'],
+    types: { artifact: { required: ['resource', 'sources'] }, journal: {} },
+  });
+  const at = new Date(2026, 10, 13, 9, 30, 0);
+  const text = newPageText(declaration, 'artifact', 'Proposal: v2 #1', 'human:mika', at);
+  const page = splitPage(text);
+  assert.equal(page.body, '\n');
+  const { values, keys, error } = parseProperties(page.yaml);
+  assert.equal(error, undefined);
+  // The type first, then the title, then what every page and this type require; nothing else.
+  assert.deepEqual(keys, ['type', 'title', 'description', 'generated', 'resource', 'sources']);
+  assert.equal(values.type, 'artifact');
+  assert.equal(values.title, 'Proposal: v2 #1');
+  assert.equal(values.description, '');
+  assert.deepEqual(values.sources, []);
+  assert.equal((values.generated as { by: string }).by, 'human:mika');
+  assert.match((values.generated as { at: string }).at, /^2026-11-13T09:30:00[+-]\d\d:\d\d$/);
+  // Without a person to name, the last change is left for the first save.
+  const unnamed = parseProperties(
+    splitPage(newPageText(declaration, 'journal', 'Day', undefined, at)).yaml,
+  );
+  assert.deepEqual(unnamed.keys, ['type', 'title', 'description']);
 });

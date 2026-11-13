@@ -6,9 +6,11 @@ import path from 'node:path';
 import { pageFacts, type PageFacts } from '../src/domain/bundle';
 import { checkOntology, findingLimit, relationTarget, relationsFrom } from '../src/domain/ontology';
 import { propertyDeclaration } from '../src/domain/properties';
+import { linkTo, resolveNoteLink } from '../src/domain/note-links';
 import { FileService } from '../src/host/files';
 import { SearchService } from '../src/host/search';
 import { BundleService } from '../src/host/bundle';
+import { createTypedNote } from '../src/host/properties';
 import { page, vocabulary } from './fixtures/ontology';
 
 const declaration = propertyDeclaration.parse(vocabulary);
@@ -296,4 +298,75 @@ test('A check retries a page it could not read without requiring a file change',
   const recovered = (await service.ontology(space.scopeId)).report!;
   assert.equal(recovered.findingCount, 0);
   assert.equal(recovered.types.find(({ name }) => name === 'project')!.pages, 1);
+});
+
+test('A new page of a declared type follows the declaration from its first save', async (t) => {
+  const { root, files, space, write, service } = await fixture(t);
+  await write('.property/property.json', JSON.stringify(vocabulary));
+  const git = { userEmail: async () => 'mika@example.invalid' };
+  const created = await createTypedNote(
+    files,
+    git,
+    space.scopeId,
+    '案件 A',
+    'Knowledge_Base/wiki',
+    'project',
+  );
+  assert.equal(created.path, 'Knowledge_Base/wiki/案件 A.md');
+  assert.equal(
+    await readFile(path.join(root, created.path), 'utf8'),
+    '---\ntype: project\ntitle: 案件 A\n---\n\n',
+  );
+  // A concept must carry sources: the key is there, empty, and the check says so.
+  await createTypedNote(files, git, space.scopeId, 'Claim', 'Knowledge_Base/wiki', 'concept');
+  assert.equal(
+    await readFile(path.join(root, 'Knowledge_Base/wiki/Claim.md'), 'utf8'),
+    '---\ntype: concept\ntitle: Claim\nsources: []\n---\n\n',
+  );
+  assert.deepEqual(
+    (await service.ontology(space.scopeId)).report!.findings.map(({ path: file, kind }) => [
+      path.posix.basename(file),
+      kind,
+    ]),
+    [['Claim.md', 'key-missing']],
+  );
+  // A type the knowledge base does not declare is refused, and an existing page is never replaced.
+  await assert.rejects(
+    createTypedNote(files, git, space.scopeId, 'X', 'Knowledge_Base/wiki', 'experiment'),
+    /experiment/,
+  );
+  await assert.rejects(
+    createTypedNote(files, git, space.scopeId, 'Claim', 'Knowledge_Base/wiki', 'concept'),
+  );
+});
+
+test('A relation target is written as the link that leads back to the page', () => {
+  for (const [from, target, link] of [
+    ['wiki/a.md', 'wiki/b.md', 'b.md'],
+    ['wiki/a.md', 'wiki/deep/b.md', 'deep/b.md'],
+    ['wiki/deep/a.md', 'wiki/b.md', '../b.md'],
+    ['journal/2026/a.md', 'wiki/案件 A.md', '../../wiki/案件 A.md'],
+    ['a.md', 'wiki/b.md', 'wiki/b.md'],
+    ['wiki/a.md', 'b.md', '../b.md'],
+    ['wiki/a.md', 'wiki/100% #1?.md', '100%25 %231%3F.md'],
+    ['a.md', 'note: draft.md', './note: draft.md'],
+  ] as const) {
+    assert.equal(linkTo(from, target), link, `${from} to ${target}`);
+    assert.deepEqual(resolveNoteLink(from, link), { kind: 'internal', path: target }, link);
+  }
+});
+
+test('The pages a relation can point at are listed with their titles and types', async (t) => {
+  const { space, write, service } = await fixture(t);
+  await write('.property/property.json', JSON.stringify(vocabulary));
+  await write('Knowledge_Base/wiki/b.md', page({ type: 'project', title: 'Beta' }));
+  await write('Knowledge_Base/wiki/a.md', page({ type: 'org', title: 'Acme' }));
+  await write(`Knowledge_Base/wiki/${'ガ.md'.normalize('NFD')}`, '# No frontmatter\n');
+  await write('Knowledge_Base/wiki/index.md', '# wiki\n');
+  assert.deepEqual(await service.pages(space.scopeId), [
+    { path: 'Knowledge_Base/wiki/a.md', title: 'Acme', type: 'org' },
+    { path: 'Knowledge_Base/wiki/b.md', title: 'Beta', type: 'project' },
+    // The path as it is on disk, so the link written from it opens the file that is there.
+    { path: `Knowledge_Base/wiki/${'ガ.md'.normalize('NFD')}`, title: undefined, type: undefined },
+  ]);
 });

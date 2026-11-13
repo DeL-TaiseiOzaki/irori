@@ -9,11 +9,15 @@ import {
   setProperty,
   tidyYaml,
   type PageProperties as Declared,
+  type PropertyDeclaration,
   type PropertyDefinition,
   type YamlValue,
 } from '../domain/properties';
+import { relationTarget, relationsFrom } from '../domain/ontology';
+import { linkTo } from '../domain/note-links';
 import { choosePropertiesFolded, currentPropertiesFolded } from './device-settings';
 import { Icon } from './Icon';
+import { useResource } from './useResource';
 import './page-properties.css';
 
 /** Labels for the keys the Open Knowledge Format and irori-templete use. */
@@ -95,6 +99,8 @@ export function PageProperties({
   declared,
   readOnly,
   fileName,
+  scopeId,
+  path,
   onChange,
 }: {
   /** The YAML between the delimiters; undefined when the page has no frontmatter. */
@@ -102,6 +108,9 @@ export function PageProperties({
   declared: Declared | null | undefined;
   readOnly: boolean;
   fileName: string;
+  /** The knowledge base and the page's path in it, for picking a relation's target. */
+  scopeId?: string;
+  path?: string;
   onChange: (yaml: string) => void;
 }) {
   const [raw, setRaw] = useState(false);
@@ -274,19 +283,31 @@ export function PageProperties({
                       )}
                     </dt>
                     <dd>
-                      <Value
-                        name={label(key)}
-                        kind={kind}
-                        value={value}
-                        definition={definition}
-                        options={
-                          kind === 'type'
-                            ? Object.keys(declaration?.types ?? {})
-                            : definition?.options
-                        }
-                        readOnly={readOnly}
-                        onSet={(next) => set([key], next)}
-                      />
+                      {kind === 'relations' && declaration && scopeId && path ? (
+                        <Relations
+                          value={value}
+                          declaration={declaration}
+                          type={typeof values.type === 'string' ? values.type : undefined}
+                          scopeId={scopeId}
+                          path={path}
+                          readOnly={readOnly}
+                          onSet={(next) => set([key], next)}
+                        />
+                      ) : (
+                        <Value
+                          name={label(key)}
+                          kind={kind}
+                          value={value}
+                          definition={definition}
+                          options={
+                            kind === 'type'
+                              ? Object.keys(declaration?.types ?? {})
+                              : definition?.options
+                          }
+                          readOnly={readOnly}
+                          onSet={(next) => set([key], next)}
+                        />
+                      )}
                     </dd>
                     {!readOnly && !required.has(key) && key in values && (
                       <button
@@ -472,6 +493,182 @@ function Value({
     <span className="properties-static empty">{t('なし', 'None')}</span>
   );
 }
+
+/**
+ * A page's relations, picked rather than typed (ADR 015 stage 2, ADR 060): the
+ * name from the relations the declaration lets a page of this type state, and
+ * the target from the pages of the types that relation points at, or a URL. A
+ * name or a target the declaration does not allow stays as written and is
+ * marked, never dropped.
+ */
+function Relations({
+  value,
+  declaration,
+  type,
+  scopeId,
+  path,
+  readOnly,
+  onSet,
+}: {
+  value: YamlValue | undefined;
+  declaration: PropertyDeclaration;
+  type: string | undefined;
+  scopeId: string;
+  path: string;
+  readOnly: boolean;
+  onSet: (value: YamlValue) => void;
+}) {
+  const listId = useId();
+  const entries: YamlValue[] = Array.isArray(value)
+    ? value
+    : value === undefined || isEmptyValue(value)
+      ? []
+      : [value];
+  const allowed = relationsFrom(declaration, type);
+  // A relation being added is kept here until it has a name and a target.
+  const [draft, setDraft] = useState<{ rel: string; target: string }>();
+  // The pages are read when the field is first used, not for every page opened.
+  const [wanted, setWanted] = useState(false);
+  const pages = useResource(() => window.irori.ontologyPages(scopeId), [scopeId], {
+    enabled: wanted && !readOnly,
+  });
+  const choices = (rel: string) => {
+    const to = relationTarget(declaration.relations[rel]?.to);
+    if (to === 'url') return undefined;
+    return (pages.data ?? [])
+      .filter(
+        (page) => page.path !== path && (to === 'page' || (!!page.type && to.includes(page.type))),
+      )
+      .map((page) => ({
+        link: linkTo(path, page.path),
+        label: [page.title?.trim() || page.path.split('/').at(-1), page.type]
+          .filter(Boolean)
+          .join(' · '),
+      }));
+  };
+  const row = (
+    key: string,
+    entry: { rel: string; target: string },
+    change: (next: { rel: string; target: string }) => void,
+    remove: () => void,
+  ) => {
+    const known = allowed.includes(entry.rel);
+    const options = choices(entry.rel);
+    const url = relationTarget(declaration.relations[entry.rel]?.to) === 'url';
+    return (
+      <li key={key} className="properties-relation">
+        <select
+          aria-label={t('関係', 'Relation')}
+          value={entry.rel}
+          disabled={readOnly}
+          onChange={(event) => change({ ...entry, rel: event.target.value })}
+        >
+          {!entry.rel && <option value="">{t('選択してください', 'Choose')}</option>}
+          {entry.rel && !known && (
+            <option value={entry.rel}>
+              {Object.prototype.hasOwnProperty.call(declaration.relations, entry.rel)
+                ? t(`${entry.rel}（この種類からは使えません）`, `${entry.rel} (not from this type)`)
+                : t(`${entry.rel}（宣言にない値）`, `${entry.rel} (not declared)`)}
+            </option>
+          )}
+          {allowed.map((name) => (
+            <option key={name} value={name} title={declaration.relations[name]?.description}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <input
+          aria-label={t('関係の相手', 'Relation target')}
+          type={url ? 'url' : 'text'}
+          value={entry.target}
+          readOnly={readOnly}
+          list={options?.length ? `${listId}-${key}` : undefined}
+          placeholder={url ? 'https://' : t('ページを選ぶ', 'Choose a page')}
+          onFocus={() => setWanted(true)}
+          onChange={(event) => change({ ...entry, target: event.target.value })}
+        />
+        {options?.length ? (
+          <datalist id={`${listId}-${key}`}>
+            {options.map((option) => (
+              <option key={option.link} value={option.link} label={option.label} />
+            ))}
+          </datalist>
+        ) : null}
+        {!readOnly && (
+          <button
+            type="button"
+            className="properties-remove"
+            aria-label={t('この関係を削除', 'Remove this relation')}
+            onClick={remove}
+          >
+            ×
+          </button>
+        )}
+      </li>
+    );
+  };
+  const text = (item: YamlValue, key: string) =>
+    isRecord(item) && typeof item[key] === 'string' ? (item[key] as string) : '';
+  return (
+    <ul className="properties-relations">
+      {entries.map((item, index) =>
+        isRecord(item) ? (
+          row(
+            String(index),
+            { rel: text(item, 'rel'), target: text(item, 'target') },
+            // Keys the entry carries besides these two stay with it.
+            (next) =>
+              onSet(entries.map((other, at) => (at === index ? { ...item, ...next } : other))),
+            () => onSet(entries.filter((_, at) => at !== index)),
+          )
+        ) : (
+          <li key={index} className="properties-static">
+            {display(item)}
+          </li>
+        ),
+      )}
+      {draft &&
+        row(
+          'new',
+          draft,
+          (next) => {
+            // Written once it says something: a name and a target.
+            if (next.rel && next.target.trim()) {
+              setDraft(undefined);
+              onSet([...entries, { rel: next.rel, target: next.target.trim() }]);
+            } else setDraft(next);
+          },
+          () => setDraft(undefined),
+        )}
+      {!readOnly && !draft && (
+        <li>
+          <button
+            type="button"
+            className="properties-add-relation"
+            disabled={!allowed.length}
+            title={
+              allowed.length
+                ? undefined
+                : t(
+                    'この種類のページから使える関係は宣言されていません。',
+                    'No relation is declared for a page of this type.',
+                  )
+            }
+            onClick={() => {
+              setWanted(true);
+              setDraft({ rel: allowed[0] ?? '', target: '' });
+            }}
+          >
+            {t('＋ 関係を追加', '+ Add a relation')}
+          </button>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+const isRecord = (value: unknown): value is Record<string, YamlValue> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 function Chips({
   name,

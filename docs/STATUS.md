@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Relations picked and pages started from a type, 2026-11-13 (**0.2.67**,
+[#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318);
+[ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage
+3, on top of [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the
+declaration is applied where a page is written, not only checked afterwards.
+- `PageProperties` shows `relations` as rows of a name and a target instead of a
+  read-only list. The name is a select of `relationsFrom(declaration, type)`;
+  the target an input with the pages of the types that relation points at
+  (`HostAPI.ontologyPages`, from `BundleService.pages`, read on first use), or a
+  URL field. `linkTo` writes the target relative to the page. A name the
+  declaration lacks, or one this type may not state, stays and is marked.
+- **ノートを作成** offers the vault's declared types and **種類なし**.
+  `HostAPI.createNote` takes the type; `createTypedNote` writes
+  `newPageText`: the type, the title from the file name, the person as the
+  last change and the type's required keys, empty. An undeclared type is
+  refused.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux, with new
+  cases in `tests/ontology.test.ts` and `tests/properties.test.ts`;
+  `scripts/properties-ui-smoke.ts` picks a relation and starts a page from a
+  type in a real Electron. Not seen on Windows or macOS.
+- Not done: the pickers for `link` and `sources`, and **確認済みにする**.
+
 The ontology is the declaration, 2026-11-13 (**0.2.66**,
 [#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316);
 [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked

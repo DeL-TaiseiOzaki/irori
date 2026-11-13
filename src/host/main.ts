@@ -55,7 +55,7 @@ import { isAppDocument } from './trust';
 import { BundleService } from './bundle';
 import { brokenLinks } from '../domain/vault-move';
 import { noteDirectory, openDailyNote, readNotesDeclaration } from './notes';
-import { readPageProperties } from './properties';
+import { createTypedNote, readPageProperties } from './properties';
 import {
   addNoteComment,
   moveFolderComments,
@@ -966,6 +966,7 @@ app
         await workspaces.remove(id);
       },
       ontology: (id) => bundle.ontology(id),
+      ontologyPages: (id) => bundle.pages(id),
       updateIndexes: (id) =>
         changeVault(
           id,
@@ -1169,10 +1170,13 @@ app
           return saved;
         }),
       draft: (doc) => files.draft(doc),
-      createNote: (id, name, directory) =>
-        changeFiles(async () =>
-          files.createNote(id, name, directory ?? (await noteDirectory(files, id))),
-        ),
+      createNote: (id, name, directory, type) =>
+        changeFiles(async () => {
+          const folder = directory ?? (await noteDirectory(files, id));
+          return type
+            ? createTypedNote(files, git, id, name, folder, type)
+            : files.createNote(id, name, folder);
+        }),
       notesDeclaration: (id) => readNotesDeclaration(files, id),
       pageProperties: (id) => readPageProperties(files, git, id),
       dailyNote: (id) => changeFiles(() => openDailyNote(files, id)),

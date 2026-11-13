@@ -30,14 +30,21 @@ await writeFile(
       stale_after: { kind: 'datetime' },
       tags: { kind: 'multi-select' },
       sensitivity: { kind: 'select', options: ['internal', 'confidential', 'restricted'] },
+      relations: { kind: 'relations' },
     },
     required: ['type', 'title', 'description', 'generated'],
     types: {
       artifact: { heading: '# Artifacts', required: ['resource', 'sources'] },
       concept: { heading: '# Concepts', required: ['sources'] },
+      project: { heading: '# Projects', required: [] },
     },
-    relations: {},
-    avoid: [],
+    // The ontology (ADR 060): what a page may state, from which type, to which.
+    relations: {
+      about: { description: 'The project this page is about.', from: 'any', to: ['project'] },
+      part_of: { description: 'A project inside another.', from: ['project'], to: ['project'] },
+      same_as: { description: 'The same project elsewhere.', from: ['project'], to: 'url' },
+    },
+    avoid: [{ name: 'depends_on', use: 'about' }],
   }),
 );
 const proposalHead = `---
@@ -59,6 +66,16 @@ await writeFile(
   '# Artifacts\n\n* [proposal](proposal.md) - What we sent\n',
 );
 await writeFile(path.join(root, 'bare.md'), '# 素のページ\n');
+// Two pages inside the knowledge folder: a relation is picked among the pages of the bundle.
+await mkdir(path.join(root, 'Knowledge_Base', 'wiki'), { recursive: true });
+await writeFile(
+  path.join(root, 'Knowledge_Base', 'wiki', 'alpha.md'),
+  '---\ntype: project\ntitle: アルファ計画\ndescription: The first project.\n---\n\n# アルファ\n',
+);
+await writeFile(
+  path.join(root, 'Knowledge_Base', 'wiki', 'claim.md'),
+  '---\ntype: concept\ntitle: Claim\ndescription: One claim.\nsources:\n  - { id: s, resource: https://example.com/s }\n---\n\n# Claim\n',
+);
 await writeFile(path.join(root, 'broken.md'), '---\ntitle: [unclosed\n---\n# 壊れた frontmatter\n');
 
 const files = new FileService(path.join(base, 'device'));
@@ -166,6 +183,48 @@ try {
   await properties.getByRole('button', { name: 'プロパティで編集' }).click();
   await expect(properties.getByLabel('公開範囲', { exact: true })).toHaveValue('internal');
 
+  // A relation is picked, not typed (ADR 015 stage 2): the names a page of this type may
+  // state, and the pages of the types that name points at.
+  const claim = 'Knowledge_Base/wiki/claim.md';
+  // The knowledge folder is open already; its `wiki` folder is not.
+  await page.getByRole('button', { name: 'wiki', exact: true }).click();
+  await page.getByRole('button', { name: 'claim', exact: true }).click();
+  await expect(properties.getByLabel('タイトル')).toHaveValue('Claim');
+  await properties.getByLabel('プロパティを追加').selectOption({ label: '関係' });
+  await properties.getByRole('button', { name: '＋ 関係を追加' }).click();
+  const relation = properties.locator('.properties-relation');
+  // A concept may say what it is about; only a project may be part of one or the same as one.
+  await expect(relation.getByLabel('関係', { exact: true }).locator('option')).toHaveText([
+    'about',
+  ]);
+  const target = relation.getByLabel('関係の相手');
+  await target.focus();
+  // `about` points at projects: the one project is offered, the concept itself is not.
+  await expect(relation.locator('datalist option')).toHaveCount(1);
+  await expect(relation.locator('datalist option')).toHaveAttribute('value', 'alpha.md');
+  await expect(relation.locator('datalist option')).toHaveAttribute(
+    'label',
+    'アルファ計画 · project',
+  );
+  await target.fill('alpha.md');
+  await expect
+    .poll(() => onDisk(claim), { timeout: 10000 })
+    .toContain('relations: [{ rel: about, target: alpha.md }]\n');
+  // A name the declaration lacks stays as written and is marked, never dropped.
+  await properties.getByRole('button', { name: 'YAML で編集' }).click();
+  await raw.fill((await raw.inputValue()).replace('rel: about', 'rel: depends_on'));
+  await properties.getByRole('button', { name: 'プロパティで編集' }).click();
+  await expect(relation.getByLabel('関係', { exact: true })).toHaveValue('depends_on');
+  await expect(relation.getByLabel('関係', { exact: true }).locator('option').first()).toHaveText(
+    'depends_on（宣言にない値）',
+  );
+  await relation.getByLabel('関係', { exact: true }).selectOption('about');
+  await expect
+    .poll(() => onDisk(claim), { timeout: 10000 })
+    .toContain('relations: [{ rel: about, target: alpha.md }]\n');
+  await page.getByRole('button', { name: 'proposal', exact: true }).click();
+  await expect(properties.getByLabel('タイトル')).toHaveValue('Proposal for customer A, v2');
+
   // Folded, the title and description stay and the rows give way to their count.
   const fold = properties.locator('.properties-fold');
   await fold.click();
@@ -201,9 +260,27 @@ try {
   await expect(fold).toHaveAttribute('aria-expanded', 'true');
   expect(await onDisk('broken.md')).toBe('---\ntitle: [unclosed\n---\n# 壊れた frontmatter\n');
 
+  // A new page starts from a type (ADR 015 D6): its frontmatter is there before the first word.
+  await page.getByRole('button', { name: / にノートを作成$/ }).click();
+  const create = page.getByRole('dialog', { name: 'ノートを作成', exact: true });
+  await create.getByLabel('ノート名').fill('案件 B');
+  const folder = await create.getByLabel('保存先フォルダー').inputValue();
+  await expect(create.getByLabel('種類', { exact: true }).locator('option')).toHaveText([
+    'artifact',
+    'concept',
+    'project',
+    '種類なし',
+  ]);
+  await create.getByLabel('種類', { exact: true }).selectOption('project');
+  await create.getByRole('button', { name: '作成', exact: true }).click();
+  await expect(properties.getByLabel('タイトル')).toHaveValue('案件 B');
+  expect(await onDisk(`${folder}/案件 B.md`)).toMatch(
+    /^---\ntype: project\ntitle: 案件 B\ndescription: ""\ngenerated: \{ by: human:properties\.person, at: [^}]+ \}\n---\n\n$/,
+  );
+
   if (errors.length) throw Error(`Renderer errors: ${errors.join('\n')}`);
   console.log(
-    'Properties UI smoke passed: declared properties shown above the body, a select and a tag written in place with the person named as the last change, the raw YAML view, folding kept across pages, a plain index, a page given frontmatter, and broken frontmatter left untouched.',
+    'Properties UI smoke passed: declared properties shown above the body, a select and a tag written in place with the person named as the last change, the raw YAML view, folding kept across pages, a plain index, a relation picked from the declared names and pages, a page given frontmatter, a new page started from a type, and broken frontmatter left untouched.',
   );
 } finally {
   await app.close();

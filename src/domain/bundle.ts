@@ -114,6 +114,13 @@ export interface FolderIndexStatus {
   changed: number;
 }
 
+/** A page a relation can point at, as the property view's picker lists it. */
+export interface PageChoice {
+  path: string;
+  title?: string;
+  type?: string;
+}
+
 /** What **索引を更新** and `irori index` did. */
 export interface IndexUpdate {
   /** The knowledge folder is an OKF bundle; without one there is no index to write. */

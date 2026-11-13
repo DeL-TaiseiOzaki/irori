@@ -244,6 +244,24 @@ function* noteDestinations(text: string) {
   }
 }
 
+/**
+ * The link the note at `from` writes to reach the file at `target`: relative to
+ * the note, with the characters a link reads as something else encoded, so that
+ * `resolveNoteLink(from, linkTo(from, target))` is `target` again.
+ */
+export function linkTo(from: string, target: string) {
+  const base = from.split('/').slice(0, -1);
+  const parts = target.split('/');
+  let shared = 0;
+  while (shared < base.length && shared < parts.length - 1 && base[shared] === parts[shared])
+    shared++;
+  const link = [...base.slice(shared).map(() => '..'), ...parts.slice(shared)]
+    .join('/')
+    .replace(/[%#?]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  // A first segment with a colon would read as an address with a scheme.
+  return /^[a-z][a-z0-9+.-]*:/i.test(link) ? `./${link}` : link;
+}
+
 /** The paths inside the knowledge base that the links in `text`, read at `from`, lead to. */
 export function internalLinks(text: string, from: string): string[] {
   const paths: string[] = [];
