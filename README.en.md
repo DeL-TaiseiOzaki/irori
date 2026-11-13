@@ -72,7 +72,8 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - Follow relative links and list the notes that link here (backlinks). Renaming or moving a note rewrites the links to it.
 - **Today's note** opens at a set place, from a set template.
 - Open files become tabs. **Open beside** splits the page into up to four columns, each with its own tabs. The column you click is the one you edit; the others show what is saved. Each vault keeps its columns and tabs.
-- CSV opens as a table, and an ontology as a hierarchy or a graph.
+- CSV opens as a table.
+- The ontology — the page types and relations a vault declares — opens as a diagram and tables, with a list of the pages that differ from it.
 
 **AI agents**
 - The AI pane beside the page holds any number of conversations side by side and widens freely. Hide the page to show only the agents.

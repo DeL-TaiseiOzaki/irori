@@ -933,7 +933,7 @@ export const BrainPanel = memo(function BrainPanel({
         />
         <SectionAction
           icon="graph"
-          label={t('グラフ', 'Graph')}
+          label={t('オントロジー', 'Ontology')}
           disabled={locked || held || dirty}
           onClick={onGraph}
         />
@@ -1042,7 +1042,7 @@ export const BrainPanel = memo(function BrainPanel({
                   </Menu.Item>
                   <Menu.Item disabled={locked || held} onClick={onGraph}>
                     <Icon name="graph" size={14} />
-                    {t('グラフ', 'Graph')}
+                    {t('オントロジー', 'Ontology')}
                   </Menu.Item>
                   <Menu.Item disabled={locked} onClick={onConnect}>
                     <Icon name="cloudConnect" size={14} />

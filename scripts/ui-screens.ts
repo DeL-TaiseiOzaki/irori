@@ -58,28 +58,27 @@ async function fixture(base: string) {
     research.scopeId,
     handbook.scopeId,
   ]);
-  // A small ontology for the graph.
-  await mkdir(path.join(roots.Product, 'Knowledge_Base', 'ontology'), { recursive: true });
+  // A small vocabulary for the ontology view.
+  await mkdir(path.join(roots.Product, '.property'), { recursive: true });
   await writeFile(
-    path.join(roots.Product, '.irori', 'ontology.json'),
+    path.join(roots.Product, '.property', 'property.json'),
     JSON.stringify({
       schemaVersion: 1,
-      entities: {
-        path: 'Knowledge_Base/ontology/entities.csv',
-        note: 'note',
-        parent: 'parent',
-        group: 'group',
+      required: ['type'],
+      types: {
+        decision: { description: 'What was decided, why, and what was rejected.' },
+        interview: { description: 'What a customer said.' },
+        product: { description: 'The record of a product.' },
       },
-      relations: { path: 'Knowledge_Base/ontology/relations.csv' },
+      relations: {
+        about: { description: 'The product this page is about.', from: 'any', to: ['product'] },
+        informs: {
+          description: 'What was said bears on the decision.',
+          from: ['interview'],
+          to: ['decision'],
+        },
+      },
     }),
-  );
-  await writeFile(
-    path.join(roots.Product, 'Knowledge_Base', 'ontology', 'entities.csv'),
-    'id,label,note,parent,group\nproduct,Product,,,core\ndecision,Decision,Knowledge_Base/notes/decision-001.md,product,core\ninterview,Interview,Knowledge_Base/notes/interviews.md,product,research\n',
-  );
-  await writeFile(
-    path.join(roots.Product, 'Knowledge_Base', 'ontology', 'relations.csv'),
-    'sourceId,relation,targetId\ninterview,informs,decision\n',
   );
   // Git history with one change, for Changes.
   const git = (...args: string[]) =>
@@ -191,11 +190,12 @@ for (const run of runs) {
         .getByRole('button', { name: L('ファイル', 'Files'), exact: true })
         .click();
     });
-    await step('graph', async () => {
+    await step('ontology', async () => {
       await page
-        .getByRole('button', { name: L('グラフ（オントロジー）', 'Graph (ontology)'), exact: true })
+        .getByRole('button', { name: L('オントロジー', 'Ontology'), exact: true })
+        .first()
         .click();
-      await shot(page, 'Graph', run);
+      await shot(page, 'Ontology', run);
     });
     await step('records', async () => {
       await page.getByRole('button', { name: 'decision-001', exact: true }).click();

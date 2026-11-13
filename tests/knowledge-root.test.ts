@@ -5,13 +5,13 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { SearchService } from '../src/host/search';
-import { GraphIndexService } from '../src/host/graph-index';
+import { BundleService } from '../src/host/bundle';
 import { renameLayerFolder } from '../src/host/layer-folders';
 import { addNoteComment, readNoteComments } from '../src/host/comments';
 import { noteDirectory } from '../src/host/notes';
 import { classify } from '../src/domain/scopes';
 import { knowledgeFolder, layerRoots, movedPath } from '../src/domain/layers';
-import { bundlePage, pageId } from '../src/domain/graph-index';
+import { bundlePage } from '../src/domain/bundle';
 import { hostArguments } from '../src/domain/host-requests';
 
 async function fixture(t: TestContext, name = 'KB') {
@@ -49,8 +49,6 @@ test('The vault’s root is a knowledge folder of its own, `.` in the declaratio
   assert(!bundlePage('AGENTS.md', ''));
   assert(!bundlePage('readme.md', ''));
   assert(!bundlePage('index.md', ''));
-  assert(!bundlePage('ontology/x.md', ''));
-  assert.equal(pageId('wiki/a.md', ''), 'wiki/a');
   // Moves to and from the root name the entries that moved.
   const up = { from: 'Knowledge_Base', to: '', entries: ['wiki', 'index.md'] };
   assert.equal(movedPath(up, 'Knowledge_Base/wiki/a.md'), 'wiki/a.md');
@@ -207,32 +205,25 @@ test('A folder registered with its OKF bundle at the root keeps knowledge there,
   assert.equal(JSON.parse(await read('.irori/scope.json')).knowledge, '.');
   assert.equal(await noteDirectory(files, space.scopeId), 'Notes');
 
-  const service = new GraphIndexService(files, new SearchService(files));
+  const service = new BundleService(files, new SearchService(files));
   const update = await service.update(space.scopeId);
   assert.deepEqual(update.written.sort(), [
     'index.md',
     'journal/2026/index.md',
     'journal/index.md',
-    'ontology/entities.csv',
-    'ontology/index.md',
-    'ontology/relations.csv',
     'wiki/index.md',
   ]);
   assert.equal(update.pages, 3);
-  assert.equal(
-    await read('ontology/entities.csv'),
-    'id,label,note,parentId,group\nwiki/a,A,wiki/a.md,,concept\nwiki/b,B,wiki/b.md,,concept\n',
-  );
-  assert.match(await read('ontology/index.md'), /path from the repository root without/);
   // The root index lists knowledge folders only, and keeps its frontmatter.
   assert.equal(
     await read('index.md'),
     `${okf}\n# Folders\n\n* [journal](journal/)\n* [wiki](wiki/) - What we know\n`,
   );
   assert.equal(await read('wiki/index.md'), '# Concepts\n\n* [A](a.md)\n* [B](b.md) - The other\n');
-  const status = await service.status(space.scopeId);
-  assert.equal(status.current, true);
-  assert.deepEqual(status.indexes, { folders: 4, added: 0, changed: 0 });
+  // The declaration is applied to the pages of the knowledge layer alone: Schema and contents are not pages.
+  const ontology = await service.ontology(space.scopeId);
+  assert.equal(ontology.report!.pages, 3);
+  assert.deepEqual(ontology.indexes, { folders: 4, added: 0, changed: 0 });
 });
 
 test('A pulled declaration may name the root as the knowledge folder', async (t) => {

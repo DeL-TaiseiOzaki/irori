@@ -61,7 +61,8 @@ export const propertyDeclaration = z.looseObject({
       z.looseObject({
         description: z.string().max(2000).optional(),
         from: z.union([z.literal('any'), z.array(name)]).optional(),
-        to: z.string().max(64).optional(),
+        // `page`, `url`, or the types of page it may point at (ADR 060).
+        to: z.union([z.string().max(64), z.array(name).max(200)]).optional(),
       }),
     )
     .default({}),

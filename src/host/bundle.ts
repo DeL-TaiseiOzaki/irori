@@ -3,29 +3,21 @@ import path from 'node:path';
 import { setImmediate } from 'node:timers/promises';
 import { parse as parseYaml } from 'yaml';
 import {
-  buildGraphIndex,
   bundlePage,
-  declaredGraphIndex,
-  entityColumns,
+  formerGraphIndex,
   frontmatterBlock,
-  graphIndexAt,
-  graphIndexLimits,
   pageFacts,
-  relationColumns,
-  renderGraphIndex,
-  tableDelta,
   type FolderIndexStatus,
-  type GraphIndexStatus,
-  type GraphIndexTables,
-  type GraphIndexUpdate,
+  type IndexUpdate,
   type PageFacts,
-} from '../domain/graph-index';
-import { utf8Text, type FileService } from './files';
+} from '../domain/bundle';
+import { checkOntology, type Ontology } from '../domain/ontology';
+import { reachedAsWritten, utf8Text, type FileService } from './files';
 import { isMissing, stableHash } from './local-json';
 import { textFileByteLimit } from '../domain/viewers';
-import { knowledgeFile, knowledgePath, readDeclaration } from './ontology';
 import type { SearchService } from './search';
 import { t } from '../domain/i18n';
+import { classify } from '../domain/scopes';
 import { inFolder, knowledgeFolder, underFolder } from '../domain/layers';
 import { readPropertyDeclaration } from './properties';
 import { splitPage, type PropertyDeclaration } from '../domain/properties';
@@ -35,6 +27,32 @@ import {
   type IndexedPage,
   type PlannedIndex,
 } from '../domain/folder-index';
+import type { Document } from '../domain/types';
+
+/** Refuses a path outside this KB's knowledge layer or reached through an alias, without opening it. */
+async function knowledgePath(files: FileService, scopeId: string, relative: string) {
+  const space = files.get(scopeId);
+  if (classify(space, relative) !== 'Knowledge_Base')
+    throw Error('Generated files must belong to this KB knowledge layer');
+  const actual = await files.resolve(scopeId, relative);
+  if (!reachedAsWritten(space.root, actual, relative))
+    throw Error('Generated files must not be aliases');
+}
+
+/** A knowledge-layer file read through the guards above, or undefined when there is none. */
+async function knowledgeFile(
+  files: FileService,
+  scopeId: string,
+  relative: string,
+): Promise<Document | undefined> {
+  try {
+    await knowledgePath(files, scopeId, relative);
+  } catch (error) {
+    if (isMissing(error)) return undefined;
+    throw error;
+  }
+  return files.read(scopeId, relative);
+}
 
 /** A page's facts at the size and modification time they were read. */
 interface Remembered {
@@ -51,16 +69,8 @@ interface Walked {
   pages: PageFacts[];
   /** Each page's path as on disk, in the order of `pages`. */
   paths: string[];
-  unreadable: number;
   /** The folder indexes met, by path as on disk. */
   indexes: Map<string, { size: number; text?: string }>;
-}
-
-interface Built {
-  tables: GraphIndexTables;
-  texts: ReturnType<typeof renderGraphIndex>;
-  pages: number;
-  unreadable: number;
 }
 
 /** A knowledge folder that is an OKF bundle: its root index's frontmatter and its property declaration. */
@@ -70,100 +80,92 @@ interface Bundle {
 }
 
 /**
- * Generates the graph index the knowledge base carries from its pages, says
- * whether the module on disk still matches them, and writes it when asked.
- * The walk is search's, so the layer rules, exclusions and limits are the
- * ones a reader already knows. YAML stays on this side of the boundary.
+ * Reads the pages of a knowledge base, applies its ontology to them — the
+ * types and relations `.property/property.json` declares (ADR 060) — and keeps
+ * the folder indexes of an OKF bundle (ADR 028). The walk is search's, so the
+ * layer rules, exclusions and limits are the ones a reader already knows.
+ * YAML stays on this side of the boundary.
  *
  * Parsing costs a fraction of a millisecond per page, in the main process, so
  * the walk yields every so many pages, and a page's facts are remembered by
  * size and modification time so that a repeated check reads only what changed.
  */
-export class GraphIndexService {
+export class BundleService {
   private readonly remembered = new Map<string, Map<string, Remembered>>();
-  private readonly statuses = new Map<string, Promise<GraphIndexStatus>>();
+  private readonly reading = new Map<string, Promise<Ontology>>();
   private readonly building = new Map<string, Promise<Walked>>();
   constructor(
     private readonly files: FileService,
     private readonly search: SearchService,
   ) {}
 
-  /** Whether the module and folder indexes match the pages now, and what an update would change. Writes nothing. */
-  status(scopeId: string): Promise<GraphIndexStatus> {
-    const pending = this.statuses.get(scopeId);
+  /**
+   * The declaration applied to the pages now, and whether the folder indexes
+   * match them. Writes nothing.
+   */
+  ontology(scopeId: string): Promise<Ontology> {
+    const pending = this.reading.get(scopeId);
     if (pending) return pending;
-    const next = this.readStatus(scopeId).finally(() => this.statuses.delete(scopeId));
-    this.statuses.set(scopeId, next);
+    const next = this.readOntology(scopeId).finally(() => this.reading.delete(scopeId));
+    this.reading.set(scopeId, next);
     return next;
   }
-  private async readStatus(scopeId: string): Promise<GraphIndexStatus> {
-    const declared = (await readDeclaration(this.files, scopeId)) !== null;
-    const bundle = await this.bundle(scopeId);
-    if (declared && !bundle) return declaredGraphIndex;
+  private async readOntology(scopeId: string): Promise<Ontology> {
+    const { declaration, problem } = await readPropertyDeclaration(this.files, scopeId).catch(
+      (error) => ({
+        declaration: null,
+        problem: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    const former = await this.formerGraphIndex(scopeId);
+    if (!declaration)
+      return {
+        declared: false,
+        ...(problem && { problem }),
+        ...(former && { formerGraphIndex: former }),
+      };
     const walked = await this.build(scopeId);
-    const graph = declared ? declaredGraphIndex : await this.compare(scopeId, this.graph(walked));
-    if (!bundle) return graph;
-    return { ...graph, indexes: await this.indexStatus(scopeId, walked, bundle) };
-  }
-
-  /**
-   * Generates the module, unless a declaration exists, and the folder indexes of
-   * an OKF bundle, and writes the files whose bytes change. Every output is
-   * checked before the first is written.
-   */
-  async update(scopeId: string): Promise<GraphIndexUpdate> {
-    const declared = (await readDeclaration(this.files, scopeId)) !== null;
-    const bundle = await this.bundle(scopeId);
-    if (declared && !bundle)
-      throw Error(
-        t(
-          'この KB は .irori/ontology.json で表示設定を宣言しているため、グラフ索引は生成しません。',
-          'This KB declares its view in .irori/ontology.json, so no graph index is generated.',
-        ),
-      );
-    const walked = await this.build(scopeId, true);
-    const built = declared ? undefined : this.graph(walked);
-    const planned = bundle ? await this.plan(scopeId, walked, bundle) : [];
-    const written: string[] = [];
-    if (built) {
-      const graphIndexFiles = this.at(scopeId).files;
-      const keys = ['entities', 'relations', 'index'] as const;
-      const previous = await Promise.all(
-        keys.map((key) => moduleFile(this.files, scopeId, graphIndexFiles[key])),
-      );
-      for (const [index, key] of keys.entries()) {
-        const relative = graphIndexFiles[key];
-        const existing = previous[index];
-        if (existing?.text === built.texts[key]) continue;
-        await this.files.writeGenerated(
-          scopeId,
-          relative,
-          built.texts[key],
-          existing?.hash ?? null,
-        );
-        written.push(relative);
-      }
-    }
-    for (const index of planned) {
-      const existing = await moduleFile(this.files, scopeId, index.path);
-      if (existing?.text === index.text) continue;
-      await this.files.writeGenerated(scopeId, index.path, index.text, existing?.hash ?? null);
-      written.push(index.path);
-    }
-    const graph = built ? await this.compare(scopeId, built) : declaredGraphIndex;
+    const bundle = await this.bundle(scopeId, declaration);
     return {
-      ...graph,
-      ...(bundle && { indexes: { folders: planned.length, added: 0, changed: 0 } }),
-      written,
+      declared: true,
+      report: checkOntology(declaration, walked.pages),
+      ...(bundle && { indexes: await this.indexStatus(scopeId, walked, bundle) }),
+      ...(former && { formerGraphIndex: former }),
     };
   }
 
   /**
-   * The knowledge folder as an OKF bundle: its root `index.md` opens with
-   * frontmatter naming `okf_version`, and `.property/property.json` reads. Folder
-   * indexes are offered only then (ADR 028).
+   * Generates the folder indexes of an OKF bundle from its pages and writes the
+   * files whose bytes change. Every output is checked before the first is
+   * written. A knowledge folder that is not a bundle has no index to write.
    */
-  private async bundle(scopeId: string): Promise<Bundle | undefined> {
+  async update(scopeId: string): Promise<IndexUpdate> {
+    const { declaration } = await readPropertyDeclaration(this.files, scopeId).catch(() => ({
+      declaration: null,
+    }));
+    const bundle = declaration ? await this.bundle(scopeId, declaration) : undefined;
+    if (!bundle) return { bundle: false, pages: 0, written: [] };
+    const walked = await this.build(scopeId, true);
+    const planned = await this.plan(scopeId, walked, bundle);
+    const written: string[] = [];
+    for (const index of planned) {
+      const existing = await generatedFile(this.files, scopeId, index.path);
+      if (existing?.text === index.text) continue;
+      await this.files.writeGenerated(scopeId, index.path, index.text, existing?.hash ?? null);
+      written.push(index.path);
+    }
+    return { bundle: true, pages: walked.pages.length, written };
+  }
+
+  /**
+   * The knowledge folder as an OKF bundle: its root `index.md` opens with
+   * frontmatter naming `okf_version`. Folder indexes are offered only then
+   * (ADR 028).
+   */
+  private async bundle(
+    scopeId: string,
+    declaration: PropertyDeclaration,
+  ): Promise<Bundle | undefined> {
     const root = knowledgeFolder(this.files.get(scopeId));
     let index;
     try {
@@ -186,11 +188,15 @@ export class GraphIndexService {
       !Object.prototype.hasOwnProperty.call(fields, 'okf_version')
     )
       return undefined;
-    const { declaration } = await readPropertyDeclaration(this.files, scopeId).catch(() => ({
-      declaration: null,
-    }));
-    if (!declaration) return undefined;
     return { frontmatter: page.head.slice(page.bom.length), declaration };
+  }
+
+  /** Where the graph index of an irori before 0.2.65 still lies, if it does. */
+  private async formerGraphIndex(scopeId: string) {
+    const file = formerGraphIndex(knowledgeFolder(this.files.get(scopeId)));
+    const folder = parentOf(file);
+    const entries = await this.files.entries(scopeId, folder).catch(() => []);
+    return entries.some((entry) => entry.path === file) ? `${folder}/` : undefined;
   }
 
   /** The folder indexes the pages give, with submodules left out. */
@@ -282,30 +288,6 @@ export class GraphIndexService {
     return { folders: planned.length, added, changed };
   }
 
-  /** The module in this vault's knowledge folder. */
-  private at(scopeId: string) {
-    return graphIndexAt(knowledgeFolder(this.files.get(scopeId)));
-  }
-
-  private async compare(scopeId: string, built: Built): Promise<GraphIndexStatus> {
-    const graphIndexFiles = this.at(scopeId).files;
-    const [entities, relations] = await Promise.all(
-      [graphIndexFiles.entities, graphIndexFiles.relations].map((relative) =>
-        moduleFile(this.files, scopeId, relative),
-      ),
-    );
-    return {
-      declared: false,
-      present: entities !== undefined,
-      current: entities?.text === built.texts.entities && relations?.text === built.texts.relations,
-      pages: built.pages,
-      unreadable: built.unreadable,
-      excluded: built.tables.excluded,
-      entities: tableDelta(entityColumns, built.tables.entities, entities?.text),
-      relations: tableDelta(relationColumns, built.tables.relations, relations?.text),
-    };
-  }
-
   private build(scopeId: string, fresh = false): Promise<Walked> {
     const pending = this.building.get(scopeId);
     if (pending) {
@@ -323,18 +305,14 @@ export class GraphIndexService {
     const pages: PageFacts[] = [];
     const paths: string[] = [];
     const indexes = new Map<string, { size: number; text?: string }>();
-    let unreadable = 0;
     const root = knowledgeFolder(this.files.get(scopeId));
-    const { folder } = graphIndexAt(root);
     const folderIndex = (path: string) =>
-      (!root || path.startsWith(`${root}/`)) &&
-      /(^|\/)index\.md$/i.test(path) &&
-      !path.startsWith(`${folder}/`);
+      (!root || path.startsWith(`${root}/`)) && /(^|\/)index\.md$/i.test(path);
     const walk = await this.search.walk(
       scopeId,
       (path) => bundlePage(path, root) || folderIndex(path),
       // The walk itself leaves Schema and contents out of a bundle at the vault's root.
-      (directory) => underFolder(root, directory) && directory !== folder,
+      (directory) => underFolder(root, directory),
       async ({ path, stat, read }) => {
         const known = previous.get(path);
         const same = known && known.size === stat.size && known.mtime === stat.mtimeMs;
@@ -356,13 +334,12 @@ export class GraphIndexService {
           try {
             entry.facts = pageFacts(path, frontmatter(await read()));
           } catch {
-            /* the page keeps its place with no facts */
+            /* the page keeps its place with no facts, and is read again next time */
           }
         }
         next.set(path, entry);
-        pages.push(entry.facts ?? pageFacts(path, undefined));
+        pages.push(entry.facts ?? { ...pageFacts(path, undefined), unreadable: true });
         paths.push(path);
-        if (!entry.facts) unreadable++;
         if (pages.length % 64 === 0) await setImmediate();
       },
     );
@@ -370,33 +347,11 @@ export class GraphIndexService {
     if (walk.incomplete)
       throw Error(
         t(
-          'ナレッジ層を最後まで読めなかったため、グラフ索引を確認できません。',
-          'The Knowledge layer could not be read completely, so the graph index cannot be checked.',
+          'ナレッジ層を最後まで読めなかったため、ページを確認できません。',
+          'The Knowledge layer could not be read completely, so its pages cannot be checked.',
         ),
       );
-    return { root, pages, paths, unreadable, indexes };
-  }
-
-  /** The module the walked pages give; refused when the reader could not load it. */
-  private graph({ root, pages, unreadable }: Walked): Built {
-    const graphIndexFiles = graphIndexAt(root).files;
-    const tables = buildGraphIndex(pages, root);
-    if (
-      tables.entities.length > graphIndexLimits.entities ||
-      tables.relations.length > graphIndexLimits.relations
-    )
-      throw Error(
-        t(
-          `グラフ索引は ${graphIndexLimits.entities.toLocaleString('en-US')} エンティティ・${graphIndexLimits.relations.toLocaleString('en-US')} 関係までです（今は ${tables.entities.length.toLocaleString('en-US')} エンティティ・${tables.relations.length.toLocaleString('en-US')} 関係）。書き込まずに終了しました。`,
-          `The graph index holds up to ${graphIndexLimits.entities.toLocaleString('en-US')} entities and ${graphIndexLimits.relations.toLocaleString('en-US')} relations (now ${tables.entities.length.toLocaleString('en-US')} entities and ${tables.relations.length.toLocaleString('en-US')} relations). Stopped without writing.`,
-        ),
-      );
-    const texts = renderGraphIndex(tables, root);
-    // Validate every output before publishing the first: long paths repeated in
-    // edge rows can exceed the byte limit even when both row counts fit.
-    for (const [key, text] of Object.entries(texts))
-      checkOutput(graphIndexFiles[key as keyof typeof texts], text);
-    return { tables, texts, pages: pages.length, unreadable };
+    return { root, pages, paths, indexes };
   }
 }
 
@@ -422,11 +377,11 @@ function checkOutput(relative: string, text: string) {
 }
 
 /**
- * A generated file may be unreadable as text after a bad merge or an older
- * generator. Keep its guarded byte hash so an explicit regeneration can repair
- * it; retain text only within the ordinary reader's limit.
+ * A generated file may be unreadable as text after a bad merge. Keep its
+ * guarded byte hash so an explicit regeneration can repair it; retain text only
+ * within the ordinary reader's limit.
  */
-async function moduleFile(files: FileService, scopeId: string, relative: string) {
+async function generatedFile(files: FileService, scopeId: string, relative: string) {
   try {
     await knowledgePath(files, scopeId, relative);
   } catch (error) {
@@ -440,8 +395,8 @@ async function moduleFile(files: FileService, scopeId: string, relative: string)
     () =>
       Error(
         t(
-          'CONFLICT: グラフ索引の読み取り中にファイルが変更されました。',
-          'CONFLICT: A file changed while the graph index was being read.',
+          'CONFLICT: 索引の読み取り中にファイルが変更されました。',
+          'CONFLICT: A file changed while the indexes were being read.',
         ),
       ),
     (chunk, size) => {

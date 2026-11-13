@@ -4,6 +4,9 @@ Date: 2026-10-07. Status: owner decision; implemented for 0.1.86.
 Amends [ADR 008](008-graph-index-module.md) (the button and what it writes),
 [ADR 015](015-page-properties.md) D1 (the root `README.md` is not a property page)
 and the pull guard on `.irori/scope.json` ([GIT](../GIT.md)).
+Amended by [ADR 060](060-the-ontology-is-the-declaration.md): the button writes
+the folder indexes only, since there is no graph index to write with them, and
+`.irori/ontology.json` is no longer read.
 
 ## Context
 

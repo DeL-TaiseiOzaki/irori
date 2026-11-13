@@ -1,7 +1,8 @@
 /**
  * The `irori` command: how an agent asks irori to do what the person does in
  * irori — register and arrange vaults (the irori agent), and move notes,
- * comment, update indexes and set up its own vault (either agent, ADR 031).
+ * comment, update indexes, check pages against the vault's ontology and set up
+ * its own vault (either agent, ADR 031 and 060).
  *
  * Sent: a preamble before the person's words when the command is on the
  * run's PATH, whole on a native session's first request and as one line
@@ -11,6 +12,7 @@
  */
 
 import { brainColors, brainGlyphs } from '../src/domain/brains';
+import type { Ontology, OntologyFinding } from '../src/domain/ontology';
 
 /**
  * The irori agent's `irori` command, said on a session's first request that has
@@ -57,7 +59,9 @@ stay with the person.
 
 Through files, as the person does in irori: frontmatter is a page's
 properties, with their types and fields declared in .property/property.json
-when the knowledge folder is an OKF bundle; today's note and the new-note
+when the knowledge folder is an OKF bundle. That file is the vault's
+ontology: write only the page types and relation names it declares, and
+run "irori check" after writing pages; today's note and the new-note
 folder are in .irori/notes.json; routines are
 .irori/routines/<name>/routine.yaml; comments are
 .irori/comments/<file>.json. Links irori follows are relative Markdown
@@ -102,9 +106,16 @@ irori resolve <file> <comment id>
   Removes a comment, by the id in .irori/comments/<file>.json.
 
 irori index [<vault>]
-  Writes the vault's graph index and folder indexes, as 索引を更新 does,
-  when its knowledge folder is an OKF bundle. Without a name, the vault of
-  your working folder.
+  Writes the vault's folder indexes (each folder's index.md), as 索引を更新
+  does, when its knowledge folder is an OKF bundle. Without a name, the vault
+  of your working folder.
+
+irori check [<vault>]
+  Applies the vault's ontology, the page types and relations declared in
+  .property/property.json, to its pages, and lists where a page differs: an
+  undeclared type or relation name, a required property missing, a relation
+  from or to the wrong type of page. Writes nothing. Run it after writing
+  pages.
 
 irori routines
   The routines of your folder (routines/) and of this workspace's vaults
@@ -218,13 +229,65 @@ export function commentResolved(file: string, id: string, left: number) {
   return `Removed comment ${id} from ${file}; ${left} left.`;
 }
 
+/** One difference between a page and the declaration, as `irori check` prints it. */
+function difference(finding: OntologyFinding) {
+  const instead = (use: string | undefined) => (use ? `; use ${JSON.stringify(use)} instead` : '');
+  switch (finding.kind) {
+    case 'unreadable':
+      return 'its frontmatter cannot be read';
+    case 'type-missing':
+      return 'it has no type';
+    case 'type-undeclared':
+      return `its type ${JSON.stringify(finding.name)} is not declared${instead(finding.use)}`;
+    case 'key-missing':
+      return `the required property ${JSON.stringify(finding.name)} is missing or empty`;
+    case 'relation-incomplete':
+      return 'a relation has no rel or no target';
+    case 'relation-undeclared':
+      return `the relation ${JSON.stringify(finding.name)} is not declared${instead(finding.use)}`;
+    case 'relation-from':
+      return `the relation ${JSON.stringify(finding.name)} does not go from a page of type ${JSON.stringify(finding.type)}`;
+    case 'relation-not-url':
+      return `the relation ${JSON.stringify(finding.name)} points at a URL, and ${JSON.stringify(finding.target)} is not one`;
+    case 'relation-not-page':
+      return `the relation ${JSON.stringify(finding.name)} points at a page, and ${JSON.stringify(finding.target)} is no page of this vault`;
+    case 'relation-target-type':
+      return `the relation ${JSON.stringify(finding.name)} points at ${JSON.stringify(finding.target)}, a page of ${finding.type ? `type ${JSON.stringify(finding.type)}` : 'no type'}, which it may not point at`;
+    case 'relation-repeated':
+      return `the relation ${JSON.stringify(finding.name)} to ${JSON.stringify(finding.target)} is stated twice`;
+  }
+}
+
+/** How many differences `irori check` prints. */
+const checkLines = 100;
+
+/** `irori check`. */
+export function ontologyChecked(vault: string, ontology: Ontology) {
+  const { report } = ontology;
+  if (!report)
+    return ontology.problem
+      ? `The vault "${vault}" declares an ontology that cannot be read, so nothing was checked: ${ontology.problem}`
+      : `The vault "${vault}" declares no ontology (it has no .property/property.json), so there is nothing to check its pages against.`;
+  const summary = `Checked ${report.pages} pages of the vault "${vault}" against .property/property.json (${report.types.length} types, ${report.relations.length} relations).`;
+  if (!report.findingCount) return `${summary} Every page follows the declaration.`;
+  const shown = report.findings.slice(0, checkLines);
+  return [
+    `${summary} ${report.findingCount} differ:`,
+    ...shown.map((finding) => `- ${finding.path}: ${difference(finding)}.`),
+    ...(report.findingCount > shown.length
+      ? [`...and ${report.findingCount - shown.length} more.`]
+      : []),
+    'Change the page, not the declaration: .property/property.json changes only when the person agrees.',
+  ].join('\n');
+}
+
 /** `irori index`. */
 export function indexUpdated(
   vault: string,
-  update: { declared: boolean; pages: number; written: string[] },
+  update: { bundle: boolean; pages: number; written: string[] },
 ) {
-  if (update.declared)
-    return `The vault "${vault}" declares its own ontology in .irori/ontology.json, so irori does not generate its graph index.${update.written.length ? ` Wrote ${update.written.length} folder indexes.` : ''}`;
+  if (!update.bundle)
+    return `The vault "${vault}" is not an OKF bundle (the index.md of its knowledge folder names no okf_version, or .property/property.json does not read), so irori writes no indexes for it.`;
   return update.written.length
     ? `Wrote ${update.written.length} index files for ${update.pages} pages in the vault "${vault}": ${update.written.join(', ')}.`
     : `The indexes of the vault "${vault}" are current (${update.pages} pages).`;

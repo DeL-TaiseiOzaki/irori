@@ -1,3 +1,4 @@
+import type { Ontology } from '../src/domain/ontology';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
@@ -162,6 +163,9 @@ test('the command reads its forms, options and owner/name shorthand', () => {
   assert.deepEqual(parseIroriCommand(['index']), { kind: 'index' });
   assert.deepEqual(parseIroriCommand(['index', 'Notes']), { kind: 'index', vault: 'Notes' });
   assert.throws(() => parseIroriCommand(['index', 'a', 'b']), /at most one vault/);
+  assert.deepEqual(parseIroriCommand(['check']), { kind: 'check' });
+  assert.deepEqual(parseIroriCommand(['check', 'Notes']), { kind: 'check', vault: 'Notes' });
+  assert.throws(() => parseIroriCommand(['check', 'a', 'b']), /at most one vault/);
   assert.deepEqual(parseIroriCommand(['set', '.', '--color', 'ai', '--icon', 'flask']), {
     kind: 'set',
     vault: '.',
@@ -720,6 +724,34 @@ test('a vault agent’s command reaches its own vault alone, and notes and comme
   await files.register(other, 'Other', 'personal');
   const moved: string[][] = [];
   const indexed: string[] = [];
+  const checked: string[] = [];
+  const differing: Ontology = {
+    declared: true,
+    report: {
+      types: [{ name: 'concept', required: ['type'], pages: 3 }],
+      relations: [{ name: 'about', from: 'any', to: ['project'], uses: 1, findings: 1 }],
+      avoid: [{ name: 'depends_on', use: 'uses' }],
+      pages: 3,
+      undeclaredTypes: [],
+      undeclaredRelations: [{ name: 'depends_on', count: 1, use: 'uses' }],
+      findings: [
+        {
+          path: 'Knowledge_Base/a.md',
+          kind: 'relation-undeclared',
+          name: 'depends_on',
+          use: 'uses',
+        },
+        {
+          path: 'Knowledge_Base/b.md',
+          kind: 'relation-target-type',
+          name: 'about',
+          target: 'a.md',
+          type: 'concept',
+        },
+      ],
+      findingCount: 2,
+    },
+  };
   const setup = new AgentSetup({
     ...deps,
     running: () => true,
@@ -742,12 +774,11 @@ test('a vault agent’s command reaches its own vault alone, and notes and comme
     removeComment: (scopeId, file, id) => resolveNoteComment(files, scopeId, file, id),
     updateIndex: async (scopeId) => {
       indexed.push(scopeId);
-      return {
-        ...(await import('../src/domain/graph-index')).declaredGraphIndex,
-        declared: false,
-        pages: 1,
-        written: ['Knowledge_Base/index.md'],
-      };
+      return { bundle: true, pages: 1, written: ['Knowledge_Base/index.md'] };
+    },
+    checkOntology: async (scopeId) => {
+      checked.push(scopeId);
+      return scopeId === own.scopeId ? differing : { declared: false };
     },
   });
   const context = { vault: own.scopeId, by: 'Pi (vault agent)' };
@@ -826,6 +857,18 @@ test('a vault agent’s command reaches its own vault alone, and notes and comme
   // The irori agent names any vault, or the one it stands in.
   assert.match(await setup.run(['index', 'Other'], base, {}), /"Other"/);
   await assert.rejects(setup.run(['index'], base, {}), /Name the vault/);
+
+  // The check: its own vault without a name, each difference on a line, and nothing written.
+  assert.equal(
+    await setup.run(['check'], cwd, context),
+    'Checked 3 pages of the vault "Mine" against .property/property.json (1 types, 1 relations). 2 differ:\n' +
+      '- Knowledge_Base/a.md: the relation "depends_on" is not declared; use "uses" instead.\n' +
+      '- Knowledge_Base/b.md: the relation "about" points at "a.md", a page of type "concept", which it may not point at.\n' +
+      'Change the page, not the declaration: .property/property.json changes only when the person agrees.',
+  );
+  assert.deepEqual(checked, [own.scopeId]);
+  assert.match(await setup.run(['check', 'Other'], base, {}), /"Other" declares no ontology/);
+  await assert.rejects(setup.run(['check'], base, {}), /Name the vault: "irori check <vault>"/);
   void workspaces;
 });
 

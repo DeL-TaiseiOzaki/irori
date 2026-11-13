@@ -3606,8 +3606,10 @@ function App() {
                             ? () => {
                                 setView('note');
                                 openDock('vault');
-                                const request =
-                                  'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
+                                const request = t(
+                                  'この KB のオントロジー（.property/property.json が宣言する種類と関係）を一緒に見直してください。まず宣言とページを調べ、宣言にない名前と、宣言と違う使い方を挙げてください。そのうえで、宣言を直すのかページを直すのかを、1 件ずつ理由を添えて提案してください。合意するまでは .property/property.json もページも変更しないでください。別の KB や contents は変更しないでください。',
+                                  "Please review this KB's ontology with me: the types and relations .property/property.json declares. First read the declaration and the pages, and list the names pages use that are not declared and the uses that differ from the declaration. Then propose, one at a time and with the reason, whether to change the declaration or the pages. Change neither .property/property.json nor any page before we agree. Do not change another KB or contents.",
+                                );
                                 setPrompt((previous) =>
                                   previous ? `${previous}\n\n${request}` : request,
                                 );

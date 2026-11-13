@@ -43,7 +43,7 @@ import {
   type LayerMove,
   type NamedLayer,
 } from '../domain/layers';
-import { frontmatterBlock } from '../domain/graph-index';
+import { frontmatterBlock } from '../domain/bundle';
 import { t } from '../domain/i18n';
 import {
   binaryFilePattern,
@@ -1551,7 +1551,7 @@ export class FileService {
     });
   }
   /**
-   * Publishes a file irori generated in the knowledge layer — the graph index —
+   * Publishes a file irori generated in the knowledge layer — a folder index —
    * atomically: `expected` is the hash of the bytes being replaced, or null when
    * the file must not exist yet, so a file changed meanwhile is never overwritten.
    * Missing folders are created; an alias anywhere on the path is refused.

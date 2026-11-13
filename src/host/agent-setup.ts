@@ -12,6 +12,7 @@ import {
   vaultRegistered,
   vaultRemoved,
   indexUpdated,
+  ontologyChecked,
   callRefused,
   iroriCommandHelp,
   layerChosen,
@@ -43,7 +44,8 @@ import {
 import { categoryName } from '../domain/brains';
 import type { Routine, RoutineRef, RunRoutine } from '../domain/routines';
 import type { NewComment, NoteComment } from '../domain/comments';
-import type { GraphIndexUpdate } from '../domain/graph-index';
+import type { IndexUpdate } from '../domain/bundle';
+import type { Ontology } from '../domain/ontology';
 import { owner } from '../domain/scopes';
 import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
@@ -109,8 +111,10 @@ export interface AgentSetupHost {
   ) => Promise<NoteComment[]>;
   /** Removes one comment from a file, refusing an id it does not hold. */
   removeComment?: (scopeId: string, file: string, id: string) => Promise<NoteComment[]>;
-  /** Writes the vault's graph index and folder indexes, as 索引を更新 does. */
-  updateIndex?: (scopeId: string) => Promise<GraphIndexUpdate>;
+  /** Writes the vault's folder indexes, as 索引を更新 does. */
+  updateIndex?: (scopeId: string) => Promise<IndexUpdate>;
+  /** The vault's declared types and relations applied to its pages (ADR 060). Writes nothing. */
+  checkOntology?: (scopeId: string) => Promise<Ontology>;
   /** Starts a routine as 実行 does, without a review: only reviewed files run (ADR 016 D4). */
   runRoutine?: (ref: RoutineRef, input: RunRoutine) => Promise<string>;
   /** Whether a run of the vault's own agent is in progress there. */
@@ -245,6 +249,8 @@ export class AgentSetup {
         return this.resolve(command, cwd, context);
       case 'index':
         return this.index(command, cwd, context);
+      case 'check':
+        return this.check(command, cwd, context);
     }
   }
   private async workspace(context: SetupContext) {
@@ -834,6 +840,22 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     if (!this.host.updateIndex) throw Error('Indexes are not available here.');
+    const space = this.named(command, cwd, context);
+    const update = await this.host.updateIndex(space.scopeId);
+    this.host.announce?.({ scopeId: space.scopeId });
+    return indexUpdated(space.name, update);
+  }
+  private async check(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'check' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.checkOntology) throw Error('The check is not available here.');
+    const space = this.named(command, cwd, context);
+    return ontologyChecked(space.name, await this.host.checkOntology(space.scopeId));
+  }
+  /** The vault a form names, or without a name the agent's own, or the one it stands in. */
+  private named(command: { kind: string; vault?: string }, cwd: string, context: SetupContext) {
     const here = owner(this.host.files.list(), this.folder(cwd, '.'));
     const space = command.vault
       ? this.vault(command.vault, cwd, context.vault)
@@ -842,9 +864,7 @@ export class AgentSetup {
         : here
           ? this.allowed(here, undefined)
           : undefined;
-    if (!space) throw Error('Name the vault: "irori index <vault>".');
-    const update = await this.host.updateIndex(space.scopeId);
-    this.host.announce?.({ scopeId: space.scopeId });
-    return indexUpdated(space.name, update);
+    if (!space) throw Error(`Name the vault: "irori ${command.kind} <vault>".`);
+    return space;
   }
 }

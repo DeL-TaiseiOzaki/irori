@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { kbPath } from './ontology';
 import { t } from './i18n';
 import { defaultKnowledgeFolder, inFolder, knowledgeFolder } from './layers';
 
@@ -9,6 +8,18 @@ export const defaultNoteDirectory = `${defaultKnowledgeFolder}/Notes`;
 /** Where a vault without a declaration puts new notes: `Notes` in its knowledge folder. */
 export const defaultNoteDirectoryOf = (space: { knowledge?: string }) =>
   inFolder(knowledgeFolder(space), 'Notes');
+
+/** A path relative to the owning KB, as a declaration may write it. */
+export const kbPath = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(
+    (value) =>
+      !/^[\\/]|[:\\\0]/.test(value) &&
+      value.split('/').every((part) => part && part !== '.' && part !== '..'),
+    'Use a path relative to the owning KB',
+  );
 
 const tokenPattern = /\{\{(yyyy|MM|dd|date|datetime)\}\}/g;
 const notePath = kbPath.refine((value) => /\.md$/i.test(value), 'A Markdown note is required');
