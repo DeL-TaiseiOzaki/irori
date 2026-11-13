@@ -797,6 +797,9 @@
   margin-left: auto;
   display: flex;
 }
+.menu .menu-key {
+  margin-left: auto;
+}
 /* A menu in parts: each part's name above its choices, a line between parts. */
 .menu .menu-label {
   padding: 8px 10px 4px;

@@ -73,6 +73,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - **Today's note** opens at a set place, from a set template.
 - Open files become tabs. **Open beside** splits the page into up to four columns, each with its own tabs. The column you click is the one you edit; the others show what is saved. Each vault keeps its columns and tabs.
 - CSV opens as a table, and an ontology as a hierarchy or a graph.
+- **Ctrl/⌘+F** (or **Find in file** under "…") finds words in the file on show: a note (inside its code blocks too), code, a CSV table, a PDF, Word, PowerPoint and a spreadsheet (every sheet). Case and full-width letters do not matter. Enter (or F3) goes to the next one, Shift+Enter to the previous one and Esc closes the bar; in a note, closing it selects the words found.
 
 **AI agents**
 - The AI pane beside the page holds any number of conversations side by side and widens freely. Hide the page to show only the agents.
