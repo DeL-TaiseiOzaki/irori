@@ -20,6 +20,7 @@ import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
+import { remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import {
@@ -253,6 +254,12 @@ export const hostArguments = {
   setWorkFolder: z.tuple([id, path.min(1).nullable()]),
   openWorkFolder: z.tuple([id]),
   register: z.tuple([path, name, categoryText]),
+  remoteHosts: z.tuple([]),
+  saveRemoteHost: z.tuple([remoteHostInput]),
+  removeRemoteHost: z.tuple([id]),
+  connectRemoteHost: z.tuple([id]),
+  remoteFolders: z.tuple([id, remotePath.optional()]),
+  registerRemote: z.tuple([id, remotePath, name, categoryText]),
   createSpace: z.tuple([
     z.object({
       parent: path,

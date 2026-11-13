@@ -33,6 +33,8 @@ import { CommandCatalog, codexSkills, commandWords } from './commands';
 import { ConfigApprovals, type ConfigPlace, type FoundConfig } from './config-approval';
 import { personLinesBridge } from './person-lines';
 import { handOffTaskLimit, iroriBridge } from './irori-bridge';
+import type { HandOff, HandOffResult, HandedTask, RemoteVaults } from './remote-vaults';
+import { isReachCommand, reachVault } from './vault-reach';
 import type { NativeContext } from './adapter';
 import { agentCommand, agentEnv, killTree, knownVersion, launch, version } from './process';
 import { Rpc, type Message } from './rpc';
@@ -142,6 +144,7 @@ import { categoryName } from '../domain/brains';
 import { knowledgeFolder, shownFolder } from '../domain/layers';
 import {
   brainOfPath,
+  onThisDevice,
   editedPath,
   vaultOf,
   toolFile,
@@ -265,6 +268,13 @@ type Run = {
   delegation?: Delegation;
   /** For a vault agent's run started by your AI's `irori call`: that run's id. */
   holder?: string;
+  /**
+   * For a vault agent's run handed its task from another device (ADR 061): the
+   * irori agent's conversation there, `''` when it has none yet.
+   */
+  handedFrom?: string;
+  /** For your AI: its hand-offs to vaults on SSH hosts, by vault, to stop with the run. */
+  held?: Map<string, HandOff>;
   /** A routine's agent step: a new native session that is never kept. */
   step?: StepRun;
   /** Work folders outside the run's own folder, which its agents may change too. */
@@ -366,6 +376,8 @@ type Run = {
   close: () => void;
 };
 const steerable = new Set(steeringAgents);
+/** Whether a run works on a task the irori agent handed its vault, from this device or another. */
+const handed = (run: Run) => run.holder !== undefined || run.handedFrom !== undefined;
 /** The CLIs whose session irori continues from a point of its own after a rewind or a copy (ADR 017 D6). */
 const branching = new Set<AgentId>(['claude', 'codex']);
 /** Deltas of a streamed reply are sent together after at most this long, not one by one. */
@@ -497,6 +509,10 @@ export class AgentService {
   nestedInstructions?: (scopeId: string) => Promise<string[]>;
   /** The access new conversations start in, as the person chose it in the settings (ADR 009). */
   preferredAccess?: () => Promise<AgentAccess>;
+  /** The vaults on SSH hosts, which the irori agent's runs reach when handed them (ADR 061). */
+  remote?: RemoteVaults;
+  /** Requests that runs on SSH hosts wait on, by id: their answers go to those hosts. */
+  private remoteAsked = new Set<string>();
   /** Opens an http or https page in the person's browser, when an MCP server asks and they agree. */
   openUrl?: (url: string) => Promise<void>;
   /**
@@ -515,7 +531,9 @@ export class AgentService {
   private configPlaces(run: Run, root: string): ConfigPlace[] {
     return [
       { root },
-      ...(run.delegation?.brains.map((brain) => ({ root: brain.root })) ?? []),
+      ...(run.delegation
+        ? onThisDevice(run.delegation).map((brain) => ({ root: brain.root }))
+        : []),
       ...this.localFolders(run).map((folder) => ({ root: folder, added: true })),
     ];
   }
@@ -570,13 +588,17 @@ export class AgentService {
    */
   private localFolders(run: Run, writable?: boolean) {
     const scopes = run.delegation
-      ? run.delegation.brains.map((brain) => brain.scopeId)
+      ? onThisDevice(run.delegation).map((brain) => brain.scopeId)
       : [run.binding.scopeId];
     return scopes.flatMap((scopeId) => this.files.cloud?.localFolders?.(scopeId, writable) ?? []);
   }
   /** Whether `scopeId` is your AI's own id rather than a brain's. */
   private isYou(scopeId: string) {
     return !!this.you?.rootOf(scopeId);
+  }
+  /** The vault on an SSH host with this id, if it is one (ADR 061). */
+  private remoteVault(scopeId: string) {
+    return this.remote?.list().find((vault) => vault.scopeId === scopeId);
   }
   /**
    * The folder a run works in: a brain's root, or the irori agent's folder for
@@ -781,7 +803,7 @@ export class AgentService {
       )
         throw Error(otherWorkspace());
       const run = this.conversationRun(conversationId);
-      if (run && (run.step || run.holder)) throw Error(notTheirs());
+      if (run && (run.step || handed(run))) throw Error(notTheirs());
       if (run && this.joins(run, item)) {
         const steer = await run.steering.ready();
         if (steer && this.runs.has(run.id)) {
@@ -939,7 +961,7 @@ export class AgentService {
     const brains = [...new Set(input.brains ?? [])];
     if (this.isYou(input.scopeId)) {
       refuseYourMaterials(input);
-      for (const scopeId of brains) this.files.get(scopeId);
+      for (const scopeId of brains) if (!this.remoteVault(scopeId)) this.files.get(scopeId);
     } else if (brains.length || input.workspace) throw Error('Only the irori agent takes vaults');
     let close!: () => void;
     let accept!: () => void;
@@ -1089,6 +1111,9 @@ export class AgentService {
   }
   respond(id: string, allow: boolean, answers?: AgentAnswers) {
     const pending = this.requests.get(id);
+    // A run on an SSH host asked: its host answers it, and says when it is resolved.
+    if (!pending && this.remote && this.remoteAsked.has(id))
+      return this.remote.respond(id, allow, answers);
     if (!pending) throw Error('This request has already ended');
     this.requests.delete(id);
     pending.reply({ allow, answers });
@@ -1191,10 +1216,10 @@ export class AgentService {
         },
       };
     const holder = run.holder && this.runs.get(run.holder);
-    if (holder && holder.conversationId) {
+    const from = (holder && holder.conversationId) || run.handedFrom;
+    if (from) {
       // Work handed from one of the irori agent's conversations continues in one
       // conversation of the vault, apart from the person's own.
-      const from = holder.conversationId;
       const found = await this.conversations.handed(input.scopeId, input.agent, from);
       return {
         id: found ?? randomUUID(),
@@ -1994,7 +2019,7 @@ export class AgentService {
     let record: RunRecord | undefined;
     // Claude Code and Codex take words mid-turn; the others, a routine's step and a
     // hand-off take an instruction sent now only by being stopped (ADR 056).
-    if (run.step || run.holder || !steerable.has(input.agent)) run.steering.close();
+    if (run.step || handed(run) || !steerable.has(input.agent)) run.steering.close();
     try {
       const placed = await this.place(run, input);
       if (
@@ -2049,14 +2074,17 @@ export class AgentService {
           ({ argv, cwd }, signal) =>
             argv[0] === 'call' && calls
               ? this.call(run, input, argv.slice(1), signal)
-              : !setup
-                ? Promise.reject(Error('Only "irori call" is available here.'))
-                : setup(argv, cwd, {
-                    workspaceId: input.workspace,
-                    agent: { agent: input.agent, model: input.model, effort: input.effort },
-                    inRoutine: !!run.step,
-                    by: `${agentNames[input.agent]} (irori agent)`,
-                  }),
+              : // A handed vault on an SSH host is read, and given a file, through its host (ADR 061).
+                calls && isReachCommand(argv[0])
+                ? reachVault(argv, cwd, run.delegation!, this.remote)
+                : !setup
+                  ? Promise.reject(Error('Only "irori call" is available here.'))
+                  : setup(argv, cwd, {
+                      workspaceId: input.workspace,
+                      agent: { agent: input.agent, model: input.model, effort: input.effort },
+                      inRoutine: !!run.step,
+                      by: `${agentNames[input.agent]} (irori agent)`,
+                    }),
           agentEnv(),
         );
         run.env = commands.env;
@@ -2085,9 +2113,25 @@ export class AgentService {
         run.commands = commands.close;
       }
       if (you && input.brains?.length) {
-        const names = brainAgentNames(this.files.list());
+        const elsewhere = this.remote?.list() ?? [];
+        const names = brainAgentNames([...this.files.list(), ...elsewhere]);
         const brains = await Promise.all(
           input.brains.map(async (scopeId) => {
+            // A vault on an SSH host has no folder here: its host says what it is for.
+            const far = elsewhere.find((vault) => vault.scopeId === scopeId);
+            if (far) {
+              const brief = await this.remote!.brief(scopeId, input.agent).catch(() => ({}));
+              return {
+                ...brief,
+                scopeId,
+                name: far.name,
+                category: far.category && categoryName(far.category),
+                agent: names.get(scopeId)!,
+                root: far.root,
+                host: far.host.name,
+                layers: { knowledge: shownFolder(knowledgeFolder(far)), contents: far.contents },
+              };
+            }
             const brain = this.files.get(scopeId);
             // The vault's own definition of its agent tells the irori agent what it is for.
             const own = vaultAgentDefinition(
@@ -2111,13 +2155,15 @@ export class AgentService {
             };
           }),
         );
-        run.work = brains.flatMap((brain) => (brain.work ? [brain.work] : []));
+        run.work = brains.flatMap((brain) => ('work' in brain && brain.work ? [brain.work] : []));
         const comments = await Promise.all(
           brains.map((brain) =>
-            commentsCount(this.files, brain.scopeId).then(
-              (count) => count.comments,
-              () => 0,
-            ),
+            'host' in brain
+              ? 0
+              : commentsCount(this.files, brain.scopeId).then(
+                  (count) => count.comments,
+                  () => 0,
+                ),
           ),
         );
         run.delegation = { you: space.root, brains };
@@ -2518,11 +2564,13 @@ export class AgentService {
   }
   /** Stops the vault agents' runs your AI's run handed work to. */
   private async cancelHeld(run: Run) {
-    await Promise.all(
-      [...this.runs.values()]
+    await Promise.all([
+      ...[...this.runs.values()]
         .filter((held) => held.holder === run.id)
         .map((held) => this.stop(held)),
-    );
+      // A hand-off on an SSH host stops there; a host that cannot be reached stops it itself.
+      ...[...(run.held?.values() ?? [])].map((held) => held.cancel().catch(() => {})),
+    ]);
   }
   /**
    * One hand-off through `irori call`: a run of the named brain's
@@ -2552,6 +2600,7 @@ export class AgentService {
     if (!this.delegated.get(brain.scopeId)?.has(holder.id))
       throw Error(`The ${brain.name} vault is not handed to this request.`);
     if (
+      holder.held?.has(brain.scopeId) ||
       [...this.runs.values()].some(
         (run) => run.holder === holder.id && run.binding.scopeId === brain.scopeId,
       )
@@ -2563,41 +2612,9 @@ export class AgentService {
     const delegate = (state: Delegate['state']) => ({
       delegate: { scopeId: brain.scopeId, task: id, state },
     });
-    const words = new Tail(reportLimit);
-    const errors: string[] = [];
-    let finished!: (outcome: AgentEvent['outcome']) => void;
-    const done = new Promise<AgentEvent['outcome']>((resolve) => {
-      finished = resolve;
-    });
-    // The vault's own definition of its agent goes with the task; its model is
-    // used when it is in this CLI's terms (ADR 050).
-    const own = vaultAgentDefinition(
-      (await readAgentDefinitions(brain.root)).definitions,
-      input.agent,
-    );
-    const model = definitionModel(own, input.agent) ?? input.model;
-    const preferred = (await this.preferredAccess?.().catch(() => undefined)) ?? 'default';
-    const runId = this.start(
-      {
-        scopeId: brain.scopeId,
-        agent: input.agent,
-        ...(model && { model }),
-        effort: input.effort,
-        // The access new conversations start in, never the irori agent's mode: the
-        // vault's column shows that access, and a hand-off asks the person when it asks.
-        access: defaultAgentAccess(input.agent, preferred),
-        prompt: handedTask(task, own),
-      },
-      undefined,
-      holder.id,
-      undefined,
-      conversationTitle(task),
-    );
-    // Registered before the run's first event, which waits for the next tick.
-    this.watchers.set(runId, (event) => {
-      if (event.type === 'text') words.add(event.text);
-      else if (event.type === 'error') errors.push(event.text);
-      else if (event.type === 'tool')
+    // What the irori agent's log shows of the vault agent's run as it goes.
+    const follow = (event: AgentEvent) => {
+      if (event.type === 'tool')
         this.event(holder, 'tool', event.text, {
           details: event.details,
           call: event.call,
@@ -2606,7 +2623,8 @@ export class AgentService {
         });
       // The vault agent's requests are answered where the irori agent's are; the
       // answer reaches the vault agent's run by the request's id.
-      else if (event.type === 'permission' || event.type === 'question')
+      else if (event.type === 'permission' || event.type === 'question') {
+        if (brain.host) this.remoteAsked.add(event.requestId!);
         (holder.forwarded ??= new Map()).set(
           event.requestId!,
           this.publish(holder, event.type, event.text, {
@@ -2616,31 +2634,113 @@ export class AgentService {
             ...delegate('working'),
           }),
         );
-      else if (event.type === 'status' && event.resolved) {
+      } else if (event.type === 'status' && event.resolved) {
+        this.remoteAsked.delete(event.resolved);
         holder.forwarded?.delete(event.resolved);
         this.publish(holder, 'status', '', { resolved: event.resolved });
-      } else if (event.type === 'done') finished(event.outcome);
-    });
+      }
+    };
+    const preferred = (await this.preferredAccess?.().catch(() => undefined)) ?? 'default';
+    const given: HandedTask = {
+      scopeId: brain.scopeId,
+      agent: input.agent,
+      ...(input.model && { model: input.model }),
+      ...(input.effort && { effort: input.effort }),
+      // The access new conversations start in, never the irori agent's mode: the
+      // vault's column shows that access, and a hand-off asks the person when it asks.
+      access: defaultAgentAccess(input.agent, preferred),
+      task,
+    };
     const label = task.trim().split('\n')[0].slice(0, 120);
-    this.event(holder, 'status', label, delegate('started'));
+    let started: HandOff;
+    if (brain.host) {
+      // The vault's agent runs on its host (ADR 061); the log names the task before the host answers.
+      this.event(holder, 'status', label, delegate('started'));
+      try {
+        started = await this.remote!.handOff(given, holder.conversationId, follow);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.event(holder, 'status', reason, delegate('failed'));
+        throw Error(`The ${brain.name} agent did not start: ${reason}`);
+      }
+      (holder.held ??= new Map()).set(brain.scopeId, started);
+    } else {
+      started = await this.startHanded(given, { holder: holder.id }, follow);
+      this.event(holder, 'status', label, delegate('started'));
+    }
     // Only the hand-off stops: the person's own runs in that vault go on.
-    const stop = () => void this.cancelRun(runId);
+    const stop = () => void started.cancel().catch(() => {});
     signal.addEventListener('abort', stop);
     try {
-      const outcome = await done;
-      const report = words.toString().trim();
-      if (outcome === 'completed') {
+      const ended = await started.result.catch((error): HandOffResult => ({
+        outcome: 'failed',
+        report: '',
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      const report = ended.report.trim();
+      if (ended.outcome === 'completed') {
         this.event(holder, 'status', report || noReport(), delegate('reported'));
         return report || 'The vault agent finished without a report.';
       }
       const reason =
-        errors.at(-1) ?? (outcome === 'cancelled' ? 'The run was stopped.' : 'The run failed.');
+        ended.error ?? (ended.outcome === 'cancelled' ? 'The run was stopped.' : 'The run failed.');
       this.event(holder, 'status', reason, delegate('failed'));
       throw Error(`The ${brain.name} agent did not finish: ${reason}`);
     } finally {
-      this.watchers.delete(runId);
+      holder.held?.delete(brain.scopeId);
       signal.removeEventListener('abort', stop);
     }
+  }
+  /**
+   * Starts a vault agent's run on a task handed to it (ADR 050) and follows it to
+   * its end. The vault's own definition of its agent goes with the task, and its
+   * model is used when it is in the CLI's terms. `from` is the irori agent's run
+   * when it is one of this device's, else its conversation on the device that
+   * handed the task (ADR 061).
+   */
+  async startHanded(
+    task: HandedTask,
+    from: { holder: string } | { conversationId?: string },
+    follow: (event: AgentEvent) => void = () => {},
+  ): Promise<HandOff & { runId: string }> {
+    const own = vaultAgentDefinition(
+      (await readAgentDefinitions(this.files.get(task.scopeId).root)).definitions,
+      task.agent,
+    );
+    const model = definitionModel(own, task.agent) ?? task.model;
+    const runId = this.start(
+      {
+        scopeId: task.scopeId,
+        agent: task.agent,
+        ...(model && { model }),
+        effort: task.effort,
+        access: task.access,
+        prompt: handedTask(task.task, own),
+      },
+      undefined,
+      'holder' in from ? from.holder : undefined,
+      undefined,
+      conversationTitle(task.task),
+    );
+    if (!('holder' in from)) this.runs.get(runId)!.handedFrom = from.conversationId ?? '';
+    const words = new Tail(reportLimit);
+    const errors: string[] = [];
+    // Registered before the run's first event, which waits for the next tick.
+    const result = new Promise<HandOffResult>((resolve) => {
+      this.watchers.set(runId, (event) => {
+        if (event.type === 'text') words.add(event.text);
+        else if (event.type === 'error') errors.push(event.text);
+        follow(event);
+        if (event.type !== 'done') return;
+        this.watchers.delete(runId);
+        resolve({
+          outcome: event.outcome ?? 'failed',
+          report: words.toString(),
+          ...(errors.length && { error: errors.at(-1) }),
+        });
+      });
+    });
+    return { runId, cancel: () => this.cancelRun(runId), result };
   }
   /**
    * Whether Codex took irori's hooks for this thread as trusted and enabled
@@ -3201,7 +3301,7 @@ export class AgentService {
           attachedFolders.length) && {
           additionalDirectories: [
             ...(run.claudeSkills ? [run.claudeSkills] : []),
-            ...(delegation?.brains.map((brain) => brain.root) ?? []),
+            ...(delegation ? onThisDevice(delegation).map((brain) => brain.root) : []),
             ...(run.step?.directories ?? []),
             ...this.localFolders(run),
             ...(run.work ?? []),

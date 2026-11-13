@@ -318,6 +318,8 @@ function RepositoryPanel({
   beforeAction: () => Promise<boolean>;
 }) {
   const menuHost = useRef<HTMLDivElement>(null);
+  // A vault on an SSH host shows its status and diffs; nothing here changes it (ADR 061).
+  const shownOnly = !!space.host;
   const target: GitTarget = repository ? { scopeId: space.scopeId, repository } : space.scopeId;
   // Paths Git reports are the repository's; the vault's layers are decided from its root.
   const prefix = repository ? repository + '/' : '';
@@ -563,7 +565,7 @@ function RepositoryPanel({
       </p>
     );
   if (!status.available)
-    return status.initializable ? (
+    return status.initializable && !shownOnly ? (
       <div className="git-empty">
         <h2>{t('Git 未設定', 'Not in Git')}</h2>
         {error && <ErrorMessage className="git-notice error" text={error} />}
@@ -652,6 +654,7 @@ function RepositoryPanel({
         )}
         {!status.remote &&
           !repository &&
+          !shownOnly &&
           (status.head && status.branch ? (
             <button
               className="panel-button git-publish"
@@ -686,123 +689,139 @@ function RepositoryPanel({
         >
           <Icon name="refresh" size={14} />
         </button>
-        {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
-        <Menu.Root modal={false}>
-          <Menu.Trigger
-            className="icon-button framed git-more-actions"
-            aria-label={t('その他の Git 操作', 'More Git actions')}
-            title={t('その他の Git 操作', 'More Git actions')}
-          >
-            <Icon name="more" size={15} />
-          </Menu.Trigger>
-          {/* The menu stays inside the Changes view so it is grouped with what it acts on. */}
-          <Menu.Portal container={menuHost}>
-            <Menu.Positioner side="bottom" align="start" sideOffset={6}>
-              <Menu.Popup className="menu git-menu">
-                <Menu.Item
-                  disabled={busy || conflictDirty || draftBlocked || !canSync}
-                  onClick={() =>
-                    void perform(
-                      () => host.gitSync(target, 'fetch', status.version),
-                      t('取得しました。', 'Fetched.'),
-                    )
-                  }
-                >
-                  Fetch
-                </Menu.Item>
-                <Menu.Item
-                  disabled={
-                    busy || !canSync || !!status.changes.length || status.operation !== 'none'
-                  }
-                  onClick={() => confirm('merge')}
-                >
-                  {t('履歴を統合', 'Merge history')}
-                </Menu.Item>
-                {status.remote?.repository && (
-                  <Menu.Item
-                    disabled={busy}
-                    onClick={() =>
-                      void host.gitOpenRepository(target).catch((e) => setError(errorText(e)))
-                    }
-                  >
-                    {t('GitHub を開く', 'Open on GitHub')}
-                  </Menu.Item>
-                )}
-                {!repository && (
-                  <Menu.Item
-                    disabled={busy || conflictDirty || draftBlocked || status.operation !== 'none'}
-                    onClick={onAddSubmodule}
-                  >
-                    {t('submodule を追加…', 'Add a submodule…')}
-                  </Menu.Item>
-                )}
-              </Menu.Popup>
-            </Menu.Positioner>
-          </Menu.Portal>
-        </Menu.Root>
-        <button
-          className="panel-button git-pull"
-          disabled={
-            busy ||
-            conflictDirty ||
-            !canSync ||
-            !!status.changes.length ||
-            status.operation !== 'none'
-          }
-          onClick={() => confirm('pull')}
-        >
-          <Icon name="down" size={14} />
-          Pull
-        </button>
-        <button
-          className="solid-button git-push"
-          disabled={
-            busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
-          }
-          onClick={() => confirm('push')}
-        >
-          <Icon name="up" size={14} />
-          Push
-        </button>
+        {!shownOnly && (
+          <>
+            {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
+            <Menu.Root modal={false}>
+              <Menu.Trigger
+                className="icon-button framed git-more-actions"
+                aria-label={t('その他の Git 操作', 'More Git actions')}
+                title={t('その他の Git 操作', 'More Git actions')}
+              >
+                <Icon name="more" size={15} />
+              </Menu.Trigger>
+              {/* The menu stays inside the Changes view so it is grouped with what it acts on. */}
+              <Menu.Portal container={menuHost}>
+                <Menu.Positioner side="bottom" align="start" sideOffset={6}>
+                  <Menu.Popup className="menu git-menu">
+                    <Menu.Item
+                      disabled={busy || conflictDirty || draftBlocked || !canSync}
+                      onClick={() =>
+                        void perform(
+                          () => host.gitSync(target, 'fetch', status.version),
+                          t('取得しました。', 'Fetched.'),
+                        )
+                      }
+                    >
+                      Fetch
+                    </Menu.Item>
+                    <Menu.Item
+                      disabled={
+                        busy || !canSync || !!status.changes.length || status.operation !== 'none'
+                      }
+                      onClick={() => confirm('merge')}
+                    >
+                      {t('履歴を統合', 'Merge history')}
+                    </Menu.Item>
+                    {status.remote?.repository && (
+                      <Menu.Item
+                        disabled={busy}
+                        onClick={() =>
+                          void host.gitOpenRepository(target).catch((e) => setError(errorText(e)))
+                        }
+                      >
+                        {t('GitHub を開く', 'Open on GitHub')}
+                      </Menu.Item>
+                    )}
+                    {!repository && (
+                      <Menu.Item
+                        disabled={
+                          busy || conflictDirty || draftBlocked || status.operation !== 'none'
+                        }
+                        onClick={onAddSubmodule}
+                      >
+                        {t('submodule を追加…', 'Add a submodule…')}
+                      </Menu.Item>
+                    )}
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
+            </Menu.Root>
+            <button
+              className="panel-button git-pull"
+              disabled={
+                busy ||
+                conflictDirty ||
+                !canSync ||
+                !!status.changes.length ||
+                status.operation !== 'none'
+              }
+              onClick={() => confirm('pull')}
+            >
+              <Icon name="down" size={14} />
+              Pull
+            </button>
+            <button
+              className="solid-button git-push"
+              disabled={
+                busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
+              }
+              onClick={() => confirm('push')}
+            >
+              <Icon name="up" size={14} />
+              Push
+            </button>
+          </>
+        )}
       </div>
-      <form
-        className="git-commit-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!canCommit || !message.trim()) return;
-          void perform(
-            async () => {
-              const acknowledged = messageDraft.snapshot().record?.revision;
-              const value = await host.gitCommit(target, message, status.version);
-              if (!(await messageDraft.clear(acknowledged)))
-                throw Error(
-                  t('下書きの完了を保存できませんでした。', 'Could not mark the draft complete.'),
-                );
-              return value;
-            },
-            t('コミットしました。', 'Committed.'),
-          );
-        }}
-      >
-        <input
-          aria-label={t('commit メッセージ', 'Commit message')}
-          value={message}
-          onChange={(e) => messageDraft.setText(e.target.value)}
-          placeholder={t('メッセージ', 'Message')}
-          maxLength={10000}
-          disabled={busy || !messageDraft.ready}
-          required
-        />
-        <button
-          aria-label={t('コミット', 'Commit')}
-          className="solid-button"
-          disabled={busy || !canCommit || !message.trim()}
+      {shownOnly && (
+        <p className="git-notice" role="note">
+          {t(
+            'SSH ホストにある vault です。状態と差分は見られますが、ステージやコミットはまだできません。',
+            'This vault is on an SSH host. Its status and diffs show here; staging and committing are not available yet.',
+          )}
+        </p>
+      )}
+      {!shownOnly && (
+        <form
+          className="git-commit-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!canCommit || !message.trim()) return;
+            void perform(
+              async () => {
+                const acknowledged = messageDraft.snapshot().record?.revision;
+                const value = await host.gitCommit(target, message, status.version);
+                if (!(await messageDraft.clear(acknowledged)))
+                  throw Error(
+                    t('下書きの完了を保存できませんでした。', 'Could not mark the draft complete.'),
+                  );
+                return value;
+              },
+              t('コミットしました。', 'Committed.'),
+            );
+          }}
         >
-          <Icon name="check" size={14} />
-          {t('コミット', 'Commit')}
-          {staged.length ? ` (${staged.length})` : ''}
-        </button>
-      </form>
+          <input
+            aria-label={t('commit メッセージ', 'Commit message')}
+            value={message}
+            onChange={(e) => messageDraft.setText(e.target.value)}
+            placeholder={t('メッセージ', 'Message')}
+            maxLength={10000}
+            disabled={busy || !messageDraft.ready}
+            required
+          />
+          <button
+            aria-label={t('コミット', 'Commit')}
+            className="solid-button"
+            disabled={busy || !canCommit || !message.trim()}
+          >
+            <Icon name="check" size={14} />
+            {t('コミット', 'Commit')}
+            {staged.length ? ` (${staged.length})` : ''}
+          </button>
+        </form>
+      )}
       {(messageDraft.error || storedResolution.error) && (
         <div className="git-notice error" role="alert">
           <p>{messageDraft.error || storedResolution.error}</p>
@@ -884,37 +903,39 @@ function RepositoryPanel({
                 <h3>
                   {group.title}
                   <span>{group.entries.length}</span>
-                  <button
-                    className="git-stage-all"
-                    disabled={
-                      busy ||
-                      conflictDirty ||
-                      status.operation === 'other' ||
-                      !group.entries.some(
-                        (entry) => !entry.conflict && (group.staged || !entry.blocked),
-                      )
-                    }
-                    onClick={() =>
-                      void perform(
-                        () =>
-                          host.gitStageMany(
-                            target,
-                            group.entries
-                              .filter(
-                                (entry) => !entry.conflict && (group.staged || !entry.blocked),
-                              )
-                              .map((entry) => entry.path),
-                            !group.staged,
-                            status.version,
-                          ),
-                        group.staged
-                          ? t('対象をすべて外しました。', 'Unstaged everything.')
-                          : t('すべて追加しました。', 'Staged all.'),
-                      )
-                    }
-                  >
-                    {group.staged ? t('すべて解除', 'Unstage all') : t('すべて追加', 'Stage all')}
-                  </button>
+                  {!shownOnly && (
+                    <button
+                      className="git-stage-all"
+                      disabled={
+                        busy ||
+                        conflictDirty ||
+                        status.operation === 'other' ||
+                        !group.entries.some(
+                          (entry) => !entry.conflict && (group.staged || !entry.blocked),
+                        )
+                      }
+                      onClick={() =>
+                        void perform(
+                          () =>
+                            host.gitStageMany(
+                              target,
+                              group.entries
+                                .filter(
+                                  (entry) => !entry.conflict && (group.staged || !entry.blocked),
+                                )
+                                .map((entry) => entry.path),
+                              !group.staged,
+                              status.version,
+                            ),
+                          group.staged
+                            ? t('対象をすべて外しました。', 'Unstaged everything.')
+                            : t('すべて追加しました。', 'Staged all.'),
+                        )
+                      }
+                    >
+                      {group.staged ? t('すべて解除', 'Unstage all') : t('すべて追加', 'Stage all')}
+                    </button>
+                  )}
                 </h3>
                 {!group.entries.length && (
                   <p className="muted">{t('変更はありません。', 'There are no changes.')}</p>
@@ -956,40 +977,42 @@ function RepositoryPanel({
                         </span>
                         {entry.blocked && <small>{t('対象外', 'Excluded')}</small>}
                       </button>
-                      <button
-                        className="git-stage-file"
-                        aria-label={
-                          group.staged
-                            ? t(`${entry.path} をステージから外す`, `Unstage ${entry.path}`)
-                            : t(`${entry.path} をステージする`, `Stage ${entry.path}`)
-                        }
-                        title={
-                          group.staged ? t('ステージから外す', 'Unstage') : t('ステージ', 'Stage')
-                        }
-                        disabled={
-                          busy ||
-                          conflictDirty ||
-                          entry.conflict ||
-                          status.operation === 'other' ||
-                          (!group.staged && !!entry.blocked)
-                        }
-                        onClick={() =>
-                          void perform(
-                            () =>
-                              host.gitStageMany(
-                                target,
-                                [entry.path],
-                                !group.staged,
-                                status.version,
-                              ),
+                      {!shownOnly && (
+                        <button
+                          className="git-stage-file"
+                          aria-label={
                             group.staged
-                              ? t('ステージから外しました。', 'Unstaged.')
-                              : t('ステージに追加しました。', 'Staged.'),
-                          )
-                        }
-                      >
-                        <Icon name={group.staged ? 'minus' : 'plus'} size={13} />
-                      </button>
+                              ? t(`${entry.path} をステージから外す`, `Unstage ${entry.path}`)
+                              : t(`${entry.path} をステージする`, `Stage ${entry.path}`)
+                          }
+                          title={
+                            group.staged ? t('ステージから外す', 'Unstage') : t('ステージ', 'Stage')
+                          }
+                          disabled={
+                            busy ||
+                            conflictDirty ||
+                            entry.conflict ||
+                            status.operation === 'other' ||
+                            (!group.staged && !!entry.blocked)
+                          }
+                          onClick={() =>
+                            void perform(
+                              () =>
+                                host.gitStageMany(
+                                  target,
+                                  [entry.path],
+                                  !group.staged,
+                                  status.version,
+                                ),
+                              group.staged
+                                ? t('ステージから外しました。', 'Unstaged.')
+                                : t('ステージに追加しました。', 'Staged.'),
+                            )
+                          }
+                        >
+                          <Icon name={group.staged ? 'minus' : 'plus'} size={13} />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -1059,7 +1082,7 @@ function RepositoryPanel({
                         : t('作業差分', 'Working diff')}
                   </span>
                 )}
-                {selection && diff && !chosen?.conflict && (
+                {selection && diff && !chosen?.conflict && !shownOnly && (
                   <button
                     className="stage-text-button framed"
                     disabled={
@@ -1179,7 +1202,7 @@ function RepositoryPanel({
                       </details>
                     ))}
                   </div>
-                  {conflict.editable ? (
+                  {conflict.editable && !shownOnly ? (
                     <div className="git-resolution">
                       <label>
                         {t('統合する内容', 'Merged content')}

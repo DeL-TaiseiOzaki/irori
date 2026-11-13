@@ -25,6 +25,8 @@ export const workspaceProfile = z.object({
 
 export class WorkspaceService {
   private queue = new SerialQueue();
+  /** Whether a vault that is not on this device is one on an SSH host (ADR 061). */
+  elsewhere: (scopeId: string) => boolean = () => false;
   constructor(private files: FileService) {}
   async list(): Promise<WorkspaceProfile[]> {
     return z
@@ -61,7 +63,8 @@ export class WorkspaceService {
     const previous = current.find((item) => item.id === id);
     // Editing a name must not discard temporarily unavailable repositories.
     scopeIds.forEach((scopeId) => {
-      if (!previous?.scopeIds.includes(scopeId)) this.files.get(scopeId);
+      if (!previous?.scopeIds.includes(scopeId) && !this.elsewhere(scopeId))
+        this.files.get(scopeId);
     });
     // Groups follow the vaults that stay; one left empty goes.
     const groups = normalizeGroups(previous?.groups ?? [], scopeIds);

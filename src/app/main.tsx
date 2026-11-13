@@ -186,6 +186,7 @@ import './stage.css';
 import './agent-panel.css';
 import './views.css';
 import { Startup, RegisterSpace } from './Startup';
+import { useRemoteHosts } from './RemoteHosts';
 import { appIcon } from './branding';
 import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
@@ -196,7 +197,7 @@ import { BrainPanel, SideBrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
-import { BrainSettings } from './BrainSettings';
+import { BrainSettings, RemoveVault } from './BrainSettings';
 import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
 import { NoteComments, type CommentRequest } from './NoteComments';
 import { Backlinks } from './Backlinks';
@@ -1263,6 +1264,29 @@ function App() {
     (scopeId?: string) => setRevisions((all) => bumpRevision(all, scopeId)),
     [],
   );
+  // The SSH hosts (ADR 061), as their `hosts` events change them. A vault on a host
+  // reads again once its host connects, so what it could not read before shows then.
+  const remoteHosts = useRemoteHosts().hosts;
+  const connectedHosts = useRef(new Set<string>());
+  useEffect(() => {
+    const now = new Set(
+      (remoteHosts ?? []).filter((item) => item.state === 'connected').map((item) => item.id),
+    );
+    for (const space of spaces)
+      if (space.host && now.has(space.host.id) && !connectedHosts.current.has(space.host.id))
+        bump(space.scopeId);
+    connectedHosts.current = now;
+  }, [remoteHosts]);
+  // A host renamed, or its vaults changed, changes the vaults as listed; its progress does not.
+  const hostsListed = (remoteHosts ?? [])
+    .map((item) => `${item.id}:${item.name}:${item.vaults}`)
+    .join('\n');
+  const hostsSeen = useRef<string>(undefined);
+  useEffect(() => {
+    if (hostsSeen.current !== undefined && hostsSeen.current !== hostsListed)
+      void refreshSpaces().catch(report);
+    hostsSeen.current = hostsListed;
+  }, [hostsListed]);
 
   function openDaily() {
     if (!active) return;
@@ -1348,6 +1372,46 @@ function App() {
     setSpaces(list);
     // The brain on show keeps its place but takes its newest declaration.
     setActive((a) => (a && list.find((space) => space.scopeId === a.scopeId)) ?? a ?? list[0]);
+  }
+  /** A vault just registered joins the workspace on show, and comes on show. */
+  async function joinVault(space: Space) {
+    await refreshSpaces();
+    if (workspace && !workspace.scopeIds.includes(space.scopeId))
+      setWorkspace(
+        await host.saveWorkspace(
+          workspace.name,
+          [...workspace.scopeIds, space.scopeId],
+          workspace.id,
+        ),
+      );
+    // An unsaved note keeps the stage; the new vault waits in the rail.
+    if (!(await save())) return;
+    setActive(space);
+    setDoc(undefined);
+    setBuffer('');
+  }
+  /** A vault left this device's list: the workspace and its views let it go. */
+  async function vaultRemoved(removed: string, notice: string) {
+    const [list, profiles] = await Promise.all([host.spaces(), host.workspaces()]);
+    const next = profiles.find((profile) => profile.id === workspace?.id);
+    setSpaces(list);
+    if (next) setWorkspace(next);
+    renewTabs(profiles);
+    // Another vault stays on show; in place of the one removed, the next of the workspace.
+    const members = (next?.scopeIds ?? []).flatMap((id) =>
+      list.filter((space) => space.scopeId === id),
+    );
+    setActive(
+      (shown) =>
+        (shown?.scopeId !== removed && members.find((space) => space.scopeId === shown?.scopeId)) ||
+        members[0],
+    );
+    if (current.current.doc?.scopeId === removed) unload();
+    setStages(({ [removed]: _, ...rest }) => rest);
+    updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
+    setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
+    bump();
+    setStatus(notice);
   }
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   async function environmentRestored() {
@@ -1535,7 +1599,9 @@ function App() {
   const iroriShown = level !== 'brain';
   function toggleTerminal() {
     if (!iroriShown) {
-      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
+      // A vault on an SSH host has no terminal here yet (ADR 061).
+      if (terminalSpace || (active && !active.host))
+        setTerminalSpace((value) => (value ? undefined : active));
     } else if (iroriTerminal || you?.state === 'ready') setIroriTerminal((value) => !value);
   }
   // The shortcuts read the latest render's state; the listener itself is added once.
@@ -2245,6 +2311,12 @@ function App() {
   // identities that never change; each still does what the latest render's would.
   const act = useStableFunctions({
     report,
+    joinVault: (space: Space) => void joinVault(space).catch(report),
+    remoteVaultRemoved: (scopeId: string) =>
+      void vaultRemoved(
+        scopeId,
+        t('vault を一覧から外しました。', 'Took the vault off the list.'),
+      ).catch(report),
     save,
     launch,
     addRun,
@@ -2725,6 +2797,8 @@ function App() {
             onIroriAgent: act.showYou,
             onCreateIroriAgent: act.createYou,
             onFolderChanged: act.youFolderChanged,
+            onVaultAdded: act.joinVault,
+            onVaultRemoved: act.remoteVaultRemoved,
           }
         }
         onError={act.report}
@@ -2741,7 +2815,7 @@ function App() {
           scopeId={active.scopeId}
           revision={revision}
           selected={schemaSelected}
-          locked={brainLocked || gitBusy}
+          locked={brainLocked || gitBusy || !!active.host}
           onSelect={act.selectSchema}
           onOpenFile={act.openSchemaFile}
         />
@@ -3604,7 +3678,7 @@ function App() {
                         scopeId={active.scopeId}
                         space={active}
                         target={schemaTarget}
-                        locked={brainLocked || gitBusy}
+                        locked={brainLocked || gitBusy || !!active.host}
                         revision={revision}
                         onSelect={(target) => {
                           if (target) setSchemaTarget({ ...target, scopeId: active.scopeId });
@@ -3937,7 +4011,9 @@ function App() {
         status={status}
         terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
         terminalDisabled={
-          iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
+          iroriShown
+            ? !iroriTerminal && you?.state !== 'ready'
+            : (!active || !!active.host) && !terminalSpace
         }
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}
@@ -3987,7 +4063,21 @@ function App() {
           }}
         />
       )}
-      {brainSettings && active && (
+      {brainSettings && active?.host && (
+        // A vault on an SSH host has no settings here yet: it can only leave the list (ADR 061).
+        <RemoveVault
+          space={active}
+          onClose={() => setBrainSettings(false)}
+          onRemoved={() => {
+            setBrainSettings(false);
+            void vaultRemoved(
+              active.scopeId,
+              t('vault を一覧から外しました。', 'Took the vault off the list.'),
+            ).catch(report);
+          }}
+        />
+      )}
+      {brainSettings && active && !active.host && (
         <BrainSettings
           key={active.scopeId}
           space={active}
@@ -3995,27 +4085,11 @@ function App() {
           onClose={() => setBrainSettings(false)}
           beforeRename={save}
           onRemoved={() => {
-            const removed = active.scopeId;
             setBrainSettings(false);
-            void (async () => {
-              const [list, profiles] = await Promise.all([host.spaces(), host.workspaces()]);
-              const next = profiles.find((profile) => profile.id === workspace?.id);
-              setSpaces(list);
-              if (next) setWorkspace(next);
-              renewTabs(profiles);
-              // The next vault of the workspace comes on show.
-              setActive(
-                (next?.scopeIds ?? []).flatMap((id) =>
-                  list.filter((space) => space.scopeId === id),
-                )[0],
-              );
-              if (current.current.doc?.scopeId === removed) unload();
-              setStages(({ [removed]: _, ...rest }) => rest);
-              updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
-              setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
-              bump();
-              setStatus(t('vault を削除しました。', 'Removed the vault.'));
-            })().catch(report);
+            void vaultRemoved(
+              active.scopeId,
+              t('vault を削除しました。', 'Removed the vault.'),
+            ).catch(report);
           }}
           onSaved={(next, renamed) => {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
@@ -4174,20 +4248,7 @@ function App() {
           onCancel={() => setAdd(false)}
           onRegistered={(space) => {
             setAdd(false);
-            void (async () => {
-              await refreshSpaces();
-              if (workspace)
-                setWorkspace(
-                  await host.saveWorkspace(
-                    workspace.name,
-                    [...workspace.scopeIds, space.scopeId],
-                    workspace.id,
-                  ),
-                );
-              setActive(space);
-              setDoc(undefined);
-              setBuffer('');
-            })().catch(report);
+            void joinVault(space).catch(report);
           }}
         />
       )}

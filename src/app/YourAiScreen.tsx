@@ -4,6 +4,7 @@ import { agentNames } from '../domain/types';
 import type { YourAi } from '../domain/you';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
+import { RemoteVaultPlace } from './RemoteHosts';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { Icon } from './Icon';
 import { IroriAgentFolderSection } from './IroriAgentFolder';
@@ -370,7 +371,16 @@ export function YourAiScreen({
                     <BrainTile space={space} size={26} radius={8} />
                     <span className="you-brain-names">
                       <strong>{`${space.name} agent`}</strong>
-                      <small>{brain?.agent ?? '…'}</small>
+                      <small>
+                        {brain?.agent ?? '…'}
+                        {/* A vault on an SSH host has its agent there (ADR 061). */}
+                        {space.host && (
+                          <>
+                            {' · '}
+                            <RemoteVaultPlace space={space} />
+                          </>
+                        )}
+                      </small>
                     </span>
                   </div>
                 );

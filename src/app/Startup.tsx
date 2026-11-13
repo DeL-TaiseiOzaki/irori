@@ -18,8 +18,12 @@ import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import { RestoreEnvironment } from './AccountSync';
 import { CategoryField, RemoveVault } from './BrainSettings';
+import { RemoteFolderDialog, RemoteHostChoice } from './RemoteHosts';
+import type { RemoteHost } from '../domain/remote-hosts';
 import './startup.css';
 const host = window.irori;
+/** Where a new vault comes from: a folder here, a clone, a new folder, or an SSH host's folder (ADR 061). */
+type RegisterMode = 'folder' | 'clone' | 'create' | 'ssh';
 export function RegisterSpace({
   onRegistered,
   onCancel,
@@ -28,7 +32,7 @@ export function RegisterSpace({
 }: {
   onRegistered: (space: Space) => void;
   onCancel: () => void;
-  mode?: 'folder' | 'clone' | 'create';
+  mode?: RegisterMode;
   /** The categories to offer; the presets when not given. */
   categories?: readonly Category[];
 }) {
@@ -46,6 +50,8 @@ export function RegisterSpace({
   const [publishing, setPublishing] = useState(false),
     [publish, setPublish] = useState(() => initialPublish('')),
     [created, setCreated] = useState<Space>();
+  // The SSH host whose folder becomes the vault, once chosen.
+  const [remote, setRemote] = useState<RemoteHost>();
   const cloneMode = way === 'clone',
     creating = way === 'create';
   const repository = useResource(() => host.repositories(folder), [folder], {
@@ -95,6 +101,47 @@ export function RegisterSpace({
       } else onRegistered(await host.register(folder, name, category));
     });
   }
+  const ways = (
+    <MagnetTabs
+      className="git-registration-mode"
+      label={t('リポジトリの取得方法', 'How to get the repository')}
+      value={way}
+      onValueChange={(next) => {
+        setWay(next);
+        setError('');
+      }}
+      options={[
+        { value: 'folder', label: t('既存のフォルダ', 'Existing folder'), disabled: busy },
+        { value: 'clone', label: t('GitHub から取得', 'Clone from GitHub'), disabled: busy },
+        { value: 'create', label: t('新しく作成', 'Create new'), disabled: busy },
+        { value: 'ssh', label: t('SSH ホスト', 'SSH host'), disabled: busy },
+      ]}
+    />
+  );
+  if (way === 'ssh' && remote)
+    return (
+      <RemoteFolderDialog
+        remote={remote}
+        categories={categories}
+        onCancel={() => setRemote(undefined)}
+        onRegistered={onRegistered}
+      />
+    );
+  if (way === 'ssh')
+    return (
+      <Dialog label={t('スペース登録', 'Register space')} onClose={onCancel}>
+        <div className="modal register-space" aria-label={t('スペース登録', 'Register space')}>
+          <h2>{t('スペースを登録', 'Register a space')}</h2>
+          {ways}
+          <RemoteHostChoice onChoose={setRemote} />
+          <div className="actions">
+            <button type="button" onClick={onCancel}>
+              {t('キャンセル', 'Cancel')}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+    );
   return (
     <Dialog label={t('スペース登録', 'Register space')} busy={busy} onClose={onCancel}>
       <form
@@ -106,22 +153,7 @@ export function RegisterSpace({
         }}
       >
         <h2>{t('スペースを登録', 'Register a space')}</h2>
-        {!folder && !created && (
-          <MagnetTabs
-            className="git-registration-mode"
-            label={t('リポジトリの取得方法', 'How to get the repository')}
-            value={way}
-            onValueChange={(next) => {
-              setWay(next);
-              setError('');
-            }}
-            options={[
-              { value: 'folder', label: t('既存のフォルダ', 'Existing folder'), disabled: busy },
-              { value: 'clone', label: t('GitHub から取得', 'Clone from GitHub'), disabled: busy },
-              { value: 'create', label: t('新しく作成', 'Create new'), disabled: busy },
-            ]}
-          />
-        )}
+        {!folder && !created && ways}
         {creating ? (
           <>
             <label>
@@ -410,7 +442,7 @@ export function Startup({
     [selected, setSelected] = useState<string[]>([]);
   // Undefined until edited, so the suggested name follows a language change.
   const [edited, setName] = useState<string>(),
-    [adding, setAdding] = useState<'folder' | 'clone' | 'create'>(),
+    [adding, setAdding] = useState<RegisterMode>(),
     [restoring, setRestoring] = useState(false),
     [removing, setRemoving] = useState<Space>();
   const { busy, error, setError, run } = useAction();
@@ -464,6 +496,10 @@ export function Startup({
         <button disabled={busy} onClick={() => setAdding('create')}>
           <Icon name="plus" size={16} />
           <strong>{t('新しく作成', 'Create new')}</strong>
+        </button>
+        <button disabled={busy} onClick={() => setAdding('ssh')}>
+          <Icon name="server" size={16} />
+          <strong>{t('SSH ホストから', 'From an SSH host')}</strong>
         </button>
         <button disabled={busy} onClick={() => setRestoring(true)}>
           <Icon name="user" size={16} />

@@ -52,8 +52,9 @@ note to irori's trash.${
       ? `
 
 You are a vault agent: every form reaches your own vault alone, named by
-its name or "." from its folder. clone, create, add, workspace, remove, run
-and call are the irori agent's; the person asks it in irori mode. A secret's
+its name or "." from its folder. clone, create, add, workspace, remove, run,
+call, ls, read, search and send are the irori agent's; the person asks it in
+irori mode. A secret's
 value, a routine's first review, accounts, updates and agent permissions
 stay with the person.
 
@@ -135,6 +136,16 @@ irori call <vault agent or vault name> "<task>"
   irori, hands a task to the agent of a vault handed to this request, waits
   until it finishes and prints its report. The task may come on standard input instead. On another
   CLI, hand the work to the vault's sub-agent.
+
+irori ls <vault> [<folder>]
+irori read <vault> <file>
+irori search <vault> <words>
+irori send <vault> <file> [--as <name>]
+  For a vault on an SSH host handed to this request, which has no folder on
+  this computer: list a folder of it, print a text file, search its notes,
+  and put a file of your folder or of a handed vault on this computer into
+  its work folder (the command prints where). Paths are those inside the
+  vault. A vault on this computer is read where it is.
 
 irori connect <vault> <folder> [--name <name in contents>] [--read-only]
   Connects a folder on this computer, such as one Google Drive for desktop,
