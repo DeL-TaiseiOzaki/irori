@@ -420,6 +420,8 @@ try {
   await expect(instruction).toHaveValue('/weekly ');
   await expect(commands).toHaveCount(0);
   await instruction.fill('/re');
+  // What is typed after a choice replaces it; it is not added after the name.
+  await expect(instruction).toHaveValue('/re');
   await expect(commands.getByRole('option')).toHaveCount(1);
   await instruction.press('Escape');
   await expect(commands).toHaveCount(0);

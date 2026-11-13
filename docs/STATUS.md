@@ -44,6 +44,11 @@ handed work; nothing in the window changes it yet.
   over a real `ssh` to another account with Node downloaded from nodejs.org
   (`IRORI_TEST_SSH`). `scripts/remote-hosts-ui-smoke.ts` adds a host and a vault
   in a real Electron under Xvfb with a stand-in `ssh`.
+- `useCommandMenu` places the caret after a chosen command at once
+  (`flushSync`) instead of on the next frame. The harness smoke failed on
+  main's own run of 0.2.67 and on this change's with the same message: on a
+  slow runner the deferred caret ran between the two steps of the smoke's next
+  `fill`, which then added its text after the name instead of replacing it.
 - Not tried: a Windows or macOS client, a real network between the machines, a
   real CLI with an account on the host. Not done: editing in a vault on a host,
   conversations with its own agent and its `irori` command, the shared Schema
