@@ -415,10 +415,11 @@ test(
   async (t) => {
     const { far, run, remote, host } = await handing(t);
     const { done, mine } = await run(
-      'Hand over.\nrun: irori call vault-code "run: sleep 2 && echo survived > survived.txt && echo finished-there"',
+      'Hand over.\nrun: irori call vault-code "run: touch began && sleep 2 && echo survived > survived.txt && echo finished-there"',
     );
-    await until(() => mine().some((event) => event.delegate?.state === 'started'));
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // The agent there has begun, and has two seconds of work left.
+    const { existsSync } = await import('node:fs');
+    await until(() => existsSync(path.join(far.code, 'began')));
     // The connection drops: the login is killed, as a lost network would end it.
     for (const login of far.logins) login.kill('SIGKILL');
     await until(() => remote.hosts()[0].state !== 'connected');
@@ -563,7 +564,7 @@ test(
       });
     // While an agent works there, the running vault host stays and the newer one waits.
     const { done, mine } = await run(
-      'Hand over.\nrun: irori call vault-code "run: sleep 2 && echo kept"',
+      'Hand over.\nrun: irori call vault-code "run: until [ -f go ]; do sleep 0.2; done; echo kept"',
     );
     await until(() => mine().some((event) => event.delegate?.state === 'working'));
     const early = updated();
@@ -571,6 +572,8 @@ test(
     t.after(() => early.close());
     await assert.rejects(early.connect(host.id), /別のバージョン/);
     assert.equal((await readFile(pidFile, 'utf8')).trim(), first);
+    // The agent there is let finish only now, however long the attempt took.
+    await writeFile(path.join(far.code, 'go'), '');
     // The refused attempt took the device's place; the hand-off's report is still collected.
     await done;
     assert.match(mine().find((event) => event.delegate?.state === 'reported')?.text ?? '', /kept/);

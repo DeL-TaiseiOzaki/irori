@@ -108,6 +108,8 @@ try {
     'dist/third-party-notices.txt',
     'dist-host/main.cjs',
     'dist-host/preload.cjs',
+    // What irori sends an SSH host (ADR 061); without it no vault there can be reached.
+    'dist-host/vault-host.cjs',
     'assets/irori-icon.png',
     'assets/irori-icon.ico',
     'assets/irori-icon.icns',
