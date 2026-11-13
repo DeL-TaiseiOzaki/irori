@@ -1,5 +1,46 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault can live on an SSH host, 2026-11-13 (**0.2.68**, pull request to be
+named; [ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)):
+the owner asked to talk with the second brain in one vault while code runs on
+another machine, with the vault there in the same workspace and only the irori
+agent crossing vaults. First step: such a vault is shown and its agent is
+handed work; nothing in the window changes it yet.
+- `src/remote/` is irori's vault host: one file (`dist-host/vault-host.cjs`)
+  with every package inside it, run on the host by a Node irori sends. `attach`
+  joins an `ssh` login's pipes to the vault host of `~/.irori-host/data` and
+  starts one when none answers; `serve` stays, on a socket only its user opens,
+  keeps the last 2,000 events and the open questions for a device that attaches
+  again, and ends after fifteen minutes with nothing running and no device.
+- `RemoteLink` (`src/host/remote-link.ts`) is one `ssh` login in `BatchMode`: it
+  installs what is missing (the vault host, and Node v24.21.0 from nodejs.org,
+  pinned by size and SHA-256 in `remote-payload.ts`) and replaces a vault host
+  of another version once nothing runs on it. `RemoteHosts`
+  (`src/host/remote-hosts.ts`) keeps the hosts and their vaults in
+  `remote-hosts.json`, connects on demand and refuses a vault whose id is
+  already registered here or on another host.
+- The main process lists those vaults in `spaces` with `Space.host` and answers
+  an operation that names one by sending a read to its host
+  (`src/host/vault-reads.ts`, shared with the vault host), answering here
+  (drafts, removal, the lists that stay empty) or refusing in words.
+- `AgentService.startHanded` starts a hand-off where its vault is. For a vault
+  on a host the irori agent's `irori call` runs the vault agent there; steps,
+  permission requests and questions show in the irori agent's conversation,
+  stopping it stops the run there, and the report is collected across a
+  reconnection. `irori ls`, `read`, `search` and `send` (`vault-reach.ts`) reach
+  a handed vault on a host; `prompts/remote-vault.ts` says how.
+- Configuration that runs without asking in a vault on a host, and a Git
+  repository's programs there, are approved in a dialog on this device.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux.
+  `tests/remote-hosts.test.ts` stands this machine in for a host; the same ran
+  over a real `ssh` to another account with Node downloaded from nodejs.org
+  (`IRORI_TEST_SSH`). `scripts/remote-hosts-ui-smoke.ts` adds a host and a vault
+  in a real Electron under Xvfb with a stand-in `ssh`.
+- Not tried: a Windows or macOS client, a real network between the machines, a
+  real CLI with an account on the host. Not done: editing in a vault on a host,
+  conversations with its own agent and its `irori` command, the shared Schema
+  there, the terminal, connected folders, routines, SSH prompts in the window.
+
 Relations picked and pages started from a type, 2026-11-13 (**0.2.67**,
 [#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318), published as
 `v0.2.67-preview.1`; [ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage

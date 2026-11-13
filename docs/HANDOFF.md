@@ -1,5 +1,25 @@
 # irori continuation handoff
 
+**A vault can live on an SSH host, 0.2.68** ([ADR 061](decisions/061-vaults-on-ssh-hosts.md),
+[SSH-HOSTS](SSH-HOSTS.md)). irori's own vault services run on the host as a
+*vault host* (`src/remote/`), reached through the system's `ssh`. A workspace
+mixes such vaults with this device's, and only the irori agent crosses them:
+`irori call` runs the vault's agent on the host, and `irori ls`, `read`,
+`search` and `send` read the vault and give it a file. This first step shows
+such a vault without changing it. The owner decided: only the irori agent
+crosses vaults, a vault registered in two places is refused, and a run goes on
+when the connection is cut. Next, in this order:
+1. Run it for real: from a Windows and a macOS client, across a real network,
+   and with a real CLI signed in on the host. So far only Linux and the
+   stand-in CLIs have run it.
+2. Conversations with the vault's own agent on the host, with its `irori`
+   command and the shared Schema there.
+3. Editing: the write operations move beside the reads with their guards
+   (`src/host/vault-reads.ts` is where the main process and the vault host
+   already share code).
+4. The terminal as `ssh -t`, connected folders, path links in replies for files
+   on a host, and SSH's prompts answered in the window.
+
 **The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
 [ONTOLOGY](ONTOLOGY.md)). `.property/property.json` is a knowledge base's
 ontology; irori applies it to the pages (`checkOntology`), shows it
