@@ -108,10 +108,11 @@ async function serve(dataDir: string) {
     if (stopping) return;
     stopping = true;
     server.close();
-    device?.destroy();
     await host.close().catch(() => {});
     await fs.rm(socketPath, { force: true }).catch(() => {});
     await fs.rm(pidFile, { force: true }).catch(() => {});
+    // The device is let go last: once its connection ends, another vault host may take this place.
+    device?.destroy();
     process.exit(0);
   };
 

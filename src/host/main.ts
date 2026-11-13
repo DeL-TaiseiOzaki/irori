@@ -1344,6 +1344,16 @@ app
       agentConversations: async () => [],
       agentCommands: async () => [],
       cancel: async () => {},
+      // A path of such a vault is the one on its host, as an agent there or `ssh` would use it.
+      copyEntryPath: async (scopeId, target, absolute) => {
+        const parts = target.split('/').filter(Boolean);
+        if (parts.some((part) => part === '.' || part === '..'))
+          throw Error(t('vault の中のパスではありません。', 'Not a path inside the vault.'));
+        const root = remote.list().find((vault) => vault.scopeId === scopeId)!.root;
+        const text = absolute ? [root.replace(/\/+$/, ''), ...parts].join('/') : parts.join('/');
+        clipboard.writeText(text);
+        return text;
+      },
       // Off this device's list and its workspaces; the folder on the host stays as it is.
       removeSpace: async (scopeId) => {
         await remote.unregister(scopeId);

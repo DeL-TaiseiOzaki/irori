@@ -258,7 +258,7 @@ export const hostArguments = {
   saveRemoteHost: z.tuple([remoteHostInput]),
   removeRemoteHost: z.tuple([id]),
   connectRemoteHost: z.tuple([id]),
-  remoteFolders: z.union([z.tuple([id]), z.tuple([id, remotePath])]),
+  remoteFolders: z.tuple([id, remotePath.optional()]),
   registerRemote: z.tuple([id, remotePath, name, categoryText]),
   createSpace: z.tuple([
     z.object({

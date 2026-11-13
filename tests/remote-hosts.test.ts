@@ -449,7 +449,9 @@ test(
     ).trim();
     const { execFileSync } = await import('node:child_process');
     await until(() => {
-      const left = execFileSync('sh', ['-c', 'pgrep -f "[s]leep 30" || true'], { encoding: 'utf8' });
+      const left = execFileSync('sh', ['-c', 'pgrep -f "[s]leep 30" || true'], {
+        encoding: 'utf8',
+      });
       return !left.trim();
     });
     assert.ok(vaultHost);
@@ -529,6 +531,58 @@ test(
     );
     const reported = events.find((event) => event.delegate?.state === 'reported');
     assert.match(reported?.text ?? '', /Wrote Knowledge_Base\/from-your-ai\.md/);
+  },
+);
+
+test(
+  'a vault host of another version gives way once nothing runs on it, and not before (protocol fixture)',
+  posixOnly,
+  async (t) => {
+    const { far, remote, host, vault, run, dataDir } = await handing(t);
+    const pidFile = path.join(far.home, '.irori-host/data/host.pid');
+    const first = (await readFile(pidFile, 'utf8')).trim();
+    // The same device after an update: its vault host is another file, so another version.
+    const newer = Buffer.from(
+      `// a later build\nrequire(${JSON.stringify(path.resolve('src/remote/vault-host.ts'))});\n`,
+    );
+    const updated = () =>
+      new RemoteHosts({
+        dataDir,
+        launcher: () => far.launcher,
+        payload: {
+          ...far.payload,
+          bundle: async () => ({
+            version: createHash('sha256').update(newer).digest('hex').slice(0, 16),
+            bytes: newer,
+          }),
+        },
+        language: () => 'en',
+        localScopes: () => [],
+        emit: () => {},
+        ask: async () => true,
+      });
+    // While an agent works there, the running vault host stays and the newer one waits.
+    const { done, mine } = await run(
+      'Hand over.\nrun: irori call vault-code "run: sleep 2 && echo kept"',
+    );
+    await until(() => mine().some((event) => event.delegate?.state === 'working'));
+    const early = updated();
+    await early.init();
+    t.after(() => early.close());
+    await assert.rejects(early.connect(host.id), /別のバージョン/);
+    assert.equal((await readFile(pidFile, 'utf8')).trim(), first);
+    // The refused attempt took the device's place; the hand-off's report is still collected.
+    await done;
+    assert.match(mine().find((event) => event.delegate?.state === 'reported')?.text ?? '', /kept/);
+    // With nothing running, the older one ends and the newer one serves the same vaults.
+    remote.close();
+    const later = updated();
+    await later.init();
+    t.after(() => later.close());
+    assert.equal((await later.connect(host.id)).state, 'connected');
+    assert.notEqual((await readFile(pidFile, 'utf8')).trim(), first);
+    assert.match((await later.read(vault.scopeId, 'notes/train.md')).text, /zebrafinch-42/);
+    assert.equal((await readdir(path.join(far.home, '.irori-host/bin'))).length, 2);
   },
 );
 
