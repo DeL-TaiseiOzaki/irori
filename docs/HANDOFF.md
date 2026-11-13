@@ -18,14 +18,23 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-13: **0.2.65** ([#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315),
+Ctrl/⌘+F finds words in the file on show in every main-stage view) as
+`0395d4f`, by `publish.yml` alone (push run `43382121971`, with the pull
+request's packages from app run `43379097307`): merge to release 1:19, to page
+3:22, drift in step. Anonymous downloads of the Windows installer, the Mac image
+and `irori-0.2.65-full.nupkg` matched `SHA256SUMS.txt`, and the live page links
+the 0.2.65 installers. See STATUS. Not seen on Windows or macOS before
+publishing: the find bar was exercised on Linux under Xvfb only.
+
 Published 2026-11-11: **0.2.64** ([#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313),
 a run in full access takes the configuration that runs without asking without
 the dialog and names it in its log, ADR 009) as `64e86f2`, by `publish.yml`
 alone (push run `42974838132`, with the pull request's packages from app run
 `42973426346`): merge to release 1:39, to page 3:17, drift in step. Anonymous
 downloads of the Windows installer, the Mac image and `irori-0.2.64-full.nupkg`
-matched `SHA256SUMS.txt`, and the live page links the 0.2.64 installers. See
-STATUS. Exercised through protocol fixtures only: not tried with real CLI
+matched `SHA256SUMS.txt`, and the live page linked the 0.2.64 installers until
+0.2.65 replaced them. See STATUS. Exercised through protocol fixtures only: not tried with real CLI
 accounts, on Windows or on macOS.
 
 Published 2026-11-10: **0.2.63** ([#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311),
