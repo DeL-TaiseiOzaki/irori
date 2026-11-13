@@ -40,6 +40,7 @@ import { RunSettings } from './RunSettings';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
+import { RemoteAgentNote } from './RemoteHosts';
 import { aiStateWords, sendOnEnter } from './display';
 import { useCommandMenu } from './CommandMenu';
 import {
@@ -227,7 +228,9 @@ export function AgentColumn({
   const shown = useWindowItems();
   const irori = column.owner === 'irori';
   const scopeId = irori ? you?.id : space?.scopeId;
-  const ready = irori ? you?.state === 'ready' : !!space;
+  // A vault on an SSH host has its agent there, reached only through the irori agent (ADR 061).
+  const remote = !irori && !!space?.host;
+  const ready = irori ? you?.state === 'ready' : !!space && !remote;
   const {
     infos,
     spaces,
@@ -999,7 +1002,8 @@ export function AgentColumn({
           {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
         </p>
       )}
-      {agentInfo?.available === false && (
+      {remote && space && <RemoteAgentNote space={space} />}
+      {!remote && agentInfo?.available === false && (
         <p className="agent-connection-error" role="alert">
           {t(
             'CLI が見つかりません（インストールとログインを確認）。',
@@ -1043,7 +1047,7 @@ export function AgentColumn({
         />
       )}
       <div
-        hidden={historyOpen}
+        hidden={historyOpen || remote}
         className="conversation"
         role="log"
         aria-label={
@@ -1101,7 +1105,7 @@ export function AgentColumn({
           </PathBase.Provider>
         </PathOpenerContext.Provider>
       </div>
-      <div className="composer">
+      <div className="composer" hidden={remote}>
         {editing && (
           <div className="composer-editing" role="status">
             <Icon name="penLine" size={13} />

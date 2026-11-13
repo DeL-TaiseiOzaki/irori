@@ -1,0 +1,307 @@
+/* SSH hosts and the vaults on them (ADR 061). */
+
+/* A host's connection: a dot that takes no colour while connected, as a normal
+   outcome; attention for an error, running while connecting. */
+.remote-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.remote-state > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.remote-state > i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.remote-state.connected > i {
+  background: currentColor;
+}
+.remote-state.error {
+  color: var(--attn-tx);
+}
+.remote-spin {
+  flex: none;
+  animation: irori-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-spin {
+    animation: none;
+  }
+}
+
+/* The settings part: a host per frame row, its vaults under it. */
+.remote-host {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.remote-host .settings-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.remote-destination {
+  overflow-wrap: anywhere;
+}
+.remote-vaults {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.remote-vaults:empty {
+  display: none;
+}
+.remote-vaults li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.remote-vault-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.remote-vault-name strong {
+  font-size: 13px;
+  font-weight: 560;
+}
+.remote-vault-name small {
+  font-size: 11px;
+  color: var(--tx-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.settings-body button.remote-add-vault {
+  align-self: flex-start;
+}
+
+/* Adding or changing a host: its fields in a row where they fit. */
+.remote-host-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: flex-end;
+}
+.remote-host-form label {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  font-size: 12px;
+}
+.remote-host-form label.remote-port {
+  flex: 0 1 110px;
+}
+.remote-host-form input {
+  width: 100%;
+  margin: 0;
+}
+.remote-host-form .error-message {
+  flex-basis: 100%;
+}
+.remote-actions {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Choosing a host where vaults are added. */
+.remote-choice ul {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.remote-choice-host {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--stage-2);
+  color: var(--ink);
+  text-align: left;
+}
+.remote-choice-host > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.remote-choice-host small {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.remote-lead,
+.remote-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.modal .remote-host-form {
+  margin-top: 8px;
+}
+
+/* The folder dialog: the path, the folders in it, then the vault's name. */
+.remote-destination-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -8px 0 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.remote-destination-line .remote-state {
+  color: var(--ink-3);
+}
+.remote-path {
+  display: flex;
+  gap: 8px;
+}
+.remote-path input {
+  flex: 1;
+  margin: 0;
+}
+.remote-folder-list {
+  margin: 10px 0;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--stage-2);
+  padding: 4px;
+}
+.remote-folder-list .hint {
+  margin: 10px 12px;
+}
+.remote-folder-problem {
+  padding: 10px 12px;
+}
+.remote-folder {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 13px;
+}
+.remote-folder:hover {
+  background: var(--stage-3);
+}
+.remote-folder > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remote-vault-mark {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.remote-chosen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.remote-chosen strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  color: var(--ink);
+}
+
+/* Where a vault on a host is named: the host, its folder there on hover. */
+.remote-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Above the vault's files while its host is not connected. */
+.remote-vault-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 10px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  font-size: 12px;
+  color: var(--tx-2);
+}
+.remote-vault-state p {
+  margin: 0;
+  color: var(--tx);
+}
+.remote-vault-state small {
+  overflow-wrap: anywhere;
+}
+
+/* In place of the instruction box of a vault agent whose vault is on a host. */
+.remote-agent-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: auto 16px;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--tx-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.remote-agent-note strong {
+  color: var(--tx);
+  font-size: 13px;
+}
+.remote-agent-note p {
+  margin: 0;
+  max-width: 34ch;
+}
+.composer[hidden] {
+  display: none;
+}
