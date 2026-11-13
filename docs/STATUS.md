@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 A vault can live on an SSH host, 2026-11-13 (**0.2.68**,
-[#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320); [ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)):
+[#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320), published as
+`v0.2.68-preview.1`; [ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)):
 the owner asked to talk with the second brain in one vault while code runs on
 another machine, with the vault there in the same workspace and only the irori
 agent crossing vaults. First step: such a vault is shown and its agent is

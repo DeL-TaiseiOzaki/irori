@@ -50,6 +50,28 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-13: **0.2.68** ([#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320),
+a vault can live on an SSH host, ADR 061) as `73028d8`, by `publish.yml` alone
+(push run `43413589755`, packages from app run `43412285378`). Merged at
+11:00:51 UTC, the release out at 11:02:47 (1:56), the page linking 0.2.68 by
+11:04:21 (3:30), and the run finished with the drift check at 11:04:47.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.68-full.nupkg` matched `SHA256SUMS.txt`, and the live page links the
+0.2.68 installers. See STATUS. Its CI failed twice before it passed, and both
+causes were fixed in the change:
+- `npm test`, in the new `tests/remote-hosts.test.ts`: a vault host ended once
+  idle while a hand-off's report still waited for its device. It now stays
+  until the report is collected, for up to a day.
+- `scripts/harness-ui-smoke.ts`, where the `/` list showed no command after a
+  choice. main's own run of 0.2.67 (`43388248293`) had failed the same way:
+  the caret was placed a frame after the choice, and on a slow runner that
+  frame fell inside the smoke's next `fill`. `useCommandMenu` now places it at
+  once.
+
+Seen on Linux and through CI's packaged-app smokes on the three platforms. Not
+by hand on Windows or macOS, where the command irori gives `ssh.exe` has never
+run, and not with a real CLI signed in on a host.
+
 Published 2026-11-13: **0.2.67** ([#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318),
 a relation picked from the declared names and pages, and a new page that
 starts from a type, ADR 015) as `7cd2cdc`, and **0.2.66**
