@@ -127,7 +127,7 @@ hierarchy filters, and the list of entities with their notes. `HostAPI` loses
 ## Not in this decision
 
 - The relation picker and the new page that starts from a type (ADR 015 stages
-  2 and 3). `relationsFrom` gives the picker its names.
+  2 and 3). `relationsFrom` gives the picker its names. Both followed in 0.2.67.
 - Editing the declaration through a form.
 - A place for the concepts of a domain themselves (a controlled list of topics
   with broader and narrower ones). If a knowledge base needs it, it fits this

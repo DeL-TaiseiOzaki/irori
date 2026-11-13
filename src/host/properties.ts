@@ -3,6 +3,7 @@ import type { GitService } from '../git/service';
 import { ifPresent, issueSummary, parseJsonText } from './local-json';
 import {
   actorFromEmail,
+  newPageText,
   propertyDeclaration,
   propertyDeclarationFile,
   propertyDeclarationLimit,
@@ -61,4 +62,31 @@ export async function readPageProperties(
 ): Promise<PageProperties> {
   const actor = actorFromEmail(await git.userEmail(scopeId).catch(() => ''));
   return { ...(await readPropertyDeclaration(files, scopeId)), actor };
+}
+
+/**
+ * A new page of a declared type (ADR 015 D6): its frontmatter carries the type,
+ * the title from the file name, the person as its last change, and the keys the
+ * type requires. A type the knowledge base does not declare is refused: a page
+ * may be made without a type, never with an invented one.
+ */
+export async function createTypedNote(
+  files: FileService,
+  git: Pick<GitService, 'userEmail'>,
+  scopeId: string,
+  name: string,
+  directory: string,
+  type: string,
+) {
+  const { declaration, actor } = await readPageProperties(files, git, scopeId);
+  if (!declaration || !Object.prototype.hasOwnProperty.call(declaration.types, type))
+    throw Error(
+      t(
+        `種類「${type}」は ${propertyDeclarationFile} に宣言されていません。`,
+        `The type "${type}" is not declared in ${propertyDeclarationFile}.`,
+      ),
+    );
+  return files.createNote(scopeId, name, directory, (title) =>
+    newPageText(declaration, type, title, actor, new Date()),
+  );
 }

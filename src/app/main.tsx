@@ -993,7 +993,21 @@ function App() {
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
+    // The type a new page starts from; undefined until chosen, '' for a note without one.
+    [noteType, setNoteType] = useState<string>(),
     [newNote, setNewNote] = useState(false);
+  // The types the vault declares, offered when a note is created there (ADR 015 D6).
+  const newNoteDeclared = useResource(
+    () => host.pageProperties(active!.scopeId),
+    [active?.scopeId],
+    { enabled: !!active && newNote },
+  );
+  const noteTypes = Object.keys(newNoteDeclared.data?.declaration?.types ?? {});
+  // A choice made in another vault does not carry over to one that lacks the type.
+  const chosenNoteType =
+    noteType !== undefined && (noteType === '' || noteTypes.includes(noteType))
+      ? noteType
+      : (noteTypes[0] ?? '');
   // Every run is tracked so the explorer can mark its space and the panel its
   // conversation's tab, while the panel's controls follow the conversation on show.
   function addRun(runId: string, scopeId: string, conversationId?: string) {
@@ -3676,6 +3690,7 @@ function App() {
                                       !doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)
                                     }
                                     properties={propertiesRead.data}
+                                    scopeId={doc.scopeId}
                                     text={buffer}
                                     mode={mode}
                                     filename={doc.path}
@@ -4193,7 +4208,12 @@ function App() {
                         cloudNoteTarget.directory,
                         noteName,
                       )
-                    : host.createNote(active!.scopeId, noteName, noteDirectory);
+                    : host.createNote(
+                        active!.scopeId,
+                        noteName,
+                        noteDirectory,
+                        chosenNoteType || undefined,
+                      );
                 })()
                   .then((d) => {
                     show(d);
@@ -4228,6 +4248,23 @@ function App() {
                   maxLength={4096}
                   placeholder={defaultNoteDirectory}
                 />
+              </label>
+            )}
+            {!cloudNoteTarget && noteTypes.length > 0 && (
+              <label>
+                {t('種類', 'Type')}
+                <select
+                  aria-label={t('種類', 'Type')}
+                  value={chosenNoteType}
+                  onChange={(event) => setNoteType(event.target.value)}
+                >
+                  {noteTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                  <option value="">{t('種類なし', 'No type')}</option>
+                </select>
               </label>
             )}
             <div className="actions">

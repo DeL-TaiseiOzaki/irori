@@ -732,6 +732,8 @@ export interface HostAPI {
   read(scopeId: string, path: string): Promise<Document>;
   /** The declared types and relations applied to the pages now, and whether an OKF bundle's folder indexes match them (ADR 060, 028). Writes nothing. */
   ontology(scopeId: string): Promise<import('./ontology').Ontology>;
+  /** The knowledge base's pages with their titles and types, for picking a relation's target (ADR 015 stage 2). */
+  ontologyPages(scopeId: string): Promise<import('./bundle').PageChoice[]>;
   /** Generates an OKF bundle's folder indexes from the pages, and writes the files whose bytes change. */
   updateIndexes(scopeId: string): Promise<import('./bundle').IndexUpdate>;
   /** Who typed each line of this text, resolved against the record on this device. */
@@ -781,7 +783,8 @@ export interface HostAPI {
   viewerBytes(scopeId: string, path: string): Promise<Uint8Array>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
-  createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
+  /** A new note; with `type`, a page of that declared type with its frontmatter (ADR 015 D6). */
+  createNote(scopeId: string, name: string, directory?: string, type?: string): Promise<Document>;
   /** Where this KB asks new notes and today's note to go (`.irori/notes.json`), or null. */
   notesDeclaration(scopeId: string): Promise<import('./notes').NotesDeclaration | null>;
   /** The KB's declared page properties (`.property/property.json`) and the person's actor id. */

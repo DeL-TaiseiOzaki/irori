@@ -88,11 +88,18 @@ again when they change. A knowledge base that declares nothing is told so.
 **vault agent** prepares a request in the agent panel to review the declaration
 against the pages; it preserves an unsent request and starts no model turn.
 
-**Uses it where a page is edited.** The property view offers the declared types,
-marks an undeclared one and marks a required key that is missing (ADR 015). The
-relation picker that offers only the names a page's type may use, and the new
-page that starts from a type, are not built yet; `relationsFrom` gives the
-picker its names.
+**Uses it where a page is edited** (ADR 015). The property view offers the
+declared types, marks an undeclared one and marks a required key that is
+missing. A relation is picked, not typed: its name from the relations a page of
+this type may state (`relationsFrom`), and its target from the pages of the
+types that relation points at, or a URL. The pages come from the same walk
+(`HostAPI.ontologyPages`), read when the field is first used, and the target is
+written as a link relative to the page (`linkTo`). A name or a target the
+declaration does not allow stays as written and is marked. A relation being
+added is written once it has a name and a target. **ノートを作成** asks for the
+type when the vault declares types, and the new page starts with that type, its
+title, the person as its last change and the keys the type requires, left
+empty to fill; **種類なし** makes a plain note as before.
 
 ## Folder indexes
 
