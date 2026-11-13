@@ -15,6 +15,7 @@ part. The decisions and their reasons are in
 | Hosts and vaults | `src/host/remote-hosts.ts`                                                               | This device's list (`remote-hosts.json`), connections on demand, the duplicate check, and the `RemoteVaults` port for agent runs.             |
 | Routing          | `src/host/main.ts` (`hosted`, `onHosts`)                                                 | An operation that names a vault on a host goes there when it is a read, is answered here, or is refused.                                      |
 | Agent runs       | `src/agents/service.ts` (`startHanded`, `handOff`), `vault-reach.ts`, `remote-vaults.ts` | A hand-off starts where its vault is; `irori ls`, `read`, `search` and `send`.                                                                |
+| The window       | `src/app/RemoteHosts.tsx`, and `Space.host` where a vault is shown                       | The settings part, the dialog that walks a host's folders, and a vault on a host shown without anything that edits it.                        |
 | Shared reads     | `src/host/vault-reads.ts`                                                                | The reads both the main process and the vault host answer.                                                                                    |
 
 ## On the host

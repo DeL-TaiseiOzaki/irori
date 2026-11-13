@@ -31,6 +31,12 @@ handed work; nothing in the window changes it yet.
   a handed vault on a host; `prompts/remote-vault.ts` says how.
 - Configuration that runs without asking in a vault on a host, and a Git
   repository's programs there, are approved in a dialog on this device.
+- The window (`src/app/RemoteHosts.tsx`): **設定 › SSH ホスト** adds, connects,
+  edits and removes hosts, lists each host's vaults with **一覧から外す**, and
+  **vault を追加** opens a dialog that walks the host's folders. `RegisterSpace`
+  has an **SSH ホスト** source. A vault on a host shows its host, has no editing
+  in the explorer, the Schema, the Git view or its settings, no terminal and no
+  composer of its own, and says to ask the irori agent in irori mode.
 - `npm run build`, `npm run format:check` and `npm test` pass on Linux.
   `tests/remote-hosts.test.ts` stands this machine in for a host; the same ran
   over a real `ssh` to another account with Node downloaded from nodejs.org
