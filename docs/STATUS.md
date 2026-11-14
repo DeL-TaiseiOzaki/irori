@@ -115,8 +115,9 @@ and nothing in irori read the relations a knowledge base declares.
   (ADR 015 stages 2 and 3); a list, on a page, of the pages that name it in a
   relation.
 Find in the file on show, 2026-11-13 (**0.2.65**,
-[#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315)): the owner asked for a
-keyword search inside each file on the main stage.
+[#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315), published as
+`v0.2.65-preview.1`): the owner asked for a keyword search inside each file on
+the main stage.
 - `src/app/FindBar.tsx` holds `FindScope`, the find bar above the focused
   column's `document-scroll`, and the `Finder` contract a view offers through
   `useFinder`: `find` returns the count and the occurrence to start from (the
