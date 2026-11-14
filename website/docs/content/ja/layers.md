@@ -5,11 +5,11 @@ description: AI への指示、書きためる知識、元になる資料を分�
 
 ## Schema・Knowledge・Contents
 
-| 層        | 役割                               | 例                                  |
-| --------- | ---------------------------------- | ----------------------------------- |
-| Schema    | AI への指示や設定（任意）          | `AGENTS.md`、スキル、ルール、フック |
-| Knowledge | 自分たちが書き、更新していくノート | Markdown、CSV の表                  |
-| Contents  | ノートの元になる資料               | PDF、Office ファイル、Google Drive  |
+| 層        | 役割                               | 例                                                                                |
+| --------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| Schema    | AI への指示や設定（任意）          | `AGENTS.md`、スキル、ルール、フック                                               |
+| Knowledge | 自分たちが書き、更新していくノート | Markdown、CSV の表                                                                |
+| Contents  | ノートの元になる資料               | PDF、Office ファイル、このコンピューターや同期アプリのフォルダ、GitHub リポジトリ |
 
 資料を読み、Knowledge に理解を書きます。Schema は **設定 → エージェント → vault agent** で vault agent をオンにしたときだけ表示されます。
 
@@ -19,12 +19,14 @@ description: AI への指示、書きためる知識、元になる資料を分�
 
 トップレベルの隠しファイルや隠しフォルダ、`AGENTS.md` などは Schema として扱われます。Contents の場所は vault の宣言に従い、それ以外の知識用ファイルが Knowledge に表示されます。
 
-Knowledge のフォルダは vault の設定の **層** で選べます。**vault のルート** にすると、ノートはリポジトリの直下に `AGENTS.md` と並びます。
+vault の設定の **層** では、Knowledge と Contents のそれぞれについて、画面に出す名前（**表示名**）と **フォルダ** を決めます。Knowledge で **vault のルート** を選ぶと、ノートはリポジトリの直下に `AGENTS.md` と並びます。
+
+フォルダの名前を変えると、irori はフォルダを移し、ノートのリンク・コメント・下書き・接続したフォルダを新しい場所に合わせます。リンクを更新できなかったファイルがあれば、その数が表示されます。名前は vault の `.irori/scope.json` に入るので、その vault を開く人には同じ名前で表示されます。別のコンピューターでの変更を Pull すると、すぐに反映されます。
 
 おすすめの構成は[irori-templete](https://github.com/DeL-TaiseiOzaki/irori-templete)を参照できます。新規 vault を作る操作だけで、そのテンプレート全体がコピーされるわけではありません。
 
 ## AI が使うもの
 
-vault agent（任意）は、その vault の Schema とノートを使って働きます。接続済みの Contents も、そのフォルダにアクセスできる範囲で利用できます。
+vault agent（任意）は、その vault の Schema とノートを使って働きます。接続済みの Contents も、そのフォルダにアクセスできる範囲で利用できます。エージェントが作業中のファイルや結果を置く作業フォルダは、Contents に `work` として表示されます（[AI エージェント](agents.md)を参照）。
 
-別の vault も使う依頼は[irori agent](irori-mode.md)に渡します。具体的な設定は[Schema の設定](schema.md)、資料の接続は[Google Drive](drive.md)を参照してください。
+別の vault も使う依頼は[irori agent](irori-mode.md)に渡します。具体的な設定は[Schema の設定](schema.md)、資料の接続は[同期フォルダ](sync-folders.md)と[Contents の GitHub リポジトリ](git.md#section-6)を参照してください。

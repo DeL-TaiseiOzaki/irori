@@ -38,7 +38,7 @@ Workspaces open as tabs along the top of the window, several at once. **+** at t
 
 Agents keep running in tabs not on show. A tab shows a dot while an agent in it runs or waits for permission. Closing a tab stops the agents only that tab has open, so irori asks first.
 
-**File › New Window** (Ctrl/Cmd+Shift+N) opens another window. On Windows the File menu opens from the title bar's **Menu** button; on macOS the Dock menu has it too. Each window has its own tabs, and closing one does not stop what another window has open.
+**File → New Window** (Ctrl/Cmd+Shift+N) opens another window. On Windows the File menu opens from the title bar's **Menu** button; on macOS the Dock menu has it too. Each window has its own tabs, and closing one does not stop what another window has open.
 
 ## Two vaults side by side
 

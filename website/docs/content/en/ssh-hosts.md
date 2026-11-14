@@ -19,11 +19,11 @@ The first connection puts irori's own files under `~/.irori-host` on the host. T
 
 ## Add an SSH host
 
-1. Open **Settings › Where vaults live › SSH hosts**.
+1. Open **Settings → Where vaults live → SSH hosts**.
 2. Choose **Add an SSH host**.
 3. Enter a **Name** and the **Destination**: what you would type after `ssh`, a Host of your ssh configuration or `user@host`. Add a **Port (optional)** if needed, and choose **Add**.
 
-**Connect** connects a host in the list, **Edit** changes its name or destination, and **Remove** takes it off. Hosts are this computer's own record and are not part of the [environment saved on GitHub](settings.md).
+**Connect** connects a host in the list, **Edit** changes its name or destination, and **Remove** takes it off. Hosts are this computer's own record and are not part of the [environment saved on GitHub](settings.md#section-6).
 
 ## Add a vault
 
