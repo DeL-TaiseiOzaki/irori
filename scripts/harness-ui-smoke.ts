@@ -187,8 +187,14 @@ try {
         'draggable',
         'false',
       );
+      // Removing unregistered data waits for the run too, and the sheet says why.
+      await mkdir(path.join(root, 'contents', 'leftover'));
       await page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' }).click();
       await expect(page.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toBeEnabled();
+      const leftover = page.locator('.stray-card').filter({ hasText: 'leftover' });
+      await expect(leftover.getByRole('button', { name: 'ゴミ箱に移動' })).toBeDisabled();
+      await expect(page.getByRole('status').filter({ hasText: '実行が終わると' })).toBeVisible();
+      await page.screenshot({ path: 'test-results/irori-connections-during-run.png' });
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: 'フォルダを選ぶ', exact: true })).toHaveCount(
         0,
@@ -203,6 +209,11 @@ try {
         'after cancellation',
       );
       expect((await requests()).length).toBe(3);
+      await page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' }).click();
+      await expect(leftover.getByRole('button', { name: 'ゴミ箱に移動' })).toBeEnabled();
+      await expect(page.getByRole('status').filter({ hasText: '実行が終わると' })).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await rm(path.join(root, 'contents', 'leftover'), { recursive: true });
       for (const cycle of [1, 2]) {
         await app.close();
         app = await launch();

@@ -190,6 +190,24 @@ try {
   await expect(researchColumn).toContainText('Research note');
   await expect(researchColumn).toContainText('AGENTS.md');
   await page.screenshot({ path: 'test-results/irori-overview-columns.png' });
+  // Product's connection sheet, opened here while Research runs, waits only for
+  // Product's runs: its unregistered data can be removed.
+  await mkdir(path.join(roots[0], 'contents', 'leftover'), { recursive: true });
+  const productColumn = columns.getByRole('region', { name: 'Product', exact: true });
+  await productColumn.getByRole('button', { name: 'フォルダを接続', exact: true }).click();
+  const connections = page.getByRole('dialog', { name: 'クラウド接続', exact: true });
+  await expect(
+    connections
+      .locator('.stray-card')
+      .filter({ hasText: 'leftover' })
+      .getByRole('button', { name: 'ゴミ箱に移動', exact: true }),
+  ).toBeEnabled();
+  await expect(connections.getByRole('status').filter({ hasText: '実行が終わると' })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press('Escape');
+  await expect(connections).toHaveCount(0);
+  await rm(path.join(roots[0], 'contents', 'leftover'), { recursive: true });
   await researchColumn.getByRole('button', { name: '停止', exact: true }).click();
   await expect(researchColumn.getByRole('button', { name: '送信を再開' })).toBeVisible();
   // A stopped run leaves its queue for the person, not sent on its own.

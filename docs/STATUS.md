@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Unregistered data removable from any vault's connection sheet, 2026-11-14
+(**0.2.69**): the owner reported that a folder left unregistered in contents
+(`contents/work/`) could not be removed: its **ゴミ箱に移動** was disabled.
+`main.tsx` passed the connection sheet `running` for the active vault, while
+the Overview opens the sheet for any vault, so a run elsewhere disabled every
+change and removal there.
+- The sheet's `running` is now its own vault's: a run or send there, or the
+  irori agent's hold on it (`heldByYou`), as the host's `changeCloud` refuses
+  with `agents.busy`.
+- During such a run the sheet says why its controls wait, in a `role="status"`
+  note above the registered connections.
+- `overview-ui-smoke` opens Product's sheet from the Overview while Research
+  runs and expects **ゴミ箱に移動** enabled (disabled on 0.2.68);
+  `harness-ui-smoke` expects it disabled with the note during the vault's own
+  run, and enabled after the run is stopped.
+
 A vault can live on an SSH host, 2026-11-13 (**0.2.68**,
 [#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320), published as
 `v0.2.68-preview.1`; [ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)):
