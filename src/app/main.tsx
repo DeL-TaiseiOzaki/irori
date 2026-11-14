@@ -4056,7 +4056,10 @@ function App() {
         <Connections
           key={connectionTarget.scopeId}
           space={connectionTarget}
-          running={running}
+          // The vault the sheet is for, which the Overview may open for any vault.
+          running={
+            runningScopes.includes(connectionTarget.scopeId) || heldByYou(connectionTarget.scopeId)
+          }
           onClose={() => {
             setConnectionsOpen(false);
             bump(connectionTarget.scopeId);

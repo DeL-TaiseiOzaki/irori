@@ -438,6 +438,14 @@ export function Connections({
             className="connect-registered"
             aria-label={t('登録済みの接続先', 'Registered connections')}
           >
+            {running && (connections.length > 0 || strays.length > 0) && (
+              <p className="connect-hint" role="status">
+                {t(
+                  'エージェントの実行中は、接続の変更や解除、未登録データの削除はできません。実行が終わると操作できます。',
+                  'While an agent runs, connections cannot be changed or removed, nor unregistered data removed. They can once the run ends.',
+                )}
+              </p>
+            )}
             <h3>
               {t('登録済み', 'Registered')}
               <span className="connect-count">{connections.length}</span>
