@@ -50,6 +50,17 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-14: **0.2.69** ([#322](https://github.com/DeL-TaiseiOzaki/irori/pull/322),
+the connection sheet follows its own vault's runs, so a vault's unregistered
+data can be removed while another vault's agent runs) as `fa39ced`, by
+`publish.yml` alone (push run `43615087012`, packages from app run
+`43614191663`). Merged at 16:20:36 UTC, the release out at 16:22:03 (1:27), the
+page deployed by 16:23:02 (2:26), and the run finished with the drift check at
+16:23:19. Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.69-full.nupkg` matched `SHA256SUMS.txt`, and the live page links the
+0.2.69 installers. CI passed on its first run. Seen on Linux and through CI's
+packaged-app smokes on the three platforms; not by hand on Windows or macOS.
+
 Published 2026-11-13: **0.2.68** ([#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320),
 a vault can live on an SSH host, ADR 061) as `73028d8`, by `publish.yml` alone
 (push run `43413589755`, packages from app run `43412285378`). Merged at

@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Unregistered data removable from any vault's connection sheet, 2026-11-14
-(**0.2.69**): the owner reported that a folder left unregistered in contents
+(**0.2.69**, [#322](https://github.com/DeL-TaiseiOzaki/irori/pull/322), published
+as `v0.2.69-preview.1`): the owner reported that a folder left unregistered in contents
 (`contents/work/`) could not be removed: its **ゴミ箱に移動** was disabled.
 `main.tsx` passed the connection sheet `running` for the active vault, while
 the Overview opens the sheet for any vault, so a run elsewhere disabled every
