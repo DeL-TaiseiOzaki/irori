@@ -25,7 +25,8 @@ irori は、複数の知識ベース（GitHub のリポジトリ）と、手元�
 | 毎日の記録を残す               | [今日のノート](daily-notes.md)                                      |
 | AI と作業を続ける              | [会話と履歴](conversations.md)・[Schema の設定](schema.md)          |
 | 決めた手順を実行する           | [ルーティン](routines.md)                                           |
-| 資料を読む・共有する           | [ファイルの閲覧](files.md)・[Google Drive](drive.md)・[Git](git.md) |
+| 資料を読む・共有する           | [ファイルの閲覧](files.md)・[同期フォルダ](sync-folders.md)・[Git](git.md) |
+| 別のマシンの vault を使う      | [SSH ホストの vault](ssh-hosts.md)                                  |
 | 表示を変える・困りごとを調べる | [設定](settings.md)・[トラブルシューティング](troubleshooting.md)   |
 
 このガイドは現在の検証版を対象にしています。配布版の変更は[リリースノート](https://github.com/DeL-TaiseiOzaki/irori/releases)で確認できます。
