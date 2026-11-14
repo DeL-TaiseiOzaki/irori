@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { draftFile, FileService } from '../src/host/files';
 import { SearchService } from '../src/host/search';
-import { GraphIndexService } from '../src/host/graph-index';
+import { BundleService } from '../src/host/bundle';
 import { renameLayerFolder } from '../src/host/layer-folders';
 import { AuthorshipStore } from '../src/knowledge/authorship';
 import { addNoteComment, readNoteComments } from '../src/host/comments';
@@ -179,24 +179,31 @@ test('Renaming contents keeps its connected folders, their records and the ignor
   );
 });
 
-test('The graph index lives in the knowledge folder the vault names', async (t) => {
-  const { files, id, write, read } = await fixture(t);
+test('The declaration is applied to the pages of the knowledge folder the vault names', async (t) => {
+  const { files, id, write } = await fixture(t);
+  await write(
+    '.property/property.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      types: { concept: {} },
+      relations: { uses: { from: 'any', to: ['concept'] } },
+    }),
+  );
   await write(
     'Knowledge_Base/a.md',
     '---\ntype: concept\nrelations:\n  - { rel: uses, target: b.md }\n---\n',
   );
   await write('Knowledge_Base/b.md', '---\ntype: concept\n---\n');
+  await write('elsewhere/c.md', '---\ntype: unknown\n---\n');
   await renameLayerFolder({ files }, id, 'Knowledge_Base', 'wiki');
-  const service = new GraphIndexService(files, new SearchService(files));
-  const update = await service.update(id);
-  assert.deepEqual(update.written.sort(), [
-    'wiki/ontology/entities.csv',
-    'wiki/ontology/index.md',
-    'wiki/ontology/relations.csv',
+  const service = new BundleService(files, new SearchService(files));
+  const report = (await service.ontology(id)).report!;
+  // The two pages of `wiki/`, and not the Markdown file outside the knowledge folder.
+  assert.equal(report.pages, 2);
+  assert.deepEqual(report.relations, [
+    { name: 'uses', description: undefined, from: 'any', to: ['concept'], uses: 1, findings: 0 },
   ]);
-  assert.match(await read('wiki/ontology/entities.csv'), /^a,a,wiki\/a\.md,,concept$/m);
-  assert.match(await read('wiki/ontology/index.md'), /inside `wiki\/`/);
-  assert.equal((await service.status(id)).current, true);
+  assert.equal(report.findingCount, 0);
 });
 
 test('Drafts of moved knowledge files are kept under their new paths', async (t) => {

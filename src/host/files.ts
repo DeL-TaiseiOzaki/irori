@@ -43,7 +43,7 @@ import {
   type LayerMove,
   type NamedLayer,
 } from '../domain/layers';
-import { frontmatterBlock } from '../domain/graph-index';
+import { frontmatterBlock } from '../domain/bundle';
 import { t } from '../domain/i18n';
 import {
   binaryFilePattern,
@@ -1088,12 +1088,18 @@ export class FileService {
       throw Error(t('未保存の下書きがあります。', 'There is an unsaved draft.'));
     return { filename, doc, stat };
   }
-  async createNote(id: string, name: string, directory = defaultNoteDirectory) {
+  /** A new note named `name`; `text` gives its first bytes from its title, a heading by default. */
+  async createNote(
+    id: string,
+    name: string,
+    directory = defaultNoteDirectory,
+    text: (title: string) => string = (title) => `# ${title}\n\n`,
+  ) {
     const filename = noteFilename(name);
     return this.createNoteAt(
       id,
       directory ? `${directory}/${filename}` : filename,
-      `# ${filename.slice(0, -3)}\n\n`,
+      text(filename.slice(0, -3)),
     );
   }
   /** Publishes a new note at a full relative path; an existing file is never replaced. */
@@ -1551,7 +1557,7 @@ export class FileService {
     });
   }
   /**
-   * Publishes a file irori generated in the knowledge layer — the graph index —
+   * Publishes a file irori generated in the knowledge layer — a folder index —
    * atomically: `expected` is the hash of the bytes being replaced, or null when
    * the file must not exist yet, so a file changed meanwhile is never overwritten.
    * Missing folders are created; an alias anywhere on the path is refused.

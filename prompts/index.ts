@@ -2,6 +2,7 @@
 // them from here; README.md lists each situation.
 export * from './irori-agent';
 export * from './irori-agent-starter';
+export * from './remote-vault';
 export * from './vault-agent';
 export * from './vault-intro';
 export * from './note';

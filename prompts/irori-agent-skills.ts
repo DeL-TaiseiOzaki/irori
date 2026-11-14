@@ -125,8 +125,10 @@ Google Drive tool: see connect-folder.
 - Comments for the person: \`irori comment <file> "<text>" [--quote ...]\`,
   signed as the agent; \`irori resolve <file> <id>\` removes one when the
   person agreed it is dealt with.
-- \`irori index [<vault>]\` writes the graph index and folder indexes, as
-  索引を更新 does, after pages change in an OKF bundle.
+- \`irori index [<vault>]\` writes the folder indexes, as 索引を更新 does,
+  after pages change in an OKF bundle. \`irori check [<vault>]\` lists the
+  pages that differ from the types and relations the vault declares in
+  \`.property/property.json\`, its ontology; it writes nothing.
 - Markdown files. Links that irori follows, lists as backlinks and rewrites
   on a move are relative Markdown links \`[text](path.md)\`. \`[[wiki links]]\`
   and \`![[embeds]]\` stay as text: offer to convert them, as a commit.

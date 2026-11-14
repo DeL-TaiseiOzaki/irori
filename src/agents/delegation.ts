@@ -9,16 +9,31 @@ import { within } from '../domain/scopes';
 export interface Delegation {
   /** Your AI's folder, its working directory. */
   you: string;
-  /** `work`: the folder work on that brain keeps its scratch in, when it has one. */
-  brains: { scopeId: string; name: string; agent: string; root: string; work?: string }[];
+  /**
+   * `work`: the folder work on that brain keeps its scratch in, when it has one.
+   * `host`: the SSH host a brain lives on (ADR 061); its `root` is a folder
+   * there, so no path on this device is inside it.
+   */
+  brains: {
+    scopeId: string;
+    name: string;
+    agent: string;
+    root: string;
+    work?: string;
+    host?: string;
+  }[];
 }
+
+/** The handed brains on this device: only their folders are paths here. */
+export const onThisDevice = (delegation: Delegation) =>
+  delegation.brains.filter((brain) => !brain.host);
 
 export type Decision = { allow: true } | { allow: false; reason: string };
 
 /** The brain a path lies in, if any. */
 export function brainOfPath(delegation: Delegation, file: string) {
   const absolute = path.resolve(delegation.you, file);
-  return delegation.brains.find((brain) => within(brain.root, absolute));
+  return onThisDevice(delegation).find((brain) => within(brain.root, absolute));
 }
 
 /**
@@ -29,7 +44,7 @@ export function brainOfPath(delegation: Delegation, file: string) {
  */
 export function writeDecision(delegation: Delegation, file: string): Decision {
   const absolute = path.resolve(delegation.you, file);
-  if (delegation.brains.some((item) => item.work && within(item.work, absolute)))
+  if (onThisDevice(delegation).some((item) => item.work && within(item.work, absolute)))
     return { allow: true };
   if (within(delegation.you, absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);

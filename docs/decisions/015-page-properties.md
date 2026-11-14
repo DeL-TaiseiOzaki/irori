@@ -1,10 +1,14 @@
 # 015 — Page properties above the note
 
 Date: 2026-09-29. Status: owner request accepted; stage 1 implemented for 0.1.54,
-stages 2 and 3 open.
+the relation picker of stage 2 and stage 3 for 0.2.67. Still open from stage 2:
+the pickers for `link` and `sources`, and **確認済みにする**.
 Addresses the "properties" item that [ACCEPTANCE](../ACCEPTANCE.md) leaves open
 under R03 and R08. Amended by [ADR 028](028-generated-indexes.md): the hibachi's
 root `README.md` is Schema, so it has no properties block.
+[ADR 060](060-the-ontology-is-the-declaration.md) makes this declaration the
+knowledge base's ontology: a relation's `to` may name the types it points at,
+and irori checks every page against it.
 
 ## Context
 

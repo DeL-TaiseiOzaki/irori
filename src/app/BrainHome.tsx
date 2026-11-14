@@ -10,6 +10,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon, type IconName } from './Icon';
 import { SkillReach } from './SkillReach';
+import { RemoteVaultPlace } from './RemoteHosts';
 import { VaultRepositories } from './VaultRepositories';
 import { useResource } from './useResource';
 import { useWindowItems } from './useWindowItems';
@@ -145,6 +146,8 @@ export function BrainHome({
 }) {
   const [reach, setReach] = useState(false);
   const shown = useWindowItems();
+  // A vault on an SSH host is shown, not changed (ADR 061): its home offers no edits.
+  const remote = !!space.host;
   const knowledgeRoot = roots?.entries.some(
     (entry) => entry.path === knowledgeFolder(space) && entry.directory,
   );
@@ -184,17 +187,25 @@ export function BrainHome({
             <span className="home-name" title={space.name}>
               {space.name}
             </span>
-            <button
-              className="stage-button home-edit"
-              aria-label={t('vault の設定', 'vault settings')}
-              title={t('vault の設定', 'vault settings')}
-              disabled={locked || held}
-              onClick={onSettings}
-            >
-              <Icon name="penLine" size={15} />
-            </button>
+            {!remote && (
+              <button
+                className="stage-button home-edit"
+                aria-label={t('vault の設定', 'vault settings')}
+                title={t('vault の設定', 'vault settings')}
+                disabled={locked || held}
+                onClick={onSettings}
+              >
+                <Icon name="penLine" size={15} />
+              </button>
+            )}
           </h1>
           <div className="home-meta">
+            {space.host && (
+              <>
+                <RemoteVaultPlace space={space} />
+                <i />
+              </>
+            )}
             {space.category && (
               <>
                 <span>
@@ -222,7 +233,13 @@ export function BrainHome({
           </div>
         </div>
         <div className="home-actions">
-          {daily && (
+          {remote && (
+            <span className="save-state" role="status">
+              <Icon name="lock" size={13} />
+              {t('読み取り専用', 'Read-only')}
+            </span>
+          )}
+          {daily && !remote && (
             <button
               className={
                 primary === 'daily' ? 'primary-button home-button' : 'stage-text-button framed'
@@ -234,17 +251,19 @@ export function BrainHome({
               {t('今日のノート', "Today's note")}
             </button>
           )}
-          <button
-            className={
-              primary === 'note' ? 'primary-button home-button' : 'stage-text-button framed'
-            }
-            disabled={locked}
-            onClick={onNewNote}
-          >
-            <Icon name="plus" size={15} />
-            {t('ノートを作成', 'Create note')}
-          </button>
-          {shown.terminal && (
+          {!remote && (
+            <button
+              className={
+                primary === 'note' ? 'primary-button home-button' : 'stage-text-button framed'
+              }
+              disabled={locked}
+              onClick={onNewNote}
+            >
+              <Icon name="plus" size={15} />
+              {t('ノートを作成', 'Create note')}
+            </button>
+          )}
+          {shown.terminal && !remote && (
             <button className="stage-text-button" onClick={onTerminal}>
               <Icon name="terminal" size={15} />
               {t('ターミナル', 'Terminal')}
@@ -262,7 +281,9 @@ export function BrainHome({
               className="home-changes"
               action={
                 <button className="primary-button small" onClick={onChanges}>
-                  {t('確認してコミット', 'Review and commit')}
+                  {remote
+                    ? t('変更を見る', 'View changes')
+                    : t('確認してコミット', 'Review and commit')}
                 </button>
               }
             >
@@ -311,7 +332,7 @@ export function BrainHome({
                   onClick={onGraph}
                 >
                   <Icon name="graph" size={14} />
-                  {t('グラフ', 'Graph')}
+                  {t('オントロジー', 'Ontology')}
                 </button>
               </>
             }
@@ -411,10 +432,12 @@ export function BrainHome({
             layer="contents"
             title={layerLabel(space, 'contents')}
             action={
-              <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
-                <Icon name="cloudConnect" size={14} />
-                {t('接続', 'Connect')}
-              </button>
+              !remote && (
+                <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
+                  <Icon name="cloudConnect" size={14} />
+                  {t('接続', 'Connect')}
+                </button>
+              )
             }
           >
             {connections.map((connection) => (

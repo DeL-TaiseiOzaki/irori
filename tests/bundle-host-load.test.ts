@@ -5,9 +5,14 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { SearchService } from '../src/host/search';
-import { GraphIndexService } from '../src/host/graph-index';
+import { BundleService } from '../src/host/bundle';
 import type { Space } from '../src/domain/types';
-import { graphIndexFiles } from '../src/domain/graph-index';
+
+const okf = '---\nokf_version: "0.2"\n---\n';
+const declaration = JSON.stringify({
+  schemaVersion: 1,
+  types: { concept: { heading: '# Concepts' } },
+});
 
 function gate() {
   let release!: () => void;
@@ -17,7 +22,7 @@ function gate() {
   return { wait, release };
 }
 
-test('Graph checks coalesce by scope, queue fresh updates and retry failed walks', async (t) => {
+test('Checks coalesce by scope, queue fresh updates and retry failed walks', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-host-graph-'));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
@@ -27,6 +32,9 @@ test('Graph checks coalesce by scope, queue fresh updates and retry failed walks
     const root = path.join(base, name);
     await mkdir(path.join(root, 'Knowledge_Base/wiki'), { recursive: true });
     await writeFile(path.join(root, 'Knowledge_Base/wiki/note.md'), '---\ntitle: Note\n---\nBody');
+    await writeFile(path.join(root, 'Knowledge_Base/index.md'), okf);
+    await mkdir(path.join(root, '.property'));
+    await writeFile(path.join(root, '.property/property.json'), declaration);
     spaces.push(await files.register(root, name, 'personal'));
   }
   const search = new SearchService(files);
@@ -48,33 +56,41 @@ test('Graph checks coalesce by scope, queue fresh updates and retry failed walks
     }
     return walk(...args);
   };
-  const graph = new GraphIndexService(files, search);
+  const graph = new BundleService(files, search);
   const building = graph as unknown as { build: (id: string, fresh?: boolean) => Promise<unknown> };
   const build = building.build.bind(graph);
   const updateStarted = gate();
   let builds = 0;
+  const pages = async (id: string) => (await graph.ontology(id)).report!.pages;
+  const current = async (id: string) => {
+    const { indexes } = await graph.ontology(id);
+    return !!indexes && !indexes.added && !indexes.changed;
+  };
   building.build = (id, fresh) => {
     if (id === spaces[0].scopeId && ++builds === 2) updateStarted.release();
     return build(id, fresh);
   };
-  const first = graph.status(spaces[0].scopeId);
+  const first = pages(spaces[0].scopeId);
   await started.wait;
-  const burst = Array.from({ length: 20 }, () => graph.status(spaces[0].scopeId));
+  const burst = Array.from({ length: 20 }, () => pages(spaces[0].scopeId));
   const updating = graph.update(spaces[0].scopeId);
   await updateStarted.wait;
-  assert.equal((await graph.status(spaces[1].scopeId)).pages, 1);
+  assert.equal(await pages(spaces[1].scopeId), 1);
   resume.release();
-  assert.ok((await Promise.all([first, ...burst])).every((status) => status.pages === 1));
-  assert.equal((await updating).current, true);
+  assert.ok((await Promise.all([first, ...burst])).every((count) => count === 1));
+  assert.deepEqual((await updating).written, [
+    'Knowledge_Base/index.md',
+    'Knowledge_Base/wiki/index.md',
+  ]);
   assert.equal(walks.get(spaces[0].scopeId), 2);
-  assert.equal((await graph.status(spaces[0].scopeId)).current, true);
+  assert.equal(await current(spaces[0].scopeId), true);
   assert.equal(walks.get(spaces[0].scopeId), 3);
   fail = true;
-  await assert.rejects(graph.status(spaces[0].scopeId), /Temporary walk failure/);
-  assert.equal((await graph.status(spaces[0].scopeId)).current, true);
+  await assert.rejects(graph.ontology(spaces[0].scopeId), /Temporary walk failure/);
+  assert.equal(await current(spaces[0].scopeId), true);
 });
 
-test('An explicit graph update rereads pages edited after a coalesced status walk checked them', async (t) => {
+test('An explicit update rereads pages edited after a coalesced check walked them', async (t) => {
   const base = await mkdtemp(path.join(tmpdir(), 'irori-host-graph-update-'));
   t.after(() => rm(base, { recursive: true, force: true }));
   const files = new FileService(path.join(base, 'device'));
@@ -82,10 +98,11 @@ test('An explicit graph update rereads pages edited after a coalesced status wal
   const root = path.join(base, 'KB');
   await mkdir(path.join(root, 'Knowledge_Base/wiki'), { recursive: true });
   const note = path.join(root, 'Knowledge_Base/wiki/note.md');
-  const page = (title: string) =>
-    `---\ntitle: ${title}\nrelations:\n  - { rel: uses, target: other.md }\n---\nBody`;
+  const page = (title: string) => `---\ntype: concept\ntitle: ${title}\n---\nBody`;
   await writeFile(note, page('OriginalTitle'));
-  await writeFile(path.join(root, 'Knowledge_Base/wiki/other.md'), '# Other');
+  await writeFile(path.join(root, 'Knowledge_Base/index.md'), okf);
+  await mkdir(path.join(root, '.property'));
+  await writeFile(path.join(root, '.property/property.json'), declaration);
   const space = await files.register(root, 'Fixture', 'personal');
   const search = new SearchService(files);
   const walk = search.walk.bind(search);
@@ -101,7 +118,7 @@ test('An explicit graph update rereads pages edited after a coalesced status wal
     }
     return result;
   };
-  const graph = new GraphIndexService(files, search);
+  const graph = new BundleService(files, search);
   const building = graph as unknown as { build: (id: string, fresh?: boolean) => Promise<unknown> };
   const build = building.build.bind(graph);
   const updateStarted = gate();
@@ -109,16 +126,16 @@ test('An explicit graph update rereads pages edited after a coalesced status wal
     if (fresh) updateStarted.release();
     return build(id, fresh);
   };
-  const checking = graph.status(space.scopeId);
+  const checking = graph.ontology(space.scopeId);
   await started.wait;
   await writeFile(note, page('UpdatedTitleWithMoreText'));
   const updating = graph.update(space.scopeId);
   await updateStarted.wait;
   resume.release();
   await checking;
-  assert.equal((await updating).current, true);
+  assert.equal((await updating).written.length, 2);
   assert.equal(walks, 2);
-  const entities = await readFile(path.join(root, graphIndexFiles.entities), 'utf8');
-  assert.match(entities, /UpdatedTitleWithMoreText/);
-  assert.doesNotMatch(entities, /OriginalTitle/);
+  const index = await readFile(path.join(root, 'Knowledge_Base/wiki/index.md'), 'utf8');
+  assert.match(index, /UpdatedTitleWithMoreText/);
+  assert.doesNotMatch(index, /OriginalTitle/);
 });

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type KeyboardEvent, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import type { AgentCommand, AgentId } from '../domain/types';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
@@ -70,11 +71,11 @@ export function useCommandMenu({
   const open = wanted && (!loaded?.commands || matches.length > 0);
   const choose = (command: AgentCommand) => {
     const text = `/${command.name} `;
-    setPrompt(text);
-    requestAnimationFrame(() => {
-      field.current?.focus();
-      field.current?.setSelectionRange(text.length, text.length);
-    });
+    // The caret goes after the name at once. Placed a frame later, it moved under
+    // whatever was typed or selected meanwhile, and the next words landed after the name.
+    flushSync(() => setPrompt(text));
+    field.current?.focus();
+    field.current?.setSelectionRange(text.length, text.length);
   };
   const option = (index: number) => `${id}-option-${index}`;
   /** Handles the keys the open list takes; true when the textarea must not act on it. */

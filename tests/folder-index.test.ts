@@ -5,11 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { SearchService } from '../src/host/search';
-import { GraphIndexService } from '../src/host/graph-index';
-import { graphIndexFiles } from '../src/domain/graph-index';
+import { BundleService } from '../src/host/bundle';
 import { folderDescriptions, linkDestination, renderFolderIndex } from '../src/domain/folder-index';
 import { linksTo, resolveNoteLink, samePath } from '../src/domain/note-links';
-import { ontologyFixture } from './fixtures/ontology';
 
 const declaration = {
   schemaVersion: 1,
@@ -31,8 +29,7 @@ const decomposed = 'Knowledge_Base/wiki/データ ノート.md'.normalize('NFD')
 // A bundle with every case the rule names: nested folders, a decomposed Japanese
 // name, an undeclared and a missing type, a missing description, folder lines a
 // person described, prose that is not kept, a folder with only an index, and the
-// folders the walk must leave out (hidden, the graph module, a submodule and a
-// nested vault).
+// folders the walk must leave out (hidden, a submodule and a nested vault).
 const bundle: [string, string][] = [
   ['.property/property.json', JSON.stringify(declaration)],
   [
@@ -66,7 +63,6 @@ const bundle: [string, string][] = [
   ['Knowledge_Base/wiki/ext/.git', 'gitdir: ../../../.git/modules/ext\n'],
   ['Knowledge_Base/wiki/ext/inside.md', page({ type: 'concept', title: 'Inside' })],
   ['Knowledge_Base/.hidden/h.md', page({ type: 'concept', title: 'Hidden' })],
-  ['Knowledge_Base/ontology/stray.md', page({ type: 'concept', title: 'Stray' })],
 ];
 
 const expected: Record<string, string> = {
@@ -105,8 +101,9 @@ async function fixture(t: TestContext, files = bundle) {
   await service.register(path.join(root, 'Knowledge_Base/team'), '入れ子', 'team');
   await write('Knowledge_Base/team/Knowledge_Base/inner.md', page({ type: 'concept' }));
   const read = (relative: string) => readFile(path.join(root, relative), 'utf8');
-  const graph = new GraphIndexService(service, new SearchService(service));
-  return { root, files: service, space, write, read, graph };
+  const bundles = new BundleService(service, new SearchService(service));
+  const indexes = async () => (await bundles.ontology(space.scopeId)).indexes;
+  return { root, files: service, space, write, read, bundles, indexes };
 }
 
 async function filesUnder(directory: string, prefix = ''): Promise<string[]> {
@@ -121,14 +118,15 @@ async function filesUnder(directory: string, prefix = ''): Promise<string[]> {
 }
 
 test('Folder indexes are generated from the pages, deterministically, and kept only where they list something', async (t) => {
-  const { root, space, read, graph } = await fixture(t);
-  const before = await graph.status(space.scopeId);
-  assert.deepEqual(before.indexes, { folders: 4, added: 2, changed: 2 });
-  const updated = await graph.update(space.scopeId);
-  assert.deepEqual(
-    updated.written.filter((file) => !file.startsWith('Knowledge_Base/ontology/')).sort(),
-    Object.keys(expected).sort(),
-  );
+  const { root, space, read, bundles, indexes } = await fixture(t);
+  assert.deepEqual(await indexes(), { folders: 4, added: 2, changed: 2 });
+  const updated = await bundles.update(space.scopeId);
+  assert.equal(updated.bundle, true);
+  // Every page the walk met, the submodule's included; only the indexes leave that one out.
+  assert.equal(updated.pages, 9);
+  assert.deepEqual(updated.written.sort(), Object.keys(expected).sort());
+  // The indexes are all an update writes: irori generates no graph of the pages (ADR 060).
+  assert.ok(!(await filesUnder(root)).some((file) => file.includes('ontology/')));
   for (const [file, text] of Object.entries(expected)) assert.equal(await read(file), text, file);
   // A folder with no page keeps its own index, and is listed above.
   assert.equal(await read('Knowledge_Base/journal/index.md'), '# Entries\n\nNothing yet.\n');
@@ -138,13 +136,9 @@ test('Folder indexes are generated from the pages, deterministically, and kept o
   for (const left of ['wiki/ext/index.md', '.hidden/index.md', 'team/index.md'])
     assert.ok(!written.includes(left), left);
   // The same pages give the same bytes: a second run writes nothing.
-  const again = await graph.update(space.scopeId);
+  const again = await bundles.update(space.scopeId);
   assert.deepEqual(again.written, []);
-  assert.deepEqual((await graph.status(space.scopeId)).indexes, {
-    folders: 4,
-    added: 0,
-    changed: 0,
-  });
+  assert.deepEqual(await indexes(), { folders: 4, added: 0, changed: 0 });
 
   // Every generated link resolves, through irori's own link reader, to a file on disk.
   const onDisk = (await filesUnder(root)).filter((file) => !file.startsWith('.git/'));
@@ -163,8 +157,8 @@ test('Folder indexes are generated from the pages, deterministically, and kept o
 });
 
 test('A page change, a removed page and a new folder show as counts and are written by one update', async (t) => {
-  const { space, write, read, graph, root } = await fixture(t);
-  await graph.update(space.scopeId);
+  const { space, write, read, bundles, indexes, root } = await fixture(t);
+  await bundles.update(space.scopeId);
   await write(
     'Knowledge_Base/wiki/b.md',
     page({ type: 'concept', title: 'B', description: 'Now said' }),
@@ -174,10 +168,9 @@ test('A page change, a removed page and a new folder show as counts and are writ
     page({ type: 'journal', title: '10月7日' }),
   );
   await rm(path.join(root, 'Knowledge_Base/wiki/topics'), { recursive: true });
-  const status = await graph.status(space.scopeId);
   // wiki changes; journal and journal/2026 are new pages' folders, journal's index is rewritten.
-  assert.deepEqual(status.indexes, { folders: 4, added: 1, changed: 2 });
-  await graph.update(space.scopeId);
+  assert.deepEqual(await indexes(), { folders: 4, added: 1, changed: 2 });
+  await bundles.update(space.scopeId);
   assert.match(await read('Knowledge_Base/wiki/index.md'), /\* \[B\]\(b\.md\) - Now said\n/);
   assert.doesNotMatch(await read('Knowledge_Base/wiki/index.md'), /topics/);
   assert.equal(await read('Knowledge_Base/journal/index.md'), '# Folders\n\n* [2026](2026/)\n');
@@ -192,34 +185,43 @@ test('A page change, a removed page and a new folder show as counts and are writ
   );
 });
 
-test('A declared ontology keeps its tables, and the folder indexes are generated all the same', async (t) => {
-  const { space, write, read, graph, root } = await fixture(t);
-  await write('.irori/ontology.json', JSON.stringify(ontologyFixture.declaration));
-  await write(ontologyFixture.declaration.entities.path, ontologyFixture.entities);
-  const status = await graph.status(space.scopeId);
-  assert.equal(status.declared, true);
-  assert.deepEqual(status.indexes, { folders: 4, added: 2, changed: 2 });
-  const updated = await graph.update(space.scopeId);
-  assert.deepEqual(updated.written.sort(), Object.keys(expected).sort());
-  assert.equal(await read('Knowledge_Base/index.md'), expected['Knowledge_Base/index.md']);
-  await assert.rejects(readFile(path.join(root, graphIndexFiles.entities)), /ENOENT/);
+test('A folder that held the graph index of an earlier irori is a folder like any other', async (t) => {
+  const { space, write, read, bundles } = await fixture(t);
+  const former = 'id,label,note,parentId,group\n';
+  await write('Knowledge_Base/ontology/entities.csv', former);
+  await write('Knowledge_Base/ontology/index.md', '# ontology\n\nGenerated by an earlier irori.\n');
+  assert.equal(
+    (await bundles.ontology(space.scopeId)).formerGraphIndex,
+    'Knowledge_Base/ontology/',
+  );
+  await bundles.update(space.scopeId);
+  // It holds no page, so its own index is left alone; the root lists it, as it lists `archive`.
+  assert.equal(await read('Knowledge_Base/ontology/entities.csv'), former);
+  assert.equal(
+    await read('Knowledge_Base/ontology/index.md'),
+    '# ontology\n\nGenerated by an earlier irori.\n',
+  );
+  assert.match(await read('Knowledge_Base/index.md'), /\* \[ontology\]\(ontology\/\)\n/);
 });
 
 test('Only an OKF bundle with a readable property declaration is offered folder indexes', async (t) => {
-  const { space, write, graph } = await fixture(t);
+  const { space, write, read, bundles, indexes } = await fixture(t);
+  const nothing = { bundle: false, pages: 0, written: [] };
   await write('.property/property.json', '{ "schemaVersion": 2 }');
-  assert.equal((await graph.status(space.scopeId)).indexes, undefined);
+  assert.equal(await indexes(), undefined);
+  assert.deepEqual(await bundles.update(space.scopeId), nothing);
   await write('.property/property.json', JSON.stringify(declaration));
   await write('Knowledge_Base/index.md', '# Index without okf_version\n');
-  assert.equal((await graph.status(space.scopeId)).indexes, undefined);
+  assert.equal(await indexes(), undefined);
   await write('Knowledge_Base/index.md', '---\ntitle: not a bundle root\n---\n');
-  assert.equal((await graph.status(space.scopeId)).indexes, undefined);
-  await write('.irori/ontology.json', JSON.stringify(ontologyFixture.declaration));
-  await assert.rejects(() => graph.update(space.scopeId), /ontology\.json/);
+  assert.equal(await indexes(), undefined);
+  // An update there writes nothing: without a bundle there is no index to write.
+  assert.deepEqual(await bundles.update(space.scopeId), nothing);
+  assert.equal(await read('Knowledge_Base/index.md'), '---\ntitle: not a bundle root\n---\n');
 });
 
 test('An empty folder with only an index keeps its line and description in the root index', async (t) => {
-  const { space, read, graph } = await fixture(t, [
+  const { space, read, bundles } = await fixture(t, [
     ['.property/property.json', JSON.stringify(declaration)],
     [
       'Knowledge_Base/index.md',
@@ -229,7 +231,7 @@ test('An empty folder with only an index keeps its line and description in the r
     ['Knowledge_Base/wiki/index.md', '# Concepts\n'],
     ['Knowledge_Base/wiki/first.md', page({ type: 'concept', title: 'First' })],
   ]);
-  await graph.update(space.scopeId);
+  await bundles.update(space.scopeId);
   assert.equal(
     await read('Knowledge_Base/index.md'),
     '---\nokf_version: "0.2"\n---\n\n# Folders\n\n' +

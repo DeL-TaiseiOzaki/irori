@@ -1,5 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
-import { frontmatterBlock } from '../domain/graph-index';
+import { frontmatterBlock } from '../domain/bundle';
 import { linkCount, linksTo, resolveNoteLink, rewriteLinks, samePath } from '../domain/note-links';
 import { t } from '../domain/i18n';
 import { defaultContentsFolder, defaultKnowledgeFolder } from '../domain/layers';

@@ -1,5 +1,119 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault can live on an SSH host, 2026-11-13 (**0.2.68**,
+[#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320), published as
+`v0.2.68-preview.1`; [ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)):
+the owner asked to talk with the second brain in one vault while code runs on
+another machine, with the vault there in the same workspace and only the irori
+agent crossing vaults. First step: such a vault is shown and its agent is
+handed work; nothing in the window changes it yet.
+- `src/remote/` is irori's vault host: one file (`dist-host/vault-host.cjs`)
+  with every package inside it, run on the host by a Node irori sends. `attach`
+  joins an `ssh` login's pipes to the vault host of `~/.irori-host/data` and
+  starts one when none answers; `serve` stays, on a socket only its user opens,
+  keeps the last 2,000 events and the open questions for a device that attaches
+  again, keeps a hand-off's report for a day until its device collects it, and
+  ends after fifteen minutes with nothing running, no report waiting and no
+  device.
+- `RemoteLink` (`src/host/remote-link.ts`) is one `ssh` login in `BatchMode`: it
+  installs what is missing (the vault host, and Node v24.21.0 from nodejs.org,
+  pinned by size and SHA-256 in `remote-payload.ts`) and replaces a vault host
+  of another version once nothing runs on it. `RemoteHosts`
+  (`src/host/remote-hosts.ts`) keeps the hosts and their vaults in
+  `remote-hosts.json`, connects on demand and refuses a vault whose id is
+  already registered here or on another host.
+- The main process lists those vaults in `spaces` with `Space.host` and answers
+  an operation that names one by sending a read to its host
+  (`src/host/vault-reads.ts`, shared with the vault host), answering here
+  (drafts, removal, the lists that stay empty) or refusing in words.
+- `AgentService.startHanded` starts a hand-off where its vault is. For a vault
+  on a host the irori agent's `irori call` runs the vault agent there; steps,
+  permission requests and questions show in the irori agent's conversation,
+  stopping it stops the run there, and the report is collected across a
+  reconnection. `irori ls`, `read`, `search` and `send` (`vault-reach.ts`) reach
+  a handed vault on a host; `prompts/remote-vault.ts` says how.
+- Configuration that runs without asking in a vault on a host, and a Git
+  repository's programs there, are approved in a dialog on this device.
+- The window (`src/app/RemoteHosts.tsx`): **設定 › SSH ホスト** adds, connects,
+  edits and removes hosts, lists each host's vaults with **一覧から外す**, and
+  **vault を追加** opens a dialog that walks the host's folders. `RegisterSpace`
+  has an **SSH ホスト** source. A vault on a host shows its host, has no editing
+  in the explorer, the Schema, the Git view or its settings, no terminal and no
+  composer of its own, and says to ask the irori agent in irori mode.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux.
+  `tests/remote-hosts.test.ts` stands this machine in for a host; the same ran
+  over a real `ssh` to another account with Node downloaded from nodejs.org
+  (`IRORI_TEST_SSH`). `scripts/remote-hosts-ui-smoke.ts` adds a host and a vault
+  in a real Electron under Xvfb with a stand-in `ssh`.
+- `useCommandMenu` places the caret after a chosen command at once
+  (`flushSync`) instead of on the next frame. The harness smoke failed on
+  main's own run of 0.2.67 and on this change's with the same message: on a
+  slow runner the deferred caret ran between the two steps of the smoke's next
+  `fill`, which then added its text after the name instead of replacing it.
+- Not tried: a Windows or macOS client, a real network between the machines, a
+  real CLI with an account on the host. Not done: editing in a vault on a host,
+  conversations with its own agent and its `irori` command, the shared Schema
+  there, the terminal, connected folders, routines, SSH prompts in the window.
+
+Relations picked and pages started from a type, 2026-11-13 (**0.2.67**,
+[#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318), published as
+`v0.2.67-preview.1`; [ADR 015](decisions/015-page-properties.md) stage 2's relation picker and stage
+3, on top of [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the
+declaration is applied where a page is written, not only checked afterwards.
+- `PageProperties` shows `relations` as rows of a name and a target instead of a
+  read-only list. The name is a select of `relationsFrom(declaration, type)`;
+  the target an input with the pages of the types that relation points at
+  (`HostAPI.ontologyPages`, from `BundleService.pages`, read on first use), or a
+  URL field. `linkTo` writes the target relative to the page. A name the
+  declaration lacks, or one this type may not state, stays and is marked.
+- **ノートを作成** offers the vault's declared types and **種類なし**.
+  `HostAPI.createNote` takes the type; `createTypedNote` writes
+  `newPageText`: the type, the title from the file name, the person as the
+  last change and the type's required keys, empty. An undeclared type is
+  refused.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux, with new
+  cases in `tests/ontology.test.ts` and `tests/properties.test.ts`;
+  `scripts/properties-ui-smoke.ts` picks a relation and starts a page from a
+  type in a real Electron. Not seen on Windows or macOS.
+- Not done: the pickers for `link` and `sources`, and **確認済みにする**.
+
+The ontology is the declaration, 2026-11-13 (**0.2.66**,
+[#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316), published as
+`v0.2.66-preview.1`; [ADR 060](decisions/060-the-ontology-is-the-declaration.md)): the owner asked
+how irori handles the ontology and for the simplest mechanism, then corrected the
+first answer: what is wanted is an ontology, not a knowledge graph. Until 0.2.65
+the view called オントロジー drew a graph of the pages from generated CSV files,
+and nothing in irori read the relations a knowledge base declares.
+- The ontology is `.property/property.json`. A relation's `to` may now name the
+  types it points at (`src/domain/properties.ts`); `page`, `url` and older
+  declarations read as before.
+- `checkOntology` (`src/domain/ontology.ts`) applies the declaration to the
+  pages and returns eleven kinds of finding, counts per type and relation, and
+  the names in use that are not declared. `BundleService` (`src/host/bundle.ts`,
+  was `GraphIndexService`) walks the pages as before, remembers each page's facts
+  by size and modification time, and now also keeps the keys a page carries.
+- `OntologyPanel` draws the declared types and relations (React Flow, laid out
+  top to bottom, with an arc for a relation from a type to itself) and lists
+  types, relations, undeclared names and findings; a finding opens its page.
+  The entry is **オントロジー** (was **グラフ**), and the prepared vault-agent
+  request asks for a review of the declaration.
+- Removed: the graph index module (`ontology/entities.csv`, `relations.csv`,
+  its `index.md`), its freshness check, limits and repair; the declared CSV pair
+  of `.irori/ontology.json`; the group and hierarchy filters and the entity
+  list. `HostAPI.ontology` returns the report; `graphIndexStatus` and
+  `updateGraphIndex` give way to `updateIndexes`. **索引を更新** and
+  `irori index` write the folder indexes only (ADR 028), and say so for a vault
+  that is not an OKF bundle. An `ontology/` folder left by an earlier irori is
+  named in the view and otherwise untouched.
+- `npm run build`, `npm run format:check` and `npm test` pass on Linux, with
+  `tests/ontology.test.ts`, `tests/bundle.test.ts`, `tests/csv.test.ts` and
+  `tests/bundle-host-load.test.ts` new or rewritten and the folder-index,
+  root-layout, layer-name, move and command tests adapted.
+  `scripts/ontology-ui-smoke.ts` passes in a real Electron under Xvfb. Not seen
+  on Windows or macOS, and not tried against a real knowledge base.
+- Not done: the relation picker and the new page that starts from a type
+  (ADR 015 stages 2 and 3); a list, on a page, of the pages that name it in a
+  relation.
 Find in the file on show, 2026-11-13 (**0.2.65**,
 [#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315), published as
 `v0.2.65-preview.1`): the owner asked for a keyword search inside each file on

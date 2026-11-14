@@ -154,11 +154,15 @@ export function RemoveVault({
 }) {
   const [trash, setTrash] = useState(false);
   const { busy, error, run } = useAction();
-  const label = t(`${space.name} を削除`, `Remove ${space.name}`);
+  // A vault on an SSH host only leaves this device's list; its folder there is never touched.
+  const remote = space.host;
+  const label = remote
+    ? t(`${space.name} を一覧から外す`, `Take ${space.name} off the list`)
+    : t(`${space.name} を削除`, `Remove ${space.name}`);
   async function remove() {
     await run(async () => {
       if (beforeRemove && !(await beforeRemove())) return;
-      await host.removeSpace(space.scopeId, trash);
+      await host.removeSpace(space.scopeId, !remote && trash);
       onRemoved();
     });
   }
@@ -172,21 +176,16 @@ export function RemoveVault({
         }}
       >
         <h2>{label}</h2>
-        <p>
-          {t(
-            'irori とワークスペースから外します。フォルダをゴミ箱に移しても、この vault の検索インデックス・削除済みノート・下書き・会話・取り込んだ資料・ルーティンの記録は irori のデータフォルダに残ります。',
-            "It leaves irori and its workspaces. Even if the folder goes to the trash, the vault's search index, deleted notes, drafts, conversations, captured materials and routine records stay in irori's data folder.",
-          )}
-        </p>
-        <label>
-          <input
-            type="checkbox"
-            checked={trash}
-            disabled={busy}
-            onChange={(event) => setTrash(event.target.checked)}
-          />{' '}
-          {t('フォルダもゴミ箱に移す', 'Also move the folder to the trash')}
-        </label>
+        {remote ? (
+          <p>
+            {t(
+              `この端末の一覧とワークスペースから外します。SSH ホスト「${remote.name}」のフォルダとそのファイルは、そのまま残ります。`,
+              `It leaves this device's list and its workspaces. The folder on the SSH host ${remote.name} and its files stay as they are.`,
+            )}
+          </p>
+        ) : (
+          <RemoveLocal trash={trash} busy={busy} onTrash={setTrash} />
+        )}
         <p className="hint mono">{space.root}</p>
         {error && <p role="alert">{error}</p>}
         <div className="actions">
@@ -194,11 +193,42 @@ export function RemoveVault({
             {t('キャンセル', 'Cancel')}
           </button>
           <button className="primary" disabled={busy}>
-            {t('削除', 'Remove')}
+            {remote ? t('一覧から外す', 'Take off the list') : t('削除', 'Remove')}
           </button>
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** What removing a vault of this computer does, and the choice to trash its folder too. */
+function RemoveLocal({
+  trash,
+  busy,
+  onTrash,
+}: {
+  trash: boolean;
+  busy: boolean;
+  onTrash: (trash: boolean) => void;
+}) {
+  return (
+    <>
+      <p>
+        {t(
+          'irori とワークスペースから外します。フォルダをゴミ箱に移しても、この vault の検索インデックス・削除済みノート・下書き・会話・取り込んだ資料・ルーティンの記録は irori のデータフォルダに残ります。',
+          "It leaves irori and its workspaces. Even if the folder goes to the trash, the vault's search index, deleted notes, drafts, conversations, captured materials and routine records stay in irori's data folder.",
+        )}
+      </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={trash}
+          disabled={busy}
+          onChange={(event) => onTrash(event.target.checked)}
+        />{' '}
+        {t('フォルダもゴミ箱に移す', 'Also move the folder to the trash')}
+      </label>
+    </>
   );
 }
 

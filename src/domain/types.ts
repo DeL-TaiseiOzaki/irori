@@ -57,6 +57,12 @@ export interface LayerFolderRename {
 }
 export interface Space extends ScopeDeclaration {
   root: string;
+  /**
+   * The SSH host the vault lives on (ADR 061); a vault on this device has none.
+   * `root` is then its folder on that host, and irori shows the vault without
+   * changing it.
+   */
+  host?: { id: string; name: string };
 }
 export interface Entry {
   path: string;
@@ -399,7 +405,9 @@ export type HostEvent =
   /** The irori agent registered a vault; `workspace` is the one it joined, as saved. */
   | { type: 'vaults'; workspace?: WorkspaceProfile }
   /** Another window opened or closed a workspace tab, or closed (ADR 051). */
-  | { type: 'windows' };
+  | { type: 'windows' }
+  /** An SSH host was added, changed or removed, or its connection or its vaults changed (ADR 061). */
+  | { type: 'hosts' };
 export interface StartRun {
   scopeId: string;
   agent: AgentId;
@@ -708,6 +716,23 @@ export interface HostAPI {
   /** Shows the vault's work folder in the system file manager, making the default one first. */
   openWorkFolder(scopeId: string): Promise<void>;
   register(root: string, name: string, category: Category): Promise<Space>;
+  /** The SSH hosts this device knows, with whether each is connected (ADR 061). */
+  remoteHosts(): Promise<import('./remote-hosts').RemoteHost[]>;
+  /** Adds an SSH host, or changes one's name, destination or port. */
+  saveRemoteHost(
+    input: import('./remote-hosts').RemoteHostInput,
+  ): Promise<import('./remote-hosts').RemoteHost>;
+  /** Forgets an SSH host; one whose vaults are still on this device's list is refused. */
+  removeRemoteHost(id: string): Promise<void>;
+  /** Connects to an SSH host now, putting irori's vault host there first when it is missing. */
+  connectRemoteHost(id: string): Promise<import('./remote-hosts').RemoteHost>;
+  /** The folders in a folder of an SSH host, its home when none is named, for choosing a vault's. */
+  remoteFolders(hostId: string, path?: string): Promise<import('./remote-hosts').RemoteFolders>;
+  /**
+   * Registers a folder of an SSH host as a vault. One whose id is already
+   * registered on this device or on another host is refused.
+   */
+  registerRemote(hostId: string, root: string, name: string, category: Category): Promise<Space>;
   /** Makes a new folder a Git repository and registers it as a vault. */
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
   /**
@@ -730,11 +755,12 @@ export interface HostAPI {
   saveSpaceIcon(scopeId: string, bytes: Uint8Array): Promise<string>;
   entries(scopeId: string, directory: string): Promise<Entry[]>;
   read(scopeId: string, path: string): Promise<Document>;
-  ontology(scopeId: string): Promise<import('./ontology').OntologyView | null>;
-  /** Whether the graph index and an OKF bundle's folder indexes match the pages now, and what an update would change (ADR 008, 028). Writes nothing. */
-  graphIndexStatus(scopeId: string): Promise<import('./graph-index').GraphIndexStatus>;
-  /** Generates the graph index (unless declared) and the folder indexes from the pages, and writes the files whose bytes change. */
-  updateGraphIndex(scopeId: string): Promise<import('./graph-index').GraphIndexUpdate>;
+  /** The declared types and relations applied to the pages now, and whether an OKF bundle's folder indexes match them (ADR 060, 028). Writes nothing. */
+  ontology(scopeId: string): Promise<import('./ontology').Ontology>;
+  /** The knowledge base's pages with their titles and types, for picking a relation's target (ADR 015 stage 2). */
+  ontologyPages(scopeId: string): Promise<import('./bundle').PageChoice[]>;
+  /** Generates an OKF bundle's folder indexes from the pages, and writes the files whose bytes change. */
+  updateIndexes(scopeId: string): Promise<import('./bundle').IndexUpdate>;
   /** Who typed each line of this text, resolved against the record on this device. */
   noteAuthorship(
     scopeId: string,
@@ -782,7 +808,8 @@ export interface HostAPI {
   viewerBytes(scopeId: string, path: string): Promise<Uint8Array>;
   save(doc: Document): Promise<Document>;
   draft(doc: Document): Promise<void>;
-  createNote(scopeId: string, name: string, directory?: string): Promise<Document>;
+  /** A new note; with `type`, a page of that declared type with its frontmatter (ADR 015 D6). */
+  createNote(scopeId: string, name: string, directory?: string, type?: string): Promise<Document>;
   /** Where this KB asks new notes and today's note to go (`.irori/notes.json`), or null. */
   notesDeclaration(scopeId: string): Promise<import('./notes').NotesDeclaration | null>;
   /** The KB's declared page properties (`.property/property.json`) and the person's actor id. */

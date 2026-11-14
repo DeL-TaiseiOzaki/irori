@@ -146,7 +146,8 @@ export function run() {
     if (prompt.includes('irori: the irori agent handed you this task')) return vault(prompt);
     const brains = [
       ...prompt.matchAll(
-        /^- (.+?)(?: \([^)]*\))?: folder ("(?:[^"\\]|\\.)*"), vault agent "([^"]+)"(?:, its agent: ("(?:[^"\\]|\\.)*"))?/gm,
+        // A vault on an SSH host is named with its host, and its folder there (ADR 061).
+        /^- (.+?)(?: \([^)]*\))?: (?:on the SSH host "[^"]*", )?folder ("(?:[^"\\]|\\.)*")(?: there)?, vault agent "([^"]+)"(?:, its agent: ("(?:[^"\\]|\\.)*"))?/gm,
       ),
     ].map((match) => ({
       name: match[1],

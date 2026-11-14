@@ -102,6 +102,37 @@
   border-radius: 4px;
   padding: 0 5px;
 }
+.properties-relations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.properties-relation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.properties-relation select {
+  flex: none;
+  max-width: 45%;
+}
+.properties-relation input {
+  flex: 1;
+  min-width: 0;
+}
+.properties-add-relation {
+  padding: 2px 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.properties-add-relation:hover:not(:disabled) {
+  color: var(--ink);
+}
 .properties-static {
   color: var(--ink-2);
   overflow-wrap: anywhere;

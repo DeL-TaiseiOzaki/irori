@@ -19,6 +19,7 @@ import { eventTarget } from '../domain/agent-log';
 import { anyRevision, scopeRevision, type ScopeRevisions } from '../domain/revisions';
 import { firstEntries } from './BrainHome';
 import { BrainTile } from './BrainTile';
+import { RemoteVaultPlace } from './RemoteHosts';
 import { layoutStorage } from './device-settings';
 import { Icon } from './Icon';
 import { aiStateWords, sendOnEnter, type AiState } from './display';
@@ -431,11 +432,17 @@ function BrainColumn({
           <BrainTile space={space} size={30} radius={9} />
           <span>
             <strong>{space.name}</strong>
-            {space.category && (
+            {space.host ? (
               <small>
-                <Icon name={categoryIcon(space.category)} size={11} />
-                {categoryName(space.category)}
+                <RemoteVaultPlace space={space} />
               </small>
+            ) : (
+              space.category && (
+                <small>
+                  <Icon name={categoryIcon(space.category)} size={11} />
+                  {categoryName(space.category)}
+                </small>
+              )
             )}
           </span>
         </button>
@@ -498,7 +505,7 @@ function BrainColumn({
             )}
           </div>
         ))}
-        {connections.data && !connections.data.length && (
+        {connections.data && !connections.data.length && !space.host && (
           <button className="column-connect" onClick={() => onConnect(space)}>
             <Icon name="cloudConnect" size={14} />
             {t('フォルダを接続', 'Connect a folder')}
@@ -768,6 +775,7 @@ export function Overview({
         setActed((value) => value + 1);
       }
     };
+  const localSpaces = useMemo(() => spaces.filter((space) => !space.host), [spaces]);
   const running = spaces.filter((space) => ais[space.scopeId]?.running).length;
   const waiting = spaces.filter((space) => {
     const ai = ais[space.scopeId];
@@ -1058,7 +1066,8 @@ export function Overview({
                       ))}
                     </div>
                     <OverviewComposer
-                      spaces={spaces}
+                      // A vault on an SSH host takes work through the irori agent (ADR 061).
+                      spaces={localSpaces}
                       ais={ais}
                       agentFor={agentFor}
                       accessChoice={accessChoice}

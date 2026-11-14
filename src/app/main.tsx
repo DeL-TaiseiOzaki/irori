@@ -186,6 +186,7 @@ import './stage.css';
 import './agent-panel.css';
 import './views.css';
 import { Startup, RegisterSpace } from './Startup';
+import { useRemoteHosts } from './RemoteHosts';
 import { appIcon } from './branding';
 import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
@@ -196,7 +197,7 @@ import { BrainPanel, SideBrainPanel, type BrainMode } from './BrainPanel';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { BrainTile } from './BrainTile';
 import { BrainHome } from './BrainHome';
-import { BrainSettings } from './BrainSettings';
+import { BrainSettings, RemoveVault } from './BrainSettings';
 import { AiToggle, Crumbs, fileCrumbs, NoteInfo, NoteMenu } from './NoteBar';
 import { NoteComments, type CommentRequest } from './NoteComments';
 import { Backlinks } from './Backlinks';
@@ -993,7 +994,21 @@ function App() {
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
+    // The type a new page starts from; undefined until chosen, '' for a note without one.
+    [noteType, setNoteType] = useState<string>(),
     [newNote, setNewNote] = useState(false);
+  // The types the vault declares, offered when a note is created there (ADR 015 D6).
+  const newNoteDeclared = useResource(
+    () => host.pageProperties(active!.scopeId),
+    [active?.scopeId],
+    { enabled: !!active && newNote },
+  );
+  const noteTypes = Object.keys(newNoteDeclared.data?.declaration?.types ?? {});
+  // A choice made in another vault does not carry over to one that lacks the type.
+  const chosenNoteType =
+    noteType !== undefined && (noteType === '' || noteTypes.includes(noteType))
+      ? noteType
+      : (noteTypes[0] ?? '');
   // Every run is tracked so the explorer can mark its space and the panel its
   // conversation's tab, while the panel's controls follow the conversation on show.
   function addRun(runId: string, scopeId: string, conversationId?: string) {
@@ -1249,6 +1264,29 @@ function App() {
     (scopeId?: string) => setRevisions((all) => bumpRevision(all, scopeId)),
     [],
   );
+  // The SSH hosts (ADR 061), as their `hosts` events change them. A vault on a host
+  // reads again once its host connects, so what it could not read before shows then.
+  const remoteHosts = useRemoteHosts().hosts;
+  const connectedHosts = useRef(new Set<string>());
+  useEffect(() => {
+    const now = new Set(
+      (remoteHosts ?? []).filter((item) => item.state === 'connected').map((item) => item.id),
+    );
+    for (const space of spaces)
+      if (space.host && now.has(space.host.id) && !connectedHosts.current.has(space.host.id))
+        bump(space.scopeId);
+    connectedHosts.current = now;
+  }, [remoteHosts]);
+  // A host renamed, or its vaults changed, changes the vaults as listed; its progress does not.
+  const hostsListed = (remoteHosts ?? [])
+    .map((item) => `${item.id}:${item.name}:${item.vaults}`)
+    .join('\n');
+  const hostsSeen = useRef<string>(undefined);
+  useEffect(() => {
+    if (hostsSeen.current !== undefined && hostsSeen.current !== hostsListed)
+      void refreshSpaces().catch(report);
+    hostsSeen.current = hostsListed;
+  }, [hostsListed]);
 
   function openDaily() {
     if (!active) return;
@@ -1334,6 +1372,46 @@ function App() {
     setSpaces(list);
     // The brain on show keeps its place but takes its newest declaration.
     setActive((a) => (a && list.find((space) => space.scopeId === a.scopeId)) ?? a ?? list[0]);
+  }
+  /** A vault just registered joins the workspace on show, and comes on show. */
+  async function joinVault(space: Space) {
+    await refreshSpaces();
+    if (workspace && !workspace.scopeIds.includes(space.scopeId))
+      setWorkspace(
+        await host.saveWorkspace(
+          workspace.name,
+          [...workspace.scopeIds, space.scopeId],
+          workspace.id,
+        ),
+      );
+    // An unsaved note keeps the stage; the new vault waits in the rail.
+    if (!(await save())) return;
+    setActive(space);
+    setDoc(undefined);
+    setBuffer('');
+  }
+  /** A vault left this device's list: the workspace and its views let it go. */
+  async function vaultRemoved(removed: string, notice: string) {
+    const [list, profiles] = await Promise.all([host.spaces(), host.workspaces()]);
+    const next = profiles.find((profile) => profile.id === workspace?.id);
+    setSpaces(list);
+    if (next) setWorkspace(next);
+    renewTabs(profiles);
+    // Another vault stays on show; in place of the one removed, the next of the workspace.
+    const members = (next?.scopeIds ?? []).flatMap((id) =>
+      list.filter((space) => space.scopeId === id),
+    );
+    setActive(
+      (shown) =>
+        (shown?.scopeId !== removed && members.find((space) => space.scopeId === shown?.scopeId)) ||
+        members[0],
+    );
+    if (current.current.doc?.scopeId === removed) unload();
+    setStages(({ [removed]: _, ...rest }) => rest);
+    updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
+    setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
+    bump();
+    setStatus(notice);
   }
   /** The environment saved on the GitHub account was restored here (ADR 026). */
   async function environmentRestored() {
@@ -1521,7 +1599,9 @@ function App() {
   const iroriShown = level !== 'brain';
   function toggleTerminal() {
     if (!iroriShown) {
-      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
+      // A vault on an SSH host has no terminal here yet (ADR 061).
+      if (terminalSpace || (active && !active.host))
+        setTerminalSpace((value) => (value ? undefined : active));
     } else if (iroriTerminal || you?.state === 'ready') setIroriTerminal((value) => !value);
   }
   // The shortcuts read the latest render's state; the listener itself is added once.
@@ -2231,6 +2311,12 @@ function App() {
   // identities that never change; each still does what the latest render's would.
   const act = useStableFunctions({
     report,
+    joinVault: (space: Space) => void joinVault(space).catch(report),
+    remoteVaultRemoved: (scopeId: string) =>
+      void vaultRemoved(
+        scopeId,
+        t('vault を一覧から外しました。', 'Took the vault off the list.'),
+      ).catch(report),
     save,
     launch,
     addRun,
@@ -2711,6 +2797,8 @@ function App() {
             onIroriAgent: act.showYou,
             onCreateIroriAgent: act.createYou,
             onFolderChanged: act.youFolderChanged,
+            onVaultAdded: act.joinVault,
+            onVaultRemoved: act.remoteVaultRemoved,
           }
         }
         onError={act.report}
@@ -2727,7 +2815,7 @@ function App() {
           scopeId={active.scopeId}
           revision={revision}
           selected={schemaSelected}
-          locked={brainLocked || gitBusy}
+          locked={brainLocked || gitBusy || !!active.host}
           onSelect={act.selectSchema}
           onOpenFile={act.openSchemaFile}
         />
@@ -3590,7 +3678,7 @@ function App() {
                         scopeId={active.scopeId}
                         space={active}
                         target={schemaTarget}
-                        locked={brainLocked || gitBusy}
+                        locked={brainLocked || gitBusy || !!active.host}
                         revision={revision}
                         onSelect={(target) => {
                           if (target) setSchemaTarget({ ...target, scopeId: active.scopeId });
@@ -3616,8 +3704,10 @@ function App() {
                             ? () => {
                                 setView('note');
                                 openDock('vault');
-                                const request =
-                                  'この KB のオントロジーを一緒に整理してください。まず既存 CSV とノートを調べ、構築方針と表示設定を提案してください。既存 ID・未知の列・ノートは保持し、別 KB や contents を変更しないでください。irori の表示宣言は .irori/ontology.json、形式は {"schemaVersion":1,"entities":{"path":"ontology/entities.csv","id":"id","label":"label","note":"note","parent":"parentId","group":"group"},"relations":{"path":"ontology/relations.csv","source":"sourceId","target":"targetId","label":"relation"}} です。パスと列名は既存 CSV に合わせられます。note はこの KB 内の Markdown 相対パス、parentId は親 ID、group はサブグラフ名です。note・parent・group の列マッピングと relations は任意で、未使用なら宣言から省略できます。CSV はカンマ区切り、ID は重複させずラベル変更で変えないでください。';
+                                const request = t(
+                                  'この KB のオントロジー（.property/property.json が宣言する種類と関係）を一緒に見直してください。まず宣言とページを調べ、宣言にない名前と、宣言と違う使い方を挙げてください。そのうえで、宣言を直すのかページを直すのかを、1 件ずつ理由を添えて提案してください。合意するまでは .property/property.json もページも変更しないでください。別の KB や contents は変更しないでください。',
+                                  "Please review this KB's ontology with me: the types and relations .property/property.json declares. First read the declaration and the pages, and list the names pages use that are not declared and the uses that differ from the declaration. Then propose, one at a time and with the reason, whether to change the declaration or the pages. Change neither .property/property.json nor any page before we agree. Do not change another KB or contents.",
+                                );
                                 setPrompt((previous) =>
                                   previous ? `${previous}\n\n${request}` : request,
                                 );
@@ -3674,6 +3764,7 @@ function App() {
                                       !doc.cloud && !!docSpace && isPropertyPage(docSpace, doc.path)
                                     }
                                     properties={propertiesRead.data}
+                                    scopeId={doc.scopeId}
                                     text={buffer}
                                     mode={mode}
                                     filename={doc.path}
@@ -3920,7 +4011,9 @@ function App() {
         status={status}
         terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
         terminalDisabled={
-          iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
+          iroriShown
+            ? !iroriTerminal && you?.state !== 'ready'
+            : (!active || !!active.host) && !terminalSpace
         }
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}
@@ -3970,7 +4063,21 @@ function App() {
           }}
         />
       )}
-      {brainSettings && active && (
+      {brainSettings && active?.host && (
+        // A vault on an SSH host has no settings here yet: it can only leave the list (ADR 061).
+        <RemoveVault
+          space={active}
+          onClose={() => setBrainSettings(false)}
+          onRemoved={() => {
+            setBrainSettings(false);
+            void vaultRemoved(
+              active.scopeId,
+              t('vault を一覧から外しました。', 'Took the vault off the list.'),
+            ).catch(report);
+          }}
+        />
+      )}
+      {brainSettings && active && !active.host && (
         <BrainSettings
           key={active.scopeId}
           space={active}
@@ -3978,27 +4085,11 @@ function App() {
           onClose={() => setBrainSettings(false)}
           beforeRename={save}
           onRemoved={() => {
-            const removed = active.scopeId;
             setBrainSettings(false);
-            void (async () => {
-              const [list, profiles] = await Promise.all([host.spaces(), host.workspaces()]);
-              const next = profiles.find((profile) => profile.id === workspace?.id);
-              setSpaces(list);
-              if (next) setWorkspace(next);
-              renewTabs(profiles);
-              // The next vault of the workspace comes on show.
-              setActive(
-                (next?.scopeIds ?? []).flatMap((id) =>
-                  list.filter((space) => space.scopeId === id),
-                )[0],
-              );
-              if (current.current.doc?.scopeId === removed) unload();
-              setStages(({ [removed]: _, ...rest }) => rest);
-              updateSources((all) => all.filter((ref) => ref.scopeId !== removed));
-              setTerminalSpace((space) => (space?.scopeId === removed ? undefined : space));
-              bump();
-              setStatus(t('vault を削除しました。', 'Removed the vault.'));
-            })().catch(report);
+            void vaultRemoved(
+              active.scopeId,
+              t('vault を削除しました。', 'Removed the vault.'),
+            ).catch(report);
           }}
           onSaved={(next, renamed) => {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
@@ -4157,20 +4248,7 @@ function App() {
           onCancel={() => setAdd(false)}
           onRegistered={(space) => {
             setAdd(false);
-            void (async () => {
-              await refreshSpaces();
-              if (workspace)
-                setWorkspace(
-                  await host.saveWorkspace(
-                    workspace.name,
-                    [...workspace.scopeIds, space.scopeId],
-                    workspace.id,
-                  ),
-                );
-              setActive(space);
-              setDoc(undefined);
-              setBuffer('');
-            })().catch(report);
+            void joinVault(space).catch(report);
           }}
         />
       )}
@@ -4191,7 +4269,12 @@ function App() {
                         cloudNoteTarget.directory,
                         noteName,
                       )
-                    : host.createNote(active!.scopeId, noteName, noteDirectory);
+                    : host.createNote(
+                        active!.scopeId,
+                        noteName,
+                        noteDirectory,
+                        chosenNoteType || undefined,
+                      );
                 })()
                   .then((d) => {
                     show(d);
@@ -4226,6 +4309,23 @@ function App() {
                   maxLength={4096}
                   placeholder={defaultNoteDirectory}
                 />
+              </label>
+            )}
+            {!cloudNoteTarget && noteTypes.length > 0 && (
+              <label>
+                {t('種類', 'Type')}
+                <select
+                  aria-label={t('種類', 'Type')}
+                  value={chosenNoteType}
+                  onChange={(event) => setNoteType(event.target.value)}
+                >
+                  {noteTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                  <option value="">{t('種類なし', 'No type')}</option>
+                </select>
               </label>
             )}
             <div className="actions">

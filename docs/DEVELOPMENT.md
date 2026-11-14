@@ -52,6 +52,8 @@ npm run test:lifecycle
 IRORI_UI_REAL_AGENTS=1 xvfb-run -a npm run test:ui
 ```
 
+`IRORI_TEST_SSH=<destination> npm test` also checks vaults on SSH hosts over a real connection to a disposable Linux machine ([SSH-HOSTS](SSH-HOSTS.md#trying-it)); without it that test is skipped and the rest stand this machine in for a host.
+
 On PowerShell, set `$env:IRORI_UI_REAL_AGENTS="1"` and run `npm run test:ui` on the desktop. Detailed evidence goes to the ignored `test-results/`, and tests mutate only disposable directories.
 
 ## Architecture
@@ -61,6 +63,7 @@ On PowerShell, set `$env:IRORI_UI_REAL_AGENTS="1"` and run `npm run test:ui` on 
 - PDF, Office and image viewing: the host hands over only the bytes of a file whose extension has a viewer, up to 100 MiB, and pdf.js, docx-preview, pptx-to-html and SheetJS draw it in the sandboxed renderer. Office output is stripped of scripts, frames and external URLs before it is shown ([viewer libraries](libraries/file-viewers.md)).
 - A Node `FileService` owns canonical paths, scope ownership, portable UUID declarations, local bindings/drafts/backups, bounded lazy directory listing, watchers and version-aware writes.
 - Codex uses the native app-server JSONL protocol; the Claude Agent SDK controls the installed unmodified `claude` binary. Session handles and bounded display history / pending messages persist in device data, bound to scope UUID, provider and canonical checkout root. A failed resume keeps the handle instead of silently starting a new conversation.
+- A vault can live on an SSH host ([ADR 061](decisions/061-vaults-on-ssh-hosts.md), [SSH-HOSTS](SSH-HOSTS.md)): irori's own vault services run there as a *vault host*, reached through the system's `ssh`, and the main process sends each read of such a vault to its host.
 - Device data lives in Electron's standard `userData` (override with `IRORI_DATA_DIR` for tests): workspace selections, and sync-folder bindings. Existing `contents` bytes are never moved or deleted by setup.
 
 Design decisions are recorded in [ADR 001 (host)](decisions/001-initial-host.md) and [ADR 002 (release and workspace)](decisions/002-release-and-workspace.md).
@@ -72,7 +75,7 @@ Design decisions are recorded in [ADR 001 (host)](decisions/001-initial-host.md)
 | Distribution and publication | [DISTRIBUTION](DISTRIBUTION.md) / [UPDATES](UPDATES.md) / [PACKAGING](PACKAGING.md) / [RELEASE-PLAN](RELEASE-PLAN.md) |
 | Status and acceptance | [STATUS](STATUS.md) / [ACCEPTANCE](ACCEPTANCE.md) / [CHECKPOINT](CHECKPOINT.md) |
 | Daily editing and records | [DAILY-WORKFLOW](DAILY-WORKFLOW.md) / [EDITING-AND-RECORDS](EDITING-AND-RECORDS.md) / [EDITOR-ASSISTANCE](EDITOR-ASSISTANCE.md) / [RECOVERY-AND-NOTE-TOOLS](RECOVERY-AND-NOTE-TOOLS.md) |
-| Agents and conversations | [HARNESSES](HARNESSES.md) / [YOUR-AI](YOUR-AI.md) / [SKILLS](SKILLS.md) / [CONVERSATIONS](CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](WORKSPACE-CONNECTIONS.md) |
+| Agents and conversations | [HARNESSES](HARNESSES.md) / [YOUR-AI](YOUR-AI.md) / [SKILLS](SKILLS.md) / [CONVERSATIONS](CONVERSATIONS.md) / [WORKSPACE-CONNECTIONS](WORKSPACE-CONNECTIONS.md) / [SSH-HOSTS](SSH-HOSTS.md) |
 | Git and cloud | [GIT](GIT.md) / [CLOUD-SETUP](CLOUD-SETUP.md) / [WORKSPACE-DRIVE](WORKSPACE-DRIVE.md) / [DISTRIBUTOR-GOOGLE](DISTRIBUTOR-GOOGLE.md) |
 | UI and knowledge views | [UI-DESIGN](UI-DESIGN.md) / [ADR 014 (v5)](decisions/014-ui-v5.md) / [LAYERED-EXPLORER](LAYERED-EXPLORER.md) / [ONTOLOGY](ONTOLOGY.md) / [KB-SEARCH](KB-SEARCH.md) / [NOTE-LINKS](NOTE-LINKS.md) / [KNOWLEDGE-NAVIGATION](KNOWLEDGE-NAVIGATION.md) / [TERMINAL](TERMINAL.md) |
 | File viewers | [file viewer libraries](libraries/file-viewers.md) |

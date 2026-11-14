@@ -323,7 +323,7 @@ KB itself.
 ## Boundaries
 
 A skill package must resolve inside its own KB's schema layer and must not be an
-alias — the same checks the ontology reader applies. The chosen name crosses the
+alias — the same checks irori's generated indexes go through. The chosen name crosses the
 `HostAPI` boundary as a validated skill name, so it cannot address a path. The
 instructions are stated to the agent as the KB's own contract; text captured
 from `contents/` is not, and remains data.

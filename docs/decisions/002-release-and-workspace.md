@@ -2,6 +2,8 @@
 
 Date: 2026-09-13. Status: product decisions confirmed by the user; workspace-level new connections implemented, remaining product features and legacy transfer pending.
 
+The ontology presentation decided here (CSV tables drawn as a graph) is superseded by [ADR 060](060-the-ontology-is-the-declaration.md): the ontology is the declaration of types and relations, and a CSV is a table.
+
 These decisions supersede unresolved Q01/Q02 and conflicting earlier product proposals. Historical specifications in the parent workspace are not the current implementation contract.
 
 ## License and acceptance devices

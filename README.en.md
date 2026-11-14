@@ -63,6 +63,7 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 **Vaults and workspaces**
 - A vault is organized as **Knowledge** (notes) and **Contents** (materials). Turning the vault agent on (**Settings → Agents → vault agent**) also shows **Schema** (instructions and skills for AI).
 - **irori mode** (formerly the Overview) shows the workspace's vaults on the vault map or side by side. Search also runs across every vault.
+- **Vaults on SSH hosts**: add a Linux machine you reach with `ssh` under **Settings → SSH hosts**, and a folder there joins a workspace as a vault. For now such a vault is read, not changed from the window. In irori mode the irori agent hands its agent work with `irori call`; that agent runs on the SSH host, and so does the code it runs. Its permission requests and questions come to irori on this computer. A run goes on if the connection is cut, and irori collects its report once it is back. irori uses this computer's own `ssh`, so `ssh <destination>` must connect without a password first, and the CLI you use (Claude Code, Codex…) must be installed and signed in on the host.
 - The Knowledge and Contents lists work like Explorer or Finder. A right click or the ⋯ menu makes folders and files of any kind, brings in files from elsewhere, and renames, moves or deletes. What is deleted in Contents goes to the system trash; in a folder a sync app keeps, the sync app passes the deletion to the cloud and to anyone it is shared with. Drag to move; drop files or folders from Finder or Explorer to add them. In Knowledge, links follow what moved. The list follows the file open on the page: however it was opened, from an agent's link, a note's link or search, its folders open and its row comes into view.
 - Copy, cut and paste files and folders from the right-click menu or with Ctrl/⌘+C, X and V. A taken name keeps both (`name 2`), and a note copied within Knowledge still links where the original did. Files copied in Finder or Explorer paste in too.
 - Each vault has its own name, category, icon and colour. The same sheet removes a vault, keeping its folder or moving it to the trash. Either way, the vault's search index, deleted notes, drafts, conversations, captured materials and routine records stay in irori's data folder.
@@ -72,7 +73,8 @@ Get the installer from the **[download site](https://del-taiseiozaki.github.io/i
 - Follow relative links and list the notes that link here (backlinks). Renaming or moving a note rewrites the links to it.
 - **Today's note** opens at a set place, from a set template.
 - Open files become tabs. **Open beside** splits the page into up to four columns, each with its own tabs. The column you click is the one you edit; the others show what is saved. Each vault keeps its columns and tabs.
-- CSV opens as a table, and an ontology as a hierarchy or a graph.
+- CSV opens as a table.
+- The ontology — the page types and relations a vault declares — opens as a diagram and tables, with a list of the pages that differ from it.
 - **Ctrl/⌘+F** (or **Find in file** under "…") finds words in the file on show: a note (inside its code blocks too), code, a CSV table, a PDF, Word, PowerPoint and a spreadsheet (every sheet). Case and full-width letters do not matter. Enter (or F3) goes to the next one, Shift+Enter to the previous one and Esc closes the bar; in a note, closing it selects the words found.
 
 **AI agents**

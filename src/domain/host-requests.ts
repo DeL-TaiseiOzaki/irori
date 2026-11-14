@@ -20,6 +20,7 @@ import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
+import { remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validRepositoryName } from './git';
 import {
@@ -253,6 +254,12 @@ export const hostArguments = {
   setWorkFolder: z.tuple([id, path.min(1).nullable()]),
   openWorkFolder: z.tuple([id]),
   register: z.tuple([path, name, categoryText]),
+  remoteHosts: z.tuple([]),
+  saveRemoteHost: z.tuple([remoteHostInput]),
+  removeRemoteHost: z.tuple([id]),
+  connectRemoteHost: z.tuple([id]),
+  remoteFolders: z.tuple([id, remotePath.optional()]),
+  registerRemote: z.tuple([id, remotePath, name, categoryText]),
   createSpace: z.tuple([
     z.object({
       parent: path,
@@ -282,8 +289,8 @@ export const hostArguments = {
   entries: z.tuple([id, path]),
   read: z.tuple([id, path]),
   ontology: z.tuple([id]),
-  graphIndexStatus: z.tuple([id]),
-  updateGraphIndex: z.tuple([id]),
+  ontologyPages: z.tuple([id]),
+  updateIndexes: z.tuple([id]),
   skills: z.tuple([id]),
   skillReach: z.tuple([id]),
   schemaSettings: z.tuple([id]),
@@ -303,7 +310,12 @@ export const hostArguments = {
   viewerBytes: z.tuple([id, path]),
   save: z.tuple([document]),
   draft: z.tuple([document]),
-  createNote: z.tuple([id, z.string().max(120), path.optional()]),
+  createNote: z.tuple([
+    id,
+    z.string().max(120),
+    path.optional(),
+    z.string().min(1).max(200).optional(),
+  ]),
   notesDeclaration: z.tuple([id]),
   pageProperties: z.tuple([id]),
   dailyNote: z.tuple([id]),

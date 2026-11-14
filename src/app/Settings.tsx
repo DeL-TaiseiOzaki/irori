@@ -5,6 +5,7 @@ import { BrainTile } from './BrainTile';
 import { UpdateNotice, updateWaiting, useUpdateState } from './UpdateNotice';
 import { AccountSection, RestoreEnvironment } from './AccountSync';
 import { IroriAgentFolderSection } from './IroriAgentFolder';
+import { RemoteHostsSettings, sshHostsLead, useRemoteHosts } from './RemoteHosts';
 import { appVersion } from './branding';
 import { ErrorMessage } from './ErrorMessage';
 import { useAction } from './useAction';
@@ -218,6 +219,7 @@ const groups = [
   { id: 'display', label: () => t('表示', 'Display') },
   { id: 'agents', label: () => t('エージェント', 'Agents') },
   { id: 'automation', label: () => t('自動化', 'Automation') },
+  { id: 'places', label: () => t('vault の場所', 'Where vaults live') },
   { id: 'account', label: () => t('アカウントと更新', 'Account and updates') },
 ] as const;
 
@@ -245,6 +247,7 @@ const parts = [
     icon: 'routine',
     label: () => t('ルーティン', 'Routines'),
   },
+  { id: 'ssh-hosts', group: 'places', icon: 'server', label: () => t('SSH ホスト', 'SSH hosts') },
   { id: 'account', group: 'account', icon: 'user', label: () => t('アカウント', 'Account') },
   { id: 'updates', group: 'account', icon: 'refresh', label: () => t('更新', 'Updates') },
 ] as const satisfies readonly {
@@ -277,6 +280,10 @@ export type SettingsWorkspace = {
   onCreateIroriAgent: () => Promise<void>;
   /** The irori agent's folder for this workspace changed (ADR 044). */
   onFolderChanged: () => void;
+  /** A vault on an SSH host was added from the settings; it joins the workspace (ADR 061). */
+  onVaultAdded?: (space: Space) => void;
+  /** A vault on an SSH host left this device's list from the settings. */
+  onVaultRemoved?: (scopeId: string) => void;
 };
 
 /**
@@ -641,6 +648,7 @@ export function Settings({
   const itemsShown = windowItems.filter((item) => items[item]).length;
   const javascript = useRuntime('javascript', onError);
   const python = useRuntime('python', onError);
+  const remote = useRemoteHosts().hosts ?? [];
   // The start screen's language switch changes the language beside these settings.
   const shown = useLanguage();
   useEffect(() => setLanguage(shown), [shown]);
@@ -701,6 +709,21 @@ export function Settings({
             [javascript.on && 'JavaScript', python.on && 'Python'].filter(Boolean).join(list) ||
             t('実行環境なし', 'No runtimes'),
         };
+      case 'ssh-hosts': {
+        const connected = remote.filter((item) => item.state === 'connected').length;
+        const count = t(
+          `${remote.length} 台`,
+          `${remote.length} host${remote.length === 1 ? '' : 's'}`,
+        );
+        return {
+          text: !remote.length
+            ? t('なし', 'None')
+            : connected
+              ? t(`${count}・接続中 ${connected}`, `${count}, ${connected} connected`)
+              : count,
+          attention: remote.some((item) => item.state === 'error'),
+        };
+      }
       case 'account':
         return { text: t('GitHub に環境を保存', 'Environment on GitHub') };
       case 'updates':
@@ -1093,6 +1116,12 @@ export function Settings({
         </SwitchRow>
       </Group>
     ),
+    'ssh-hosts': () => (
+      <RemoteHostsSettings
+        onVaultAdded={workspace?.onVaultAdded}
+        onVaultRemoved={workspace?.onVaultRemoved}
+      />
+    ),
     account: () => (
       <Group>
         <div className="settings-item">
@@ -1150,6 +1179,7 @@ export function Settings({
         'ルーティンの run ステップが使う実行環境を、この端末に用意します。ほかの種類のファイルやコマンドは、PATH にあるものを使います。',
         "Prepares the runtimes routines' run steps use on this device. Other files and commands use what is on PATH.",
       ),
+    'ssh-hosts': sshHostsLead,
     account: () =>
       t(
         `この端末の環境（vault、ワークスペース、ルーティン、設定など）を GitHub の非公開リポジトリ ${environmentRepository} に保存し、別の端末で復元できます。`,

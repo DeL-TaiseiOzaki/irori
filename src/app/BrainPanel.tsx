@@ -37,6 +37,7 @@ import { layoutStorage } from './device-settings';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
 import { useLanguage } from './useLanguage';
+import { RemoteVaultPlace, RemoteVaultState } from './RemoteHosts';
 import './brain-panel.css';
 
 const host = window.irori;
@@ -679,12 +680,18 @@ export const SideBrainPanel = memo(function SideBrainPanel({
     (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
   );
   const layers = ['Knowledge_Base', 'contents'] as const;
-  const shown = locked ? undefined : held ? addingOnly(explorer) : explorer;
+  // A vault on an SSH host is shown, not changed (ADR 061).
+  const shown = locked || space.host ? undefined : held ? addingOnly(explorer) : explorer;
   const identity = (
     <>
       <BrainTile space={space} size={34} radius={10} />
       <span className="brain-names side-names">
         <strong>{space.name}</strong>
+        {space.host && (
+          <small>
+            <RemoteVaultPlace space={space} />
+          </small>
+        )}
       </span>
     </>
   );
@@ -863,6 +870,9 @@ export const BrainPanel = memo(function BrainPanel({
   children?: ReactNode;
 }) {
   useLanguage();
+  // A vault on an SSH host is shown, not changed (ADR 061): nothing that edits is offered.
+  const remote = !!space.host;
+  const editLocked = locked || remote;
   const [folded, setFolded] = useState<Layer[]>([]);
   const [schemaFiles, setSchemaFiles] = useState(false);
   const refs = {
@@ -911,7 +921,7 @@ export const BrainPanel = memo(function BrainPanel({
     ),
     Knowledge_Base: (
       <>
-        {daily && (
+        {daily && !remote && (
           <SectionAction
             icon="calendar"
             label={t('今日のノート', "Today's note")}
@@ -919,28 +929,32 @@ export const BrainPanel = memo(function BrainPanel({
             onClick={onDaily}
           />
         )}
-        <SectionAction
-          icon="plus"
-          label={t(`${space.name} にノートを作成`, `Create a note in ${space.name}`)}
-          disabled={locked}
-          onClick={onNewNote}
-        />
-        <SectionAction
-          icon="folderPlus"
-          label={t('新しいフォルダ', 'New folder')}
-          disabled={locked || !explorer}
-          onClick={() => explorer?.create(knowledgeFolder(space), 'folder')}
-        />
+        {!remote && (
+          <SectionAction
+            icon="plus"
+            label={t(`${space.name} にノートを作成`, `Create a note in ${space.name}`)}
+            disabled={locked}
+            onClick={onNewNote}
+          />
+        )}
+        {!remote && (
+          <SectionAction
+            icon="folderPlus"
+            label={t('新しいフォルダ', 'New folder')}
+            disabled={locked || !explorer}
+            onClick={() => explorer?.create(knowledgeFolder(space), 'folder')}
+          />
+        )}
         <SectionAction
           icon="graph"
-          label={t('グラフ', 'Graph')}
+          label={t('オントロジー', 'Ontology')}
           disabled={locked || held || dirty}
           onClick={onGraph}
         />
         <VaultRepositories space={space} connections={connections} className="section-action" />
       </>
     ),
-    contents: (
+    contents: !remote && (
       <SectionAction
         icon="cloudConnect"
         label={t(`${space.name} のクラウド接続`, `Cloud connection for ${space.name}`)}
@@ -962,7 +976,7 @@ export const BrainPanel = memo(function BrainPanel({
           revision={revision}
           selected={selected}
           onOpen={onOpen}
-          {...(!locked &&
+          {...(!editLocked &&
             (layer === 'Knowledge_Base'
               ? { explorer: held ? addingOnly(explorer) : explorer, writable: true }
               : held
@@ -989,7 +1003,7 @@ export const BrainPanel = memo(function BrainPanel({
             selected={selected}
             connections={connections}
             onOpen={onOpen}
-            explorer={locked ? undefined : held ? addingOnly(explorer) : explorer}
+            explorer={editLocked ? undefined : held ? addingOnly(explorer) : explorer}
           />
         )}
       </div>
@@ -1003,11 +1017,17 @@ export const BrainPanel = memo(function BrainPanel({
             <BrainTile space={space} size={34} radius={10} />
             <span className="brain-names">
               <strong>{space.name}</strong>
-              {space.category && (
+              {space.host ? (
                 <small>
-                  <Icon name={categoryIcon(space.category)} size={12} />
-                  {category}
+                  <RemoteVaultPlace space={space} />
                 </small>
+              ) : (
+                space.category && (
+                  <small>
+                    <Icon name={categoryIcon(space.category)} size={12} />
+                    {category}
+                  </small>
+                )
               )}
             </span>
           </button>
@@ -1033,8 +1053,10 @@ export const BrainPanel = memo(function BrainPanel({
               <Menu.Positioner side="bottom" align="end" sideOffset={4}>
                 <Menu.Popup className="menu">
                   <Menu.Item disabled={locked || held} onClick={onSettings}>
-                    <Icon name="penLine" size={14} />
-                    {t('vault の設定', 'vault settings')}
+                    <Icon name={remote ? 'close' : 'penLine'} size={14} />
+                    {remote
+                      ? t('一覧から外す', 'Take off the list')
+                      : t('vault の設定', 'vault settings')}
                   </Menu.Item>
                   <Menu.Item disabled={locked || held} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
@@ -1042,16 +1064,20 @@ export const BrainPanel = memo(function BrainPanel({
                   </Menu.Item>
                   <Menu.Item disabled={locked || held} onClick={onGraph}>
                     <Icon name="graph" size={14} />
-                    {t('グラフ', 'Graph')}
+                    {t('オントロジー', 'Ontology')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked} onClick={onConnect}>
-                    <Icon name="cloudConnect" size={14} />
-                    {t('クラウド接続', 'Cloud connection')}
-                  </Menu.Item>
-                  <Menu.Item disabled={locked || held} onClick={onTrash}>
-                    <Icon name="trash" size={14} />
-                    {t('削除したノートを復元', 'Restore deleted notes')}
-                  </Menu.Item>
+                  {!remote && (
+                    <Menu.Item disabled={locked} onClick={onConnect}>
+                      <Icon name="cloudConnect" size={14} />
+                      {t('クラウド接続', 'Cloud connection')}
+                    </Menu.Item>
+                  )}
+                  {!remote && (
+                    <Menu.Item disabled={locked || held} onClick={onTrash}>
+                      <Icon name="trash" size={14} />
+                      {t('削除したノートを復元', 'Restore deleted notes')}
+                    </Menu.Item>
+                  )}
                 </Menu.Popup>
               </Menu.Positioner>
             </Menu.Portal>
@@ -1090,6 +1116,7 @@ export const BrainPanel = memo(function BrainPanel({
           ]}
         />
       </header>
+      <RemoteVaultState space={space} />
       {mode === 'changes' && <div className="brain-changes">{children}</div>}
       {/* The files stay mounted behind the changes, so open folders stay open. */}
       <div className="brain-files" hidden={mode === 'changes'}>

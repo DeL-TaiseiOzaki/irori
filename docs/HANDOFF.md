@@ -1,5 +1,37 @@
 # irori continuation handoff
 
+**A vault can live on an SSH host, 0.2.68** ([ADR 061](decisions/061-vaults-on-ssh-hosts.md),
+[SSH-HOSTS](SSH-HOSTS.md)). irori's own vault services run on the host as a
+*vault host* (`src/remote/`), reached through the system's `ssh`. A workspace
+mixes such vaults with this device's, and only the irori agent crosses them:
+`irori call` runs the vault's agent on the host, and `irori ls`, `read`,
+`search` and `send` read the vault and give it a file. This first step shows
+such a vault without changing it. The owner decided: only the irori agent
+crosses vaults, a vault registered in two places is refused, and a run goes on
+when the connection is cut. Next, in this order:
+1. Run it for real: from a Windows and a macOS client, across a real network,
+   and with a real CLI signed in on the host. So far only Linux and the
+   stand-in CLIs have run it.
+2. Conversations with the vault's own agent on the host, with its `irori`
+   command and the shared Schema there.
+3. Editing: the write operations move beside the reads with their guards
+   (`src/host/vault-reads.ts` is where the main process and the vault host
+   already share code).
+4. The terminal as `ssh -t`, connected folders, path links in replies for files
+   on a host, and SSH's prompts answered in the window.
+
+**The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
+[ONTOLOGY](ONTOLOGY.md)). `.property/property.json` is a knowledge base's
+ontology; irori applies it to the pages (`checkOntology`), shows it
+(`OntologyPanel`) and keeps no graph of the pages. `ontology/` CSV files and
+`.irori/ontology.json` are no longer generated or read. 0.2.67 applies the
+declaration where a page is written: the relation picker of
+[ADR 015](decisions/015-page-properties.md) stage 2 and stage 3's new page
+that starts from a type. Next: the pickers for `link` and `sources` and
+**確認済みにする**, which complete stage 2. The template's change that writes
+type lists in `to` is irori-templete's own pull request and needs 0.2.66 or
+later.
+
 **Publishing a preview, from 0.2.4** ([DISTRIBUTION](DISTRIBUTION.md#how-the-rule-is-held)).
 `IRORI_AUTO_PUBLISH=on` is set, so merging a pull request that ships publishes
 it by itself through `publish.yml`: release, page with a generated manifest,
@@ -18,14 +50,60 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-13: **0.2.68** ([#320](https://github.com/DeL-TaiseiOzaki/irori/pull/320),
+a vault can live on an SSH host, ADR 061) as `73028d8`, by `publish.yml` alone
+(push run `43413589755`, packages from app run `43412285378`). Merged at
+11:00:51 UTC, the release out at 11:02:47 (1:56), the page linking 0.2.68 by
+11:04:21 (3:30), and the run finished with the drift check at 11:04:47.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.68-full.nupkg` matched `SHA256SUMS.txt`, and the live page links the
+0.2.68 installers. See STATUS. Its CI failed twice before it passed, and both
+causes were fixed in the change:
+- `npm test`, in the new `tests/remote-hosts.test.ts`: a vault host ended once
+  idle while a hand-off's report still waited for its device. It now stays
+  until the report is collected, for up to a day.
+- `scripts/harness-ui-smoke.ts`, where the `/` list showed no command after a
+  choice. main's own run of 0.2.67 (`43388248293`) had failed the same way:
+  the caret was placed a frame after the choice, and on a slow runner that
+  frame fell inside the smoke's next `fill`. `useCommandMenu` now places it at
+  once.
+
+Seen on Linux and through CI's packaged-app smokes on the three platforms. Not
+by hand on Windows or macOS, where the command irori gives `ssh.exe` has never
+run, and not with a real CLI signed in on a host.
+
+Published 2026-11-13: **0.2.67** ([#318](https://github.com/DeL-TaiseiOzaki/irori/pull/318),
+a relation picked from the declared names and pages, and a new page that
+starts from a type, ADR 015) as `7cd2cdc`, and **0.2.66**
+([#316](https://github.com/DeL-TaiseiOzaki/irori/pull/316), the ontology is the
+declaration and irori keeps no graph of the pages, ADR 060) as `cb3855c`. Both
+by `publish.yml` alone, with the pull requests' packages:
+- 0.2.66: push run `43385201693`, packages from app run `43382834347`. Merged
+  at 07:21:38 UTC, the release out at 07:23:05 (1:27), the run finished with
+  the page and the drift check at 07:25:18 (3:40).
+- 0.2.67: push run `43386395208`, packages from app run `43384523816`. Merged
+  at 07:31:43 UTC, the release out at 07:33:36 (1:53), the page linking 0.2.67
+  by 07:35:48 (4:05), and the run finished with the drift check at 07:36:06.
+
+Anonymous downloads of the Windows installer, the Mac image and the
+`-full.nupkg` of each matched its `SHA256SUMS.txt`, and the live page links the
+0.2.67 installers and shows the ontology view's screenshot. The template's side
+merged the same day as irori-templete #19, after 0.2.66 was out. See STATUS.
+Seen on Linux under Xvfb and through CI's packaged-app smokes on the three
+platforms; not by hand on Windows or macOS, and not against a vault in real use.
+#316's first CI run failed once in `tests/schema-reach.test.ts` (the Codex
+hook-trust test, `1 !== 2` at its second start), which that change does not
+touch; the next run passed. It is a test to watch.
+
 Published 2026-11-13: **0.2.65** ([#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315),
 Ctrl/⌘+F finds words in the file on show in every main-stage view) as
 `0395d4f`, by `publish.yml` alone (push run `43382121971`, with the pull
 request's packages from app run `43379097307`): merge to release 1:19, to page
 3:22, drift in step. Anonymous downloads of the Windows installer, the Mac image
-and `irori-0.2.65-full.nupkg` matched `SHA256SUMS.txt`, and the live page links
-the 0.2.65 installers. See STATUS. Not seen on Windows or macOS before
-publishing: the find bar was exercised on Linux under Xvfb only.
+and `irori-0.2.65-full.nupkg` matched `SHA256SUMS.txt`, and the live page linked
+the 0.2.65 installers until 0.2.66 replaced them. See STATUS. Not seen on
+Windows or macOS before publishing: the find bar was exercised on Linux under
+Xvfb only.
 
 Published 2026-11-11: **0.2.64** ([#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313),
 a run in full access takes the configuration that runs without asking without
@@ -34,8 +112,8 @@ alone (push run `42974838132`, with the pull request's packages from app run
 `42973426346`): merge to release 1:39, to page 3:17, drift in step. Anonymous
 downloads of the Windows installer, the Mac image and `irori-0.2.64-full.nupkg`
 matched `SHA256SUMS.txt`, and the live page linked the 0.2.64 installers until
-0.2.65 replaced them. See STATUS. Exercised through protocol fixtures only: not tried with real CLI
-accounts, on Windows or on macOS.
+0.2.65 replaced them. See STATUS. Exercised through protocol fixtures only: not
+tried with real CLI accounts, on Windows or on macOS.
 
 Published 2026-11-10: **0.2.63** ([#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311),
 the window showing the work: one menu for how a conversation runs, the rest in

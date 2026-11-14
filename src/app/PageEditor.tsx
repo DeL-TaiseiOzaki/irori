@@ -40,6 +40,7 @@ export function PageEditor({
   searchTarget,
   onSearchResult,
   filename,
+  scopeId,
   readOnly = false,
   ...rest
 }: Omit<ComponentProps<typeof Editor>, 'ref'> & {
@@ -47,6 +48,8 @@ export function PageEditor({
   /** Whether this file is a knowledge page that shows properties. */
   page: boolean;
   properties: Declared | null | undefined;
+  /** The knowledge base the page is in, for picking what a relation points at. */
+  scopeId?: string;
 }) {
   const inner = useRef<EditorHandle>(null);
   // Split once: only the first text is used, and a long page is not split on every keystroke.
@@ -132,6 +135,8 @@ export function PageEditor({
         declared={properties}
         readOnly={readOnly}
         fileName={baseName(filename ?? '')}
+        scopeId={scopeId}
+        path={filename}
         onChange={setHeadYaml}
       />
       {editor}
