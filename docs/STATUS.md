@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Schema's Rules and Hooks without explanatory notes, 2026-11-15 (**0.2.71**):
+the owner found the Schema section's notes under Rules and Hooks unneeded.
+- `SchemaList` no longer shows the rules' and hooks' reach notes (ADR 058) or
+  the hooks' note on other settings that run code; `hookReachNote` and its
+  `schema-reach` import are gone. The reach table still drives the runs and
+  the skill reach view. The instructions' limit note stays.
+- The guide's `schema.md` (en, ja) no longer says the settings show each
+  CLI's reach; its own explanation stays.
+
 Words that match what irori does, 2026-11-15 (**0.2.70**,
 [#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326), published as
 `v0.2.70-preview.1`): found while the guide was brought up to date (#324).
