@@ -30,6 +30,14 @@ If macOS blocks the first launch, choose **System Settings → Privacy & Securit
 
 ## Prepare Git and AI
 
-Install [Git](https://git-scm.com/downloads). AI agents support Claude Code, Codex, OpenCode, Pi, Hermes Agent, and the Antigravity CLI. Install and authenticate your chosen CLI first. You do not need an irori account or an irori-specific API key.
+Install [Git](https://git-scm.com/downloads). To publish vaults to GitHub or save your environment there, also install the [GitHub CLI](https://cli.github.com/) `gh` and sign in with `gh auth login`. AI agents support Claude Code, Codex, OpenCode, Pi, Hermes Agent, and the Antigravity CLI. Install and authenticate your chosen CLI first. You do not need an irori account or an irori-specific API key.
 
-The app notifies you when a new build is available. Choose **Update and restart** to install it. Continue with the [quickstart](quickstart.md).
+The app notifies you when a new build is available. Choose **Update and restart** to install it.
+
+## First launch
+
+A new installation starts in English. To switch to Japanese, choose **日本語** at the foot of the start screen; **Settings → Language and theme** changes it later.
+
+If you [saved your environment on GitHub](settings.md#section-6) from another computer, sign in with `gh`, then choose **Restore from GitHub** on the start screen. It brings back your vaults, workspaces and settings together.
+
+Continue with the [quickstart](quickstart.md).

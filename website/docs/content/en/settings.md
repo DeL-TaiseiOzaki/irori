@@ -1,6 +1,6 @@
 ---
 title: Settings
-description: Open display, agent, routine, and account settings one part at a time.
+description: Open display, agent, routine, SSH host, and account settings one part at a time, and save your environment on GitHub.
 ---
 
 ## Finding a setting
@@ -16,13 +16,14 @@ Open **Settings** in the app to see its parts listed at the left, in framed grou
 | Agents | irori agent | Its working folder, its Schema, its screen |
 | Agents | vault agent | Turning vault agents on or off, and each vault's Schema |
 | Automation | Routines | The JavaScript and Python runtimes |
+| Where vaults live | SSH hosts | The SSH hosts that hold vaults ([vaults on SSH hosts](ssh-hosts.md)) |
 | Account and updates | Account, Updates | The environment saved on GitHub, and app updates |
 
 A choice applies at once. The start screen's **Settings** leave out **Updates** (the start screen has **Check for updates** at its foot), and parts that need a workspace say "Set in a workspace".
 
 ## Language, theme, and notes
 
-Under **Language and theme**, select **日本語** or **English**. This changes irori's interface text. It does not translate your notes or AI instructions. Choose the theme from **Match system**, **Hearth**, **Light**, or **Dark**.
+Under **Language and theme**, select **日本語** or **English**. This changes irori's interface text. It does not translate your notes or AI instructions. Choose the theme from **Match system**, **Hearth**, **Light**, or **Dark**. The start screen's footer also has a language switch, named in the other language: **日本語** or **English**. A new installation starts in English.
 
 Under **Notes**, choose the Markdown font (system, sans-serif, rounded, serif, textbook, or monospace), the text size (14 to 20 px), the line spacing, and the side margins. The sample at the top shows each choice at once. Display changes do not alter the Markdown files.
 
@@ -43,13 +44,15 @@ irori's window shows what a note and a conversation need. A conversation's model
 | Status bar | Terminal | Off | Ctrl+` opens and closes it. Its button shows while it is open |
 | Status bar | Version | Off | **Updates** names it |
 
+The terminal opens for what is on show. In a vault it is a shell that starts in the vault's folder. In irori mode, on the routines page and on the irori agent's screen, it is a drawer at the foot of the window that starts in the irori agent's folder; it keeps running while a vault is on show and is there again when you come back. A vault on an SSH host has no terminal yet.
+
 **Show all** puts every item on the window, and **Back to default** returns to the list above. The choice is part of the environment saved to GitHub.
 
 ## Agents
 
 The Agents group has three parts: **Shared** for both agents, **irori agent** for the agent of the whole workspace, and **vault agent** for the agent inside each vault.
 
-Under **Shared**, **Access of a new conversation** chooses whether new conversations of the irori agent and the vault agents start in **Standard** or **Full access**. It is Standard by default. With Full access, agents in new conversations run commands and change files without asking. Existing conversations keep their access, and each conversation can be switched. Routine steps follow each step's own setting. The choice is this computer's only and is not part of the environment saved to GitHub. The same part opens the **Shared Schema**, the instructions and skills every agent follows. **CLIs on this device** lists each CLI with its version, or as not found.
+Under **Shared**, **Access of a new conversation** chooses whether new conversations of the irori agent and the vault agents start in **Standard** or **Full access**. It is Standard by default. With Full access, agents in new conversations run commands and change files without asking. Existing conversations keep their access, and each conversation can be switched. Routine steps follow each step's own setting. The choice is this computer's only and is not part of the environment saved to GitHub. The same part opens the **Shared Schema**, whose instructions, skills, rules and hooks reach every agent (it needs the irori agent set up; see [Schema settings](schema.md)). **CLIs on this device** lists each CLI with its version, or as not found.
 
 Under **irori agent**, choose the folder the irori agent works in for this workspace, and open its Schema and its screen. If the irori agent is not set up yet, **Set up** is there too.
 
@@ -60,3 +63,20 @@ Turn on the vault agent with the switch under **vault agent**. It is off by defa
 **Updates** names the version you use; **Check for updates** looks for a new one. When one is available, choose **Update and restart**.
 
 To use JavaScript or Python in [routines](routines.md), turn on **JavaScript** or **Python** under **Routines**. Turning Python on downloads uv, and "Downloading and preparing uv…" shows until it is done. Choose the AI CLI at the top of the [AI panel](agents.md), and the model, thinking level and access in the menu under the instruction box.
+
+## Save your environment on GitHub
+
+**Account and updates → Account** shows the GitHub account the GitHub CLI `gh` is signed in to. irori has no sign-in of its own and uses `gh`'s. **Save environment** saves this computer's environment to the private `irori-settings` repository of that account. It saves only when you choose it, as a new commit each time; nothing syncs by itself.
+
+| Saved | Not saved |
+| --- | --- |
+| Vaults with a GitHub remote (as their repository names), workspaces | Vaults without a GitHub remote, folder paths |
+| Display settings, the vault agent switch, the irori agent's CLI and models, the routine runtimes, **What the window shows** | The access of a new conversation, SSH hosts |
+| The irori agent's routines and files, its Schema and the shared Schema among them | Notes, conversations |
+| Routine secrets, only with a passphrase | Credential files such as `.env` |
+
+A save replaces the saved environment with this computer's. When that drops vaults or routines this computer does not have, **Account** says so; what a save drops stays in the Git history.
+
+Routine secrets are saved only when you enter a passphrase of 12 characters or more. It encrypts only the secrets' values: secret names, routines, the irori agent's files and the names of vaults and workspaces are saved unencrypted. The passphrase is not stored anywhere; enter the same one to restore.
+
+On another computer, sign in with `gh`, then choose **Restore from GitHub** on the start screen, or **Restore** under **Account**. Choose what to bring in (vaults, the irori agent's files, routines, secrets), check **Clone into**, and choose **Restore**: irori clones the chosen vaults there and takes in the workspaces. The saved settings replace this computer's; everything else is only added. Vaults and routines already on this computer stay as they are, and an irori agent file changed here stays too, named in the result.

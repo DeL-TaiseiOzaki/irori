@@ -27,6 +27,7 @@ export const pages = [
   { slug: 'sync-folders', group: 'connections' },
   { slug: 'drive', group: 'connections' },
   { slug: 'git', group: 'connections' },
+  { slug: 'ssh-hosts', group: 'connections' },
   { slug: 'settings', group: 'reference' },
   { slug: 'troubleshooting', group: 'reference' },
 ] as const;

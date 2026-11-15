@@ -1,6 +1,6 @@
 ---
 title: Conversations and history
-description: Keep AI work in separate conversations and reopen it from history.
+description: Keep AI work in separate conversations, switch between them in tabs, and reopen them from history.
 ---
 
 ## Start or open a conversation
@@ -9,11 +9,13 @@ Each vault agent and the irori agent can have several conversations. **New conve
 
 Open earlier conversations from **History**. Choosing a different CLI starts a new conversation; opening one from history switches to its CLI.
 
+Once a column has two or more conversations open, they show as tabs. A tab marks a conversation that is running or needs approval. **New conversation**, choosing another CLI, and opening a conversation from **History** add a tab. Closing a tab or a column (**Close this column**) never stops a run: a running conversation has no close button on its tab, and one still running in a closed column comes back as a tab in the first column. With **Columns** turned on under **What the window shows** in the [settings](settings.md#section-3), **Add a column** puts another conversation beside the first.
+
 ## Organize history
 
 Rename, pin, or archive conversations. **By note** groups them by linked note, and **This note** filters to the note open beside the panel.
 
-Deleting a conversation removes irori's saved copy. The CLI's own history stays, and so do the copies of notes and materials its runs used, in irori's data folder. Conversations live in this computer's application data. Choosing a storage folder and searching conversation text are not available yet.
+Deleting a conversation removes irori's saved copy and the files attached to it; stop a running conversation first. The CLI's own history stays, and so do the copies of notes and materials its runs used, in irori's data folder. Conversations live in this computer's application data. Choosing a storage folder and searching conversation text are not available yet.
 
 ## Edit and branch
 
@@ -25,7 +27,7 @@ Claude Code and Codex branch their own session from that point too. Other CLIs c
 
 ## Queues and resuming
 
-Each conversation runs one instruction at a time, and several conversations can run at once. Instructions sent during a run wait in that conversation's queue.
+Each conversation runs one instruction at a time, and several conversations can run at once. Instructions sent during a run wait in that conversation's queue. irori does not coordinate conversations running in the same vault: two that change the same file can overwrite each other.
 
 When an instruction cannot wait, press **今すぐ送る** (send now) beside it in the queue. Claude Code and Codex take it at their next step without stopping the running work. An instruction with attached files, one whose skill, model or other choices differ from the run's, and any instruction on another CLI stop the run and are then sent.
 

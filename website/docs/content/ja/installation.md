@@ -30,6 +30,14 @@ Windows ARM と Intel Mac の配布版はありません。Linux では[ソー�
 
 ## Git と AI を準備する
 
-[Git](https://git-scm.com/downloads)をインストールします。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
+[Git](https://git-scm.com/downloads)をインストールします。vault を GitHub に公開したり、環境を GitHub に保存したりする場合は、[GitHub CLI](https://cli.github.com/) `gh` も入れて `gh auth login` でログインします。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
 
-新しい版が出るとアプリが知らせます。**更新して再起動** で更新できます。次は[クイックスタート](quickstart.md)へ進んでください。
+新しい版が出るとアプリが知らせます。**更新して再起動** で更新できます。
+
+## 最初の起動
+
+新しくインストールした irori は英語で始まります。起動画面の下の **日本語** を押すと、日本語に切り替わります。言語はあとから **設定 → 言語とテーマ** でも変えられます。
+
+別のコンピューターで[環境を GitHub に保存](settings.md#section-6)していれば、`gh` でログインしてから、起動画面の **GitHub から環境を復元** を押します。vault・ワークスペース・設定をまとめて取り込めます。
+
+次は[クイックスタート](quickstart.md)へ進んでください。

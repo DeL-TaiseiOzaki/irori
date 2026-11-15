@@ -25,7 +25,8 @@ The **vault agent** is optional; turn it on in **Settings → Agents → vault a
 | Keep a daily record               | [Daily notes](daily-notes.md)                                         |
 | Continue work with AI             | [Conversations](conversations.md) and [Schema settings](schema.md)    |
 | Run a defined procedure           | [Routines](routines.md)                                               |
-| Read and share materials          | [File viewers](files.md), [Google Drive](drive.md), and [Git](git.md) |
+| Read and share materials          | [File viewers](files.md), [synced folders](sync-folders.md), and [Git](git.md) |
+| Use a vault on another machine    | [Vaults on SSH hosts](ssh-hosts.md)                                   |
 | Adjust the app or solve a problem | [Settings](settings.md) and [troubleshooting](troubleshooting.md)     |
 
 This guide covers the current testing preview. See [release notes](https://github.com/DeL-TaiseiOzaki/irori/releases) for changes in published builds.
