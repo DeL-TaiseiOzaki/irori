@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+`irori call` in the irori agent's design note, 2026-11-15 (docs and tests only;
+nothing ships): two sentences of [YOUR-AI](YOUR-AI.md) still spoke as before
+ADR 050 and 0.2.70.
+- The name `irori call` takes is a vault's vault agent name, not a sub-agent
+  name; irori writes no `vault-*` sub-agent since 0.2.34.
+- `callRefused` has two cases, and the note named one: a vault agent's
+  `irori call`, and an irori agent's request that hands no vault.
+- `tests/irori-command.test.ts` holds both refusals as `AgentSetup.run` gives
+  them; `tests/vault-command.test.ts` names the vault agent name in its title.
+
 Schema's Rules and Hooks without explanatory notes, 2026-11-15 (**0.2.71**):
 the owner found the Schema section's notes under Rules and Hooks unneeded.
 - `SchemaList` no longer shows the rules' and hooks' reach notes (ADR 058) or

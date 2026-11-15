@@ -37,7 +37,7 @@ function call(env: NodeJS.ProcessEnv, args: string[], input?: string) {
   });
 }
 
-test('a vault is named by its sub-agent name or its own name, and only if handed', () => {
+test('a vault is named by its vault agent name or its own name, and only if handed', () => {
   const delegation: Delegation = {
     you: '/me/you',
     brains: [
