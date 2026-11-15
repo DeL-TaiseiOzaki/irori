@@ -102,9 +102,12 @@ ADR 024 says; irori does not relink them.
 ## Consequences
 
 - A knowledge base built from the template keeps its indexes current with one
-  button, and its `lint` checks the same rule instead of writing indexes. The
-  template states the rule (irori-templete `AGENTS.md`, **Indexes**); the two
-  must change together.
+  button. The rule is irori's, stated here. The template restated it in its
+  `AGENTS.md` (**Indexes**) and its `lint` checked the bytes, so the two had to
+  change together, until its ADR 010
+  ([irori-templete #20](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/20)):
+  it now cites this ADR, and its agents run `irori index` instead of writing or
+  checking indexes themselves.
 - Prose in a folder index is lost on the next update. A folder's description is
   the one place a person writes into an index.
 - The root `README.md` is no longer found by search or listed among backlinks,
