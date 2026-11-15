@@ -5,7 +5,10 @@ note editing, knowledge and Drive connections, and execution of local CLI
 agents. `irori-extention` ended development on 2026-09-18 and remains a readable
 design reference; new VS Code compatibility work belongs in irori.
 `irori-templete` is the recommended main-KB repository template under development. Keep each
-repository's changes and Git history separate.
+repository's changes and Git history separate. What ships, as `scripts/release-policy.ts`
+decides, does not name irori-templete or restate its rules: it cites irori's own decisions,
+and how irori relates to the template is written in `docs/`, so a template change never
+needs a release.
 
 Within `dev-irori`, follow the [workspace contract](../AGENTS.md); shared agent
 skills and runtime configuration live at the workspace root. Load only the

@@ -3,10 +3,10 @@ import { webAddress } from './links';
 import { t } from './i18n';
 
 /**
- * Where a link written in a note points. The recommended knowledge base writes
- * relative Markdown links between pages — a page's identity is its path in the
- * bundle (`irori-templete` ADR 002 D3) — so a link is resolved against the note
- * that carries it, never against the knowledge base root.
+ * Where a link written in a note points. Pages link to each other with relative
+ * Markdown links — a page's identity is its path in the bundle
+ * ([NOTE-LINKS](../../docs/NOTE-LINKS.md)) — so a link is resolved against the
+ * note that carries it, never against the knowledge base root.
  */
 export type LinkTarget =
   | { kind: 'external'; url: string }
