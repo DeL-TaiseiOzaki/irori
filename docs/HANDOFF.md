@@ -1,5 +1,25 @@
 # irori continuation handoff
 
+**The guide follows the app again, 2026-11-15** ([#324](https://github.com/DeL-TaiseiOzaki/irori/pull/324)).
+`website/docs` had been written at 0.1.61 and fell about 55 features behind;
+it now matches 0.2.70, with a page for vaults on SSH hosts. To keep it from
+falling behind again (a suggestion, not an owner decision), update the guide
+page, in ja and en, in the pull request that changes what a person sees. A website-only change ships nothing, so
+`publish.yml` does not deploy it: dispatch `website.yml` on `main` after the
+merge. Still open from this round:
+1. Removing an unregistered folder (`CloudService.removeStray`) has no
+   permanent-delete fallback when the system trash refuses, as `deleteEntry`
+   has had since 0.2.59. On Windows, a vault inside Google Drive for desktop or
+   OneDrive may hit this. Not reproduced; the reported case (0.2.69) was the
+   button disabled by another vault's run.
+2. 0.2.69 and 0.2.70 were run on Linux and through CI's packaged-app smokes,
+   not by hand on Windows or macOS.
+3. A local `npm run test:website` once hung for 15 minutes with no output; the two
+   later runs passed in about 20 seconds. Cause not found.
+4. `docs/releases/0.2.7-preview.1.md` says a PDF, Office or image file over
+   100 MiB opens in its own application; a reading of `open()` in
+   `src/app/main.tsx` suggests it only shows an error. Not checked in the app.
+
 **A vault can live on an SSH host, 0.2.68** ([ADR 061](decisions/061-vaults-on-ssh-hosts.md),
 [SSH-HOSTS](SSH-HOSTS.md)). irori's own vault services run on the host as a
 *vault host* (`src/remote/`), reached through the system's `ssh`. A workspace
@@ -49,6 +69,16 @@ If a run fails, read its log, fix the cause, and publish by hand:
 published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
+
+Published 2026-11-15: **0.2.70** ([#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326),
+`irori call`'s help and refusal say it hands work on every CLI, and the shared
+Schema's description names rules and hooks) as `adcc2e0`, by `publish.yml`
+alone (push run `43673700042`, packages from app run `43672988230`). Merged at
+03:44:27 UTC, the release out at 03:45:47 (1:20), the page deployed by 03:47:58
+(3:31), and the run finished with the drift check at 03:48:14. Anonymous
+downloads of the Windows installer, the Mac image and `irori-0.2.70-full.nupkg`
+matched `SHA256SUMS.txt`, and the live page links the 0.2.70 installers. CI
+passed on its first run.
 
 Published 2026-11-14: **0.2.69** ([#322](https://github.com/DeL-TaiseiOzaki/irori/pull/322),
 the connection sheet follows its own vault's runs, so a vault's unregistered

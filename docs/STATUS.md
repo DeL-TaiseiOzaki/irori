@@ -9,8 +9,9 @@ the owner found the Schema section's notes under Rules and Hooks unneeded.
 - The guide's `schema.md` (en, ja) no longer says the settings show each
   CLI's reach; its own explanation stays.
 
-Words that match what irori does, 2026-11-15 (**0.2.70**): found while the
-guide was brought up to date (#324).
+Words that match what irori does, 2026-11-15 (**0.2.70**,
+[#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326), published as
+`v0.2.70-preview.1`): found while the guide was brought up to date (#324).
 - `prompts/irori-command.ts`: the `irori call` help and `callRefused(false)`
   still said hand-offs work only on Pi, Hermes Agent and the Antigravity CLI
   (ADR 033 D4, replaced by ADR 050 in 0.2.34). The help now says every CLI; the
@@ -22,6 +23,21 @@ guide was brought up to date (#324).
 - `src/app/Settings.tsx`: the shared Schema's description names rules and hooks
   (ADR 048) and that its hooks run beside a folder's own.
 - `tests/prompts.test.ts` checks the help and the refusal; it fails on 0.2.69.
+
+The guide and landing page brought up to date, 2026-11-15
+([#324](https://github.com/DeL-TaiseiOzaki/irori/pull/324), website only): the
+owner asked that features missing from the landing page and the guide be added.
+The guide was written at 0.1.61; an audit of every release note from 0.1.62 to
+0.2.69 against it found about 55 user-visible features it never described and a
+dozen sentences that had become wrong.
+- New page `ssh-hosts` (vaults on SSH hosts); the other guide pages gained
+  what was missing, in ja and en with the same sections. Labels were checked
+  against the `t()` strings in `src/`.
+- The landing page names SSH hosts where a vault is added, beside the irori
+  agent, and under "Which computers?".
+- `npm run build:website` and `npm run test:website` pass (44 articles, 288
+  links). `website.yml` was dispatched by hand after the merge: a website-only
+  change ships nothing, so `publish.yml` does not deploy it.
 
 Unregistered data removable from any vault's connection sheet, 2026-11-14
 (**0.2.69**, [#322](https://github.com/DeL-TaiseiOzaki/irori/pull/322), published
