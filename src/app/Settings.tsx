@@ -891,8 +891,8 @@ export function Settings({
           <Row
             label={t('共通 Schema', 'Shared Schema')}
             description={t(
-              'すべてのエージェントが従う指示とスキルです。irori agent や vault の Schema が同じことを決めていれば、そちらが優先されます。',
-              "Instructions and skills every agent follows. Where the irori agent's or a vault's own Schema says otherwise, its own wins.",
+              'すべてのエージェントに届く指示・スキル・ルール・フックです。irori agent や vault の Schema が同じことを決めていれば、そちらが優先されます。フックは各フォルダのフックと並んで動きます。',
+              "Instructions, skills, rules and hooks that reach every agent. Where the irori agent's or a vault's own Schema says otherwise, its own wins. Shared hooks run beside a folder's own.",
             )}
           >
             {!workspace ? (

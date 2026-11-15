@@ -36,11 +36,11 @@ export const iroriCommandPointer =
 export const vaultCommandPreamble =
   'The `irori` command is on your PATH and acts on this vault alone. Move or rename a note, file or folder with `irori move` and remove a note with `irori trash`: `mv` and `rm` break the links into it and its comments. Leave a comment for the person with `irori comment`. `irori help` lists the rest, and where irori keeps properties, notes and routines.';
 
-/** Why `irori call` is refused: a vault agent's, or a run that hands work to sub-agents. */
+/** Why `irori call` is refused: a vault agent's, or an irori agent's request that hands no vault. */
 export function callRefused(vaultAgent: boolean) {
   return vaultAgent
     ? '"irori call" is the irori agent\'s. Ask the person to ask the irori agent in irori mode.'
-    : '"irori call" hands work over only on Pi, Hermes Agent or the Antigravity CLI, for vaults handed to this request. On this CLI, hand the work to the vault\'s sub-agent.';
+    : '"irori call" hands work only to a vault handed to this request, and this request hands none: they are the vaults of the workspace it was sent in. Do the work here, or ask the person to send the request from a workspace that has the vault.';
 }
 
 /** `irori help`: every form of the command, with where new vaults go by default. */
@@ -132,10 +132,10 @@ irori run <routine> [--vault <vault>]
   --vault names a vault's. A routine's agent steps cannot start routines.
 
 irori call <vault agent or vault name> "<task>"
-  On Pi, Hermes Agent or the Antigravity CLI, which get no sub-agents from
-  irori, hands a task to the agent of a vault handed to this request, waits
-  until it finishes and prints its report. The task may come on standard input instead. On another
-  CLI, hand the work to the vault's sub-agent.
+  Hands a task to the agent of a vault handed to this request, on any CLI:
+  it runs inside the vault with the vault's own Schema. Waits until it
+  finishes and prints its report. The task may come on standard input
+  instead.
 
 irori ls <vault> [<folder>]
 irori read <vault> <file>

@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Words that match what irori does, 2026-11-15 (**0.2.70**): found while the
+guide was brought up to date (#324).
+- `prompts/irori-command.ts`: the `irori call` help and `callRefused(false)`
+  still said hand-offs work only on Pi, Hermes Agent and the Antigravity CLI
+  (ADR 033 D4, replaced by ADR 050 in 0.2.34). The help now says every CLI; the
+  refusal, reached only when an irori agent's request hands no vault, says the
+  handed vaults are the workspace's and what to do instead.
+- `prompts/irori-agent-skills.ts`: `write-routine` hands a vault's routine to
+  that vault's agent with `irori call`, not to its sub-agent. Skills already
+  written into a folder are not rewritten (`flag: 'wx'`).
+- `src/app/Settings.tsx`: the shared Schema's description names rules and hooks
+  (ADR 048) and that its hooks run beside a folder's own.
+- `tests/prompts.test.ts` checks the help and the refusal; it fails on 0.2.69.
+
 Unregistered data removable from any vault's connection sheet, 2026-11-14
 (**0.2.69**, [#322](https://github.com/DeL-TaiseiOzaki/irori/pull/322), published
 as `v0.2.69-preview.1`): the owner reported that a folder left unregistered in contents

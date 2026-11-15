@@ -164,6 +164,13 @@ test('The irori agent hands vaults with irori call on every CLI, and hears each 
   assert.match(handed, /irori call <vault agent or vault name> "<task>"/);
   assert.match(handed, /Not your CLI's own sub-agents/);
   assert.doesNotMatch(handed, /sub-agent "|spawn_agent|task tool/);
+  // The command's own help and refusal say the same: no CLI is left out (ADR 050).
+  const help = prompts.iroriCommandHelp('/kb');
+  const call = help.slice(help.indexOf('irori call'), help.indexOf('irori ls'));
+  assert.match(call, /on any CLI/);
+  for (const text of [call, prompts.callRefused(false)])
+    assert.doesNotMatch(text, /Pi, Hermes Agent or the Antigravity CLI|vault's sub-agent/);
+  assert.match(prompts.callRefused(false), /handed to this request/);
   // The vault agent gets the task, with the vault's definition when it has one.
   assert.equal(
     prompts.handedTask('Tidy the inbox.'),
