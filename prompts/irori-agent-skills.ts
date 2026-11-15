@@ -315,7 +315,7 @@ with \`irori run\` once they have reviewed it there; nothing runs on a schedule.
    its agent steps are \`agent: irori\`, with the vaults to hand over in
    \`vaults\`. A routine that concerns one vault alone may live in that
    vault's \`.irori/routines/<name>/\` with \`agent: vault\`; hand writing
-   it to that vault's sub-agent.
+   it to that vault's agent with \`irori call\`.
 3. Write \`routine.yaml\`. Keys are read strictly: an unknown or misspelt key
    makes the routine invalid.
 
