@@ -4,6 +4,7 @@ import {
   closeTab,
   insertTab,
   onlyIn,
+  reorderTab,
   openTab,
   replaceTab,
   WindowTabs,
@@ -122,4 +123,15 @@ test('Where a dragged tab is goes to the host as a name and a screen point, or n
   assert.ok(!accepts({ name: '作業', at: { x: 1.5, y: 18 } }));
   assert.ok(!accepts({ name: 'x'.repeat(121), at: { x: 0, y: 0 } }));
   assert.ok(!accepts({ name: '作業', at: { x: 0, y: 0 }, id: 'other' }));
+});
+
+test('A tab dragged along its strip stands before the other tab it was let go at', () => {
+  const tabs = [tab('a'), tab('b'), tab('c'), tab('d')];
+  assert.deepEqual(ids(reorderTab(tabs, 'c', 0)), ['c', 'a', 'b', 'd']);
+  assert.deepEqual(ids(reorderTab(tabs, 'a', 2)), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(ids(reorderTab(tabs, 'a', 3)), ['b', 'c', 'd', 'a']);
+  assert.deepEqual(ids(reorderTab(tabs, 'b', 1)), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(ids(reorderTab(tabs, 'b', 99)), ['a', 'c', 'd', 'b']);
+  assert.deepEqual(ids(reorderTab(tabs, 'b', -1)), ['b', 'a', 'c', 'd']);
+  assert.equal(reorderTab(tabs, 'gone', 0), tabs);
 });

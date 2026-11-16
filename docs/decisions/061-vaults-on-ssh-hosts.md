@@ -94,7 +94,7 @@ weighed and dropped:
    - Still `BatchMode`: a host that needs a password, a passphrase or a
      host-key answer typed is not connected. Remote-SSH answers these in its
      window (it sets `SSH_ASKPASS` to itself); that is the next step toward it.
-   *Amended 2026-11-16 (0.2.77), owner request: what `ssh` asks is answered in
+   *Amended 2026-11-16 (0.2.78), owner request: what `ssh` asks is answered in
    irori's window.* A password, a key's passphrase, a verification code and
    whether to trust a host's key no longer need a terminal first.
    - `ssh` is started without `BatchMode` and with `SSH_ASKPASS` naming a small
@@ -183,7 +183,7 @@ weighed and dropped:
   host; conversations with its own agent and its `irori` command; the terminal;
   connected folders; routines; the shared Schema for runs there; hosts other
   than Linux on x64 and arm64. (SSH's prompts are answered in the window since
-  0.2.77.)
+  0.2.78.)
 - A host with glibc older than 2.28 cannot run the Node that is sent.
 - Where `systemd-logind` kills a user's processes at logout
   (`KillUserProcesses=yes`), the vault host ends with the login; the common

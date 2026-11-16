@@ -1,16 +1,18 @@
 # irori continuation handoff
 
-**Workspace tabs move between windows, 0.2.74 and 0.2.76**
+**Workspace tabs move between windows and along the strip, 0.2.74 to 0.2.77**
 ([ADR 063](decisions/063-tab-out-to-a-new-window.md),
-[ADR 064](decisions/064-tab-joins-another-window.md)). A tab dragged out opens in a
+[ADR 064](decisions/064-tab-joins-another-window.md),
+[ADR 065](decisions/065-tabs-reordered-by-dragging.md)). A tab dragged out opens in a
 new window, or joins the tabs of the window it is let go on; a window's only tab
-joins and its window closes. Run on Linux under Xvfb only. Next:
+joins and its window closes; along the strip it is reordered. Run on Linux under
+Xvfb only. Next:
 1. Try it by hand on Windows and macOS, with the pointer let go outside the
    window, on another window's title bar and on a second screen; Chromium keeps
    the drag's pointer events there, but irori has not been seen doing it on
    those systems.
-2. Not covered: reordering tabs by dragging, and a menu or keyboard way to move
-   a tab between windows.
+2. Not covered: a menu or keyboard way to reorder tabs or move them between
+   windows.
 
 **Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
 irori runs `gh auth login --web` from the account section, the restore sheet
@@ -69,7 +71,7 @@ expects what VS Code's Remote-SSH gives. Its Windows side
 (`%ProgramData%\ssh\ssh_config`, `Include` paths with backslashes) has not been
 run.
 
-0.2.77 answers what `ssh` asks in the window, at the owner's request: a
+0.2.78 answers what `ssh` asks in the window, at the owner's request: a
 password, a key's passphrase, a verification code and a host's key
 (`src/host/ssh-askpass.ts`, the dialog `SshQuestions`; [SSH-HOSTS](SSH-HOSTS.md#what-ssh-asks)).
 A connection is now one login. What to know before changing it:
@@ -86,7 +88,7 @@ A connection is now one login. What to know before changing it:
    on macOS and Windows not at all.
 3. irori keeps no password. If the owner asks for one to be remembered, the
    system's keychain is the place, and that is a decision of theirs to make.
-4. A vault host from before 0.2.77 is replaced within the login that finds it;
+4. A vault host from before 0.2.78 is replaced within the login that finds it;
    `$version` is how a newer one is asked without taking its device's place.
 
 **The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
@@ -118,6 +120,16 @@ If a run fails, read its log, fix the cause, and publish by hand:
 published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
+
+Published 2026-11-16: **0.2.76** ([#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337),
+a workspace tab let go on another window's tabs joins them, ADR 064) as
+`66fd122`, by `publish.yml` alone (push run `43953151069`). Merged at 20:45:58
+UTC, the release out at 20:47:26 (1:28), the page deployed by 20:48:29 (2:31),
+and the drift check passed at 20:48:50. Anonymous downloads of the Windows
+installer, the Mac image and `irori-0.2.76-full.nupkg` matched
+`SHA256SUMS.txt`, and the live page links the 0.2.76 installers. CI passed on
+its first run. Seen on Linux under Xvfb and through CI's packaged-app smokes;
+not by hand on Windows or macOS.
 
 Published 2026-11-16: **0.2.75** ([#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333),
 the hosts of the person's ssh configuration are offered as SSH hosts, and a

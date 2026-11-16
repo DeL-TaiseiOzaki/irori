@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-What ssh asks is answered in the window, 2026-11-16 (**0.2.77**;
+What ssh asks is answered in the window, 2026-11-16 (**0.2.78**;
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md#what-ssh-asks)):
 the owner asked that a verification code and a password be typed in irori's
 window, as VS Code's Remote-SSH lets them.
@@ -36,8 +36,21 @@ window, as VS Code's Remote-SSH lets them.
   The Windows program was compiled here with Mono's C# 5 compiler and run under
   Mono against the same protocol; that is not Windows.
 
+Workspace tabs reordered by dragging, 2026-11-16 (**0.2.77**,
+[ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
+dragged along its strip change the order.
+- `WorkspaceTabs` measures the other tabs when a drag begins; along the strip it
+  shows a mark (`.workspace-tab-slot`) in the gap the tab would take and, let go
+  there, calls `onReorder`; the app moves it with `reorderTab`. Out of the strip
+  the drag still moves the tab to another window (ADR 063, 064).
+- The ghost hangs under the pointer along the strip so the mark stays seen.
+- `scripts/windows-ui-smoke.ts` reorders two tabs with the mouse and lets one go
+  where it stands; `tests/workspace-tabs.test.ts` covers `reorderTab`. Linux
+  under Xvfb only.
+
 A workspace tab let go on another window's tabs joins them, 2026-11-16 (**0.2.76**,
-[ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab
+[#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337), published as
+`v0.2.76-preview.1`; [ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab
 dragged out could go back, onto another window's tabs.
 - `moveTab` now looks for the window whose title bar is at the drop point
   (`stripUnder`, with the windows in the order they were last focused) and hands
@@ -55,6 +68,11 @@ dragged out could go back, onto another window's tabs.
   `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` cover
   `stripUnder`, `insertTab`, `onlyTab` and `dragTab`'s arguments. Linux under
   Xvfb only.
+- `publish.yml` published
+  [v0.2.76-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.76-preview.1)
+  from `66fd122` (push run `43953151069`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,399,168 bytes, Mac 145,691,978 bytes and
+  `irori-0.2.76-full.nupkg` 178,568,897 bytes.
 
 SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.75**,
 [#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333), published as

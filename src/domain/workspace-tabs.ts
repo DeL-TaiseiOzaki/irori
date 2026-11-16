@@ -66,6 +66,18 @@ export type TabPlace = {
 export type MovedTab = { id: string; place?: TabPlace };
 
 /**
+ * A tab dragged along its own strip (ADR 065): it leaves its place and stands before the
+ * `index`-th of the other tabs, or after them all.
+ */
+export function reorderTab(tabs: WorkspaceProfile[], id: string, index: number) {
+  const tab = tabs.find((item) => item.id === id);
+  if (!tab) return tabs;
+  const others = tabs.filter((item) => item.id !== id);
+  const at = Math.max(0, Math.min(index, others.length));
+  return [...others.slice(0, at), tab, ...others.slice(at)];
+}
+
+/**
  * A workspace dropped into the tabs at `index` (ADR 064); one already open keeps its
  * place and takes the newer profile.
  */
